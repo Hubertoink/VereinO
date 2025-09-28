@@ -448,10 +448,59 @@ svg text {
     overflow: auto;
 }
 
+/* Wider layout for Quick-Add (Buchung) modal */
+.booking-modal {
+    width: min(1100px, 96vw);
+    max-height: 90vh;
+}
+
+/* Two-column layout for Basis + Finanzen blocks */
+.booking-modal .block-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 1040px) {
+    .booking-modal .block-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Responsive tweaks similar to invoice modal */
+@media (max-width: 1040px) {
+    .booking-modal {
+        width: min(96vw, 100%);
+        padding: 12px;
+    }
+}
+@media (max-width: 880px) {
+    .booking-modal {
+        width: min(96vw, 100%);
+        padding: 12px;
+    }
+}
+
 .row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+
+/* In the wider booking modal, allow denser grids */
+.booking-modal .row {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1040px) {
+    .booking-modal .row {
+        grid-template-columns: 1fr 1fr; /* fall back to 2 cols on narrower screens */
+    }
+}
+@media (max-width: 720px) {
+    .booking-modal .row {
+        grid-template-columns: 1fr; /* single column on small screens */
+    }
 }
 
 .field {
@@ -741,7 +790,7 @@ textarea:focus {
     padding: 14px 20px;
     font-size: 16px;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-    opacity: 0.95;
+    opacity: 0.90;
     cursor: pointer;
 }
 
