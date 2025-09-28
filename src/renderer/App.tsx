@@ -1005,6 +1005,18 @@ export default function App() {
                                         setPage(1)
                                         await loadRecent()
                                     }}
+                                    onEarmarkClick={async (id) => {
+                                        setFilterEarmark(id)
+                                        setActivePage('Buchungen')
+                                        setPage(1)
+                                        await loadRecent()
+                                    }}
+                                    onBudgetClick={async (id) => {
+                                        setFilterBudgetId(id)
+                                        setActivePage('Buchungen')
+                                        setPage(1)
+                                        await loadRecent()
+                                    }}
                                 />
                             </div>
                             {/* Batch assign modal (earmark, tags, budget) */}
@@ -4754,7 +4766,7 @@ function ReportsComparison(props: { refreshKey?: number; from?: string; to?: str
 }
 
 // JournalTable with in-place header drag-and-drop reordering
-function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt, fmtDate, onEdit, onDelete, onToggleSort, sortDir, sortBy, onTagClick, highlightId, lockedUntil }: {
+function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt, fmtDate, onEdit, onDelete, onToggleSort, sortDir, sortBy, onTagClick, onEarmarkClick, onBudgetClick, highlightId, lockedUntil }: {
     rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; fileCount?: number; earmarkId?: number | null; earmarkCode?: string | null; budgetId?: number | null; budgetLabel?: string | null; tags?: string[] }>
     order: string[]
     cols: Record<string, boolean>
@@ -4769,6 +4781,8 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     sortDir: 'ASC' | 'DESC'
     sortBy: 'date' | 'net' | 'gross'
     onTagClick?: (name: string) => void
+    onEarmarkClick?: (id: number) => void
+    onBudgetClick?: (id: number) => void
     highlightId?: number | null
     lockedUntil?: string | null
 }) {
@@ -4866,7 +4880,17 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 const em = earmarks.find(e => e.code === r.earmarkCode)
                 const bg = em?.color
                 const fg = contrastText(bg)
-                return <span className="badge" title={`Zweckbindung ${r.earmarkCode}`} style={{ background: bg || undefined, color: bg ? fg : undefined }}>{r.earmarkCode}</span>
+                const id = r.earmarkId as number | null | undefined
+                return (
+                    <button
+                        className="badge"
+                        title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
+                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer' }}
+                        onClick={() => { if (id != null) onEarmarkClick?.(id) }}
+                    >
+                        {r.earmarkCode}
+                    </button>
+                )
             })() : ''}</td>
         ) : k === 'paymentMethod' ? (
             <td key={k}>{r.type === 'TRANSFER'
@@ -4881,8 +4905,17 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
         ) : k === 'budget' ? (
             <td key={k} align="center">{r.budgetLabel ? (
                 (() => {
-                    const bg = (r as any).budgetColor || undefined; const fg = contrastText(bg); return (
-                        <span className="badge" title={`Budget: ${r.budgetLabel}`} style={{ background: bg, color: bg ? fg : undefined }}>{r.budgetLabel}</span>
+                    const bg = (r as any).budgetColor || undefined; const fg = contrastText(bg);
+                    const id = r.budgetId as number | null | undefined
+                    return (
+                        <button
+                            className="badge"
+                            title={`Nach Budget ${r.budgetLabel} filtern`}
+                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
+                            onClick={() => { if (id != null) onBudgetClick?.(id) }}
+                        >
+                            {r.budgetLabel}
+                        </button>
                     )
                 })()
             ) : ''}</td>
