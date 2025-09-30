@@ -3953,6 +3953,7 @@ function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string
         byPaymentMethod: Array<{ key: 'BAR' | 'BANK' | null; net: number; vat: number; gross: number }>
         byType: Array<{ key: 'IN' | 'OUT' | 'TRANSFER'; net: number; vat: number; gross: number }>
     }>(null)
+    const [monthsCount, setMonthsCount] = useState<number>(0)
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     useEffect(() => {
         let cancelled = false
@@ -3962,6 +3963,22 @@ function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string
             .finally(() => { if (!cancelled) setLoading(false) })
         return () => { cancelled = true }
     }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.refreshKey])
+
+    // Derive number of distinct months in range to compute averages (Ø Netto/Monat)
+    useEffect(() => {
+        let cancelled = false
+        Promise.all([
+            window.api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod }),
+            window.api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod })
+        ]).then(([inRes, outRes]) => {
+            if (cancelled) return
+            const months = new Set<string>()
+            for (const b of (inRes?.buckets || [])) months.add(b.month)
+            for (const b of (outRes?.buckets || [])) months.add(b.month)
+            setMonthsCount(months.size)
+        }).catch(() => setMonthsCount(0))
+        return () => { cancelled = true }
+    }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
 
     return (
         <div className="card" style={{ marginTop: 12, padding: 12, display: 'grid', gap: 12 }}>
@@ -3975,6 +3992,32 @@ function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string
             {loading && <div>Lade …</div>}
             {data && (
                 <div style={{ display: 'grid', gap: 12 }}>
+                    {(() => {
+                        const inSum = (data.byType.find(t => t.key === 'IN')?.gross || 0)
+                        const outSum = (data.byType.find(t => t.key === 'OUT')?.gross || 0)
+                        const net = inSum - outSum
+                        const avgPerMonth = monthsCount > 0 ? (net / monthsCount) : null
+                        return (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <div className="helper">Einnahmen (Brutto)</div>
+                                    <div style={{ fontWeight: 600, color: '#2e7d32' }}>{eurFmt.format(inSum)}</div>
+                                </div>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <div className="helper">Ausgaben (Brutto)</div>
+                                    <div style={{ fontWeight: 600, color: '#c62828' }}>{eurFmt.format(outSum)}</div>
+                                </div>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <div className="helper">Netto</div>
+                                    <div style={{ fontWeight: 600, color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
+                                </div>
+                                <div className="card" style={{ padding: 10 }}>
+                                    <div className="helper">Ø Netto/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
+                                    <div style={{ fontWeight: 600 }}>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
+                                </div>
+                            </div>
+                        )
+                    })()}
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                         <div><div className="helper">Netto</div><div>{eurFmt.format(data.totals.net)}</div></div>
                         <div><div className="helper">MwSt</div><div>{eurFmt.format(data.totals.vat)}</div></div>
@@ -4069,6 +4112,9 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
     const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
     const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
     const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+    const [capOutliers, setCapOutliers] = useState<boolean>(() => {
+        try { return localStorage.getItem('reports.capOutliers') === '1' } catch { return false }
+    })
     const svgRef = useRef<SVGSVGElement | null>(null)
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     // Measure container width to expand chart to available space
@@ -4110,7 +4156,21 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
         let cum = 0
         return series.map((s) => { cum += (s.inGross + s.outGross); return cum })
     })()
-    const maxVal = Math.max(1, ...series.map(s => Math.max(s.inGross, s.outGross)), ...saldo.map(v => Math.abs(v)))
+    // Optional: cap outliers at ~95th percentile of absolute values to improve readability
+    const scaleVals = (() => {
+        const vals: number[] = []
+        for (const s of series) { vals.push(Math.abs(s.inGross)); vals.push(Math.abs(s.outGross)); }
+        for (const v of saldo) vals.push(Math.abs(v))
+        return vals
+    })()
+    const p95 = (arr: number[]) => {
+        if (!arr.length) return 1
+        const a = arr.slice().sort((x, y) => x - y)
+        const idx = Math.max(0, Math.min(a.length - 1, Math.floor(0.95 * (a.length - 1))))
+        return Math.max(1, a[idx])
+    }
+    const maxValRaw = Math.max(1, ...scaleVals)
+    const maxVal = capOutliers ? p95(scaleVals) : maxValRaw
     const margin = { top: 22, right: 28, bottom: 42, left: 34 }
     const innerH = 180
     const defaultGroupW = 44
@@ -4138,6 +4198,9 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <label className="helper" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Skalierung gegen Ausreißer robuster machen (95. Perzentil)">
+                        <input type="checkbox" checked={capOutliers} onChange={(e) => { const v = e.target.checked; setCapOutliers(v); try { localStorage.setItem('reports.capOutliers', v ? '1' : '0') } catch {} }} /> Ausreißer abblenden
+                    </label>
                     <div className="legend">
                         <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
                         <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
@@ -4164,9 +4227,23 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
                             const yOut = yBase + (innerH - hOut)
                             const saldoMonth = s.inGross + s.outGross
                             return (
-                                <g key={s.month} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
+                                <g key={s.month} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => {
+                                    // Drilldown to Buchungen for this month
+                                    const [yy, mm] = s.month.split('-').map(Number)
+                                    const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
+                                    const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
+                                    const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
+                                    window.dispatchEvent(ev)
+                                }} style={{ cursor: 'pointer' }}>
                                     <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
                                     <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
+                                    {/* Monthly net overlay (thin bar) */}
+                                    {(() => {
+                                        const hNet = Math.round((Math.abs(saldoMonth) / maxVal) * innerH)
+                                        const yNet = yBase + (innerH - hNet)
+                                        const color = saldoMonth >= 0 ? '#2e7d32' : '#c62828'
+                                        return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill={color} rx={2} opacity={0.7} />
+                                    })()}
                                     {hoverIdx === i && (
                                         <g>
                                             <text x={gx + barW} y={Math.min(yIn, yOut) - 6} textAnchor="middle" fontSize="10">
@@ -4175,6 +4252,7 @@ function ReportsMonthlyChart(props: { refreshKey?: number; from?: string; to?: s
                                         </g>
                                     )}
                                     <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
+                                    <title>{`${monthLabel(s.month, true)}\nIN: ${eurFmt.format(s.inGross)}\nOUT: ${eurFmt.format(Math.abs(s.outGross))}\nNetto: ${eurFmt.format(saldoMonth)}\nKlick für Drilldown`}</title>
                                 </g>
                             )
                         })}
@@ -4617,7 +4695,13 @@ function ReportsInOutLines(props: { refreshKey?: number; from?: string; to?: str
                         <polyline fill="none" stroke="#2e7d32" strokeWidth="2" points={points(inBuckets)} />
                         <polyline fill="none" stroke="#c62828" strokeWidth="2" points={points(outBuckets)} />
                         {months.map((m, i) => (
-                            <g key={m} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
+                            <g key={m} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => {
+                                const [yy, mm] = m.split('-').map(Number)
+                                const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
+                                const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
+                                const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
+                                window.dispatchEvent(ev)
+                            }} style={{ cursor: 'pointer' }}>
                                 {/* interactive points */}
                                 <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="#2e7d32">
                                     <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(inBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
