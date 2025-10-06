@@ -2323,12 +2323,14 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
 function MembersView() {
     const [q, setQ] = useState('')
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
-    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[] }>>([])
+    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; tags?: string[]; iban?: string | null; contribution_amount?: number | null }>>([])
     const [total, setTotal] = useState(0)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
     const [busy, setBusy] = useState(false)
-    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; tags?: string[] } }>(null)
+    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; tags?: string[];
+        iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
+        mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
 
     async function load() {
         setBusy(true)
@@ -2372,6 +2374,8 @@ function MembersView() {
                         <th align="left">Name</th>
                         <th align="left">E-Mail</th>
                         <th align="left">Telefon</th>
+                        <th align="left">IBAN</th>
+                        <th align="right">Beitrag</th>
                         <th align="left">Status</th>
                         <th align="left">Tags</th>
                         <th align="center">Aktionen</th>
@@ -2384,16 +2388,18 @@ function MembersView() {
                             <td>{r.name}</td>
                             <td>{r.email || '—'}</td>
                             <td>{r.phone || '—'}</td>
+                            <td>{r.iban || '—'}</td>
+                            <td align="right">{r.contribution_amount != null ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.contribution_amount) : '—'}</td>
                             <td><span className="badge">{r.status}</span></td>
                             <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(r.tags || []).join(', ')}</td>
                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { id: r.id, memberNo: r.memberNo ?? null, name: r.name, email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, status: r.status as any, tags: r.tags || [] } })}>✎</button>
+                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: { id: r.id, memberNo: r.memberNo ?? null, name: r.name, email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, status: r.status as any, tags: r.tags || [], iban: (r as any).iban ?? null, bic: (r as any).bic ?? null, contribution_amount: (r as any).contribution_amount ?? null } })}>✎</button>
                                 <button className="btn danger" title="Löschen" onClick={async () => { if (!confirm('Mitglied wirklich löschen?')) return; try { await (window as any).api?.members?.delete?.({ id: r.id }); await load() } catch (e) { /* ignore */ } }}>🗑</button>
                             </td>
                         </tr>
                     ))}
                     {rows.length === 0 && (
-                        <tr><td colSpan={7}><div className="helper">Keine Einträge</div></td></tr>
+                        <tr><td colSpan={9}><div className="helper">Keine Einträge</div></td></tr>
                     )}
                 </tbody>
             </table>
@@ -2433,6 +2439,47 @@ function MembersView() {
                             <div className="field" style={{ gridColumn: '1 / span 2' }}>
                                 <label>Adresse</label>
                                 <input className="input" value={form.draft.address ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, address: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>IBAN</label>
+                                <input className="input" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>BIC</label>
+                                <input className="input" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Beitrag (EUR)</label>
+                                <input className="input" type="number" step="0.01" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Intervall</label>
+                                <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
+                                    <option value="">—</option>
+                                    <option value="MONTHLY">Monatlich</option>
+                                    <option value="QUARTERLY">Quartal</option>
+                                    <option value="YEARLY">Jährlich</option>
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Mandats-Ref.</label>
+                                <input className="input" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Mandats-Datum</label>
+                                <input className="input" type="date" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Eintritt</label>
+                                <input className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} />
+                            </div>
+                            <div className="field">
+                                <label>Austritt</label>
+                                <input className="input" type="date" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} />
+                            </div>
+                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                <label>Notizen</label>
+                                <input className="input" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} />
                             </div>
                             <div className="field">
                                 <label>Status</label>

@@ -366,6 +366,23 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_members_status ON members(status);
     `
   }
+  ,
+  {
+    version: 17,
+    up: `
+    -- Members Phase 2: Contribution and SEPA-related fields
+    ALTER TABLE members ADD COLUMN iban TEXT;
+    ALTER TABLE members ADD COLUMN bic TEXT;
+    ALTER TABLE members ADD COLUMN contribution_amount NUMERIC; -- EUR amount (gross)
+    ALTER TABLE members ADD COLUMN contribution_interval TEXT CHECK(contribution_interval IN ('MONTHLY','QUARTERLY','YEARLY'));
+    ALTER TABLE members ADD COLUMN mandate_ref TEXT; -- SEPA mandate reference
+    ALTER TABLE members ADD COLUMN mandate_date TEXT; -- date when mandate signed
+    ALTER TABLE members ADD COLUMN join_date TEXT;
+    ALTER TABLE members ADD COLUMN leave_date TEXT;
+    ALTER TABLE members ADD COLUMN notes TEXT;
+    ALTER TABLE members ADD COLUMN next_due_date TEXT;
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {
