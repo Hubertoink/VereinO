@@ -43,7 +43,14 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('window.close', async () => {
         const win = BrowserWindow.getFocusedWindow()
-        win?.close()
+        if (win) {
+            // On Windows: ensure app quits when user clicks close button
+            if (process.platform === 'win32') {
+                app.quit()
+            } else {
+                win.close()
+            }
+        }
         return { ok: true }
     })
     ipcMain.handle('window.isMaximized', async () => {

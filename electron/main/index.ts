@@ -27,7 +27,7 @@ async function createWindow() {
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,
-            sandbox: true,
+            sandbox: false, // Changed to false to allow localStorage persistence
             nodeIntegration: false,
             webSecurity: true,
             devTools: isDev
