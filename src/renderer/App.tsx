@@ -525,7 +525,10 @@ export default function App() {
 
     // Active earmarks for selection in forms (used in filters and forms)
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
+    // FINANCE-scoped tag definitions for Buchungen/Rechnungen UI (filters, suggestions)
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
+    // MEMBER-scoped tag definitions for Mitglieder suggestions
+    const [memberTagDefs, setMemberTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
     async function loadEarmarks() {
         const res = await window.api?.bindings.list?.({ activeOnly: true })
         if (res) setEarmarks(res.rows.map(r => ({ id: r.id, code: r.code, name: r.name, color: (r as any).color })))
@@ -534,12 +537,20 @@ export default function App() {
     useEffect(() => { loadEarmarks() }, [])
     useEffect(() => {
         let cancelled = false
-        async function load() {
-            const res = await window.api?.tags?.list?.({})
-            if (!cancelled && res?.rows) setTagDefs(res.rows)
+        async function loadFinance() {
+            try {
+                const res = await window.api?.tags?.list?.({ scope: 'FINANCE' })
+                if (!cancelled && res?.rows) setTagDefs(res.rows)
+            } catch { /* ignore */ }
         }
-        load()
-        const onTagsChanged = () => load()
+        async function loadMember() {
+            try {
+                const res = await window.api?.tags?.list?.({ scope: 'MEMBER' })
+                if (!cancelled && res?.rows) setMemberTagDefs(res.rows)
+            } catch { /* ignore */ }
+        }
+        loadFinance(); loadMember()
+        const onTagsChanged = () => { loadFinance(); loadMember() }
         window.addEventListener('tags-changed', onTagsChanged)
         return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
     }, [])
@@ -1133,6 +1144,7 @@ export default function App() {
                                                     if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
                                                 }
                                                 const res = await window.api?.vouchers.update?.(payload)
+                                                try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                                                 notify('success', 'Buchung gespeichert')
                                                 const w = (res as any)?.warnings as string[] | undefined
                                                 if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
@@ -2448,6 +2460,22 @@ function MembersView() {
     useEffect(() => { try { localStorage.setItem('invite.body', inviteBody) } catch {} }, [inviteBody])
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
 
+    // MEMBER tag definitions (for suggestions in the form)
+    const [memberTagDefs, setMemberTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    useEffect(() => {
+        let cancelled = false
+        async function loadMemberTags() {
+            try {
+                const res = await window.api?.tags?.list?.({ scope: 'MEMBER' })
+                if (!cancelled && res?.rows) setMemberTagDefs(res.rows)
+            } catch { /* ignore */ }
+        }
+        loadMemberTags()
+        const onTagsChanged = () => loadMemberTags()
+        window.addEventListener('tags-changed', onTagsChanged)
+        return () => { cancelled = true; window.removeEventListener('tags-changed', onTagsChanged) }
+    }, [])
+
     // Column preferences for members table
     const [showColumnsModal, setShowColumnsModal] = useState(false)
     const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showBoardTable: boolean }>(() => {
@@ -2829,6 +2857,14 @@ function MembersView() {
                                             <div className="field" style={{ gridColumn: '1 / span 2' }}>
                                                 <label>Tags (Komma-getrennt)</label>
                                                 <input className="input" placeholder="z.B. Jugend, Vorstand" value={(form.draft.tags || []).join(', ')} onChange={(e) => setForm({ ...form, draft: { ...form.draft, tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} />
+                                                {!!memberTagDefs.length && (
+                                                    <div className="helper">Vorschläge: {memberTagDefs.slice(0, 8).map(t => (
+                                                        <button key={t.id} className="btn ghost" onClick={() => {
+                                                            const list = (form.draft.tags || [])
+                                                            if (!list.some(x => x.toLowerCase() === t.name.toLowerCase())) setForm({ ...form, draft: { ...form.draft, tags: [...list, t.name] } })
+                                                        }}>{t.name}</button>
+                                                    ))}</div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -4242,7 +4278,8 @@ function InvoicesView() {
         let cancelled = false
         ;(async () => {
             try {
-                const t = await window.api?.tags?.list?.({})
+                // Load FINANCE-scoped tags for vouchers area
+                const t = await window.api?.tags?.list?.({ scope: 'FINANCE' })
                 if (!cancelled) setTags((t?.rows || []).map(r => ({ id: r.id, name: r.name, color: r.color ?? null })))
             } catch { }
             try {
@@ -4557,6 +4594,7 @@ function InvoicesView() {
                 }
                 const res = await window.api?.invoices?.update?.(payload as any)
                 if (res?.id) {
+                    try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                     setForm(null)
                     setFormFiles([])
                     // Flash the updated invoice row
@@ -8036,7 +8074,7 @@ function SettingsView({
     )
 }
 
-function TagModal({ value, onClose, onSaved, notify }: { value: { id?: number; name: string; color?: string | null }; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+function TagModal({ value, onClose, onSaved, notify, scope }: { value: { id?: number; name: string; color?: string | null }; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; scope?: 'FINANCE' | 'MEMBER' }) {
     const [v, setV] = useState(value)
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
@@ -8077,7 +8115,9 @@ function TagModal({ value, onClose, onSaved, notify }: { value: { id?: number; n
                         try {
                             const payload = { ...v, name: (v.name || '').trim() }
                             if (!payload.name) { notify?.('error', 'Bitte einen Namen eingeben'); return }
-                            await window.api?.tags?.upsert?.(payload as any)
+                            const p: any = { ...payload }
+                            if (scope) p.scope = scope
+                            await window.api?.tags?.upsert?.(p)
                             window.dispatchEvent(new Event('tags-changed'))
                             onSaved()
                         } catch (e: any) {
@@ -8130,27 +8170,37 @@ function TagModal({ value, onClose, onSaved, notify }: { value: { id?: number; n
 
 // Global Tags Manager Modal
 function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void; notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; onChanged?: () => void }) {
+    const [scope, setScope] = useState<'FINANCE' | 'MEMBER'>(() => {
+        try { return (localStorage.getItem('tags.manager.scope') as 'FINANCE' | 'MEMBER') || 'FINANCE' } catch { return 'FINANCE' }
+    })
     const [tags, setTags] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     const [edit, setEdit] = useState<null | { id?: number; name: string; color?: string | null }>(null)
     const [busy, setBusy] = useState(false)
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; name: string }>(null)
-    async function refresh() {
+    async function refresh(sc: 'FINANCE' | 'MEMBER' = scope) {
         try {
             setBusy(true)
-            const res = await window.api?.tags?.list?.({ includeUsage: true })
+            const res = await window.api?.tags?.list?.({ includeUsage: true, scope: sc })
             if (res?.rows) setTags(res.rows)
         } finally { setBusy(false) }
     }
-    useEffect(() => { refresh() }, [])
+    useEffect(() => { refresh(scope) }, [scope])
+    useEffect(() => { try { localStorage.setItem('tags.manager.scope', scope) } catch { } }, [scope])
     const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
     const colorSwatch = (c?: string | null) => c ? (<span title={c} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: c, verticalAlign: 'middle' }} />) : '—'
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Tags verwalten</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h2 style={{ margin: 0 }}>Tags verwalten</h2>
+                        <select className="input" value={scope} onChange={(e) => setScope(e.target.value as any)} title="Bereich">
+                            <option value="FINANCE">Buchungen</option>
+                            <option value="MEMBER">Mitglieder</option>
+                        </select>
+                    </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
+                        <button className="btn" onClick={() => refresh(scope)} disabled={busy}>Aktualisieren</button>
                         <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
                         <button className="btn danger" onClick={onClose}>Schließen</button>
                     </div>
@@ -8186,7 +8236,8 @@ function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void;
                     <TagModal
                         value={edit}
                         onClose={() => setEdit(null)}
-                        onSaved={async () => { await refresh(); setEdit(null); notify('success', 'Tag gespeichert'); onChanged?.() }}
+                        onSaved={async () => { await refresh(scope); setEdit(null); notify('success', 'Tag gespeichert'); onChanged?.() }}
+                        scope={scope}
                         notify={notify}
                     />
                 )}
@@ -8198,7 +8249,7 @@ function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void;
                                 <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>✕</button>
                             </div>
                             <div>Den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
-                            <div className="helper">Hinweis: Der Tag wird aus allen Buchungen entfernt.</div>
+                            <div className="helper">Hinweis: Der Tag wird aus allen {scope === 'FINANCE' ? 'Buchungen' : 'Mitgliedern'} entfernt.</div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                                 <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
                                 <button className="btn danger" onClick={async () => {
@@ -8934,6 +8985,7 @@ function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters
                 const res = await window.api?.vouchers.batchAssignTags?.({ tags, ...currentFilters })
                 const n = res?.updated ?? 0
                 onApplied(n)
+                try { window.dispatchEvent(new Event('tags-changed')) } catch {}
                 onClose()
             } else if (mode === 'BUDGET') {
                 if (!budgetId) { notify?.('error', 'Bitte ein Budget wählen'); return }

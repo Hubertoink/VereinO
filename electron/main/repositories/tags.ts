@@ -15,11 +15,16 @@ export function listTags(opts?: { q?: string; includeUsage?: boolean; scope?: 'F
     const rows = d.prepare(`SELECT id, name, color, scope FROM tags${whereSql} ORDER BY name`).all(...params) as any[]
     if (!opts?.includeUsage) return rows
     const withUsage = rows.map(r => {
-        const c = (d.prepare(`SELECT (
-            SELECT COUNT(1) FROM voucher_tags WHERE tag_id = ?
-        ) + (
-            SELECT COUNT(1) FROM invoice_tags WHERE tag_id = ?
-        ) as c`).get(r.id, r.id) as any)?.c || 0
+        let c = 0
+        if (String(r.scope || 'FINANCE') === 'MEMBER') {
+            c = (d.prepare('SELECT COUNT(1) as c FROM member_tags WHERE tag_id = ?').get(r.id) as any)?.c || 0
+        } else {
+            c = (d.prepare(`SELECT (
+                SELECT COUNT(1) FROM voucher_tags WHERE tag_id = ?
+            ) + (
+                SELECT COUNT(1) FROM invoice_tags WHERE tag_id = ?
+            ) as c`).get(r.id, r.id) as any)?.c || 0
+        }
         return { ...r, usage: c }
     })
     return withUsage
@@ -38,6 +43,8 @@ export function upsertTag(input: { id?: number; name: string; color?: string | n
 export function deleteTag(id: number) {
     const d = getDb()
     d.prepare('DELETE FROM voucher_tags WHERE tag_id=?').run(id)
+    try { d.prepare('DELETE FROM invoice_tags WHERE tag_id=?').run(id) } catch {}
+    try { d.prepare('DELETE FROM member_tags WHERE tag_id=?').run(id) } catch {}
     d.prepare('DELETE FROM tags WHERE id=?').run(id)
     return { id }
 }
