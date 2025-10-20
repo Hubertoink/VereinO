@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
+import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
+import TimeFilterModal from './components/modals/TimeFilterModal'
+import MetaFilterModal from './components/modals/MetaFilterModal'
+import ExportOptionsModal from './components/modals/ExportOptionsModal'
+import Toasts from './components/common/Toasts'
+import useToasts from './hooks/useToasts'
+import { useAutoBackupPrompt } from './app/useAppInit'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -68,13 +75,7 @@ export default function App() {
     const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
     const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
     // Toast notifications
-    const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; text: string; action?: { label: string; onClick: () => void } }>>([])
-    const toastIdRef = useRef(1)
-    const notify = (type: 'success' | 'error' | 'info', text: string, ms = 3000, action?: { label: string; onClick: () => void }) => {
-        const id = toastIdRef.current++
-        setToasts(prev => [...prev, { id, type, text, action }])
-        window.setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ms)
-    }
+    const { toasts, notify } = useToasts()
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
@@ -110,23 +111,7 @@ export default function App() {
 
     // Auto-backup prompt (renderer-side modal)
     const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
-    useEffect(() => {
-        // Decide locally if a prompt should be shown; mirrors logic from main but with modal UX
-        let disposed = false
-        ;(async () => {
-            try {
-                const mode = String((await window.api?.settings?.get?.({ key: 'backup.auto' }))?.value || 'PROMPT').toUpperCase()
-                if (mode !== 'PROMPT') return
-                const intervalDays = Number((await window.api?.settings?.get?.({ key: 'backup.intervalDays' }))?.value || 7)
-                const lastAuto = Number((await window.api?.settings?.get?.({ key: 'backup.lastAuto' }))?.value || 0)
-                const now = Date.now()
-                const due = !lastAuto || (now - lastAuto) > intervalDays * 24 * 60 * 60 * 1000
-                if (!due) return
-                if (!disposed) setAutoBackupPrompt({ intervalDays })
-            } catch { /* ignore */ }
-        })()
-        return () => { disposed = true }
-    }, [])
+    useAutoBackupPrompt(setAutoBackupPrompt)
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
     // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
@@ -1998,213 +1983,13 @@ export default function App() {
     )
 }
 // Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
-function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, earmarkId, budgetId, onApply }: {
-    open: boolean
-    onClose: () => void
-    budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
-    earmarks: Array<{ id: number; code: string; name?: string | null }>
-    sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    earmarkId: number | null
-    budgetId: number | null
-    onApply: (v: { sphere: null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId: number | null; budgetId: number | null }) => void
-}) {
-    const [s, setS] = useState<null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>(sphere)
-    const [e, setE] = useState<number | null>(earmarkId)
-    const [b, setB] = useState<number | null>(budgetId)
-    useEffect(() => { setS(sphere); setE(earmarkId); setB(budgetId) }, [sphere, earmarkId, budgetId, open])
-    const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
-        (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
-    return open ? (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Filter wählen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Sphäre</label>
-                        <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
-                            <option value="">Alle</option>
-                            <option value="IDEELL">IDEELL</option>
-                            <option value="ZWECK">ZWECK</option>
-                            <option value="VERMOEGEN">VERMOEGEN</option>
-                            <option value="WGB">WGB</option>
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Zweckbindung</label>
-                        <select className="input" value={e ?? ''} onChange={(ev) => setE(ev.target.value ? Number(ev.target.value) : null)}>
-                            <option value="">Alle</option>
-                            {earmarks.map(em => (
-                                <option key={em.id} value={em.id}>{em.code} – {em.name || ''}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Budget</label>
-                        <select className="input" value={b ?? ''} onChange={(ev) => setB(ev.target.value ? Number(ev.target.value) : null)}>
-                            <option value="">Alle</option>
-                            {budgets.map(bu => (
-                                <option key={bu.id} value={bu.id}>{labelForBudget(bu)}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                    <button className="btn" onClick={() => { setS(null); setE(null); setB(null) }}>Zurücksetzen</button>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={() => { onApply({ sphere: s, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-}
+// MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
 
 // Time Filter Modal: controls date range and quick year selection
-function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
-    open: boolean
-    onClose: () => void
-    yearsAvail: number[]
-    from: string
-    to: string
-    onApply: (v: { from: string; to: string }) => void
-}) {
-    const [f, setF] = useState<string>(from)
-    const [t, setT] = useState<string>(to)
-    useEffect(() => { setF(from); setT(to) }, [from, to, open])
-    return open ? (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Zeitraum wählen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field">
-                        <label>Von</label>
-                        <input className="input" type="date" value={f} onChange={(e) => setF(e.target.value)} />
-                    </div>
-                    <div className="field">
-                        <label>Bis</label>
-                        <input className="input" type="date" value={t} onChange={(e) => setT(e.target.value)} />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Schnellauswahl Jahr</label>
-                        <select className="input" value={(() => {
-                            if (!f || !t) return ''
-                            const fy = f.slice(0, 4)
-                            const ty = t.slice(0, 4)
-                            // full-year only when matching boundaries
-                            if (f === `${fy}-01-01` && t === `${fy}-12-31` && fy === ty) return fy
-                            return ''
-                        })()} onChange={(e) => {
-                            const y = e.target.value
-                            if (!y) { setF(''); setT(''); return }
-                            const yr = Number(y)
-                            const nf = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-                            const nt = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-                            setF(nf); setT(nt)
-                        }}>
-                            <option value="">—</option>
-                            {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                    <button className="btn" onClick={() => { setF(''); setT('') }}>Zurücksetzen</button>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={onClose}>Abbrechen</button>
-                        <button className="btn primary" onClick={() => { onApply({ from: f, to: t }); onClose() }}>Übernehmen</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    ) : null
-}
+// TimeFilterModal extracted to components/modals/TimeFilterModal.tsx
 
 // Export Options Modal for Reports
-function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport }: {
-    open: boolean
-    onClose: () => void
-    fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
-    setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
-    orgName: string
-    setOrgName: (v: string) => void
-    amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
-    setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
-    sortDir: 'ASC' | 'DESC'
-    setSortDir: (v: 'ASC' | 'DESC') => void
-    onExport: (fmt: 'CSV' | 'XLSX' | 'PDF') => Promise<void>
-}) {
-    const all: Array<{ key: any; label: string }> = [
-        { key: 'date', label: 'Datum' },
-        { key: 'voucherNo', label: 'Nr.' },
-        { key: 'type', label: 'Typ' },
-        { key: 'sphere', label: 'Sphäre' },
-        { key: 'description', label: 'Beschreibung' },
-        { key: 'paymentMethod', label: 'Zahlweg' },
-        { key: 'netAmount', label: 'Netto' },
-        { key: 'vatAmount', label: 'MwSt' },
-        { key: 'grossAmount', label: 'Brutto' },
-        { key: 'tags', label: 'Tags' }
-    ]
-    const toggle = (k: any) => {
-        const set = new Set(fields)
-        if (set.has(k)) set.delete(k)
-        else set.add(k)
-        setFields(Array.from(set) as any)
-    }
-    return open ? createPortal(
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>Export Optionen</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
-                </header>
-                <div className="row">
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Felder</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                            {all.map(f => (
-                                <label key={f.key} className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
-                                    <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggle(f.key)} style={{ marginRight: 6 }} />
-                                    {f.label}
-                                </label>
-                            ))}
-                        </div>
-                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags“ gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Organisationsname (optional)</label>
-                        <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Betragsdarstellung</label>
-                        <div className="btn-group" role="group">
-                            <button className="btn" onClick={() => setAmountMode('POSITIVE_BOTH')} style={{ background: amountMode === 'POSITIVE_BOTH' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Beide positiv</button>
-                            <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
-                        </div>
-                    </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                        <label>Sortierung (Datum)</label>
-                        <div className="btn-group" role="group">
-                            <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
-                            <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={() => onExport('CSV')}>CSV</button>
-                    <button className="btn" onClick={() => onExport('PDF')}>PDF</button>
-                    <button className="btn primary" onClick={() => onExport('XLSX')}>XLSX</button>
-                </div>
-            </div>
-        </div>, document.body
-    ) : null
-}
+// ExportOptionsModal extracted to components/modals/ExportOptionsModal.tsx
 
 // duplicate AutoBackupPromptModal removed; see single definition below
 function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
@@ -2461,25 +2246,7 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
     )
 }
 
-function AutoBackupPromptModal({ intervalDays, onClose, onBackupNow }: { intervalDays: number; onClose: () => void; onBackupNow: () => Promise<void> }) {
-    return (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-            <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0 }}>Automatische Sicherung</h2>
-                    <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
-                </div>
-                <div className="card" style={{ padding: 12 }}>
-                    Seit der letzten Sicherung sind mehr als {intervalDays} Tag(e) vergangen. Möchtest du jetzt ein Backup erstellen?
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn" onClick={onClose}>Später</button>
-                    <button className="btn primary" onClick={onBackupNow}>Jetzt sichern</button>
-                </div>
-            </div>
-        </div>
-    )
-}
+// AutoBackupPromptModal extracted to components/modals/AutoBackupPromptModal.tsx
 
 // Basic Members UI: list with search and add/edit modal (Phase 1)
 function MembersView() {
