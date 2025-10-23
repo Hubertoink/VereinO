@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vereino
+      POSTGRES_PASSWORD: vereino
+      POSTGRES_DB: vereino
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://vereino:vereino@db:5432/vereino?schema=public
+      NODE_ENV: development
+      PORT: 3001
+      JWT_SECRET: dev-secret-change-me
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./api:/usr/src/app
+      - /usr/src/app/node_modules
+
+  # web (Next.js) will be added in a later phase
+  # web:
+  #   build:
+  #     context: ./web
+  #     dockerfile: Dockerfile
+  #   depends_on:
+  #     - api
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     NEXT_PUBLIC_API_BASE: http://localhost:3001
+  #   volumes:
+  #     - ./web:/usr/src/app
+  #     - /usr/src/app/node_modules
+
+volumes:
+  pg_data:
