@@ -6,6 +6,7 @@ import DbInitFailedModal from './components/modals/DbInitFailedModal'
 import TimeFilterModal from './components/modals/TimeFilterModal'
 import MetaFilterModal from './components/modals/MetaFilterModal'
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
+import SetupWizardModal from './components/modals/SetupWizardModal'
 import Toasts from './components/common/Toasts'
 import useToasts from './hooks/useToasts'
 import { useAutoBackupPrompt } from './app/useAppInit'
@@ -119,6 +120,24 @@ export default function App() {
     useEffect(() => {
         if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
     }, [activePage])
+
+    // First-run setup wizard
+    const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
+    useEffect(() => {
+        let alive = true
+        ;(async () => {
+            try {
+                // Only prompt when not yet completed
+                const done = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
+                if (done?.value) return
+                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
+                const tags = await (window as any).api?.tags?.list?.({})
+                const should = !on?.value || !(tags?.rows && tags.rows.length)
+                if (should && alive) setShowSetupWizard(true)
+            } catch { /* ignore */ }
+        })()
+        return () => { alive = false }
+    }, [])
 
     // Auto-backup prompt (renderer-side modal)
     const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
@@ -1513,6 +1532,7 @@ export default function App() {
                             notify={notify}
                             bumpDataVersion={bumpDataVersion}
                             openTagsManager={() => setShowTagsManager(true)}
+                            openSetupWizard={() => setShowSetupWizard(true)}
                             labelForCol={labelForCol}
                         />
                     )}
@@ -2020,6 +2040,24 @@ export default function App() {
                             notify('error', e?.message || String(e))
                         }
                     }}
+                />
+            )}
+            {/* First-run Setup Wizard */}
+            {showSetupWizard && (
+                <SetupWizardModal
+                    onClose={() => setShowSetupWizard(false)}
+                    navLayout={navLayout}
+                    setNavLayout={setNavLayout}
+                    navIconColorMode={navIconColorMode}
+                    setNavIconColorMode={setNavIconColorMode}
+                    colorTheme={colorTheme as any}
+                    setColorTheme={setColorTheme as any}
+                    journalRowStyle={journalRowStyle}
+                    setJournalRowStyle={setJournalRowStyle}
+                    journalRowDensity={journalRowDensity}
+                    setJournalRowDensity={setJournalRowDensity}
+                    existingTags={(tagDefs || []).map(t => ({ name: t.name, color: t.color || undefined }))}
+                    notify={notify}
                 />
             )}
         </div>
@@ -6392,6 +6430,7 @@ function SettingsView({
     notify,
     bumpDataVersion,
     openTagsManager,
+    openSetupWizard,
     labelForCol,
 }: {
     defaultCols: Record<string, boolean>
@@ -6421,6 +6460,7 @@ function SettingsView({
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
     bumpDataVersion: () => void
     openTagsManager?: () => void
+    openSetupWizard?: () => void
     labelForCol: (k: string) => string
 }) {
     type TileKey = 'general' | 'table' | 'import' | 'storage' | 'org' | 'tags' | 'yearEnd' | 'tutorial' | 'about'
@@ -6437,6 +6477,12 @@ function SettingsView({
         const [busyImport, setBusyImport] = useState(false)
         return (
             <div style={{ display: 'grid', gap: 12 }}>
+                {/* Quick access: Re-run setup wizard */}
+                <div className="card settings-card" style={{ padding: 12 }}>
+                    <div className="settings-title"><span aria-hidden>✨</span> <strong>Setup (Erststart)</strong></div>
+                    <div className="settings-sub">Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.</div>
+                    <button className="btn" onClick={() => openSetupWizard && openSetupWizard()}>Setup erneut öffnen…</button>
+                </div>
                 {/* Cluster 1: Darstellung & Layout */}
                 <div className="card settings-card" style={{ padding: 12 }}>
                     <div className="settings-title"><span aria-hidden>🖼️</span> <strong>Aussehen & Navigation</strong></div>

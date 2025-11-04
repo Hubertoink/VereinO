@@ -336,6 +336,13 @@ h1 {
 }
 
 h2 {
+
+/* Subtle hover highlight for buttons used in Setup Wizard */
+.btn.hover-highlight:hover {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent) inset;
+    transition: background 120ms ease, box-shadow 120ms ease;
+}
     font-size: 18px;
     margin: 24px 0 8px;
 }
