@@ -5589,178 +5589,9 @@ function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earma
     )
 }
 
-function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: Array<{ id: number; code: string; name: string; color?: string | null; budget?: number | null; startDate?: string | null; endDate?: string | null }>; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; onEdit?: (b: any) => void }) {
-    const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
-    useEffect(() => {
-        let alive = true
-        async function run() {
-            const res: Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number }> = {}
-            for (const b of bindings) {
-                const u = await window.api?.bindings.usage?.({ earmarkId: b.id, from, to, sphere })
-                if (u) res[b.id] = u as any
-            }
-            if (alive) setUsage(res)
-        }
-        run()
-        return () => { alive = false }
-    }, [bindings, from, to, sphere])
-    const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-    if (!bindings.length) return null
-    return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
-            {bindings.map(b => {
-                const u = usage[b.id]
-                const bg = b.color || undefined
-                const fg = contrastText(bg)
-                    const res: Record<number, any> = {}
-                    for (const b of bindings) {
-                        const u = await (window as any).api?.bindings?.usage?.({ earmarkId: b.id, from, to, sphere })
-                        if (u) res[b.id] = u
-                    }
-                    if (alive) setUsage(res)
-                const outsideCount = (u as any)?.outsideCount as number | undefined
-                return (
-                    <div
-                        key={b.id}
-                        className="card"
-                        style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}
-                        title={`Zweckbindung ${b.code} – Klick auf Filter oder Buttons für Aktionen`}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                            <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-                            <span className="helper" style={{ fontWeight: 600 }}>{b.name}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                            <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>
-                            <span className="badge out">OUT: {fmt.format(released)}</span>
-                            <span className="badge">Saldo: {fmt.format(u?.balance ?? 0)}</span>
-                            {((budget) > 0) && (
-                                <>
-                                    <span className="badge" title="Anfangsbudget">Budget: {fmt.format(budget)}</span>
-                                    <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? (budget - released))}</span>
-                                </>
-                            )}
-                        </div>
-                        {/* Date and counts row */}
-                        <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                            {(startDate || endDate) && (
-                                <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
-                            )}
-                            {(totalCount != null) && (
-                                <span title="Zugeordnete Buchungen">📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
-                            )}
-                        </div>
-                        {budget > 0 && (
-                            <div style={{ marginTop: 8 }}>
-                                <div className="helper">Fortschritt</div>
-                                <div style={{ height: 10, background: 'color-mix(in oklab, var(--accent) 15%, transparent)', borderRadius: 6, position: 'relative' }} aria-label={`Verbrauch ${pct}%`} title={`${pct}%`}>
-                                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: bg || 'var(--accent)', borderRadius: 6 }} />
-                                </div>
-                            </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-                            <button className="btn ghost" onClick={() => {
-                                const ev = new CustomEvent('apply-earmark-filter', { detail: { earmarkId: b.id } })
-                                window.dispatchEvent(ev)
-                            }}>Zu Buchungen</button>
-                            {onEdit && <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>}
-                        </div>
-                    </div>
-                )
-            })}
-        </div>
-    )
-}
+// EarmarkUsageCards moved to components/tiles/EarmarkUsageCards
 
-function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; amountPlanned: number; color?: string | null; startDate?: string | null; endDate?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number | null; projectId?: number | null; earmarkId?: number | null }>; eurFmt: Intl.NumberFormat; onEdit: (b: any) => void }) {
-    const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
-    useEffect(() => {
-        let alive = true
-        async function run() {
-            const res: Record<number, { spent: number; inflow: number; count: number; lastDate: string | null }> = {}
-            for (const b of budgets) {
-                try {
-                    const u = await window.api?.budgets.usage?.({ budgetId: b.id })
-                    if (!alive) return
-                    res[b.id] = u || { spent: 0, inflow: 0, count: 0, lastDate: null }
-                } catch {
-                    if (!alive) return
-                    res[b.id] = { spent: 0, inflow: 0, count: 0, lastDate: null }
-                }
-            }
-        // moved to components/tiles/EarmarkUsageCards
-            if (alive) setUsage(res)
-        }
-        run()
-        return () => { alive = false }
-    }, [budgets])
-
-    if (!budgets.length) return null
-    return (
-        <div style={{ marginTop: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-                {budgets.map((b) => {
-                    const bg = b.color || undefined
-                    const fg = contrastText(bg)
-                    const plan = b.amountPlanned || 0
-                    const spent = Math.max(0, usage[b.id]?.spent || 0)
-                    const inflow = Math.max(0, usage[b.id]?.inflow || 0)
-                    const remaining = plan - spent
-                    const saldo = inflow - spent
-                    const pct = plan > 0 ? Math.min(100, Math.max(0, Math.round((spent / plan) * 100))) : 0
-                    const title = (b.name && b.name.trim()) || b.categoryName || b.projectName || `Budget ${b.year}`
-                    const startDate = b.startDate ?? usage[b.id]?.startDate ?? null
-                    const endDate = b.endDate ?? usage[b.id]?.endDate ?? null
-                    const totalCount = (usage[b.id]?.countInside ?? 0) + (usage[b.id]?.countOutside ?? 0)
-                    const outsideCount = usage[b.id]?.countOutside ?? 0
-                    return (
-                        <div key={b.id} className="card" style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                                <span className="badge" style={{ background: bg, color: fg }}>{b.year}</span>
-                                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{title}</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                                <span className="badge in">IN: {eurFmt.format(inflow)}</span>
-                                <span className="badge out">OUT: {eurFmt.format(spent)}</span>
-                                <span className="badge">Budget: {eurFmt.format(plan)}</span>
-                                <span className="badge">Saldo: {eurFmt.format(saldo)}</span>
-                                <span className="badge" title="Verfügbar">Rest: {eurFmt.format(remaining)}</span>
-                            </div>
-                            {/* Date and counts row */}
-                            <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                                {(startDate || endDate) && (
-                                    <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
-                                )}
-                                {(totalCount > 0 || usage[b.id]?.count != null) && (
-                                    <span title="Zugeordnete Buchungen">📄 {totalCount || usage[b.id]?.count || 0}{outsideCount > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>
-                                )}
-                            </div>
-                            {plan > 0 && (
-                                <div style={{ marginTop: 8 }}>
-                                    <div className="helper">Fortschritt</div>
-                                    <div style={{ height: 10, background: 'color-mix(in oklab, var(--accent) 15%, transparent)', borderRadius: 6, position: 'relative' }} aria-label={`Verbrauch ${pct}%`} title={`${pct}%`}>
-                                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: bg || 'var(--accent)', borderRadius: 6 }} />
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-                                <button className="btn ghost" onClick={() => {
-                                    // Jump to Buchungen for this budget's year and apply a precise budget filter
-                                    const y = b.year
-                                    const from = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-                                    const to = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-                                    const ev = new CustomEvent('apply-budget-jump', { detail: { from, to, budgetId: b.id } })
-                                    window.dispatchEvent(ev)
-                                }}>Zu Buchungen</button>
-                                <button className="btn" onClick={() => onEdit(b)}>✎ Bearbeiten</button>
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-    )
-}
+// BudgetTiles moved to components/tiles/BudgetTiles
 
 function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' }) {
     const [loading, setLoading] = useState(false)
@@ -6052,19 +5883,8 @@ function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number;
                             const yIn = yBase + (innerH - hIn)
                             const yOut = yBase + (innerH - hOut)
                             const saldoMonth = s.inGross + s.outGross
-                                const res: Record<number, any> = {}
-                                for (const b of budgets) {
-                                    try {
-                                        const u = await (window as any).api?.budgets?.usage?.({ budgetId: b.id })
-                                        if (!alive) return
-                                        res[b.id] = u || { spent: 0, inflow: 0, count: 0, lastDate: null }
-                                    } catch {
-                                        if (!alive) return
-                                        res[b.id] = { spent: 0, inflow: 0, count: 0, lastDate: null }
-                                    }
-                                }
-                                if (alive) setUsage(res)
-                                    <g>
+                            return (
+                                <g key={i}>
                                     <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
                                     <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
                                     {/* Monthly net overlay (thin bar) */}
@@ -6083,7 +5903,6 @@ function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number;
                                     )}
                                     <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
                                     <title>{`${monthLabel(s.month, true)}\nIN: ${eurFmt.format(s.inGross)}\nOUT: ${eurFmt.format(Math.abs(s.outGross))}\nNetto: ${eurFmt.format(saldoMonth)}\nKlick für Drilldown`}</title>
-                                    </g>
                                 </g>
                             )
                         })}
