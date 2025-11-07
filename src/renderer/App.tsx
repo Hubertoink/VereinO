@@ -36,164 +36,9 @@ function contrastText(bg?: string | null) {
     const r = parseInt(hex.slice(0, 2), 16)
     const g = parseInt(hex.slice(2, 4), 16)
     const b = parseInt(hex.slice(4, 6), 16)
-    // Perceived luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? '#000' : '#fff'
+    const l = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return l > 0.55 ? '#000' : '#fff'
 }
-
-const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-// TopHeaderOrg moved to components/layout/TopHeaderOrg
-
-export default function App() {
-    // DB init failure handling
-    const [dbInitError, setDbInitError] = useState<null | { message?: string }>(null)
-    const [dbInitBusy, setDbInitBusy] = useState(false)
-    useEffect(() => {
-        const off = (window as any).api?.db?.onInitFailed?.((info: any) => {
-            setDbInitError({ message: info?.message || '' })
-        })
-        return () => { try { off && off() } catch {} }
-    }, [])
-    // Global data refresh key to trigger summary re-fetches across views
-    const [refreshKey, setRefreshKey] = useState(0)
-    const bumpDataVersion = () => setRefreshKey((k) => k + 1)
-    const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
-    const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
-    // Toast notifications
-    const { toasts, notify } = useToasts()
-    // Map backend errors to friendlier messages (esp. earmark period issues)
-    const friendlyError = (e: any) => {
-        const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
-        return 'Fehler: ' + msg
-    }
-    // Dynamic available years from vouchers
-    const [yearsAvail, setYearsAvail] = useState<number[]>([])
-    useEffect(() => {
-        let cancelled = false
-        async function loadYears() {
-            try {
-                const res = await window.api?.reports?.years?.()
-                if (!cancelled && res?.years) setYearsAvail(res.years)
-            } catch { }
-        }
-        loadYears()
-        const onChanged = () => loadYears()
-        window.addEventListener('data-changed', onChanged)
-        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-    }, [])
-    const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen'>(() => {
-        try { return (localStorage.getItem('activePage') as any) || 'Buchungen' } catch { return 'Buchungen' }
-    })
-    // When switching to Reports, bump a key to trigger chart re-measures
-    const [reportsActivateKey, setReportsActivateKey] = useState(0)
-    useEffect(() => {
-        if (activePage === 'Reports') setReportsActivateKey((k) => k + 1)
-    }, [activePage])
-
-    // First-run setup wizard
-    const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
-    useEffect(() => {
-        let alive = true
-        ;(async () => {
-            try {
-                // Only prompt when not yet completed
-                const done = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
-                if (done?.value) return
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-                const tags = await (window as any).api?.tags?.list?.({})
-                const should = !on?.value || !(tags?.rows && tags.rows.length)
-                if (should && alive) setShowSetupWizard(true)
-            } catch { /* ignore */ }
-        })()
-        return () => { alive = false }
-    }, [])
-
-    // Auto-backup prompt (renderer-side modal)
-    const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
-    useAutoBackupPrompt(setAutoBackupPrompt)
-
-    const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
-    // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
-    type NavLayout = 'left' | 'top'
-    const [navLayout, setNavLayout] = useState<NavLayout>(() => {
-        try { return (localStorage.getItem('ui.navLayout') as NavLayout) || 'left' } catch { return 'left' }
-    })
-    const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-        try { return localStorage.getItem('sidebarCollapsed') === '1' } catch { return false }
-    })
-    // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
-    const [reportsTab, setReportsTab] = useState<string>(() => {
-        try { return 'overview' } catch { return 'overview' }
-    })
-
-    // UI preference: color theme palette
-    type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
-    const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-        try { return (localStorage.getItem('ui.colorTheme') as ColorTheme) || 'default' } catch { return 'default' }
-    })
-    useEffect(() => {
-        try { localStorage.setItem('ui.colorTheme', colorTheme) } catch { }
-        // apply on <html>
-        try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch { }
-    }, [colorTheme])
-    // UI preference: journal table row style and density (Buchungen)
-    type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-    type JournalRowDensity = 'normal' | 'compact'
-    const [journalRowStyle, setJournalRowStyle] = useState<JournalRowStyle>(() => {
-        try { return (localStorage.getItem('ui.journalRowStyle') as JournalRowStyle) || 'both' } catch { return 'both' }
-    })
-    const [journalRowDensity, setJournalRowDensity] = useState<JournalRowDensity>(() => {
-        try { return (localStorage.getItem('ui.journalRowDensity') as JournalRowDensity) || 'normal' } catch { return 'normal' }
-    })
-    useEffect(() => {
-        try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch { }
-        try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch { }
-    }, [journalRowStyle])
-    useEffect(() => {
-        try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch { }
-        try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch { }
-    }, [journalRowDensity])
-    // Period lock (year-end) status for UI controls (e.g., lock edit)
-    const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
-    useEffect(() => {
-        let alive = true
-        async function load() {
-            try { const s = await (window as any).api?.yearEnd?.status?.(); if (alive) setPeriodLock(s || { closedUntil: null }) } catch {}
-        }
-        load()
-        const onChanged = () => load()
-        window.addEventListener('data-changed', onChanged)
-        return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-    }, [])
-    // Export options modal state (Reports)
-    const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
-    type AmountMode = 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
-    const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
-    const [exportOrgName, setExportOrgName] = useState<string>('')
-    const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
-    const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
-
-    // DOM-Debug removed for release
-    // const [domDebug, setDomDebug] = useState<boolean>(false)
-    // Global Tags Manager modal state
-    const [showTagsManager, setShowTagsManager] = useState<boolean>(false)
-    // Time filter modal state
-    const [showTimeFilter, setShowTimeFilter] = useState<boolean>(false)
-    const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
-    useEffect(() => {
-        try { localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0') } catch { }
-    }, [sidebarCollapsed])
-    useEffect(() => { try { localStorage.setItem('ui.navLayout', navLayout) } catch { } }, [navLayout])
-
-    useEffect(() => {
-        try { localStorage.setItem('activePage', activePage) } catch { }
-    }, [activePage])
-    // No-op: unified reports page; keep effect to avoid removing too many deps
-    useEffect(() => { /* unified reports */ }, [reportsTab])
     // Open Export Options when requested from nested components
     useEffect(() => {
         function onOpenExport() { setShowExportOptions(true) }
@@ -967,18 +812,7 @@ export default function App() {
                         <FilterTotals refreshKey={refreshKey} from={from || undefined} to={to || undefined} paymentMethod={filterPM || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} q={q || undefined} tag={filterTag || undefined} />
                     )}
                     {activePage === 'Buchungen' && (
-                        <div>
-                            <div className="card">
-                                {/* Pagination controls */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                                    <div className="helper">Seite {page} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
-                                    <div style={{ display: 'flex', gap: 6 }}>
-                                        <button className="btn" onClick={() => { setPage(1) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                        <button className="btn" onClick={() => { setPage(p => Math.max(1, p - 1)) }} disabled={page <= 1} style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                        <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
-                                    </div>
-                                </div>
+                        <div className="card">
                                 <JournalTable
                                     rows={rows}
                                     order={order}
@@ -1122,11 +956,11 @@ export default function App() {
                                                     <div className="helper title">Basis</div>
                                                     <div className="row">
                                                         <div className="field">
-                                                            <label>Datum</label>
+                                                            <label>Datum<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                             <input className="input" type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
                                                         </div>
                                                         <div className="field booking-type-row">
-                                                            <label>Art</label>
+                                                            <label>Art<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                             <div className="segment-group" role="group" aria-label="Art wählen">
                                                                 {(['IN','OUT','TRANSFER'] as const).map(t => (
                                                                     <button key={t} type="button" className={`seg-btn${editRow.type === t ? ' active' : ''}`} data-type={t} onClick={() => setEditRow({ ...editRow, type: t })}>{t}</button>
@@ -1134,7 +968,7 @@ export default function App() {
                                                             </div>
                                                         </div>
                                                         <div className="field">
-                                                            <label>Sphäre</label>
+                                                            <label>Sphäre<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                             <select value={editRow.sphere ?? ''} disabled={editRow.type === 'TRANSFER'} onChange={(e) => setEditRow({ ...editRow, sphere: (e.target.value as any) || undefined })}>
                                                                 <option value="">—</option>
                                                                 <option value="IDEELL">IDEELL</option>
@@ -1171,13 +1005,13 @@ export default function App() {
                                                     </div>
                                                 </section>
 
-                                                {/* Block B – Finanzdetails */}
+                                                {/* Block B – Finanzdetails (restored, without pagination) */}
                                                 <section className="booking-section booking-section--finances">
                                                     <div className="helper title">Finanzen</div>
                                                     <div className="row">
                                                         {editRow.type === 'TRANSFER' ? (
                                                             <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                                                <label>Betrag (Transfer)</label>
+                                                                <label>Betrag (Transfer)<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                                 <span className="adorn-wrap">
                                                                     <input className="input amount-input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
                                                                         onChange={(e) => {
@@ -1190,8 +1024,8 @@ export default function App() {
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <div className="field">
-                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
+                                                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                                                                    <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                                     <div style={{ display: 'flex', gap: 8 }}>
                                                                         <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
                                                                             <option value="NET">Netto</option>
@@ -1637,11 +1471,11 @@ export default function App() {
                                 <div className="helper title">Basis</div>
                                 <div className="row">
                                     <div className="field">
-                                        <label>Datum</label>
+                                        <label>Datum<span className="required-asterisk" aria-hidden="true">*</span></label>
                                         <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
                                     </div>
                                     <div className="field booking-type-row">
-                                        <label>Art</label>
+                                        <label>Art<span className="required-asterisk" aria-hidden="true">*</span></label>
                                         <div className="segment-group" role="group" aria-label="Art wählen">
                                             {(['IN','OUT','TRANSFER'] as const).map(t => (
                                                 <button key={t} type="button" className={`seg-btn${qa.type === t ? ' active' : ''}`} data-type={t} onClick={() => setQa({ ...qa, type: t })}>{t}</button>
@@ -1649,7 +1483,7 @@ export default function App() {
                                         </div>
                                     </div>
                                     <div className="field">
-                                        <label>Sphäre</label>
+                                        <label>Sphäre<span className="required-asterisk" aria-hidden="true">*</span></label>
                                         <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })}>
                                             <option value="IDEELL">IDEELL</option>
                                             <option value="ZWECK">ZWECK</option>
@@ -1691,7 +1525,7 @@ export default function App() {
                                 <div className="row">
                                     {qa.type === 'TRANSFER' ? (
                                         <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                            <label>Betrag (Transfer)</label>
+                                            <label>Betrag (Transfer)<span className="required-asterisk" aria-hidden="true">*</span></label>
                                             <span className="adorn-wrap">
                                                 <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                     onChange={(e) => {
@@ -1705,7 +1539,7 @@ export default function App() {
                                     ) : (
                                         <>
                                             <div className="field">
-                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}</label>
+                                                <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'}<span className="required-asterisk" aria-hidden="true">*</span></label>
                                                 <div style={{ display: 'flex', gap: 8 }}>
                                                     <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
                                                         <option value="NET">Netto</option>
@@ -4379,7 +4213,7 @@ function InvoicesView() {
                             )}
                         </tbody>
                     </table>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
                         <div className="helper">Gesamt: {total}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <label className="helper">Pro Seite</label>
@@ -4388,9 +4222,46 @@ function InvoicesView() {
                                 <option value={20}>20</option>
                                 <option value={50}>50</option>
                             </select>
-                            <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))}>Zurück</button>
+                                <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste Seite" aria-label="Erste Seite">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                        <polyline points="11 17 6 12 11 7" />
+                                        <polyline points="18 17 13 12 18 7" />
+                                    </svg>
+                                </button>
+                            <button
+                                className="btn"
+                                disabled={!canPrev}
+                                onClick={() => setOffset(Math.max(0, offset - limit))}
+                                title="Zurück"
+                                aria-label="Zurück"
+                                style={!canPrev ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                            >
+                                ‹
+                            </button>
                             <span className="helper">Seite {page} / {pages}</span>
-                            <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)}>Weiter</button>
+                            <button
+                                className="btn"
+                                disabled={!canNext}
+                                onClick={() => setOffset(offset + limit)}
+                                title="Weiter"
+                                aria-label="Weiter"
+                                style={!canNext ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                            >
+                                ›
+                            </button>
+                            <button
+                                className="btn"
+                                disabled={!canNext}
+                                onClick={() => setOffset(Math.max(0, (pages - 1) * limit))}
+                                title="Letzte Seite"
+                                aria-label="Letzte Seite"
+                                style={!canNext ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
+                                    <polyline points="11 17 6 12 11 7" />
+                                    <polyline points="18 17 13 12 18 7" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </>
@@ -4470,8 +4341,9 @@ function InvoicesView() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                     <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Rechnung anlegen' : 'Rechnung bearbeiten'}</h2>
-                                    <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px' }}>
+                                    <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                         <input aria-label="Datum" className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={{ height: 26, padding: '2px 6px' }} />
+                                        <span className="required-asterisk" aria-hidden="true">*</span>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -4503,7 +4375,7 @@ function InvoicesView() {
                                     <input className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" />
                                 </div>
                                 <div className="field">
-                                    <label>Partei</label>
+                                    <label>Partei<span className="required-asterisk" aria-hidden="true">*</span></label>
                                     <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" />
                                     {/* datalist placed later */}
                                 </div>
@@ -4512,7 +4384,7 @@ function InvoicesView() {
                                     <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
                                 </div>
                                 <div className="field">
-                                    <label>Betrag (EUR)</label>
+                                    <label>Betrag (EUR)<span className="required-asterisk" aria-hidden="true">*</span></label>
                                     <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} />
                                     <div className="helper">{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : 'Bitte Betrag eingeben' })()}</div>
                                 </div>
@@ -8545,42 +8417,79 @@ function BatchEarmarkModal({ onClose, earmarks, tagDefs, budgets, currentFilters
                         </>
                     )}
 
-                    {mode === 'BUDGET' && (
-                        <>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label>Budget</label>
-                                <select className="input" value={budgetId as any} onChange={(e) => setBudgetId(e.target.value ? Number(e.target.value) : '')}>
-                                    <option value="">— bitte wählen —</option>
-                                    {budgets.map(b => (
-                                        <option key={b.id} value={b.id}>{b.label}</option>
-                                    ))}
-                                </select>
+                    {activePage === 'Buchungen' && (
+                        <div className="card">
+                            <JournalTable
+                                rows={rows}
+                                order={order}
+                                cols={cols}
+                                onReorder={(o: any) => setOrder(o as any)}
+                                earmarks={earmarks}
+                                tagDefs={tagDefs}
+                                eurFmt={eurFmt}
+                                fmtDate={fmtDate}
+                                onEdit={(r) => setEditRow({
+                                    ...r,
+                                    mode: (r as any).grossAmount != null ? 'GROSS' : 'NET',
+                                    netAmount: (r as any).netAmount ?? null,
+                                    grossAmount: (r as any).grossAmount ?? null,
+                                    vatRate: (r as any).vatRate ?? 0
+                                } as any)}
+                                onDelete={(r) => setDeleteRow(r)}
+                                onToggleSort={(col: 'date' | 'net' | 'gross') => {
+                                    setPage(1)
+                                    setSortBy(col)
+                                    setSortDir(prev => (col === sortBy ? (prev === 'DESC' ? 'ASC' : 'DESC') : 'DESC'))
+                                }}
+                                sortDir={sortDir}
+                                sortBy={sortBy}
+                                highlightId={flashId}
+                                lockedUntil={periodLock?.closedUntil || null}
+                                onTagClick={async (name) => {
+                                    setFilterTag(name)
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                    await loadRecent()
+                                }}
+                                onEarmarkClick={async (id) => {
+                                    setFilterEarmark(id)
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                    await loadRecent()
+                                }}
+                                onBudgetClick={async (id) => {
+                                    setFilterBudgetId(id)
+                                    setActivePage('Buchungen')
+                                    setPage(1)
+                                    await loadRecent()
+                                }}
+                            />
+                            {/* Unified pagination footer (like Invoices) */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+                                <div className="helper">Gesamt: {totalRows}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <label className="helper">Pro Seite</label>
+                                    <select className="input" value={journalLimit} onChange={e => { setJournalLimit(Number(e.target.value)); setPage(1) }} style={{ width: 80 }}>
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                    </select>
+                                    <button className="btn" onClick={() => setPage(1)} disabled={page <= 1} title="Erste Seite" aria-label="Erste Seite" style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            <polyline points="11 17 6 12 11 7" />
+                                            <polyline points="18 17 13 12 18 7" />
+                                        </svg>
+                                    </button>
+                                    <button className="btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} title="Zurück" aria-label="Zurück" style={page <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹</button>
+                                    <span className="helper">Seite {page} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
+                                    <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter" aria-label="Weiter" style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>›</button>
+                                    <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte Seite" aria-label="Letzte Seite" style={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
+                                            <polyline points="11 17 6 12 11 7" />
+                                            <polyline points="18 17 13 12 18 7" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                <label><input type="checkbox" checked={onlyWithout} onChange={(e) => setOnlyWithout(e.target.checked)} /> Nur Buchungen ohne Budget aktualisieren</label>
-                            </div>
-                        </>
-                    )}
-
-                    <div className="card" style={{ gridColumn: '1 / span 2', padding: 10 }}>
-                        <div className="helper">Betroffene Buchungen: Aktuelle Filter werden angewandt (Suche, Zeitraum, Sphäre, Art, Zahlweg).</div>
-                        <ul style={{ margin: '6px 0 0 16px' }}>
-                            {currentFilters.q && <li>Suche: <code>{currentFilters.q}</code></li>}
-                            {currentFilters.from && currentFilters.to && <li>Zeitraum: {currentFilters.from} – {currentFilters.to}</li>}
-                            {currentFilters.sphere && <li>Sphäre: {currentFilters.sphere}</li>}
-                            {currentFilters.type && <li>Art: {currentFilters.type}</li>}
-                            {currentFilters.paymentMethod && <li>Zahlweg: {currentFilters.paymentMethod}</li>}
-                            {onlyWithout && mode === 'EARMARK' && <li>Nur ohne bestehende Zweckbindung</li>}
-                            {onlyWithout && mode === 'BUDGET' && <li>Nur ohne bestehendes Budget</li>}
-                        </ul>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" disabled={busy || (mode === 'EARMARK' && !earmarkId) || (mode === 'BUDGET' && !budgetId)} onClick={run}>Übernehmen</button>
-                </div>
-            </div>
-        </div>,
-        document.body
-    )
-}
+                        </div>

@@ -862,6 +862,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 12px;
 }
 
+/* Visual indicator for required fields */
+.required-asterisk {
+    color: var(--danger);
+    font-weight: 700;
+    margin-left: 4px;
+}
+
 /* Chips for active filters */
 .chip {
     display: inline-flex;
