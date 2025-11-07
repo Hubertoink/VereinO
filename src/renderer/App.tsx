@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import DbMigrateModal from './DbMigrateModal'
 import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
+import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
+import BudgetTiles from './components/tiles/BudgetTiles'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -5610,12 +5612,12 @@ function EarmarkUsageCards({ bindings, from, to, sphere, onEdit }: { bindings: A
                 const u = usage[b.id]
                 const bg = b.color || undefined
                 const fg = contrastText(bg)
-                const budget = u?.budget ?? b.budget ?? 0
-                const released = Math.max(0, u?.released ?? 0)
-                const pct = budget > 0 ? Math.min(100, Math.round((released / budget) * 100)) : 0
-                const startDate = (b as any).startDate ?? u?.startDate ?? null
-                const endDate = (b as any).endDate ?? u?.endDate ?? null
-                const totalCount = (u as any)?.totalCount as number | undefined
+                    const res: Record<number, any> = {}
+                    for (const b of bindings) {
+                        const u = await (window as any).api?.bindings?.usage?.({ earmarkId: b.id, from, to, sphere })
+                        if (u) res[b.id] = u
+                    }
+                    if (alive) setUsage(res)
                 const outsideCount = (u as any)?.outsideCount as number | undefined
                 return (
                     <div
@@ -5686,6 +5688,7 @@ function BudgetTiles({ budgets, eurFmt, onEdit }: { budgets: Array<{ id: number;
                     res[b.id] = { spent: 0, inflow: 0, count: 0, lastDate: null }
                 }
             }
+        // moved to components/tiles/EarmarkUsageCards
             if (alive) setUsage(res)
         }
         run()
@@ -6049,18 +6052,18 @@ function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number;
                             const yIn = yBase + (innerH - hIn)
                             const yOut = yBase + (innerH - hOut)
                             const saldoMonth = s.inGross + s.outGross
-                            return (
-                                <g key={s.month}>
-                                    {/* Large invisible hit area per month to ease hover/click */}
-                                    <rect x={gx - Math.floor(gap/2)} y={yBase} width={groupW + gap} height={innerH} fill="transparent" onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} onClick={() => setHoverIdx(i)} onDoubleClick={() => {
-                                    // Drilldown to Buchungen for this month (double-click)
-                                    const [yy, mm] = s.month.split('-').map(Number)
-                                    const from = new Date(Date.UTC(yy, (mm - 1) as number, 1)).toISOString().slice(0, 10)
-                                    const to = new Date(Date.UTC(yy, (mm - 1) as number + 1, 0)).toISOString().slice(0, 10)
-                                    const ev = new CustomEvent('apply-budget-jump', { detail: { from, to } })
-                                    window.dispatchEvent(ev)
-                                    }} style={{ cursor: 'pointer' }} />
-                                    {/* Actual bars */}
+                                const res: Record<number, any> = {}
+                                for (const b of budgets) {
+                                    try {
+                                        const u = await (window as any).api?.budgets?.usage?.({ budgetId: b.id })
+                                        if (!alive) return
+                                        res[b.id] = u || { spent: 0, inflow: 0, count: 0, lastDate: null }
+                                    } catch {
+                                        if (!alive) return
+                                        res[b.id] = { spent: 0, inflow: 0, count: 0, lastDate: null }
+                                    }
+                                }
+                                if (alive) setUsage(res)
                                     <g>
                                     <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
                                     <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
@@ -6130,6 +6133,7 @@ function ReportsSphereBars(props: { refreshKey?: number; from?: string; to?: str
             window.api?.reports.summary?.({ from: props.from, to: props.to, type: 'IN' }),
             window.api?.reports.summary?.({ from: props.from, to: props.to, type: 'OUT' })
         ]).then(([sumIn, sumOut]) => {
+                    // moved to components/tiles/BudgetTiles
             if (cancelled) return
             const map: any = {}
             for (const s of spheres) map[s] = { inGross: 0, outGross: 0 }
