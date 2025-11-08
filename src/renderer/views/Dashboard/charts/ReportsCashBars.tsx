@@ -45,11 +45,11 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
   })()
   
   return (
-    <div className="card" style={{ padding: 12 }}>
+    <div className="card" style={{ padding: 12, overflow: 'hidden' }}>
       <strong>Kassenstand (BAR/BANK)</strong>
       {loading && <div className="helper">Laden…</div>}
       {!loading && (
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', overflow: 'hidden' }}>
           {(() => {
             const idx = hoverIdx
             if (idx == null) return null
@@ -63,7 +63,7 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
               </div>
             )
           })()}
-          <svg width={W} height={H} role="img" aria-label="Kassenstand">
+          <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Kassenstand">
           {/* X-Achse Grid + Labels */}
           {xTicks.map((v, i) => (
             <g key={i}>

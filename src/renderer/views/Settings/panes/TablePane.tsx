@@ -134,6 +134,33 @@ export function TablePane({
         />
       </div>
 
+      {/* Table Preview */}
+      <div>
+        <div className="helper" style={{ marginBottom: 6 }}>Vorschau:</div>
+        <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
+          <table cellPadding={6} style={{ width: '100%', fontSize: 13 }}>
+            <thead>
+              <tr>
+                {order.filter(k => cols[k]).map(k => (
+                  <th key={k} align="left" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
+                    {labelForCol(k)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {order.filter(k => cols[k]).map(k => (
+                  <td key={k} style={{ paddingTop: 6, color: 'var(--text-dim)' }}>
+                    {k === 'actions' ? '⚙️' : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? '📎' : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Preset Buttons */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="btn" onClick={presetStandard}>

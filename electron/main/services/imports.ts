@@ -551,9 +551,10 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
     // Define table aligned with app logic
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Anmerkungen']
+    // Removed 'Anmerkungen' column – not used by the app
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
+        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
     ]
     ws.addTable({
         name: 'Buchungen',
@@ -562,7 +563,7 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         totalsRow: false,
         columns: columns.map((c) => ({ name: c })),
         rows: [
-            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'optional']
+            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '']
         ]
     })
     // Freeze header + intro
@@ -586,7 +587,7 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     tips.addRow(['Beispiel-M-Code:'])
     const mCode = [
         'let',
-        '  Quelle = Csv.Document(File.Contents("C:/Pfad/zu/datei.csv"),[Delimiter=";", Columns=10, Encoding=65001, QuoteStyle=QuoteStyle.None]),',
+        '  Quelle = Csv.Document(File.Contents("C:/Pfad/zu/datei.csv"),[Delimiter=";", Columns=9, Encoding=65001, QuoteStyle=QuoteStyle.None]),',
         '  Header = Table.PromoteHeaders(Quelle, [PromoteAllScalars=true]),',
         '  Umbenannt = Table.RenameColumns(Header, {',
         '    {"Datum","Datum"},',
@@ -634,9 +635,9 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
 
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Anmerkungen']
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
+        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
     ]
 
     const today = new Date()
@@ -644,16 +645,16 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     const m = String(today.getMonth() + 1).padStart(2, '0')
 
     const rows: any[] = [
-        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'Brutto Einnahme'],
-        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', '', 'Brutto Ausgabe'],
-        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', '', ''],
-        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', '', ''],
-        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', '', ''],
-        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', '', ''],
-        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', '', ''],
-        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', '', ''],
-        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', '', ''],
-        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '', 'Summe – wird ignoriert']
+        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', ''],
+        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', ''],
+        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', ''],
+        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', ''],
+        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', ''],
+        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', ''],
+        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', ''],
+        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', ''],
+        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', ''],
+        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '']
     ]
 
     ws.addTable({ name: 'Buchungen', ref: 'A4', headerRow: true, totalsRow: false, columns: columns.map(n => ({ name: n })), rows })

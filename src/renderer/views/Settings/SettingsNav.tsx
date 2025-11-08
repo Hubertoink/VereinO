@@ -23,13 +23,13 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   ]
 
   return (
-    <div 
-      className="settings-tiles" 
-      style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', 
-        gap: 12, 
-        marginBottom: 16 
+    <div
+      className="settings-tiles"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 16,
       }}
     >
       {tiles.map((tile) => (
@@ -45,17 +45,19 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
             padding: '16px 12px',
             gap: 8,
             minHeight: 80,
+            flex: 1,
             textAlign: 'center',
-            background: active === tile.key 
-              ? 'color-mix(in oklab, var(--accent) 15%, transparent)' 
-              : undefined,
+            background:
+              active === tile.key
+                ? 'color-mix(in oklab, var(--accent) 15%, transparent)'
+                : undefined,
           }}
           aria-current={active === tile.key ? 'page' : undefined}
         >
           <span style={{ fontSize: 28 }} aria-hidden="true">
             {tile.icon}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>
+          <span style={{ fontSize: 13, fontWeight: active === tile.key ? 600 : 500, color: active === tile.key ? 'var(--text)' : undefined }}>
             {tile.label}
           </span>
         </button>

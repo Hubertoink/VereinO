@@ -794,7 +794,7 @@ export default function App() {
                                     </button>
                                 ))}
                                 <div aria-hidden style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
-                                {/* Group 2: Buchungen, Rechnungen, Budgets, Zweckbindungen */}
+                                {/* Group 2: Buchungen, Rechnungen, Mitglieder, Budgets, Zweckbindungen */}
                                 {[
                                     { key: 'Buchungen', label: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
                                     { key: 'Rechnungen', label: 'Rechnungen', icon: (
@@ -2239,8 +2239,8 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
                 </div>
             </div>
 
-            {/* Charts preview */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Charts preview - alle untereinander in 1 Spalte */}
+            <div style={{ display: 'grid', gap: 12 }}>
                 {(() => {
                     const now = new Date()
                     const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
@@ -2252,8 +2252,13 @@ function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoice
                         : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
                     return (
                         <>
-                            <ReportsMonthlyChart from={f} to={t} refreshKey={refreshKey} />
-                            <ReportsCashBars from={f} to={t} refreshKey={refreshKey} />
+                            {/* Limit both charts to prevent overflow on wide screens */}
+                            <div style={{ maxWidth: 1200, width: '100%' }}>
+                                <ReportsMonthlyChart from={f} to={t} refreshKey={refreshKey} />
+                            </div>
+                            <div style={{ maxWidth: 500, width: '100%' }}>
+                                <ReportsCashBars from={f} to={t} refreshKey={refreshKey} />
+                            </div>
                         </>
                     )
                 })()}
@@ -4871,7 +4876,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
         k === 'actions' ? <th key={k} align="center" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Aktionen</th>
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
-                    : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Typ</th>
+                    : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
                         : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sphäre</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>🎯</th>

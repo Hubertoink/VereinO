@@ -1,6 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
+function monthKeys(from?: string, to?: string): string[] {
+  // Build inclusive YYYY-MM keys; fallback to current year if props missing
+  let f = from, t = to
+  if (!f || !t) {
+    const now = new Date()
+    const y = now.getUTCFullYear()
+    f = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+    t = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+  }
+  const out: string[] = []
+  const [y0, m0] = [Number(String(f).slice(0, 4)), Number(String(f).slice(5, 7)) - 1]
+  const [y1, m1] = [Number(String(t).slice(0, 4)), Number(String(t).slice(5, 7)) - 1]
+  const d = new Date(Date.UTC(y0, m0, 1))
+  while (d.getUTCFullYear() < y1 || (d.getUTCFullYear() === y1 && d.getUTCMonth() <= m1)) {
+    out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+    d.setUTCMonth(d.getUTCMonth() + 1)
+  }
+  return out
+}
+
 export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod }) {
   const [loading, setLoading] = useState(false)
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
@@ -61,11 +81,14 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return () => { cancelled = true }
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
 
-  const months = Array.from(new Set([...(inBuckets.map(b => b.month)), ...(outBuckets.map(b => b.month))])).sort()
+  // Ensure we show all months in range, even when there is no data
+  const months = monthKeys(props.from, props.to)
+  const inMap = new Map(inBuckets.map(b => [String(b.month), Number(b.gross) || 0]))
+  const outMap = new Map(outBuckets.map(b => [String(b.month), Math.abs(Number(b.gross) || 0)]))
   const series = months.map(m => ({
     month: m,
-    inGross: inBuckets.find(b => b.month === m)?.gross || 0,
-    outGross: -(Math.abs(outBuckets.find(b => b.month === m)?.gross || 0)),
+    inGross: inMap.get(m) || 0,
+    outGross: -(outMap.get(m) || 0),
   }))
   const saldo = (() => {
     let cum = 0

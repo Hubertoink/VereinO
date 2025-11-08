@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import BalanceAreaChart from './BalanceAreaChart'
 import IncomeExpenseBars from './IncomeExpenseBars'
+import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
+import ReportsCashBars from './charts/ReportsCashBars'
 import EarmarksUsageBars from './EarmarksUsageBars'
 import BudgetDeviationList from './BudgetDeviationList'
 import WorkQueueCard from './WorkQueueCard'
+import EarmarkDetailCard from './EarmarkDetailCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
 
@@ -73,7 +76,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       setSum({ inGross, outGross, diff })
     })
     return () => { cancelled = true }
-  }, [period, refreshKey])
+  }, [period, yearSel, refreshKey])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [invOpenCount, setInvOpenCount] = useState<number>(0)
@@ -173,7 +176,6 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
             <strong>Offene Rechnungen</strong>
             <span className="chip" title="Summen berücksichtigen offene (OPEN+PARTIAL) Rechnungen. 'Fällig in ≤ 5 Tagen' bezieht sich auf heute bis +5 Tage, 'Überfällig' ist vor heute.">ⓘ</span>
           </div>
-          <button className="btn ghost" onClick={onGoToInvoices}>Zu Rechnungen</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 8, overflow: 'hidden' }}>
           <div className="card" style={{ padding: 10, minWidth: 0 }}>
@@ -216,28 +218,30 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       {(() => {
         const now = new Date()
         const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
-        const f = period === 'MONAT'
-          ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-          : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-        const t = period === 'MONAT'
-          ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-          : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
-        const filters: CommonFilters = { from: f, to: t }
+        // Jahresbereich für Jahres-Charts
+        const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+        const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+        const yearFilters: CommonFilters = { from: yearFrom, to: yearTo }
+
+        // Monatsbereich (für Tagesverlauf im Kassenstand, wenn "Monat" gewählt ist)
+        const curMonthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+        const curMonthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+        const balanceFilters: CommonFilters = (period === 'MONAT')
+          ? { from: curMonthFrom, to: curMonthTo }
+          : yearFilters
+
         return (
           <>
-            {/* Hauptsektion: links groß, rechts Stack */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-              <BalanceAreaChart {...filters} />
-              <div style={{ display: 'grid', gap: 12 }}>
-                <WorkQueueCard {...filters} />
-                <BudgetDeviationList {...filters} limit={5} />
-                <EarmarksUsageBars {...filters} limit={5} />
-              </div>
-            </div>
-
-            {/* Zweite Reihe */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-              <IncomeExpenseBars {...filters} />
+            {/* Alle Komponenten untereinander in einer Spalte */}
+            <div style={{ display: 'grid', gap: 12 }}>
+              <BalanceAreaChart {...balanceFilters} />
+              <WorkQueueCard {...yearFilters} />
+              <BudgetDeviationList {...yearFilters} limit={5} />
+              <EarmarksUsageBars {...yearFilters} limit={5} />
+              <EarmarkDetailCard {...yearFilters} />
+              <ReportsMonthlyChart from={yearFilters.from} to={yearFilters.to} />
+              <ReportsCashBars from={yearFilters.from} to={yearFilters.to} />
+              <IncomeExpenseBars {...yearFilters} />
             </div>
           </>
         )

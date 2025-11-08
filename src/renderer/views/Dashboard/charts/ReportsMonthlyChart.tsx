@@ -126,13 +126,13 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }
 
   return (
-    <div className="card chart-card">
+    <div className="card chart-card" style={{ overflow: 'hidden' }}>
       <div className="chart-head">
         <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <span className="helper">{from} → {to}</span>
       </div>
-      <div className="chart-canvas">
-        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Monatsverlauf">
+      <div className="chart-canvas" style={{ overflow: 'hidden' }}>
+        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatsverlauf">
           {/* Axes */}
           <line x1={P} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />

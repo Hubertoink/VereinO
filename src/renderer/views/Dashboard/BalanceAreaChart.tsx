@@ -176,13 +176,13 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   
 
   return (
-    <section className="card" style={{ padding: 12 }}>
+    <section className="card" style={{ padding: 12, overflow: 'hidden' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <strong>Kassenstand (Saldo monatlich)</strong>
+        <strong>{isDaily ? 'Kassenstand (Saldo täglich)' : 'Kassenstand (Saldo monatlich)'}</strong>
         <span className="helper">{from} → {to}</span>
       </header>
-      <div style={{ position: 'relative' }}>
-        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Monatlicher Saldo">
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+        <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" height="auto" style={{ maxWidth: '100%', height: 'auto' }} role="img" aria-label="Monatlicher Saldo">
           {/* Zero/baseline axis */}
           {(yMin <= 0 && yMax >= 0) && (<line x1={P/2} x2={W-P/2} y1={ys(0)} y2={ys(0)} stroke="var(--border)" strokeWidth={1} />)}
           {/* Y axis */}

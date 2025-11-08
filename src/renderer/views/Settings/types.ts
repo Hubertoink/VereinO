@@ -131,7 +131,7 @@ export interface SettingsProps {
   setTagDefs: React.Dispatch<React.SetStateAction<TagDef[]>>
 
   // Callbacks
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openTagsManager?: () => void
   openSetupWizard?: () => void
@@ -158,7 +158,7 @@ export interface GeneralPaneProps {
   setDateFmt: (v: DateFmt) => void
   journalLimit: number
   setJournalLimit: (n: number) => void
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
 }
@@ -176,27 +176,27 @@ export interface TablePaneProps {
 }
 
 export interface StoragePaneProps {
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
 }
 
 export interface TagsPaneProps {
   tagDefs: TagDef[]
   setTagDefs: React.Dispatch<React.SetStateAction<TagDef[]>>
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openTagsManager?: () => void
 }
 
 export interface OrgPaneProps {
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
 }
 
 export interface YearEndPaneProps {
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
 }
 
 export interface ImportPaneProps {
-  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
 }

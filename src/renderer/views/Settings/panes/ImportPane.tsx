@@ -1,10 +1,11 @@
 import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
+import { ImportXlsxCard } from '../components/ImportXlsxCard'
 
 /**
  * ImportPane - Data Import (XLSX & camt.053 XML)
- * Shows guidance and an Import-Log modal sourced from the audit table.
+ * Provides full import functionality: file upload, preview, mapping, and execution.
  */
 export function ImportPane({ notify }: ImportPaneProps) {
   const [showLog, setShowLog] = React.useState(false)
@@ -25,26 +26,27 @@ export function ImportPane({ notify }: ImportPaneProps) {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gap: 6 }}>
           <strong>Datenimport</strong>
           <div className="helper">Excel (.xlsx) oder camt.053 XML (.xml). Vorschau → Zuordnung prüfen → Import.</div>
+          {/* Erklärungstext dauerhaft unter der Überschrift */}
+          <div className="helper">
+            <ul style={{ margin: '4px 0 0 16px' }}>
+              <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
+              <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden ignoriert.</li>
+              <li>Mindestens: Datum und Betrag (Brutto oder Netto+USt). Optional: Art, Sphäre, Zweckbindung, Zahlweg.</li>
+              <li>Bank-/Bar-Split: Alternativ die vier Spalten Bank+/-, Bar+/- verwenden (erzeugt ggf. mehrere Buchungen pro Zeile).</li>
+            </ul>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <details>
-            <summary className="chip" title="Hinweise zur Datei-Struktur">ⓘ</summary>
-            <div className="helper" style={{ marginTop: 6 }}>
-              <ul style={{ margin: '4px 0 0 16px' }}>
-                <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
-                <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden ignoriert.</li>
-                <li>Mindestens: Datum und Betrag (Brutto oder Netto+USt). Optional: Art, Sphäre, Zweckbindung, Zahlweg.</li>
-                <li>Bank-/Bar-Split: Alternativ die vier Spalten Bank+/-, Bar+/- verwenden (erzeugt ggf. mehrere Buchungen pro Zeile).</li>
-              </ul>
-            </div>
-          </details>
           <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}>📝 Log</button>
         </div>
       </div>
+
+      {/* Full Excel/camt.053 XML import functionality */}
+      <ImportXlsxCard notify={notify} />
 
       {showLog && createPortal(
         <div className="modal-overlay" onClick={() => setShowLog(false)} role="dialog" aria-modal="true">
