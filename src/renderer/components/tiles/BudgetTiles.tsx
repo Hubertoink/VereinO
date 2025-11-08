@@ -34,6 +34,8 @@ export interface BudgetTileBudget {
 
 export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
+  const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
+  
   useEffect(() => {
     let alive = true
     async function run() {
@@ -87,7 +89,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
               </div>
               <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {(startDate || endDate) && (
-                  <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
+                  <span title="Zeitraum">🗓 {fmtDate(startDate)} – {fmtDate(endDate)}</span>
                 )}
                 {(totalCount > 0 || usage[b.id]?.count != null) && (
                   <span title="Zugeordnete Buchungen">📄 {totalCount || usage[b.id]?.count || 0}{outsideCount > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>

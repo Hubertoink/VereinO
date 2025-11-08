@@ -38,6 +38,8 @@ export interface EarmarkUsageCardsProps {
 
 export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, onGoToBookings }: EarmarkUsageCardsProps) {
   const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
+  const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
+  
   useEffect(() => {
     let alive = true
     async function run() {
@@ -90,7 +92,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
             </div>
             <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {(startDate || endDate) && (
-                <span title="Zeitraum">🗓 {startDate ?? '—'} – {endDate ?? '—'}</span>
+                <span title="Zeitraum">🗓 {fmtDate(startDate)} – {fmtDate(endDate)}</span>
               )}
               {(totalCount != null) && (
                 <span title="Zugeordnete Buchungen">📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · außerhalb: ${outsideCount}` : ''}</span>

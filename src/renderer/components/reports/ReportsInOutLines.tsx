@@ -77,6 +77,13 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     return withYear ? `${mon} ${y}` : mon
   }
   const years = useMemo(() => Array.from(new Set(months.map(m => m.slice(0, 4)))), [months])
+  const yearText = useMemo(() => {
+    const fy = props.from?.slice(0, 4)
+    const ty = props.to?.slice(0, 4)
+    if (fy && ty && fy === ty) return fy
+    if (years.length === 0) return ''
+    return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`
+  }, [props.from, props.to, years])
   const points = (arr: Array<{ month: string; gross: number }>) => months.map((m, i) => `${xFor(i)},${yFor(arr.find(b => b.month === m)?.gross || 0)}`).join(' ')
   
   // Y-Achse Ticks
@@ -162,10 +169,8 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                 <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, false)}</text>
               </g>
             ))}
-            {years.length > 0 && (
-              <text x={Math.round(width / 2)} y={margin.top + innerH + 34} textAnchor="middle" fontSize="11" fill="var(--text-dim)">
-                {years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`}
-              </text>
+            {yearText && (
+              <text x={Math.round(width / 2)} y={margin.top + innerH + 34} textAnchor="middle" fontSize="11" fill="var(--text-dim)">{yearText}</text>
             )}
           </svg>
         </div>

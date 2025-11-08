@@ -4,8 +4,6 @@ import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import { createPortal } from 'react-dom'
-import BindingModal from './components/modals/BindingModal'
-import BudgetModal from './components/modals/BudgetModal'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
@@ -19,7 +17,8 @@ import DbMigrateModal from './DbMigrateModal'
 import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
 import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
-import BudgetTiles from './components/tiles/BudgetTiles'
+import BudgetsView from './views/Budgets/BudgetsView'
+import EarmarksView from './views/Earmarks/EarmarksView'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -600,18 +599,15 @@ export default function App() {
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
-    // Zweckbindungen (Bindings) state
+    // Zweckbindungen (Bindings) state (kept for Buchungen page dropdowns/filters)
     const [bindings, setBindings] = useState<Array<{ id: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive: number; color?: string | null; budget?: number | null }>>([])
-    const [editBinding, setEditBinding] = useState<null | { id?: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive?: boolean; color?: string | null; budget?: number | null }>(null)
-    const [deleteBinding, setDeleteBinding] = useState<null | { id: number; code: string; name: string }>(null)
     async function loadBindings() {
         const res = await window.api?.bindings.list?.({})
         if (res) setBindings(res.rows)
     }
 
-    // Budgets state
+    // Budgets state (kept for Buchungen page dropdowns/filters)
     const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
-    // Derived friendly list for selects
     const budgetsForEdit = useMemo(() => {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
@@ -626,8 +622,6 @@ export default function App() {
         }
         return (budgets || []).map((b) => ({ id: b.id, label: makeLabel(b) }))
     }, [budgets, earmarks])
-    const [editBudget, setEditBudget] = useState<null | { id?: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId?: number | null; projectId?: number | null; earmarkId?: number | null; amountPlanned: number }>(null)
-    const [deleteBudget, setDeleteBudget] = useState<null | { id: number; name?: string | null }>(null)
     async function loadBudgets() {
         const res = await window.api?.budgets.list?.({})
         if (res) {
@@ -653,10 +647,8 @@ export default function App() {
     }
 
     useEffect(() => {
-        if (activePage === 'Zweckbindungen') loadBindings()
-        if (activePage === 'Budgets') loadBudgets()
-        // Also ensure budgets are available for forms in Buchungen
-        if (activePage === 'Buchungen') { loadBudgets() }
+        // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
+        if (activePage === 'Buchungen') { loadBindings(); loadBudgets() }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activePage])
 
@@ -1501,143 +1493,29 @@ export default function App() {
                     )}
 
                     {activePage === 'Zweckbindungen' && (
-                        <>
-                            <div className="card" style={{ padding: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div className="helper">Zweckbindungen verwalten</div>
-                                    <button
-                                        className="btn primary"
-                                        onClick={() => setEditBinding({ code: '', name: '', description: null, startDate: null, endDate: null, isActive: true, color: null } as any)}
-                                    >+ Neu</button>
-                                </div>
-                                <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
-                                    <thead>
-                                        <tr>
-                                            <th align="left">Code</th>
-                                            <th align="left">Name</th>
-                                            <th align="left">Zeitraum</th>
-                                            <th align="left">Status</th>
-                                            <th align="right">Budget</th>
-                                            <th align="left">Farbe</th>
-                                            <th align="center">Aktionen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {bindings.map(b => (
-                                            <tr key={b.id}>
-                                                <td>{b.code}</td>
-                                                <td>{b.name}</td>
-                                                <td>{(b.startDate ?? '—')} – {(b.endDate ?? '—')}</td>
-                                                <td>{b.isActive ? 'aktiv' : 'inaktiv'}</td>
-                                                <td align="right">{b.budget != null ? eurFmt.format(b.budget) : '—'}</td>
-                                                <td>
-                                                    {b.color ? (
-                                                        <span title={b.color} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: b.color, verticalAlign: 'middle' }} />
-                                                    ) : '—'}
-                                                </td>
-                                                <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                                    <button className="btn" onClick={() => setEditBinding({ id: b.id, code: b.code, name: b.name, description: b.description ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, isActive: !!b.isActive, color: b.color ?? null, budget: (b as any).budget ?? null })}>✎</button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {bindings.length === 0 && (
-                                            <tr>
-                                                <td colSpan={7} className="helper">Keine Zweckbindungen vorhanden.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                                {editBinding && (
-                                    <BindingModal
-                                        value={editBinding}
-                                        onClose={() => setEditBinding(null)}
-                                        onSaved={async () => { notify('success', 'Zweckbindung gespeichert'); await loadBindings(); await loadEarmarks() }}
-                                    />
-                                )}
-                                {/* Delete-Dialog für Zweckbindungen wird nun im Bearbeiten-Modal gehandhabt */}
-                            </div>
-
-                            {/* Übersicht der Zweckbindungen in Kachelform – analog zu Budgets */}
-                            <EarmarkUsageCards
-                                bindings={bindings as any}
-                                from={from || undefined}
-                                to={to || undefined}
-                                sphere={filterSphere || undefined}
-                                onEdit={(b: any) => setEditBinding({ id: b.id, code: b.code, name: b.name, description: b.description ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, isActive: !!b.isActive, color: b.color ?? null, budget: (b as any).budget ?? null })}
-                                onGoToBookings={(earmarkId) => {
-                                    setFilterEarmark(earmarkId)
-                                    setActivePage('Buchungen')
-                                    setPage(1)
-                                }}
-                            />
-                        </>
+                        <EarmarksView
+                            from={from || undefined}
+                            to={to || undefined}
+                            filterSphere={filterSphere || undefined}
+                            onGoToBookings={(earmarkId) => {
+                                setFilterEarmark(earmarkId)
+                                setActivePage('Buchungen')
+                                setPage(1)
+                            }}
+                            onLoadEarmarks={loadEarmarks}
+                            notify={notify}
+                        />
                     )}
 
                     {activePage === 'Budgets' && (
-                        <div style={{ display: 'grid', gap: 12 }}>
-                            <div className="card" style={{ padding: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
-                                <button className="btn primary" onClick={() => setEditBudget({ year: new Date().getFullYear(), sphere: 'IDEELL', amountPlanned: 0, categoryId: null, projectId: null, earmarkId: null })}>+ Neu</button>
-                            </div>
-                                {/* Aktualisieren-Button entfernt gemäß Vorgabe */}
-                            {/* Simple table for now (legacy), will be replaced by tiles below */}
-                            <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
-                                <thead>
-                                    <tr>
-                                        <th align="left">Jahr</th>
-                                        <th align="left">Name</th>
-                                        <th align="left">Kategorie</th>
-                                        <th align="left">Projekt</th>
-                                        <th align="left">Zeitraum</th>
-                                        <th align="left">Farbe</th>
-                                        <th align="right">Budget</th>
-                                        <th align="center">Aktionen</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(budgets as any).map((b: any) => (
-                                        <tr key={b.id}>
-                                            <td>{b.year}</td>
-                                            <td>{b.name ?? '—'}</td>
-                                            <td>{b.categoryName ?? '—'}</td>
-                                            <td>{b.projectName ?? '—'}</td>
-                                            <td>{(b.startDate ?? '—')} – {(b.endDate ?? '—')}</td>
-                                            <td>{b.color ? <span title={b.color} style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 4, background: b.color }} /> : '—'}</td>
-                                            <td align="right">{eurFmt.format(b.amountPlanned)}</td>
-                                            <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                                <button className="btn" onClick={() => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)}>✎</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {(budgets as any).length === 0 && (
-                                        <tr>
-                                            <td colSpan={8} className="helper">Keine Budgets vorhanden.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                            </div>
-                            {/* Übersicht ohne Rahmen gemäß Vorgabe */}
-                            <BudgetTiles 
-                                budgets={budgets as any} 
-                                eurFmt={eurFmt} 
-                                onEdit={(b) => setEditBudget({ id: b.id, year: b.year, sphere: b.sphere, categoryId: b.categoryId ?? null, projectId: b.projectId ?? null, earmarkId: b.earmarkId ?? null, amountPlanned: b.amountPlanned, name: b.name ?? null, categoryName: b.categoryName ?? null, projectName: b.projectName ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, color: b.color ?? null } as any)} 
-                                onGoToBookings={(budgetId) => {
-                                    setFilterBudgetId(budgetId)
-                                    setActivePage('Buchungen')
-                                    setPage(1)
-                                }}
-                            />
-                            {editBudget && (
-                                <BudgetModal
-                                    value={editBudget as any}
-                                    onClose={() => setEditBudget(null)}
-                                    onSaved={async () => { notify('success', 'Budget gespeichert'); await loadBudgets() }}
-                                />
-                            )}
-                            {/* Delete-Dialog für Budgets wird nun im Bearbeiten-Modal gehandhabt */}
-                        </div>
+                        <BudgetsView
+                            onGoToBookings={(budgetId) => {
+                                setFilterBudgetId(budgetId)
+                                setActivePage('Buchungen')
+                                setPage(1)
+                            }}
+                            notify={notify}
+                        />
                     )}
 
                     {activePage === 'Mitglieder' && (

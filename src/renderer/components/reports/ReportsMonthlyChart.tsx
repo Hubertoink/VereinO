@@ -121,6 +121,13 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return withYear ? `${mon} ${y}` : mon
   }
   const years = useMemo(() => Array.from(new Set(months.map(m => m.slice(0, 4)))), [months])
+  const yearText = useMemo(() => {
+    const fy = props.from?.slice(0, 4)
+    const ty = props.to?.slice(0, 4)
+    if (fy && ty && fy === ty) return fy
+    if (years.length === 0) return ''
+    return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`
+  }, [props.from, props.to, years])
   const xFor = (idx: number) => margin.left + idx * (groupW + gap)
   const yFor = (val: number) => yBase + (innerH - Math.round((Math.abs(val) / maxVal) * innerH))
   
@@ -219,10 +226,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               </g>
             )}
             <line x1={yAxisX} y1={yBase} x2={yAxisX} y2={yBase + innerH} stroke="var(--border)" />
-            {years.length > 0 && (
-              <text x={Math.round(width / 2)} y={yBase + innerH + 34} textAnchor="middle" fontSize="11" fill="var(--text-dim)">
-                {years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`}
-              </text>
+            {yearText && (
+              <text x={Math.round(width / 2)} y={yBase + innerH + 34} textAnchor="middle" fontSize="11" fill="var(--text-dim)">{yearText}</text>
             )}
           </svg>
         </div>
