@@ -13,6 +13,11 @@ export function StoragePane({ notify }: StoragePaneProps) {
   const { autoMode, intervalDays, backups, busy: backupBusy, refreshBackups, makeBackup, updateAutoMode, updateInterval, chooseBackupDir, backupDir, openBackupFolder } = useBackupSettings()
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  // Data management & security (moved from GeneralPane)
+  const [showImportConfirm, setShowImportConfirm] = React.useState(false)
+  const [busyImport, setBusyImport] = React.useState(false)
+  const [showDeleteAll, setShowDeleteAll] = React.useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState('')
   // Unified comparison modal state
   const [compareModal, setCompareModal] = React.useState<null | {
     mode: 'folder' | 'default'
@@ -229,6 +234,146 @@ export function StoragePane({ notify }: StoragePaneProps) {
         </div>
         <BackupList backups={backups} onRestore={doRestore} />
       </section>
+
+      {/* Datenverwaltung & Sicherheit */}
+      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+        <div className="settings-title">
+          <span aria-hidden>🗄️</span> <strong>Datenverwaltung & Sicherheit</strong>
+        </div>
+        <div className="settings-sub">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            onClick={async () => {
+              try {
+                const res = await window.api?.db.export?.()
+                if (res?.filePath) {
+                  // Ignore empty string (cancel)
+                  if (String(res.filePath).trim().length > 0) notify('success', `Datenbank exportiert: ${res.filePath}`)
+                }
+              } catch (e: any) {
+                const msg = e?.message || String(e)
+                if (/Abbruch/i.test(msg)) return
+                notify('error', msg)
+              }
+            }}
+          >
+            Exportieren
+          </button>
+          <button className="btn danger" onClick={() => setShowImportConfirm(true)}>
+            Importieren…
+          </button>
+        </div>
+        <div className="muted-sep" />
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div>
+            <strong>Gefährliche Aktion</strong>
+            <div className="helper">Alle Buchungen löschen (inkl. Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
+          </div>
+          <div>
+            <button className="btn danger" onClick={() => { setDeleteConfirmText(''); setShowDeleteAll(true) }}>
+              Alle Buchungen löschen…
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Import Confirmation Modal */}
+      {showImportConfirm && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal" style={{ display: 'grid', gap: 12, maxWidth: 560 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0 }}>Datenbank importieren</h2>
+              <button className="btn ghost" onClick={() => setShowImportConfirm(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="helper" style={{ color: 'var(--danger)' }}>
+              Achtung: Die aktuelle Datenbank wird überschrieben. Erstelle vorher eine Sicherung, wenn du dir unsicher bist.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setShowImportConfirm(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="btn danger"
+                disabled={busyImport}
+                onClick={async () => {
+                  try {
+                    setBusyImport(true)
+                    const res = await window.api?.db?.import?.()
+                    if (res?.ok) {
+                      notify('success', 'Datenbank importiert. Die App wird neu geladen …')
+                      window.dispatchEvent(new Event('data-changed'))
+                      window.setTimeout(() => window.location.reload(), 600)
+                    }
+                  } catch (e: any) {
+                    const msg = e?.message || String(e)
+                    if (/Abbruch/i.test(msg)) {
+                      // graceful cancel -> ignore
+                    } else {
+                      notify('error', msg)
+                    }
+                  } finally {
+                    setBusyImport(false)
+                    setShowImportConfirm(false)
+                  }
+                }}
+              >
+                Ja, fortfahren
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteAll && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal" style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0 }}>Alle Buchungen löschen</h2>
+              <button className="btn ghost" onClick={() => setShowDeleteAll(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="helper">
+              Dieser Vorgang löscht ALLE Buchungen und zugehörige Anhänge dauerhaft. Dies kann nicht rückgängig gemacht werden.
+            </div>
+            <div className="field">
+              <label>Zur Bestätigung bitte exakt "LÖSCHEN" eingeben</label>
+              <input
+                className="input"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.currentTarget.value)}
+                placeholder="LÖSCHEN"
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setShowDeleteAll(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="btn danger"
+                disabled={deleteConfirmText !== 'LÖSCHEN'}
+                onClick={async () => {
+                  try {
+                    const res = await window.api?.vouchers.clearAll?.()
+                    const n = res?.deleted ?? 0
+                    setShowDeleteAll(false)
+                    notify('success', `${n} Buchung(en) gelöscht.`)
+                    window.dispatchEvent(new Event('data-changed'))
+                  } catch (e: any) {
+                    notify('error', e?.message || String(e))
+                  }
+                }}
+              >
+                Ja, alles löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* Fallback simple migrate modal */}

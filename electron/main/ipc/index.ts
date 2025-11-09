@@ -664,8 +664,12 @@ export function registerIpcHandlers() {
         const { root } = getAppDataDir()
         const dbPath = path.join(root, 'database.sqlite')
         if (!fs.existsSync(dbPath)) throw new Error('Datenbankdatei nicht gefunden')
-        const save = await dialog.showSaveDialog({ title: 'Datenbank exportieren …', defaultPath: 'VereinO_database.sqlite', filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }] })
-        if (save.canceled || !save.filePath) throw new Error('Abbruch')
+        const now = new Date()
+        const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+        const defaultName = `VereinO_database_${stamp}.sqlite`
+        const save = await dialog.showSaveDialog({ title: 'Datenbank exportieren …', defaultPath: defaultName, filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }] })
+        // Graceful cancel: return empty path instead of throwing
+        if (save.canceled || !save.filePath) return DbExportOutput.parse({ filePath: '' as any })
         fs.copyFileSync(dbPath, save.filePath)
         return DbExportOutput.parse({ filePath: save.filePath })
     })
@@ -674,7 +678,8 @@ export function registerIpcHandlers() {
     ipcMain.handle('db.import', async () => {
         DbImportInput.parse({})
         const open = await dialog.showOpenDialog({ title: 'Datenbank importieren …', filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }], properties: ['openFile'] })
-        if (open.canceled || !open.filePaths?.[0]) throw new Error('Abbruch')
+        // Graceful cancel
+        if (open.canceled || !open.filePaths?.[0]) return DbImportOutput.parse({ ok: false })
         const importPath = open.filePaths[0]
         const { root } = getAppDataDir()
         const dbPath = path.join(root, 'database.sqlite')
