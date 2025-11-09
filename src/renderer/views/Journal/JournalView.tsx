@@ -207,41 +207,41 @@ export default function JournalView({
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from || to) list.push({ key: 'range', label: `${from || '…'} – ${to || '…'}`, clear: () => { setFrom(''); setTo('') } })
-        if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
-        if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
-        if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
-        if (filterEarmark != null) {
-            const em = earmarks.find(e => e.id === filterEarmark)
-            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + filterEarmark}` , clear: () => setFilterEarmark(null) })
+        if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
+        if (activeFilterSphere) list.push({ key: 'sphere', label: `Sphäre: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
+        if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
+        if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
+        if (activeFilterEarmark != null) {
+            const em = earmarks.find(e => e.id === activeFilterEarmark)
+            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}` , clear: () => activeSetFilterEarmark(null) })
         }
-        if (filterBudgetId != null) {
-            const label = budgetNames.get(filterBudgetId) || `#${filterBudgetId}`
-            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
+        if (activeFilterBudgetId != null) {
+            const label = budgetNames.get(activeFilterBudgetId) || `#${activeFilterBudgetId}`
+            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null) })
         }
-        if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-        if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
+        if (activeFilterTag) list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null) })
+        if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, activeQ])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
         try {
-            const offset = (page - 1) * journalLimit
+            const offset = (activePage - 1) * journalLimit
             const res = await window.api?.vouchers?.list?.({
                 limit: journalLimit,
                 offset,
                 sort: sortDir,
                 sortBy,
-                paymentMethod: filterPM || undefined,
-                sphere: filterSphere || undefined,
-                type: filterType || undefined,
-                from: from || undefined,
-                to: to || undefined,
-                earmarkId: filterEarmark || undefined,
-                budgetId: filterBudgetId || undefined,
-                q: q.trim() || undefined,
-                tag: filterTag || undefined
+                paymentMethod: activeFilterPM || undefined,
+                sphere: activeFilterSphere || undefined,
+                type: activeFilterType || undefined,
+                from: activeFrom || undefined,
+                to: activeTo || undefined,
+                earmarkId: activeFilterEarmark || undefined,
+                budgetId: activeFilterBudgetId || undefined,
+                q: activeQ.trim() || undefined,
+                tag: activeFilterTag || undefined
             })
             if (res) {
                 setRows(res.rows || [])
@@ -251,7 +251,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, page, sortDir, sortBy, filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag, notify, refreshKey])
+    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
 
     // Load on mount and filter changes
     useEffect(() => {
