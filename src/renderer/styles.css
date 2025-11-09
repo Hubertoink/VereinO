@@ -7,6 +7,52 @@
 .settings-content { 
     overflow-y: auto;
 }
+.settings-pane { display: grid; gap: 16px; }
+.settings-pane-card { padding: 12px; }
+.settings-pane-actions { margin-top: 8px; }
+.swatches { display: flex; gap: 8px; margin-top: 8px; }
+.swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); }
+
+/* Storage pane specific */
+.storage-pane { display: grid; gap: 12px; }
+.storage-section { padding: 12px; display: grid; gap: 8px; }
+.storage-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.storage-auto-settings { display: flex; gap: 12px; flex-wrap: wrap; }
+.storage-backup-dir { display: flex; gap: 4px; flex-wrap: wrap; }
+.storage-backup-code { font-size: 12px; word-break: break-all; }
+.storage-field-min-160 { min-width: 160px; }
+.storage-field-min-240 { min-width: 240px; }
+.storage-data-management { display: grid; gap: 8px; }
+.error-text { color: var(--danger); }
+
+/* Modal styles */
+.modal-grid { display: grid; gap: 12px; }
+.modal-grid-14 { display: grid; gap: 14px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { margin: 0; }
+.modal-actions-end { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.modal-actions-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.modal-wide { max-width: 760px; }
+.modal-wider { max-width: 780px; }
+.helper-danger { color: var(--danger); }
+.helper-mt-neg { margin-top: -4px; }
+.helper-flex-1 { flex: 1; }
+
+/* Table comparison styles */
+.compare-table { padding: 12px; display: grid; gap: 8px; }
+.compare-table-10 { padding: 12px; display: grid; gap: 10px; }
+.compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; font-weight: 600; }
+.compare-rows { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+.compare-badge-current { background: var(--accent); color: #fff; padding: 4px 8px; border-radius: 4px; text-align: center; }
+.compare-badge-target { text-align: center; }
+.compare-cell { padding: 4px 8px; text-align: center; border-radius: 4px; }
+.compare-cell-diff { background: rgba(255, 193, 7, 0.15); }
+.compare-cell-diff-border { border: 1px solid rgba(255, 193, 7, 0.3); }
+.compare-cell-diff-blue { background: rgba(33, 150, 243, 0.15); }
+.compare-cell-diff-blue-border { border: 1px solid rgba(33, 150, 243, 0.3); }
+.compare-cell-diff-current { background: rgba(255, 193, 7, 0.15); padding: 4px 8px; text-align: center; border-radius: 4px; font-weight: 600; border: 1px solid rgba(255, 193, 7, 0.3); }
+.compare-cell-diff-target { background: rgba(33, 150, 243, 0.15); padding: 4px 8px; text-align: center; border-radius: 4px; border: 1px solid rgba(33, 150, 243, 0.3); }
+.compare-no-data { grid-column: 1 / span 3; }
 
 /* Settings: Cards and previews */
 .settings-card { border: 1px solid var(--panel-border, color-mix(in oklab, var(--text)/10%, transparent)); border-radius: 10px; background: var(--surface); box-shadow: 0 1px 0 color-mix(in oklab, var(--text)/7%, transparent) inset; }

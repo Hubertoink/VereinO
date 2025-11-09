@@ -186,25 +186,25 @@ export function StoragePane({ notify }: StoragePaneProps) {
   React.useEffect(() => { refreshBackups(); refreshLoc() }, [])
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="storage-pane">
       <div>
         <strong>Speicher & Sicherungen</strong>
         <div className="helper">Verwalte Speicherort und Sicherungen der Datenbank.</div>
       </div>
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+      <section className="card storage-section">
         <div className="helper">Aktueller Speicherort</div>
         <LocationInfoDisplay info={info} />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="storage-actions">
           <button className="btn" disabled={busy || locBusy} onClick={handlePickFolder}>📁 Ordner wählen…</button>
           <button className="btn" disabled={busy || locBusy} onClick={handleResetToDefault}>↩️ Standard vergleichen…</button>
         </div>
-        {locError && <div style={{ color: 'var(--danger)' }}>{locError}</div>}
+        {locError && <div className="error-text">{locError}</div>}
       </section>
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+      <section className="card storage-section">
         <div className="helper">Automatische Sicherungen</div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="storage-auto-settings">
           <div className="field">
             <label htmlFor="auto-backup-mode">Modus</label>
             <select id="auto-backup-mode" className="input" value={autoMode} onChange={(e) => updateAutoMode(e.target.value as any)}>
@@ -213,14 +213,14 @@ export function StoragePane({ notify }: StoragePaneProps) {
               <option value="SILENT">Still</option>
             </select>
           </div>
-          <div className="field" style={{ minWidth: 160 }}>
+          <div className="field storage-field-min-160">
             <label htmlFor="auto-backup-interval">Intervall (Tage)</label>
             <input id="auto-backup-interval" title="Intervall (Tage)" className="input" type="number" min={1} value={intervalDays} onChange={(e) => updateInterval(Number(e.target.value) || 1)} />
           </div>
-          <div className="field" style={{ minWidth: 240 }}>
+          <div className="field storage-field-min-240">
             <label>Backup-Verzeichnis</label>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{backupDir || 'Standard'}</code>
+            <div className="storage-backup-dir">
+              <code className="storage-backup-code">{backupDir || 'Standard'}</code>
               <button className="btn" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis gesetzt') }}>Ändern…</button>
               <button className="btn" disabled={backupBusy} onClick={openBackupFolder}>Öffnen…</button>
             </div>
@@ -228,20 +228,20 @@ export function StoragePane({ notify }: StoragePaneProps) {
         </div>
       </section>
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <section className="card storage-section">
+        <div className="storage-actions">
           <button className="btn" disabled={busy} onClick={doMakeBackup}>Jetzt sichern</button>
         </div>
         <BackupList backups={backups} onRestore={doRestore} />
       </section>
 
       {/* Datenverwaltung & Sicherheit */}
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+      <section className="card storage-section">
         <div className="settings-title">
-          <span aria-hidden>🗄️</span> <strong>Datenverwaltung & Sicherheit</strong>
+          <span aria-hidden="true">🗄️</span> <strong>Datenverwaltung & Sicherheit</strong>
         </div>
         <div className="settings-sub">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="storage-actions">
           <button
             className="btn"
             onClick={async () => {
@@ -262,7 +262,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
           </button>
           <button className="btn danger" onClick={async () => {
             try {
-              const picked = await window.api?.db?.import?.pick?.()
+              const api = window.api?.db?.import as any
+              const picked = await api?.pick?.()
               if (picked?.ok && picked.filePath) {
                 const cur = await loadCurrentCounts()
                 setImportPick({ filePath: picked.filePath, size: picked.size, mtime: picked.mtime, counts: picked.counts, currentCounts: cur })
@@ -277,7 +278,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
           </button>
         </div>
         <div className="muted-sep" />
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div className="storage-data-management">
           <div>
             <strong>Gefährliche Aktion</strong>
             <div className="helper">Alle Buchungen löschen (inkl. Anhänge). Dies kann nicht rückgängig gemacht werden.</div>
@@ -293,21 +294,21 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Import comparison modal */}
       {importPick && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyImport && setImportPick(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Import vergleichen</h2>
+          <div className="modal modal-wide modal-grid" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Import vergleichen</h2>
               <button className="btn ghost" onClick={() => setImportPick(null)}>✕</button>
             </div>
-            <div className="helper" style={{ color: 'var(--danger)' }}>
+            <div className="helper helper-danger">
               Die aktuelle Datenbank wird beim Import überschrieben. Prüfe die Tabellenstände, bevor du fortfährst.
             </div>
-            <div className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, fontWeight: 600 }}>
+            <div className="card compare-table">
+              <div className="compare-header">
                 <div>Tabelle</div>
-                <div style={{ background: 'var(--accent)', color: '#fff', padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>Aktuell</div>
-                <div style={{ textAlign: 'center' }}>Import</div>
+                <div className="compare-badge-current">Aktuell</div>
+                <div className="compare-badge-target">Import</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8 }}>
+              <div className="compare-rows">
                 {(() => {
                   const currentCounts = importPick.currentCounts || {}
                   const importCounts = importPick.counts || {}
@@ -332,8 +333,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
                     return (
                       <React.Fragment key={k}>
                         <div>{tableNames[k] || k}</div>
-                        <div style={{ padding: '4px 8px', textAlign: 'center', background: diff ? 'rgba(255,193,7,0.15)' : 'transparent', borderRadius: 4 }}>{cur}</div>
-                        <div style={{ padding: '4px 8px', textAlign: 'center', background: diff ? 'rgba(33,150,243,0.15)' : 'transparent', borderRadius: 4 }}>{imp}</div>
+                        <div className={diff ? 'compare-cell compare-cell-diff' : 'compare-cell'}>{cur}</div>
+                        <div className={diff ? 'compare-cell compare-cell-diff-blue' : 'compare-cell'}>{imp}</div>
                       </React.Fragment>
                     )
                   })
@@ -342,18 +343,19 @@ export function StoragePane({ notify }: StoragePaneProps) {
                   const currentCounts = importPick.currentCounts || {}
                   const importCounts = importPick.counts || {}
                   if (!Object.keys(currentCounts).length && !Object.keys(importCounts).length) {
-                    return <div style={{ gridColumn: '1 / span 3' }} className="helper">Keine Tabellenstände verfügbar.</div>
+                    return <div className="compare-no-data helper">Keine Tabellenstände verfügbar.</div>
                   }
                   return null
                 })()}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+            <div className="modal-actions-end">
               <button className="btn" disabled={busyImport} onClick={() => setImportPick(null)}>Abbrechen</button>
               <button className="btn danger" disabled={busyImport} onClick={async () => {
                 try {
                   setBusyImport(true)
-                  const res = await window.api?.db?.import?.fromPath?.(importPick.filePath)
+                  const api = window.api?.db?.import as any
+                  const res = await api?.fromPath?.(importPick.filePath)
                   if (res?.ok) {
                     notify('success', 'Datenbank importiert. Neu laden …')
                     window.dispatchEvent(new Event('data-changed'))
@@ -375,9 +377,9 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Delete All Confirmation Modal */}
       {showDeleteAll && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal" style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Alle Buchungen löschen</h2>
+          <div className="modal modal-grid">
+            <div className="modal-header">
+              <h2>Alle Buchungen löschen</h2>
               <button className="btn ghost" onClick={() => setShowDeleteAll(false)}>
                 ✕
               </button>
@@ -394,7 +396,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
                 placeholder="LÖSCHEN"
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div className="modal-actions-end">
               <button className="btn" onClick={() => setShowDeleteAll(false)}>
                 Abbrechen
               </button>
@@ -446,27 +448,27 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
       {compareModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busy && setCompareModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 780, display: 'grid', gap: 14 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>
+          <div className="modal modal-wider modal-grid-14" onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>
                 {compareModal.mode === 'folder' ? 'Datenbanken vergleichen' : 'Standard-Datenbank Vergleich'}
               </h2>
               <button className="btn ghost" onClick={() => setCompareModal(null)} aria-label="Schließen">✕</button>
             </header>
-            <div className="helper" style={{ marginTop: -4 }}>
+            <div className="helper helper-mt-neg">
               {compareModal.mode === 'folder' ? (
                 compareModal.hasTargetDb ? 'Im gewählten Ordner wurde eine bestehende Datenbank gefunden. Vergleiche die Tabellenstände und wähle eine Aktion.' : 'Der gewählte Ordner enthält keine Datenbank. Du kannst deine aktuelle Datenbank dorthin migrieren.'
               ) : (
                 compareModal.hasTargetDb ? 'Es existiert bereits eine Standard-Datenbank. Vergleiche Tabellenstände, bevor du wechselst oder migrierst.' : 'Im Standardordner liegt keine Datenbank. Du kannst deine aktuelle dorthin migrieren.'
               )}
             </div>
-            <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, fontWeight: 600 }}>
+            <div className="card compare-table-10">
+              <div className="compare-header">
                 <div>Tabelle</div>
-                <div style={{ background: 'var(--accent)', color: '#fff', padding: '4px 8px', borderRadius: 4, textAlign: 'center' }}>Aktuell</div>
-                <div style={{ textAlign: 'center' }}>{compareModal.mode === 'folder' ? 'Gewählt' : 'Standard'}</div>
+                <div className="compare-badge-current">Aktuell</div>
+                <div className="compare-badge-target">{compareModal.mode === 'folder' ? 'Gewählt' : 'Standard'}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8 }}>
+              <div className="compare-rows">
                 {(() => {
                   // Map technical table names to German
                   const tableNames: Record<string, string> = {
@@ -497,23 +499,10 @@ export function StoragePane({ notify }: StoragePaneProps) {
                     return (
                       <React.Fragment key={k}>
                         <div>{germanName}</div>
-                        <div style={{ 
-                          background: isDifferent ? 'rgba(255, 193, 7, 0.15)' : 'transparent',
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          textAlign: 'center',
-                          fontWeight: 600,
-                          border: isDifferent ? '1px solid rgba(255, 193, 7, 0.3)' : 'none'
-                        }}>
+                        <div className={isDifferent ? 'compare-cell-diff-current' : 'compare-cell'}>
                           {current}
                         </div>
-                        <div style={{ 
-                          background: isDifferent ? 'rgba(33, 150, 243, 0.15)' : 'transparent',
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          textAlign: 'center',
-                          border: isDifferent ? '1px solid rgba(33, 150, 243, 0.3)' : 'none'
-                        }}>
+                        <div className={isDifferent ? 'compare-cell-diff-target' : 'compare-cell'}>
                           {target || '0'}
                         </div>
                       </React.Fragment>
@@ -521,19 +510,19 @@ export function StoragePane({ notify }: StoragePaneProps) {
                   })
                 })()}
                 {Object.keys(compareModal.currentCounts).length === 0 && Object.keys(compareModal.targetCounts || {}).length === 0 && (
-                  <div style={{ gridColumn: '1 / span 3' }} className="helper">Keine Tabellenstände verfügbar.</div>
+                  <div className="compare-no-data helper">Keine Tabellenstände verfügbar.</div>
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-              <div className="helper" style={{ flex: 1 }}>
+            <div className="modal-actions-between">
+              <div className="helper helper-flex-1">
                 {compareModal.mode === 'folder' ? (
                   compareModal.hasTargetDb ? 'Aktion wählen: Bestehende Datenbank verwenden oder aktuelle Datenbank in den Ordner kopieren.' : 'Aktion wählen: Aktuelle Datenbank in den Ordner kopieren.'
                 ) : (
                   compareModal.hasTargetDb ? 'Aktion wählen: Standard-Datenbank verwenden oder aktuelle zur Standard migrieren.' : 'Aktion wählen: Aktuelle Datenbank zum Standard migrieren.'
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="storage-actions">
                 {compareModal.mode === 'folder' && compareModal.hasTargetDb && (
                   <button className="btn" onClick={useSelectedFolder} disabled={busy}>Bestehende verwenden</button>
                 )}
@@ -552,7 +541,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
         </div>
       )}
 
-      {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
+      {err && <div className="error-text">{err}</div>}
     </div>
   )
 }

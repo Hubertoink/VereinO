@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useToast } from '../context/ToastContext'
 import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
@@ -19,6 +20,7 @@ function contrastText(bg?: string | null) {
 }
 
 export default function InvoicesView() {
+  const { notify } = useToast()
   // Filters and pagination
   const [q, setQ] = useState<string>('')
   const [status, setStatus] = useState<'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'>('ALL')
@@ -176,6 +178,14 @@ export default function InvoicesView() {
       const res = await window.api?.invoices?.addPayment?.({ invoiceId: showPayModal.id, date: payDate, amount: amt })
       if (res) {
         setRows(prev => prev.map(r => r.id === showPayModal.id ? { ...r, paidSum: res.paidSum ?? (r.paidSum + amt), status: res.status } : r))
+        try {
+          const row = rows.find(r => r.id === showPayModal.id)
+          const autoPostEnabled = !!(row?.autoPost)
+          if (res.status === 'PAID' && autoPostEnabled) {
+            const invLabel = row?.invoiceNo ? `Rechnung ${row.invoiceNo}` : `Rechnung #${row?.id}`
+            notify('success', `${invLabel} wurde automatisch als Buchung erstellt.`)
+          }
+        } catch {}
         setShowPayModal(null)
         try { window.dispatchEvent(new Event('data-changed')) } catch {}
         await loadSummary()
@@ -204,6 +214,7 @@ export default function InvoicesView() {
   const [editInvoiceFiles, setEditInvoiceFiles] = useState<Array<{ id: number; fileName: string; size?: number | null; createdAt?: string | null }>>([])
   const [formError, setFormError] = useState<string>('')
   const [requiredTouched, setRequiredTouched] = useState(false)
+  const [missingRequired, setMissingRequired] = useState<string[]>([])
   function openCreate() { const today = new Date().toISOString().slice(0, 10); setForm({ mode: 'create', draft: { date: today, dueDate: null, invoiceNo: '', party: '', description: '', grossAmount: '', paymentMethod: 'BANK', sphere: 'IDEELL', earmarkId: '', budgetId: '', autoPost: true, voucherType: 'OUT', tags: [] } }); setFormFiles([]); setFormError(''); setRequiredTouched(false) }
   function openEdit(row: any) { setForm({ mode: 'edit', draft: { id: row.id, date: row.date, dueDate: row.dueDate ?? null, invoiceNo: row.invoiceNo ?? '', party: row.party, description: row.description ?? '', grossAmount: String(row.grossAmount ?? ''), paymentMethod: (row.paymentMethod ?? '') as any, sphere: row.sphere, earmarkId: (typeof row.earmarkId === 'number' ? row.earmarkId : '') as any, budgetId: (typeof row.budgetId === 'number' ? row.budgetId : '') as any, autoPost: !!(row.autoPost ?? 0), voucherType: row.voucherType, tags: (row.tags || []) as string[] }, sourceRow: row }); setFormFiles([]); setFormError(''); setRequiredTouched(false) }
   function parseAmount(input: string): number | null { if (!input) return null; const s = input.replace(/\./g, '').replace(',', '.'); const n = Number(s); return isFinite(n) ? Math.round(n * 100) / 100 : null }
@@ -212,10 +223,13 @@ export default function InvoicesView() {
     setRequiredTouched(true)
     setFormError('')
     const d = form.draft
-    if (!d.date) { setFormError('Bitte Datum angeben'); return }
-    if (!d.party || !d.party.trim()) { setFormError('Bitte Partei angeben'); return }
+    const missing: string[] = []
+    if (!d.date) missing.push('Datum')
+    if (!(d.invoiceNo || '').trim()) missing.push('Rechnungsnummer')
+    if (!d.party || !d.party.trim()) missing.push('Partei')
     const amt = parseAmount(d.grossAmount)
-    if (amt == null || amt <= 0) { setFormError('Bitte gültigen Betrag eingeben (> 0)'); return }
+    if (amt == null || amt <= 0) missing.push('Betrag')
+    if (missing.length) { setMissingRequired(missing); return }
     try {
       if (form.mode === 'create') {
         let files: { name: string; dataBase64: string; mime?: string }[] | undefined
@@ -493,8 +507,18 @@ export default function InvoicesView() {
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 3fr) minmax(320px, 2fr)', gap: 12 }}>
               <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
                 <div className="field">
-                  <label>Rechnungsnummer</label>
-                  <input className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" />
+                  <label>Rechnungsnummer <span className="req-asterisk" aria-hidden="true">*</span></label>
+                  <input
+                    className="input"
+                    value={form.draft.invoiceNo || ''}
+                    onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))}
+                    placeholder="z. B. 2025-001"
+                    style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
+                    aria-label="Rechnungsnummer"
+                  />
+                  {requiredTouched && !(form.draft.invoiceNo || '').trim() && (
+                    <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Rechnungsnummer angeben</div>
+                  )}
                 </div>
                 <div className="field">
                   <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -662,6 +686,7 @@ export default function InvoicesView() {
             {(() => {
               const missing: string[] = []
               if (!form!.draft.date) missing.push('Datum')
+              if (!(form!.draft.invoiceNo || '').trim()) missing.push('Rechnungsnummer')
               if (!form!.draft.party?.trim()) missing.push('Partei')
               const a = parseAmount(form!.draft.grossAmount)
               if (a == null || a <= 0) missing.push('Betrag')
@@ -673,7 +698,7 @@ export default function InvoicesView() {
                       <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
                     )}
                     <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                    <button className="btn primary" onClick={() => { setRequiredTouched(true); saveForm() }} disabled={missing.length > 0}>Speichern</button>
+                    <button className="btn primary" onClick={() => { setRequiredTouched(true); if (missing.length > 0) { setMissingRequired(missing); return } saveForm() }}>Speichern</button>
                   </div>
                 </div>
               )
@@ -682,6 +707,25 @@ export default function InvoicesView() {
             <datalist id="desc-suggestions">{descSuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>
           </div>
         </div>, document.body)}
+
+        {missingRequired.length > 0 && createPortal(
+          <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setMissingRequired([])}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
+                <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen">×</button>
+              </header>
+              <div className="card" style={{ padding: 10 }}>
+                <div>Bitte ergänze die folgenden Felder:</div>
+                <ul className="helper" style={{ marginTop: 6 }}>
+                  {missingRequired.map(f => <li key={f}>{f}</li>)}
+                </ul>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn primary" onClick={() => setMissingRequired([])}>OK</button>
+              </div>
+            </div>
+          </div>, document.body)}
 
       {detailId != null && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setDetailId(null); setDetail(null) }}>

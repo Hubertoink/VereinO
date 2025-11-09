@@ -204,6 +204,19 @@ export default function JournalView({
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
 
+    // ==================== TAG COUNTS ====================
+    const tagCounts = useMemo(() => {
+        const counts: Record<string, number> = {}
+        rows.forEach(row => {
+            if (row.tags && Array.isArray(row.tags)) {
+                row.tags.forEach(tag => {
+                    counts[tag] = (counts[tag] || 0) + 1
+                })
+            }
+        })
+        return counts
+    }, [rows])
+
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
@@ -308,32 +321,37 @@ export default function JournalView({
             {/* Filter Toolbar */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-                <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as any) || null)}>
+                <select className="input" value={activeFilterType ?? ''} onChange={(e) => activeSetFilterType((e.target.value as any) || null)}>
                     <option value="">Alle</option>
                     <option value="IN">IN</option>
                     <option value="OUT">OUT</option>
                     <option value="TRANSFER">TRANSFER</option>
                 </select>
                 <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-                <select className="input" value={filterPM ?? ''} onChange={(e) => { const v = e.target.value as any; setFilterPM(v || null); }}>
+                <select className="input" value={activeFilterPM ?? ''} onChange={(e) => { const v = e.target.value as any; activeSetFilterPM(v || null); }}>
                     <option value="">Alle</option>
                     <option value="BAR">Bar</option>
                     <option value="BANK">Bank</option>
                 </select>
                 <span style={{ color: 'var(--text-dim)' }}>Tag:</span>
-                <select className="input" value={filterTag ?? ''} onChange={(e) => setFilterTag(e.target.value || null)}>
+                <select className="input" value={activeFilterTag ?? ''} onChange={(e) => activeSetFilterTag(e.target.value || null)}>
                     <option value="">Alle</option>
-                    {tagDefs.map(t => (
-                        <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
+                    {tagDefs.map(t => {
+                        const count = tagCounts[t.name] || 0
+                        return (
+                            <option key={t.id} value={t.name}>
+                                {t.name} ({count})
+                            </option>
+                        )
+                    })}
                 </select>
 
                 {/* Textsuche */}
                 <input
                     className="input"
                     placeholder="Suche (#ID, Text, Betrag …)"
-                    value={q}
-                    onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                    value={activeQ}
+                    onChange={(e) => { activeSetQ(e.target.value); activeSetPage(1); }}
                     style={{ minWidth: 200, flex: '1 1 260px' }}
                     aria-label="Suche"
                 />
@@ -386,21 +404,21 @@ export default function JournalView({
                             <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
                         </span>
                     ))}
-                    {(filterType || filterPM || filterTag || filterSphere || filterEarmark || filterBudgetId || from || to || q.trim()) && (
+                    {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
                         <button
                             className="btn ghost"
                             title="Alle Filter zurücksetzen"
                             onClick={() => { 
-                                setFilterType(null);
-                                setFilterPM(null);
-                                setFilterTag(null);
-                                setFilterSphere(null);
-                                setFilterEarmark(null);
-                                setFilterBudgetId(null);
-                                setFrom('');
-                                setTo('');
-                                setQ('');
-                                setPage(1);
+                                activeSetFilterType(null);
+                                activeSetFilterPM(null);
+                                activeSetFilterTag(null);
+                                activeSetFilterSphere(null);
+                                activeSetFilterEarmark(null);
+                                activeSetFilterBudgetId(null);
+                                activeSetFrom('');
+                                activeSetTo('');
+                                activeSetQ('');
+                                activeSetPage(1);
                             }}
                             style={{ padding: '4px 8px', color: 'var(--accent)' }}
                         >
@@ -416,15 +434,15 @@ export default function JournalView({
             {/* Filter Totals */}
             <FilterTotals 
                 refreshKey={refreshKey} 
-                from={from || undefined} 
-                to={to || undefined} 
-                paymentMethod={filterPM || undefined} 
-                sphere={filterSphere || undefined} 
-                type={filterType || undefined} 
-                earmarkId={filterEarmark || undefined} 
-                budgetId={filterBudgetId ?? undefined} 
-                q={q || undefined} 
-                tag={filterTag || undefined} 
+                from={activeFrom || undefined} 
+                to={activeTo || undefined} 
+                paymentMethod={activeFilterPM || undefined} 
+                sphere={activeFilterSphere || undefined} 
+                type={activeFilterType || undefined} 
+                earmarkId={activeFilterEarmark || undefined} 
+                budgetId={activeFilterBudgetId ?? undefined} 
+                q={activeQ || undefined} 
+                tag={activeFilterTag || undefined} 
             />
 
             {/* Main Table Card */}
@@ -432,12 +450,12 @@ export default function JournalView({
                 <div className="card">
                     {/* Pagination controls */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                        <div className="helper">Seite {page} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
+                        <div className="helper">Seite {activePage} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
                         <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn" onClick={() => { setPage(1) }} disabled={page <= 1} title="Erste">⏮</button>
-                            <button className="btn" onClick={() => { setPage(p => Math.max(1, p - 1)) }} disabled={page <= 1} title="Zurück">‹</button>
-                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(p => Math.min(maxP, p + 1)) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter">›</button>
-                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); setPage(maxP) }} disabled={page >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte">⏭</button>
+                            <button className="btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">⏮</button>
+                            <button className="btn" onClick={() => { activeSetPage(p => Math.max(1, p - 1)) }} disabled={activePage <= 1} title="Zurück">‹</button>
+                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(p => Math.min(maxP, p + 1)) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter">›</button>
+                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(maxP) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte">⏭</button>
                         </div>
                     </div>
 
@@ -468,21 +486,21 @@ export default function JournalView({
                         highlightId={flashId}
                         lockedUntil={periodLock?.closedUntil || null}
                         onTagClick={async (name) => {
-                            setFilterTag(name)
+                            activeSetFilterTag(name)
                             setActivePage('Buchungen')
-                            setPage(1)
+                            activeSetPage(1)
                             await loadRecent()
                         }}
                         onEarmarkClick={async (id) => {
-                            setFilterEarmark(id)
+                            activeSetFilterEarmark(id)
                             setActivePage('Buchungen')
-                            setPage(1)
+                            activeSetPage(1)
                             await loadRecent()
                         }}
                         onBudgetClick={async (id) => {
-                            setFilterBudgetId(id)
+                            activeSetFilterBudgetId(id)
                             setActivePage('Buchungen')
-                            setPage(1)
+                            activeSetPage(1)
                             await loadRecent()
                         }}
                     />

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 
@@ -657,23 +658,26 @@ export default function MembersView() {
                 <PaymentsAssignModal onClose={() => setShowPayments(false)} />
             )}
             {missingRequired.length > 0 && (
-                <div className="modal-overlay" onClick={() => setMissingRequired([])}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
-                            <button className="btn" onClick={() => setMissingRequired([])}>×</button>
-                        </header>
-                        <div className="card" style={{ padding: 10 }}>
-                            <div>Bitte ergänze die folgenden Felder:</div>
-                            <ul className="helper" style={{ marginTop: 6 }}>
-                                {missingRequired.map((f) => (<li key={f}>{f}</li>))}
-                            </ul>
+                createPortal(
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setMissingRequired([])}>
+                        <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
+                                <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen">×</button>
+                            </header>
+                            <div className="card" style={{ padding: 10 }}>
+                                <div>Bitte ergänze die folgenden Felder:</div>
+                                <ul className="helper" style={{ marginTop: 6 }}>
+                                    {missingRequired.map((f) => (<li key={f}>{f}</li>))}
+                                </ul>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                <button className="btn primary" onClick={() => setMissingRequired([])}>OK</button>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn primary" onClick={() => setMissingRequired([])}>OK</button>
-                        </div>
-                    </div>
-                </div>
+                    </div>,
+                    document.body
+                )
             )}
             {deleteConfirm && (
                 <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
