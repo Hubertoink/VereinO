@@ -26,6 +26,8 @@ import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
 import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
 import { useQuickAdd } from './hooks/useQuickAdd'
+import { ToastProvider, useToast } from './context/ToastContext'
+import { UIPreferencesProvider } from './context/UIPreferences'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -86,20 +88,16 @@ function TopHeaderOrg() {
     )
 }
 
-export default function App() {
+function AppInner() {
+    // Use toast context
+    const { notify } = useToast()
+    
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
     const bumpDataVersion = () => setRefreshKey((k) => k + 1)
     const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
     const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
-    // Toast notifications
-    const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; text: string; action?: { label: string; onClick: () => void } }>>([])
-    const toastIdRef = useRef(1)
-    const notify = (type: 'success' | 'error' | 'info', text: string, ms = 3000, action?: { label: string; onClick: () => void }) => {
-        const id = toastIdRef.current++
-        setToasts(prev => [...prev, { id, type, text, action }])
-        window.setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ms)
-    }
+    
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
@@ -983,18 +981,6 @@ export default function App() {
                 />
             )}
             {/* removed: Confirm mark as paid modal */}
-            {/* Toasts bottom-right */}
-            <div className="toast-container" aria-live="polite" aria-atomic="true">
-                {toasts.map(t => (
-                    <div key={t.id} className={`toast ${t.type}`} role="status" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span className="title">{t.type === 'error' ? 'Fehler' : t.type === 'success' ? 'OK' : 'Info'}</span>
-                        <span className="flex-1">{t.text}</span>
-                        {t.action && (
-                            <button className="btn" onClick={() => t.action?.onClick?.()}>{t.action.label}</button>
-                        )}
-                    </div>
-                ))}
-            </div>
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Rechnungen' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">+ Buchung</button>
@@ -1850,5 +1836,16 @@ function IconArrow({ size = 14 }: { size?: number }) {
             <path d="M5 12h14" />
             <path d="M13 8l6 4-6 4" />
         </svg>
+    )
+}
+
+// Wrapper with context providers
+export default function App() {
+    return (
+        <UIPreferencesProvider>
+            <ToastProvider>
+                <AppInner />
+            </ToastProvider>
+        </UIPreferencesProvider>
     )
 }
