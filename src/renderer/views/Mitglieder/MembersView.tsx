@@ -202,9 +202,8 @@ export default function MembersView() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div className="helper">{busy ? 'Lade…' : `Seite ${page}/${pages} – ${total} Einträge`}</div>
-                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}
-                        style={{ background: 'var(--accent)', color: '#fff' }}>✉ Einladen (E-Mail)</button>
-                    <button className="btn" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
+                    <button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null

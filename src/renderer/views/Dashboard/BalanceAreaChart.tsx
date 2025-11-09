@@ -226,14 +226,20 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
           )}
         </svg>
         {hoverIdx != null && (
-          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)' }}>
+          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
             {(() => {
               const key = String(labels[hoverIdx])
               const isDailyLoc = (from && to && from.slice(0,7) === to.slice(0,7))
               const labelText = isDailyLoc ? `${key.slice(8,10)}.${key.slice(5,7)}.` : (MONTH_NAMES[Math.max(0, Math.min(11, Number(key.slice(5)) - 1))] || key.slice(5))
-              return <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{labelText}</div>
+              const val = series[hoverIdx] || 0
+              const color = val >= 0 ? 'var(--success)' : 'var(--danger)'
+              return (
+                <>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{labelText}</div>
+                  <div style={{ fontWeight: 700, color }}>{eur.format(val)}</div>
+                </>
+              )
             })()}
-            <div style={{ fontWeight: 700 }}>{eur.format(series[hoverIdx] || 0)}</div>
           </div>
         )}
         {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}

@@ -56,6 +56,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
 
   const labels = rowsIn.map(r => r.month)
   const monthNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+  const monthNamesFull = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']
   const maxVal = Math.max(1,
     ...rowsIn.map(r => r.gross),
     ...rowsOut.map(r => r.gross),
@@ -167,11 +168,11 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
           )}
         </svg>
         {hoverIdx != null && (
-          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600 }}>{monthNames[Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))] || String(labels[hoverIdx]).slice(5)}</div>
-            <div><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
-            <div><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
-            <div><span style={{ color: '#f9a825' }}>Netto</span> <strong>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
+          <div style={{ position: 'absolute', left: `${(xs(hoverIdx, labels.length)/W)*100}%`, top: 8, transform: 'translateX(-50%)', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthNamesFull[Math.max(0, Math.min(11, Number(String(labels[hoverIdx]).slice(5)) - 1))] || String(labels[hoverIdx]).slice(5)}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(rowsIn[hoverIdx]?.gross || 0)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(rowsOut[hoverIdx]?.gross || 0)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eur.format(rowsNet[hoverIdx]?.gross || 0)}</strong></div>
           </div>
         )}
         {loading && <div className="helper" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>Laden…</div>}

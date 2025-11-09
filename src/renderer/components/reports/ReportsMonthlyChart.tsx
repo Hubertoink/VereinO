@@ -120,6 +120,12 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const mon = d.toLocaleString('de-DE', { month: 'short' }).replace('.', '')
     return withYear ? `${mon} ${y}` : mon
   }
+  const monthLabelFull = (m: string) => {
+    const [y, mm] = m.split('-').map(Number)
+    const d = new Date(Date.UTC(y, (mm - 1) as number, 1))
+    const mon = d.toLocaleString('de-DE', { month: 'long' })
+    return mon.charAt(0).toUpperCase() + mon.slice(1)
+  }
   const years = useMemo(() => Array.from(new Set(months.map(m => m.slice(0, 4)))), [months])
   const yearText = useMemo(() => {
     const fy = props.from?.slice(0, 4)
@@ -170,12 +176,14 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             if (idx == null || !series[idx]) return null
             const s = series[idx]
             const net = s.inGross + s.outGross
+            const gx = xFor(idx) + barW
+            const tooltipX = (gx / width) * 100
             return (
-              <div style={{ position: 'absolute', top: 6, left: 12, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', gap: 10, alignItems: 'center' }}>
-                <strong style={{ fontSize: 12 }}>{monthLabel(s.month, true)}</strong>
-                <span className="chip" style={{ background: '#2e7d32', color: '#fff' }}>IN {eurFmt.format(s.inGross)}</span>
-                <span className="chip" style={{ background: '#c62828', color: '#fff' }}>OUT {eurFmt.format(Math.abs(s.outGross))}</span>
-                <span className="chip" style={{ background: net >= 0 ? '#2e7d32' : '#c62828', color: '#fff' }}>Netto {eurFmt.format(net)}</span>
+              <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>
               </div>
             )
           })()}
@@ -201,8 +209,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
                   {(() => {
                     const hNet = Math.round((Math.abs(saldoMonth) / maxVal) * innerH)
                     const yNet = yBase + (innerH - hNet)
-                    const color = '#f9a825'
-                    return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill={color} rx={2} opacity={0.9} />
+                    return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill="var(--warning)" rx={2} opacity={0.9} />
                   })()}
                   <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
                 </g>
