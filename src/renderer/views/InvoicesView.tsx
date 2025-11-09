@@ -263,29 +263,29 @@ export default function InvoicesView() {
   }, [form?.mode, (form?.draft as any)?.id])
 
   return (
-    <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0 }}>Rechnungen</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input className="input" placeholder="Suche Rechnungen (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} style={{ width: 280 }} />
-          <select className="input" value={status} onChange={e => { setStatus(e.target.value as any); setOffset(0) }}>
+    <div className="card invoices-container">
+      <div className="invoices-header">
+        <h1>Rechnungen</h1>
+        <div className="invoices-filters">
+          <input className="input invoices-search" placeholder="Suche Rechnungen (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} aria-label="Rechnungen durchsuchen" />
+          <select className="input" value={status} onChange={e => { setStatus(e.target.value as any); setOffset(0) }} aria-label="Status filtern">
             <option value="ALL">Alle</option>
             <option value="OPEN">Offen</option>
             <option value="PARTIAL">Teilweise</option>
             <option value="PAID">Bezahlt</option>
           </select>
-          <select className="input" value={sphere} onChange={e => { setSphere((e.target.value || '') as any); setOffset(0) }}>
+          <select className="input" value={sphere} onChange={e => { setSphere((e.target.value || '') as any); setOffset(0) }} aria-label="Sphäre filtern">
             <option value="">Sphäre: alle</option>
             <option value="IDEELL">IDEELL</option>
             <option value="ZWECK">ZWECK</option>
             <option value="VERMOEGEN">VERMÖGEN</option>
             <option value="WGB">WGB</option>
           </select>
-          <select className="input" value={String(budgetId)} onChange={e => { const v = e.target.value; setBudgetId(v && v !== '' ? Number(v) : ''); setOffset(0) }}>
+          <select className="input" value={String(budgetId)} onChange={e => { const v = e.target.value; setBudgetId(v && v !== '' ? Number(v) : ''); setOffset(0) }} aria-label="Budget filtern">
             <option value="">Budget: alle</option>
             {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
           </select>
-          <select className="input" value={tag} onChange={e => { setTag(e.target.value); setOffset(0) }}>
+          <select className="input" value={tag} onChange={e => { setTag(e.target.value); setOffset(0) }} aria-label="Tag filtern">
             <option value="">Tag: alle</option>
             {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
           </select>
@@ -297,8 +297,8 @@ export default function InvoicesView() {
           <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
           </button>
-          {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn" style={{ background: 'var(--accent)', color: '#000' }} onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
-          <div style={{ width: 12 }} />
+          {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
+          <div className="filter-divider" />
           <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
         </div>
       </div>
@@ -308,9 +308,9 @@ export default function InvoicesView() {
       ) : (
         <>
           {summary && (
-            <div className="helper" style={{ marginBottom: 6 }}>
+            <div className="helper invoices-summary">
               Offen gesamt: <strong>{eurFmt.format(Math.max(0, Math.round((summary.remaining || 0) * 100) / 100))}</strong>
-              <span style={{ marginLeft: 8, color: 'var(--text-dim)' }}>
+              <span className="summary-remaining">
                 ({summary.count} Rechnungen; Brutto {eurFmt.format(summary.gross || 0)}, Bezahlt {eurFmt.format(summary.paid || 0)})
               </span>
             </div>
@@ -409,11 +409,11 @@ export default function InvoicesView() {
               {rows.length === 0 && (<tr><td colSpan={12} className="helper">Keine Rechnungen gefunden.</td></tr>)}
             </tbody>
           </table>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+          <div className="invoices-pagination">
             <div className="helper">Gesamt: {total}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="pagination-controls">
               <label className="helper">Pro Seite</label>
-              <select className="input" value={limit} onChange={e => { setLimit(Number(e.target.value)); setOffset(0) }}>
+              <select className="input" value={limit} onChange={e => { setLimit(Number(e.target.value)); setOffset(0) }} aria-label="Einträge pro Seite">
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -430,7 +430,7 @@ export default function InvoicesView() {
 
       {showPayModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
+          <div className="modal payment-modal-grid" onClick={e => e.stopPropagation()}>
             <ModalHeader 
               title="Zahlung hinzufügen" 
               subtitle={`${showPayModal.invoiceNo ? `Rechnung ${showPayModal.invoiceNo}` : `Rechnung #${showPayModal.id}`} · ${showPayModal.party || ''}`}
@@ -440,7 +440,7 @@ export default function InvoicesView() {
             <div className="row">
               <div className="field">
                 <label>Datum</label>
-                <input className="input" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
+                <input className="input" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} aria-label="Zahlungsdatum" />
               </div>
               <div className="field">
                 <label>Betrag (EUR)</label>
@@ -521,7 +521,7 @@ export default function InvoicesView() {
                 </div>
                 <div className="field">
                   <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} />
+                  <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={{ fontSize: 24, paddingTop: 10, paddingBottom: 10 }} aria-label="Rechnungsbetrag in Euro" />
                   <div className="helper">{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : 'Bitte Betrag eingeben' })()}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -552,7 +552,7 @@ export default function InvoicesView() {
               <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
                 <div className="field">
                   <label>Sphäre <span className="helper">(Steuerlicher Bereich)</span></label>
-                  <select className="input" value={form.draft.sphere} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, sphere: e.target.value as any } }))}>
+                  <select className="input" value={form.draft.sphere} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, sphere: e.target.value as any } }))} aria-label="Sphäre auswählen">
                     <option value="IDEELL">IDEELL</option>
                     <option value="ZWECK">ZWECK</option>
                     <option value="VERMOEGEN">VERMÖGEN</option>
@@ -561,21 +561,21 @@ export default function InvoicesView() {
                 </div>
                 <div className="field">
                   <label>Zweckbindung</label>
-                  <select className="input" value={(form.draft.earmarkId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, earmarkId: e.target.value ? Number(e.target.value) : '' } }))}>
+                  <select className="input" value={(form.draft.earmarkId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, earmarkId: e.target.value ? Number(e.target.value) : '' } }))} aria-label="Zweckbindung auswählen">
                     <option value="">—</option>
                     {earmarks.map(em => (<option key={em.id} value={em.id}>{em.code} – {em.name}</option>))}
                   </select>
                 </div>
                 <div className="field">
                   <label>Budget <span className="helper">(optional)</span></label>
-                  <select className="input" value={(form.draft.budgetId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, budgetId: e.target.value ? Number(e.target.value) : '' } }))}>
+                  <select className="input" value={(form.draft.budgetId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, budgetId: e.target.value ? Number(e.target.value) : '' } }))} aria-label="Budget auswählen">
                     <option value="">—</option>
                     {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
                   </select>
                 </div>
                 <div className="field">
                   <label>Auto-Buchung</label>
-                  <select className="input" value={form.draft.autoPost ? '1' : '0'} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, autoPost: e.target.value === '1' } }))}>
+                  <select className="input" value={form.draft.autoPost ? '1' : '0'} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, autoPost: e.target.value === '1' } }))} aria-label="Automatische Buchung">
                     <option value="1">Ja</option>
                     <option value="0">Nein</option>
                   </select>

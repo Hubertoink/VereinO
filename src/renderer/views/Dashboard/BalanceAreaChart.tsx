@@ -102,6 +102,11 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // Prepare values for chart
   // isDaily: when the selected range is within one month (we built per-day rows above)
   const isDaily = (from && to && from.slice(0,7) === to.slice(0,7))
+  
+  // Check if multi-year range (> 2 years) - if so, we need coarser granularity
+  const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
+  const isMultiYear = yearSpan > 2
+  
   // Convert signed values (IN positive, OUT negative) into a cumulative saldo over time
   const baseSeries = rows.map(r => Number(r.gross) || 0)
   const series = (() => {
@@ -122,7 +127,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // For daily view, reduce width and increase horizontal padding for better spacing
   const W = isDaily ? 920 : 760
   const H = 240
-  const P = 80
+  const P = 90
   const xs = (i: number, n: number) => P + (i * (W - 2 * P)) / Math.max(1, n - 1)
   const ys = (v: number) => {
     const top = 16
@@ -141,7 +146,17 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // X labels: months for yearly, days for monthly
   // isDaily already computed above
   // Yearly view: show all months; Daily view: reduce to ~6-7 labels for cleaner look
-  const tickEvery = isDaily ? Math.max(1, Math.ceil(labels.length / 6)) : 1
+  // Multi-year view (>2 years): show only every 3rd, 6th or 12th month depending on span
+  let tickEvery = 1
+  if (isDaily) {
+    tickEvery = Math.max(1, Math.ceil(labels.length / 6))
+  } else if (isMultiYear) {
+    // For multi-year: show fewer labels (quarterly or yearly ticks)
+    const totalMonths = labels.length
+    if (totalMonths > 48) tickEvery = 12 // Show yearly for > 4 years
+    else if (totalMonths > 24) tickEvery = 6 // Show every 6 months for 2-4 years
+    else tickEvery = 3 // Show quarterly for < 2 years
+  }
 
   // Y-axis ticks (nice range around min..max incl. 0 when in range)
   // For daily view, use fewer ticks (3-4) for cleaner look
@@ -236,12 +251,28 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
             {(() => {
               const key = String(labels[hoverIdx])
               const isDailyLoc = (from && to && from.slice(0,7) === to.slice(0,7))
-              const labelText = isDailyLoc ? `${key.slice(8,10)}.${key.slice(5,7)}.` : (MONTH_NAMES[Math.max(0, Math.min(11, Number(key.slice(5)) - 1))] || key.slice(5))
+              const year = key.slice(0, 4)
+              const month = key.slice(5, 7)
+              const day = key.slice(8, 10)
+              
+              let labelText: string
+              if (isDailyLoc) {
+                labelText = `${day}.${month}.${year}`
+              } else if (isMultiYear || yearSpan > 0) {
+                // Show "Monat Jahr" for multi-year ranges
+                const monthName = MONTH_NAMES[Math.max(0, Math.min(11, Number(month) - 1))]
+                labelText = `${monthName} ${year}`
+              } else {
+                // Single year: just month name
+                labelText = MONTH_NAMES[Math.max(0, Math.min(11, Number(month) - 1))] || month
+              }
+              
               const val = series[hoverIdx] || 0
               const color = val >= 0 ? 'var(--success)' : 'var(--danger)'
               return (
                 <>
                   <div className="chart-tooltip-header">{labelText}</div>
+                  <div className="helper" style={{ fontSize: '11px', marginBottom: '2px' }}>Saldo kumuliert</div>
                   <div style={{ fontWeight: 700, color }}>{eur.format(val)}</div>
                 </>
               )

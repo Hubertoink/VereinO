@@ -6,13 +6,14 @@ export interface NavItem {
   key: NavKey
   label: string
   group: NavGroup
+  showDividerAfter?: boolean
   // Inline SVG as React nodes will be supplied by consumers to keep this file framework-light
 }
 
 export const navItems: NavItem[] = [
   { key: 'Dashboard', label: 'Dashboard', group: 'dashboard' },
-  { key: 'Buchungen', label: 'Buchungen', group: 'core' },
-  { key: 'Rechnungen', label: 'Rechnungen', group: 'core' },
+  { key: 'Buchungen', label: 'Buchungen', group: 'core', showDividerAfter: true },
+  { key: 'Rechnungen', label: 'Rechnungen', group: 'core', showDividerAfter: true },
   { key: 'Mitglieder', label: 'Mitglieder', group: 'core' },
   { key: 'Budgets', label: 'Budgets', group: 'core' },
   { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'core' },

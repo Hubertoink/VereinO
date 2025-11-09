@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 
 type NavLayout = 'top' | 'left'
-type ColorTheme = 'light' | 'dark'
+type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
 type NavIconColorMode = 'color' | 'mono'
 type DateFormat = 'de' | 'iso'
-type JournalRowStyle = 'standard' | 'compact' | 'spacious'
-type JournalRowDensity = 'normal' | 'dense'
+type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
+type JournalRowDensity = 'normal' | 'compact'
 
 interface UIPreferencesContextValue {
   navLayout: NavLayout
@@ -28,8 +28,8 @@ const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(nul
 
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [navLayout, setNavLayout] = useState<NavLayout>(() => {
-    const stored = localStorage.getItem('navLayout')
-    return stored === 'left' || stored === 'top' ? stored : 'top'
+    const stored = localStorage.getItem('ui.navLayout')
+    return stored === 'left' || stored === 'top' ? stored : 'left'
   })
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -38,8 +38,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   })
 
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-    const stored = localStorage.getItem('colorTheme')
-    return stored === 'dark' ? 'dark' : 'light'
+    const stored = localStorage.getItem('ui.colorTheme')
+    return (stored === 'default' || stored === 'fiery-ocean' || stored === 'peachy-delight' || 
+            stored === 'pastel-dreamland' || stored === 'ocean-breeze' || stored === 'earthy-tones' || 
+            stored === 'monochrome-harmony' || stored === 'vintage-charm') ? stored : 'default'
   })
 
   const [navIconColorMode, setNavIconColorMode] = useState<NavIconColorMode>(() => {
@@ -53,17 +55,17 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   })
 
   const [journalRowStyle, setJournalRowStyle] = useState<JournalRowStyle>(() => {
-    const stored = localStorage.getItem('journalRowStyle')
-    return stored === 'compact' || stored === 'spacious' ? stored : 'standard'
+    const stored = localStorage.getItem('ui.journalRowStyle')
+    return (stored === 'both' || stored === 'lines' || stored === 'zebra' || stored === 'none') ? stored : 'both'
   })
 
   const [journalRowDensity, setJournalRowDensity] = useState<JournalRowDensity>(() => {
-    const stored = localStorage.getItem('journalRowDensity')
-    return stored === 'dense' ? 'dense' : 'normal'
+    const stored = localStorage.getItem('ui.journalRowDensity')
+    return stored === 'compact' ? 'compact' : 'normal'
   })
 
   useEffect(() => {
-    localStorage.setItem('navLayout', navLayout)
+    localStorage.setItem('ui.navLayout', navLayout)
   }, [navLayout])
 
   useEffect(() => {
@@ -71,8 +73,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    localStorage.setItem('colorTheme', colorTheme)
-    document.documentElement.setAttribute('data-theme', colorTheme)
+    localStorage.setItem('ui.colorTheme', colorTheme)
+    document.documentElement.setAttribute('data-color-theme', colorTheme)
   }, [colorTheme])
 
   useEffect(() => {
@@ -84,12 +86,12 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [dateFormat])
 
   useEffect(() => {
-    localStorage.setItem('journalRowStyle', journalRowStyle)
+    localStorage.setItem('ui.journalRowStyle', journalRowStyle)
     document.documentElement.setAttribute('data-journal-row-style', journalRowStyle)
   }, [journalRowStyle])
 
   useEffect(() => {
-    localStorage.setItem('journalRowDensity', journalRowDensity)
+    localStorage.setItem('ui.journalRowDensity', journalRowDensity)
     document.documentElement.setAttribute('data-journal-row-density', journalRowDensity)
   }, [journalRowDensity])
 

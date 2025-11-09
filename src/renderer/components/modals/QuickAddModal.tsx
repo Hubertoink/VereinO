@@ -46,8 +46,8 @@ export default function QuickAddModal({
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>+ Buchung</h2>
+                <header className="modal-header-flex">
+                    <h2>+ Buchung</h2>
                     <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -57,9 +57,9 @@ export default function QuickAddModal({
                 
                 <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
                     {/* Live Summary */}
-                    <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+                    <div className="card summary-card">
                         <div className="helper">Zusammenfassung</div>
-                        <div style={{ fontWeight: 600 }}>
+                        <div className="summary-text-bold">
                             {(() => {
                                 const date = fmtDate(qa.date)
                                 const type = qa.type
@@ -77,33 +77,35 @@ export default function QuickAddModal({
                     </div>
 
                     {/* Blocks A+B in a side-by-side grid on wide screens */}
-                    <div className="block-grid" style={{ marginBottom: 8 }}>
+                    <div className="block-grid block-grid-mb">
                         {/* Block A – Basisinfos */}
-                        <div className="card" style={{ padding: 12 }}>
-                            <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                        <div className="card form-card">
+                            <div className="helper helper-mb">Basis</div>
                             <div className="row">
                                 <div className="field">
                                     <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                    <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} required />
+                                    <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
                                 </div>
                                 <div className="field">
                                     <label>Art</label>
                                     <div className="btn-group" role="group" aria-label="Art wählen">
                                         {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                            <button key={t} type="button" className="btn" onClick={() => {
-                                                const newQa = { ...qa, type: t }
-                                                if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
-                                                    (newQa as any).transferFrom = 'BAR';
-                                                    (newQa as any).transferTo = 'BANK'
-                                                }
-                                                setQa(newQa)
-                                            }} style={{ background: qa.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                            <button key={t} type="button" 
+                                                className={`btn ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
+                                                onClick={() => {
+                                                    const newQa = { ...qa, type: t }
+                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
+                                                        (newQa as any).transferFrom = 'BAR';
+                                                        (newQa as any).transferTo = 'BANK'
+                                                    }
+                                                    setQa(newQa)
+                                                }}>{t}</button>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="field">
                                     <label>Sphäre</label>
-                                    <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })}>
+                                    <select value={qa.sphere} disabled={qa.type === 'TRANSFER'} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })} aria-label="Sphäre der Buchung">
                                         <option value="IDEELL">IDEELL</option>
                                         <option value="ZWECK">ZWECK</option>
                                         <option value="VERMOEGEN">VERMOEGEN</option>
@@ -118,7 +120,8 @@ export default function QuickAddModal({
                                                 const v = e.target.value
                                                 if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
                                                 else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
-                                            }}>
+                                            }}
+                                            aria-label="Transfer-Richtung">
                                             <option value="BAR->BANK">BAR → BANK</option>
                                             <option value="BANK->BAR">BANK → BAR</option>
                                         </select>
@@ -128,7 +131,9 @@ export default function QuickAddModal({
                                         <label>Zahlweg</label>
                                         <div className="btn-group" role="group" aria-label="Zahlweg wählen">
                                             {(['BAR','BANK'] as const).map(pm => (
-                                                <button key={pm} type="button" className="btn" onClick={() => setQa({ ...qa, paymentMethod: pm })} style={{ background: (qa as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                <button key={pm} type="button" 
+                                                    className={`btn ${(qa as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`}
+                                                    onClick={() => setQa({ ...qa, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -137,18 +142,19 @@ export default function QuickAddModal({
                         </div>
 
                         {/* Block B – Finanzdetails */}
-                        <div className="card" style={{ padding: 12 }}>
-                            <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
+                        <div className="card form-card">
+                            <div className="helper helper-mb">Finanzen</div>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
-                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <div className="field field-full-width">
                                         <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <span className="adorn-wrap">
                                             <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                 onChange={(e) => {
                                                     const v = Number(e.target.value)
                                                     setQa({ ...qa, grossAmount: v })
-                                                }} />
+                                                }}
+                                                aria-label="Transfer-Betrag" />
                                             <span className="adorn-suffix">€</span>
                                         </span>
                                         <div className="helper">Transfers sind umsatzsteuerneutral.</div>
@@ -157,18 +163,19 @@ export default function QuickAddModal({
                                     <>
                                         <div className="field">
                                             <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })}>
+                                            <div className="flex-gap-8">
+                                                <select className="input" value={(qa as any).mode ?? 'NET'} onChange={(e) => setQa({ ...qa, mode: e.target.value as any })} aria-label="Netto oder Brutto Modus">
                                                     <option value="NET">Netto</option>
                                                     <option value="GROSS">Brutto</option>
                                                 </select>
-                                                <span className="adorn-wrap" style={{ flex: 1 }}>
+                                                <span className="adorn-wrap flex-1">
                                                     <input className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
                                                         onChange={(e) => {
                                                             const v = Number(e.target.value)
                                                             if ((qa as any).mode === 'GROSS') setQa({ ...qa, grossAmount: v })
                                                             else setQa({ ...qa, netAmount: v })
-                                                        }} />
+                                                        }}
+                                                        aria-label={(qa as any).mode === 'GROSS' ? 'Brutto-Betrag' : 'Netto-Betrag'} />
                                                     <span className="adorn-suffix">€</span>
                                                 </span>
                                             </div>
@@ -177,7 +184,7 @@ export default function QuickAddModal({
                                         {(qa as any).mode === 'NET' && (
                                             <div className="field">
                                                 <label>USt %</label>
-                                                <input className="input" type="number" step="0.1" value={qa.vatRate} onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })} />
+                                                <input className="input" type="number" step="0.1" value={qa.vatRate} onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })} aria-label="Umsatzsteuer Prozentsatz" />
                                             </div>
                                         )}
                                     </>
@@ -186,7 +193,7 @@ export default function QuickAddModal({
                             <div className="row">
                                 <div className="field">
                                     <label>Budget</label>
-                                    <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                    <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Budget auswählen">
                                         <option value="">—</option>
                                         {budgetsForEdit.map(b => (
                                             <option key={b.id} value={b.id}>{b.label}</option>
@@ -195,7 +202,7 @@ export default function QuickAddModal({
                                 </div>
                                 <div className="field">
                                     <label>Zweckbindung</label>
-                                    <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
+                                    <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Zweckbindung auswählen">
                                         <option value="">—</option>
                                         {earmarks.map(em => (
                                             <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
@@ -206,13 +213,13 @@ export default function QuickAddModal({
                         </div>
                     </div>
 
-                    {/* Block C+D – Beschreibung & Tags + Anhänge */}
-                    <div className="block-grid" style={{ marginBottom: 8 }}>
+                    {/* Blocks C+D in a side-by-side grid */}
+                    <div className="block-grid block-grid-mb">
                         {/* Block C – Beschreibung & Tags */}
-                        <div className="card" style={{ padding: 12 }}>
-                            <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
+                        <div className="card form-card">
+                            <div className="helper helper-mb">Beschreibung & Tags</div>
                             <div className="row">
-                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                <div className="field field-full-width">
                                     <label>Beschreibung</label>
                                     <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
                                     <datalist id="desc-suggestions">
@@ -230,17 +237,16 @@ export default function QuickAddModal({
 
                         {/* Block D – Anhänge */}
                         <div
-                            className="card"
-                            style={{ padding: 12 }}
+                            className="card attachment-card"
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <div className="attachment-header">
+                                <div className="attachment-title">
                                     <strong>Anhänge</strong>
                                     <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 8 }}>
+                                <div className="flex-gap-8">
                                     <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => onDropFiles(e.target.files)} />
                                     <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
                                     {files.length > 0 && (
@@ -249,10 +255,10 @@ export default function QuickAddModal({
                                 </div>
                             </div>
                             {files.length > 0 && (
-                                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                                <ul className="file-list">
                                     {files.map((f, i) => (
-                                        <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                                        <li key={i} className="file-list-item">
+                                            <span className="file-name">{f.name}</span>
                                             <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
                                         </li>
                                     ))}
@@ -261,9 +267,9 @@ export default function QuickAddModal({
                         </div>
                     </div>
                     
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                    <div className="modal-footer-actions">
                         <div className="helper">Esc = Abbrechen · Ctrl+U = Datei hinzufügen</div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div className="flex-gap-8">
                             <button type="button" className="btn" onClick={() => { onClose(); setFiles([]) }}>Abbrechen</button>
                             <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
                         </div>

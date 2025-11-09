@@ -102,7 +102,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   })()
   const maxValRaw = Math.max(1, ...scaleVals)
   const maxVal = maxValRaw
-  const margin = { top: 22, right: 28, bottom: 42, left: 60 }
+  const margin = { top: 22, right: 28, bottom: 42, left: 75 }
   const innerH = 180
   const defaultGroupW = 44
   const barW = 16
@@ -213,6 +213,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>
+                <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--accent)' }}>Saldo kumuliert</span> <strong style={{ color: 'var(--accent)' }}>{eurFmt.format(saldo[idx] || 0)}</strong></div>
               </div>
             )
           })()}

@@ -27,7 +27,11 @@ import BudgetsView from './views/Budgets/BudgetsView'
 import EarmarksView from './views/Earmarks/EarmarksView'
 import { useQuickAdd } from './hooks/useQuickAdd'
 import { ToastProvider, useToast } from './context/ToastContext'
-import { UIPreferencesProvider } from './context/UIPreferences'
+import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences'
+import { AppLayout } from './components/layout/AppLayout'
+import { TopNav } from './components/layout/TopNav'
+import { SideNav } from './components/layout/SideNav'
+import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -92,6 +96,24 @@ function AppInner() {
     // Use toast context
     const { notify } = useToast()
     
+    // Use UI preferences context
+    const {
+        navLayout,
+        setNavLayout,
+        sidebarCollapsed,
+        setSidebarCollapsed,
+        colorTheme,
+        setColorTheme,
+        navIconColorMode,
+        setNavIconColorMode,
+        dateFormat,
+        setDateFormat,
+        journalRowStyle,
+        setJournalRowStyle,
+        journalRowDensity,
+        setJournalRowDensity
+    } = useUIPreferences()
+    
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
     const bumpDataVersion = () => setRefreshKey((k) => k + 1)
@@ -122,8 +144,8 @@ function AppInner() {
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
-    const [activePage, setActivePage] = useState<'Dashboard' | 'Buchungen' | 'Zweckbindungen' | 'Budgets' | 'Reports' | 'Belege' | 'Rechnungen' | 'Mitglieder' | 'Einstellungen'>(() => {
-        try { return (localStorage.getItem('activePage') as any) || 'Buchungen' } catch { return 'Buchungen' }
+    const [activePage, setActivePage] = useState<NavKey>(() => {
+        try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
     // When switching to Reports, bump a key to trigger chart re-measures
     const [reportsActivateKey, setReportsActivateKey] = useState(0)
@@ -152,46 +174,12 @@ function AppInner() {
     }, [])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
-    // Navigation layout preference: 'left' classic sidebar vs 'top' icon-only header menu
-    type NavLayout = 'left' | 'top'
-    const [navLayout, setNavLayout] = useState<NavLayout>(() => {
-        try { return (localStorage.getItem('ui.navLayout') as NavLayout) || 'left' } catch { return 'left' }
-    })
-    const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-        try { return localStorage.getItem('sidebarCollapsed') === '1' } catch { return false }
-    })
+    
     // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
     const [reportsTab, setReportsTab] = useState<string>(() => {
         try { return 'overview' } catch { return 'overview' }
     })
 
-    // UI preference: color theme palette
-    type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
-    const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-        try { return (localStorage.getItem('ui.colorTheme') as ColorTheme) || 'default' } catch { return 'default' }
-    })
-    useEffect(() => {
-        try { localStorage.setItem('ui.colorTheme', colorTheme) } catch { }
-        // apply on <html>
-        try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch { }
-    }, [colorTheme])
-    // UI preference: journal table row style and density (Buchungen)
-    type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-    type JournalRowDensity = 'normal' | 'compact'
-    const [journalRowStyle, setJournalRowStyle] = useState<JournalRowStyle>(() => {
-        try { return (localStorage.getItem('ui.journalRowStyle') as JournalRowStyle) || 'both' } catch { return 'both' }
-    })
-    const [journalRowDensity, setJournalRowDensity] = useState<JournalRowDensity>(() => {
-        try { return (localStorage.getItem('ui.journalRowDensity') as JournalRowDensity) || 'normal' } catch { return 'normal' }
-    })
-    useEffect(() => {
-        try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch { }
-        try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch { }
-    }, [journalRowStyle])
-    useEffect(() => {
-        try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch { }
-        try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch { }
-    }, [journalRowDensity])
     // Period lock (year-end) status for UI controls (e.g., lock edit)
     const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
     useEffect(() => {
@@ -221,10 +209,6 @@ function AppInner() {
     const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
     // Setup Wizard modal state
     const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
-    useEffect(() => {
-        try { localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0') } catch { }
-    }, [sidebarCollapsed])
-    useEffect(() => { try { localStorage.setItem('ui.navLayout', navLayout) } catch { } }, [navLayout])
 
     useEffect(() => {
         try { localStorage.setItem('activePage', activePage) } catch { }
@@ -289,7 +273,7 @@ function AppInner() {
                 if (w && w.length) {
                     for (const msg of w) notify('info', 'Warnung: ' + msg)
                 }
-                await loadRecent()
+                // JournalView handles reload via refreshKey dependency; bump version to trigger it
                 bumpDataVersion()
             }
             return res
@@ -336,7 +320,7 @@ function AppInner() {
                 setFlashId(res.id)
                 window.setTimeout(() => setFlashId((cur) => (cur === res.id ? null : cur)), 3000)
                 notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
-                await loadRecent()
+                // JournalView handles reload via refreshKey dependency; bump version to trigger it
                 bumpDataVersion()
             }
         } catch (e: any) {
@@ -354,7 +338,7 @@ function AppInner() {
             const res = await window.api?.vouchers.reverse?.({ originalId: lastId, reason: 'Dev Reverse' })
             if (res) {
                 notify('success', `Storno erstellt: #${res.voucherNo}`)
-                await loadRecent()
+                // JournalView handles reload via refreshKey dependency; bump version to trigger it
                 bumpDataVersion()
             }
         } catch (e: any) {
@@ -471,7 +455,7 @@ function AppInner() {
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'
             case 'paymentMethod': return 'Zahlweg'
-            case 'attachments': return 'Anh?nge'
+            case 'attachments': return 'Anhänge'
             case 'net': return 'Netto'
             case 'vat': return 'USt'
             case 'gross': return 'Brutto'
@@ -549,7 +533,7 @@ function AppInner() {
 
     // Load vouchers whenever filters or page change
     useEffect(() => {
-        if (activePage === 'Buchungen') loadRecent()
+    // Removed old global loadRecent; JournalView listens to refreshKey now
     }, [activePage, loadRecent])
 
     // States for edit + batch modals (previously removed inadvertently)
@@ -582,7 +566,7 @@ function AppInner() {
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string }>(null)
-    // Refresh attachments when opening an edit modal (so neue Anh?nge erscheinen beim erneuten ?ffnen)
+    // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten ?ffnen)
     useEffect(() => {
         if (editRow?.id) {
             setEditRowFilesLoading(true)
@@ -656,12 +640,7 @@ function AppInner() {
 
     // (earmarks loaded above)
 
-    // Preference: colored vs monochrome menu icons
-    type NavIconColorMode = 'color' | 'mono'
-    const [navIconColorMode, setNavIconColorMode] = useState<NavIconColorMode>(() => {
-        try { return (localStorage.getItem('ui.navIconColorMode') as NavIconColorMode) || 'mono' } catch { return 'mono' }
-    })
-    useEffect(() => { try { localStorage.setItem('ui.navIconColorMode', navIconColorMode) } catch { } }, [navIconColorMode])
+    // Color palette for navigation icons
     const navIconPalette: Record<string, string> = {
         'Dashboard': '#7C4DFF',
         'Buchungen': '#2962FF',
@@ -703,61 +682,13 @@ function AppInner() {
                     <TopHeaderOrg />
                 </div>
                 {isTopNav ? (
-                    <nav aria-label="Hauptmen? (oben)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifySelf: 'center', WebkitAppRegion: 'no-drag' } as any}>
-                        {/* Groups: Dashboard | Buchungen/Rechnungen/Budgets/Zweckbindungen | Belege/Reports | Einstellungen */}
-                        {[
-                            [
-                                { key: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
-                            ],
-                            [
-                                { key: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
-                                { key: 'Rechnungen', icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
-                                        <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
-                                        <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
-                                    </svg>
-                                ) },
-                                { key: 'Mitglieder', icon: (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
-                                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
-                                    </svg>
-                                ) },
-                                { key: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
-                                { key: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
-                            ],
-                            [
-                                { key: 'Belege', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8l-6-6zM8 12h8v2H8v-2zm0-4h5v2H8V8z" /></svg>) },
-                                { key: 'Reports', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7z" /></svg>) }
-                            ],
-                            [
-                                { key: 'Einstellungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94a7.97 7.97 0 0 0 .06-1l2.03-1.58-1.92-3.32-2.39.5a7.97 7.97 0 0 0-1.73-1l-.36-2.43h-3.84l-.36 2.43a7.97 7.97 0 0 0-1.73 1l-2.39-.5-1.92 3.32L4.8 11.94c0 .34.02.67.06 1L2.83 14.5l1.92 3.32 2.39-.5c.53.4 1.12.74 1.73 1l.36 2.43h3.84l.36-2.43c.61-.26 1.2-.6 1.73-1l2.39.5 1.92-3.32-2.03-1.56zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" /></svg>) }
-                            ]
-                        ].map((group, gi, arr) => (
-                            <React.Fragment key={`nav-group-${gi}`}>
-                                {group.map(({ key, icon }) => (
-                                    <React.Fragment key={key}>
-                                        <button
-                                            className="btn ghost"
-                                            onClick={() => setActivePage(key as any)}
-                                            title={key}
-                                            aria-label={key}
-                                            style={{ width: 36, height: 36, padding: 0, display: 'grid', placeItems: 'center', borderRadius: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-                                        >
-                                            <span style={{ color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>
-                                                {icon}
-                                            </span>
-                                        </button>
-                                        {(['Buchungen','Rechnungen','Mitglieder'] as const).includes(key as any) && (
-                                            <span aria-hidden className="divider-v" />
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                                {gi < arr.length - 1 && (
-                                    <span aria-hidden className="divider-v" />
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </nav>
+                    <div style={{ display: 'inline-flex', WebkitAppRegion: 'no-drag' } as any}>
+                        <TopNav
+                            activePage={activePage}
+                            onNavigate={setActivePage}
+                            navIconColorMode={navIconColorMode}
+                        />
+                    </div>
                 ) : null}
                 {isTopNav && <div />}
                 {/* Window controls */}
@@ -774,64 +705,13 @@ function AppInner() {
                 </div>
             </header>
             {!isTopNav && (
-                <aside aria-label="Seitenleiste" style={{ gridArea: 'side', display: 'flex', flexDirection: 'column', padding: 8, borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
-                            <div className="flex flex-col gap-6">
-                                {/* Group 1: Dashboard */}
-                                {[
-                                    { key: 'Dashboard', label: 'Dashboard', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span className="icon-wrapper">{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden className="divider-h" />
-                                {/* Group 2: Buchungen, Rechnungen, Mitglieder, Budgets, Zweckbindungen */}
-                                {[
-                                    { key: 'Buchungen', label: 'Buchungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h12v2H3v-2z" /></svg>) },
-                                    { key: 'Rechnungen', label: 'Rechnungen', icon: (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Rechnungen">
-                                            <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 3v5h5"/>
-                                            <path d="M8 12h8v2H8zM8 16h8v2H8zM8 8h4v2H8z"/>
-                                        </svg>
-                                    ) },
-                                    { key: 'Mitglieder', label: 'Mitglieder', icon: (
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img" aria-label="Mitglieder">
-                                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h7v-3.5c0-2.33-4.67-3.5-7-3.5z"/>
-                                        </svg>
-                                    ) },
-                                    { key: 'Budgets', label: 'Budgets', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17h18v2H3v-2zm0-7h18v6H3V10zm0-5h18v2H3V5z" /></svg>) },
-                                    { key: 'Zweckbindungen', label: 'Zweckbindungen', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden className="divider-h" />
-                                {/* Group 3: Belege, Reports */}
-                                {[
-                                    { key: 'Belege', label: 'Belege', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8l-6-6zM8 12h8v2H8v-2zm0-4h5v2H8V8z" /></svg>) },
-                                    { key: 'Reports', label: 'Reports', icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7z" /></svg>) }
-                                ].map(({ key, label, icon }) => (
-                                    <button key={key} className="btn ghost" onClick={() => setActivePage(key as any)} style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === (key as any) ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} title={label}>
-                                        <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette[key] : undefined }}>{icon}</span>
-                                        {!sidebarCollapsed && <span>{label}</span>}
-                                    </button>
-                                ))}
-                                <div aria-hidden className="divider-h" />
-                                <button
-                                    className="btn ghost"
-                                    onClick={() => setActivePage('Einstellungen')}
-                                    style={{ textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: activePage === 'Einstellungen' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-                                    title="Einstellungen"
-                                >
-                                    <span style={{ width: 22, display: 'inline-flex', justifyContent: 'center', color: navIconColorMode === 'color' ? navIconPalette['Einstellungen'] : undefined }}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94a7.97 7.97 0 0 0 .06-1l2.03-1.58-1.92-3.32-2.39.5a7.97 7.97 0 0 0-1.73-1l-.36-2.43h-3.84l-.36 2.43a7.97 7.97 0 0 0-1.73 1l-2.39-.5-1.92 3.32L4.8 11.94c0 .34.02.67.06 1L2.83 14.5l1.92 3.32 2.39-.5c.53.4 1.12.74 1.73 1l.36 2.43h3.84l.36-2.43c.61-.26 1.2-.6 1.73-1l2.39.5 1.92-3.32-2.03-1.56zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z" /></svg>
-                                    </span>
-                                    {!sidebarCollapsed && <span>Einstellungen</span>}
-                                </button>
-                                </div>
+                <aside className="app-sidebar">
+                    <SideNav
+                        activePage={activePage}
+                        onNavigate={setActivePage}
+                        navIconColorMode={navIconColorMode}
+                        collapsed={sidebarCollapsed}
+                    />
                 </aside>
             )}
 
@@ -1667,7 +1547,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                                 : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
                                     : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
                                         : k === 'paymentMethod' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Zahlweg</th>
-                                            : k === 'attachments' ? <th key={k} align="center" title="Anh?nge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
+                                            : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
                                                 : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} className="cursor-pointer">Netto {renderSortIcon('net')}</th>
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
                                                         : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} className="cursor-pointer">Brutto {renderSortIcon('gross')}</th>
@@ -1773,7 +1653,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 })()
             ) : ''}</td>
         ) : k === 'attachments' ? (
-            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anh?nge`}>?? {r.fileCount}</span>) : ''}</td>
+            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anhänge`}>?? {r.fileCount}</span>) : ''}</td>
         ) : k === 'net' ? (
             <td key={k} align="right">{eurFmt.format(r.netAmount)}</td>
         ) : k === 'vat' ? (

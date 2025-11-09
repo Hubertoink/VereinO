@@ -112,20 +112,22 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const maxBar = Math.max(1, ...rowsIn.map(r=>r.gross), ...rowsOut.map(r=>r.gross))
   const minLine = Math.min(0, ...cumSeries)
   const maxLine = Math.max(0, ...cumSeries)
-  const W = 900, H = 260, P = 64
+  // Use the same scale for both bars and line
+  const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
+  const W = 900, H = 260, P = 90
   const baseY = H - 28
   const maxH = baseY - 24
   const xs = (i: number, n: number) => {
     const usable = W - 2 * P
     return P + (i * usable) / Math.max(1, n - 1)
   }
-  const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxBar)) * maxH
+  // Use unified scale for both bars and line
+  const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
   const yLine = (v: number) => {
     const top = 16
     const bottom = baseY
-    const min = minLine
-    const max = maxLine
-    return top + (max - v) * (bottom - top) / Math.max(1e-9, (max - min || 1))
+    // Use same scale as bars
+    return baseY - (v / Math.max(1e-9, maxValue)) * maxH
   }
   const barW = 12, gap = 8
   const MONTH_NAMES = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
@@ -143,9 +145,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return step
   }
   const yTicks = (() => {
-    const step = niceStep(Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine)))
+    const step = niceStep(maxValue)
     const arr: number[] = []
-    for (let v = 0; v <= Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine)); v += step) arr.push(Math.round(v))
+    for (let v = 0; v <= maxValue; v += step) arr.push(Math.round(v))
     return arr
   })()
 
@@ -241,13 +243,20 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
         {/* HTML tooltip overlay for better theming/accessibility */}
         {hoverIdx != null && labels[hoverIdx] && (() => {
           const label = String(labels[hoverIdx])
+          const year = label.slice(0, 4)
+          const month = label.slice(5, 7)
+          const day = label.slice(8, 10)
+          
           let mLabel: string
           if (isDaily) {
-            // Format: "DD.MM."
-            mLabel = `${label.slice(8, 10)}.${label.slice(5, 7)}.`
+            // Format: "DD.MM.YYYY"
+            mLabel = `${day}.${month}.${year}`
           } else {
-            const monthIdx = Math.max(0, Math.min(11, Number(label.slice(5)) - 1))
-            mLabel = MONTH_NAMES[monthIdx] || label.slice(5)
+            const monthIdx = Math.max(0, Math.min(11, Number(month) - 1))
+            const monthName = MONTH_NAMES[monthIdx] || month
+            // Check if multi-year range
+            const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
+            mLabel = yearSpan > 0 ? `${monthName} ${year}` : monthName
           }
           const inVal = rowsIn[hoverIdx]?.gross || 0
           const outVal = rowsOut[hoverIdx]?.gross || 0
@@ -259,7 +268,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{mLabel}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(inVal)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(outVal)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Saldo kum.</span> <strong style={{ color: 'var(--warning)' }}>{eur.format(saldo)}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)' }}><span style={{ color: 'var(--accent)' }}>Saldo kumuliert</span> <strong style={{ color: 'var(--accent)' }}>{eur.format(saldo)}</strong></div>
             </div>
           )
         })()}

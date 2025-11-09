@@ -41,7 +41,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
   }, [])
 
-  const [period, setPeriod] = useState<'MONAT' | 'JAHR'>(() => {
+  const [period, setPeriod] = useState<'MONAT' | 'JAHR' | 'GESAMT'>(() => {
     try { return (localStorage.getItem('dashPeriod') as any) || 'JAHR' } catch { return 'JAHR' }
   })
   useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
@@ -63,12 +63,23 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     let cancelled = false
     const now = new Date()
     const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
-    const from = period === 'MONAT'
-      ? new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-      : new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-    const to = period === 'MONAT'
-      ? new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-      : new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+    
+    let from: string, to: string
+    if (period === 'GESAMT') {
+      // Gesamtlaufzeit: vom ersten bis zum letzten verfügbaren Jahr
+      const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
+      const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
+      from = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
+      to = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
+    } else if (period === 'MONAT') {
+      from = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+      to = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+    } else {
+      // JAHR
+      from = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
+      to = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+    }
+    
     window.api?.reports.summary?.({ from, to }).then(res => {
       if (cancelled || !res) return
       const inGross = res.byType.find(x => x.key === 'IN')?.gross || 0
@@ -78,7 +89,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       setSum({ inGross, outGross, diff })
     })
     return () => { cancelled = true }
-  }, [period, yearSel, refreshKey])
+  }, [period, yearSel, refreshKey, yearsAvail])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [invOpenCount, setInvOpenCount] = useState<number>(0)
@@ -202,6 +213,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           <div className="btn-group" role="group" aria-label="Zeitraum">
               <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
               <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
+              <button className={`btn ghost ${period === 'GESAMT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('GESAMT')}>Gesamt</button>
           </div>
           {period === 'JAHR' && yearsAvail.length > 1 && (
             <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label="Jahr auswählen">
@@ -212,15 +224,15 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           )}
         </div>
           <div className="card card--success summary-card">
-          <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+          <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
         </div>
           <div className="card card--danger summary-card">
-          <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+          <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
         </div>
           <div className="card card--accent summary-card">
-          <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : 'Jahr'})</div>
+          <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
             <div className="summary-value" style={{ color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
         </div>
       </div>
@@ -272,6 +284,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       {(() => {
         const now = new Date()
         const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+        
         // Jahresbereich für Jahres-Charts
         const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
         const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
@@ -280,9 +293,18 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
         // Monatsbereich (für Tagesverlauf im Kassenstand, wenn "Monat" gewählt ist)
         const curMonthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
         const curMonthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
-        const balanceFilters: CommonFilters = (period === 'MONAT')
-          ? { from: curMonthFrom, to: curMonthTo }
-          : yearFilters
+        
+        // Gesamtbereich über alle Jahre
+        const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
+        const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
+        const gesamtFrom = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
+        const gesamtTo = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
+        
+        const balanceFilters: CommonFilters = period === 'GESAMT'
+          ? { from: gesamtFrom, to: gesamtTo }
+          : period === 'MONAT'
+            ? { from: curMonthFrom, to: curMonthTo }
+            : yearFilters
 
         return (
           <>

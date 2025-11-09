@@ -184,7 +184,8 @@ export default function JournalView({
         } catch (e: any) {
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
-    }, [journalLimit, page, sortDir, sortBy, filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag, notify])
+    // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
+    }, [journalLimit, page, sortDir, sortBy, filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag, notify, refreshKey])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -534,14 +535,14 @@ export default function JournalView({
                                                 <label>Art</label>
                                                 <div className="btn-group" role="group" aria-label="Art wählen">
                                                     {(['IN','OUT','TRANSFER'] as const).map(t => (
-                                                        <button key={t} type="button" className="btn" onClick={() => {
+                                                        <button key={t} type="button" className={`btn ${editRow.type === t ? 'btn-toggle-active' : ''} ${t==='IN' ? 'btn-type-in' : t==='OUT' ? 'btn-type-out' : ''}`} onClick={() => {
                                                             const newRow = { ...editRow, type: t }
                                                             if (t === 'TRANSFER' && (!newRow.transferFrom || !newRow.transferTo)) {
                                                                 newRow.transferFrom = 'BAR'
                                                                 newRow.transferTo = 'BANK'
                                                             }
                                                             setEditRow(newRow)
-                                                        }} style={{ background: editRow.type === t ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined, color: t==='IN' ? 'var(--success)' : t==='OUT' ? 'var(--danger)' : undefined }}>{t}</button>
+                                                        }}>{t}</button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -573,7 +574,7 @@ export default function JournalView({
                                                     <label>Zahlweg</label>
                                                     <div className="btn-group" role="group" aria-label="Zahlweg wählen">
                                                         {(['BAR','BANK'] as const).map(pm => (
-                                                            <button key={pm} type="button" className="btn" onClick={() => setEditRow({ ...editRow, paymentMethod: pm })} style={{ background: (editRow as any).paymentMethod === pm ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                            <button key={pm} type="button" className={`btn ${(editRow as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`} onClick={() => setEditRow({ ...editRow, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
                                                         ))}
                                                     </div>
                                                 </div>
