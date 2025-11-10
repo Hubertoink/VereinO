@@ -131,7 +131,7 @@ export default function JournalView({
         try { return (localStorage.getItem('journal.sort') as any) || 'DESC' } 
         catch { return 'DESC' } 
     })
-    const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net'>(() => { 
+    const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'>(() => { 
         try { return (localStorage.getItem('journal.sortBy') as any) || 'date' } 
         catch { return 'date' } 
     })
@@ -476,7 +476,7 @@ export default function JournalView({
                             vatRate: (r as any).vatRate ?? 0
                         } as any)}
                         onDelete={(r) => setDeleteRow(r)}
-                        onToggleSort={(col: 'date' | 'net' | 'gross') => {
+                        onToggleSort={(col: 'date' | 'net' | 'gross' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
                             setPage(1)
                             setSortBy(col)
                             setSortDir(prev => (col === sortBy ? (prev === 'DESC' ? 'ASC' : 'DESC') : 'DESC'))

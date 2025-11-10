@@ -259,7 +259,8 @@ export function listVouchersAdvanced(filters: {
     limit?: number
     offset?: number
     sort?: 'ASC' | 'DESC'
-    sortBy?: 'date' | 'gross' | 'net'
+    // Extended sort keys
+    sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -314,8 +315,20 @@ export function listVouchersAdvanced(filters: {
     }
     if (wh.length) sql += ' WHERE ' + wh.join(' AND ')
     const dir = (sort === 'ASC' ? 'ASC' : 'DESC')
-    const orderCol = sortBy === 'gross' ? 'v.gross_amount' : sortBy === 'net' ? 'v.net_amount' : 'v.date'
-    sql += ` ORDER BY ${orderCol} ${dir}, v.id ${dir} LIMIT ? OFFSET ?`
+    // Map sort key to SQL expression (include aliases from SELECT)
+    const orderExpr = (() => {
+        switch (sortBy) {
+            case 'gross': return 'v.gross_amount'
+            case 'net': return 'v.net_amount'
+            case 'attachments': return 'fileCount'
+            case 'budget': return 'budgetLabel COLLATE NOCASE'
+            case 'earmark': return 'earmarkCode COLLATE NOCASE'
+            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'sphere': return 'v.sphere'
+            case 'date': default: return 'v.date'
+        }
+    })()
+    sql += ` ORDER BY ${orderExpr} ${dir}, v.id ${dir} LIMIT ? OFFSET ?`
     params.push(limit, offset)
     const rows = d.prepare(sql).all(...params) as any[]
     // Map concatenated tags to array
@@ -326,7 +339,8 @@ export function listVouchersAdvancedPaged(filters: {
     limit?: number
     offset?: number
     sort?: 'ASC' | 'DESC'
-    sortBy?: 'date' | 'gross' | 'net'
+    // Extended sort keys
+    sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
@@ -361,8 +375,21 @@ export function listVouchersAdvancedPaged(filters: {
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v${joinSql}${whereSql}`).get(...params) as any)?.c || 0
+    // Determine ORDER BY expression
+    const orderExpr = (() => {
+        switch (sortBy) {
+            case 'gross': return 'v.gross_amount'
+            case 'net': return 'v.net_amount'
+            case 'attachments': return 'fileCount'
+            case 'budget': return 'budgetLabel COLLATE NOCASE'
+            case 'earmark': return 'earmarkCode COLLATE NOCASE'
+            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'sphere': return 'v.sphere'
+            case 'date': default: return 'v.date'
+        }
+    })()
     const rows = d.prepare(
-    `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
@@ -383,7 +410,7 @@ export function listVouchersAdvancedPaged(filters: {
                     WHERE vt.voucher_id = v.id
                 ) as tagsConcat
          FROM vouchers v${joinSql}${whereSql}
-         ORDER BY ${sortBy === 'gross' ? 'v.gross_amount' : sortBy === 'net' ? 'v.net_amount' : 'v.date'} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
+         ORDER BY ${orderExpr} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
          LIMIT ? OFFSET ?`
     ).all(...params, limit, offset) as any[]
     const mapped = rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
@@ -713,10 +740,15 @@ export function updateVoucher(input: {
     const current = d.prepare(`
         SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
                net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount,
-               earmark_id as earmarkId, budget_id as budgetId
+               earmark_id as earmarkId, budget_id as budgetId,
+               payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+               description
         FROM vouchers WHERE id=?
     `).get(input.id) as any
     if (!current) throw new Error('Beleg nicht gefunden')
+    // Capture tags before update for audit
+    const beforeTags = getTagsForVoucher(input.id)
+    const currentFull = { ...current, tags: beforeTags }
     // Enforce period lock for the voucher's existing date (block edits in closed year)
     ensurePeriodOpen(current.date, d)
 
@@ -828,11 +860,18 @@ export function updateVoucher(input: {
     if (!fields.length && !input.tags && !setAmounts) return { id: input.id, warnings }
     params.push(input.id)
     d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
-    try {
-        const after = d.prepare('SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo, earmark_id as earmarkId, budget_id as budgetId FROM vouchers WHERE id=?').get(input.id)
-        writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: current, after, changes: input })
-    } catch { /* ignore audit failures */ }
+    // Apply tag changes before snapshotting 'after' so audit contains new tags state
     if (input.tags) setVoucherTags(input.id, input.tags)
+    try {
+        const after = d.prepare(`
+            SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+                   earmark_id as earmarkId, budget_id as budgetId, net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount
+            FROM vouchers WHERE id=?
+        `).get(input.id) as any
+        const afterTags = getTagsForVoucher(input.id)
+        const afterFull = { ...after, tags: afterTags }
+        writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
+    } catch { /* ignore audit failures */ }
     return { id: input.id, warnings }
 }
 

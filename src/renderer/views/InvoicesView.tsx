@@ -319,7 +319,7 @@ export default function InvoicesView() {
           <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
         </div>
       </div>
-      {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+      {error && <div className="invoices-text-danger">{error}</div>}
       {loading ? (
         <LoadingState message="Lade Rechnungen…" />
       ) : (
@@ -332,29 +332,29 @@ export default function InvoicesView() {
               </span>
             </div>
           )}
-          <table cellPadding={6} style={{ width: '100%' }}>
+          <table cellPadding={6} className="invoices-table">
             <thead>
               <tr>
                 <th align="center" title="Typ">Typ</th>
                 <th align="left">
-                  <button className="btn ghost" title="Nach Datum sortieren" onClick={() => { setSortBy('date'); setSortDir(prev => (sortBy === 'date' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="btn ghost invoices-sort-btn" title="Nach Datum sortieren" onClick={() => { setSortBy('date'); setSortDir(prev => (sortBy === 'date' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }}>
                     <span>Datum</span>
-                    <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'date' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'date' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                    <span aria-hidden="true" className={sortBy === 'date' ? 'invoices-sort-icon-active' : 'invoices-sort-icon'}>{sortBy === 'date' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
                   </button>
                 </th>
                 <th align="left">
-                  <button className="btn ghost" title="Nach Fälligkeit sortieren" onClick={() => { setSortBy('due'); setSortDir(prev => (sortBy === 'due' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'ASC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="btn ghost invoices-sort-btn" title="Nach Fälligkeit sortieren" onClick={() => { setSortBy('due'); setSortDir(prev => (sortBy === 'due' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'ASC'))); setOffset(0) }}>
                     <span>Fällig</span>
-                    <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'due' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'due' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                    <span aria-hidden="true" className={sortBy === 'due' ? 'invoices-sort-icon-active' : 'invoices-sort-icon'}>{sortBy === 'due' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
                   </button>
                 </th>
                 <th align="left">Nr.</th>
                 <th align="left">Partei</th>
                 {colPrefs.showTags && <th align="left">Tags</th>}
                 <th align="right">
-                  <button className="btn ghost" title="Nach Betrag sortieren" onClick={() => { setSortBy('amount'); setSortDir(prev => (sortBy === 'amount' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }} style={{ padding: 0, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button className="btn ghost invoices-sort-btn" title="Nach Betrag sortieren" onClick={() => { setSortBy('amount'); setSortDir(prev => (sortBy === 'amount' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'DESC'))); setOffset(0) }}>
                     <span>Brutto</span>
-                    <span aria-hidden="true" className="sort-icon" style={{ color: sortBy === 'amount' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'amount' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                    <span aria-hidden="true" className={sortBy === 'amount' ? 'invoices-sort-icon-active' : 'invoices-sort-icon'}>{sortBy === 'amount' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
                   </button>
                 </th>
                 {colPrefs.showBezahlt && <th align="right">Bezahlt</th>}
@@ -370,7 +370,7 @@ export default function InvoicesView() {
                 return (
                   <tr key={r.id} className={flashId === r.id ? 'row-flash' : undefined}>
                     <td align="center" title={r.voucherType === 'IN' ? 'Einnahme' : 'Ausgabe'}>
-                      <span className="badge" style={{ background: r.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)', color: 'white', padding: '2px 6px' }}>
+                      <span className={`badge invoices-type-badge ${r.voucherType === 'IN' ? 'invoices-type-badge-in' : ''}`}>
                         {r.voucherType === 'IN' ? '↑ IN' : '↓ OUT'}
                       </span>
                     </td>
@@ -395,7 +395,7 @@ export default function InvoicesView() {
                     <td>{r.party}</td>
                     {colPrefs.showTags && (
                       <td>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <div className="invoices-tags-container">
                           {(r.tags || []).map((t: string) => {
                             const def = (tags || []).find(td => (td.name || '').toLowerCase() === (t || '').toLowerCase())
                             const bg = def?.color || undefined
@@ -409,14 +409,14 @@ export default function InvoicesView() {
                     )}
                     <td align="right">{eurFmt.format(r.grossAmount)}</td>
                     {colPrefs.showBezahlt && <td align="right" title={`Summe Zahlungen`}>{eurFmt.format(r.paidSum || 0)}</td>}
-                    {colPrefs.showRest && <td align="right" style={{ color: remaining > 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(remaining)}</td>}
+                    {colPrefs.showRest && <td align="right" className={remaining > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(remaining)}</td>}
                     <td>{statusBadge(r.status)}</td>
                     {colPrefs.showAttachments && <td align="center">{(r.fileCount || 0) > 0 ? <span className="badge">📎 {r.fileCount}</span> : ''}</td>}
-                    <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                    <td align="center" className="invoices-actions-nowrap">
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
                       <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
                       {remaining > 0 && r.status !== 'PAID' && (
-                        <button className="btn" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }} style={{ background: 'var(--success)', color: '#fff' }}>{'€+'}</button>
+                        <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>
                       )}
                     </td>
                   </tr>
@@ -479,21 +479,21 @@ export default function InvoicesView() {
 
       {form && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal invoice-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10, width: 'min(1100px, 96vw)', maxHeight: '90vh', overflow: 'auto' }}>
-            <div className="card" style={{ padding: 10, display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="modal invoice-modal invoices-modal-grid" onClick={e => e.stopPropagation()}>
+            <div className="card invoices-form-header">
+              <div className="invoices-form-header-top">
+                <div className="invoices-form-header-info">
                   <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Rechnung anlegen' : 'Rechnung bearbeiten'}</h2>
                   <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px' }}>
                     <input aria-label="Datum" className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={{ height: 26, padding: '2px 6px' }} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div className="invoices-form-header-actions">
                   {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
                   <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
                 </div>
               </div>
-              <div className="helper" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="helper invoices-form-header-helper">
                 <span>Buchungstyp: <strong style={{ color: form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)' }}>{form.draft.voucherType}</strong></span>
                 <span>Betrag: <strong>{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : '—' })()}</strong></span>
                 <span>Fällig: <strong>{form.draft.dueDate || '—'}</strong></span>
@@ -502,70 +502,66 @@ export default function InvoicesView() {
               </div>
             </div>
 
-            {formError && <div style={{ color: 'var(--danger)' }}>{formError}</div>}
+            {formError && <div className="invoices-text-danger">{formError}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 3fr) minmax(320px, 2fr)', gap: 12 }}>
-              <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-                <div className="field">
-                  <label>Rechnungsnummer <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input
-                    className="input"
-                    value={form.draft.invoiceNo || ''}
-                    onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))}
-                    placeholder="z. B. 2025-001"
-                    style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
-                    aria-label="Rechnungsnummer"
-                  />
-                  {requiredTouched && !(form.draft.invoiceNo || '').trim() && (
-                    <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Rechnungsnummer angeben</div>
-                  )}
-                </div>
-                <div className="field">
-                  <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
-                  {requiredTouched && (!form.draft.party?.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Partei angeben</div>)}
-                </div>
-                <div className="field">
-                  <label>Beschreibung</label>
-                  <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
-                </div>
-                <div className="field">
-                  <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                  <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label="Rechnungsbetrag in Euro" />
-                  {(() => {
-                    const a = parseAmount(form.draft.grossAmount)
-                    if (a != null && a > 0) {
-                      return <div className="helper">{eurFmt.format(a)}</div>
-                    }
-                    return null
-                  })()}
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <div className="field" style={{ minWidth: 160 }}>
-                    <label>Fällig</label>
-                    <input className="input" type="date" value={form.draft.dueDate || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, dueDate: e.target.value || null } }))} style={{ minWidth: 0 }} />
+            <div className="invoices-form-grid">
+              <div className="card invoices-form-card">
+                {/* Reihenlayout angepasst */}
+                {/* Reihe 1: Datum */}
+                <div className="invoices-left-grid">
+                  <div className="field invoices-form-field-span2">
+                    <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
+                    <input className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined} />
+                    {requiredTouched && !form.draft.date && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Datum angeben</div>)}
                   </div>
-                  <div className="field" style={{ minWidth: 160 }}>
+                  {/* Reihe 2: Partei */}
+                  <div className="field invoices-form-field-span2">
+                    <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
+                    <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                    {requiredTouched && (!form.draft.party?.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Partei angeben</div>)}
+                  </div>
+                  {/* Reihe 3: Rechnungsnummer + Betrag */}
+                  <div className="field">
+                    <label>Rechnungsnummer <span className="req-asterisk" aria-hidden="true">*</span></label>
+                    <input
+                      className="input"
+                      value={form.draft.invoiceNo || ''}
+                      onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))}
+                      placeholder="z. B. 2025-001"
+                      style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
+                      aria-label="Rechnungsnummer"
+                    />
+                    {requiredTouched && !(form.draft.invoiceNo || '').trim() && (
+                      <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Rechnungsnummer angeben</div>
+                    )}
+                  </div>
+                  <div className="field">
+                    <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
+                    <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label="Rechnungsbetrag in Euro" />
+                    {/* Entfernte Helfer-Ausgabe des formatierten Betrags unter dem Eingabefeld (Duplikat) */}
+                  </div>
+                  {/* Reihe 4: Beschreibung (volle Breite) */}
+                  <div className="field invoices-form-field-span2">
+                    <label>Beschreibung</label>
+                    <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
+                  </div>
+                  {/* Reihe 5: Zahlungsweg (volle Breite) */}
+                  <div className="field invoices-form-field-span2">
                     <label>Zahlweg</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button type="button" className="btn" style={{ width: 56, justifyContent: 'center', background: !form.draft.paymentMethod ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: '' } }))} title="Kein Zahlweg">—</button>
                       <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.paymentMethod === 'BAR' ? 'color-mix(in oklab, var(--accent) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } }))} title="Bar">💵 Bar</button>
                       <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.paymentMethod === 'BANK' ? 'color-mix(in oklab, var(--accent) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } }))} title="Bank">🏦 Bank</button>
                     </div>
                   </div>
-                  <div className="field" style={{ minWidth: 180 }}>
-                    <label>Buchungstyp</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.voucherType === 'IN' ? 'color-mix(in oklab, var(--success) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } }))}>IN</button>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.voucherType === 'OUT' ? 'color-mix(in oklab, var(--danger) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } }))}>OUT</button>
-                    </div>
+                  {/* Reihe 6: Tags (schmaler) */}
+                  <div className="field invoices-form-field-span2 invoices-tags-narrow">
+                    <TagsEditor label="Tags" value={form.draft.tags} onChange={tags => setForm(f => f && ({ ...f, draft: { ...f.draft, tags } }))} tagDefs={tags} className="tags-editor" />
                   </div>
                 </div>
-
-                <TagsEditor label="Tags" value={form.draft.tags} onChange={tags => setForm(f => f && ({ ...f, draft: { ...f.draft, tags } }))} tagDefs={tags} className="tags-editor" />
               </div>
 
-              <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
+              <div className="card invoices-form-card">
                 <div className="field">
                   <label>Sphäre <span className="helper">(Steuerlicher Bereich)</span></label>
                   <select className="input" value={form.draft.sphere} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, sphere: e.target.value as any } }))} aria-label="Sphäre auswählen">
@@ -691,9 +687,9 @@ export default function InvoicesView() {
               const a = parseAmount(form!.draft.grossAmount)
               if (a == null || a <= 0) missing.push('Betrag')
               return (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <div className="invoices-form-footer">
                   <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="invoices-form-footer-actions">
                     {form.mode === 'edit' && form.draft.id && (
                       <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
                     )}
@@ -710,18 +706,18 @@ export default function InvoicesView() {
 
         {missingRequired.length > 0 && createPortal(
           <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setMissingRequired([])}>
-            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+            <div className="modal invoices-missing-modal" onClick={e => e.stopPropagation()}>
               <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
                 <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen">×</button>
               </header>
               <div className="card" style={{ padding: 10 }}>
                 <div>Bitte ergänze die folgenden Felder:</div>
-                <ul className="helper" style={{ marginTop: 6 }}>
+                <ul className="helper invoices-missing-list">
                   {missingRequired.map(f => <li key={f}>{f}</li>)}
                 </ul>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div className="invoices-missing-actions">
                 <button className="btn primary" onClick={() => setMissingRequired([])}>OK</button>
               </div>
             </div>
@@ -729,33 +725,33 @@ export default function InvoicesView() {
 
       {detailId != null && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setDetailId(null); setDetail(null) }}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10, maxWidth: 760 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div className="modal invoices-detail-grid" onClick={e => e.stopPropagation()} style={{ maxWidth: 760 }}>
+            <div className="invoices-detail-header">
               <h2 style={{ margin: 0 }}>Rechnung {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="invoices-detail-header-actions">
                 {detail && <button className="btn" onClick={() => { const d = detail as any; setDetailId(null); setDetail(null); setTimeout(() => openEdit(d), 0) }}>✎ Bearbeiten</button>}
                 <button className="btn ghost" onClick={() => { setDetailId(null); setDetail(null) }}>✕</button>
               </div>
             </div>
             {loadingDetail && <div className="helper">Lade Details…</div>}
             {!loadingDetail && detail && (
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div className="invoices-detail-grid">
                 <div className="card" style={{ padding: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'grid', gap: 4 }}>
+                  <div className="invoices-detail-overview">
+                    <div className="invoices-detail-overview-left">
                       <div style={{ fontWeight: 600 }}>{detail.party}</div>
                       <div className="helper">{detail.description || '—'}</div>
                     </div>
                     <div>{statusBadge(detail.status)}</div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginTop: 8 }}>
+                  <div className="invoices-detail-info-grid">
                     <div><div className="helper">Datum</div><div>{fmtDateLocal(detail.date)}</div></div>
                     <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '')}</div></div>
                     <div><div className="helper">Sphäre</div><div>{detail.sphere}</div></div>
                     <div><div className="helper">Zahlweg</div><div>{detail.paymentMethod || '—'}</div></div>
                     <div><div className="helper">Betrag</div><div>{eurFmt.format(detail.grossAmount)}</div></div>
                     <div><div className="helper">Bezahlt</div><div>{eurFmt.format(detail.paidSum || 0)}</div></div>
-                    <div><div className="helper">Rest</div><div style={{ color: Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100) > 0 ? 'var(--danger)' : 'var(--success)' }}>{eurFmt.format(Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100))}</div></div>
+                    <div><div className="helper">Rest</div><div className={Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100) > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100))}</div></div>
                     <div><div className="helper">Auto-Buchung</div><div>{(detail.autoPost ?? 0) ? 'ja' : 'nein'}</div></div>
                     <div><div className="helper">Buchungstyp</div><div>{detail.voucherType}</div></div>
                     <div>
@@ -773,7 +769,7 @@ export default function InvoicesView() {
                     </div>
                   </div>
                   {(detail.tags || []).length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    <div className="invoices-detail-tags">
                       {(detail.tags || []).map(t => {
                         const def = (tags || []).find(td => (td.name || '').toLowerCase() === (t || '').toLowerCase())
                         const bg = def?.color || undefined
@@ -785,10 +781,10 @@ export default function InvoicesView() {
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="invoices-detail-split">
                   <div className="card" style={{ padding: 12 }}>
                     <strong>Zahlungen</strong>
-                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
+                    <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
                       <thead><tr><th align="left">Datum</th><th align="right">Betrag</th></tr></thead>
                       <tbody>
                         {(detail.payments || []).map(p => (<tr key={p.id}><td>{fmtDateLocal(p.date)}</td><td align="right">{eurFmt.format(p.amount)}</td></tr>))}
@@ -798,7 +794,7 @@ export default function InvoicesView() {
                   </div>
                   <div className="card" style={{ padding: 12 }}>
                     <strong>Dateien</strong>
-                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
+                    <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
                       <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="left">Datum</th><th align="center">Aktion</th></tr></thead>
                       <tbody>
                         {(detail.files || []).map(f => (
@@ -821,7 +817,7 @@ export default function InvoicesView() {
                     </table>
                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div className="invoices-detail-footer">
                   <button className="btn" onClick={() => { setDetailId(null); setDetail(null) }}>Schließen</button>
                 </div>
               </div>

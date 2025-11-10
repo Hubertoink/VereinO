@@ -235,6 +235,27 @@ function AppInner() {
         return () => { cancelled = true }
     }, [showExportOptions])
 
+    // Global handler: jump from invoice detail (linked booking) to Journal view filtered
+    useEffect(() => {
+        function onVoucherJump(ev: any) {
+            try {
+                const detail = ev?.detail || {}
+                // Switch to Buchungen view first
+                setActivePage('Buchungen')
+                // Apply search query or voucherId filter
+                if (typeof detail.q === 'string' && detail.q.trim()) {
+                    setQ(detail.q)
+                    setPage(1)
+                } else if (detail.voucherId) {
+                    setQ('#' + String(detail.voucherId))
+                    setPage(1)
+                }
+            } catch { /* ignore */ }
+        }
+        window.addEventListener('apply-voucher-jump' as any, onVoucherJump as any)
+        return () => window.removeEventListener('apply-voucher-jump' as any, onVoucherJump as any)
+    }, [])
+
     // UI preference: date format (ISO vs PRETTY)
     type DateFmt = 'ISO' | 'PRETTY'
     const [dateFmt, setDateFmt] = useState<DateFmt>(() => {

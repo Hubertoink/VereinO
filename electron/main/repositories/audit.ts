@@ -15,9 +15,9 @@ export function listRecentAudit(limit = 20) {
                 diff_json as diffJson, 
                 created_at as createdAt,
                 CASE 
-                    WHEN entity = 'vouchers' THEN (SELECT date FROM vouchers v WHERE v.id = audit_log.entity_id)
-                    WHEN entity = 'invoices' THEN (SELECT date FROM invoices i WHERE i.id = audit_log.entity_id)
-                    WHEN entity = 'members' THEN (SELECT created_at FROM members m WHERE m.id = audit_log.entity_id)
+                    WHEN entity IN ('vouchers', 'VOUCHER') THEN (SELECT date FROM vouchers v WHERE v.id = audit_log.entity_id)
+                    WHEN entity IN ('invoices', 'INVOICE') THEN (SELECT date FROM invoices i WHERE i.id = audit_log.entity_id)
+                    WHEN entity IN ('members', 'MEMBER') THEN (SELECT created_at FROM members m WHERE m.id = audit_log.entity_id)
                     ELSE NULL
                 END as recordDate
              FROM audit_log 

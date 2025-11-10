@@ -75,7 +75,8 @@ export const ReportsExportInput = z.object({
     amountMode: z.enum(['POSITIVE_BOTH', 'OUT_NEGATIVE']).optional(),
     // Sorting controls (applies to table/list output across formats)
     sort: z.enum(['ASC', 'DESC']).optional(),
-    sortBy: z.enum(['date', 'gross', 'net']).optional()
+    // Extend sortBy to support additional columns in exports too (optional)
+    sortBy: z.enum(['date', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere']).optional()
 })
 
 export const ReportsExportOutput = z.object({ filePath: z.string() })
@@ -192,7 +193,8 @@ export const VouchersListInput = z
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0).optional(),
         sort: z.enum(['ASC', 'DESC']).optional(),
-        sortBy: z.enum(['date', 'gross', 'net']).optional(),
+        // New sortable columns for Buchungen
+        sortBy: z.enum(['date', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere']).optional(),
         paymentMethod: PaymentMethod.optional(),
         sphere: Sphere.optional(),
         type: VoucherType.optional(),
