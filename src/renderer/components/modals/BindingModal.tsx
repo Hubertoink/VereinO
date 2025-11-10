@@ -41,10 +41,11 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
   async function save() {
     setRequiredTouched(true)
     const name = (v.name || '').trim()
-    if (!name) return
+    const code = (v.code || '').trim()
+    if (!name || !code) return
     await (window as any).api?.bindings.upsert?.({
       id: v.id as any,
-      code: v.code,
+      code,
       name,
       description: v.description ?? null,
       startDate: v.startDate ?? null,
@@ -74,21 +75,29 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
         />
         <div className="row">
           <div className="field">
-            <label htmlFor="binding-code">Code</label>
-            <input id="binding-code" className="input" value={v.code} onChange={(e) => setV({ ...v, code: e.target.value })} placeholder="z.B. ZW01" />
+            <label htmlFor="binding-code">Code<span className="req-asterisk">*</span></label>
+            <input
+              id="binding-code"
+              className={`input ${requiredTouched && !v.code.trim() ? 'input-error' : ''}`}
+              value={v.code}
+              onChange={(e) => setV({ ...v, code: e.target.value })}
+              placeholder="z.B. ZW01"
+            />
+            {requiredTouched && !v.code.trim() && (
+              <div className="helper error-text">Bitte Code angeben</div>
+            )}
           </div>
           <div className="field">
             <label htmlFor="binding-name">Name<span className="req-asterisk">*</span></label>
-            <input 
-              id="binding-name" 
-              className="input" 
-              value={v.name} 
-              onChange={(e) => setV({ ...v, name: e.target.value })} 
+            <input
+              id="binding-name"
+              className={`input ${requiredTouched && !v.name.trim() ? 'input-error' : ''}`}
+              value={v.name}
+              onChange={(e) => setV({ ...v, name: e.target.value })}
               placeholder="z.B. Sommerfest 2025"
-              style={requiredTouched && !v.name.trim() ? { borderColor: 'var(--danger)' } : undefined}
             />
             {requiredTouched && !v.name.trim() && (
-              <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
+              <div className="helper error-text">Bitte Namen angeben</div>
             )}
           </div>
           <div className="field field-full-width">
@@ -134,8 +143,8 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           </div>
         </div>
         <div className="modal-footer">
-          <div className="helper" style={{ margin: 0 }}>Ctrl+S = Speichern · Esc = Abbrechen</div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="helper m-0">Ctrl+S = Speichern · Esc = Abbrechen</div>
+          <div className="modal-actions">
             {!!v.id && (
               <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
