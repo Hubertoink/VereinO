@@ -484,9 +484,6 @@ export default function InvoicesView() {
               <div className="invoices-form-header-top">
                 <div className="invoices-form-header-info">
                   <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Rechnung anlegen' : 'Rechnung bearbeiten'}</h2>
-                  <div className="badge" title="Rechnungsdatum" style={{ padding: '2px 6px' }}>
-                    <input aria-label="Datum" className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={{ height: 26, padding: '2px 6px' }} />
-                  </div>
                 </div>
                 <div className="invoices-form-header-actions">
                   {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
@@ -507,12 +504,16 @@ export default function InvoicesView() {
             <div className="invoices-form-grid">
               <div className="card invoices-form-card">
                 {/* Reihenlayout angepasst */}
-                {/* Reihe 1: Datum */}
+                {/* Reihe 1: Datum | Fälligkeit */}
                 <div className="invoices-left-grid">
-                  <div className="field invoices-form-field-span2">
+                  <div className="field">
                     <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                     <input className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined} />
                     {requiredTouched && !form.draft.date && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Datum angeben</div>)}
+                  </div>
+                  <div className="field">
+                    <label>Fälligkeit</label>
+                    <input className="input" type="date" value={form.draft.dueDate || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, dueDate: e.target.value || null } }))} />
                   </div>
                   {/* Reihe 2: Partei */}
                   <div className="field invoices-form-field-span2">
