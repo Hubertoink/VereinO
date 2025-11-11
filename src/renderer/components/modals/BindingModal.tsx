@@ -146,7 +146,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           <div className="helper m-0">Ctrl+S = Speichern · Esc = Abbrechen</div>
           <div className="modal-actions">
             {!!v.id && (
-              <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+              <button className="btn danger modal-delete-btn" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
             <button className="btn" onClick={onClose}>Abbrechen</button>
             <button className="btn primary" onClick={() => save()}>Speichern</button>

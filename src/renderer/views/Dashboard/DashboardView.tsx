@@ -311,19 +311,19 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
             <div style={{ display: 'grid', gap: 12 }}>
               <BalanceAreaChart {...balanceFilters} />
               {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
-              {/* Two-column layout: Zweckbindungen (max 2) left, Budgets (max 2) right */}
+              {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {activeEarmarks.map(em => (
-                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...yearFilters} />
-                  ))}
-                  {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
-                </div>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {activeBudgets.map(b => (
                     <BudgetDetailCard key={b.id} budgetId={b.id} from={yearFilters.from} to={yearFilters.to} />
                   ))}
                   {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
+                </div>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {activeEarmarks.map(em => (
+                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...yearFilters} />
+                  ))}
+                  {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
                 </div>
               </div>
               <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} />
@@ -368,14 +368,17 @@ function DashboardRecentActivity() {
     // Handle batch assignments (robust to missing fields/casing)
     if (a === 'BATCH_ASSIGN_EARMARK') {
       const count = Number(d?.count || 0)
-      const earmarkLabel = (d?.earmarkCode || d?.earmark?.code)
-        ? `${d?.earmarkCode || d?.earmark?.code} – ${d?.earmarkName || d?.earmark?.name || ''}`.trim()
-        : (d?.earmarkName || d?.earmark?.name || (d?.earmarkId ? `#${d.earmarkId}` : ''))
+      const earmarkCode = d?.earmarkCode || d?.earmark?.code || ''
+      const earmarkName = d?.earmarkName || d?.earmark?.name || ''
+      const earmarkLabel = earmarkCode && earmarkName 
+        ? `${earmarkCode} – ${earmarkName}`
+        : earmarkCode || earmarkName || (d?.earmarkId ? `#${d.earmarkId}` : '')
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Zweckbindung: ${earmarkLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_BUDGET') {
       const count = Number(d?.count || 0)
-      const budgetLabel = d?.budgetLabel || d?.budgetName || d?.budget?.name || (d?.budgetId ? `#${d.budgetId}` : '')
+      const budgetName = d?.budgetName || d?.budget?.name || ''
+      const budgetLabel = budgetName || d?.budgetLabel || (d?.budgetId ? `#${d.budgetId}` : '')
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Budget: ${budgetLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_TAGS') {

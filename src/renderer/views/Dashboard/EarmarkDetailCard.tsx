@@ -122,7 +122,7 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
         <div style={{ marginTop: 10 }}>
           <div className="helper" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Fortschritt Ausgaben</span>
-            <span>{consumedPct?.toFixed(1)}%{remaining != null ? ` · Rest: ${eur.format(remaining)}` : ''}</span>
+            <span>{consumedPct?.toFixed(1)}%{remaining != null ? ` · Rest: ` : ''}{remaining != null ? <strong style={{ textDecoration: 'underline', textDecorationStyle: 'double' }}>{eur.format(remaining)}</strong> : ''}</span>
           </div>
           <div style={{ position: 'relative', height: 6, background: 'color-mix(in oklab, var(--border) 40%, transparent)', borderRadius: 4, overflow: 'hidden', marginTop: 4 }}>
             <div style={{ position: 'absolute', inset: 0, width: `${consumedPct || 0}%`, background: earmark?.color || 'var(--accent)', transition: 'width .4s', borderRadius: 4 }} />

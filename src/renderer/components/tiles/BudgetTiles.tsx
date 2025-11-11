@@ -85,7 +85,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                 <span className="badge out">OUT: {eurFmt.format(spent)}</span>
                 <span className="badge">Budget: {eurFmt.format(plan)}</span>
                 <span className="badge">Saldo: {eurFmt.format(saldo)}</span>
-                <span className="badge" title="Verfügbar">Rest: {eurFmt.format(remaining)}</span>
+                <span className="badge" title="Verfügbar" style={{ fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'double' }}>Rest: {eurFmt.format(remaining)}</span>
               </div>
               <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {(startDate || endDate) && (

@@ -1789,6 +1789,10 @@ label .req-asterisk {
     gap: 8px;
 }
 
+.modal-delete-btn {
+    margin-right: 16px;
+}
+
 /* Delete confirmation modal */
 .delete-modal {
     max-width: 520px;

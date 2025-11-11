@@ -86,7 +86,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
               {budget > 0 && (
                 <>
                   <span className="badge" title="Anfangsbudget">Budget: {fmt.format(budget)}</span>
-                  <span className="badge" title="Verfügbar">Rest: {fmt.format(u?.remaining ?? (budget - released))}</span>
+                  <span className="badge" title="Verfügbar" style={{ fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'double' }}>Rest: {fmt.format(u?.remaining ?? (budget - released))}</span>
                 </>
               )}
             </div>

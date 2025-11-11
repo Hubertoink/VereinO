@@ -315,6 +315,34 @@ export default function JournalView({
         }
     }, [editRow?.id])
 
+    // Keyboard shortcuts for edit modal (Ctrl+S to save, Esc to close)
+    useEffect(() => {
+        if (!editRow) return
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl+S or Cmd+S to save
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                // Trigger form submit by finding and clicking the submit button or dispatching submit event
+                const form = document.querySelector('.booking-modal form') as HTMLFormElement | null
+                if (form) {
+                    form.requestSubmit()
+                }
+                return
+            }
+            
+            // Escape to close
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setEditRow(null)
+                return
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [editRow])
+
     // ==================== RENDER ====================
     return (
         <>

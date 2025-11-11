@@ -142,7 +142,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
           <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {!!v.id && (
-              <button className="btn danger" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+              <button className="btn danger modal-delete-btn" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
             )}
             <button className="btn" onClick={onClose}>Abbrechen</button>
             <button className="btn primary" onClick={save}>Speichern</button>

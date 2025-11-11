@@ -527,7 +527,7 @@ export default function MembersView() {
                             <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 {form.mode === 'edit' && (
-                                    <button className="btn danger" onClick={() => {
+                                    <button className="btn danger modal-delete-btn" onClick={() => {
                                         if (!form?.draft?.id) return
                                         const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
                                         setDeleteConfirm({ id: form.draft.id, label })
