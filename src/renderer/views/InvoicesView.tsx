@@ -593,7 +593,7 @@ export default function InvoicesView() {
                   </select>
                 </div>
                 <div className="field">
-                  <label>Budget <span className="helper">(optional)</span></label>
+                  <label>Budget</label>
                   <select className="input" value={(form.draft.budgetId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, budgetId: e.target.value ? Number(e.target.value) : '' } }))} aria-label="Budget auswählen">
                     <option value="">—</option>
                     {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
