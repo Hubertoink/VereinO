@@ -100,7 +100,7 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
   const budget = earmark?.budget ?? null
   const consumedPct = budget ? Math.min(100, Math.round((sumOut / Math.max(1e-9, budget)) * 1000) / 10) : null
   const saldo = Math.round((sumIn - sumOut) * 100) / 100
-  const remaining = budget != null ? Math.round((budget - sumOut) * 100) / 100 : null
+  const remaining = budget != null ? Math.round((budget + saldo) * 100) / 100 : null  // Budget + Saldo (IN - OUT)
   const bgTint = earmark?.color ? `color-mix(in oklab, ${earmark.color} 14%, var(--surface))` : undefined
 
   return (

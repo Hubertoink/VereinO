@@ -66,8 +66,8 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
           const plan = b.amountPlanned || 0
           const spent = Math.max(0, usage[b.id]?.spent || 0)
           const inflow = Math.max(0, usage[b.id]?.inflow || 0)
-          const remaining = plan - spent
           const saldo = inflow - spent
+          const remaining = plan + saldo  // Budget + Saldo (IN - OUT)
           const pct = plan > 0 ? Math.min(100, Math.max(0, Math.round((spent / plan) * 100))) : 0
           const title = (b.name && b.name.trim()) || b.categoryName || b.projectName || `Budget ${b.year}`
           const startDate = b.startDate ?? usage[b.id]?.startDate ?? null

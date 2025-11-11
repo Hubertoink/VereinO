@@ -83,7 +83,7 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
   const planned = budget?.amountPlanned ?? 0
   const saldo = Math.round((sumIn - sumOut) * 100) / 100
   const consumedPct = planned > 0 ? Math.min(100, Math.round((sumOut / planned) * 1000) / 10) : null
-  const remaining = planned > 0 ? Math.round((planned - sumOut) * 100) / 100 : null
+  const remaining = planned > 0 ? Math.round((planned + saldo) * 100) / 100 : null  // Budget + Saldo (IN - OUT)
   const bgTint = budget?.color ? `color-mix(in oklab, ${budget.color} 14%, var(--surface))` : undefined
 
   return (
