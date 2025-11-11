@@ -55,7 +55,7 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
       setBusy(true)
       if (mode === 'EARMARK') {
         if (!earmarkId) { notify?.('error', 'Bitte eine Zweckbindung wählen'); return }
-        const payload: any = { earmarkId: Number(earmarkId), ...currentFilters }
+        const payload: any = { ...currentFilters, earmarkId: Number(earmarkId) }
         if (onlyWithout) payload.onlyWithout = true
         const res = await (window as any).api?.vouchers.batchAssignEarmark?.(payload)
         const n = res?.updated ?? 0
@@ -68,7 +68,7 @@ const BatchEarmarkModal: React.FC<BatchEarmarkModalProps> = ({ onClose, earmarks
         onApplied(n); onClose()
       } else if (mode === 'BUDGET') {
         if (!budgetId) { notify?.('error', 'Bitte ein Budget wählen'); return }
-        const payload: any = { budgetId: Number(budgetId), ...currentFilters }
+        const payload: any = { ...currentFilters, budgetId: Number(budgetId) }
         if (onlyWithout) payload.onlyWithout = true
         const res = await (window as any).api?.vouchers.batchAssignBudget?.(payload)
         const n = res?.updated ?? 0

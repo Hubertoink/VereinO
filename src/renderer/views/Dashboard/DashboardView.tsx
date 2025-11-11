@@ -343,7 +343,10 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
 function DashboardRecentActivity() {
   const [rows, setRows] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(false)
+  const [earmarks, setEarmarks] = React.useState<Array<{ id: number; code: string; name: string }>>([])
+  const [budgets, setBudgets] = React.useState<Array<{ id: number; name?: string | null; year: number }>>([])
   const eur = React.useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+  
   React.useEffect(() => {
     let alive = true
     const load = async () => {
@@ -359,6 +362,25 @@ function DashboardRecentActivity() {
     window.addEventListener('data-changed', onChanged)
     return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
   }, [])
+  
+  // Load earmarks and budgets for lookups
+  React.useEffect(() => {
+    let alive = true
+    const loadMeta = async () => {
+      try {
+        const eRes = await (window as any).api?.bindings?.list?.({})
+        const bRes = await (window as any).api?.budgets?.list?.({})
+        if (alive) {
+          setEarmarks((eRes?.rows || []) as any[])
+          setBudgets((bRes?.rows || []) as any[])
+        }
+      } catch {}
+    }
+    loadMeta()
+    const onChanged = () => loadMeta()
+    window.addEventListener('data-changed', onChanged)
+    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+  }, [])
 
   function describe(row: any): { title: string; details?: string; tone?: 'ok' | 'warn' | 'err' } {
     const a = String(row.action || '').toUpperCase()
@@ -368,17 +390,12 @@ function DashboardRecentActivity() {
     // Handle batch assignments (robust to missing fields/casing)
     if (a === 'BATCH_ASSIGN_EARMARK') {
       const count = Number(d?.count || 0)
-      const earmarkCode = d?.earmarkCode || d?.earmark?.code || ''
-      const earmarkName = d?.earmarkName || d?.earmark?.name || ''
-      const earmarkLabel = earmarkCode && earmarkName 
-        ? `${earmarkCode} – ${earmarkName}`
-        : earmarkCode || earmarkName || (d?.earmarkId ? `#${d.earmarkId}` : '')
+      const earmarkLabel = d?.earmarkId ? `#${d.earmarkId}` : 'Zweckbindung'
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Zweckbindung: ${earmarkLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_BUDGET') {
       const count = Number(d?.count || 0)
-      const budgetName = d?.budgetName || d?.budget?.name || ''
-      const budgetLabel = budgetName || d?.budgetLabel || (d?.budgetId ? `#${d.budgetId}` : '')
+      const budgetLabel = d?.budgetId ? `#${d.budgetId}` : 'Budget'
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Budget: ${budgetLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_TAGS') {
@@ -421,8 +438,18 @@ function DashboardRecentActivity() {
         add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
         add('sphere', d.before?.sphere, d.after?.sphere)
-        add('earmarkId', d.before?.earmarkId, d.after?.earmarkId)
-        add('budgetId', d.before?.budgetId, d.after?.budgetId)
+        // Zweckbindung: Code anzeigen statt ID
+        add('earmarkId', d.before?.earmarkId, d.after?.earmarkId, (id: any) => {
+          if (!id) return '—'
+          const em = earmarks.find(e => e.id === Number(id))
+          return em ? `${em.code}` : `#${id}`
+        })
+        // Budget: Name anzeigen statt ID
+        add('budgetId', d.before?.budgetId, d.after?.budgetId, (id: any) => {
+          if (!id) return '—'
+          const b = budgets.find(bu => bu.id === Number(id))
+          return b ? (b.name || `${b.year}`) : `#${id}`
+        })
         // Tags
         const tagsBefore = Array.isArray(d.before?.tags) ? d.before.tags : []
         const tagsAfter = Array.isArray(d.after?.tags) ? d.after.tags : (Array.isArray(ch.tags) ? ch.tags : [])

@@ -503,14 +503,14 @@ export function batchAssignBudget(params: {
     
     // Log batch assignment to audit
     if (updated > 0) {
-        const budgetInfo = d.prepare('SELECT label FROM budgets WHERE id=?').get(params.budgetId) as any
+        const budgetInfo = d.prepare('SELECT name, year FROM budgets WHERE id=?').get(params.budgetId) as any
         writeAudit(
             d,
             null,
             'VOUCHER',
             0,
             'BATCH_ASSIGN_BUDGET',
-            { budgetId: params.budgetId, budgetLabel: budgetInfo?.label, count: updated, filters: params }
+            { budgetId: params.budgetId, budgetName: budgetInfo?.name, budgetYear: budgetInfo?.year, count: updated, filters: params }
         )
     }
     
