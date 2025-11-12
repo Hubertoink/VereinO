@@ -3,7 +3,7 @@ import { PaymentMethod } from './types'
 
 export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string }) {
   const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<Array<{ key: PaymentMethod | null; inGross: number; outGross: number }>>([])
+  const [data, setData] = useState<Array<{ key: PaymentMethod; inGross: number; outGross: number }>>([])
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -15,11 +15,11 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
       (window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: 'OUT' })
     ]).then(([sumIn, sumOut]) => {
       if (cancelled) return
-      const keys: Array<PaymentMethod | null> = ['BAR', 'BANK', null]
-      const map: Record<string, { inGross: number; outGross: number }> = { 'BAR': { inGross: 0, outGross: 0 }, 'BANK': { inGross: 0, outGross: 0 }, 'null': { inGross: 0, outGross: 0 } }
-      sumIn?.byPaymentMethod.forEach((r: any) => { const k = (r.key ?? 'null'); (map as any)[k] = (map as any)[k] || { inGross: 0, outGross: 0 }; (map as any)[k].inGross = r.gross })
-      sumOut?.byPaymentMethod.forEach((r: any) => { const k = (r.key ?? 'null'); (map as any)[k] = (map as any)[k] || { inGross: 0, outGross: 0 }; (map as any)[k].outGross = r.gross })
-      setData(keys.map(k => ({ key: k, inGross: (map as any)[(k ?? 'null')].inGross || 0, outGross: (map as any)[(k ?? 'null')].outGross || 0 })))
+      const keys: Array<PaymentMethod> = ['BAR', 'BANK']
+      const map: Record<string, { inGross: number; outGross: number }> = { 'BAR': { inGross: 0, outGross: 0 }, 'BANK': { inGross: 0, outGross: 0 } }
+      sumIn?.byPaymentMethod.forEach((r: any) => { const k = r.key; if (k === 'BAR' || k === 'BANK') { map[k].inGross = r.gross } })
+      sumOut?.byPaymentMethod.forEach((r: any) => { const k = r.key; if (k === 'BAR' || k === 'BANK') { map[k].outGross = r.gross } })
+      setData(keys.map(k => ({ key: k, inGross: map[k].inGross || 0, outGross: map[k].outGross || 0 })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [props.from, props.to, props.refreshKey])
@@ -67,7 +67,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
             const idx = hoverIdx
             if (idx == null || !data[idx]) return null
             const r = data[idx]
-            const label = r.key ?? '—'
+            const label = r.key
             return (
               <div className="chart-tooltip">
                 <div className="chart-tooltip-header">{label}</div>
@@ -89,7 +89,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
               const inX = xFor(r.inGross)
               const outX = xFor(r.outGross)
               const yBar = y + 8
-              const label = r.key ?? '—'
+              const label = r.key
               return (
                 <g key={(r.key ?? 'NULL') + i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
                   <text x={margin.left - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle" fontSize="12">{label}</text>

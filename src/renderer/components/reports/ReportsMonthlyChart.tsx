@@ -82,7 +82,28 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
 
   // Ensure we show all months in range, even when there is no data
-  const months = monthKeys(props.from, props.to)
+  // If from/to are not provided, derive the range from actual data
+  const months = (() => {
+    if (props.from && props.to) {
+      return monthKeys(props.from, props.to)
+    }
+    // No date filter: use all months from the data
+    const allMonths = new Set<string>()
+    inBuckets.forEach(b => allMonths.add(String(b.month)))
+    outBuckets.forEach(b => allMonths.add(String(b.month)))
+    if (allMonths.size === 0) {
+      // Fallback to current year if no data at all
+      const now = new Date()
+      const y = now.getUTCFullYear()
+      return monthKeys(
+        new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10),
+        new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+      )
+    }
+    const sorted = Array.from(allMonths).sort()
+    // Build complete range from first to last month
+    return monthKeys(sorted[0] + '-01', sorted[sorted.length - 1] + '-28')
+  })()
   const inMap = new Map(inBuckets.map(b => [String(b.month), Number(b.gross) || 0]))
   const outMap = new Map(outBuckets.map(b => [String(b.month), Math.abs(Number(b.gross) || 0)]))
   const series = months.map(m => ({

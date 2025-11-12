@@ -90,7 +90,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
         const s = await (window as any).api?.reports?.summary?.({ from, to })
         if (!alive || !s) return
         setBySphere((s.bySphere || []).map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
-        setByPM((s.byPaymentMethod || []).map((x: any) => ({ key: String(x.key || '—'), gross: Number(x.gross || 0) })))
+        setByPM((s.byPaymentMethod || []).filter((x: any) => x.key === 'BAR' || x.key === 'BANK').map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
       } catch { if (alive) { setBySphere([]); setByPM([]) } }
     }
     load()
@@ -105,7 +105,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
     VERMOEGEN: '#9575cd',
     WGB: '#ffb74d',
   }
-  const pmColors: Record<string, string> = { BAR: '#42a5f5', BANK: '#26a69a', '—': 'var(--muted)' }
+  const pmColors: Record<string, string> = { BAR: '#42a5f5', BANK: '#26a69a' }
 
   const sphereData = bySphere.filter(x => (x.gross || 0) !== 0)
   const pmData = byPM.filter(x => (x.gross || 0) !== 0)

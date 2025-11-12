@@ -64,6 +64,20 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
           })()}
           <svg ref={svgRef} width={size.w} height={size.h} role="img" aria-label="Nach Sphäre">
             {arcs.map((a, idx) => {
+              // Special handling for 100% single item: draw full circle
+              const isSingle100 = arcs.length === 1 && Math.abs(a.frac - 1) < 0.0001
+              if (isSingle100) {
+                // Draw complete donut ring
+                const outerCircle = `M ${cx - outerR} ${cy} A ${outerR} ${outerR} 0 1 1 ${cx + outerR} ${cy} A ${outerR} ${outerR} 0 1 1 ${cx - outerR} ${cy} Z`
+                const innerCircle = `M ${cx - innerR} ${cy} A ${innerR} ${innerR} 0 1 0 ${cx + innerR} ${cy} A ${innerR} ${innerR} 0 1 0 ${cx - innerR} ${cy} Z`
+                return (
+                  <g key={idx} onMouseEnter={() => setHoverIdx(idx)} onMouseLeave={() => setHoverIdx(null)}>
+                    <path d={outerCircle} fill={colors[a.key]} />
+                    <path d={innerCircle} fill="var(--bg)" />
+                    <text x={cx} y={cy} textAnchor="middle" fontSize="11" fill="#fff">100%</text>
+                  </g>
+                )
+              }
               const largeArc = (a.end - a.start) > Math.PI ? 1 : 0
               const sx = cx + outerR * Math.cos(a.start)
               const sy = cy + outerR * Math.sin(a.start)

@@ -85,8 +85,8 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             <div>
               <strong>Nach Zahlweg</strong>
               <ul>
-                {data.byPaymentMethod.map((r, i) => (
-                  <li key={(r.key ?? 'NULL') + i}><span style={{ minWidth: 90, display: 'inline-block' }}>{r.key ?? '—'}</span> {eurFmt.format(r.gross)}</li>
+                {data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r, i) => (
+                  <li key={(r.key ?? 'NULL') + i}><span style={{ minWidth: 90, display: 'inline-block' }}>{r.key}</span> {eurFmt.format(r.gross)}</li>
                 ))}
               </ul>
             </div>
