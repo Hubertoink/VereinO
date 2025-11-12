@@ -19,9 +19,8 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
   
   const total = (balance?.bar || 0) + (balance?.bank || 0)
   const maxVal = Math.max(100, Math.abs(balance?.bar || 0), Math.abs(balance?.bank || 0))
-  // Compact layout
-  // Increase right padding so trailing value text is fully visible
-  const W = 760, H = 160, P = { top: 18, right: 42, bottom: 16, left: 96 }
+  // Compact layout - reduced width and right padding for tighter visualization
+  const W = 600, H = 160, P = { top: 18, right: 12, bottom: 16, left: 96 }
   const barH = 20
   const gap = 14
   const xFor = (v: number) => P.left + Math.round((Math.abs(v) / Math.max(1e-9, maxVal)) * (W - P.left - P.right))
@@ -62,8 +61,8 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
               const val = balance?.bar || 0
               const xEnd = xFor(val)
               const text = eurFmt.format(val)
-              const inside = (xEnd - P.left) > 120
-              const xText = inside ? xEnd - 6 : Math.min(W - P.right - 4, xEnd + 8)
+              const inside = (xEnd - P.left) > 100
+              const xText = inside ? xEnd - 6 : xEnd + 6
               const anchor = inside ? 'end' : 'start'
               const fill = inside ? '#fff' : 'var(--text)'
               return <text x={xText} y={P.top + barH / 2} textAnchor={anchor} dominantBaseline="middle" fontSize={12} fontWeight={600} fill={fill}>{text}</text>
@@ -77,8 +76,8 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
               const val = balance?.bank || 0
               const xEnd = xFor(val)
               const text = eurFmt.format(val)
-              const inside = (xEnd - P.left) > 120
-              const xText = inside ? xEnd - 6 : Math.min(W - P.right - 4, xEnd + 8)
+              const inside = (xEnd - P.left) > 100
+              const xText = inside ? xEnd - 6 : xEnd + 6
               const anchor = inside ? 'end' : 'start'
               const fill = inside ? '#fff' : 'var(--text)'
               return <text x={xText} y={P.top + barH + gap + barH / 2} textAnchor={anchor} dominantBaseline="middle" fontSize={12} fontWeight={600} fill={fill}>{text}</text>
