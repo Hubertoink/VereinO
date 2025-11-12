@@ -420,6 +420,8 @@ export const MIGRATIONS: Mig[] = [
     version: 20,
     up: `
     -- Optional strict time range enforcement for budgets and earmarks
+    -- Check if column exists before adding (SQLite doesn't have IF NOT EXISTS for ALTER TABLE ADD COLUMN)
+    -- This is handled by checking table_info in code, but we add it here as fallback
     ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     `
@@ -444,10 +446,41 @@ export function applyMigrations(db: DB) {
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue
-    const exec = db.transaction(() => {
-      db.exec(mig.up)
-      db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
-    })
-    exec()
+    
+    // Special handling for migration 20 - check if columns already exist
+    if (mig.version === 20) {
+      try {
+        const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
+        const hasEnforceInBudgets = budgetCols.some((c: { name: string }) => c.name === 'enforce_time_range')
+        
+        if (hasEnforceInBudgets) {
+          // Columns already exist, just mark migration as applied
+          console.log('[Migration 20] Columns already exist, marking as applied')
+          db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+          continue
+        }
+      } catch (e) {
+        console.warn('[Migration 20] Failed to check if columns exist:', e)
+        // If check fails, try to apply migration anyway
+      }
+    }
+    
+    try {
+      const exec = db.transaction(() => {
+        db.exec(mig.up)
+        db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+      })
+      exec()
+      console.log(`[Migration ${mig.version}] Applied successfully`)
+    } catch (error: any) {
+      console.error(`[Migration ${mig.version}] Failed:`, error.message)
+      // For migration 20 specifically, try to continue anyway if it's a duplicate column error
+      if (mig.version === 20 && error.message?.includes('duplicate column')) {
+        console.log('[Migration 20] Column already exists, marking as applied')
+        db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+      } else {
+        throw error
+      }
+    }
   }
 }

@@ -63,8 +63,11 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
         const bg = b.color || undefined
         const fg = contrastText(bg)
         const budget = u?.budget ?? b.budget ?? 0
+        const allocated = Math.max(0, u?.allocated ?? 0)
         const released = Math.max(0, u?.released ?? 0)
-        const pct = budget > 0 ? Math.min(100, Math.round((released / budget) * 100)) : 0
+        // Progress: OUT / (Budget + IN) to account for additional income
+        const availableFunds = budget + allocated
+        const pct = availableFunds > 0 ? Math.min(100, Math.round((released / availableFunds) * 100)) : 0
         const startDate = b.startDate ?? u?.startDate ?? null
         const endDate = b.endDate ?? u?.endDate ?? null
         const totalCount = u?.totalCount as number | undefined

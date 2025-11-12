@@ -112,6 +112,30 @@ app.whenReady().then(async () => {
         const db = getDb()
         ; (global as any).singletonDb = db
         applyMigrations(db)
+        
+        // CRITICAL FIX: Always ensure enforce_time_range columns exist
+        // This handles cases where migration 20 might have failed silently
+        try {
+            const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
+            const hasEnforceInBudgets = budgetCols.some((c: { name: string }) => c.name === 'enforce_time_range')
+            
+            if (!hasEnforceInBudgets) {
+                console.log('[Startup] Adding missing enforce_time_range columns')
+                db.exec('ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0')
+                db.exec('ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0')
+                
+                // Mark migration 20 as applied if not already
+                const migrations = db.prepare('SELECT version FROM migrations').all() as Array<{ version: number }>
+                const hasV20 = migrations.some((m: { version: number }) => m.version === 20)
+                if (!hasV20) {
+                    db.prepare('INSERT INTO migrations(version) VALUES (?)').run(20)
+                }
+                console.log('[Startup] enforce_time_range columns added successfully')
+            }
+        } catch (colErr: any) {
+            console.error('[Startup] Failed to ensure enforce_time_range columns:', colErr)
+            // Don't throw - let the app try to start anyway
+        }
     } catch (err: any) {
         console.error('DB init/migrations failed', err)
         dbInitError = err

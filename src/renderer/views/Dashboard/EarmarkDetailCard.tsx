@@ -96,9 +96,10 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
     )
   }
 
-  // Progress: Anteil verbraucht = Ausgaben / Budget (falls Budget vorhanden)
+  // Progress: Anteil verbraucht = Ausgaben / (Budget + Einnahmen) um IN-Buchungen zu berücksichtigen
   const budget = earmark?.budget ?? null
-  const consumedPct = budget ? Math.min(100, Math.round((sumOut / Math.max(1e-9, budget)) * 1000) / 10) : null
+  const availableFunds = (budget || 0) + sumIn
+  const consumedPct = availableFunds > 0 ? Math.min(100, Math.round((sumOut / availableFunds) * 1000) / 10) : null
   const saldo = Math.round((sumIn - sumOut) * 100) / 100
   const remaining = budget != null ? Math.round((budget + saldo) * 100) / 100 : null  // Budget + Saldo (IN - OUT)
   const bgTint = earmark?.color ? `color-mix(in oklab, ${earmark.color} 14%, var(--surface))` : undefined
