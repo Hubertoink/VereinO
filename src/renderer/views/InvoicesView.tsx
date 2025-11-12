@@ -147,6 +147,7 @@ export default function InvoicesView() {
   const [busyAction, setBusyAction] = useState<boolean>(false)
   const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; party?: string; invoiceNo?: string | null }>(null)
   const [postToVoucherModal, setPostToVoucherModal] = useState<null | { id: number; party: string; invoiceNo?: string | null }>(null)
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState<null | { invoiceId: number; invoiceNo?: string | null; party?: string; paymentAmount: number; paymentDate: string; willCreateVoucher: boolean }>(null)
   // Detail modal
   const [detailId, setDetailId] = useState<number | null>(null)
   const [detail, setDetail] = useState<null | { id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; payments: Array<{ id: number; date: string; amount: number }>; files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>; tags: string[]; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID' }>(null)
@@ -174,6 +175,30 @@ export default function InvoicesView() {
     if (!isFinite(amt) || Math.abs(amt) < 0.01) { alert('Bitte einen Betrag angeben'); return }
     const remainingCap = typeof showPayModal.remaining === 'number' ? Math.max(0, Math.round(showPayModal.remaining * 100) / 100) : undefined
     if (remainingCap != null && amt - remainingCap > 1e-6) { alert(`Der Betrag übersteigt den offenen Rest (${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(remainingCap)}).`); return }
+    
+    // Check if invoice has paymentMethod and autoPost - if no paymentMethod and invoice will be auto-posted, ask user
+    const invoiceRow = rows.find(r => r.id === showPayModal.id)
+    if (!invoiceRow) { alert('Rechnung nicht gefunden'); return }
+    
+    const hasAutoPost = !!(invoiceRow.autoPost ?? 0)
+    const hasPaymentMethod = !!(invoiceRow.paymentMethod && invoiceRow.paymentMethod !== '')
+    const paidAfter = (invoiceRow.paidSum || 0) + amt
+    const willBePaid = paidAfter >= (invoiceRow.grossAmount || 0) - 0.01
+    
+    // If payment method is missing and invoice has auto-post enabled and will be fully paid, ask user
+    // For manual posting, the check happens when clicking "Als Buchung hinzufügen"
+    if (!hasPaymentMethod && hasAutoPost && willBePaid && !invoiceRow.postedVoucherId) {
+      setShowPaymentMethodModal({
+        invoiceId: showPayModal.id,
+        invoiceNo: showPayModal.invoiceNo,
+        party: showPayModal.party,
+        paymentAmount: amt,
+        paymentDate: payDate,
+        willCreateVoucher: true
+      })
+      return
+    }
+    
     setBusyAction(true)
     try {
       const res = await window.api?.invoices?.addPayment?.({ invoiceId: showPayModal.id, date: payDate, amount: amt })
@@ -192,6 +217,82 @@ export default function InvoicesView() {
         await loadSummary()
       }
     } catch (e: any) { alert(e?.message || String(e)) } finally { setBusyAction(false) }
+  }
+
+  async function confirmPaymentMethod(method: 'BAR' | 'BANK') {
+    if (!showPaymentMethodModal) return
+    setBusyAction(true)
+    try {
+      // Update invoice payment method first
+      const invoiceRow = rows.find(r => r.id === showPaymentMethodModal.invoiceId)
+      if (!invoiceRow) throw new Error('Rechnung nicht gefunden')
+      
+      await window.api?.invoices?.update?.({
+        id: showPaymentMethodModal.invoiceId,
+        date: invoiceRow.date,
+        dueDate: invoiceRow.dueDate || null,
+        invoiceNo: invoiceRow.invoiceNo || null,
+        party: invoiceRow.party,
+        description: invoiceRow.description || null,
+        grossAmount: invoiceRow.grossAmount,
+        paymentMethod: method,
+        sphere: invoiceRow.sphere,
+        earmarkId: invoiceRow.earmarkId || null,
+        budgetId: invoiceRow.budgetId || null,
+        autoPost: !!(invoiceRow.autoPost ?? 0),
+        voucherType: invoiceRow.voucherType,
+        tags: invoiceRow.tags || []
+      })
+      
+      // Update rows state with new payment method
+      setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId 
+        ? { ...r, paymentMethod: method } 
+        : r
+      ))
+      
+      // For auto-posting: add payment now (which will trigger auto-posting)
+      // For manual posting: just open the postToVoucher modal
+      if (showPaymentMethodModal.willCreateVoucher) {
+        // Auto-posting flow: add payment
+        const res = await window.api?.invoices?.addPayment?.({
+          invoiceId: showPaymentMethodModal.invoiceId,
+          date: showPaymentMethodModal.paymentDate,
+          amount: showPaymentMethodModal.paymentAmount
+        })
+        
+        if (res) {
+          setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId 
+            ? { ...r, paidSum: res.paidSum ?? (r.paidSum + showPaymentMethodModal.paymentAmount), status: res.status } 
+            : r
+          ))
+          
+          if (res.status === 'PAID') {
+            const invoiceLabel = showPaymentMethodModal.invoiceNo || `#${showPaymentMethodModal.invoiceId}`
+            notify('success', `Rechnung ${invoiceLabel} wurde automatisch als Buchung gebucht`)
+          }
+          
+          setShowPaymentMethodModal(null)
+          setShowPayModal(null)
+        }
+      } else {
+        // Manual posting flow: open postToVoucher modal
+        const invoiceNo = showPaymentMethodModal.invoiceNo
+        const party = showPaymentMethodModal.party
+        setShowPaymentMethodModal(null)
+        setPostToVoucherModal({ 
+          id: showPaymentMethodModal.invoiceId, 
+          party: party, 
+          invoiceNo: invoiceNo 
+        })
+      }
+      
+      try { window.dispatchEvent(new Event('data-changed')) } catch { }
+      await loadSummary()
+    } catch (e: any) {
+      alert(e?.message || String(e))
+    } finally {
+      setBusyAction(false)
+    }
   }
 
   async function deleteInvoice(id: number) {
@@ -422,7 +523,22 @@ export default function InvoicesView() {
                         <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>
                       )}
                       {r.status === 'PAID' && !r.autoPost && !r.postedVoucherId && (
-                        <button className="btn primary" title="Als Buchung hinzufügen" onClick={() => setPostToVoucherModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo })}>📝</button>
+                        <button className="btn primary" title="Als Buchung hinzufügen" onClick={() => {
+                          // Check if payment method is set before allowing manual posting
+                          const hasPaymentMethod = !!(r.paymentMethod && r.paymentMethod !== '')
+                          if (!hasPaymentMethod) {
+                            setShowPaymentMethodModal({
+                              invoiceId: r.id,
+                              invoiceNo: r.invoiceNo,
+                              party: r.party,
+                              paymentAmount: 0,
+                              paymentDate: '',
+                              willCreateVoucher: false // manual posting
+                            })
+                          } else {
+                            setPostToVoucherModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo })
+                          }
+                        }}>📝</button>
                       )}
                     </td>
                   </tr>
@@ -479,6 +595,42 @@ export default function InvoicesView() {
               <button className="btn" onClick={() => setShowPayModal(null)}>Abbrechen</button>
               <button className="btn primary" disabled={busyAction} onClick={addPayment}>Speichern</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPaymentMethodModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPaymentMethodModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500, textAlign: 'center' }}>
+            <ModalHeader 
+              title="Zahlweg festlegen" 
+              subtitle={`Rechnung #${showPaymentMethodModal.invoiceId}`}
+              onClose={() => setShowPaymentMethodModal(null)} 
+            />
+            <div className="helper" style={{ marginBottom: 24 }}>
+              Die Rechnung wird automatisch verbucht. Bitte wählen Sie den Zahlweg:
+            </div>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
+              <button 
+                className="btn primary" 
+                style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }}
+                onClick={() => confirmPaymentMethod('BAR')}
+                disabled={busyAction}
+              >
+                💵 Bar
+              </button>
+              <button 
+                className="btn primary" 
+                style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }}
+                onClick={() => confirmPaymentMethod('BANK')}
+                disabled={busyAction}
+              >
+                🏦 Bank
+              </button>
+            </div>
+            <button className="btn" onClick={() => setShowPaymentMethodModal(null)} style={{ marginTop: 8 }}>
+              Abbrechen
+            </button>
           </div>
         </div>
       )}

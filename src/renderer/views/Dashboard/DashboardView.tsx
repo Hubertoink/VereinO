@@ -153,9 +153,9 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       const overTot = sumTwo(sOverOpen, sOverPart)
       setInvOverdueCount(overTot.count)
       setInvOverdueRemaining(overTot.remaining)
-      // Nächste Fälligkeiten: Überfällige + fällig in ≤ 5 Tagen
-      const listOpen = await (window as any).api?.invoices?.list?.({ limit: 10, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN', dueTo: plus5 })
-      const listPart = await (window as any).api?.invoices?.list?.({ limit: 10, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL', dueTo: plus5 })
+      // Nächste Fälligkeiten: Alle offenen Rechnungen sortiert nach Fälligkeitsdatum (älteste zuerst)
+      const listOpen = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN' })
+      const listPart = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL' })
       const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
         .filter((r: any) => !!r && !!r.dueDate)
         .sort((a: any, b: any) => String(a.dueDate).localeCompare(String(b.dueDate)))
