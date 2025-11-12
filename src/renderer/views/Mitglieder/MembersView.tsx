@@ -35,6 +35,7 @@ export default function MembersView() {
     const [formTab, setFormTab] = useState<'PERSON'|'FINANCE'|'MANDATE'|'MEMBERSHIP'>('PERSON')
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
     const [deleteBusy, setDeleteBusy] = useState(false)
+    const [boardRoleError, setBoardRoleError] = useState<string | null>(null)
     const [showInvite, setShowInvite] = useState(false)
     const [inviteBusy, setInviteBusy] = useState(false)
     const [inviteEmails, setInviteEmails] = useState<string[]>([])
@@ -46,7 +47,7 @@ export default function MembersView() {
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
 
     const [showColumnsModal, setShowColumnsModal] = useState(false)
-    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showBoardTable: boolean; showNotes: boolean }>(() => {
+    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showNotes: boolean }>(() => {
         try {
             const raw = localStorage.getItem('members.columns')
             if (raw) {
@@ -55,18 +56,17 @@ export default function MembersView() {
                     showIBAN: parsed.showIBAN ?? true,
                     showContribution: parsed.showContribution ?? true,
                     showAddress: parsed.showAddress ?? false,
-                    showBoardTable: parsed.showBoardTable ?? false,
                     showNotes: parsed.showNotes ?? false
                 }
             }
         } catch {}
-        return { showIBAN: true, showContribution: true, showAddress: false, showBoardTable: false, showNotes: false }
+        return { showIBAN: true, showContribution: true, showAddress: false, showNotes: false }
     })
     useEffect(() => { try { localStorage.setItem('members.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
     const [boardRows, setBoardRows] = useState<any[]>([])
+    const [boardRefresh, setBoardRefresh] = useState(0)
     useEffect(() => {
         let alive = true
-        if (!colPrefs.showBoardTable) { setBoardRows([]); return }
         ;(async () => {
             try {
                 const pageSize = 200
@@ -74,7 +74,8 @@ export default function MembersView() {
                 let total = 0
                 const acc: any[] = []
                 do {
-                    const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit: pageSize, offset: ofs, sortBy: 'memberNo', sort: 'ASC' })
+                    // Load ALL members regardless of filters to get complete board overview
+                    const res = await (window as any).api?.members?.list?.({ limit: pageSize, offset: ofs, sortBy: 'memberNo', sort: 'ASC' })
                     const rows = (res?.rows || []) as any[]
                     total = res?.total ?? rows.length
                     acc.push(...rows)
@@ -93,8 +94,10 @@ export default function MembersView() {
                 if (alive) setBoardRows([])
             }
         })()
-        return () => { alive = false }
-    }, [colPrefs.showBoardTable, q, status])
+        const onChanged = () => setBoardRefresh(v => v + 1)
+        try { window.addEventListener('data-changed', onChanged) } catch {}
+        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+    }, [boardRefresh])
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     function validateIBAN(iban?: string | null): { ok: boolean; msg?: string } {
@@ -196,6 +199,41 @@ export default function MembersView() {
                             if (!form.draft.join_date || !String(form.draft.join_date).trim()) missing.push('Eintritt')
                         }
                         if (missing.length) { setMissingRequired(missing); return }
+                        
+                        // Check for duplicate board roles
+                        setBoardRoleError(null)
+                        if (form.draft.boardRole) {
+                            // Load all members in batches (max 200 per request)
+                            const allMembers: any[] = []
+                            let offset = 0
+                            const pageSize = 200
+                            let hasMore = true
+                            while (hasMore) {
+                                const batch = await (window as any).api?.members?.list?.({ limit: pageSize, offset })
+                                const rows = batch?.rows || []
+                                allMembers.push(...rows)
+                                hasMore = rows.length === pageSize
+                                offset += pageSize
+                            }
+                            
+                            const existingWithRole = allMembers.find((m: any) => 
+                                m.boardRole === form.draft.boardRole && m.id !== form.draft.id
+                            )
+                            if (existingWithRole) {
+                                const roleLabels: Record<string, string> = {
+                                    V1: '1. Vorsitz',
+                                    V2: '2. Vorsitz', 
+                                    KASSIER: 'Kassier',
+                                    KASSENPR1: '1. Kassenprüfer',
+                                    KASSENPR2: '2. Kassenprüfer',
+                                    SCHRIFT: 'Schriftführer'
+                                }
+                                const roleLabel = roleLabels[form.draft.boardRole] || form.draft.boardRole
+                                setBoardRoleError(`Die Funktion "${roleLabel}" ist bereits an ${existingWithRole.name} vergeben.`)
+                                return
+                            }
+                        }
+                        
                         const addrCombined = [addrStreet, [addrZip, addrCity].filter(Boolean).join(' ')].filter(Boolean).join(', ')
                         const payload = { ...form.draft, address: addrCombined || form.draft.address || null }
                         if (form.mode === 'create') {
@@ -204,6 +242,7 @@ export default function MembersView() {
                             await (window as any).api?.members?.update?.(payload)
                         }
                         setForm(null); setRequiredTouched(false); setMissingRequired([]); await load()
+                        window.dispatchEvent(new Event('data-changed'))
                     } catch (e: any) { alert(e?.message || String(e)) }
                 })()
             }
@@ -245,12 +284,17 @@ export default function MembersView() {
                     } }) }}>+ Neu</button>
                 </div>
             </div>
-            {colPrefs.showBoardTable && boardRows.length > 0 && (
-                <div className="card members-board-card">
-                    <div className="members-board-header">
-                        <h2 className="members-board-title">Vorstand</h2>
-                        <div className="helper">{boardRows.length} Personen</div>
+            <div className="card members-board-card">
+                <div className="members-board-header">
+                    <h2 className="members-board-title">Vorstand</h2>
+                    {boardRows.length > 0 && <div className="helper">{boardRows.length} Personen</div>}
+                </div>
+                {boardRows.length === 0 ? (
+                    <div className="helper" style={{ padding: '16px 0', textAlign: 'center' }}>
+                        <div style={{ marginBottom: 4 }}>Kein Vorstand vorhanden</div>
+                        <div style={{ fontSize: '0.9em', opacity: 0.7 }}>Vorstandsfunktionen können bei der Mitgliedschaft zugewiesen werden.</div>
                     </div>
+                ) : (
                     <table cellPadding={6} className="members-board-table">
                         <thead>
                             <tr>
@@ -259,7 +303,6 @@ export default function MembersView() {
                                 <th align="left">Nr.</th>
                                 <th align="left">E-Mail</th>
                                 <th align="left">Telefon</th>
-                                <th align="center">Aktionen</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -270,34 +313,12 @@ export default function MembersView() {
                                     <td>{r.memberNo || '—'}</td>
                                     <td>{r.email || '—'}</td>
                                     <td>{r.phone || '—'}</td>
-                                    <td align="center" className="members-nowrap">
-                                        <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
-                                            id: r.id,
-                                            memberNo: r.memberNo ?? null,
-                                            name: r.name,
-                                            email: r.email ?? null,
-                                            phone: r.phone ?? null,
-                                            address: r.address ?? null,
-                                            status: r.status as any,
-                                            boardRole: (r as any).boardRole ?? null,
-                                            iban: (r as any).iban ?? null,
-                                            bic: (r as any).bic ?? null,
-                                            contribution_amount: (r as any).contribution_amount ?? null,
-                                            contribution_interval: (r as any).contribution_interval ?? null,
-                                            mandate_ref: (r as any).mandate_ref ?? null,
-                                            mandate_date: (r as any).mandate_date ?? null,
-                                            join_date: (r as any).join_date ?? null,
-                                            leave_date: (r as any).leave_date ?? null,
-                                            notes: (r as any).notes ?? null,
-                                            next_due_date: (r as any).next_due_date ?? null
-                                        } })}>✎</button>
-                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                </div>
-            )}
+                )}
+            </div>
             <table cellPadding={6} className="members-table">
                 <thead>
                     <tr>
@@ -508,7 +529,7 @@ export default function MembersView() {
                                             <div className="field"><label>Austritt</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /></div>
                                             <div className="field"><label>Initiale Fälligkeit</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} /></div>
                                             <div className="field"><label>Funktion (Vorstand)</label>
-                                                <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } })}>
+                                                <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => { setBoardRoleError(null); setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } }) }}>
                                                     <option value="">—</option>
                                                     <option value="V1">1. Vorsitz</option>
                                                     <option value="V2">2. Vorsitz</option>
@@ -517,6 +538,7 @@ export default function MembersView() {
                                                     <option value="KASSENPR2">2. Kassenprüfer</option>
                                                     <option value="SCHRIFT">Schriftführer</option>
                                                 </select>
+                                                {boardRoleError && <div className="helper" style={{ color: 'var(--danger)', marginTop: 4 }}>{boardRoleError}</div>}
                                             </div>
                                         </div>
                                     </div>
@@ -544,6 +566,41 @@ export default function MembersView() {
                                         if (!form.draft.join_date || !String(form.draft.join_date).trim()) missing.push('Eintritt')
                                     }
                                     if (missing.length) { setMissingRequired(missing); return }
+                                    
+                                    // Check for duplicate board roles
+                                    setBoardRoleError(null)
+                                    if (form.draft.boardRole) {
+                                        // Load all members in batches (max 200 per request)
+                                        const allMembers: any[] = []
+                                        let offset = 0
+                                        const pageSize = 200
+                                        let hasMore = true
+                                        while (hasMore) {
+                                            const batch = await (window as any).api?.members?.list?.({ limit: pageSize, offset })
+                                            const rows = batch?.rows || []
+                                            allMembers.push(...rows)
+                                            hasMore = rows.length === pageSize
+                                            offset += pageSize
+                                        }
+                                        
+                                        const existingWithRole = allMembers.find((m: any) => 
+                                            m.boardRole === form.draft.boardRole && m.id !== form.draft.id
+                                        )
+                                        if (existingWithRole) {
+                                            const roleLabels: Record<string, string> = {
+                                                V1: '1. Vorsitz',
+                                                V2: '2. Vorsitz', 
+                                                KASSIER: 'Kassier',
+                                                KASSENPR1: '1. Kassenprüfer',
+                                                KASSENPR2: '2. Kassenprüfer',
+                                                SCHRIFT: 'Schriftführer'
+                                            }
+                                            const roleLabel = roleLabels[form.draft.boardRole] || form.draft.boardRole
+                                            setBoardRoleError(`Die Funktion "${roleLabel}" ist bereits an ${existingWithRole.name} vergeben.`)
+                                            return
+                                        }
+                                    }
+                                    
                                     const addrCombined = [addrStreet, [addrZip, addrCity].filter(Boolean).join(' ')].filter(Boolean).join(', ')
                                     const payload = { ...form.draft, address: addrCombined || form.draft.address || null }
                                     if (form.mode === 'create') {
@@ -551,7 +608,8 @@ export default function MembersView() {
                                     } else {
                                         await (window as any).api?.members?.update?.(payload)
                                     }
-                                    setForm(null); setRequiredTouched(false); setMissingRequired([]); await load()
+                                    setForm(null); setRequiredTouched(false); setMissingRequired([]); setBoardRoleError(null); await load()
+                                    window.dispatchEvent(new Event('data-changed'))
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Speichern</button>
                             </div>
@@ -582,10 +640,6 @@ export default function MembersView() {
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                                 <input type="checkbox" checked={colPrefs.showNotes} onChange={(e)=>setColPrefs(p=>({ ...p, showNotes: e.target.checked }))} />
                                 Anmerkungen anzeigen
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                                <input type="checkbox" checked={colPrefs.showBoardTable} onChange={(e)=>setColPrefs(p=>({ ...p, showBoardTable: e.target.checked }))} />
-                                Vorstand oben als eigene Tabelle
                             </label>
                             <div className="helper" style={{ marginTop: 8 }}>Tipp: Du kannst IBAN/Beitrag ausblenden und stattdessen die Adresse anzeigen.</div>
                         </div>
@@ -796,10 +850,10 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                                         <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} — {due.length} offen</div>
                                         <div style={{ display: 'flex', gap: 6 }}>
-                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
+                                            <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>«</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹</button>
+                                            <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>›</button>
+                                            <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>»</button>
                                         </div>
                                     </div>
                                     <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
@@ -868,12 +922,6 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             })}
                                         </tbody>
                                     </table>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                                        <button className="btn" onClick={() => setDuePage(1)} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏮</button>
-                                        <button className="btn" onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1} style={duePage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹ Zurück</button>
-                                        <button className="btn" onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>Weiter ›</button>
-                                        <button className="btn" onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))} style={duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>⏭</button>
-                                    </div>
                                 </>
                             )}
                         </div>

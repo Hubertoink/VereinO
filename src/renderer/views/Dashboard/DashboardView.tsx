@@ -100,6 +100,37 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
   const [invOverdueRemaining, setInvOverdueRemaining] = useState<number>(0)
   const [invTopDue, setInvTopDue] = useState<Array<{ id: number; party: string; dueDate?: string | null; remaining: number }>>([])
 
+  // Member statistics
+  const [memberStats, setMemberStats] = useState<{ total: number; active: number; new: number; paused: number; left: number }>({ total: 0, active: 0, new: 0, paused: 0, left: 0 })
+  
+  useEffect(() => {
+    let cancelled = false
+    const loadStats = async () => {
+      try {
+        const [allRes, activeRes, newRes, pausedRes, leftRes] = await Promise.all([
+          (window as any).api?.members?.list?.({ limit: 1, offset: 0 }),
+          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'ACTIVE' }),
+          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'NEW' }),
+          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'PAUSED' }),
+          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'LEFT' })
+        ])
+        if (!cancelled) {
+          setMemberStats({
+            total: allRes?.total || 0,
+            active: activeRes?.total || 0,
+            new: newRes?.total || 0,
+            paused: pausedRes?.total || 0,
+            left: leftRes?.total || 0
+          })
+        }
+      } catch {}
+    }
+    loadStats()
+    const onChanged = () => loadStats()
+    window.addEventListener('data-changed', onChanged)
+    return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+  }, [])
+
   const loadInvoiceTiles = useCallback(async () => {
     try {
       const now = new Date()
@@ -278,6 +309,37 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           ) : (
             <div className="helper" style={{ marginTop: 6 }}>—</div>
           )}
+        </div>
+      </div>
+
+      {/* Mitgliederübersicht */}
+      <div className="card card--accent chart-card-overflow">
+        <div className="chart-header-baseline">
+          <div className="legend-container">
+            <strong>Mitglieder</strong>
+          </div>
+        </div>
+        <div className="dashboard-grid-wide">
+          <div className="card summary-card">
+            <div className="helper">Gesamt</div>
+            <div className="summary-value-overflow">{memberStats.total}</div>
+          </div>
+          <div className="card summary-card card--success">
+            <div className="helper">Aktiv</div>
+            <div className="summary-value-overflow">{memberStats.active}</div>
+          </div>
+          <div className="card summary-card">
+            <div className="helper">Neu</div>
+            <div className="summary-value-overflow">{memberStats.new}</div>
+          </div>
+          <div className="card summary-card">
+            <div className="helper">Pause</div>
+            <div className="summary-value-overflow">{memberStats.paused}</div>
+          </div>
+          <div className="card summary-card">
+            <div className="helper">Ausgetreten</div>
+            <div className="summary-value-overflow">{memberStats.left}</div>
+          </div>
         </div>
       </div>
 

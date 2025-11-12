@@ -1183,8 +1183,8 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                         <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} ? {due.length} offen</div>
                                         <div className="flex gap-6">
                                             <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(1)} disabled={duePage <= 1}>?</button>
-                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1}>? Zur?ck</button>
-                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>Weiter ?</button>
+                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1}>‹</button>
+                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>›</button>
                                             <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>?</button>
                                         </div>
                                     </div>
