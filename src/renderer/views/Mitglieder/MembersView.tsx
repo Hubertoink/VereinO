@@ -47,12 +47,13 @@ export default function MembersView() {
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
 
     const [showColumnsModal, setShowColumnsModal] = useState(false)
-    const [colPrefs, setColPrefs] = useState<{ showIBAN: boolean; showContribution: boolean; showAddress: boolean; showNotes: boolean }>(() => {
+    const [colPrefs, setColPrefs] = useState<{ showMemberNo: boolean; showIBAN: boolean; showContribution: boolean; showAddress: boolean; showNotes: boolean }>(() => {
         try {
             const raw = localStorage.getItem('members.columns')
             if (raw) {
                 const parsed = JSON.parse(raw)
                 return {
+                    showMemberNo: parsed.showMemberNo ?? true,
                     showIBAN: parsed.showIBAN ?? true,
                     showContribution: parsed.showContribution ?? true,
                     showAddress: parsed.showAddress ?? false,
@@ -60,7 +61,7 @@ export default function MembersView() {
                 }
             }
         } catch {}
-        return { showIBAN: true, showContribution: true, showAddress: false, showNotes: false }
+        return { showMemberNo: true, showIBAN: true, showContribution: true, showAddress: false, showNotes: false }
     })
     useEffect(() => { try { localStorage.setItem('members.columns', JSON.stringify(colPrefs)) } catch {} }, [colPrefs])
     const [boardRows, setBoardRows] = useState<any[]>([])
@@ -300,7 +301,6 @@ export default function MembersView() {
                             <tr>
                                 <th align="left">Funktion</th>
                                 <th align="left">Name</th>
-                                <th align="left">Nr.</th>
                                 <th align="left">E-Mail</th>
                                 <th align="left">Telefon</th>
                             </tr>
@@ -310,7 +310,6 @@ export default function MembersView() {
                                 <tr key={`board-${r.id}`}>
                                     <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge members-badge-role" style={{ '--role-color': def.color } as React.CSSProperties}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
                                     <td>{r.name}</td>
-                                    <td>{r.memberNo || '—'}</td>
                                     <td>{r.email || '—'}</td>
                                     <td>{r.phone || '—'}</td>
                                 </tr>
@@ -322,9 +321,11 @@ export default function MembersView() {
             <table cellPadding={6} className="members-table">
                 <thead>
                     <tr>
-                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
-                        </th>
+                        {colPrefs.showMemberNo && (
+                            <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                                Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            </th>
+                        )}
                         <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                             Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
                         </th>
@@ -345,7 +346,7 @@ export default function MembersView() {
                 <tbody>
                     {rows.map(r => (
                         <tr key={r.id}>
-                            <td>{r.memberNo || '—'}</td>
+                            {colPrefs.showMemberNo && (<td>{r.memberNo || '—'}</td>)}
                             <td>
                                 <span>{r.name}</span>
                                 {r.boardRole && (() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ marginLeft: 8, background: def.color, color: '#fff' }}>{def.label}</span>) : null })()}
@@ -626,6 +627,10 @@ export default function MembersView() {
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <input type="checkbox" checked={colPrefs.showMemberNo} onChange={(e)=>setColPrefs(p=>({ ...p, showMemberNo: e.target.checked }))} />
+                                Nr. anzeigen
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
                                 <input type="checkbox" checked={colPrefs.showIBAN} onChange={(e)=>setColPrefs(p=>({ ...p, showIBAN: e.target.checked }))} />
                                 IBAN anzeigen
                             </label>
