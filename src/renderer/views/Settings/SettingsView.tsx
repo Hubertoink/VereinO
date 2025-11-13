@@ -116,26 +116,33 @@ export function SettingsView(props: SettingsProps) {
         )}
       </div>
 
-      {/* Developer Badge */}
+      {/* Developer Badge - Cookie-Banner style with hover expand */}
       <div
+        className="dev-badge-tab"
         style={{
           position: 'fixed',
           bottom: 16,
-          right: 24,
+          right: -195,
           padding: '10px 14px',
+          paddingLeft: 20,
           background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           border: '1px solid color-mix(in oklab, var(--accent) 20%, transparent)',
-          borderRadius: 8,
+          borderRadius: '8px 0 0 8px',
           fontSize: 11.5,
           color: 'var(--text)',
           display: 'flex',
           flexDirection: 'column',
           gap: 3,
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 999
+          zIndex: 0,
+          transition: 'right 0.3s ease-in-out',
+          cursor: 'pointer',
+          minWidth: 200
         }}
+        onMouseEnter={(e) => e.currentTarget.style.right = '0px'}
+        onMouseLeave={(e) => e.currentTarget.style.right = '-180px'}
       >
         <div style={{ fontWeight: 600, fontSize: 12 }}>
           VereinO {appVersion && `(v${appVersion})`}

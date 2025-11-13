@@ -42,7 +42,7 @@ interface JournalViewProps {
     setShowMetaFilter: (show: boolean) => void
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
-    tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
     budgetsForEdit: Array<{ id: number; label: string }>
     budgetNames: Map<number, string>
     // Helpers
@@ -205,17 +205,17 @@ export default function JournalView({
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
 
     // ==================== TAG COUNTS ====================
+    // Use usage counts from tagDefs (loaded with includeUsage: true in App.tsx)
+    // This ensures counts reflect ALL vouchers, not just current page
     const tagCounts = useMemo(() => {
         const counts: Record<string, number> = {}
-        rows.forEach(row => {
-            if (row.tags && Array.isArray(row.tags)) {
-                row.tags.forEach(tag => {
-                    counts[tag] = (counts[tag] || 0) + 1
-                })
+        tagDefs.forEach(tag => {
+            if (tag.usage !== undefined) {
+                counts[tag.name] = tag.usage
             }
         })
         return counts
-    }, [rows])
+    }, [tagDefs])
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {

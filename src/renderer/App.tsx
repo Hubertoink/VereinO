@@ -450,10 +450,10 @@ function AppInner() {
     const activeChips = chips
 
     // Global Tags state (for filters, table colorization, and tag manager)
-    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
+    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     async function loadTags() {
         try {
-            const res = await window.api?.tags?.list?.({})
+            const res = await window.api?.tags?.list?.({ includeUsage: true })
             if (res) setTagDefs(res.rows || [])
         } catch { /* ignore */ }
     }
