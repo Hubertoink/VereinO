@@ -47,11 +47,12 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
         if (cert) {
           setValidFrom(cert.validFrom || '')
           setValidUntil(cert.validUntil || '')
-          // Create preview URL
-          const isPdf = cert.mimeType === 'application/pdf'
+          // Only generate preview URL for image types; PDFs get icon preview
           const isImage = cert.mimeType.startsWith('image/')
-          if (isPdf || isImage) {
+          if (isImage) {
             setPreviewUrl(`data:${cert.mimeType};base64,${cert.fileData}`)
+          } else {
+            setPreviewUrl('')
           }
         }
       })
@@ -111,10 +112,11 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
       const cert = res?.certificate
       setCertificate(cert)
       if (cert) {
-        const isPdf = cert.mimeType === 'application/pdf'
         const isImage = cert.mimeType.startsWith('image/')
-        if (isPdf || isImage) {
+        if (isImage) {
           setPreviewUrl(`data:${cert.mimeType};base64,${cert.fileData}`)
+        } else {
+          setPreviewUrl('')
         }
       }
 
@@ -180,6 +182,48 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
 
   const isPdf = certificate?.mimeType === 'application/pdf'
   const isImage = certificate?.mimeType.startsWith('image/')
+
+  function renderPreview() {
+    if (!certificate) return null
+    return (
+      <div
+        style={{
+          flex: 1,
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          overflow: 'hidden',
+          minHeight: 260,
+          maxHeight: '50vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--background)',
+          position: 'relative'
+        }}
+      >
+        {isImage && previewUrl && (
+          <img
+            src={previewUrl}
+            alt="Bescheid Vorschau"
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        )}
+        {isPdf && (
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 12 }}>📄</div>
+            <div style={{ fontWeight: 500 }}>PDF Bescheid</div>
+            <div className="helper" style={{ fontSize: 12 }}>Zum Speichern oder Ersetzen unten Aktionen nutzen</div>
+          </div>
+        )}
+        {!isPdf && !isImage && (
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)' }}>
+            <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 12 }}>📎</div>
+            <div>Keine Vorschau verfügbar</div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return createPortal(
     <div
@@ -267,37 +311,7 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
         {!loading && certificate && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
             {/* Preview */}
-            {previewUrl && (
-              <div
-                style={{
-                  flex: 1,
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  minHeight: 400,
-                  maxHeight: '50vh',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'var(--background)'
-                }}
-              >
-                {isPdf && (
-                  <iframe
-                    src={previewUrl}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                    title="PDF Vorschau"
-                  />
-                )}
-                {isImage && (
-                  <img
-                    src={previewUrl}
-                    alt="Bescheid Vorschau"
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                  />
-                )}
-              </div>
-            )}
+            {renderPreview()}
 
             {/* File Info */}
             <div style={{ display: 'grid', gap: 8 }}>
