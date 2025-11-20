@@ -837,6 +837,27 @@ svg text {
     justify-content: center;
     /* Ensure overlay sits above header (z-index: 1000), FAB (3000), and most overlays */
     z-index: 5000; /* below toasts (9999) */
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* Tax Exemption Modal (refactored from inline styles) */
@@ -844,6 +865,7 @@ svg text {
     background: color-mix(in oklab, var(--surface) 65%, transparent);
     padding: 24px 16px;
     overflow-y: auto;
+    animation: modalFadeIn 0.2s ease-out;
 }
 .taxex-modal {
     width: min(920px, 96vw);
@@ -853,6 +875,7 @@ svg text {
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     background: var(--surface);
+    animation: modalSlideUp 0.25s ease-out;
 }
 .taxex-header { margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .taxex-title { margin: 0; font-size: 18px; }
@@ -890,12 +913,14 @@ svg text {
     padding: 16px;
     max-height: 80vh;
     overflow: auto;
+    animation: modalSlideUp 0.25s ease-out;
 }
 
 /* Wider layout for Quick-Add (Buchung) modal */
 .booking-modal {
     width: min(1100px, 96vw);
     max-height: 90vh;
+    animation: modalSlideUp 0.25s ease-out;
 }
 
 /* Wider Members modal similar to booking */
@@ -906,6 +931,17 @@ svg text {
     display: flex;
     flex-direction: column;
     margin: auto;
+    animation: modalSlideUp 0.25s ease-out;
+}
+
+/* Einladung per E-Mail Modal (Members) */
+.invite-modal {
+    width: min(900px, 96vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    margin: auto; /* sichert vertikale Zentrierung bei flex overlay */
+    animation: modalSlideUp 0.25s ease-out;
 }
 
 /* Two-column layout for Basis + Finanzen blocks */

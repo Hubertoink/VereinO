@@ -656,7 +656,7 @@ export default function MembersView() {
             )}
             {showInvite && (
                 <div className="modal-overlay" onClick={() => setShowInvite(false)}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 900px)', maxWidth: 900, display: 'grid', gap: 10 }}>
+                    <div className="modal invite-modal" onClick={(e)=>e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Einladung per E-Mail</h3>
                             <button className="btn" onClick={()=>setShowInvite(false)}>×</button>
