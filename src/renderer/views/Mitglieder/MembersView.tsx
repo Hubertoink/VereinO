@@ -407,7 +407,7 @@ export default function MembersView() {
 
             {form && (
                 <div className="modal-overlay" onClick={() => setForm(null)}>
-                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760 }}>
+                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
