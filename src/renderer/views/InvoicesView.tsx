@@ -574,7 +574,7 @@ export default function InvoicesView() {
                 <option value={50}>50</option>
               </select>
               <span className="helper">Seite {page} / {pages}</span>
-              <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">⏮</button>
+              <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">«</button>
               <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück">‹</button>
               <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter">›</button>
             </div>

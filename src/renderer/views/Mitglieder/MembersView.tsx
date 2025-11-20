@@ -399,7 +399,7 @@ export default function MembersView() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
                 <div className="helper">{total} Einträge</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">⏮</button>
+                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">«</button>
                     <button className="btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
                     <button className="btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
                 </div>
@@ -774,6 +774,8 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
     const [open, setOpen] = useState(false)
     const [status, setStatus] = useState<any>(null)
     const [history, setHistory] = useState<any[]>([])
+    const [historyPage, setHistoryPage] = useState(1)
+    const historyPageSize = 5
     const [memberData, setMemberData] = useState<any>(null)
     const [due, setDue] = useState<Array<{ periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
     const [selVoucherByPeriod, setSelVoucherByPeriod] = useState<Record<string, number | null>>({})
@@ -821,15 +823,33 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
         return () => { alive = false }
     }, [open, memberId])
     useEffect(() => { setDuePage(1) }, [due.length])
+    useEffect(() => { setHistoryPage(1) }, [history.length])
+    useEffect(() => {
+        if (!open) return
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setOpen(false)
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [open])
     const color = status?.state === 'OVERDUE' ? 'var(--danger)' : status?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)'
     return (
         <>
             <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
+                {/* Money bill SVG icon */}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="2" y="6" width="20" height="12" rx="2" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="3.2" fill="#fff"/>
+                    <rect x="4" y="8" width="2" height="2" rx="1" fill="#fff"/>
+                    <rect x="18" y="8" width="2" height="2" rx="1" fill="#fff"/>
+                </svg>
             </button>
             {open && (
-                <div className="modal-overlay" onClick={() => setOpen(false)}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
+                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, background: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1000px)', maxWidth: 1000, display: 'grid', gap: 10, margin: '32px auto 0 auto' }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
                             <button className="btn" onClick={()=>setOpen(false)}>×</button>
@@ -940,7 +960,15 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                             }}>Mitglied anschreiben</button>
                         </div>
                         <div className="card" style={{ padding: 10 }}>
-                            <strong>Historie</strong>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong>Historie</strong>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <button className="btn" onClick={() => setHistoryPage(1)} disabled={historyPage <= 1} style={historyPage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>«</button>
+                                    <button className="btn" onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage <= 1} style={historyPage <= 1 ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>‹</button>
+                                    <button className="btn" onClick={() => setHistoryPage(p => Math.min(Math.max(1, Math.ceil(history.length / historyPageSize)), p + 1))} disabled={historyPage >= Math.max(1, Math.ceil(history.length / historyPageSize))} style={historyPage >= Math.max(1, Math.ceil(history.length / historyPageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>›</button>
+                                    <button className="btn" onClick={() => setHistoryPage(Math.max(1, Math.ceil(history.length / historyPageSize)))} disabled={historyPage >= Math.max(1, Math.ceil(history.length / historyPageSize))} style={historyPage >= Math.max(1, Math.ceil(history.length / historyPageSize)) ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>»</button>
+                                </div>
+                            </div>
                             <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
                                 <thead>
                                     <tr>
@@ -951,8 +979,8 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {history.map((r,i)=> (
-                                        <tr key={i}>
+                                    {history.slice((historyPage-1)*historyPageSize, historyPage*historyPageSize).map((r,i)=> (
+                                        <tr key={i+(historyPage-1)*historyPageSize}>
                                             <td>{r.periodKey}</td>
                                             <td>{r.datePaid}</td>
                                             <td align="right">{new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(r.amount)}</td>
@@ -962,9 +990,10 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                     {history.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
                                 </tbody>
                             </table>
+                            <div className="helper" style={{ marginTop: 6, textAlign: 'right' }}>Seite {historyPage} von {Math.max(1, Math.ceil(history.length / historyPageSize))} – {history.length} Einträge</div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="btn" onClick={()=>setOpen(false)}>Schließen</button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <div className="helper">Esc = Abbrechen</div>
                         </div>
                     </div>
                 </div>
