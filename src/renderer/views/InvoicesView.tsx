@@ -924,7 +924,7 @@ export default function InvoicesView() {
             </div>
           </div>, document.body)}
 
-      {detailId != null && (
+      {detailId != null && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setDetailId(null); setDetail(null) }}>
           <div className="modal invoices-detail-grid" onClick={e => e.stopPropagation()} style={{ maxWidth: 860 }}>
             <div className="invoices-detail-header">
@@ -1034,7 +1034,8 @@ export default function InvoicesView() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Column selection modal */}
