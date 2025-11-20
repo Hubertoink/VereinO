@@ -121,21 +121,18 @@ export function GeneralPane({
           <div className="field">
             <label htmlFor="select-color-theme">Farb-Theme</label>
             <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
-              <option value="default">Standard</option>
-              <option value="fiery-ocean">Fiery Ocean</option>
-              <option value="peachy-delight">Peachy Delight</option>
-              <option value="pastel-dreamland">Pastel Dreamland</option>
-              <option value="ocean-breeze">Ocean Breeze</option>
-              <option value="earthy-tones">Earthy Tones</option>
-              <option value="monochrome-harmony">Monochrome Harmony</option>
-              <option value="vintage-charm">Vintage Charm</option>
+              <option value="default">Standard ◐</option>
+              <option value="fiery-ocean">Fiery Ocean ●</option>
+              <option value="peachy-delight">Peachy Delight ●</option>
+              <option value="pastel-dreamland">Pastel Dreamland ●</option>
+              <option value="ocean-breeze">Ocean Breeze ●</option>
+              <option value="earthy-tones">Earthy Tones ●</option>
+              <option value="monochrome-harmony">Monochrome Harmony ●</option>
+              <option value="vintage-charm">Vintage Charm ●</option>
+              <option value="soft-blush">Soft Blush ○</option>
+              <option value="professional-light">Professional Light ○</option>
             </select>
-            <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen).</div>
-            <div className="swatches" aria-label="Farbvorschau">
-              <span className="swatch" style={{ background: 'var(--bg)' }} title="Hintergrund" aria-label="Hintergrund" />
-              <span className="swatch" style={{ background: 'var(--surface)' }} title="Fläche" aria-label="Fläche" />
-              <span className="swatch" style={{ background: 'var(--accent)' }} title="Akzent" aria-label="Akzent" />
-            </div>
+            <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen). ● = Dark | ○ = Light</div>
           </div>
         </div>
       </div>

@@ -382,6 +382,62 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
     --pm-bank: #F5CB5C;     /* accent */
 }
 
+/* Soft Blush */
+:root[data-color-theme="soft-blush"] {
+    /* Pastel palette with warm peachy tones */
+    --bg: #FAE1DD;         /* soft-blush background */
+    --surface: #FFFFFF;    /* white for better table contrast */
+    --muted: #F8EDEB;      /* seashell for muted elements */
+    --border: #E8CFCA;     /* darker border for visibility */
+    --text: #1B1615;       /* dark brown for contrast */
+    --text-dim: #6B5C58;   /* muted brown */
+    --accent: #e4431b;     /* kept accent */
+    --accent-hover: #FEC89A; /* peach-glow */
+    --success: #5A9D60;    /* darker sage green */
+    --warning: #E5BA4A;    /* darker warm gold */
+    --danger: #E8654F;     /* darker powder-blush */
+    --badge-in: #5A9D60;
+    --badge-out: #E8654F;
+    --sphere-ideell: #FE9F67; /* darker peach */
+    --sphere-zweck: #FEC89A;  /* peach-glow */
+    --sphere-vermoegen: #D5D5D1; /* darker alabaster-grey */
+    --sphere-wgb: #C0D3CD;    /* darker alabaster-grey-2 */
+    --pm-bar: #C0D3CD;     /* darker grey */
+    --pm-bank: #FE9F67;    /* darker peach */
+    --shadow-1: 0 2px 8px rgba(252, 197, 187, 0.15);
+    --table-row-alt: rgba(255, 229, 217, 0.35);
+    --table-row-sep: rgba(232, 207, 202, 1);
+    color-scheme: light;
+}
+
+/* Professional Light */
+:root[data-color-theme="professional-light"] {
+    /* Dezentes, professionelles Light Theme */
+    --bg: #FAF9F9;         /* bright-snow - sehr heller Hintergrund */
+    --surface: #FFFFFF;    /* pure white für Karten */
+    --muted: #BEE3DB;      /* frozen-water - helles Türkis */
+    --border: #89B0AE;     /* muted-teal - gedämpftes Türkis */
+    --text: #2A2E33;       /* dunkles Grau für Text */
+    --text-dim: #555B6E;   /* blue-slate - gedämpftes Blaugrau */
+    --accent: #6B8F8D;     /* abgeleitet von muted-teal, etwas dunkler */
+    --accent-hover: #89B0AE; /* muted-teal */
+    --success: #5A9D60;    /* professionelles Grün */
+    --warning: #D4A574;    /* warmes Beige */
+    --danger: #C97064;     /* gedämpftes Rot */
+    --badge-in: #5A9D60;
+    --badge-out: #C97064;
+    --sphere-ideell: #7BA5A3; /* Türkis-Ton */
+    --sphere-zweck: #FFD6BA;  /* peach-fuzz - warmer Akzent */
+    --sphere-vermoegen: #BEE3DB; /* frozen-water */
+    --sphere-wgb: #89B0AE;    /* muted-teal */
+    --pm-bar: #BEE3DB;     /* frozen-water */
+    --pm-bank: #7BA5A3;    /* Türkis */
+    --shadow-1: 0 2px 8px rgba(85, 91, 110, 0.12);
+    --table-row-alt: rgba(190, 227, 219, 0.25);
+    --table-row-sep: rgba(137, 176, 174, 0.3);
+    color-scheme: light;
+}
+
 /* Vintage Charm */
 :root[data-color-theme="vintage-charm"] {
     /* Provided palette:
@@ -590,23 +646,27 @@ button.badge:hover { filter: brightness(1.03); }
 }
 
 .badge.sphere-ideell {
-    background: color-mix(in oklab, var(--sphere-ideell) 20%, transparent);
-    color: var(--badge-text);
+    background: color-mix(in oklab, var(--sphere-ideell) 75%, transparent);
+    color: #1B1615;
+    font-weight: 600;
 }
 
 .badge.sphere-zweck {
-    background: color-mix(in oklab, var(--sphere-zweck) 25%, transparent);
-    color: var(--badge-text);
+    background: color-mix(in oklab, var(--sphere-zweck) 75%, transparent);
+    color: #1B1615;
+    font-weight: 600;
 }
 
 .badge.sphere-vermoegen {
-    background: color-mix(in oklab, var(--sphere-vermoegen) 25%, transparent);
-    color: var(--badge-text);
+    background: color-mix(in oklab, var(--sphere-vermoegen) 75%, transparent);
+    color: #1B1615;
+    font-weight: 600;
 }
 
 .badge.sphere-wgb {
-    background: color-mix(in oklab, var(--sphere-wgb) 25%, transparent);
-    color: var(--badge-text);
+    background: color-mix(in oklab, var(--sphere-wgb) 75%, transparent);
+    color: #1B1615;
+    font-weight: 600;
 }
 
 .badge.pm-bar {
