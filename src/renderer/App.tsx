@@ -8,6 +8,7 @@ import MembersView from './views/Mitglieder/MembersView'
 import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
+import SubmissionsView from './views/Submissions/SubmissionsView'
 import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
@@ -906,6 +907,15 @@ function AppInner() {
 
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
+                    )}
+
+                    {activePage === 'Einreichungen' && (
+                        <SubmissionsView
+                            notify={notify}
+                            bumpDataVersion={bumpDataVersion}
+                            eurFmt={eurFmt}
+                            fmtDate={fmtDate}
+                        />
                     )}
             </main>
 

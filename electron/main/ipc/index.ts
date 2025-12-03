@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags } from '../repositories/vouchers'
@@ -8,6 +8,7 @@ import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
+import { createSubmissionsRepository } from '../repositories/submissions'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -1420,5 +1421,175 @@ export function registerIpcHandlers() {
         } catch (e: any) {
             return { ok: false, error: e?.message || String(e) }
         }
+    })
+
+    // ============= SUBMISSIONS =============
+    // List submissions
+    ipcMain.handle('submissions.list', async (_e, payload) => {
+        const parsed = SubmissionsListInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.list(parsed || {})
+        return SubmissionsListOutput.parse(result)
+    })
+
+    // Get single submission
+    ipcMain.handle('submissions.get', async (_e, payload) => {
+        const parsed = SubmissionGetInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.get(parsed.id)
+        return SubmissionGetOutput.parse(result)
+    })
+
+    // Import submissions from JSON
+    ipcMain.handle('submissions.import', async (_e, payload) => {
+        const parsed = SubmissionsImportInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.import(parsed)
+        return SubmissionsImportOutput.parse(result)
+    })
+
+    // Import submissions from file picker
+    ipcMain.handle('submissions.importFromFile', async () => {
+        const result = await dialog.showOpenDialog({
+            title: 'Einreichungen importieren',
+            filters: [
+                { name: 'Einreichungen', extensions: ['vereino-submission.json', 'json'] }
+            ],
+            properties: ['openFile', 'multiSelections']
+        })
+        if (result.canceled || !result.filePaths.length) {
+            return { imported: 0, ids: [] }
+        }
+
+        const allSubmissions: any[] = []
+        for (const filePath of result.filePaths) {
+            try {
+                const content = fs.readFileSync(filePath, 'utf-8')
+                const data = JSON.parse(content)
+                if (Array.isArray(data.submissions)) {
+                    allSubmissions.push(...data.submissions)
+                } else if (data.date && data.grossAmount) {
+                    // Single submission format
+                    allSubmissions.push(data)
+                }
+            } catch (e) {
+                console.error(`Failed to parse submission file: ${filePath}`, e)
+            }
+        }
+
+        if (allSubmissions.length === 0) {
+            return { imported: 0, ids: [] }
+        }
+
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const importResult = repo.import({ submissions: allSubmissions })
+        return SubmissionsImportOutput.parse(importResult)
+    })
+
+    // Approve submission
+    ipcMain.handle('submissions.approve', async (_e, payload) => {
+        const parsed = SubmissionApproveInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.approve(parsed.id, { reviewerNotes: parsed.reviewerNotes })
+        return SubmissionApproveOutput.parse(result)
+    })
+
+    // Reject submission
+    ipcMain.handle('submissions.reject', async (_e, payload) => {
+        const parsed = SubmissionRejectInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.reject(parsed.id, { reviewerNotes: parsed.reviewerNotes })
+        return SubmissionRejectOutput.parse(result)
+    })
+
+    // Delete submission
+    ipcMain.handle('submissions.delete', async (_e, payload) => {
+        const parsed = SubmissionDeleteInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.delete(parsed.id)
+        return SubmissionDeleteOutput.parse(result)
+    })
+
+    // Convert approved submission to voucher
+    ipcMain.handle('submissions.convert', async (_e, payload) => {
+        const parsed = SubmissionConvertInput.parse(payload)
+        const db = getDb()
+        const submRepo = createSubmissionsRepository(db)
+        
+        const submission = submRepo.get(parsed.id)
+        if (!submission) {
+            return { ok: false }
+        }
+        if (submission.status !== 'approved') {
+            return { ok: false }
+        }
+
+        // Create voucher from submission
+        const voucherPayload = {
+            date: submission.date,
+            type: submission.type as 'IN' | 'OUT',
+            sphere: parsed.sphere,
+            description: submission.description || undefined,
+            grossAmount: submission.grossAmount,
+            vatRate: 0,
+            paymentMethod: parsed.paymentMethod,
+            categoryId: parsed.categoryId,
+            earmarkId: parsed.earmarkId,
+            budgetId: parsed.budgetId,
+            counterparty: submission.counterparty || undefined,
+            files: [] as Array<{ name: string; dataBase64: string; mime?: string }>
+        }
+
+        // Add attachments as files
+        for (const att of submission.attachments) {
+            const fullAtt = submRepo.getAttachment(att.id)
+            if (fullAtt) {
+                voucherPayload.files.push({
+                    name: fullAtt.filename,
+                    dataBase64: fullAtt.data.toString('base64'),
+                    mime: fullAtt.mimeType || undefined
+                })
+            }
+        }
+
+        const voucherResult = createVoucher(voucherPayload)
+        
+        // Link submission to voucher
+        if (voucherResult.id) {
+            submRepo.linkToVoucher(parsed.id, voucherResult.id)
+        }
+
+        return SubmissionConvertOutput.parse({ ok: true, voucherId: voucherResult.id })
+    })
+
+    // Summary
+    ipcMain.handle('submissions.summary', async () => {
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const result = repo.summary()
+        return SubmissionsSummaryOutput.parse(result)
+    })
+
+    // Read attachment data
+    ipcMain.handle('submissions.readAttachment', async (_e, payload) => {
+        const parsed = SubmissionAttachmentReadInput.parse(payload)
+        const db = getDb()
+        const repo = createSubmissionsRepository(db)
+        const att = repo.getAttachment(parsed.attachmentId)
+        if (!att) {
+            return null
+        }
+        return SubmissionAttachmentReadOutput.parse({
+            filename: att.filename,
+            mimeType: att.mimeType,
+            dataBase64: att.data.toString('base64')
+        })
     })
 }

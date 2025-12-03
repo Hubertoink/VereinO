@@ -186,6 +186,18 @@ contextBridge.exposeInMainWorld('api', {
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),
         openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath })
+    },
+    submissions: {
+        list: (payload?: any) => ipcRenderer.invoke('submissions.list', payload),
+        get: (payload: any) => ipcRenderer.invoke('submissions.get', payload),
+        import: (payload: any) => ipcRenderer.invoke('submissions.import', payload),
+        importFromFile: () => ipcRenderer.invoke('submissions.importFromFile'),
+        approve: (payload: any) => ipcRenderer.invoke('submissions.approve', payload),
+        reject: (payload: any) => ipcRenderer.invoke('submissions.reject', payload),
+        delete: (payload: any) => ipcRenderer.invoke('submissions.delete', payload),
+        convert: (payload: any) => ipcRenderer.invoke('submissions.convert', payload),
+        summary: () => ipcRenderer.invoke('submissions.summary'),
+        readAttachment: (payload: any) => ipcRenderer.invoke('submissions.readAttachment', payload)
     }
 })
 

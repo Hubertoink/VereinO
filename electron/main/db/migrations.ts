@@ -425,6 +425,43 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    version: 21,
+    up: `
+    -- Submissions: Vouchers submitted by members for review by the treasurer
+    CREATE TABLE IF NOT EXISTS submissions (
+      id INTEGER PRIMARY KEY,
+      external_id TEXT,
+      date TEXT NOT NULL,
+      type TEXT CHECK(type IN ('IN','OUT')) NOT NULL DEFAULT 'OUT',
+      description TEXT,
+      gross_amount NUMERIC NOT NULL DEFAULT 0,
+      category_hint TEXT,
+      counterparty TEXT,
+      submitted_by TEXT NOT NULL,
+      submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      status TEXT CHECK(status IN ('pending','approved','rejected')) NOT NULL DEFAULT 'pending',
+      reviewed_at TEXT,
+      reviewer_notes TEXT,
+      voucher_id INTEGER,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS submission_attachments (
+      id INTEGER PRIMARY KEY,
+      submission_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT,
+      data BLOB NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(submission_id) REFERENCES submissions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+    CREATE INDEX IF NOT EXISTS idx_submissions_date ON submissions(date);
+    CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission ON submission_attachments(submission_id);
+    `
   }
 ]
 
