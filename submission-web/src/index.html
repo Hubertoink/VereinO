@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Buchung einreichen – VereinO</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>📋 Buchung einreichen</h1>
+            <div class="header-badge" id="badge-count">0</div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main" id="main-view">
+            <!-- Form for new submission -->
+            <form id="submission-form" class="form-card">
+                <div class="form-group">
+                    <label for="date">Datum *</label>
+                    <input type="date" id="date" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Art *</label>
+                    <div class="btn-group">
+                        <button type="button" class="btn-toggle active" data-type="OUT">Ausgabe</button>
+                        <button type="button" class="btn-toggle" data-type="IN">Einnahme</button>
+                    </div>
+                    <input type="hidden" id="type" value="OUT">
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">Betrag (€) *</label>
+                    <input type="number" id="amount" step="0.01" min="0.01" placeholder="0,00" required inputmode="decimal">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Beschreibung *</label>
+                    <input type="text" id="description" placeholder="Wofür?" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="counterparty">Zahler/Empfänger</label>
+                    <input type="text" id="counterparty" placeholder="Name des Zahlenden/Empfängers">
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Kategorie-Hinweis</label>
+                    <input type="text" id="category" placeholder="z.B. Vereinsfest, Material, etc.">
+                </div>
+
+                <!-- Image upload -->
+                <div class="form-group">
+                    <label>Beleg-Foto</label>
+                    <div class="image-upload" id="image-upload">
+                        <input type="file" id="image-input" accept="image/*" capture="environment" hidden>
+                        <div class="image-preview" id="image-preview">
+                            <div class="image-placeholder" id="image-placeholder">
+                                <span class="icon">📷</span>
+                                <span>Foto aufnehmen oder auswählen</span>
+                            </div>
+                            <img id="preview-img" src="" alt="Vorschau" hidden>
+                            <button type="button" class="btn-remove-image" id="remove-image" hidden>×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="submitter">Dein Name *</label>
+                    <input type="text" id="submitter" placeholder="Vor- und Nachname" required>
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    <span class="icon">➕</span> Zur Liste hinzufügen
+                </button>
+            </form>
+        </main>
+
+        <!-- Submissions list view -->
+        <div id="list-view" class="list-view" hidden>
+            <div class="list-header">
+                <h2>Eingereichte Buchungen</h2>
+                <button type="button" class="btn-back" id="btn-back">← Zurück</button>
+            </div>
+            <div class="submissions-list" id="submissions-list"></div>
+            <div class="list-actions">
+                <button type="button" class="btn-secondary" id="btn-clear">🗑️ Alle löschen</button>
+                <button type="button" class="btn-primary" id="btn-download">📥 JSON herunterladen</button>
+            </div>
+            <div class="email-hint">
+                <p>Nach dem Download die <code>.vereino-submission.json</code> Datei per E-Mail an den Kassier senden.</p>
+            </div>
+        </div>
+
+        <!-- Bottom nav -->
+        <nav class="bottom-nav">
+            <button type="button" class="nav-btn active" id="nav-form">
+                <span class="icon">➕</span>
+                <span>Neu</span>
+            </button>
+            <button type="button" class="nav-btn" id="nav-list">
+                <span class="icon">📋</span>
+                <span>Liste</span>
+                <span class="nav-badge" id="nav-badge">0</span>
+            </button>
+        </nav>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
