@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { ICONS } from '../../utils/icons'
+import TagsEditor from '../../components/TagsEditor'
 
 // Unicode icons for buttons (keine ICONS.upload/refresh/trash im bestehenden ICONS-Set)
 const ICON_IMPORT = '📥'
@@ -30,31 +31,71 @@ interface Submission {
     }>
 }
 
+// Editable voucher data for kassier review
+interface VoucherDraft {
+    date: string
+    type: 'IN' | 'OUT'
+    sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    description: string
+    grossAmount: number
+    vatRate: number
+    paymentMethod: 'BAR' | 'BANK'
+    earmarkId: number | null
+    budgetId: number | null
+    tags: string[]
+    counterparty: string
+}
+
 interface SubmissionsViewProps {
     notify: (type: 'info' | 'success' | 'error', text: string, duration?: number) => void
     bumpDataVersion: () => void
     eurFmt: Intl.NumberFormat
     fmtDate: (d: string) => string
+    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
+    budgetsForEdit: Array<{ id: number; label: string }>
+    tagDefs: Array<{ id: number; name: string; color?: string | null }>
 }
 
-// Review modal for kassier to approve/reject
+// Review modal for kassier to approve/reject with edit capability
 function ReviewModal({
     submission,
     onClose,
     onApprove,
-    onReject
+    onReject,
+    earmarks,
+    budgetsForEdit,
+    tagDefs
 }: {
     submission: Submission
     onClose: () => void
-    onApprove: (notes: string) => void
+    onApprove: (notes: string, draft: VoucherDraft) => void
     onReject: (notes: string) => void
+    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
+    budgetsForEdit: Array<{ id: number; label: string }>
+    tagDefs: Array<{ id: number; name: string; color?: string | null }>
 }) {
     const [notes, setNotes] = useState('')
     const [loading, setLoading] = useState(false)
+    const [editMode, setEditMode] = useState(false)
+    
+    // Editable voucher draft
+    const [draft, setDraft] = useState<VoucherDraft>(() => ({
+        date: submission.date,
+        type: submission.type,
+        sphere: 'IDEELL',
+        description: submission.description || '',
+        grossAmount: submission.gross_amount,
+        vatRate: 0,
+        paymentMethod: 'BANK',
+        earmarkId: null,
+        budgetId: null,
+        tags: [],
+        counterparty: submission.counterparty || ''
+    }))
 
     const handleApprove = async () => {
         setLoading(true)
-        await onApprove(notes)
+        await onApprove(notes, draft)
         setLoading(false)
     }
 
@@ -64,67 +105,219 @@ function ReviewModal({
         setLoading(false)
     }
 
+    // Calculate net amount from gross
+    const netAmount = useMemo(() => {
+        if (draft.vatRate === 0) return draft.grossAmount
+        return Math.round(draft.grossAmount / (1 + draft.vatRate / 100))
+    }, [draft.grossAmount, draft.vatRate])
+
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: editMode ? 800 : 600 }} onClick={(e) => e.stopPropagation()}>
                 <header className="flex justify-between items-center mb-16">
-                    <h2 style={{ margin: 0 }}>Einreichung prüfen</h2>
+                    <h2 style={{ margin: 0 }}>
+                        {editMode ? 'Buchung bearbeiten & genehmigen' : 'Einreichung prüfen'}
+                    </h2>
                     <button className="btn danger" onClick={onClose} aria-label="Schließen">×</button>
                 </header>
 
-                <div className="card mb-16" style={{ padding: 16 }}>
-                    <div className="grid gap-8" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                {/* Original submission info */}
+                <div className="card mb-16" style={{ padding: 16, background: 'var(--surface-alt)' }}>
+                    <div className="helper mb-8">Eingereichte Daten</div>
+                    <div className="grid gap-8" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                         <div>
-                            <label className="helper">Datum</label>
-                            <div>{submission.date}</div>
+                            <span className="helper">Datum:</span> {submission.date}
                         </div>
                         <div>
-                            <label className="helper">Typ</label>
-                            <div>{submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'}</div>
+                            <span className="helper">Typ:</span> {submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'}
+                        </div>
+                        <div>
+                            <span className="helper">Betrag:</span>{' '}
+                            <strong style={{ color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
+                                {submission.type === 'OUT' && '-'}€ {(submission.gross_amount / 100).toFixed(2)}
+                            </strong>
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
-                            <label className="helper">Beschreibung</label>
-                            <div>{submission.description || '–'}</div>
+                            <span className="helper">Beschreibung:</span> {submission.description || '–'}
                         </div>
                         <div>
-                            <label className="helper">Bruttobetrag</label>
-                            <div style={{ fontWeight: 600, color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
-                                {submission.type === 'OUT' && '-'}€ {(submission.gross_amount / 100).toFixed(2)}
+                            <span className="helper">Von:</span> {submission.submitted_by}
+                        </div>
+                        {submission.category_hint && (
+                            <div style={{ gridColumn: 'span 3' }}>
+                                <span className="helper">Kategorie-Hinweis:</span> {submission.category_hint}
                             </div>
-                        </div>
-                        <div>
-                            <label className="helper">Gegenpartei</label>
-                            <div>{submission.counterparty || '–'}</div>
-                        </div>
-                        <div>
-                            <label className="helper">Kategorie-Hinweis</label>
-                            <div>{submission.category_hint || '–'}</div>
-                        </div>
-                        <div>
-                            <label className="helper">Eingereicht von</label>
-                            <div>{submission.submitted_by}</div>
-                        </div>
+                        )}
                     </div>
-
                     {submission.attachments && submission.attachments.length > 0 && (
-                        <div className="mt-16">
-                            <label className="helper">Anhänge</label>
-                            <div className="flex gap-8 flex-wrap">
-                                {submission.attachments.map((att) => (
-                                    <span key={att.id} className="chip">
-                                        📎 {att.name}
-                                    </span>
-                                ))}
-                            </div>
+                        <div className="mt-8">
+                            <span className="helper">Anhänge:</span>{' '}
+                            {submission.attachments.map((att) => (
+                                <span key={att.id} className="chip" style={{ marginLeft: 4 }}>
+                                    📎 {att.name}
+                                </span>
+                            ))}
                         </div>
                     )}
                 </div>
+
+                {/* Toggle edit mode */}
+                {!editMode ? (
+                    <button className="btn mb-16" onClick={() => setEditMode(true)} style={{ width: '100%' }}>
+                        {ICONS.EDIT} Buchungsdetails vor Genehmigung bearbeiten
+                    </button>
+                ) : (
+                    /* Editable voucher form */
+                    <div className="card mb-16" style={{ padding: 16 }}>
+                        <div className="helper mb-8">Buchungsdetails (bearbeitbar)</div>
+                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                            <div className="field">
+                                <label>Datum</label>
+                                <input
+                                    type="date"
+                                    className="input"
+                                    value={draft.date}
+                                    onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Art</label>
+                                <div className="btn-group">
+                                    <button
+                                        type="button"
+                                        className={`btn ${draft.type === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`}
+                                        onClick={() => setDraft({ ...draft, type: 'IN' })}
+                                    >
+                                        Einnahme
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn ${draft.type === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`}
+                                        onClick={() => setDraft({ ...draft, type: 'OUT' })}
+                                    >
+                                        Ausgabe
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="field">
+                                <label>Sphäre</label>
+                                <select
+                                    className="input"
+                                    value={draft.sphere}
+                                    onChange={(e) => setDraft({ ...draft, sphere: e.target.value as any })}
+                                >
+                                    <option value="IDEELL">IDEELL</option>
+                                    <option value="ZWECK">ZWECK</option>
+                                    <option value="VERMOEGEN">VERMÖGEN</option>
+                                    <option value="WGB">WGB</option>
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Zahlweg</label>
+                                <div className="btn-group">
+                                    <button
+                                        type="button"
+                                        className={`btn ${draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`}
+                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BAR' })}
+                                    >
+                                        Bar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn ${draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`}
+                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BANK' })}
+                                    >
+                                        Bank
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="field" style={{ gridColumn: 'span 2' }}>
+                                <label>Beschreibung</label>
+                                <input
+                                    type="text"
+                                    className="input"
+                                    value={draft.description}
+                                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                                    placeholder="Beschreibung der Buchung"
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Bruttobetrag (Cent)</label>
+                                <input
+                                    type="number"
+                                    className="input"
+                                    value={draft.grossAmount}
+                                    onChange={(e) => setDraft({ ...draft, grossAmount: Number(e.target.value) })}
+                                    min={0}
+                                />
+                                <span className="helper">= € {(draft.grossAmount / 100).toFixed(2)}</span>
+                            </div>
+                            <div className="field">
+                                <label>MwSt-Satz (%)</label>
+                                <select
+                                    className="input"
+                                    value={draft.vatRate}
+                                    onChange={(e) => setDraft({ ...draft, vatRate: Number(e.target.value) })}
+                                >
+                                    <option value={0}>0%</option>
+                                    <option value={7}>7%</option>
+                                    <option value={19}>19%</option>
+                                </select>
+                                <span className="helper">Netto: € {(netAmount / 100).toFixed(2)}</span>
+                            </div>
+                            <div className="field">
+                                <label>Gegenpartei</label>
+                                <input
+                                    type="text"
+                                    className="input"
+                                    value={draft.counterparty}
+                                    onChange={(e) => setDraft({ ...draft, counterparty: e.target.value })}
+                                    placeholder="Zahler/Empfänger"
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Zweckbindung</label>
+                                <select
+                                    className="input"
+                                    value={draft.earmarkId ?? ''}
+                                    onChange={(e) => setDraft({ ...draft, earmarkId: e.target.value ? Number(e.target.value) : null })}
+                                >
+                                    <option value="">– Keine –</option>
+                                    {earmarks.map((em) => (
+                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Budget</label>
+                                <select
+                                    className="input"
+                                    value={draft.budgetId ?? ''}
+                                    onChange={(e) => setDraft({ ...draft, budgetId: e.target.value ? Number(e.target.value) : null })}
+                                >
+                                    <option value="">– Kein Budget –</option>
+                                    {budgetsForEdit.map((b) => (
+                                        <option key={b.id} value={b.id}>{b.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field" style={{ gridColumn: 'span 2' }}>
+                                <TagsEditor
+                                    label="Tags"
+                                    value={draft.tags}
+                                    onChange={(tags) => setDraft({ ...draft, tags })}
+                                    tagDefs={tagDefs}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="field">
                     <label>Notizen (optional)</label>
                     <textarea
                         className="input"
-                        rows={3}
+                        rows={2}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Anmerkungen zur Entscheidung..."
@@ -158,7 +351,7 @@ function StatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' }
     return <span className={className}>{label}</span>
 }
 
-export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDate }: SubmissionsViewProps) {
+export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDate, earmarks, budgetsForEdit, tagDefs }: SubmissionsViewProps) {
     const [submissions, setSubmissions] = useState<Submission[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -202,19 +395,40 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         }
     }
 
-    // Approve submission
-    const handleApprove = async (notes: string) => {
+    // Approve submission with edited voucher data
+    const handleApprove = async (notes: string, draft: VoucherDraft) => {
         if (!reviewSubmission) return
         try {
-            const res = await (window as any).api?.submissions?.approve?.({
-                id: reviewSubmission.id,
-                notes
-            })
-            if (res?.voucherId) {
-                notify('success', `Einreichung genehmigt – Buchung #${res.voucherId} erstellt`)
-            } else {
-                notify('success', 'Einreichung genehmigt')
+            // First create the voucher with the edited data
+            const voucherPayload = {
+                date: draft.date,
+                type: draft.type,
+                sphere: draft.sphere,
+                description: draft.description || undefined,
+                grossAmount: draft.grossAmount,
+                vatRate: draft.vatRate,
+                paymentMethod: draft.paymentMethod,
+                earmarkId: draft.earmarkId || undefined,
+                budgetId: draft.budgetId || undefined,
+                tags: draft.tags.length > 0 ? draft.tags : undefined,
+                counterparty: draft.counterparty || undefined
             }
+            
+            const voucherRes = await (window as any).api?.vouchers?.create?.(voucherPayload)
+            
+            if (voucherRes?.id) {
+                // Mark submission as approved with the voucher ID
+                await (window as any).api?.submissions?.approve?.({
+                    id: reviewSubmission.id,
+                    reviewerNotes: notes,
+                    voucherId: voucherRes.id
+                })
+                notify('success', `Einreichung genehmigt – Buchung #${voucherRes.voucherNo} erstellt`)
+            } else {
+                notify('error', 'Buchung konnte nicht erstellt werden')
+                return
+            }
+            
             setReviewSubmission(null)
             loadSubmissions()
             bumpDataVersion()
@@ -415,6 +629,9 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     onClose={() => setReviewSubmission(null)}
                     onApprove={handleApprove}
                     onReject={handleReject}
+                    earmarks={earmarks}
+                    budgetsForEdit={budgetsForEdit}
+                    tagDefs={tagDefs}
                 />
             )}
         </div>

@@ -915,6 +915,9 @@ function AppInner() {
                             bumpDataVersion={bumpDataVersion}
                             eurFmt={eurFmt}
                             fmtDate={fmtDate}
+                            earmarks={earmarks}
+                            budgetsForEdit={budgetsForEdit}
+                            tagDefs={tagDefs}
                         />
                     )}
             </main>
