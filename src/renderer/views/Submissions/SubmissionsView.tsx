@@ -490,6 +490,8 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                 notify('success', `${res.imported} Einreichung(en) importiert`)
                 loadSubmissions()
                 bumpDataVersion()
+                // Trigger badge updates
+                window.dispatchEvent(new Event('data-changed'))
             } else if (res?.imported === 0) {
                 notify('info', 'Keine neuen Einreichungen im Import gefunden')
             }
