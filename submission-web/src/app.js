@@ -340,6 +340,8 @@ function handleDownload() {
             externalId: sub.id,
             date: sub.date,
             type: sub.type,
+            sphere: sub.sphere,
+            paymentMethod: sub.paymentMethod,
             grossAmount: sub.grossAmount,
             description: sub.description,
             counterparty: sub.counterparty,
