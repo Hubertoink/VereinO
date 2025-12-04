@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { ICONS } from '../../utils/icons'
 import TagsEditor from '../../components/TagsEditor'
 
@@ -10,24 +11,23 @@ const ICON_DELETE = ICONS.DELETE
 // Type matching the backend schema
 interface Submission {
     id: number
-    external_id?: string | null
+    externalId?: string | null
     date: string
     type: 'IN' | 'OUT'
     description?: string | null
-    gross_amount: number
-    category_hint?: string | null
+    grossAmount: number
+    categoryHint?: string | null
     counterparty?: string | null
-    submitted_by: string
-    submitted_at: string
+    submittedBy: string
+    submittedAt: string
     status: 'pending' | 'approved' | 'rejected'
-    reviewed_at?: string | null
-    reviewer_notes?: string | null
-    voucher_id?: number | null
+    reviewedAt?: string | null
+    reviewerNotes?: string | null
+    voucherId?: number | null
     attachments?: Array<{
         id: number
-        name: string
-        mime_type: string
-        size: number
+        filename: string
+        mimeType?: string | null
     }>
 }
 
@@ -77,14 +77,16 @@ function ReviewModal({
     const [notes, setNotes] = useState('')
     const [loading, setLoading] = useState(false)
     const [editMode, setEditMode] = useState(false)
+    const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; mimeType?: string | null; dataBase64?: string } | null>(null)
+    const [loadingPreview, setLoadingPreview] = useState(false)
     
-    // Editable voucher draft
+    // Editable voucher draft - convert from cents to euros for display
     const [draft, setDraft] = useState<VoucherDraft>(() => ({
         date: submission.date,
         type: submission.type,
         sphere: 'IDEELL',
         description: submission.description || '',
-        grossAmount: submission.gross_amount,
+        grossAmount: submission.grossAmount, // stored in cents
         vatRate: 0,
         paymentMethod: 'BANK',
         earmarkId: null,
@@ -92,6 +94,22 @@ function ReviewModal({
         tags: [],
         counterparty: submission.counterparty || ''
     }))
+
+    // Euro input state (for display, stored separately from cents)
+    const [grossAmountEuro, setGrossAmountEuro] = useState(() => 
+        (submission.grossAmount / 100).toFixed(2).replace('.', ',')
+    )
+
+    // ESC key handler
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose()
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [onClose])
 
     const handleApprove = async () => {
         setLoading(true)
@@ -134,18 +152,18 @@ function ReviewModal({
                         <div>
                             <span className="helper">Betrag:</span>{' '}
                             <strong style={{ color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
-                                {submission.type === 'OUT' && '-'}€ {(submission.gross_amount / 100).toFixed(2)}
+                                {submission.type === 'OUT' && '-'}€ {(submission.grossAmount / 100).toFixed(2)}
                             </strong>
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
                             <span className="helper">Beschreibung:</span> {submission.description || '–'}
                         </div>
                         <div>
-                            <span className="helper">Von:</span> {submission.submitted_by}
+                            <span className="helper">Von:</span> {submission.submittedBy}
                         </div>
-                        {submission.category_hint && (
+                        {submission.categoryHint && (
                             <div style={{ gridColumn: 'span 3' }}>
-                                <span className="helper">Kategorie-Hinweis:</span> {submission.category_hint}
+                                <span className="helper">Kategorie-Hinweis:</span> {submission.categoryHint}
                             </div>
                         )}
                     </div>
@@ -153,10 +171,29 @@ function ReviewModal({
                         <div className="mt-8">
                             <span className="helper">Anhänge:</span>{' '}
                             {submission.attachments.map((att) => (
-                                <span key={att.id} className="chip" style={{ marginLeft: 4 }}>
-                                    📎 {att.name}
-                                </span>
+                                <button
+                                    key={att.id}
+                                    className="chip"
+                                    style={{ marginLeft: 4, cursor: 'pointer' }}
+                                    onClick={async () => {
+                                        setLoadingPreview(true)
+                                        try {
+                                            const data = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
+                                            if (data) {
+                                                setPreviewAttachment(data)
+                                            }
+                                        } catch (e) {
+                                            console.error('Failed to load attachment:', e)
+                                        } finally {
+                                            setLoadingPreview(false)
+                                        }
+                                    }}
+                                    title="Klicken zum Ansehen"
+                                >
+                                    📎 {att.filename}
+                                </button>
                             ))}
+                            {loadingPreview && <span className="helper ml-8">Lade...</span>}
                         </div>
                     )}
                 </div>
@@ -242,15 +279,30 @@ function ReviewModal({
                                 />
                             </div>
                             <div className="field">
-                                <label>Bruttobetrag (Cent)</label>
+                                <label>Bruttobetrag (€)</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="input"
-                                    value={draft.grossAmount}
-                                    onChange={(e) => setDraft({ ...draft, grossAmount: Number(e.target.value) })}
-                                    min={0}
+                                    value={grossAmountEuro}
+                                    onChange={(e) => {
+                                        const val = e.target.value
+                                        setGrossAmountEuro(val)
+                                        // Parse and convert to cents
+                                        const parsed = parseFloat(val.replace(',', '.'))
+                                        if (!isNaN(parsed)) {
+                                            setDraft({ ...draft, grossAmount: Math.round(parsed * 100) })
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        // Format on blur
+                                        const parsed = parseFloat(grossAmountEuro.replace(',', '.'))
+                                        if (!isNaN(parsed)) {
+                                            setGrossAmountEuro(parsed.toFixed(2).replace('.', ','))
+                                        }
+                                    }}
+                                    placeholder="z.B. 150,00"
                                 />
-                                <span className="helper">= € {(draft.grossAmount / 100).toFixed(2)}</span>
                             </div>
                             <div className="field">
                                 <label>MwSt-Satz (%)</label>
@@ -313,7 +365,7 @@ function ReviewModal({
                     </div>
                 )}
 
-                <div className="field">
+                <div className="field mb-16">
                     <label>Notizen (optional)</label>
                     <textarea
                         className="input"
@@ -324,7 +376,7 @@ function ReviewModal({
                     />
                 </div>
 
-                <div className="flex justify-between mt-16">
+                <div className="flex justify-between">
                     <button className="btn danger" onClick={handleReject} disabled={loading}>
                         {ICONS.CROSS} Ablehnen
                     </button>
@@ -335,6 +387,42 @@ function ReviewModal({
                         </button>
                     </div>
                 </div>
+
+                {/* Attachment Preview Modal - rendered via portal to escape ReviewModal */}
+                {previewAttachment && createPortal(
+                    <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => setPreviewAttachment(null)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800, maxHeight: '90vh', overflow: 'auto', zIndex: 10002 }}>
+                            <header className="flex justify-between items-center mb-16">
+                                <h3 style={{ margin: 0 }}>📎 {previewAttachment.filename}</h3>
+                                <button className="btn ghost" onClick={() => setPreviewAttachment(null)} aria-label="Schließen">✕</button>
+                            </header>
+                            <div style={{ textAlign: 'center' }}>
+                                {previewAttachment.mimeType?.startsWith('image/') ? (
+                                    <img
+                                        src={`data:${previewAttachment.mimeType};base64,${previewAttachment.dataBase64}`}
+                                        alt={previewAttachment.filename}
+                                        style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8 }}
+                                    />
+                                ) : previewAttachment.mimeType === 'application/pdf' ? (
+                                    <iframe
+                                        src={`data:application/pdf;base64,${previewAttachment.dataBase64}`}
+                                        style={{ width: '100%', height: '70vh', border: 'none', borderRadius: 8 }}
+                                        title={previewAttachment.filename}
+                                    />
+                                ) : (
+                                    <div className="card" style={{ padding: 32, background: 'var(--surface-alt)' }}>
+                                        <p>📄 {previewAttachment.filename}</p>
+                                        <p className="helper">Vorschau nicht verfügbar für diesen Dateityp</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex justify-end mt-16">
+                                <button className="btn" onClick={() => setPreviewAttachment(null)}>Schließen</button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
         </div>
     )
@@ -357,6 +445,19 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     const [error, setError] = useState('')
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'pending' | 'approved' | 'rejected'>('ALL')
     const [reviewSubmission, setReviewSubmission] = useState<Submission | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<Submission | null>(null)
+    const [deleting, setDeleting] = useState(false)
+
+    // ESC key handler for delete modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && deleteConfirm) {
+                setDeleteConfirm(null)
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [deleteConfirm])
 
     // Load submissions
     const loadSubmissions = useCallback(async () => {
@@ -365,8 +466,8 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         try {
             const filter = filterStatus === 'ALL' ? {} : { status: filterStatus }
             const res = await (window as any).api?.submissions?.list?.(filter)
-            if (res?.submissions) {
-                setSubmissions(res.submissions)
+            if (res?.rows) {
+                setSubmissions(res.rows)
             }
         } catch (e: any) {
             setError('Fehler beim Laden: ' + (e?.message || e))
@@ -399,24 +500,55 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     const handleApprove = async (notes: string, draft: VoucherDraft) => {
         if (!reviewSubmission) return
         try {
+            // Build description with counterparty appended if present
+            let finalDescription = draft.description || ''
+            if (draft.counterparty && draft.counterparty.trim()) {
+                if (finalDescription) {
+                    finalDescription = `${finalDescription} - ${draft.counterparty.trim()}`
+                } else {
+                    finalDescription = draft.counterparty.trim()
+                }
+            }
+
             // First create the voucher with the edited data
+            // Note: Voucher API expects Euro, but draft.grossAmount is in cents
             const voucherPayload = {
                 date: draft.date,
                 type: draft.type,
                 sphere: draft.sphere,
-                description: draft.description || undefined,
-                grossAmount: draft.grossAmount,
+                description: finalDescription || undefined,
+                grossAmount: draft.grossAmount / 100, // Convert from cents to euros
                 vatRate: draft.vatRate,
                 paymentMethod: draft.paymentMethod,
                 earmarkId: draft.earmarkId || undefined,
                 budgetId: draft.budgetId || undefined,
-                tags: draft.tags.length > 0 ? draft.tags : undefined,
-                counterparty: draft.counterparty || undefined
+                tags: draft.tags.length > 0 ? draft.tags : undefined
             }
             
             const voucherRes = await (window as any).api?.vouchers?.create?.(voucherPayload)
             
             if (voucherRes?.id) {
+                // Copy attachments from submission to voucher
+                if (reviewSubmission.attachments && reviewSubmission.attachments.length > 0) {
+                    for (const att of reviewSubmission.attachments) {
+                        try {
+                            // Read the attachment data from submission
+                            const attData = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
+                            if (attData?.dataBase64) {
+                                // Add to voucher
+                                await (window as any).api?.attachments?.add?.({
+                                    voucherId: voucherRes.id,
+                                    fileName: attData.filename,
+                                    dataBase64: attData.dataBase64,
+                                    mimeType: attData.mimeType
+                                })
+                            }
+                        } catch (attErr) {
+                            console.error('Failed to copy attachment:', att.id, attErr)
+                        }
+                    }
+                }
+
                 // Mark submission as approved with the voucher ID
                 await (window as any).api?.submissions?.approve?.({
                     id: reviewSubmission.id,
@@ -455,15 +587,23 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     }
 
     // Delete submission
-    const handleDelete = async (id: number) => {
-        if (!confirm('Einreichung wirklich löschen?')) return
+    const handleDelete = async (sub: Submission) => {
+        setDeleteConfirm(sub)
+    }
+
+    const confirmDelete = async () => {
+        if (!deleteConfirm) return
+        setDeleting(true)
         try {
-            await (window as any).api?.submissions?.delete?.({ id })
+            await (window as any).api?.submissions?.delete?.({ id: deleteConfirm.id })
             notify('success', 'Einreichung gelöscht')
+            setDeleteConfirm(null)
             loadSubmissions()
             bumpDataVersion()
         } catch (e: any) {
             notify('error', 'Löschen fehlgeschlagen: ' + (e?.message || e))
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -473,7 +613,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         return [...submissions].sort((a, b) => {
             if (a.status === 'pending' && b.status !== 'pending') return -1
             if (a.status !== 'pending' && b.status === 'pending') return 1
-            return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+            return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
         })
     }, [submissions])
 
@@ -563,13 +703,13 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>Status</th>
-                                <th>Datum</th>
-                                <th>Typ</th>
-                                <th>Beschreibung</th>
+                                <th style={{ textAlign: 'left' }}>Status</th>
+                                <th style={{ textAlign: 'left' }}>Datum</th>
+                                <th style={{ textAlign: 'left' }}>Typ</th>
+                                <th style={{ textAlign: 'left' }}>Beschreibung</th>
                                 <th style={{ textAlign: 'right' }}>Betrag</th>
-                                <th>Eingereicht von</th>
-                                <th>Eingereicht am</th>
+                                <th style={{ textAlign: 'left' }}>Eingereicht von</th>
+                                <th style={{ textAlign: 'left' }}>Eingereicht am</th>
                                 <th style={{ textAlign: 'right' }}>Aktionen</th>
                             </tr>
                         </thead>
@@ -585,10 +725,10 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                                         </span>
                                     </td>
                                     <td style={{ textAlign: 'right', fontWeight: 600, color: sub.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
-                                        {sub.type === 'OUT' && '-'}€ {(sub.gross_amount / 100).toFixed(2)}
+                                        {sub.type === 'OUT' && '-'}€ {(sub.grossAmount / 100).toFixed(2)}
                                     </td>
-                                    <td>{sub.submitted_by}</td>
-                                    <td>{fmtDate(sub.submitted_at.slice(0, 10))}</td>
+                                    <td>{sub.submittedBy}</td>
+                                    <td>{fmtDate(sub.submittedAt.slice(0, 10))}</td>
                                     <td style={{ textAlign: 'right' }}>
                                         <div className="flex gap-4 justify-end">
                                             {sub.status === 'pending' && (
@@ -600,14 +740,14 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                                                     Prüfen
                                                 </button>
                                             )}
-                                            {sub.voucher_id && (
-                                                <button className="btn" title={`Zur Buchung #${sub.voucher_id}`}>
-                                                    #{sub.voucher_id}
+                                            {sub.voucherId && (
+                                                <button className="btn" title={`Zur Buchung #${sub.voucherId}`}>
+                                                    #{sub.voucherId}
                                                 </button>
                                             )}
                                             <button
                                                 className="btn danger"
-                                                onClick={() => handleDelete(sub.id)}
+                                                onClick={() => handleDelete(sub)}
                                                 title="Löschen"
                                                 aria-label="Einreichung löschen"
                                             >
@@ -633,6 +773,46 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     budgetsForEdit={budgetsForEdit}
                     tagDefs={tagDefs}
                 />
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                        <header className="flex justify-between items-center mb-16">
+                            <h2 style={{ margin: 0 }}>Einreichung löschen</h2>
+                            <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen">✕</button>
+                        </header>
+                        <div className="mb-16">
+                            <p style={{ margin: '0 0 8px 0' }}>Diese Einreichung wirklich löschen?</p>
+                            <div className="card" style={{ padding: 12, background: 'var(--surface-alt)' }}>
+                                <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                    <div>
+                                        <span className="helper">Datum:</span> {fmtDate(deleteConfirm.date)}
+                                    </div>
+                                    <div>
+                                        <span className="helper">Betrag:</span>{' '}
+                                        <strong style={{ color: deleteConfirm.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
+                                            {deleteConfirm.type === 'OUT' && '-'}€ {(deleteConfirm.grossAmount / 100).toFixed(2)}
+                                        </strong>
+                                    </div>
+                                    <div style={{ gridColumn: 'span 2' }}>
+                                        <span className="helper">Beschreibung:</span> {deleteConfirm.description || '–'}
+                                    </div>
+                                    <div>
+                                        <span className="helper">Eingereicht von:</span> {deleteConfirm.submittedBy}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-8">
+                            <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
+                            <button className="btn danger" onClick={confirmDelete} disabled={deleting}>
+                                {deleting ? 'Lösche...' : 'Ja, löschen'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     )

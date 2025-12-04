@@ -23,6 +23,8 @@ const btnDownload = document.getElementById('btn-download')
 // Form elements
 const dateInput = document.getElementById('date')
 const typeInput = document.getElementById('type')
+const sphereInput = document.getElementById('sphere')
+const sphereHelp = document.getElementById('sphere-help')
 const amountInput = document.getElementById('amount')
 const descriptionInput = document.getElementById('description')
 const counterpartyInput = document.getElementById('counterparty')
@@ -80,6 +82,12 @@ function setupEventListeners() {
         clearImage()
     })
     
+    // Sphere help
+    sphereHelp.addEventListener('click', (e) => {
+        e.preventDefault()
+        showSphereHelp()
+    })
+    
     // Navigation
     navForm.addEventListener('click', () => showView('form'))
     navList.addEventListener('click', () => showView('list'))
@@ -112,6 +120,7 @@ function handleFormSubmit(e) {
         id: generateId(),
         date: dateInput.value,
         type: typeInput.value,
+        sphere: sphereInput.value,
         grossAmount: Math.round(parseFloat(amountInput.value) * 100), // Convert to cents
         description: descriptionInput.value.trim(),
         counterparty: counterpartyInput.value.trim() || null,
@@ -272,23 +281,35 @@ function renderSubmissionsList() {
 }
 
 function handleDeleteSubmission(id) {
-    if (!confirm('Diese Buchung wirklich löschen?')) return
-    
-    submissions = submissions.filter(s => s.id !== id)
-    saveToStorage()
-    updateBadges()
-    renderSubmissionsList()
-    showToast('Buchung gelöscht', 'success')
+    showConfirm({
+        icon: '🗑️',
+        title: 'Buchung löschen?',
+        message: 'Diese Buchung wird aus der Liste entfernt.',
+        confirmText: 'Löschen',
+        onConfirm: () => {
+            submissions = submissions.filter(s => s.id !== id)
+            saveToStorage()
+            updateBadges()
+            renderSubmissionsList()
+            showToast('Buchung gelöscht', 'success')
+        }
+    })
 }
 
 function handleClearAll() {
-    if (!confirm('Alle Buchungen löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return
-    
-    submissions = []
-    saveToStorage()
-    updateBadges()
-    renderSubmissionsList()
-    showToast('Alle Buchungen gelöscht', 'success')
+    showConfirm({
+        icon: '⚠️',
+        title: 'Alle löschen?',
+        message: 'Alle Buchungen werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
+        confirmText: 'Alle löschen',
+        onConfirm: () => {
+            submissions = []
+            saveToStorage()
+            updateBadges()
+            renderSubmissionsList()
+            showToast('Alle Buchungen gelöscht', 'success')
+        }
+    })
 }
 
 // ===== Download =====
@@ -412,6 +433,100 @@ function escapeHtml(str) {
     div.textContent = str
     return div.innerHTML
 }
+
+// ===== Confirm Modal =====
+let confirmCallback = null
+
+// ===== Alert Modal (info only) =====
+const alertModal = document.getElementById('alert-modal')
+const alertIcon = document.getElementById('alert-icon')
+const alertTitle = document.getElementById('alert-title')
+const alertMessage = document.getElementById('alert-message')
+const alertOk = document.getElementById('alert-ok')
+
+function showAlert({ icon = '💡', title = 'Info', message = '' }) {
+    alertIcon.textContent = icon
+    alertTitle.textContent = title
+    alertMessage.textContent = message
+    
+    alertModal.hidden = false
+    alertModal.offsetHeight
+    alertModal.classList.add('show')
+}
+
+function hideAlert() {
+    alertModal.classList.remove('show')
+    setTimeout(() => {
+        alertModal.hidden = true
+    }, 200)
+}
+
+alertOk.addEventListener('click', hideAlert)
+alertModal.addEventListener('click', (e) => {
+    if (e.target === alertModal) hideAlert()
+})
+
+// ===== Sphere Help Modal =====
+function showSphereHelp() {
+    showAlert({
+        icon: '💡',
+        title: 'Was ist die Sphäre?',
+        message: `Die Sphäre beschreibt den Bereich des Vereins, dem diese Buchung zugeordnet wird:
+
+• IDEELL – Ideeller Bereich (gemeinnützige Aktivitäten)
+• ZWECK – Zweckbetrieb (wirtschaftliche Aktivitäten für den Satzungszweck)
+• VERMOEGEN – Vermögensverwaltung (Kapitalerträge, Mieteinnahmen)
+• WGB – Wirtschaftlicher Geschäftsbetrieb (steuerpflichtige wirtschaftliche Tätigkeiten)`
+    })
+}
+
+// ===== Confirm Modal Elements =====
+const confirmModal = document.getElementById('confirm-modal')
+const confirmIcon = document.getElementById('confirm-icon')
+const confirmTitle = document.getElementById('confirm-title')
+const confirmMessage = document.getElementById('confirm-message')
+const confirmOk = document.getElementById('confirm-ok')
+const confirmCancel = document.getElementById('confirm-cancel')
+
+function showConfirm({ icon = '⚠️', title = 'Bestätigung', message = 'Sind Sie sicher?', confirmText = 'OK', onConfirm }) {
+    confirmIcon.textContent = icon
+    confirmTitle.textContent = title
+    confirmMessage.textContent = message
+    confirmOk.textContent = confirmText
+    confirmCallback = onConfirm
+    
+    confirmModal.hidden = false
+    // Trigger reflow for animation
+    confirmModal.offsetHeight
+    confirmModal.classList.add('show')
+}
+
+function hideConfirm() {
+    confirmModal.classList.remove('show')
+    setTimeout(() => {
+        confirmModal.hidden = true
+        confirmCallback = null
+    }, 200)
+}
+
+confirmOk.addEventListener('click', () => {
+    if (confirmCallback) confirmCallback()
+    hideConfirm()
+})
+
+confirmCancel.addEventListener('click', hideConfirm)
+
+confirmModal.addEventListener('click', (e) => {
+    if (e.target === confirmModal) hideConfirm()
+})
+
+// Close modals on ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (!alertModal.hidden) hideAlert()
+        if (!confirmModal.hidden) hideConfirm()
+    }
+})
 
 // ===== Start App =====
 init()

@@ -60,6 +60,7 @@ docker-compose down
 5. Container starten mit gewünschtem Port-Mapping
 
 Alternativ mit docker-compose:
+
 ```bash
 docker-compose up -d --build
 ```
@@ -72,10 +73,10 @@ Für HTTPS mit nginx als Reverse Proxy:
 server {
     listen 443 ssl http2;
     server_name buchung.deinverein.de;
-    
+
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
-    
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;

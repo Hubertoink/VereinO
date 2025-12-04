@@ -37,6 +37,19 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="sphere">
+                        Sphäre
+                        <button type="button" class="help-icon" id="sphere-help" aria-label="Hilfe zu Sphäre">?</button>
+                    </label>
+                    <select id="sphere">
+                        <option value="IDEELL" selected>Ideell</option>
+                        <option value="ZWECK">Zweckbetrieb</option>
+                        <option value="VERMOEGEN">Vermögensverwaltung</option>
+                        <option value="WGB">Wirtschaftl. Geschäftsbetrieb</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="amount">Betrag (€) *</label>
                     <input type="number" id="amount" step="0.01" min="0.01" placeholder="0,00" required inputmode="decimal">
                 </div>
@@ -111,6 +124,31 @@
                 <span class="nav-badge" id="nav-badge">0</span>
             </button>
         </nav>
+
+        <!-- Alert Modal (info only, single button) -->
+        <div class="modal-overlay" id="alert-modal" hidden>
+            <div class="modal-dialog alert-dialog">
+                <div class="modal-icon" id="alert-icon">💡</div>
+                <h3 class="modal-title" id="alert-title">Info</h3>
+                <p class="modal-message" id="alert-message"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal btn-modal-confirm" id="alert-ok">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Modal -->
+        <div class="modal-overlay" id="confirm-modal" hidden>
+            <div class="modal-dialog">
+                <div class="modal-icon" id="confirm-icon">⚠️</div>
+                <h3 class="modal-title" id="confirm-title">Bestätigung</h3>
+                <p class="modal-message" id="confirm-message">Sind Sie sicher?</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal btn-modal-cancel" id="confirm-cancel">Abbrechen</button>
+                    <button type="button" class="btn-modal btn-modal-confirm" id="confirm-ok">OK</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="app.js"></script>
