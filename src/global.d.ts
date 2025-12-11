@@ -198,10 +198,7 @@ declare global {
             shell: {
                 showItemInFolder: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
                 openPath: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
-            }
-            shell: {
-                showItemInFolder: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
-                openPath: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
+                openExternal: (url: string) => Promise<{ ok: boolean; error?: string | null }>
             }
         }
     }

@@ -78,6 +78,23 @@ body {
 .header h1 {
     font-size: 1.25rem;
     font-weight: 600;
+    flex: 1;
+}
+
+.header-info-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin: 0 8px;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.header-info-btn:hover {
+    opacity: 1;
 }
 
 .header-badge {
@@ -667,6 +684,55 @@ body {
 
 .alert-dialog .btn-modal-confirm:active {
     background: var(--primary-dark);
+}
+
+/* ===== Info Modal ===== */
+.info-dialog {
+    max-width: 520px;
+}
+
+.info-content {
+    text-align: left;
+}
+
+.info-content p {
+    margin-bottom: 12px;
+}
+
+.info-content p:last-of-type {
+    margin-bottom: 0;
+}
+
+.info-links {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0;
+}
+
+.info-links li {
+    margin-bottom: 8px;
+}
+
+.info-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.2s;
+}
+
+.info-links a:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+.info-note {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 12px;
+    font-style: italic;
 }
 
 /* ===== Input with Help Icon ===== */

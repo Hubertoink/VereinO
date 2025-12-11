@@ -722,7 +722,7 @@ function AppInner() {
     }
     const isTopNav = navLayout === 'top'
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : `${sidebarCollapsed ? '64px' : '240px'} 1fr`, gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header
                 style={{ gridArea: 'top', position: 'sticky', top: 0, zIndex: 1000, display: 'grid', gridTemplateColumns: isTopNav ? '1fr auto 1fr 104px' : '1fr 104px', alignItems: 'center', gap: 12, padding: '4px 8px', borderBottom: '1px solid var(--border)', backdropFilter: 'var(--blur)', background: 'color-mix(in oklab, var(--surface) 50%, transparent)', WebkitAppRegion: 'drag' } as any}
@@ -734,19 +734,6 @@ function AppInner() {
                 }}
             >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
-                    {!isTopNav && (
-                        <button
-                            className="btn ghost icon-btn"
-                            title={sidebarCollapsed ? 'Seitenleiste erweitern' : 'Seitenleiste komprimieren'}
-                            aria-label="Seitenleiste umschalten"
-                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" strokeWidth="2" />
-                                <rect x="3" y="5" width="5" height="14" />
-                            </svg>
-                        </button>
-                    )}
                     <TopHeaderOrg />
                 </div>
                 {isTopNav ? (
@@ -781,7 +768,7 @@ function AppInner() {
                         activePage={activePage}
                         onNavigate={setActivePage}
                         navIconColorMode={navIconColorMode}
-                        collapsed={sidebarCollapsed}
+                        collapsed={true}
                         pendingSubmissionsCount={pendingSubmissionsCount}
                         openInvoicesCount={openInvoicesCount}
                         showBadges={showSubmissionBadge}

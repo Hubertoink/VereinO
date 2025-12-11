@@ -15,6 +15,7 @@
         <!-- Header -->
         <header class="header">
             <h1>📋 Buchung einreichen</h1>
+            <button type="button" class="header-info-btn" id="info-btn" aria-label="Informationen">ℹ️</button>
             <div class="header-badge" id="badge-count">0</div>
         </header>
 
@@ -155,6 +156,34 @@
                 <div class="modal-actions">
                     <button type="button" class="btn-modal btn-modal-cancel" id="confirm-cancel">Abbrechen</button>
                     <button type="button" class="btn-modal btn-modal-confirm" id="confirm-ok">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Modal -->
+        <div class="modal-overlay" id="info-modal" hidden>
+            <div class="modal-dialog info-dialog">
+                <div class="modal-icon">ℹ️</div>
+                <h3 class="modal-title">Über VereinO</h3>
+                <div class="modal-message info-content">
+                    <p>Mit dieser Web-App können Sie Buchungsvorschläge für Ihren Verein erstellen.</p>
+                    <p><strong>Weitere Informationen:</strong></p>
+                    <ul class="info-links">
+                        <li>
+                            <a href="https://github.com/Hubertoink/VereinO" target="_blank" rel="noopener noreferrer">
+                                📦 GitHub Repository
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://1drv.ms/u/c/783bd05049ea9e15/IQBnmNFw7mbCTaj0VA2xHd9LAeaetRr3owo29Z8PU7uZrHY" target="_blank" rel="noopener noreferrer">
+                                💾 Desktop-App herunterladen (OneDrive)
+                            </a>
+                        </li>
+                    </ul>
+                    <p class="info-note">Die Desktop-App ermöglicht die vollständige Verwaltung der Vereinsfinanzen.</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-modal btn-modal-confirm" id="info-ok">Schließen</button>
                 </div>
             </div>
         </div>

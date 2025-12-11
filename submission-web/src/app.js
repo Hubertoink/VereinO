@@ -535,11 +535,37 @@ confirmModal.addEventListener('click', (e) => {
     if (e.target === confirmModal) hideConfirm()
 })
 
+// ===== Info Modal =====
+const infoModal = document.getElementById('info-modal')
+const infoBtn = document.getElementById('info-btn')
+const infoOk = document.getElementById('info-ok')
+
+function showInfo() {
+    infoModal.hidden = false
+    // Trigger reflow for animation
+    infoModal.offsetHeight
+    infoModal.classList.add('show')
+}
+
+function hideInfo() {
+    infoModal.classList.remove('show')
+    setTimeout(() => {
+        infoModal.hidden = true
+    }, 200)
+}
+
+infoBtn.addEventListener('click', showInfo)
+infoOk.addEventListener('click', hideInfo)
+infoModal.addEventListener('click', (e) => {
+    if (e.target === infoModal) hideInfo()
+})
+
 // Close modals on ESC key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (!alertModal.hidden) hideAlert()
         if (!confirmModal.hidden) hideConfirm()
+        if (!infoModal.hidden) hideInfo()
     }
 })
 

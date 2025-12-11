@@ -448,6 +448,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     const [reviewSubmission, setReviewSubmission] = useState<Submission | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<Submission | null>(null)
     const [deleting, setDeleting] = useState(false)
+    const [showHelp, setShowHelp] = useState(false)
 
     // ESC key handler for delete modal
     useEffect(() => {
@@ -640,11 +641,31 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     <p className="helper">Eingereichte Buchungsvorschläge von Mitgliedern</p>
                 </div>
                 <div className="flex gap-8">
+                    <button className="btn ghost" onClick={() => setShowHelp(!showHelp)} title="Hilfe anzeigen">
+                        ℹ️
+                    </button>
                     <button className="btn" onClick={handleImport} title="JSON-Datei importieren">
                         {ICON_IMPORT} Importieren
                     </button>
                 </div>
             </header>
+
+            {showHelp && (
+                <div className="card mb-16" style={{ padding: 16, background: 'var(--surface-2)', borderLeft: '4px solid var(--accent)' }}>
+                    <h3 style={{ marginTop: 0 }}>Wie funktioniert das?</h3>
+                    <p>
+                        Mitglieder können ihre Auslagen über die Web-App unter{' '}
+                        <a href="#" onClick={(e) => { e.preventDefault(); window.api?.shell?.openExternal?.('https://vereino.kassiero.de/') }}>
+                            https://vereino.kassiero.de/
+                        </a>{' '}
+                        erfassen.
+                    </p>
+                    <p>
+                        Am Ende wird eine Datei (<code>.vereino-submission.json</code>) erstellt, die das Mitglied an den Kassenwart sendet.
+                        Diese Datei kann über den "Importieren"-Button hier eingelesen werden.
+                    </p>
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid gap-16 mb-16" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

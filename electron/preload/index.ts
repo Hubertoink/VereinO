@@ -185,7 +185,8 @@ contextBridge.exposeInMainWorld('api', {
     },
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),
-        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath })
+        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath }),
+        openExternal: (url: string) => ipcRenderer.invoke('shell.openExternal', { url })
     },
     submissions: {
         list: (payload?: any) => ipcRenderer.invoke('submissions.list', payload),

@@ -1321,6 +1321,9 @@ export function registerIpcHandlers() {
     ipcMain.handle('shell.openPath', async (_e, payload: { fullPath: string }) => {
         try { const res = await shell.openPath(payload.fullPath); return { ok: !res, error: res || null } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
     })
+    ipcMain.handle('shell.openExternal', async (_e, payload: { url: string }) => {
+        try { await shell.openExternal(payload.url); return { ok: true } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
+    })
 
     // Members: quick letter generation (RTF) and open
     ipcMain.handle('members.writeLetter', async (_e, payload: { id?: number; name: string; address?: string | null; memberNo?: string | null }) => {

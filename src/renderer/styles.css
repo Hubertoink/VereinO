@@ -69,7 +69,9 @@
 
 /* InvoicesView utility classes */
 .invoices-text-danger { color: var(--danger); }
-.invoices-table { width: 100%; }
+.invoices-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.invoices-table th:last-child, .invoices-table td:last-child { width: 1%; white-space: nowrap; }
+.invoices-table td { vertical-align: middle; }
 .invoices-sort-btn { padding: 0; display: inline-flex; gap: 6px; align-items: center; }
 .invoices-sort-icon { color: var(--text-dim); }
 .invoices-sort-icon-active { color: var(--warning); }
@@ -1691,6 +1693,15 @@ textarea:focus {
   pointer-events: none;
   border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
 }
+
+/* When sidebar is expanded (has label), position badge inline at the end */
+.side-nav-btn:has(.nav-label) .nav-badge {
+  position: static;
+  margin-left: auto;
+  transform: none;
+  border: none; /* Optional: remove border in inline mode if preferred */
+}
+
 .nav-divider { width: 1px; height: 20px; background: var(--border); align-self: center; }
 .side-nav .nav-divider { width: auto; height: 1px; margin: 6px 0; }
 .top-nav .divider-v { width: 1px; height: 20px; margin: 0; background: var(--border); }
