@@ -635,7 +635,8 @@ export default function JournalView({
                                                 return eurFmt.format(g)
                                             })()
                                             const sphere = editRow.sphere
-                                            return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
+                                            const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
+                                            return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
                                         })()}
                                     </div>
                                 </div>
@@ -819,7 +820,7 @@ export default function JournalView({
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                                                 <strong>Anhänge</strong>
-                                                <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                                {editRowFiles.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
                                             </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input ref={editFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
@@ -874,7 +875,20 @@ export default function JournalView({
                                                     ))}
                                                 </ul>
                                             ) : (
-                                                <div className="helper">Keine Dateien vorhanden</div>
+                                                <div 
+                                                    style={{ 
+                                                        marginTop: 8, 
+                                                        padding: 20, 
+                                                        border: '2px dashed var(--border)', 
+                                                        borderRadius: 8, 
+                                                        textAlign: 'center',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => editFileInputRef.current?.click?.()}
+                                                >
+                                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                                    <div className="helper">Dateien hierher ziehen oder klicken</div>
+                                                </div>
                                             )
                                         )}
                                     </div>

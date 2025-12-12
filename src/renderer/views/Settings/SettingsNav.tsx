@@ -9,7 +9,7 @@ interface SettingsNavProps {
 /**
  * SettingsNav - Tile-based Navigation for Settings
  * 
- * Windows-like tile layout for switching between settings categories
+ * File tab (Aktenreiter) layout for switching between settings categories
  */
 export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   const tiles: Array<{ key: TileKey; icon: string; label: string }> = [
@@ -23,43 +23,18 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   ]
 
   return (
-    <div
-      className="settings-tiles"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 12,
-        marginBottom: 16,
-      }}
-    >
+    <div className="settings-tabs">
       {tiles.map((tile) => (
         <button
           key={tile.key}
-          className={`btn ${active === tile.key ? 'primary' : ''}`}
+          className={`settings-tab ${active === tile.key ? 'active' : ''}`}
           onClick={() => onSelect(tile.key)}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px 12px',
-            gap: 8,
-            minHeight: 80,
-            flex: 1,
-            textAlign: 'center',
-            background:
-              active === tile.key
-                ? 'color-mix(in oklab, var(--accent) 15%, transparent)'
-                : undefined,
-          }}
           aria-current={active === tile.key ? 'page' : undefined}
         >
-          <span style={{ fontSize: 28 }} aria-hidden="true">
+          <span className="settings-tab-icon" aria-hidden="true">
             {tile.icon}
           </span>
-          <span style={{ fontSize: 13, fontWeight: active === tile.key ? 600 : 500, color: active === tile.key ? 'var(--text)' : undefined }}>
-            {tile.label}
-          </span>
+          <span>{tile.label}</span>
         </button>
       ))}
     </div>

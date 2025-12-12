@@ -86,15 +86,19 @@
 
                 <!-- Image upload - full width -->
                 <div class="form-group form-group--full">
-                    <label>Beleg-Foto</label>
+                    <label>Beleg</label>
                     <div class="image-upload" id="image-upload">
-                        <input type="file" id="image-input" accept="image/*" capture="environment" hidden>
+                        <input type="file" id="image-input" accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" hidden>
                         <div class="image-preview" id="image-preview">
                             <div class="image-placeholder" id="image-placeholder">
-                                <span class="icon">📷</span>
-                                <span>Foto aufnehmen oder auswählen</span>
+                                <span class="icon">📎</span>
+                                <span>Foto oder Datei auswählen</span>
                             </div>
                             <img id="preview-img" src="" alt="Vorschau" hidden>
+                            <div id="file-preview" class="file-preview" hidden>
+                                <span class="file-icon">📄</span>
+                                <span class="file-name" id="file-name"></span>
+                            </div>
                             <button type="button" class="btn-remove-image" id="remove-image" hidden>×</button>
                         </div>
                     </div>

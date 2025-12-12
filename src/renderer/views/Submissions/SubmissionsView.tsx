@@ -45,6 +45,9 @@ interface VoucherDraft {
     budgetId: number | null
     tags: string[]
     counterparty: string
+    // Attachment changes
+    removedAttachmentIds?: number[]
+    newAttachments?: Array<{ filename: string; mimeType: string; dataBase64: string }>
 }
 
 interface SubmissionsViewProps {
@@ -81,6 +84,11 @@ function ReviewModal({
     const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; mimeType?: string | null; dataBase64?: string } | null>(null)
     const [loadingPreview, setLoadingPreview] = useState(false)
     
+    // Attachments management - track existing attachments and new ones
+    const [existingAttachments, setExistingAttachments] = useState(submission.attachments || [])
+    const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([])
+    const [newAttachments, setNewAttachments] = useState<Array<{ filename: string; mimeType: string; dataBase64: string }>>([])
+    
     // Editable voucher draft - convert from cents to euros for display
     const [draft, setDraft] = useState<VoucherDraft>(() => ({
         date: submission.date,
@@ -114,7 +122,11 @@ function ReviewModal({
 
     const handleApprove = async () => {
         setLoading(true)
-        await onApprove(notes, draft)
+        await onApprove(notes, {
+            ...draft,
+            removedAttachmentIds,
+            newAttachments
+        })
         setLoading(false)
     }
 
@@ -132,259 +144,399 @@ function ReviewModal({
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: editMode ? 800 : 600 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: editMode ? 1100 : 600, display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
                 <header className="flex justify-between items-center mb-16">
                     <h2 style={{ margin: 0 }}>
                         {editMode ? 'Buchung bearbeiten & genehmigen' : 'Einreichung prüfen'}
                     </h2>
-                    <button className="btn danger" onClick={onClose} aria-label="Schließen">×</button>
+                    <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
                 </header>
 
-                {/* Original submission info */}
-                <div className="card mb-16" style={{ padding: 16, background: 'var(--surface-alt)' }}>
-                    <div className="helper mb-8">Eingereichte Daten</div>
-                    <div className="grid gap-8" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-                        <div>
-                            <span className="helper">Datum:</span> {submission.date}
-                        </div>
-                        <div>
-                            <span className="helper">Typ:</span> {submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'}
-                        </div>
-                        <div>
-                            <span className="helper">Betrag:</span>{' '}
-                            <strong style={{ color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
+                {/* Scrollable content area */}
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16 }}>
+                    {/* Original submission summary - like Zusammenfassung in voucher modal */}
+                    <div className="card mb-16" style={{ padding: 12, background: 'var(--surface-alt)' }}>
+                        <div className="helper mb-4" style={{ fontSize: 11 }}>Eingereichte Daten</div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>
+                            {submission.date} · {submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {submission.paymentMethod || 'BANK'} ·{' '}
+                            <span style={{ color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
                                 {submission.type === 'OUT' && '-'}€ {(submission.grossAmount / 100).toFixed(2)}
-                            </strong>
+                            </span>
+                            {submission.sphere && ` · ${submission.sphere}`}
                         </div>
-                        <div style={{ gridColumn: 'span 2' }}>
-                            <span className="helper">Beschreibung:</span> {submission.description || '–'}
+                        <div className="helper mt-4">
+                            {submission.description || '–'} · Von: {submission.submittedBy}
+                            {submission.categoryHint && ` · Hinweis: ${submission.categoryHint}`}
                         </div>
-                        <div>
-                            <span className="helper">Von:</span> {submission.submittedBy}
-                        </div>
-                        {submission.categoryHint && (
-                            <div style={{ gridColumn: 'span 3' }}>
-                                <span className="helper">Kategorie-Hinweis:</span> {submission.categoryHint}
+                        {submission.attachments && submission.attachments.length > 0 && !editMode && (
+                            <div className="mt-8 flex flex-wrap gap-4">
+                                {submission.attachments.map((att) => (
+                                    <button
+                                        key={att.id}
+                                        className="chip"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={async () => {
+                                            setLoadingPreview(true)
+                                            try {
+                                                const data = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
+                                                if (data) {
+                                                    setPreviewAttachment(data)
+                                                }
+                                            } catch (e) {
+                                                console.error('Failed to load attachment:', e)
+                                            } finally {
+                                                setLoadingPreview(false)
+                                            }
+                                        }}
+                                        title="Klicken zum Ansehen"
+                                    >
+                                        📎 {att.filename}
+                                    </button>
+                                ))}
+                                {loadingPreview && <span className="helper">Lade...</span>}
                             </div>
                         )}
                     </div>
-                    {submission.attachments && submission.attachments.length > 0 && (
-                        <div className="mt-8">
-                            <span className="helper">Anhänge:</span>{' '}
-                            {submission.attachments.map((att) => (
-                                <button
-                                    key={att.id}
-                                    className="chip"
-                                    style={{ marginLeft: 4, cursor: 'pointer' }}
-                                    onClick={async () => {
-                                        setLoadingPreview(true)
-                                        try {
-                                            const data = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
-                                            if (data) {
-                                                setPreviewAttachment(data)
-                                            }
-                                        } catch (e) {
-                                            console.error('Failed to load attachment:', e)
-                                        } finally {
-                                            setLoadingPreview(false)
-                                        }
-                                    }}
-                                    title="Klicken zum Ansehen"
-                                >
-                                    📎 {att.filename}
-                                </button>
-                            ))}
-                            {loadingPreview && <span className="helper ml-8">Lade...</span>}
+
+                    {/* Toggle edit mode */}
+                    {!editMode ? (
+                        <button className="btn mb-16" onClick={() => setEditMode(true)} style={{ width: '100%' }}>
+                            {ICONS.EDIT} Buchungsdetails vor Genehmigung bearbeiten
+                        </button>
+                    ) : (
+                        /* Editable voucher form - styled like voucher modal */
+                        <div className="grid gap-16" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                            {/* Left column: Basis + Beschreibung & Tags */}
+                            <div className="flex flex-col gap-16">
+                                {/* Basis card */}
+                                <div className="card" style={{ padding: 16 }}>
+                                    <div className="helper mb-12" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Basis</div>
+                                    <div className="grid gap-12">
+                                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="field">
+                                                <label>Datum</label>
+                                                <input
+                                                    type="date"
+                                                    className="input"
+                                                    value={draft.date}
+                                                    onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="field">
+                                                <label>Art</label>
+                                                <div className="btn-group">
+                                                    <button
+                                                        type="button"
+                                                        className={`btn ${draft.type === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`}
+                                                        onClick={() => setDraft({ ...draft, type: 'IN' })}
+                                                    >
+                                                        Einnahme
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn ${draft.type === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`}
+                                                        onClick={() => setDraft({ ...draft, type: 'OUT' })}
+                                                    >
+                                                        Ausgabe
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="field">
+                                                <label>Sphäre</label>
+                                                <select
+                                                    className="input"
+                                                    value={draft.sphere}
+                                                    onChange={(e) => setDraft({ ...draft, sphere: e.target.value as any })}
+                                                >
+                                                    <option value="IDEELL">IDEELL</option>
+                                                    <option value="ZWECK">ZWECK</option>
+                                                    <option value="VERMOEGEN">VERMÖGEN</option>
+                                                    <option value="WGB">WGB</option>
+                                                </select>
+                                            </div>
+                                            <div className="field">
+                                                <label>Zahlweg</label>
+                                                <div className="btn-group">
+                                                    <button
+                                                        type="button"
+                                                        className={`btn ${draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`}
+                                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BAR' })}
+                                                    >
+                                                        Bar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn ${draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`}
+                                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BANK' })}
+                                                    >
+                                                        Bank
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Beschreibung & Tags card */}
+                                <div className="card" style={{ padding: 16 }}>
+                                    <div className="helper mb-12" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Beschreibung & Tags</div>
+                                    <div className="grid gap-12">
+                                        <div className="field">
+                                            <label>Beschreibung</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={draft.description}
+                                                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                                                placeholder="z. B. Mitgliedsbeitrag, Spende ..."
+                                            />
+                                        </div>
+                                        <div className="field">
+                                            <label>Gegenpartei</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={draft.counterparty}
+                                                onChange={(e) => setDraft({ ...draft, counterparty: e.target.value })}
+                                                placeholder="Zahler/Empfänger"
+                                            />
+                                        </div>
+                                        <TagsEditor
+                                            label="Tags"
+                                            value={draft.tags}
+                                            onChange={(tags) => setDraft({ ...draft, tags })}
+                                            tagDefs={tagDefs}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right column: Finanzen + Anhänge */}
+                            <div className="flex flex-col gap-16">
+                                {/* Finanzen card */}
+                                <div className="card" style={{ padding: 16 }}>
+                                    <div className="helper mb-12" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Finanzen</div>
+                                    <div className="grid gap-12">
+                                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="field">
+                                                <label>Bruttobetrag (€)</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    className="input"
+                                                    value={grossAmountEuro}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value
+                                                        setGrossAmountEuro(val)
+                                                        const parsed = parseFloat(val.replace(',', '.'))
+                                                        if (!isNaN(parsed)) {
+                                                            setDraft({ ...draft, grossAmount: Math.round(parsed * 100) })
+                                                        }
+                                                    }}
+                                                    onBlur={() => {
+                                                        const parsed = parseFloat(grossAmountEuro.replace(',', '.'))
+                                                        if (!isNaN(parsed)) {
+                                                            setGrossAmountEuro(parsed.toFixed(2).replace('.', ','))
+                                                        }
+                                                    }}
+                                                    placeholder="z.B. 150,00"
+                                                />
+                                            </div>
+                                            <div className="field">
+                                                <label>MwSt-Satz (%)</label>
+                                                <select
+                                                    className="input"
+                                                    value={draft.vatRate}
+                                                    onChange={(e) => setDraft({ ...draft, vatRate: Number(e.target.value) })}
+                                                >
+                                                    <option value={0}>0%</option>
+                                                    <option value={7}>7%</option>
+                                                    <option value={19}>19%</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="helper" style={{ marginTop: -8 }}>Netto: € {(netAmount / 100).toFixed(2)}</div>
+                                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="field">
+                                                <label>Budget</label>
+                                                <select
+                                                    className="input"
+                                                    value={draft.budgetId ?? ''}
+                                                    onChange={(e) => setDraft({ ...draft, budgetId: e.target.value ? Number(e.target.value) : null })}
+                                                >
+                                                    <option value="">—</option>
+                                                    {budgetsForEdit.map((b) => (
+                                                        <option key={b.id} value={b.id}>{b.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="field">
+                                                <label>Zweckbindung</label>
+                                                <select
+                                                    className="input"
+                                                    value={draft.earmarkId ?? ''}
+                                                    onChange={(e) => setDraft({ ...draft, earmarkId: e.target.value ? Number(e.target.value) : null })}
+                                                >
+                                                    <option value="">—</option>
+                                                    {earmarks.map((em) => (
+                                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Anhänge card */}
+                                <div className="card" style={{ padding: 16 }}>
+                                    <div className="flex justify-between items-center mb-12">
+                                        <div className="helper" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Anhänge</div>
+                                        <label className="btn" style={{ cursor: 'pointer', padding: '4px 10px', fontSize: 12 }}>
+                                            + Datei(en)
+                                            <input
+                                                type="file"
+                                                accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx"
+                                                style={{ display: 'none' }}
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0]
+                                                    if (!file) return
+                                                    
+                                                    const isImage = file.type.startsWith('image/')
+                                                    const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024
+                                                    
+                                                    if (file.size > maxSize) {
+                                                        alert(`Datei zu groß (max. ${isImage ? '5' : '10'}MB)`)
+                                                        return
+                                                    }
+                                                    
+                                                    const reader = new FileReader()
+                                                    reader.onload = (ev) => {
+                                                        const dataUrl = ev.target?.result as string
+                                                        const base64 = dataUrl.split(',')[1]
+                                                        setNewAttachments([...newAttachments, {
+                                                            filename: file.name,
+                                                            mimeType: file.type || 'application/octet-stream',
+                                                            dataBase64: base64
+                                                        }])
+                                                    }
+                                                    reader.readAsDataURL(file)
+                                                    e.target.value = ''
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+                                    <div className="flex flex-wrap gap-8">
+                                        {/* Existing attachments */}
+                                        {existingAttachments
+                                            .filter(att => !removedAttachmentIds.includes(att.id))
+                                            .map((att) => (
+                                                <div key={att.id} className="chip" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn ghost"
+                                                        style={{ padding: 0, fontSize: 13 }}
+                                                        onClick={async () => {
+                                                            setLoadingPreview(true)
+                                                            try {
+                                                                const data = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
+                                                                if (data) {
+                                                                    setPreviewAttachment(data)
+                                                                }
+                                                            } catch (e) {
+                                                                console.error('Failed to load attachment:', e)
+                                                            } finally {
+                                                                setLoadingPreview(false)
+                                                            }
+                                                        }}
+                                                        title="Klicken zum Ansehen"
+                                                    >
+                                                        📎 {att.filename}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn ghost"
+                                                        style={{ padding: 0, marginLeft: 4, color: 'var(--danger)', fontSize: 14 }}
+                                                        onClick={() => setRemovedAttachmentIds([...removedAttachmentIds, att.id])}
+                                                        title="Anhang entfernen"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        {/* New attachments */}
+                                        {newAttachments.map((att, idx) => (
+                                            <div key={`new-${idx}`} className="chip" style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'color-mix(in oklab, var(--success) 20%, transparent)' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn ghost"
+                                                    style={{ padding: 0, fontSize: 13 }}
+                                                    onClick={() => setPreviewAttachment({ filename: att.filename, mimeType: att.mimeType, dataBase64: att.dataBase64 })}
+                                                    title="Klicken zum Ansehen"
+                                                >
+                                                    📎 {att.filename} <span className="helper">(neu)</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn ghost"
+                                                    style={{ padding: 0, marginLeft: 4, color: 'var(--danger)', fontSize: 14 }}
+                                                    onClick={() => setNewAttachments(newAttachments.filter((_, i) => i !== idx))}
+                                                    title="Anhang entfernen"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {existingAttachments.filter(att => !removedAttachmentIds.includes(att.id)).length === 0 && newAttachments.length === 0 && (
+                                            <span className="helper">Keine Anhänge</span>
+                                        )}
+                                        {loadingPreview && <span className="helper">Lade...</span>}
+                                    </div>
+                                </div>
+
+                                {/* Notizen card */}
+                                <div className="card" style={{ padding: 16 }}>
+                                    <div className="helper mb-12" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notizen</div>
+                                    <textarea
+                                        className="input"
+                                        rows={2}
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        placeholder="Anmerkungen zur Entscheidung..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Notes field only shown when not in edit mode */}
+                    {!editMode && (
+                        <div className="field mb-16">
+                            <label>Notizen (optional)</label>
+                            <textarea
+                                className="input"
+                                rows={2}
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Anmerkungen zur Entscheidung..."
+                            />
                         </div>
                     )}
                 </div>
 
-                {/* Toggle edit mode */}
-                {!editMode ? (
-                    <button className="btn mb-16" onClick={() => setEditMode(true)} style={{ width: '100%' }}>
-                        {ICONS.EDIT} Buchungsdetails vor Genehmigung bearbeiten
-                    </button>
-                ) : (
-                    /* Editable voucher form */
-                    <div className="card mb-16" style={{ padding: 16 }}>
-                        <div className="helper mb-8">Buchungsdetails (bearbeitbar)</div>
-                        <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                            <div className="field">
-                                <label>Datum</label>
-                                <input
-                                    type="date"
-                                    className="input"
-                                    value={draft.date}
-                                    onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                                />
-                            </div>
-                            <div className="field">
-                                <label>Art</label>
-                                <div className="btn-group">
-                                    <button
-                                        type="button"
-                                        className={`btn ${draft.type === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`}
-                                        onClick={() => setDraft({ ...draft, type: 'IN' })}
-                                    >
-                                        Einnahme
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`btn ${draft.type === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`}
-                                        onClick={() => setDraft({ ...draft, type: 'OUT' })}
-                                    >
-                                        Ausgabe
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="field">
-                                <label>Sphäre</label>
-                                <select
-                                    className="input"
-                                    value={draft.sphere}
-                                    onChange={(e) => setDraft({ ...draft, sphere: e.target.value as any })}
-                                >
-                                    <option value="IDEELL">IDEELL</option>
-                                    <option value="ZWECK">ZWECK</option>
-                                    <option value="VERMOEGEN">VERMÖGEN</option>
-                                    <option value="WGB">WGB</option>
-                                </select>
-                            </div>
-                            <div className="field">
-                                <label>Zahlweg</label>
-                                <div className="btn-group">
-                                    <button
-                                        type="button"
-                                        className={`btn ${draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`}
-                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BAR' })}
-                                    >
-                                        Bar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`btn ${draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`}
-                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BANK' })}
-                                    >
-                                        Bank
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="field" style={{ gridColumn: 'span 2' }}>
-                                <label>Beschreibung</label>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    value={draft.description}
-                                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                                    placeholder="Beschreibung der Buchung"
-                                />
-                            </div>
-                            <div className="field">
-                                <label>Bruttobetrag (€)</label>
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    className="input"
-                                    value={grossAmountEuro}
-                                    onChange={(e) => {
-                                        const val = e.target.value
-                                        setGrossAmountEuro(val)
-                                        // Parse and convert to cents
-                                        const parsed = parseFloat(val.replace(',', '.'))
-                                        if (!isNaN(parsed)) {
-                                            setDraft({ ...draft, grossAmount: Math.round(parsed * 100) })
-                                        }
-                                    }}
-                                    onBlur={() => {
-                                        // Format on blur
-                                        const parsed = parseFloat(grossAmountEuro.replace(',', '.'))
-                                        if (!isNaN(parsed)) {
-                                            setGrossAmountEuro(parsed.toFixed(2).replace('.', ','))
-                                        }
-                                    }}
-                                    placeholder="z.B. 150,00"
-                                />
-                            </div>
-                            <div className="field">
-                                <label>MwSt-Satz (%)</label>
-                                <select
-                                    className="input"
-                                    value={draft.vatRate}
-                                    onChange={(e) => setDraft({ ...draft, vatRate: Number(e.target.value) })}
-                                >
-                                    <option value={0}>0%</option>
-                                    <option value={7}>7%</option>
-                                    <option value={19}>19%</option>
-                                </select>
-                                <span className="helper">Netto: € {(netAmount / 100).toFixed(2)}</span>
-                            </div>
-                            <div className="field">
-                                <label>Gegenpartei</label>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    value={draft.counterparty}
-                                    onChange={(e) => setDraft({ ...draft, counterparty: e.target.value })}
-                                    placeholder="Zahler/Empfänger"
-                                />
-                            </div>
-                            <div className="field">
-                                <label>Zweckbindung</label>
-                                <select
-                                    className="input"
-                                    value={draft.earmarkId ?? ''}
-                                    onChange={(e) => setDraft({ ...draft, earmarkId: e.target.value ? Number(e.target.value) : null })}
-                                >
-                                    <option value="">– Keine –</option>
-                                    {earmarks.map((em) => (
-                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="field">
-                                <label>Budget</label>
-                                <select
-                                    className="input"
-                                    value={draft.budgetId ?? ''}
-                                    onChange={(e) => setDraft({ ...draft, budgetId: e.target.value ? Number(e.target.value) : null })}
-                                >
-                                    <option value="">– Kein Budget –</option>
-                                    {budgetsForEdit.map((b) => (
-                                        <option key={b.id} value={b.id}>{b.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="field" style={{ gridColumn: 'span 2' }}>
-                                <TagsEditor
-                                    label="Tags"
-                                    value={draft.tags}
-                                    onChange={(tags) => setDraft({ ...draft, tags })}
-                                    tagDefs={tagDefs}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="field mb-16">
-                    <label>Notizen (optional)</label>
-                    <textarea
-                        className="input"
-                        rows={2}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Anmerkungen zur Entscheidung..."
-                    />
-                </div>
-
-                <div className="flex justify-between">
-                    <button className="btn danger" onClick={handleReject} disabled={loading}>
-                        {ICONS.CROSS} Ablehnen
-                    </button>
+                {/* Footer with shortcuts and actions */}
+                <div className="flex justify-between items-center" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 'auto' }}>
+                    <span className="helper" style={{ fontSize: 11 }}>
+                        Esc = Abbrechen
+                    </span>
                     <div className="flex gap-8">
+                        <button className="btn danger" onClick={handleReject} disabled={loading}>
+                            {ICONS.CROSS} Ablehnen
+                        </button>
                         <button className="btn" onClick={onClose}>Abbrechen</button>
                         <button className="btn primary" onClick={handleApprove} disabled={loading}>
-                            {ICONS.CHECK} Genehmigen & Buchung erstellen
+                            {ICONS.CHECK} Genehmigen
                         </button>
                     </div>
                 </div>
@@ -412,12 +564,27 @@ function ReviewModal({
                                     />
                                 ) : (
                                     <div className="card" style={{ padding: 32, background: 'var(--surface-alt)' }}>
-                                        <p>📄 {previewAttachment.filename}</p>
+                                        <p style={{ fontSize: 48, marginBottom: 8 }}>📄</p>
+                                        <p style={{ fontWeight: 600 }}>{previewAttachment.filename}</p>
                                         <p className="helper">Vorschau nicht verfügbar für diesen Dateityp</p>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex justify-end mt-16">
+                            <div className="flex justify-end mt-16 gap-8">
+                                <button 
+                                    className="btn"
+                                    onClick={() => {
+                                        // Download the file
+                                        const link = document.createElement('a')
+                                        link.href = `data:${previewAttachment.mimeType || 'application/octet-stream'};base64,${previewAttachment.dataBase64}`
+                                        link.download = previewAttachment.filename
+                                        document.body.appendChild(link)
+                                        link.click()
+                                        document.body.removeChild(link)
+                                    }}
+                                >
+                                    📥 Herunterladen
+                                </button>
                                 <button className="btn" onClick={() => setPreviewAttachment(null)}>Schließen</button>
                             </div>
                         </div>
@@ -532,9 +699,13 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             const voucherRes = await (window as any).api?.vouchers?.create?.(voucherPayload)
             
             if (voucherRes?.id) {
-                // Copy attachments from submission to voucher
+                // Copy attachments from submission to voucher (excluding removed ones)
+                const removedIds = draft.removedAttachmentIds || []
                 if (reviewSubmission.attachments && reviewSubmission.attachments.length > 0) {
                     for (const att of reviewSubmission.attachments) {
+                        // Skip removed attachments
+                        if (removedIds.includes(att.id)) continue
+                        
                         try {
                             // Read the attachment data from submission
                             const attData = await (window as any).api?.submissions?.readAttachment?.({ attachmentId: att.id })
@@ -549,6 +720,22 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                             }
                         } catch (attErr) {
                             console.error('Failed to copy attachment:', att.id, attErr)
+                        }
+                    }
+                }
+                
+                // Add new attachments
+                if (draft.newAttachments && draft.newAttachments.length > 0) {
+                    for (const newAtt of draft.newAttachments) {
+                        try {
+                            await (window as any).api?.attachments?.add?.({
+                                voucherId: voucherRes.id,
+                                fileName: newAtt.filename,
+                                dataBase64: newAtt.dataBase64,
+                                mimeType: newAtt.mimeType
+                            })
+                        } catch (attErr) {
+                            console.error('Failed to add new attachment:', newAtt.filename, attErr)
                         }
                     }
                 }

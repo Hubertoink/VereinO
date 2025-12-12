@@ -71,7 +71,8 @@ export default function QuickAddModal({
                                     return eurFmt.format(g)
                                 })()
                                 const sphere = qa.sphere
-                                return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
+                                const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
+                                return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
                             })()}
                         </div>
                     </div>
@@ -278,7 +279,7 @@ export default function QuickAddModal({
                             <div className="attachment-header">
                                 <div className="attachment-title">
                                     <strong>Anhänge</strong>
-                                    <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                    {files.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
                                 </div>
                                 <div className="flex-gap-8">
                                     <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
@@ -288,7 +289,7 @@ export default function QuickAddModal({
                                     )}
                                 </div>
                             </div>
-                            {files.length > 0 && (
+                            {files.length > 0 ? (
                                 <ul className="file-list">
                                     {files.map((f, i) => (
                                         <li key={i} className="file-list-item">
@@ -297,6 +298,21 @@ export default function QuickAddModal({
                                         </li>
                                     ))}
                                 </ul>
+                            ) : (
+                                <div 
+                                    style={{ 
+                                        marginTop: 8, 
+                                        padding: 20, 
+                                        border: '2px dashed var(--border)', 
+                                        borderRadius: 8, 
+                                        textAlign: 'center',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={openFilePicker}
+                                >
+                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                    <div className="helper">Dateien hierher ziehen oder klicken</div>
+                                </div>
                             )}
                         </div>
                     </div>

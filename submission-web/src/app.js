@@ -36,6 +36,8 @@ const imageUpload = document.getElementById('image-upload')
 const imagePreview = document.getElementById('image-preview')
 const imagePlaceholder = document.getElementById('image-placeholder')
 const previewImg = document.getElementById('preview-img')
+const filePreview = document.getElementById('file-preview')
+const fileName = document.getElementById('file-name')
 const removeImageBtn = document.getElementById('remove-image')
 
 // Type toggle buttons
@@ -169,33 +171,53 @@ function resetForm() {
     typeInput.value = 'OUT'
 }
 
-// ===== Image Handling =====
+// ===== Image/File Handling =====
 function handleImageSelect(e) {
     const file = e.target.files[0]
     if (!file) return
     
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showToast('Bild zu groß (max. 5MB)', 'error')
+    // Check file size (max 10MB for files, 5MB for images)
+    const isImage = file.type.startsWith('image/')
+    const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024
+    
+    if (file.size > maxSize) {
+        showToast(`Datei zu groß (max. ${isImage ? '5' : '10'}MB)`, 'error')
         return
     }
     
-    // Read and compress image
     const reader = new FileReader()
     reader.onload = (event) => {
-        compressImage(event.target.result, file.type, (compressedData) => {
+        if (isImage) {
+            // Compress image
+            compressImage(event.target.result, file.type, (compressedData) => {
+                currentImage = {
+                    name: file.name,
+                    mimeType: file.type || 'image/jpeg',
+                    dataBase64: compressedData.split(',')[1] // Remove data URL prefix
+                }
+                
+                // Show image preview
+                previewImg.src = compressedData
+                previewImg.hidden = false
+                filePreview.hidden = true
+                imagePlaceholder.hidden = true
+                removeImageBtn.hidden = false
+            })
+        } else {
+            // Handle non-image files (PDF, documents, etc.)
             currentImage = {
                 name: file.name,
-                mimeType: file.type || 'image/jpeg',
-                dataBase64: compressedData.split(',')[1] // Remove data URL prefix
+                mimeType: file.type || 'application/octet-stream',
+                dataBase64: event.target.result.split(',')[1] // Remove data URL prefix
             }
             
-            // Show preview
-            previewImg.src = compressedData
-            previewImg.hidden = false
+            // Show file preview
+            previewImg.hidden = true
+            filePreview.hidden = false
+            fileName.textContent = file.name
             imagePlaceholder.hidden = true
             removeImageBtn.hidden = false
-        })
+        }
     }
     reader.readAsDataURL(file)
 }
@@ -236,6 +258,8 @@ function clearImage() {
     imageInput.value = ''
     previewImg.src = ''
     previewImg.hidden = true
+    filePreview.hidden = true
+    fileName.textContent = ''
     imagePlaceholder.hidden = false
     removeImageBtn.hidden = true
 }
