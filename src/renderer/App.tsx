@@ -32,6 +32,7 @@ import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
+import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
@@ -62,7 +63,7 @@ function contrastText(bg?: string | null) {
 }
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-function TopHeaderOrg() {
+function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
     const [org, setOrg] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
     useEffect(() => {
@@ -86,6 +87,7 @@ function TopHeaderOrg() {
     return (
         <div className="inline-flex items-center gap-8">
             <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
+            <OrgSwitcher notify={notify} />
             {text ? (
                 <div className="helper text-ellipsis" title={text}>{text}</div>
             ) : null}
@@ -113,6 +115,10 @@ function AppInner() {
         setJournalRowStyle,
         journalRowDensity,
         setJournalRowDensity,
+        backgroundImage,
+        setBackgroundImage,
+        glassModals,
+        setGlassModals,
         showSubmissionBadge,
         setShowSubmissionBadge
     } = useUIPreferences()
@@ -734,7 +740,7 @@ function AppInner() {
                 }}
             >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
-                    <TopHeaderOrg />
+                    <TopHeaderOrg notify={notify} />
                 </div>
                 {isTopNav ? (
                     <div style={{ display: 'inline-flex', WebkitAppRegion: 'no-drag' } as any}>
@@ -872,6 +878,10 @@ function AppInner() {
                             setJournalRowStyle={setJournalRowStyle}
                             journalRowDensity={journalRowDensity}
                             setJournalRowDensity={setJournalRowDensity}
+                            backgroundImage={backgroundImage}
+                            setBackgroundImage={setBackgroundImage}
+                            glassModals={glassModals}
+                            setGlassModals={setGlassModals}
                             showSubmissionBadge={showSubmissionBadge}
                             setShowSubmissionBadge={setShowSubmissionBadge}
                             tagDefs={tagDefs}

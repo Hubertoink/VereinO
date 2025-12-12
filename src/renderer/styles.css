@@ -106,26 +106,27 @@
     display: inline-flex;
     border-radius: 8px;
     overflow: hidden;
-    border: 1px solid var(--border);
+    gap: 2px;
 }
 
 .btn-group .btn-option {
     padding: 6px 14px;
     font-size: 13px;
     font-weight: 500;
-    background: color-mix(in oklab, var(--muted) 30%, transparent);
+    background: color-mix(in oklab, var(--muted) 40%, transparent);
     color: var(--text-dim);
     border: none;
+    border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
 }
 
 .btn-group .btn-option:not(:last-child) {
-    border-right: 1px solid var(--border);
+    border-right: none;
 }
 
 .btn-group .btn-option:hover {
-    background: color-mix(in oklab, var(--muted) 50%, transparent);
+    background: color-mix(in oklab, var(--muted) 70%, transparent);
     color: var(--text);
 }
 
@@ -1723,6 +1724,140 @@ textarea:focus {
     text-overflow: ellipsis;
 }
 
+/* Organization Switcher */
+.org-switcher {
+    position: relative;
+    display: inline-flex;
+}
+
+.org-switcher-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    max-width: 200px;
+}
+.org-switcher-trigger:hover {
+    background: var(--muted);
+    border-color: var(--text);
+}
+.org-switcher-trigger:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.org-switcher-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.org-switcher-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    text-align: left;
+}
+
+.org-switcher-arrow {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.org-switcher-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 220px;
+    max-width: 300px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    z-index: 2000;
+    padding: 6px;
+    animation: org-dropdown-in 0.15s ease-out;
+}
+@keyframes org-dropdown-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.org-switcher-header {
+    padding: 6px 10px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.org-switcher-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+}
+.org-switcher-item:hover {
+    background: var(--muted);
+}
+.org-switcher-item.active {
+    background: color-mix(in oklab, var(--primary) 15%, transparent);
+    cursor: default;
+}
+.org-switcher-item:disabled {
+    cursor: default;
+}
+
+.org-item-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.org-item-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.org-switcher-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 6px 4px;
+}
+
+.org-switcher-new {
+    color: var(--primary);
+    font-weight: 500;
+}
+.org-switcher-new:hover {
+    background: color-mix(in oklab, var(--primary) 10%, transparent);
+}
+
 /* Window controls in titlebar */
 .window-controls {
     display: inline-flex;
@@ -2848,4 +2983,65 @@ label .req-asterisk {
 .members-badge-role {
     background: var(--role-color);
     color: #fff;
+}
+
+/* ========================================
+   Background Images
+   ======================================== */
+
+/* Base styles for background images */
+html[data-background-image]:not([data-background-image="none"])::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.25;
+    pointer-events: none;
+}
+
+/* Ensure main content is above background */
+html[data-background-image]:not([data-background-image="none"]) body {
+    position: relative;
+    z-index: 1;
+}
+
+html[data-background-image="cherry-blossom"]::before {
+    background-image: url('./assets/a_close_up_of_a_tree_branch_with_pink_flowers.jpg');
+}
+
+html[data-background-image="foggy-forest"]::before {
+    background-image: url('./assets/a_foggy_forest_with_trees.png');
+}
+
+html[data-background-image="mountain-snow"]::before {
+    background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+}
+
+/* ========================================
+   Glassmorphism Modals
+   ======================================== */
+
+/* When glass modals are enabled, make modal backgrounds translucent with blur */
+html[data-glass-modals="true"] .modal-content,
+html[data-glass-modals="true"] .card {
+    background: color-mix(in oklab, var(--surface) 75%, transparent) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+html[data-glass-modals="true"] .settings-content {
+    background: color-mix(in oklab, var(--surface) 70%, transparent) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+/* Slightly more translucent for nested cards in glass mode */
+html[data-glass-modals="true"] .settings-pane-card {
+    background: color-mix(in oklab, var(--surface) 60%, transparent) !important;
 }

@@ -31,6 +31,10 @@ export function GeneralPane({
   openSetupWizard,
   showSubmissionBadge,
   setShowSubmissionBadge,
+  backgroundImage,
+  setBackgroundImage,
+  glassModals,
+  setGlassModals,
 }: GeneralPaneProps) {
   // Date format examples
   const sample = '2025-01-15'
@@ -53,12 +57,68 @@ export function GeneralPane({
         </div>
       </div>
 
-      {/* Cluster 1: Darstellung & Layout */}
+      {/* Cluster: Farbschema & Design - organization-specific */}
       <div className="card settings-card settings-pane-card">
         <div className="settings-title">
-          <span aria-hidden="true">🖼️</span> <strong>Aussehen & Navigation</strong>
+          <span aria-hidden="true">🎨</span> <strong>Farbschema & Design</strong>
         </div>
-        <div className="settings-sub">Passe die Darstellung deiner Buchungen und Menüs an.</div>
+        <div className="settings-sub">
+          Diese Einstellungen werden pro Organisation gespeichert.
+        </div>
+        
+        {/* Theme and Background */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label htmlFor="select-color-theme">Farb-Theme</label>
+            <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
+              <option value="default">Standard ◐</option>
+              <option value="fiery-ocean">Fiery Ocean ●</option>
+              <option value="peachy-delight">Peachy Delight ●</option>
+              <option value="pastel-dreamland">Pastel Dreamland ●</option>
+              <option value="ocean-breeze">Ocean Breeze ●</option>
+              <option value="earthy-tones">Earthy Tones ●</option>
+              <option value="monochrome-harmony">Monochrome Harmony ●</option>
+              <option value="vintage-charm">Vintage Charm ●</option>
+              <option value="soft-blush">Soft Blush ○</option>
+              <option value="professional-light">Professional Light ○</option>
+            </select>
+            <div className="helper">● = Dark | ○ = Light</div>
+          </div>
+          <div className="field">
+            <label htmlFor="select-background-image">Hintergrundbild</label>
+            <select id="select-background-image" className="input" value={backgroundImage} onChange={(e) => setBackgroundImage(e.target.value as any)}>
+              <option value="none">Kein Hintergrundbild</option>
+              <option value="cherry-blossom">🌸 Kirschblüten</option>
+              <option value="foggy-forest">🌲 Nebliger Wald</option>
+              <option value="mountain-snow">🏔️ Schneeberge</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Glass effect toggle */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
+            <input
+              id="toggle-glass-modals"
+              role="switch"
+              aria-checked={glassModals}
+              className="toggle"
+              type="checkbox"
+              checked={glassModals}
+              onChange={(e) => setGlassModals(e.target.checked)}
+            />
+          </div>
+          <div className="helper" style={{ alignSelf: 'center' }}>Transparente Fenster mit Unschärfe-Effekt</div>
+        </div>
+      </div>
+
+      {/* Cluster: Navigation & Layout */}
+      <div className="card settings-card settings-pane-card">
+        <div className="settings-title">
+          <span aria-hidden="true">🧭</span> <strong>Navigation & Layout</strong>
+        </div>
+        <div className="settings-sub">Passe die Darstellung deiner Menüs und Buchungstabelle an.</div>
         
         {/* Row 1: Layout options */}
         <div className="settings-row-2col" style={{ marginTop: 12 }}>
@@ -102,7 +162,7 @@ export function GeneralPane({
           </div>
         </div>
 
-        {/* Row 2: Row style and Theme */}
+        {/* Row 2: Row style */}
         <div className="settings-row-2col" style={{ marginTop: 12 }}>
           <div className="field">
             <label htmlFor="select-row-style">Buchungen: Zeilenlayout</label>
@@ -113,22 +173,7 @@ export function GeneralPane({
               <option value="none">Ohne Linien/Zebra</option>
             </select>
           </div>
-          <div className="field">
-            <label htmlFor="select-color-theme">Farb-Theme</label>
-            <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
-              <option value="default">Standard ◐</option>
-              <option value="fiery-ocean">Fiery Ocean ●</option>
-              <option value="peachy-delight">Peachy Delight ●</option>
-              <option value="pastel-dreamland">Pastel Dreamland ●</option>
-              <option value="ocean-breeze">Ocean Breeze ●</option>
-              <option value="earthy-tones">Earthy Tones ●</option>
-              <option value="monochrome-harmony">Monochrome Harmony ●</option>
-              <option value="vintage-charm">Vintage Charm ●</option>
-              <option value="soft-blush">Soft Blush ○</option>
-              <option value="professional-light">Professional Light ○</option>
-            </select>
-            <div className="helper">● = Dark | ○ = Light</div>
-          </div>
+          <div className="field" />
         </div>
 
         {/* Row 3: Toggles in a grid */}
