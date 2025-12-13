@@ -146,13 +146,31 @@ export default function JournalTable({
         if (!lockedUntil) return false
         return String(d) <= String(lockedUntil)
     }
+
+    // Column width configuration for fixed table layout
+    const colWidths: Record<string, string> = {
+        actions: '50px',
+        date: '90px',
+        voucherNo: '110px',
+        type: '70px',
+        sphere: '70px',
+        description: 'auto', // flex to fill remaining space
+        earmark: '120px',
+        budget: '130px',
+        paymentMethod: '95px',
+        attachments: '40px',
+        net: '85px',
+        vat: '70px',
+        gross: '95px'
+    }
+
     const tdFor = (k: string, r: any) => (
         k === 'actions' ? (
             <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
                 {isLocked(r.date) ? (
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -209,10 +227,14 @@ export default function JournalTable({
                         const to = r.transferTo
                         const title = from && to ? `${from} → ${to}` : 'Transfer'
                         return (
-                            <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                {from === 'BAR' ? <IconCash /> : <IconBank />}
+                            <span className="badge pm-transfer" title={title} aria-label={title}>
+                                <span className={`pm-icon ${from === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
+                                    {from === 'BAR' ? <IconCash /> : <IconBank />}
+                                </span>
                                 <IconArrow />
-                                {to === 'BAR' ? <IconCash /> : <IconBank />}
+                                <span className={`pm-icon ${to === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
+                                    {to === 'BAR' ? <IconCash /> : <IconBank />}
+                                </span>
                             </span>
                         )
                     })()
@@ -254,6 +276,11 @@ export default function JournalTable({
     )
     return (
         <table className="journal-table" cellPadding={6}>
+            <colgroup>
+                {visibleOrder.map((k) => (
+                    <col key={k} style={{ width: colWidths[k] || 'auto' }} />
+                ))}
+            </colgroup>
             <thead>
                 <tr>
                     {visibleOrder.map((k) => thFor(k))}

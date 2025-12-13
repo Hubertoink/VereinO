@@ -718,6 +718,22 @@ pre {
     background: color-mix(in oklab, var(--danger) 60%, transparent);
 }
 
+/* Edit button animation - slight tilt on hover */
+.btn-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.btn-edit:hover {
+    transform: rotate(-12deg);
+}
+
+.btn-edit:active {
+    transform: rotate(-8deg) scale(0.95);
+}
+
 .card {
     background: color-mix(in oklab, var(--surface) 85%, transparent);
     -webkit-backdrop-filter: var(--blur);
@@ -813,6 +829,34 @@ button.badge:hover { filter: brightness(1.03); }
     color: #0B0E14;
 }
 
+/* Transfer badge with colored payment method icons */
+.badge.pm-transfer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    padding: 4px 10px;
+}
+
+.badge.pm-transfer .pm-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+}
+
+.badge.pm-transfer .pm-bar-icon {
+    background: color-mix(in oklab, var(--pm-bar) 50%, transparent);
+    color: #0f2a14;
+}
+
+.badge.pm-transfer .pm-bank-icon {
+    background: color-mix(in oklab, var(--pm-bank) 50%, transparent);
+    color: #0B0E14;
+}
+
 /* Force SVG icons inside payment badges to use a lighter stroke for better contrast */
 .badge.pm-bar svg,
 .badge.pm-bank svg {
@@ -832,6 +876,29 @@ button.badge:hover { filter: brightness(1.03); }
 table {
     width: 100%;
     border-collapse: collapse;
+}
+
+/* Journal table: prevent overflow, ensure columns fit */
+.journal-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Column width hints for journal table */
+.journal-table th:nth-child(1), /* Aktionen */
+.journal-table td:nth-child(1) { width: 60px; }
+
+.journal-table th,
+.journal-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Allow description column to wrap and take remaining space */
+.journal-table td:has(> div) { /* Description cell with tags */
+    white-space: normal;
+    overflow: visible;
 }
 
 th,
@@ -1279,12 +1346,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
+    gap: 4px;
+    padding: 2px 6px;
     border-radius: 999px;
     background: var(--muted);
     border: 1px solid var(--border);
-    font-size: 12px;
+    font-size: 11px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .chip .chip-x,
@@ -1295,40 +1368,52 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
 }
 
-/* Budget badges - slightly rounded, with icon */
+/* Budget badges - compact, with icon and hover effect */
 .badge-budget {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 8px;
+    gap: 3px;
+    padding: 2px 6px;
     border-radius: 4px;
     background: var(--muted);
     border: 1px solid var(--border);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.badge-budget:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .badge-budget::before {
     content: '💰';
-    font-size: 14px;
+    font-size: 11px;
 }
 
-/* Earmark (Zweckbindung) badges - slightly rounded, with icon */
+/* Earmark (Zweckbindung) badges - compact, with icon and hover effect */
 .badge-earmark {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 8px;
+    gap: 3px;
+    padding: 2px 6px;
     border-radius: 4px;
     background: var(--muted);
     border: 1px solid var(--border);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.badge-earmark:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .badge-earmark::before {
     content: '🎯';
-    font-size: 14px;
+    font-size: 11px;
 }
 
 /* Brief flash highlight for newly created/updated rows */
