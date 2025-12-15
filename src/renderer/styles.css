@@ -842,28 +842,30 @@ button.badge:hover { filter: brightness(1.03); }
 .badge.pm-transfer {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    background: color-mix(in oklab, var(--accent) 18%, transparent);
-    padding: 4px 10px;
+    gap: 4px;
+    background: linear-gradient(90deg, 
+        color-mix(in oklab, var(--pm-bar) 30%, transparent) 0%, 
+        color-mix(in oklab, var(--pm-bank) 30%, transparent) 100%);
+    padding: 4px 8px;
 }
 
 .badge.pm-transfer .pm-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
 }
 
 .badge.pm-transfer .pm-bar-icon {
-    background: color-mix(in oklab, var(--pm-bar) 50%, transparent);
     color: #0f2a14;
 }
 
 .badge.pm-transfer .pm-bank-icon {
-    background: color-mix(in oklab, var(--pm-bank) 50%, transparent);
     color: #0B0E14;
+}
+
+.badge.pm-transfer .transfer-arrow {
+    color: var(--text-dim);
+    font-size: 10px;
 }
 
 /* Force SVG icons inside payment badges to use a lighter stroke for better contrast */

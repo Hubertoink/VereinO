@@ -330,7 +330,7 @@ export default function JournalTable({
                                 <span className={`pm-icon ${from === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
                                     {from === 'BAR' ? <IconCash /> : <IconBank />}
                                 </span>
-                                <IconArrow />
+                                <span className="transfer-arrow">→</span>
                                 <span className={`pm-icon ${to === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
                                     {to === 'BAR' ? <IconCash /> : <IconBank />}
                                 </span>
