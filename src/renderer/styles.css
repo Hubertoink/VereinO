@@ -780,6 +780,15 @@ button.badge:focus-visible {
 }
 button.badge:hover { filter: brightness(1.03); }
 
+.badge.in,
+.badge.out,
+.badge.transfer {
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
 .badge.in {
     background: color-mix(in oklab, var(--badge-in) 25%, transparent);
     color: var(--badge-text);
