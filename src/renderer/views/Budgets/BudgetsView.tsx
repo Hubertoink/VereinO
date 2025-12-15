@@ -132,7 +132,7 @@ export default function BudgetsView({
                 <td align="right">{eurFmt.format(b.amountPlanned)}</td>
                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
                   <button
-                    className="btn"
+                    className="btn btn-edit"
                     onClick={() =>
                       setEditBudget({
                         id: b.id,
