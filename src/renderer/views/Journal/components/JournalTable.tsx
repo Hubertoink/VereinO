@@ -145,9 +145,28 @@ export default function JournalTable({
 
     // Handle resize move
     const handleResizeMove = useCallback((e: MouseEvent) => {
-        if (!resizingCol.current) return
+        if (!resizingCol.current || !tableRef.current) return
         const delta = e.clientX - resizeStartX.current
         const newWidth = Math.max(40, resizeStartWidth.current + delta)
+        
+        // Get container width to limit total table width
+        const container = tableRef.current.parentElement
+        if (container) {
+            const containerWidth = container.clientWidth
+            const currentTableWidth = tableRef.current.offsetWidth
+            const currentColWidth = resizeStartWidth.current
+            const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
+            
+            // If table would exceed container, limit the column width
+            if (projectedTableWidth > containerWidth && delta > 0) {
+                const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
+                if (maxNewWidth > 40) {
+                    setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(40, maxNewWidth) }))
+                }
+                return
+            }
+        }
+        
         setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
     }, [])
 

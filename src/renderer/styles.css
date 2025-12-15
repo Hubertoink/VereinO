@@ -966,6 +966,8 @@ tbody tr:nth-child(even):hover {
 /* Resizable table columns */
 .resizable-table {
     table-layout: fixed;
+    max-width: 100%;
+    width: 100%;
 }
 .resizable-th {
     position: relative;
