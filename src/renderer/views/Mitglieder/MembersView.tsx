@@ -353,7 +353,7 @@ export default function MembersView() {
                                 </td>
                             )}
                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
+                                <button className="btn btn-edit" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
                                     id: r.id,
                                     memberNo: r.memberNo ?? null,
                                     name: r.name,

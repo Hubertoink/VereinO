@@ -963,6 +963,30 @@ tbody tr:nth-child(even):hover {
 :root[data-journal-row-density="compact"] .journal-table th,
 :root[data-journal-row-density="compact"] .journal-table td { padding-top: 2px; padding-bottom: 2px; }
 
+/* Resizable table columns */
+.resizable-table {
+    table-layout: fixed;
+}
+.resizable-th {
+    position: relative;
+}
+.col-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 5;
+    user-select: none;
+}
+.col-resize-handle:hover,
+.col-resize-handle.resizing {
+    background: var(--accent);
+    opacity: 0.6;
+}
+
 /* Sticky headers for Buchungen (journal) and Verbindlichkeiten tables */
 .journal-table thead th,
 .invoices-table thead th {

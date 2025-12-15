@@ -539,7 +539,7 @@ export default function InvoicesView() {
                     <td align="center" className="invoices-actions-nowrap">
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
                       {r.status !== 'PAID' && (
-                        <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
+                        <button className="btn btn-edit" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
                       )}
                       {remaining > 0 && r.status !== 'PAID' && (
                         <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>

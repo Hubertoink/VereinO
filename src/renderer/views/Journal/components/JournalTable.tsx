@@ -1,4 +1,4 @@
-﻿import React, { useRef } from 'react'
+﻿import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay } from '../../../utils/icons'
 
 // Helper function for contrast text color
@@ -13,6 +13,22 @@ function contrastText(bg?: string | null) {
     // Perceived luminance
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
     return luminance > 0.6 ? '#000' : '#fff'
+}
+
+// LocalStorage key for column widths
+const COLUMN_WIDTHS_KEY = 'journal-column-widths'
+
+function loadColumnWidths(): Record<string, number> {
+    try {
+        const stored = localStorage.getItem(COLUMN_WIDTHS_KEY)
+        return stored ? JSON.parse(stored) : {}
+    } catch { return {} }
+}
+
+function saveColumnWidths(widths: Record<string, number>) {
+    try {
+        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths))
+    } catch { /* ignore */ }
 }
 
 interface JournalTableProps {
@@ -95,6 +111,54 @@ export default function JournalTable({
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
+    
+    // Column resize state
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
+    const resizingCol = useRef<string | null>(null)
+    const resizeStartX = useRef<number>(0)
+    const resizeStartWidth = useRef<number>(0)
+    const tableRef = useRef<HTMLTableElement>(null)
+
+    // Save column widths when they change
+    useEffect(() => {
+        if (Object.keys(columnWidths).length > 0) {
+            saveColumnWidths(columnWidths)
+        }
+    }, [columnWidths])
+
+    // Handle resize start
+    const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        resizingCol.current = colKey
+        resizeStartX.current = e.clientX
+        
+        // Get current column width
+        const th = (e.target as HTMLElement).closest('th')
+        resizeStartWidth.current = th?.offsetWidth || 100
+        
+        document.addEventListener('mousemove', handleResizeMove)
+        document.addEventListener('mouseup', handleResizeEnd)
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+    }, [])
+
+    // Handle resize move
+    const handleResizeMove = useCallback((e: MouseEvent) => {
+        if (!resizingCol.current) return
+        const delta = e.clientX - resizeStartX.current
+        const newWidth = Math.max(40, resizeStartWidth.current + delta)
+        setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
+    }, [])
+
+    // Handle resize end
+    const handleResizeEnd = useCallback(() => {
+        resizingCol.current = null
+        document.removeEventListener('mousemove', handleResizeMove)
+        document.removeEventListener('mouseup', handleResizeEnd)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+    }, [handleResizeMove])
 
     function onHeaderDragStart(e: React.DragEvent<HTMLTableCellElement>, idx: number) {
         dragIdx.current = idx
@@ -147,22 +211,38 @@ export default function JournalTable({
         return String(d) <= String(lockedUntil)
     }
 
-    // Column width configuration for fixed table layout
-    const colWidths: Record<string, string> = {
-        actions: '50px',
-        date: '90px',
-        voucherNo: '110px',
-        type: '70px',
-        sphere: '70px',
-        description: 'auto', // flex to fill remaining space
-        earmark: '120px',
-        budget: '130px',
-        paymentMethod: '95px',
-        attachments: '40px',
-        net: '85px',
-        vat: '70px',
-        gross: '95px'
+    // Column width configuration for fixed table layout (default values)
+    const defaultColWidths: Record<string, number> = {
+        actions: 50,
+        date: 90,
+        voucherNo: 110,
+        type: 70,
+        sphere: 70,
+        description: 200,
+        earmark: 120,
+        budget: 130,
+        paymentMethod: 95,
+        attachments: 40,
+        net: 85,
+        vat: 70,
+        gross: 95
     }
+
+    // Get column width (user-defined or default)
+    const getColWidth = (k: string): string => {
+        if (columnWidths[k]) return `${columnWidths[k]}px`
+        if (k === 'description') return 'auto' // description flexes
+        return `${defaultColWidths[k] || 100}px`
+    }
+
+    // Render resize handle
+    const ResizeHandle = ({ colKey }: { colKey: string }) => (
+        <span
+            className="col-resize-handle"
+            onMouseDown={(e) => handleResizeStart(e, colKey)}
+            onClick={(e) => e.stopPropagation()}
+        />
+    )
 
     const tdFor = (k: string, r: any) => (
         k === 'actions' ? (
@@ -275,15 +355,29 @@ export default function JournalTable({
         )
     )
     return (
-        <table className="journal-table" cellPadding={6}>
+        <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
             <colgroup>
                 {visibleOrder.map((k) => (
-                    <col key={k} style={{ width: colWidths[k] || 'auto' }} />
+                    <col key={k} style={{ width: getColWidth(k) }} />
                 ))}
             </colgroup>
             <thead>
                 <tr>
-                    {visibleOrder.map((k) => thFor(k))}
+                    {visibleOrder.map((k, idx) => {
+                        const isLast = idx === visibleOrder.length - 1
+                        const th = thFor(k)
+                        // Clone the th and add resize handle
+                        return React.cloneElement(th, {
+                            key: k,
+                            className: `${th.props.className || ''} resizable-th`.trim(),
+                            children: (
+                                <>
+                                    {th.props.children}
+                                    {!isLast && <ResizeHandle colKey={k} />}
+                                </>
+                            )
+                        })
+                    })}
                 </tr>
             </thead>
             <tbody>
