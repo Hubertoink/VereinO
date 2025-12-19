@@ -54,31 +54,100 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div>
-        <strong>Tags</strong>
-        <div className="helper">Verwalte Farben & Namen. Tags färben Buchungszeilen zur schnelleren visuellen Orientierung.</div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-        <button className="btn primary" onClick={() => setEditTag({ name: '', color: null })}>+ Neu</button>
-      </div>
-      <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-        <div className="helper">Bestehende Tags:</div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          {tagDefs.length === 0 && <div className="helper">Keine Tags vorhanden.</div>}
-          {tagDefs.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 8 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                {t.color && <span style={{ width: 16, height: 16, borderRadius: 4, background: t.color }} title={t.color} />}
-                <strong>{t.name}</strong>
-              </span>
-              <span className="helper" style={{ marginLeft: 'auto' }}>Verwendung: {t.usage ?? 0}</span>
-              <button className="btn ghost" onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} title="Bearbeiten">✎</button>
-              <button className="btn ghost" onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} title="Löschen">✕</button>
-            </div>
-          ))}
+    <div style={{ display: 'grid', gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 20 }}>🏷️</span>
+            <strong style={{ fontSize: 16 }}>Tags</strong>
+            <span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{tagDefs.length}</span>
+          </div>
+          <div className="helper">Verwalte Farben & Namen. Tags färben Buchungszeilen zur schnelleren visuellen Orientierung.</div>
         </div>
+        <button className="btn primary" onClick={() => setEditTag({ name: '', color: null })} style={{ whiteSpace: 'nowrap' }}>
+          + Neuer Tag
+        </button>
       </div>
+
+      {/* Tags Grid */}
+      {tagDefs.length === 0 ? (
+        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🏷️</div>
+          <div className="helper">Noch keine Tags vorhanden.</div>
+          <div className="helper" style={{ marginTop: 4 }}>Erstelle deinen ersten Tag mit dem Button oben.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+          {tagDefs.map(t => {
+            const bgColor = t.color ? `${t.color}20` : 'var(--muted)'
+            const borderColor = t.color || 'var(--border)'
+            return (
+              <div 
+                key={t.id} 
+                className="card"
+                style={{ 
+                  padding: '12px 14px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 10,
+                  background: bgColor,
+                  borderLeft: `4px solid ${borderColor}`,
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                }}
+              >
+                {/* Color indicator */}
+                <div 
+                  style={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: 8, 
+                    background: t.color || 'var(--muted)', 
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                  }} 
+                  title={t.color || 'Keine Farbe'}
+                >
+                  {t.name.charAt(0).toUpperCase()}
+                </div>
+                
+                {/* Name and usage */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{t.name}</div>
+                  <div className="helper" style={{ fontSize: 11 }}>
+                    {(t.usage ?? 0) === 0 ? 'Nicht verwendet' : `${t.usage} Buchung${(t.usage ?? 0) !== 1 ? 'en' : ''}`}
+                  </div>
+                </div>
+                
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button 
+                    className="btn btn-edit" 
+                    onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} 
+                    title="Bearbeiten"
+                  >
+                    ✎
+                  </button>
+                  <button 
+                    className="btn ghost" 
+                    onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
+                    title="Löschen"
+                    style={{ padding: '6px 8px' }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {editTag && (
         <TagModal

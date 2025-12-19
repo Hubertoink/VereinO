@@ -7,8 +7,9 @@ import { BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { summarizeVouchers, listVouchersFiltered, cashBalance } from '../repositories/vouchers'
-import { listBindings } from '../repositories/bindings'
+import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
+import { listBindings, bindingUsage } from '../repositories/bindings'
+import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
 
 export interface FiscalReportOptions {
@@ -18,6 +19,7 @@ export interface FiscalReportOptions {
   orgName?: string
   includeBindings?: boolean
   includeVoucherList?: boolean
+  includeBudgets?: boolean
 }
 
 interface SphereData {
@@ -36,7 +38,7 @@ interface SphereData {
  * Generate fiscal year report PDF for tax office
  */
 export async function generateFiscalReportPDF(options: FiscalReportOptions): Promise<{ filePath: string }> {
-  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true } = options
+  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false } = options
   const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
 
   // Create export directory
@@ -86,24 +88,62 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     }
   })
 
-  // 5. Get earmarks/bindings if requested
+  // 5. Get earmarks/bindings if requested (with proper balance calculation)
   let bindingsData: any[] = []
   if (includeBindings) {
     try {
       const bindings = listBindings()
-      bindingsData = bindings.map((b: any) => ({
-        name: b.name,
-        balance: Number(b.balance) || 0
-      }))
+      // Calculate opening balance (before fiscal year) for each binding
+      const previousYearEndDate = `${fiscalYear - 1}-12-31`
+      bindingsData = bindings.map((b: any) => {
+        // Get opening balance: initial budget + movements before fiscal year
+        const openingUsage = bindingUsage(b.id, { to: previousYearEndDate })
+        // Opening balance = budget (initial capital) + transactions before this year
+        const initialBudget = Number(b.budget) || 0
+        const openingBalance = initialBudget + openingUsage.balance
+        // Calculate current year usage
+        const usage = bindingUsage(b.id, { from, to })
+        // Closing balance = opening + year movements
+        const closingBalance = openingBalance + usage.balance
+        return {
+          name: b.name,
+          code: b.code,
+          openingBalance,
+          allocated: usage.allocated,
+          released: usage.released,
+          closingBalance
+        }
+      })
     } catch {
       bindingsData = []
     }
   }
 
-  // 6. Get voucher list if requested
+  // 6. Get budgets if requested
+  let budgetsData: any[] = []
+  if (includeBudgets) {
+    try {
+      const budgets = listBudgets({ year: fiscalYear })
+      budgetsData = budgets.map((b: any) => {
+        const usage = budgetUsage({ budgetId: b.id, from, to })
+        return {
+          name: b.name || b.categoryName || b.projectName || `Budget ${b.id}`,
+          sphere: b.sphere,
+          amountPlanned: Number(b.amountPlanned) || 0,
+          spent: Number(usage.spent) || 0,
+          inflow: Number(usage.inflow) || 0,
+          remaining: (Number(b.amountPlanned) || 0) - (Number(usage.spent) || 0) + (Number(usage.inflow) || 0)
+        }
+      })
+    } catch {
+      budgetsData = []
+    }
+  }
+
+  // 7. Get voucher list if requested
   let voucherRows: any[] = []
   if (includeVoucherList) {
-    const vouchers = listVouchersFiltered({ from, to } as any)
+    const vouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC' })
     voucherRows = Array.isArray(vouchers) ? vouchers : []
   }
 
@@ -351,19 +391,63 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     <thead>
       <tr>
         <th>Zweckbindung</th>
-        <th class="number">Bestand</th>
+        <th class="number">Anfangsbestand</th>
+        <th class="number">Zufluss</th>
+        <th class="number">Abfluss</th>
+        <th class="number">Endbestand</th>
       </tr>
     </thead>
     <tbody>
       ${bindingsData.map(b => `
         <tr>
-          <td>${esc(b.name)}</td>
-          <td class="number ${b.balance >= 0 ? 'positive' : 'negative'}">${euro(b.balance)}</td>
+          <td>${esc(b.name)}${b.code ? ` <span class="helper">(${esc(b.code)})</span>` : ''}</td>
+          <td class="number">${euro(b.openingBalance)}</td>
+          <td class="number positive">${euro(b.allocated)}</td>
+          <td class="number negative">${euro(b.released)}</td>
+          <td class="number ${b.closingBalance >= 0 ? 'positive' : 'negative'}">${euro(b.closingBalance)}</td>
         </tr>
       `).join('')}
       <tr class="total-row">
         <td>Summe zweckgebundene Mittel</td>
-        <td class="number">${euro(bindingsData.reduce((sum, b) => sum + b.balance, 0))}</td>
+        <td class="number">${euro(bindingsData.reduce((sum, b) => sum + b.openingBalance, 0))}</td>
+        <td class="number">${euro(bindingsData.reduce((sum, b) => sum + b.allocated, 0))}</td>
+        <td class="number">${euro(bindingsData.reduce((sum, b) => sum + b.released, 0))}</td>
+        <td class="number">${euro(bindingsData.reduce((sum, b) => sum + b.closingBalance, 0))}</td>
+      </tr>
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${includeBudgets && budgetsData.length > 0 ? `
+  <h2>${includeBindings && bindingsData.length > 0 ? '6' : '5'}. Budgets ${fiscalYear}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Budget</th>
+        <th>Sphäre</th>
+        <th class="number">Geplant</th>
+        <th class="number">Ausgegeben</th>
+        <th class="number">Einnahmen</th>
+        <th class="number">Verfügbar</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${budgetsData.map(b => `
+        <tr>
+          <td>${esc(b.name)}</td>
+          <td><span class="sphere-badge sphere-${b.sphere}">${esc(b.sphere)}</span></td>
+          <td class="number">${euro(b.amountPlanned)}</td>
+          <td class="number negative">${euro(b.spent)}</td>
+          <td class="number positive">${euro(b.inflow)}</td>
+          <td class="number ${b.remaining >= 0 ? 'positive' : 'negative'}">${euro(b.remaining)}</td>
+        </tr>
+      `).join('')}
+      <tr class="total-row">
+        <td colspan="2">Summe Budgets</td>
+        <td class="number">${euro(budgetsData.reduce((sum, b) => sum + b.amountPlanned, 0))}</td>
+        <td class="number">${euro(budgetsData.reduce((sum, b) => sum + b.spent, 0))}</td>
+        <td class="number">${euro(budgetsData.reduce((sum, b) => sum + b.inflow, 0))}</td>
+        <td class="number">${euro(budgetsData.reduce((sum, b) => sum + b.remaining, 0))}</td>
       </tr>
     </tbody>
   </table>
@@ -426,7 +510,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   const win = new BrowserWindow({ 
     show: false, 
     width: 900, 
-    height: 1200,
+    height: 10000, // Large height to accommodate all content
     webPreferences: {
       offscreen: true
     }
@@ -434,8 +518,15 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   
   await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
   
-  // Wait a bit for rendering
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Wait for the page to fully render (especially important for large tables)
+  await new Promise<void>((resolve) => {
+    win.webContents.on('did-finish-load', () => {
+      // Additional delay to ensure all styles are applied
+      setTimeout(resolve, 300)
+    })
+    // Fallback timeout in case did-finish-load already fired
+    setTimeout(resolve, 1000)
+  })
   
   const buff = await win.webContents.printToPDF({ 
     pageSize: 'A4', 

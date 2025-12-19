@@ -73,30 +73,80 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             )
           })()}
           {/* Netto/MwSt/Brutto totals row intentionally removed per UI simplification */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-            <div>
-              <strong>Nach Sphäre</strong>
-              <ul>
-                {data.bySphere.map((r) => (
-                  <li key={r.key}><span style={{ minWidth: 90, display: 'inline-block' }}>{r.key}</span> {eurFmt.format(r.gross)}</li>
-                ))}
-              </ul>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            {/* Nach Sphäre */}
+            <div className="card" style={{ padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 16 }}>📊</span>
+                <strong>Nach Sphäre</strong>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {data.bySphere.map((r) => {
+                  // Use rgba with low opacity for theme compatibility (works in light and dark)
+                  const colors: Record<string, { bg: string; text: string }> = {
+                    IDEELL: { bg: 'rgba(21, 101, 192, 0.15)', text: '#42a5f5' },
+                    ZWECK: { bg: 'rgba(46, 125, 50, 0.15)', text: '#66bb6a' },
+                    VERMOEGEN: { bg: 'rgba(239, 108, 0, 0.15)', text: '#ffa726' },
+                    WGB: { bg: 'rgba(123, 31, 162, 0.15)', text: '#ab47bc' }
+                  }
+                  const c = colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
+                  return (
+                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: c.bg }}>
+                      <span style={{ fontWeight: 500, color: c.text, fontSize: 13 }}>{r.key}</span>
+                      <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            <div>
-              <strong>Nach Zahlweg</strong>
-              <ul>
-                {data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r, i) => (
-                  <li key={(r.key ?? 'NULL') + i}><span style={{ minWidth: 90, display: 'inline-block' }}>{r.key}</span> {eurFmt.format(r.gross)}</li>
-                ))}
-              </ul>
+
+            {/* Nach Zahlweg */}
+            <div className="card" style={{ padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 16 }}>💳</span>
+                <strong>Nach Zahlweg</strong>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r, i) => {
+                  const icons: Record<string, string> = { BANK: '🏦', BAR: '💵' }
+                  return (
+                    <div key={(r.key ?? 'NULL') + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, fontSize: 13 }}>
+                        <span>{icons[r.key ?? ''] || '📄'}</span>
+                        {r.key}
+                      </span>
+                      <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            <div>
-              <strong>Nach Art</strong>
-              <ul>
-                {data.byType.map((r) => (
-                  <li key={r.key}><span style={{ minWidth: 90, display: 'inline-block' }}>{r.key}</span> {eurFmt.format(r.gross)}</li>
-                ))}
-              </ul>
+
+            {/* Nach Art */}
+            <div className="card" style={{ padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 16 }}>📋</span>
+                <strong>Nach Art</strong>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {data.byType.map((r) => {
+                  const styles: Record<string, { bg: string; text: string; icon: string }> = {
+                    IN: { bg: 'rgba(46, 125, 50, 0.12)', text: '#2e7d32', icon: '↓' },
+                    OUT: { bg: 'rgba(198, 40, 40, 0.12)', text: '#c62828', icon: '↑' },
+                    TRANSFER: { bg: 'rgba(25, 118, 210, 0.12)', text: '#1976d2', icon: '↔' }
+                  }
+                  const s = styles[r.key] || { bg: 'var(--muted)', text: 'var(--text)', icon: '•' }
+                  return (
+                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: s.bg }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, color: s.text, fontSize: 13 }}>
+                        <span style={{ fontWeight: 700 }}>{s.icon}</span>
+                        {r.key}
+                      </span>
+                      <span style={{ fontWeight: 600, color: s.text, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>

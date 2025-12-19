@@ -586,6 +586,7 @@ export function registerIpcHandlers() {
             to,
             includeBindings: parsed.includeBindings ?? false,
             includeVoucherList: parsed.includeVoucherList ?? false,
+            includeBudgets: parsed.includeBudgets ?? false,
             orgName: parsed.orgName
         })
         return FiscalReportOutput.parse(result)

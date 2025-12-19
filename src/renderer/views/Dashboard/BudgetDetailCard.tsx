@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-type Voucher = { id: number; date: string; description: string; grossAmount: number; type: 'IN' | 'OUT' | 'TRANSFER' }
+type Voucher = { 
+  id: number
+  date: string
+  description: string
+  grossAmount: number
+  budgetAmount?: number | null
+  type: 'IN' | 'OUT' | 'TRANSFER' 
+}
 type Budget = {
   id: number
   year: number
@@ -12,6 +19,14 @@ type Budget = {
   color?: string | null
 }
 
+// Status colors based on usage percentage
+function getStatusColor(pct: number): { text: string; icon: string } {
+  if (pct >= 100) return { text: '#ef5350', icon: '⚠️' }
+  if (pct >= 80) return { text: '#ffa726', icon: '⚡' }
+  if (pct >= 50) return { text: '#ffee58', icon: '📊' }
+  return { text: '#66bb6a', icon: '✓' }
+}
+
 export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: number; from: string; to: string }) {
   const [budget, setBudget] = useState<Budget | null>(null)
   const [vouchers, setVouchers] = useState<Voucher[]>([])
@@ -21,7 +36,6 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = useMemo(() => (d?: string | null) => {
     if (!d) return '—'
-    // Expect YYYY-MM-DD
     if (d.length >= 10) return `${d.slice(8,10)}.${d.slice(5,7)}.${d.slice(0,4)}`
     try { return new Intl.DateTimeFormat('de-DE').format(new Date(d)) } catch { return String(d) }
   }, [])
@@ -31,14 +45,13 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
     const load = async () => {
       try {
         setLoading(true)
-        // Load all budgets (no activeOnly flag exists; filter client-side)
         const res = await (window as any).api?.budgets?.list?.({})
         const list: Budget[] = (res?.rows || res || [])
         const b = list.find(x => Number(x.id) === Number(budgetId)) || null
         if (!alive) return
         setBudget(b)
 
-        // Aggregate via budgets.usage (supports budgetId) for accuracy
+        // Aggregate via budgets.usage
         try {
           const sd = b?.startDate ? String(b.startDate).slice(0,10) : null
           const ed = b?.endDate ? String(b.endDate).slice(0,10) : null
@@ -67,14 +80,13 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
 
   if (!budget && !loading) {
     return (
-      <section className="card" style={{ padding: 12 }}>
+      <section className="card" style={{ padding: 16 }}>
         <strong>Budget</strong>
         <div className="helper" style={{ marginTop: 6 }}>Nicht gefunden.</div>
       </section>
     )
   }
 
-  // Clamp range for display without introducing conditional hooks
   const sd = budget?.startDate ? String(budget.startDate).slice(0,10) : null
   const ed = budget?.endDate ? String(budget.endDate).slice(0,10) : null
   const clampedFrom = (sd && sd > from) ? sd : from
@@ -82,52 +94,116 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
 
   const planned = budget?.amountPlanned ?? 0
   const saldo = Math.round((sumIn - sumOut) * 100) / 100
-  // Progress: OUT / (Budget + IN) to account for additional income
-  const availableFunds = planned + sumIn
-  const consumedPct = availableFunds > 0 ? Math.min(100, Math.round((sumOut / availableFunds) * 1000) / 10) : null
-  const remaining = planned > 0 ? Math.round((planned + saldo) * 100) / 100 : null  // Budget + Saldo (IN - OUT)
-  const bgTint = budget?.color ? `color-mix(in oklab, ${budget.color} 14%, var(--surface))` : undefined
+  // Net consumption = OUT - IN (how much of budget was actually consumed)
+  const netSpent = sumOut - sumIn
+  const consumedPct = planned > 0 ? Math.max(0, Math.min(100, Math.round((netSpent / planned) * 1000) / 10)) : 0
+  const remaining = Math.round((planned + saldo) * 100) / 100
+  const status = getStatusColor(consumedPct)
+  const bgColor = budget?.color || '#6366f1'
 
   return (
-    <section className="card" style={{ padding: 12, background: bgTint }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ minWidth: 0 }}>
-          <strong>Budget: {budget?.name || `#${budget?.id}`}</strong>
-          <div className="helper">{budget?.sphere || ''}</div>
-          <div className="helper">Zeitraum: {fmtDate(clampedFrom)} – {fmtDate(clampedTo)}</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="helper">Geplant: {eur.format(planned)}</div>
-          <div className="helper">IN: {eur.format(sumIn)} · OUT: {eur.format(sumOut)}</div>
-          <div className="helper">Saldo: <span style={{ color: saldo >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>{eur.format(saldo)}</span></div>
-        </div>
-      </header>
-      {planned > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <div className="helper" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Fortschritt Ausgaben</span>
-            <span>{consumedPct?.toFixed(1)}%{remaining != null ? ` · Rest: ` : ''}{remaining != null ? <strong style={{ textDecoration: 'underline', textDecorationStyle: 'double' }}>{eur.format(remaining)}</strong> : ''}</span>
+    <section className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${bgColor}, ${bgColor}dd)`, 
+        padding: '12px 16px',
+        color: '#fff'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 2 }}>Budget</div>
+            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {budget?.name || `#${budget?.id}`}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+              {fmtDate(clampedFrom)} – {fmtDate(clampedTo)}
+            </div>
           </div>
-          <div style={{ position: 'relative', height: 6, background: 'color-mix(in oklab, var(--border) 40%, transparent)', borderRadius: 4, overflow: 'hidden', marginTop: 4 }}>
-            <div style={{ position: 'absolute', inset: 0, width: `${consumedPct || 0}%`, background: budget?.color || 'var(--accent)', transition: 'width .4s', borderRadius: 4 }} />
+          <div style={{ textAlign: 'right', fontSize: 12 }}>
+            <div style={{ opacity: 0.85 }}>Geplant: {eur.format(planned)}</div>
+            <div style={{ opacity: 0.85 }}>IN: {eur.format(sumIn)} · OUT: {eur.format(sumOut)}</div>
+            <div style={{ fontWeight: 600 }}>Saldo: {eur.format(saldo)}</div>
           </div>
         </div>
-      )}
-      <div style={{ marginTop: 12 }}>
-        <div className="helper">Letzte Buchungen (max. 5)</div>
-        {loading && <div className="helper" style={{ marginTop: 6 }}>Laden…</div>}
-        {!loading && vouchers.length === 0 && (<div className="helper" style={{ marginTop: 6 }}>Keine Buchungen.</div>)}
-        {!loading && vouchers.length > 0 && (
-          <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
-            {vouchers.map(v => (
-              <div key={v.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8, alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <div className="helper">{fmtDate(v.date)}</div>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.description}>{v.description || '—'}</div>
-                <div style={{ textAlign: 'right', fontWeight: 600, color: v.type === 'IN' ? 'var(--success)' : v.type === 'OUT' ? 'var(--danger)' : 'inherit' }}>{eur.format(Math.abs(v.grossAmount || 0))}</div>
-              </div>
-            ))}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '12px 16px' }}>
+        {/* Progress Bar */}
+        {planned > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Fortschritt Ausgaben</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>
+                <span style={{ color: status.text }}>{status.icon} {consumedPct.toFixed(1)}%</span>
+                <span style={{ marginLeft: 8 }}>Rest: <strong style={{ color: remaining >= 0 ? '#66bb6a' : '#ef5350' }}>{eur.format(remaining)}</strong></span>
+              </span>
+            </div>
+            <div style={{ height: 6, background: 'var(--muted)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ 
+                height: '100%', 
+                width: `${Math.min(100, consumedPct)}%`, 
+                background: consumedPct >= 100 ? 'linear-gradient(90deg, #ef5350, #f44336)' : 
+                           consumedPct >= 80 ? 'linear-gradient(90deg, #ffa726, #ff9800)' : 
+                           `linear-gradient(90deg, ${bgColor}, ${bgColor}cc)`,
+                borderRadius: 3,
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
           </div>
         )}
+
+        {/* Recent Vouchers */}
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>📄</span>
+            <span>Letzte Buchungen (max. 5)</span>
+          </div>
+          {loading && <div className="helper">Laden…</div>}
+          {!loading && vouchers.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>Keine Buchungen.</div>
+          )}
+          {!loading && vouchers.length > 0 && (
+            <div style={{ display: 'grid', gap: 0 }}>
+              {vouchers.map((v, i) => {
+                // Use budgetAmount if available, otherwise fall back to grossAmount
+                const displayAmount = v.budgetAmount != null ? Math.abs(v.budgetAmount) : Math.abs(v.grossAmount || 0)
+                return (
+                  <div 
+                    key={v.id} 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '72px 1fr auto', 
+                      gap: 10, 
+                      alignItems: 'center', 
+                      padding: '8px 0',
+                      borderBottom: i < vouchers.length - 1 ? '1px solid var(--border)' : undefined
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtDate(v.date)}</div>
+                    <div style={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      fontWeight: 500
+                    }} title={v.description}>
+                      {v.description || '—'}
+                    </div>
+                    <div style={{ 
+                      textAlign: 'right', 
+                      fontWeight: 600, 
+                      fontSize: 13,
+                      color: v.type === 'IN' ? '#66bb6a' : v.type === 'OUT' ? '#ef5350' : 'inherit' 
+                    }}>
+                      {eur.format(displayAmount)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )

@@ -256,6 +256,7 @@ function AppInner() {
     const [fiscalYear, setFiscalYear] = useState<number>(new Date().getFullYear())
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
+    const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -834,6 +835,10 @@ function AppInner() {
                             journalLimit={journalLimit}
                             setJournalLimit={(n: number) => { setJournalLimit(n); setPage(1) }}
                             dateFmt={dateFmt}
+                            cols={cols}
+                            setCols={setCols}
+                            order={order}
+                            setOrder={setOrder}
                             from={from}
                             to={to}
                             filterSphere={filterSphere}
@@ -1097,6 +1102,8 @@ function AppInner() {
                     setIncludeBindings={setIncludeBindings}
                     includeVoucherList={includeVoucherList}
                     setIncludeVoucherList={setIncludeVoucherList}
+                    includeBudgets={includeBudgets}
+                    setIncludeBudgets={setIncludeBudgets}
                     onExport={async (fmt) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -1105,6 +1112,7 @@ function AppInner() {
                                     fiscalYear,
                                     includeBindings,
                                     includeVoucherList,
+                                    includeBudgets,
                                     orgName: exportOrgName || undefined
                                 })
                                 if (res) {

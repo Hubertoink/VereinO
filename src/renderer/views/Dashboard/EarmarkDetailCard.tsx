@@ -5,6 +5,7 @@ type Voucher = {
   date: string
   description: string
   grossAmount: number
+  earmarkAmount?: number | null
   type: 'IN' | 'OUT' | 'TRANSFER'
 }
 
@@ -14,6 +15,16 @@ type Earmark = {
   name: string
   budget: number | null
   color?: string
+  startDate?: string | null
+  endDate?: string | null
+}
+
+// Status colors based on usage percentage
+function getStatusColor(pct: number): { text: string; icon: string } {
+  if (pct >= 100) return { text: '#ef5350', icon: '⚠️' }
+  if (pct >= 80) return { text: '#ffa726', icon: '⚡' }
+  if (pct >= 50) return { text: '#ffee58', icon: '📊' }
+  return { text: '#66bb6a', icon: '✓' }
 }
 
 export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?: number; from: string; to: string }) {
@@ -34,7 +45,6 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
     const load = async () => {
       try {
         setLoading(true)
-        // Get all earmarks and pick the first active one if none specified
         const list = await (window as any).api?.bindings?.list?.({ activeOnly: true })
         const earmarks = (list?.rows || list || []) as Earmark[]
         
@@ -52,13 +62,13 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
         
         setEarmark(selected)
 
-        // Fetch aggregate IN/OUT for usage progress (using reports.summary with earmark filter)
+        // Fetch aggregate IN/OUT using bindings.usage for accuracy
         try {
-          const s = await (window as any).api?.reports?.summary?.({ from, to, earmarkId: selected.id })
-          const inGross = s?.byType?.find((x: any) => x.key === 'IN')?.gross || 0
-          const outGrossRaw = s?.byType?.find((x: any) => x.key === 'OUT')?.gross || 0
-          setSumIn(Math.max(0, Number(inGross) || 0))
-          setSumOut(Math.abs(Number(outGrossRaw) || 0))
+          const u = await (window as any).api?.bindings?.usage?.({ earmarkId: selected.id, from, to })
+          const allocated = Math.max(0, Number(u?.allocated || 0))
+          const released = Math.max(0, Number(u?.released || 0))
+          setSumIn(Math.round(allocated * 100) / 100)
+          setSumOut(Math.round(released * 100) / 100)
         } catch { setSumIn(0); setSumOut(0) }
         
         // Fetch vouchers with this earmark
@@ -89,69 +99,133 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
 
   if (!earmark && !loading) {
     return (
-      <section className="card" style={{ padding: 12 }}>
+      <section className="card" style={{ padding: 16 }}>
         <strong>Zweckbindung</strong>
         <div className="helper" style={{ marginTop: 8 }}>Keine aktive Zweckbindung gefunden.</div>
       </section>
     )
   }
 
-  // Progress: Anteil verbraucht = Ausgaben / (Budget + Einnahmen) um IN-Buchungen zu berücksichtigen
-  const budget = earmark?.budget ?? null
-  const availableFunds = (budget || 0) + sumIn
-  const consumedPct = availableFunds > 0 ? Math.min(100, Math.round((sumOut / availableFunds) * 1000) / 10) : null
+  const budget = earmark?.budget ?? 0
+  // Net consumption = OUT - IN (how much of budget was actually consumed)
+  const netSpent = sumOut - sumIn
+  const consumedPct = budget > 0 ? Math.max(0, Math.min(100, Math.round((netSpent / budget) * 1000) / 10)) : 0
   const saldo = Math.round((sumIn - sumOut) * 100) / 100
-  const remaining = budget != null ? Math.round((budget + saldo) * 100) / 100 : null  // Budget + Saldo (IN - OUT)
-  const bgTint = earmark?.color ? `color-mix(in oklab, ${earmark.color} 14%, var(--surface))` : undefined
+  const remaining = Math.round((budget + saldo) * 100) / 100
+  const status = getStatusColor(consumedPct)
+  const bgColor = earmark?.color || '#8b5cf6'
 
   return (
-    <section className="card" style={{ padding: 12, background: bgTint }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+    <section className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${bgColor}, ${bgColor}dd)`, 
+        padding: '12px 16px',
+        color: '#fff'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 2 }}>
+              <span style={{ 
+                background: 'rgba(255,255,255,0.2)', 
+                padding: '2px 6px', 
+                borderRadius: 4, 
+                fontSize: 10, 
+                fontWeight: 600 
+              }}>{earmark?.code}</span>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {earmark?.name || '—'}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+              Zeitraum: {fmtDate(from)} – {fmtDate(to)}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: 12 }}>
+            {budget > 0 && <div style={{ opacity: 0.85 }}>Budget: {eur.format(budget)}</div>}
+            <div style={{ opacity: 0.85 }}>IN: {eur.format(sumIn)} · OUT: {eur.format(sumOut)}</div>
+            <div style={{ fontWeight: 600 }}>Saldo: {eur.format(saldo)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '12px 16px' }}>
+        {/* Progress Bar */}
+        {budget > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Fortschritt Ausgaben</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>
+                <span style={{ color: status.text }}>{status.icon} {consumedPct.toFixed(1)}%</span>
+                <span style={{ marginLeft: 8 }}>Rest: <strong style={{ color: remaining >= 0 ? '#66bb6a' : '#ef5350' }}>{eur.format(remaining)}</strong></span>
+              </span>
+            </div>
+            <div style={{ height: 6, background: 'var(--muted)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ 
+                height: '100%', 
+                width: `${Math.min(100, consumedPct)}%`, 
+                background: consumedPct >= 100 ? 'linear-gradient(90deg, #ef5350, #f44336)' : 
+                           consumedPct >= 80 ? 'linear-gradient(90deg, #ffa726, #ff9800)' : 
+                           `linear-gradient(90deg, ${bgColor}, ${bgColor}cc)`,
+                borderRadius: 3,
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Recent Vouchers */}
         <div>
-          <strong>Zweckbindung: {earmark?.code || '—'}</strong>
-          <div className="helper">{earmark?.name || ''}</div>
-          <div className="helper">Zeitraum: {fmtDate(from)} – {fmtDate(to)}</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          {earmark?.budget != null && <div className="helper">Budget: {eur.format(earmark.budget)}</div>}
-          <div className="helper">IN: {eur.format(sumIn)} · OUT: {eur.format(sumOut)}</div>
-          <div className="helper">Saldo: <span style={{ color: saldo >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>{eur.format(saldo)}</span></div>
-        </div>
-      </header>
-      {/* Usage progress line */}
-      {budget != null && (
-        <div style={{ marginTop: 10 }}>
-          <div className="helper" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Fortschritt Ausgaben</span>
-            <span>{consumedPct?.toFixed(1)}%{remaining != null ? ` · Rest: ` : ''}{remaining != null ? <strong style={{ textDecoration: 'underline', textDecorationStyle: 'double' }}>{eur.format(remaining)}</strong> : ''}</span>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>📄</span>
+            <span>Letzte Buchungen (max. 5)</span>
           </div>
-          <div style={{ position: 'relative', height: 6, background: 'color-mix(in oklab, var(--border) 40%, transparent)', borderRadius: 4, overflow: 'hidden', marginTop: 4 }}>
-            <div style={{ position: 'absolute', inset: 0, width: `${consumedPct || 0}%`, background: earmark?.color || 'var(--accent)', transition: 'width .4s', borderRadius: 4 }} />
-          </div>
+          {loading && <div className="helper">Laden…</div>}
+          {!loading && vouchers.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>Keine Buchungen im Zeitraum.</div>
+          )}
+          {!loading && vouchers.length > 0 && (
+            <div style={{ display: 'grid', gap: 0 }}>
+              {vouchers.map((v, i) => {
+                // Use earmarkAmount if available, otherwise fall back to grossAmount
+                const displayAmount = v.earmarkAmount != null ? Math.abs(v.earmarkAmount) : Math.abs(v.grossAmount || 0)
+                return (
+                  <div 
+                    key={v.id} 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '72px 1fr auto', 
+                      gap: 10, 
+                      alignItems: 'center', 
+                      padding: '8px 0',
+                      borderBottom: i < vouchers.length - 1 ? '1px solid var(--border)' : undefined
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtDate(v.date)}</div>
+                    <div style={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      fontWeight: 500
+                    }} title={v.description}>
+                      {v.description || '—'}
+                    </div>
+                    <div style={{ 
+                      textAlign: 'right', 
+                      fontWeight: 600, 
+                      fontSize: 13,
+                      color: v.type === 'IN' ? '#66bb6a' : v.type === 'OUT' ? '#ef5350' : 'inherit' 
+                    }}>
+                      {eur.format(displayAmount)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
-      
-      <div style={{ marginTop: 12 }}>
-        <div className="helper">Letzte Buchungen (max. 5)</div>
-        {loading && <div className="helper" style={{ marginTop: 6 }}>Laden…</div>}
-        {!loading && vouchers.length === 0 && (
-          <div className="helper" style={{ marginTop: 6 }}>Keine Buchungen im Zeitraum.</div>
-        )}
-        {!loading && vouchers.length > 0 && (
-          <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
-            {vouchers.map((v) => (
-              <div key={v.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8, alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                <div className="helper">{fmtDate(v.date)}</div>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.description}>
-                  {v.description || '—'}
-                </div>
-                <div style={{ textAlign: 'right', fontWeight: 600, color: v.type === 'IN' ? 'var(--success)' : v.type === 'OUT' ? 'var(--danger)' : 'inherit' }}>
-                  {eur.format(Math.abs(v.grossAmount || 0))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </section>
   )

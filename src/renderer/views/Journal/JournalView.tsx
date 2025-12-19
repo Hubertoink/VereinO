@@ -37,6 +37,8 @@ type VoucherRow = {
     earmarksAssigned?: EarmarkAssignment[]
 }
 
+type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+
 interface JournalViewProps {
     // Props die von App.tsx kommen
     flashId: number | null
@@ -62,6 +64,11 @@ interface JournalViewProps {
     journalLimit: number
     setJournalLimit: (n: number) => void
     dateFmt: 'ISO' | 'PRETTY'
+    // Column visibility & order (shared with Settings)
+    cols: Record<ColKey, boolean>
+    setCols: (cols: Record<ColKey, boolean>) => void
+    order: ColKey[]
+    setOrder: (order: ColKey[]) => void
     // Filter states from App
     from?: string
     to?: string
@@ -106,6 +113,11 @@ export default function JournalView({
     journalLimit: journalLimitProp,
     setJournalLimit: setJournalLimitProp,
     dateFmt,
+    // Column visibility & order from App
+    cols,
+    setCols,
+    order,
+    setOrder,
     // Filter props from App
     from: fromProp,
     to: toProp,
@@ -183,26 +195,7 @@ export default function JournalView({
     const activeSetQ = setQProp || setQ
     const activeSetPage = setPageProp || setPage
 
-    // Column preferences
-    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
-    const defaultCols: Record<ColKey, boolean> = { 
-        actions: true, date: true, voucherNo: true, type: true, sphere: true, 
-        description: true, earmark: true, budget: true, paymentMethod: true, 
-        attachments: true, net: true, vat: true, gross: true 
-    }
-    const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
-        try {
-            const s = localStorage.getItem('journalCols')
-            return s ? JSON.parse(s) : defaultCols
-        } catch { return defaultCols }
-    })
-    const [order, setOrder] = useState<ColKey[]>(() => {
-        try {
-            const s = localStorage.getItem('journalColsOrder')
-            return s ? JSON.parse(s) : defaultOrder
-        } catch { return defaultOrder }
-    })
+    // Column preferences now come from props (shared with Settings)
 
     // Modal states
     const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
