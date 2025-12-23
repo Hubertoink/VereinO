@@ -3,15 +3,28 @@ import { OrgPaneProps } from '../types'
 import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
 
+interface ActiveOrg {
+  id: string
+  name: string
+  dbRoot: string
+}
+
 /**
  * OrgPane - Organization Settings
  * 
  * Handles:
- * - Organization name
+ * - Organization name (for active organization in switcher)
+ * - Organization display name (org.name setting)
  * - Cashier name
  * - Tax Exemption Certificate (Steuerbefreiungsbescheid)
  */
 export function OrgPane({ notify }: OrgPaneProps) {
+  // Active organization (for the switcher)
+  const [activeOrg, setActiveOrg] = React.useState<ActiveOrg | null>(null)
+  const [activeOrgName, setActiveOrgName] = React.useState<string>('')
+  const [savingOrg, setSavingOrg] = React.useState(false)
+  
+  // Organization display settings
   const [orgName, setOrgName] = React.useState<string>('')
   const [cashier, setCashier] = React.useState<string>('')
   const [busy, setBusy] = React.useState(false)
@@ -25,6 +38,18 @@ export function OrgPane({ notify }: OrgPaneProps) {
       setTaxCertificate(res?.certificate || null)
     } catch (e: any) {
       console.error('Error loading tax certificate:', e)
+    }
+  }
+
+  async function loadActiveOrg() {
+    try {
+      const res = await (window as any).api?.organizations?.active?.()
+      if (res?.organization) {
+        setActiveOrg(res.organization)
+        setActiveOrgName(res.organization.name || '')
+      }
+    } catch (e: any) {
+      console.error('Error loading active organization:', e)
     }
   }
 
@@ -44,8 +69,22 @@ export function OrgPane({ notify }: OrgPaneProps) {
     }
     load()
     loadTaxCertificate()
+    loadActiveOrg()
     return () => { cancelled = true }
   }, [])
+
+  async function saveOrgName() {
+    if (!activeOrg || !activeOrgName.trim()) return
+    setSavingOrg(true)
+    try {
+      await (window as any).api?.organizations?.rename?.({ orgId: activeOrg.id, name: activeOrgName.trim() })
+      notify('success', 'Organisationsname geändert')
+      await loadActiveOrg()
+      window.dispatchEvent(new Event('data-changed'))
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    } finally { setSavingOrg(false) }
+  }
 
   async function save() {
     setBusy(true)
@@ -53,7 +92,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
     try {
       await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
       await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
-      notify('success', 'Organisation gespeichert')
+      notify('success', 'Einstellungen gespeichert')
       window.dispatchEvent(new Event('data-changed'))
     } catch (e: any) {
       setError(e?.message || String(e))
@@ -63,14 +102,43 @@ export function OrgPane({ notify }: OrgPaneProps) {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
+      {/* Active Organization Name (for switcher) */}
+      {activeOrg && (
+        <div style={{ marginBottom: 12, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong>🏢 Aktive Organisation</strong>
+            <div className="helper">Name der Organisation im Organisations-Wechsler</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: 400 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Organisationsname</label>
+              <input 
+                className="input" 
+                value={activeOrgName} 
+                onChange={(e) => setActiveOrgName(e.target.value)} 
+                placeholder="z. B. Hauptverein" 
+              />
+            </div>
+            <button 
+              className="btn" 
+              disabled={savingOrg || !activeOrgName.trim() || activeOrgName === activeOrg.name} 
+              onClick={saveOrgName}
+            >
+              Umbenennen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Organization Display Settings */}
       <div>
-        <strong>Organisation</strong>
-        <div className="helper">Name der Organisation und der Kassierer:in.</div>
+        <strong>📋 Anzeige-Einstellungen</strong>
+        <div className="helper">Diese Angaben erscheinen in der Titelleiste und in Exporten.</div>
       </div>
       {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
       <div className="row">
         <div className="field">
-          <label>Name der Organisation</label>
+          <label>Vollständiger Vereinsname</label>
           <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
         </div>
         <div className="field">

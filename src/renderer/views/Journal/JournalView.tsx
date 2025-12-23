@@ -6,6 +6,9 @@ import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
 
 // Type für Voucher-Zeilen
+type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
+type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string }
+
 type VoucherRow = {
     id: number
     voucherNo: string
@@ -23,11 +26,18 @@ type VoucherRow = {
     hasFiles?: boolean
     earmarkId?: number | null
     earmarkCode?: string | null
+    earmarkAmount?: number | null
     budgetId?: number | null
     budgetLabel?: string | null
+    budgetAmount?: number | null
     fileCount?: number
     tags?: string[]
+    // Multiple assignments
+    budgets?: BudgetAssignment[]
+    earmarksAssigned?: EarmarkAssignment[]
 }
+
+type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 
 interface JournalViewProps {
     // Props die von App.tsx kommen
@@ -54,6 +64,11 @@ interface JournalViewProps {
     journalLimit: number
     setJournalLimit: (n: number) => void
     dateFmt: 'ISO' | 'PRETTY'
+    // Column visibility & order (shared with Settings)
+    cols: Record<ColKey, boolean>
+    setCols: (cols: Record<ColKey, boolean>) => void
+    order: ColKey[]
+    setOrder: (order: ColKey[]) => void
     // Filter states from App
     from?: string
     to?: string
@@ -98,6 +113,11 @@ export default function JournalView({
     journalLimit: journalLimitProp,
     setJournalLimit: setJournalLimitProp,
     dateFmt,
+    // Column visibility & order from App
+    cols,
+    setCols,
+    order,
+    setOrder,
     // Filter props from App
     from: fromProp,
     to: toProp,
@@ -175,26 +195,7 @@ export default function JournalView({
     const activeSetQ = setQProp || setQ
     const activeSetPage = setPageProp || setPage
 
-    // Column preferences
-    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
-    const defaultCols: Record<ColKey, boolean> = { 
-        actions: true, date: true, voucherNo: true, type: true, sphere: true, 
-        description: true, earmark: true, budget: true, paymentMethod: true, 
-        attachments: true, net: true, vat: true, gross: true 
-    }
-    const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-    const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
-        try {
-            const s = localStorage.getItem('journalCols')
-            return s ? JSON.parse(s) : defaultCols
-        } catch { return defaultCols }
-    })
-    const [order, setOrder] = useState<ColKey[]>(() => {
-        try {
-            const s = localStorage.getItem('journalColsOrder')
-            return s ? JSON.parse(s) : defaultOrder
-        } catch { return defaultOrder }
-    })
+    // Column preferences now come from props (shared with Settings)
 
     // Modal states
     const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
@@ -593,7 +594,57 @@ export default function JournalView({
                                         notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
                                         return
                                     }
-                                    const payload: any = { id: editRow.id, date: editRow.date, description: editRow.description ?? null, type: editRow.type, sphere: editRow.sphere, earmarkId: editRow.earmarkId, budgetId: editRow.budgetId, tags: editRow.tags || [] }
+                                    // Build budgets array from the new multi-assignment UI
+                                    const budgets = ((editRow as any).budgets || [])
+                                        .filter((b: BudgetAssignment) => b.budgetId && b.amount > 0)
+                                        .map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount }))
+                                    // Build earmarks array from the new multi-assignment UI
+                                    const earmarksArr = ((editRow as any).earmarksAssigned || [])
+                                        .filter((e: EarmarkAssignment) => e.earmarkId && e.amount > 0)
+                                        .map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount }))
+                                    
+                                    // Validate: No duplicate budgets
+                                    const budgetIds = budgets.map((b: { budgetId: number }) => b.budgetId)
+                                    if (new Set(budgetIds).size !== budgetIds.length) {
+                                        notify('error', 'Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.')
+                                        return
+                                    }
+                                    // Validate: No duplicate earmarks
+                                    const earmarkIds = earmarksArr.map((e: { earmarkId: number }) => e.earmarkId)
+                                    if (new Set(earmarkIds).size !== earmarkIds.length) {
+                                        notify('error', 'Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.')
+                                        return
+                                    }
+                                    // Validate: Total budget amount should not exceed gross amount
+                                    const totalBudgetAmount = budgets.reduce((sum: number, b: { amount: number }) => sum + b.amount, 0)
+                                    const grossAmount = Number((editRow as any).grossAmount) || 0
+                                    if (totalBudgetAmount > grossAmount * 1.001) { // small tolerance for rounding
+                                        notify('error', `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`)
+                                        return
+                                    }
+                                    // Validate: Total earmark amount should not exceed gross amount
+                                    const totalEarmarkAmount = earmarksArr.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
+                                    if (totalEarmarkAmount > grossAmount * 1.001) {
+                                        notify('error', `Die Summe der Zweckbindungs-Beträge (${totalEarmarkAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`)
+                                        return
+                                    }
+
+                                    const payload: any = { 
+                                        id: editRow.id, 
+                                        date: editRow.date, 
+                                        description: editRow.description ?? null, 
+                                        type: editRow.type, 
+                                        sphere: editRow.sphere, 
+                                        // Legacy fields (kept for backwards compatibility, first item from arrays)
+                                        earmarkId: earmarksArr.length > 0 ? earmarksArr[0].earmarkId : null, 
+                                        earmarkAmount: earmarksArr.length > 0 ? earmarksArr[0].amount : null,
+                                        budgetId: budgets.length > 0 ? budgets[0].budgetId : null, 
+                                        budgetAmount: budgets.length > 0 ? budgets[0].amount : null,
+                                        // New arrays for multiple assignments
+                                        budgets,
+                                        earmarks: earmarksArr,
+                                        tags: editRow.tags || [] 
+                                    }
                                     if (editRow.type === 'TRANSFER') {
                                         delete payload.paymentMethod
                                         payload.transferFrom = editRow.transferFrom ?? null
@@ -635,7 +686,8 @@ export default function JournalView({
                                                 return eurFmt.format(g)
                                             })()
                                             const sphere = editRow.sphere
-                                            return `${date} · ${type} · ${pm} · ${amount} · ${sphere}`
+                                            const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
+                                            return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
                                         })()}
                                     </div>
                                 </div>
@@ -752,24 +804,174 @@ export default function JournalView({
                                                 </>
                                             )}
                                         </div>
+                                        {/* Budget Zuordnungen (mehrfach möglich) */}
                                         <div className="row">
-                                            <div className="field">
-                                                <label>Budget</label>
-                                                <select value={(editRow as any).budgetId ?? ''} onChange={(e) => setEditRow({ ...editRow, budgetId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                                    <option value="">—</option>
-                                                    {budgetsForEdit.map(b => (
-                                                        <option key={b.id} value={b.id}>{b.label}</option>
-                                                    ))}
-                                                </select>
+                                            <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    Budget
+                                                    <button
+                                                        type="button"
+                                                        className="btn ghost"
+                                                        style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                        onClick={() => {
+                                                            const currentBudgets = (editRow as any).budgets || []
+                                                            setEditRow({ ...editRow, budgets: [...currentBudgets, { budgetId: 0, amount: (editRow as any).grossAmount || 0 }] } as any)
+                                                        }}
+                                                        title="Weiteres Budget hinzufügen"
+                                                    >+</button>
+                                                </label>
+                                                {(() => {
+                                                    const budgetsList = (editRow as any).budgets || []
+                                                    const budgetIds = budgetsList.filter((b: BudgetAssignment) => b.budgetId).map((b: BudgetAssignment) => b.budgetId)
+                                                    const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
+                                                    const totalBudgetAmount = budgetsList.reduce((sum: number, b: BudgetAssignment) => sum + (b.amount || 0), 0)
+                                                    const grossAmt = Number((editRow as any).grossAmount) || 0
+                                                    const exceedsTotal = totalBudgetAmount > grossAmt * 1.001
+                                                    return budgetsList.length > 0 ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                            {budgetsList.map((ba: BudgetAssignment, idx: number) => {
+                                                                const isDuplicate = budgetIds.filter((id: number) => id === ba.budgetId).length > 1
+                                                                return (
+                                                                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                                        <select
+                                                                            style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
+                                                                            value={ba.budgetId || ''}
+                                                                            onChange={(e) => {
+                                                                                const newBudgets = [...budgetsList]
+                                                                                newBudgets[idx] = { ...newBudgets[idx], budgetId: e.target.value ? Number(e.target.value) : 0 }
+                                                                                setEditRow({ ...editRow, budgets: newBudgets } as any)
+                                                                            }}
+                                                                        >
+                                                                            <option value="">— Budget wählen —</option>
+                                                                            {budgetsForEdit.map(b => (
+                                                                                <option key={b.id} value={b.id}>{b.label}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                            <input
+                                                                                className="input"
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                value={ba.amount ?? ''}
+                                                                                onChange={(e) => {
+                                                                                    const newBudgets = [...budgetsList]
+                                                                                    newBudgets[idx] = { ...newBudgets[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                                    setEditRow({ ...editRow, budgets: newBudgets } as any)
+                                                                                }}
+                                                                                title="Betrag für dieses Budget"
+                                                                            />
+                                                                            <span className="adorn-suffix">€</span>
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn ghost"
+                                                                            style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                            onClick={() => {
+                                                                                const newBudgets = budgetsList.filter((_: any, i: number) => i !== idx)
+                                                                                setEditRow({ ...editRow, budgets: newBudgets } as any)
+                                                                            }}
+                                                                            title="Entfernen"
+                                                                        >✕</button>
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                            {hasDuplicateBudgets && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Ein Budget kann nur einmal zugeordnet werden</div>
+                                                            )}
+                                                            {exceedsTotal && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
+                                                    )
+                                                })()}
                                             </div>
-                                            <div className="field">
-                                                <label>Zweckbindung</label>
-                                                <select value={(editRow as any).earmarkId ?? ''} onChange={(e) => setEditRow({ ...editRow, earmarkId: e.target.value ? Number(e.target.value) : null } as any)}>
-                                                    <option value="">—</option>
-                                                    {earmarks.map(em => (
-                                                        <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                                    ))}
-                                                </select>
+                                        </div>
+                                        {/* Zweckbindung Zuordnungen (mehrfach möglich) */}
+                                        <div className="row">
+                                            <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    Zweckbindung
+                                                    <button
+                                                        type="button"
+                                                        className="btn ghost"
+                                                        style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                        onClick={() => {
+                                                            const currentEarmarks = (editRow as any).earmarksAssigned || []
+                                                            setEditRow({ ...editRow, earmarksAssigned: [...currentEarmarks, { earmarkId: 0, amount: (editRow as any).grossAmount || 0 }] } as any)
+                                                        }}
+                                                        title="Weitere Zweckbindung hinzufügen"
+                                                    >+</button>
+                                                </label>
+                                                {(() => {
+                                                    const earmarksList = (editRow as any).earmarksAssigned || []
+                                                    const earmarkIds = earmarksList.filter((e: EarmarkAssignment) => e.earmarkId).map((e: EarmarkAssignment) => e.earmarkId)
+                                                    const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
+                                                    const totalEarmarkAmount = earmarksList.reduce((sum: number, e: EarmarkAssignment) => sum + (e.amount || 0), 0)
+                                                    const grossAmt = Number((editRow as any).grossAmount) || 0
+                                                    const exceedsTotal = totalEarmarkAmount > grossAmt * 1.001
+                                                    return earmarksList.length > 0 ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                            {earmarksList.map((ea: EarmarkAssignment, idx: number) => {
+                                                                const isDuplicate = earmarkIds.filter((id: number) => id === ea.earmarkId).length > 1
+                                                                return (
+                                                                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                                        <select
+                                                                            style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
+                                                                            value={ea.earmarkId || ''}
+                                                                            onChange={(e) => {
+                                                                                const newEarmarks = [...earmarksList]
+                                                                                newEarmarks[idx] = { ...newEarmarks[idx], earmarkId: e.target.value ? Number(e.target.value) : 0 }
+                                                                                setEditRow({ ...editRow, earmarksAssigned: newEarmarks } as any)
+                                                                            }}
+                                                                        >
+                                                                            <option value="">— Zweckbindung wählen —</option>
+                                                                            {earmarks.map(em => (
+                                                                                <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                            <input
+                                                                                className="input"
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                value={ea.amount ?? ''}
+                                                                                onChange={(e) => {
+                                                                                    const newEarmarks = [...earmarksList]
+                                                                                    newEarmarks[idx] = { ...newEarmarks[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                                    setEditRow({ ...editRow, earmarksAssigned: newEarmarks } as any)
+                                                                                }}
+                                                                                title="Betrag für diese Zweckbindung"
+                                                                            />
+                                                                            <span className="adorn-suffix">€</span>
+                                                                        </span>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn ghost"
+                                                                            style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                            onClick={() => {
+                                                                                const newEarmarks = earmarksList.filter((_: any, i: number) => i !== idx)
+                                                                                setEditRow({ ...editRow, earmarksAssigned: newEarmarks } as any)
+                                                                            }}
+                                                                            title="Entfernen"
+                                                                        >✕</button>
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                            {hasDuplicateEarmarks && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Eine Zweckbindung kann nur einmal zugeordnet werden</div>
+                                                            )}
+                                                            {exceedsTotal && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
+                                                    )
+                                                })()}
                                             </div>
                                         </div>
                                     </div>
@@ -819,7 +1021,7 @@ export default function JournalView({
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                                                 <strong>Anhänge</strong>
-                                                <div className="helper">Dateien hierher ziehen oder per Button/Ctrl+U auswählen</div>
+                                                {editRowFiles.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
                                             </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input ref={editFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
@@ -874,7 +1076,20 @@ export default function JournalView({
                                                     ))}
                                                 </ul>
                                             ) : (
-                                                <div className="helper">Keine Dateien vorhanden</div>
+                                                <div 
+                                                    style={{ 
+                                                        marginTop: 8, 
+                                                        padding: 20, 
+                                                        border: '2px dashed var(--border)', 
+                                                        borderRadius: 8, 
+                                                        textAlign: 'center',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => editFileInputRef.current?.click?.()}
+                                                >
+                                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                                    <div className="helper">Dateien hierher ziehen oder klicken</div>
+                                                </div>
                                             )
                                         )}
                                     </div>

@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -22,6 +22,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setIncludeBindings?: (v: boolean) => void
   includeVoucherList?: boolean
   setIncludeVoucherList?: (v: boolean) => void
+  includeBudgets?: boolean
+  setIncludeBudgets?: (v: boolean) => void
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -151,6 +153,15 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                     style={{ marginRight: 6 }} 
                   />
                   Zweckbindungen einbeziehen
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={includeBudgets ?? false} 
+                    onChange={(e) => setIncludeBudgets?.(e.target.checked)} 
+                    style={{ marginRight: 6 }} 
+                  />
+                  Budgets einbeziehen
                 </label>
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
                   <input 

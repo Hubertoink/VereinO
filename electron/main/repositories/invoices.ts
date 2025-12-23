@@ -156,7 +156,7 @@ export function listInvoicesPaged(filters: {
   const d = getDb()
   const { limit = 20, offset = 0, status, sphere, budgetId, q, dueFrom, dueTo, tag } = filters
   const sort = (filters.sort === 'ASC' || filters.sort === 'DESC') ? filters.sort : undefined
-  const sortBy = (filters.sortBy === 'date' || filters.sortBy === 'due' || (filters as any).sortBy === 'amount') ? (filters as any).sortBy : undefined
+  const sortBy = (filters.sortBy === 'date' || filters.sortBy === 'due' || filters.sortBy === 'amount' || filters.sortBy === 'status') ? filters.sortBy : undefined
   const params: any[] = []
   const wh: string[] = []
   let joinTag = ''
@@ -178,7 +178,9 @@ export function listInvoicesPaged(filters: {
     ? 'i.date'
     : (sortBy === 'amount')
       ? 'i.gross_amount'
-      : 'COALESCE(i.due_date, i.date)'
+      : (sortBy === 'status')
+        ? "CASE WHEN IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) >= i.gross_amount THEN 2 WHEN IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) > 0 THEN 1 ELSE 0 END"
+        : 'COALESCE(i.due_date, i.date)'
   const orderDir = sort ?? 'ASC'
 
   const rows = d.prepare(`
@@ -206,7 +208,29 @@ export function listInvoicesPaged(filters: {
   })
 
   const filtered = (status && status !== 'ALL') ? mapped.filter(r => r.status === status) : mapped
-  return { rows: filtered, total }
+  
+  // Recalculate total after status filter by counting all matching rows (not just the limited result)
+  let actualTotal = total
+  if (status && status !== 'ALL') {
+    // We need to count all rows with this status, not just the limited result
+    // Fetch all rows without limit to count them properly
+    const allRowsForCount = d.prepare(`
+      SELECT 
+        i.id,
+        i.gross_amount as grossAmount,
+        IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum
+      ${base}
+      GROUP BY i.id
+    `).all(...params) as any[]
+    
+    const allMapped = allRowsForCount.map(r => {
+      const status2 = computeStatus(Number(r.grossAmount || 0), Number(r.paidSum || 0))
+      return { ...r, status: status2 as InvoiceStatus }
+    })
+    actualTotal = allMapped.filter(r => r.status === status).length
+  }
+  
+  return { rows: filtered, total: actualTotal }
 }
 
 export function summarizeInvoices(filters: {

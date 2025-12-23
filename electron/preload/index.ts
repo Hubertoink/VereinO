@@ -185,7 +185,37 @@ contextBridge.exposeInMainWorld('api', {
     },
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),
-        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath })
+        openPath: (fullPath: string) => ipcRenderer.invoke('shell.openPath', { fullPath }),
+        openExternal: (url: string) => ipcRenderer.invoke('shell.openExternal', { url })
+    },
+    submissions: {
+        list: (payload?: any) => ipcRenderer.invoke('submissions.list', payload),
+        get: (payload: any) => ipcRenderer.invoke('submissions.get', payload),
+        import: (payload: any) => ipcRenderer.invoke('submissions.import', payload),
+        importFromFile: () => ipcRenderer.invoke('submissions.importFromFile'),
+        approve: (payload: any) => ipcRenderer.invoke('submissions.approve', payload),
+        reject: (payload: any) => ipcRenderer.invoke('submissions.reject', payload),
+        delete: (payload: any) => ipcRenderer.invoke('submissions.delete', payload),
+        convert: (payload: any) => ipcRenderer.invoke('submissions.convert', payload),
+        summary: () => ipcRenderer.invoke('submissions.summary'),
+        readAttachment: (payload: any) => ipcRenderer.invoke('submissions.readAttachment', payload)
+    },
+    organizations: {
+        list: () => ipcRenderer.invoke('organizations.list'),
+        active: () => ipcRenderer.invoke('organizations.active'),
+        create: (payload: { name: string }) => ipcRenderer.invoke('organizations.create', payload),
+        switch: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.switch', payload),
+        rename: (payload: { orgId: string; name: string }) => ipcRenderer.invoke('organizations.rename', payload),
+        delete: (payload: { orgId: string; deleteData?: boolean }) => ipcRenderer.invoke('organizations.delete', payload),
+        getAppearance: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.getAppearance', payload),
+        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => 
+            ipcRenderer.invoke('organizations.setAppearance', payload),
+        activeAppearance: () => ipcRenderer.invoke('organizations.activeAppearance'),
+        onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => {
+            const handler = (_: any, org: { id: string; name: string; dbRoot: string }) => cb(org)
+            ipcRenderer.on('organizations:switched', handler)
+            return () => ipcRenderer.removeListener('organizations:switched', handler)
+        }
     }
 })
 

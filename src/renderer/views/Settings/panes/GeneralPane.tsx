@@ -29,6 +29,12 @@ export function GeneralPane({
   dateFmt,
   setDateFmt,
   openSetupWizard,
+  showSubmissionBadge,
+  setShowSubmissionBadge,
+  backgroundImage,
+  setBackgroundImage,
+  glassModals,
+  setGlassModals,
 }: GeneralPaneProps) {
   // Date format examples
   const sample = '2025-01-15'
@@ -51,73 +57,17 @@ export function GeneralPane({
         </div>
       </div>
 
-      {/* Cluster 1: Darstellung & Layout */}
+      {/* Cluster: Farbschema & Design - organization-specific */}
       <div className="card settings-card settings-pane-card">
         <div className="settings-title">
-          <span aria-hidden="true">🖼️</span> <strong>Aussehen & Navigation</strong>
+          <span aria-hidden="true">🎨</span> <strong>Farbschema & Design</strong>
         </div>
-        <div className="settings-sub">Passe die Darstellung deiner Buchungen und Menüs an.</div>
-        <div className="row">
-          <div className="field">
-            <label htmlFor="select-row-style">Buchungen: Zeilenlayout</label>
-            <select id="select-row-style" className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
-              <option value="both">Linien + Zebra</option>
-              <option value="lines">Nur Linien</option>
-              <option value="zebra">Nur Zebra</option>
-              <option value="none">Ohne Linien/Zebra</option>
-            </select>
-            <div className="helper">
-              "Nur Linien" entspricht der Verbindlichkeiten-Tabelle. "Zebra" hebt jede zweite Zeile leicht hervor.
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="select-row-density">Buchungen: Zeilenhöhe</label>
-            <select id="select-row-density" className="input" value={journalRowDensity} onChange={(e) => setJournalRowDensity(e.target.value as any)}>
-              <option value="normal">Normal</option>
-              <option value="compact">Kompakt</option>
-            </select>
-            <div className="helper">„Kompakt" reduziert die vertikale Polsterung der Tabellenzellen.</div>
-          </div>
-          <div className="field">
-            <label htmlFor="select-nav-layout">Menü-Layout</label>
-            <select id="select-nav-layout" className="input" value={navLayout} onChange={(e) => setNavLayout(e.target.value as 'left' | 'top')}>
-              <option value="left">Links (klassisch)</option>
-              <option value="top">Oben (icons)</option>
-            </select>
-            <div className="helper">
-              „Oben" blendet die Seitenleiste aus und zeigt eine kompakte Icon-Leiste im Kopfbereich.
-            </div>
-          </div>
-          {navLayout === 'left' && (
-            <div className="field">
-              <div className="label-row">
-                <label htmlFor="toggle-sidebar-compact">Kompakte Seitenleiste</label>
-                <input
-                  id="toggle-sidebar-compact"
-                  role="switch"
-                  aria-checked={sidebarCollapsed}
-                  className="toggle"
-                  type="checkbox"
-                  checked={sidebarCollapsed}
-                  onChange={(e) => setSidebarCollapsed(e.target.checked)}
-                />
-              </div>
-            </div>
-          )}
-          <div className="field">
-            <div className="label-row">
-              <label htmlFor="toggle-menu-icons">Farbige Menüicons</label>
-              <input
-                id="toggle-menu-icons"
-                role="switch"
-                aria-checked={navIconColorMode === 'color'}
-                className="toggle"
-                type="checkbox"
-                checked={navIconColorMode === 'color'}
-                onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
-              />
-            </div>
-          </div>
+        <div className="settings-sub">
+          Diese Einstellungen werden pro Organisation gespeichert.
+        </div>
+        
+        {/* Theme and Background */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
           <div className="field">
             <label htmlFor="select-color-theme">Farb-Theme</label>
             <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
@@ -132,7 +82,139 @@ export function GeneralPane({
               <option value="soft-blush">Soft Blush ○</option>
               <option value="professional-light">Professional Light ○</option>
             </select>
-            <div className="helper">Wirkt auf Akzentfarben (Buttons, Hervorhebungen). ● = Dark | ○ = Light</div>
+            <div className="helper">● = Dark | ○ = Light</div>
+          </div>
+          <div className="field">
+            <label htmlFor="select-background-image">Hintergrundbild</label>
+            <select id="select-background-image" className="input" value={backgroundImage} onChange={(e) => setBackgroundImage(e.target.value as any)}>
+              <option value="none">Kein Hintergrundbild</option>
+              <option value="cherry-blossom">🌸 Kirschblüten</option>
+              <option value="foggy-forest">🌲 Nebliger Wald</option>
+              <option value="mountain-snow">🏔️ Schneeberge</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Glass effect toggle */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
+            <input
+              id="toggle-glass-modals"
+              role="switch"
+              aria-checked={glassModals}
+              className="toggle"
+              type="checkbox"
+              checked={glassModals}
+              onChange={(e) => setGlassModals(e.target.checked)}
+            />
+          </div>
+          <div className="helper" style={{ alignSelf: 'center' }}>Transparente Fenster mit Unschärfe-Effekt</div>
+        </div>
+      </div>
+
+      {/* Cluster: Navigation & Layout */}
+      <div className="card settings-card settings-pane-card">
+        <div className="settings-title">
+          <span aria-hidden="true">🧭</span> <strong>Navigation & Layout</strong>
+        </div>
+        <div className="settings-sub">Passe die Darstellung deiner Menüs und Buchungstabelle an.</div>
+        
+        {/* Row 1: Layout options */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label>Menü-Layout</label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn-option ${navLayout === 'left' ? 'active' : ''}`}
+                onClick={() => setNavLayout('left')}
+              >
+                Links (klassisch)
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${navLayout === 'top' ? 'active' : ''}`}
+                onClick={() => setNavLayout('top')}
+              >
+                Oben (icons)
+              </button>
+            </div>
+          </div>
+          <div className="field">
+            <label>Zeilenhöhe</label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn-option ${journalRowDensity === 'normal' ? 'active' : ''}`}
+                onClick={() => setJournalRowDensity('normal')}
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${journalRowDensity === 'compact' ? 'active' : ''}`}
+                onClick={() => setJournalRowDensity('compact')}
+              >
+                Kompakt
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Row style */}
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label htmlFor="select-row-style">Buchungen: Zeilenlayout</label>
+            <select id="select-row-style" className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
+              <option value="both">Linien + Zebra</option>
+              <option value="lines">Nur Linien</option>
+              <option value="zebra">Nur Zebra</option>
+              <option value="none">Ohne Linien/Zebra</option>
+            </select>
+          </div>
+          <div className="field" />
+        </div>
+
+        {/* Row 3: Toggles in a grid */}
+        <div className="settings-row-3col" style={{ marginTop: 16 }}>
+          {navLayout === 'left' && (
+            <div className="settings-inline-toggle">
+              <label htmlFor="toggle-sidebar-compact">Kompakte Seitenleiste</label>
+              <input
+                id="toggle-sidebar-compact"
+                role="switch"
+                aria-checked={sidebarCollapsed}
+                className="toggle"
+                type="checkbox"
+                checked={sidebarCollapsed}
+                onChange={(e) => setSidebarCollapsed(e.target.checked)}
+              />
+            </div>
+          )}
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-menu-icons">Farbige Menüicons</label>
+            <input
+              id="toggle-menu-icons"
+              role="switch"
+              aria-checked={navIconColorMode === 'color'}
+              className="toggle"
+              type="checkbox"
+              checked={navIconColorMode === 'color'}
+              onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
+            />
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-submission-badge">Menü-Badges</label>
+            <input
+              id="toggle-submission-badge"
+              role="switch"
+              aria-checked={showSubmissionBadge}
+              className="toggle"
+              type="checkbox"
+              checked={showSubmissionBadge}
+              onChange={(e) => setShowSubmissionBadge(e.target.checked)}
+            />
           </div>
         </div>
       </div>
@@ -143,22 +225,51 @@ export function GeneralPane({
           <span aria-hidden="true">🔎</span> <strong>Anzeige & Lesbarkeit</strong>
         </div>
         <div className="settings-sub">Kontrolliere Anzahl und Darstellung zentraler Informationen.</div>
-        <div className="row">
+        <div className="settings-row-2col" style={{ marginTop: 12 }}>
           <div className="field">
-            <label htmlFor="select-journal-limit">Buchungen: Anzahl der Einträge</label>
-            <select id="select-journal-limit" className="input" value={journalLimit} onChange={(e) => setJournalLimit(Number(e.target.value))}>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+            <label>Buchungen: Anzahl der Einträge</label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn-option ${journalLimit === 20 ? 'active' : ''}`}
+                onClick={() => setJournalLimit(20)}
+              >
+                20
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${journalLimit === 50 ? 'active' : ''}`}
+                onClick={() => setJournalLimit(50)}
+              >
+                50
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${journalLimit === 100 ? 'active' : ''}`}
+                onClick={() => setJournalLimit(100)}
+              >
+                100
+              </button>
+            </div>
           </div>
           <div className="field">
-            <label htmlFor="select-date-format">Datumsformat</label>
-            <select id="select-date-format" className="input" value={dateFmt} onChange={(e) => setDateFmt(e.target.value as any)}>
-              <option value="ISO">ISO (z.B. {sample})</option>
-              <option value="PRETTY">Lesbar (z.B. {pretty})</option>
-            </select>
-            <div className="helper">Wirkt u.a. in Buchungen (Datumsspalte) und Filter-Chips.</div>
+            <label>Datumsformat</label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn-option ${dateFmt === 'ISO' ? 'active' : ''}`}
+                onClick={() => setDateFmt('ISO')}
+              >
+                {sample}
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${dateFmt === 'PRETTY' ? 'active' : ''}`}
+                onClick={() => setDateFmt('PRETTY')}
+              >
+                {pretty}
+              </button>
+            </div>
           </div>
         </div>
       </div>

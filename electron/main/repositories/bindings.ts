@@ -53,13 +53,20 @@ export function deleteBinding(id: number) {
 
 export function bindingUsage(earmarkId: number, params?: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
     const d = getDb()
-    const wh: string[] = ['earmark_id = ?']
+    // Berechnung über die Junction-Tabelle voucher_earmarks für mehrere Zuordnungen pro Buchung
+    const wh: string[] = ['ve.earmark_id = ?']
     const vals: any[] = [earmarkId]
-    if (params?.from) { wh.push('date >= ?'); vals.push(params.from) }
-    if (params?.to) { wh.push('date <= ?'); vals.push(params.to) }
-    if (params?.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
+    if (params?.from) { wh.push('v.date >= ?'); vals.push(params.from) }
+    if (params?.to) { wh.push('v.date <= ?'); vals.push(params.to) }
+    if (params?.sphere) { wh.push('v.sphere = ?'); vals.push(params.sphere) }
     const whereSql = ' WHERE ' + wh.join(' AND ')
-    const rows = d.prepare(`SELECT type, IFNULL(SUM(gross_amount),0) as gross FROM vouchers${whereSql} GROUP BY type`).all(...vals) as any[]
+    const rows = d.prepare(`
+        SELECT v.type, IFNULL(SUM(ve.amount),0) as gross 
+        FROM voucher_earmarks ve 
+        JOIN vouchers v ON v.id = ve.voucher_id
+        ${whereSql} 
+        GROUP BY v.type
+    `).all(...vals) as any[]
     let allocated = 0, released = 0
     for (const r of rows) {
         if (r.type === 'IN') allocated += r.gross || 0
@@ -70,18 +77,18 @@ export function bindingUsage(earmarkId: number, params?: { from?: string; to?: s
     const balance = Math.round((allocated - released) * 100) / 100
     const remaining = Math.round(((budget + allocated - released) * 100)) / 100
     // Counts: total, inside, and outside relative to earmark's own date range
-    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE earmark_id=?`).get(earmarkId) as any
+    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_earmarks WHERE earmark_id=?`).get(earmarkId) as any
     const totalCount = Number(totalCountRow?.c || 0)
     const startDate = metaRow?.startDate || null
     const endDate = metaRow?.endDate || null
     let insideCount = totalCount
     let outsideCount = 0
     if (startDate || endDate) {
-        const wh2: string[] = ['earmark_id = ?']
+        const wh2: string[] = ['ve.earmark_id = ?']
         const vals2: any[] = [earmarkId]
-        if (startDate) { wh2.push('date >= ?'); vals2.push(startDate) }
-        if (endDate) { wh2.push('date <= ?'); vals2.push(endDate) }
-        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM vouchers WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
+        if (startDate) { wh2.push('v.date >= ?'); vals2.push(startDate) }
+        if (endDate) { wh2.push('v.date <= ?'); vals2.push(endDate) }
+        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_earmarks ve JOIN vouchers v ON v.id = ve.voucher_id WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
         insideCount = Number(insideRow?.c || 0)
         outsideCount = Math.max(0, totalCount - insideCount)
     }

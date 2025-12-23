@@ -425,6 +425,99 @@ export const MIGRATIONS: Mig[] = [
     ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE earmarks ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    version: 21,
+    up: `
+    -- Submissions: Vouchers submitted by members for review by the treasurer
+    CREATE TABLE IF NOT EXISTS submissions (
+      id INTEGER PRIMARY KEY,
+      external_id TEXT,
+      date TEXT NOT NULL,
+      type TEXT CHECK(type IN ('IN','OUT')) NOT NULL DEFAULT 'OUT',
+      description TEXT,
+      gross_amount NUMERIC NOT NULL DEFAULT 0,
+      category_hint TEXT,
+      counterparty TEXT,
+      submitted_by TEXT NOT NULL,
+      submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      status TEXT CHECK(status IN ('pending','approved','rejected')) NOT NULL DEFAULT 'pending',
+      reviewed_at TEXT,
+      reviewer_notes TEXT,
+      voucher_id INTEGER,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS submission_attachments (
+      id INTEGER PRIMARY KEY,
+      submission_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT,
+      data BLOB NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(submission_id) REFERENCES submissions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+    CREATE INDEX IF NOT EXISTS idx_submissions_date ON submissions(date);
+    CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission ON submission_attachments(submission_id);
+    `
+  },
+  {
+    version: 22,
+    up: `
+    -- Add sphere and payment_method to submissions
+    ALTER TABLE submissions ADD COLUMN sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB'));
+    ALTER TABLE submissions ADD COLUMN payment_method TEXT CHECK(payment_method IN ('BAR','BANK'));
+    `
+  },
+  {
+    version: 23,
+    up: `
+    -- Add partial budget/earmark amount columns to vouchers
+    -- When NULL, the full gross_amount is used
+    ALTER TABLE vouchers ADD COLUMN budget_amount REAL;
+    ALTER TABLE vouchers ADD COLUMN earmark_amount REAL;
+    `
+  },
+  {
+    version: 24,
+    up: `
+    -- Junction tables for multiple budgets/earmarks per voucher
+    CREATE TABLE IF NOT EXISTS voucher_budgets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+      budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(voucher_id, budget_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_voucher_budgets_voucher ON voucher_budgets(voucher_id);
+    CREATE INDEX IF NOT EXISTS idx_voucher_budgets_budget ON voucher_budgets(budget_id);
+
+    CREATE TABLE IF NOT EXISTS voucher_earmarks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+      earmark_id INTEGER NOT NULL REFERENCES earmarks(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(voucher_id, earmark_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_voucher ON voucher_earmarks(voucher_id);
+    CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
+
+    -- Migrate existing budget assignments to junction table
+    INSERT INTO voucher_budgets (voucher_id, budget_id, amount)
+    SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
+    FROM vouchers
+    WHERE budget_id IS NOT NULL;
+
+    -- Migrate existing earmark assignments to junction table
+    INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount)
+    SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
+    FROM vouchers
+    WHERE earmark_id IS NOT NULL;
+    `
   }
 ]
 

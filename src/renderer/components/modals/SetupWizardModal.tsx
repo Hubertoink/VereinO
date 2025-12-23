@@ -1,13 +1,37 @@
-/* eslint-disable */
+﻿ 
 import React, { useEffect, useMemo, useState } from 'react'
 
 type NavLayout = 'left' | 'top'
 type NavIconColorMode = 'color' | 'mono'
-type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
+type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm' | 'soft-blush' | 'professional-light'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
+type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
+
+// Toggle button component for binary options
+function ToggleButtons<T extends string>({ value, onChange, options }: { 
+    value: T
+    onChange: (v: T) => void 
+    options: Array<{ value: T; label: string; icon?: string }>
+}) {
+    return (
+        <div className="toggle-button-group">
+            {options.map(opt => (
+                <button
+                    key={opt.value}
+                    type="button"
+                    className={`toggle-button ${value === opt.value ? 'active' : ''}`}
+                    onClick={() => onChange(opt.value)}
+                >
+                    {opt.icon && <span className="toggle-icon">{opt.icon}</span>}
+                    <span>{opt.label}</span>
+                </button>
+            ))}
+        </div>
+    )
+}
 
 export default function SetupWizardModal({
     onClose,
@@ -16,6 +40,7 @@ export default function SetupWizardModal({
     colorTheme, setColorTheme,
     journalRowStyle, setJournalRowStyle,
     journalRowDensity, setJournalRowDensity,
+    backgroundImage, setBackgroundImage,
     existingTags,
     notify
 }: {
@@ -30,6 +55,8 @@ export default function SetupWizardModal({
     setJournalRowStyle: (v: JournalRowStyle) => void
     journalRowDensity: JournalRowDensity
     setJournalRowDensity: (v: JournalRowDensity) => void
+    backgroundImage: BackgroundImage
+    setBackgroundImage: (v: BackgroundImage) => void
     existingTags: Array<{ name: string; color?: string | null }>
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
@@ -43,14 +70,8 @@ export default function SetupWizardModal({
     const [colsOrder, setColsOrder] = useState<ColKey[]>(['actions', 'date', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat'])
     const mandatoryCols: ColKey[] = ['actions','date','description','gross']
 
-    // Defaults for first-run preview (as per request): top menu, colored icons, compact rows
-    useEffect(() => {
-        // Apply a pleasant preview immediately (non-destructive; persistence happens on Finish)
-        try { setNavLayout('top') } catch {}
-        try { setNavIconColorMode('color') } catch {}
-        try { setJournalRowDensity('compact') } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    // Note: We no longer override existing settings on wizard open.
+    // The wizard now shows current values and only persists on "Fertig".
 
     // Load existing values to prefill
     useEffect(() => {
@@ -356,55 +377,111 @@ export default function SetupWizardModal({
             )
         }
         if (step === 2) {
+            const themeOptions: Array<{ value: ColorTheme; label: string; isLight?: boolean }> = [
+                { value: 'default', label: 'Standard' },
+                { value: 'fiery-ocean', label: 'Fiery Ocean' },
+                { value: 'peachy-delight', label: 'Peachy Delight' },
+                { value: 'pastel-dreamland', label: 'Pastel Dreamland' },
+                { value: 'ocean-breeze', label: 'Ocean Breeze' },
+                { value: 'earthy-tones', label: 'Earthy Tones' },
+                { value: 'monochrome-harmony', label: 'Monochrome' },
+                { value: 'vintage-charm', label: 'Vintage Charm' },
+                { value: 'soft-blush', label: 'Soft Blush', isLight: true },
+                { value: 'professional-light', label: 'Professional', isLight: true }
+            ]
+            const bgOptions: Array<{ value: BackgroundImage; label: string }> = [
+                { value: 'none', label: 'Keiner' },
+                { value: 'cherry-blossom', label: 'Kirschblüten' },
+                { value: 'foggy-forest', label: 'Nebelwald' },
+                { value: 'mountain-snow', label: 'Bergschnee' }
+            ]
             return (
-                <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="row">
-                        <div className="field" style={{ minWidth: 220 }}>
+                <div className="card setup-appearance-card">
+                    {/* Row 1: Binary toggles */}
+                    <div className="setup-toggle-row">
+                        <div className="setup-field">
                             <label>Menü-Layout</label>
-                            <select className="input" value={navLayout} onChange={(e) => setNavLayout(e.target.value as NavLayout)}>
-                                <option value="left">Links (klassisch)</option>
-                                <option value="top">Oben (kompakt)</option>
-                            </select>
-                            <div className="helper">„Oben“ zeigt eine kompakte Icon-Leiste am oberen Rand.</div>
+                            <ToggleButtons
+                                value={navLayout}
+                                onChange={setNavLayout}
+                                options={[
+                                    { value: 'left', label: 'Links', icon: '' },
+                                    { value: 'top', label: 'Oben', icon: '' }
+                                ]}
+                            />
                         </div>
-                        <div className="field" style={{ minWidth: 220 }}>
-                            <label>Farbige Menü-Icons</label>
-                            <select className="input" value={navIconColorMode} onChange={(e) => setNavIconColorMode(e.target.value as NavIconColorMode)}>
-                                <option value="mono">Monochrom</option>
-                                <option value="color">Farbig</option>
-                            </select>
+                        <div className="setup-field">
+                            <label>Menü-Icons</label>
+                            <ToggleButtons
+                                value={navIconColorMode}
+                                onChange={setNavIconColorMode}
+                                options={[
+                                    { value: 'mono', label: 'Mono', icon: '' },
+                                    { value: 'color', label: 'Farbig', icon: '' }
+                                ]}
+                            />
                         </div>
-                        <div className="field" style={{ minWidth: 220 }}>
+                        <div className="setup-field">
                             <label>Zeilenhöhe</label>
-                            <select className="input" value={journalRowDensity} onChange={(e) => setJournalRowDensity(e.target.value as JournalRowDensity)}>
-                                <option value="normal">Normal</option>
-                                <option value="compact">Kompakt</option>
-                            </select>
+                            <ToggleButtons
+                                value={journalRowDensity}
+                                onChange={setJournalRowDensity}
+                                options={[
+                                    { value: 'normal', label: 'Normal', icon: '' },
+                                    { value: 'compact', label: 'Kompakt', icon: '' }
+                                ]}
+                            />
                         </div>
-                        <div className="field" style={{ minWidth: 220 }}>
+                        <div className="setup-field">
                             <label>Zeilenlayout</label>
                             <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as JournalRowStyle)}>
                                 <option value="both">Linien + Zebra</option>
                                 <option value="lines">Nur Linien</option>
                                 <option value="zebra">Nur Zebra</option>
-                                <option value="none">Ohne Linien/Zebra</option>
-                            </select>
-                        </div>
-                        <div className="field" style={{ minWidth: 220 }}>
-                            <label>Farb-Theme</label>
-                            <select className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as ColorTheme)}>
-                                <option value="default">Standard</option>
-                                <option value="fiery-ocean">Fiery Ocean</option>
-                                <option value="peachy-delight">Peachy Delight</option>
-                                <option value="pastel-dreamland">Pastel Dreamland</option>
-                                <option value="ocean-breeze">Ocean Breeze</option>
-                                <option value="earthy-tones">Earthy Tones</option>
-                                <option value="monochrome-harmony">Monochrome Harmony</option>
-                                <option value="vintage-charm">Vintage Charm</option>
+                                <option value="none">Ohne</option>
                             </select>
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    
+                    {/* Row 2: Theme selection */}
+                    <div className="setup-section">
+                        <label>Farb-Theme</label>
+                        <div className="theme-picker">
+                            {themeOptions.map(t => (
+                                <button
+                                    key={t.value}
+                                    type="button"
+                                    className={`theme-chip ${colorTheme === t.value ? 'active' : ''}`}
+                                    onClick={() => setColorTheme(t.value)}
+                                    data-theme={t.value}
+                                >
+                                    <span className="theme-swatch" data-theme={t.value} />
+                                    <span>{t.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Row 3: Background image */}
+                    <div className="setup-section">
+                        <label>Hintergrundbild</label>
+                        <div className="background-picker">
+                            {bgOptions.map(bg => (
+                                <button
+                                    key={bg.value}
+                                    type="button"
+                                    className={`background-chip ${backgroundImage === bg.value ? 'active' : ''}`}
+                                    onClick={() => setBackgroundImage(bg.value)}
+                                >
+                                    <span className={`background-preview bg-${bg.value}`} />
+                                    <span>{bg.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Preview row */}
+                    <div className="setup-preview-row">
                         <MiniNavPreview />
                         <MiniTablePreview />
                     </div>
@@ -577,11 +654,11 @@ export default function SetupWizardModal({
                     {step < LAST_STEP ? (
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button className="btn hover-highlight" onClick={() => setStep(s => Math.min(LAST_STEP, s + 1))}>Weiter</button>
-                            <button className="btn ghost hover-highlight" onClick={() => finish(true)}>Später</button>
+                            <button className="btn ghost hover-highlight" onClick={onClose}>Später</button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn ghost hover-highlight" onClick={() => finish(true)}>Später</button>
+                            <button className="btn ghost hover-highlight" onClick={onClose}>Später</button>
                             <button className="btn primary hover-highlight" onClick={() => finish(true)}>Fertig</button>
                         </div>
                     )}

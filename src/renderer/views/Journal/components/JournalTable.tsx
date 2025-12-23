@@ -1,4 +1,4 @@
-﻿import React, { useRef } from 'react'
+﻿import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay } from '../../../utils/icons'
 
 // Helper function for contrast text color
@@ -13,6 +13,22 @@ function contrastText(bg?: string | null) {
     // Perceived luminance
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
     return luminance > 0.6 ? '#000' : '#fff'
+}
+
+// LocalStorage key for column widths
+const COLUMN_WIDTHS_KEY = 'journal-column-widths'
+
+function loadColumnWidths(): Record<string, number> {
+    try {
+        const stored = localStorage.getItem(COLUMN_WIDTHS_KEY)
+        return stored ? JSON.parse(stored) : {}
+    } catch { return {} }
+}
+
+function saveColumnWidths(widths: Record<string, number>) {
+    try {
+        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths))
+    } catch { /* ignore */ }
 }
 
 interface JournalTableProps {
@@ -95,6 +111,73 @@ export default function JournalTable({
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
+    
+    // Column resize state
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
+    const resizingCol = useRef<string | null>(null)
+    const resizeStartX = useRef<number>(0)
+    const resizeStartWidth = useRef<number>(0)
+    const tableRef = useRef<HTMLTableElement>(null)
+
+    // Save column widths when they change
+    useEffect(() => {
+        if (Object.keys(columnWidths).length > 0) {
+            saveColumnWidths(columnWidths)
+        }
+    }, [columnWidths])
+
+    // Handle resize start
+    const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        resizingCol.current = colKey
+        resizeStartX.current = e.clientX
+        
+        // Get current column width
+        const th = (e.target as HTMLElement).closest('th')
+        resizeStartWidth.current = th?.offsetWidth || 100
+        
+        document.addEventListener('mousemove', handleResizeMove)
+        document.addEventListener('mouseup', handleResizeEnd)
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+    }, [])
+
+    // Handle resize move
+    const handleResizeMove = useCallback((e: MouseEvent) => {
+        if (!resizingCol.current || !tableRef.current) return
+        const delta = e.clientX - resizeStartX.current
+        const newWidth = Math.max(40, resizeStartWidth.current + delta)
+        
+        // Get container width to limit total table width
+        const container = tableRef.current.parentElement
+        if (container) {
+            const containerWidth = container.clientWidth
+            const currentTableWidth = tableRef.current.offsetWidth
+            const currentColWidth = resizeStartWidth.current
+            const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
+            
+            // If table would exceed container, limit the column width
+            if (projectedTableWidth > containerWidth && delta > 0) {
+                const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
+                if (maxNewWidth > 40) {
+                    setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(40, maxNewWidth) }))
+                }
+                return
+            }
+        }
+        
+        setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
+    }, [])
+
+    // Handle resize end
+    const handleResizeEnd = useCallback(() => {
+        resizingCol.current = null
+        document.removeEventListener('mousemove', handleResizeMove)
+        document.removeEventListener('mouseup', handleResizeEnd)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+    }, [handleResizeMove])
 
     function onHeaderDragStart(e: React.DragEvent<HTMLTableCellElement>, idx: number) {
         dragIdx.current = idx
@@ -146,13 +229,47 @@ export default function JournalTable({
         if (!lockedUntil) return false
         return String(d) <= String(lockedUntil)
     }
+
+    // Column width configuration for fixed table layout (default values)
+    const defaultColWidths: Record<string, number> = {
+        actions: 50,
+        date: 90,
+        voucherNo: 110,
+        type: 70,
+        sphere: 70,
+        description: 200,
+        earmark: 120,
+        budget: 130,
+        paymentMethod: 95,
+        attachments: 40,
+        net: 85,
+        vat: 70,
+        gross: 95
+    }
+
+    // Get column width (user-defined or default)
+    const getColWidth = (k: string): string => {
+        if (columnWidths[k]) return `${columnWidths[k]}px`
+        if (k === 'description') return 'auto' // description flexes
+        return `${defaultColWidths[k] || 100}px`
+    }
+
+    // Render resize handle
+    const ResizeHandle = ({ colKey }: { colKey: string }) => (
+        <span
+            className="col-resize-handle"
+            onMouseDown={(e) => handleResizeStart(e, colKey)}
+            onClick={(e) => e.stopPropagation()}
+        />
+    )
+
     const tdFor = (k: string, r: any) => (
         k === 'actions' ? (
             <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
                 {isLocked(r.date) ? (
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -209,10 +326,14 @@ export default function JournalTable({
                         const to = r.transferTo
                         const title = from && to ? `${from} → ${to}` : 'Transfer'
                         return (
-                            <span className="badge" title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                {from === 'BAR' ? <IconCash /> : <IconBank />}
-                                <IconArrow />
-                                {to === 'BAR' ? <IconCash /> : <IconBank />}
+                            <span className="badge pm-transfer" title={title} aria-label={title}>
+                                <span className={`pm-icon ${from === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
+                                    {from === 'BAR' ? <IconCash /> : <IconBank />}
+                                </span>
+                                <span className="transfer-arrow">→</span>
+                                <span className={`pm-icon ${to === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
+                                    {to === 'BAR' ? <IconCash /> : <IconBank />}
+                                </span>
                             </span>
                         )
                     })()
@@ -253,10 +374,29 @@ export default function JournalTable({
         )
     )
     return (
-        <table className="journal-table" cellPadding={6}>
+        <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
+            <colgroup>
+                {visibleOrder.map((k) => (
+                    <col key={k} style={{ width: getColWidth(k) }} />
+                ))}
+            </colgroup>
             <thead>
                 <tr>
-                    {visibleOrder.map((k) => thFor(k))}
+                    {visibleOrder.map((k, idx) => {
+                        const isLast = idx === visibleOrder.length - 1
+                        const th = thFor(k)
+                        // Clone the th and add resize handle
+                        return React.cloneElement(th, {
+                            key: k,
+                            className: `${th.props.className || ''} resizable-th`.trim(),
+                            children: (
+                                <>
+                                    {th.props.children}
+                                    {!isLast && <ResizeHandle colKey={k} />}
+                                </>
+                            )
+                        })
+                    })}
                 </tr>
             </thead>
             <tbody>

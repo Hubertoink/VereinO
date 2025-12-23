@@ -64,6 +64,10 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowStyle={props.setJournalRowStyle}
             journalRowDensity={props.journalRowDensity}
             setJournalRowDensity={props.setJournalRowDensity}
+            backgroundImage={props.backgroundImage}
+            setBackgroundImage={props.setBackgroundImage}
+            glassModals={props.glassModals}
+            setGlassModals={props.setGlassModals}
             dateFmt={props.dateFmt}
             setDateFmt={props.setDateFmt}
             journalLimit={props.journalLimit}
@@ -71,6 +75,8 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
+            showSubmissionBadge={props.showSubmissionBadge}
+            setShowSubmissionBadge={props.setShowSubmissionBadge}
           />
         )}
         

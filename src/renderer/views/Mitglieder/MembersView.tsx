@@ -3,19 +3,6 @@ import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 
-// Local helpers ported from App
-function contrastText(bg?: string | null) {
-    if (!bg) return '#000'
-    const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-    if (!m) return '#000'
-    const hex = m[1]
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? '#000' : '#fff'
-}
-
 export default function MembersView() {
     const [q, setQ] = useState('')
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
@@ -32,7 +19,6 @@ export default function MembersView() {
     const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
         mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
-    const [formTab, setFormTab] = useState<'PERSON'|'FINANCE'|'MANDATE'|'MEMBERSHIP'>('PERSON')
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
     const [deleteBusy, setDeleteBusy] = useState(false)
     const [boardRoleError, setBoardRoleError] = useState<string | null>(null)
@@ -183,7 +169,6 @@ export default function MembersView() {
 
     useEffect(() => {
         if (!form) return
-        if (form.mode === 'create') { setRequiredTouched(false); setMissingRequired([]); setFormTab('PERSON'); setAddrStreet(''); setAddrZip(''); setAddrCity('') }
         // Keyboard shortcuts: Ctrl+S to save, Esc to close
         function onKey(e: KeyboardEvent) {
             if (e.key === 'Escape') { setForm(null); e.preventDefault(); return }
@@ -278,7 +263,7 @@ export default function MembersView() {
                 <div className="members-header-right">
                     <div className="helper">{busy ? <LoadingState size="small" message="" /> : `Seite ${page}/${pages} – ${total} Einträge`}</div>
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
-                    <button className="btn btn-accent" onClick={() => { setFormTab('PERSON'); setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
+                    <button className="btn btn-accent" onClick={() => { setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
                         iban: null, bic: null, contribution_amount: null, contribution_interval: null,
                         mandate_ref: null, mandate_date: null, join_date: null, leave_date: null, notes: null, next_due_date: null
@@ -368,7 +353,7 @@ export default function MembersView() {
                                 </td>
                             )}
                             <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                <button className="btn" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
+                                <button className="btn btn-edit" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
                                     id: r.id,
                                     memberNo: r.memberNo ?? null,
                                     name: r.name,
@@ -407,7 +392,7 @@ export default function MembersView() {
 
             {form && (
                 <div className="modal-overlay" onClick={() => setForm(null)}>
-                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -419,133 +404,127 @@ export default function MembersView() {
                                 </button>
                             </div>
                         </header>
-                        <div role="tablist" aria-label="Mitglied bearbeiten" style={{ display: 'flex', gap: 6, borderBottom: '1px solid var(--border)', padding: '4px 0' }}>
-                                {([
-                                { k: 'PERSON', label: 'Persönliches', color: '#2962FF' },
-                                { k: 'FINANCE', label: 'Finanzdaten', color: '#00C853' },
-                                { k: 'MANDATE', label: 'Mandat', color: '#FFD600' },
-                                { k: 'MEMBERSHIP', label: 'Mitgliedschaft', color: '#7C4DFF' }
-                            ] as Array<{k: any; label: string; color: string}>).map(t => {
-                                const active = formTab === t.k
-                                const bg = active ? 'color-mix(in oklab, ' + t.color + ' 25%, transparent)' : undefined
-                                const br = active ? t.color : 'transparent'
-                                // Force white text for Mandat tab when active (yellow background)
-                                const textColor = active ? (t.k === 'MANDATE' ? '#fff' : contrastText(t.color)) : undefined
-                                return (
-                                    <button key={t.k} role="tab" aria-selected={active} className="btn" onClick={() => setFormTab(t.k)}
-                                        style={{ borderColor: br, background: bg, color: textColor }}>
-                                        {t.label}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                        <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                            <div style={{ display: 'grid', gap: 12 }}>
-                                {formTab === 'PERSON' && (
-                                    <div className="card" style={{ padding: 10 }}>
-                                        <div className="helper" title="Name, Kontakt und Anschrift">Persönliche Daten</div>
-                                        <div className="row" style={{ marginTop: 6 }}>
-                                            <div className="field">
-                                                <label>Mitglieds-Nr. <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
-                                                <input className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
-                                                {requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Mitgliedsnummer angeben</div>)}
-                                            </div>
-                                            <div className="field">
-                                                <label>Name <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
-                                                <input className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
-                                                {requiredTouched && (!form.draft.name || !form.draft.name.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Name angeben</div>)}
-                                            </div>
-                                            <div className="field"><label>E-Mail</label><input className="input" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
-                                            <div className="field"><label>Telefon</label><input className="input" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value || null } })} /></div>
-                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                <label>Adresse</label>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 1fr', gap: 6 }}>
-                                                    <input className="input" placeholder="Straße und Nr." value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} />
-                                                    <input className="input" placeholder="PLZ" value={addrZip} onChange={(e) => setAddrZip(e.target.value)} />
-                                                    <input className="input" placeholder="Ort" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
-                                                </div>
-                                            </div>
-                                            <div className="field"><label>Status</label>
-                                                <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
-                                                    <option value="ACTIVE">Aktiv</option>
-                                                    <option value="NEW">Neu</option>
-                                                    <option value="PAUSED">Pause</option>
-                                                    <option value="LEFT">Ausgetreten</option>
-                                                </select>
-                                            </div>
-                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                <label>Anmerkungen</label>
-                                                <textarea className="input" rows={3} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical' }} />
-                                            </div>
+
+                        {/* Two-column layout with all fields visible */}
+                        <div className="block-grid" style={{ marginTop: 12, gap: 8 }}>
+                            {/* Left column: Basis */}
+                            <div className="card" style={{ padding: 12 }}>
+                                <div className="helper" style={{ marginBottom: 8 }}>Basis</div>
+                                <div className="row">
+                                    <div className="field">
+                                        <label>Mitglieds-Nr. <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                        <input className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                        {requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
+                                    </div>
+                                    <div className="field">
+                                        <label>Name <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                        <input className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                        {requiredTouched && (!form.draft.name || !form.draft.name.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
+                                    </div>
+                                    <div className="field"><label>E-Mail</label><input className="input" type="email" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
+                                    <div className="field"><label>Telefon</label><input className="input" type="tel" inputMode="numeric" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value.replace(/[^0-9\s\-\+]/g, '') || null } })} /></div>
+                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                        <label>Adresse</label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 70px 1fr', gap: 6 }}>
+                                            <input className="input" placeholder="Straße und Nr." value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} />
+                                            <input className="input" inputMode="numeric" placeholder="PLZ" value={addrZip} onChange={(e) => setAddrZip(e.target.value.replace(/[^0-9]/g, ''))} maxLength={5} />
+                                            <input className="input" placeholder="Ort" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
                                         </div>
                                     </div>
-                                )}
-                                {formTab === 'FINANCE' && (
-                                    <div className="card" style={{ padding: 10 }}>
-                                        <div className="helper" title="Bankdaten und Beitrag">Finanzdaten</div>
-                                        <div className="row" style={{ marginTop: 6 }}>
-                                            {(() => { const v = validateIBAN(form.draft.iban); return (
-                                                <div className="field"><label title="IBAN mit Prüfziffer, Leerzeichen optional">IBAN</label>
-                                                    <input className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
-                                                    {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
-                                                </div>
-                                            ) })()}
-                                            {(() => { const v = validateBIC(form.draft.bic); return (
-                                                <div className="field"><label title="8 oder 11 Zeichen">BIC</label>
-                                                    <input className="input" placeholder="BANKDEFFXXX" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
-                                                    {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
-                                                </div>
-                                            ) })()}
-                                            <div className="field"><label title="Regelmäßiger Beitrag in Euro">Beitrag (EUR)</label>
-                                                <input className="input" type="number" step="0.01" placeholder="z.B. 12,00" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
-                                            </div>
-                                            <div className="field"><label title="Abbuchungsintervall">Intervall</label>
-                                                <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
-                                                    <option value="">—</option>
-                                                    <option value="MONTHLY">Monatlich</option>
-                                                    <option value="QUARTERLY">Quartal</option>
-                                                    <option value="YEARLY">Jährlich</option>
-                                                </select>
-                                            </div>
-                                            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                                <div className="helper" aria-live="polite">{nextDuePreview(form.draft.contribution_amount ?? null, form.draft.contribution_interval ?? null, form.draft.next_due_date ?? form.draft.mandate_date ?? form.draft.join_date ?? null) || '—'}</div>
-                                            </div>
+                                </div>
+                            </div>
+
+                            {/* Right column: Mitgliedschaft + Anmerkungen */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="card" style={{ padding: 12 }}>
+                                    <div className="helper" style={{ marginBottom: 8 }}>Mitgliedschaft</div>
+                                    <div className="row">
+                                        <div className="field">
+                                            <label>Eintritt <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                            <input className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                            {requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
+                                        </div>
+                                        <div className="field"><label>Austritt</label><input className="input" type="date" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /></div>
+                                        <div className="field">
+                                            <label>Status</label>
+                                            <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
+                                                <option value="ACTIVE">Aktiv</option>
+                                                <option value="NEW">Neu</option>
+                                                <option value="PAUSED">Pause</option>
+                                                <option value="LEFT">Ausgetreten</option>
+                                            </select>
+                                        </div>
+                                        <div className="field">
+                                            <label>Vorstandsfunktion</label>
+                                            <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => { setBoardRoleError(null); setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } }) }}>
+                                                <option value="">—</option>
+                                                <option value="V1">1. Vorsitz</option>
+                                                <option value="V2">2. Vorsitz</option>
+                                                <option value="KASSIER">Kassier</option>
+                                                <option value="KASSENPR1">1. Kassenprüfer</option>
+                                                <option value="KASSENPR2">2. Kassenprüfer</option>
+                                                <option value="SCHRIFT">Schriftführer</option>
+                                            </select>
+                                            {boardRoleError && <div className="helper" style={{ color: 'var(--danger)' }}>{boardRoleError}</div>}
                                         </div>
                                     </div>
-                                )}
-                                {formTab === 'MANDATE' && (
-                                    <div className="card" style={{ padding: 10 }}>
-                                        <div className="helper" title="SEPA-Lastschrift Mandat">Mandatsinfos</div>
-                                        <div className="row" style={{ marginTop: 6 }}>
-                                            <div className="field"><label title="Referenz auf SEPA-Mandat">Mandats-Ref.</label><input className="input" placeholder="M-2025-001" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} /></div>
-                                            <div className="field"><label>Mandats-Datum</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} /></div>
-                                        </div>
-                                    </div>
-                                )}
-                                {formTab === 'MEMBERSHIP' && (
-                                    <div className="card" style={{ padding: 10 }}>
-                                        <div className="helper" title="Mitgliedschaftsdaten">Mitgliedschaft</div>
-                                        <div className="row" style={{ marginTop: 6 }}>
-                                            <div className="field"><label>Eintritt <span className="helper" style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />{requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Eintrittsdatum angeben</div>)}</div>
-                                            <div className="field"><label>Austritt</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /></div>
-                                            <div className="field"><label>Initiale Fälligkeit</label><input className="input" type="date" placeholder="tt.mm.jjjj" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} /></div>
-                                            <div className="field"><label>Funktion (Vorstand)</label>
-                                                <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => { setBoardRoleError(null); setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } }) }}>
-                                                    <option value="">—</option>
-                                                    <option value="V1">1. Vorsitz</option>
-                                                    <option value="V2">2. Vorsitz</option>
-                                                    <option value="KASSIER">Kassier</option>
-                                                    <option value="KASSENPR1">1. Kassenprüfer</option>
-                                                    <option value="KASSENPR2">2. Kassenprüfer</option>
-                                                    <option value="SCHRIFT">Schriftführer</option>
-                                                </select>
-                                                {boardRoleError && <div className="helper" style={{ color: 'var(--danger)', marginTop: 4 }}>{boardRoleError}</div>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                </div>
+                                <div className="card" style={{ padding: 12, flex: 1 }}>
+                                    <div className="helper" style={{ marginBottom: 6 }}>Anmerkungen</div>
+                                    <textarea className="input" rows={2} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
+                                </div>
                             </div>
                         </div>
+
+                        {/* Finanzen block - full width, more compact */}
+                        <div className="card" style={{ padding: 12, marginTop: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
+                                <div className="helper">Finanzen & SEPA-Mandat</div>
+                                <div className="helper" style={{ fontSize: '0.85em' }} aria-live="polite">{nextDuePreview(form.draft.contribution_amount ?? null, form.draft.contribution_interval ?? null, form.draft.next_due_date ?? form.draft.mandate_date ?? form.draft.join_date ?? null) || ''}</div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                                {(() => { const v = validateIBAN(form.draft.iban); return (
+                                    <div className="field" style={{ gridColumn: 'span 2' }}>
+                                        <label title="IBAN mit Prüfziffer">IBAN</label>
+                                        <input className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                        {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
+                                    </div>
+                                ) })()}
+                                {(() => { const v = validateBIC(form.draft.bic); return (
+                                    <div className="field">
+                                        <label title="8 oder 11 Zeichen">BIC</label>
+                                        <input className="input" placeholder="BANKDEFFXXX" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                        {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
+                                    </div>
+                                ) })()}
+                                <div className="field">
+                                    <label>Mandats-Ref.</label>
+                                    <input className="input" placeholder="M-2025-001" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} />
+                                </div>
+                                <div className="field">
+                                    <label>Beitrag (EUR)</label>
+                                    <input className="input" type="number" step="0.01" placeholder="z.B. 12,00" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
+                                </div>
+                                <div className="field">
+                                    <label>Intervall</label>
+                                    <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
+                                        <option value="">—</option>
+                                        <option value="MONTHLY">Monatlich</option>
+                                        <option value="QUARTERLY">Quartal</option>
+                                        <option value="YEARLY">Jährlich</option>
+                                    </select>
+                                </div>
+                                <div className="field">
+                                    <label>Mandats-Datum</label>
+                                    <input className="input" type="date" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} />
+                                </div>
+                                <div className="field">
+                                    <label>Nächste Fälligkeit</label>
+                                    <input className="input" type="date" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} />
+                                </div>
+                            </div>
+                        </div>
+
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
                             <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
                             <div style={{ display: 'flex', gap: 8 }}>

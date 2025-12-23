@@ -36,7 +36,19 @@ type DB = any
 let db: DB | undefined
 
 // Simple app-level JSON config (outside DB) to remember custom DB location
-type AppConfig = { dbRoot?: string }
+type AppConfig = { 
+    dbRoot?: string
+    activeOrgId?: string
+    organizations?: Array<{
+        id: string
+        name: string
+        dbRoot: string
+        createdAt: string
+        colorTheme?: string
+        backgroundImage?: string
+        glassModals?: boolean
+    }>
+}
 function getConfigPath() {
     const ud = app.getPath('userData')
     if (!fs.existsSync(ud)) fs.mkdirSync(ud, { recursive: true })
@@ -159,4 +171,293 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
     writeAppConfig({ ...readAppConfig(), dbRoot: dstRoot })
 
     return { root: dstRoot, dbPath: dstDbPath, filesDir: dstFilesDir }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-Organization Support
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateOrgId(): string {
+    return 'org_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+}
+
+/**
+ * List all organizations from the app config.
+ * If no organizations exist, returns the current DB as a "default" organization.
+ */
+export function listOrganizations(): Array<{ id: string; name: string; dbRoot: string; createdAt: string; isActive: boolean }> {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    const activeId = cfg.activeOrgId
+    
+    // If no orgs defined, create a virtual entry for the current DB
+    if (orgs.length === 0) {
+        const currentRoot = getConfiguredRoot()
+        return [{
+            id: 'default',
+            name: 'Standard',
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString(),
+            isActive: true
+        }]
+    }
+    
+    return orgs.map(o => ({ ...o, isActive: o.id === activeId }))
+}
+
+/**
+ * Get the currently active organization
+ */
+export function getActiveOrganization(): { id: string; name: string; dbRoot: string; createdAt: string } | null {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    const activeId = cfg.activeOrgId || 'default'
+    
+    if (orgs.length === 0) {
+        const currentRoot = getConfiguredRoot()
+        return { id: 'default', name: 'Standard', dbRoot: currentRoot, createdAt: new Date().toISOString() }
+    }
+    
+    return orgs.find(o => o.id === activeId) || orgs[0] || null
+}
+
+/**
+ * Create a new organization with its own database folder.
+ * The folder is created under userData/organizations/<id>/
+ */
+export function createOrganization(name: string): { id: string; name: string; dbRoot: string; createdAt: string } {
+    if (!name || typeof name !== 'string' || !name.trim()) {
+        throw new Error('Organisationsname ist erforderlich')
+    }
+    
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    
+    // Migrate existing DB to first org if this is the first creation
+    if (orgs.length === 0 && cfg.dbRoot !== undefined) {
+        // There's already a DB in use - create a "default" entry for it
+        const currentRoot = getConfiguredRoot()
+        const defaultOrg = {
+            id: 'default',
+            name: 'Standard',
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString()
+        }
+        orgs.push(defaultOrg)
+    } else if (orgs.length === 0) {
+        // No orgs yet and using default userData - create entry for it
+        const currentRoot = app.getPath('userData')
+        const defaultOrg = {
+            id: 'default',
+            name: 'Standard',
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString()
+        }
+        orgs.push(defaultOrg)
+    }
+    
+    const id = generateOrgId()
+    const orgsFolder = path.join(app.getPath('userData'), 'organizations')
+    if (!fs.existsSync(orgsFolder)) fs.mkdirSync(orgsFolder, { recursive: true })
+    
+    const orgRoot = path.join(orgsFolder, id)
+    fs.mkdirSync(orgRoot, { recursive: true })
+    
+    // Create files subfolder
+    const filesDir = path.join(orgRoot, 'files')
+    fs.mkdirSync(filesDir, { recursive: true })
+    
+    const newOrg = {
+        id,
+        name: name.trim(),
+        dbRoot: orgRoot,
+        createdAt: new Date().toISOString()
+    }
+    
+    orgs.push(newOrg)
+    writeAppConfig({ ...cfg, organizations: orgs })
+    
+    return newOrg
+}
+
+/**
+ * Switch to a different organization.
+ * Closes current DB and updates config. Caller should reload the app/window.
+ */
+export function switchOrganization(orgId: string): { success: boolean; org: { id: string; name: string; dbRoot: string } } {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    
+    // Handle default org case
+    if (orgId === 'default' && orgs.length === 0) {
+        closeDb()
+        const defaultRoot = app.getPath('userData')
+        writeAppConfig({ ...cfg, activeOrgId: 'default', dbRoot: defaultRoot })
+        return { success: true, org: { id: 'default', name: 'Standard', dbRoot: defaultRoot } }
+    }
+    
+    const org = orgs.find(o => o.id === orgId)
+    if (!org) throw new Error('Organisation nicht gefunden')
+    
+    // Close current DB
+    closeDb()
+    
+    // Update config
+    writeAppConfig({ ...cfg, activeOrgId: orgId, dbRoot: org.dbRoot })
+    
+    return { success: true, org }
+}
+
+/**
+ * Rename an organization
+ */
+export function renameOrganization(orgId: string, newName: string): { success: boolean } {
+    if (!newName || !newName.trim()) throw new Error('Name ist erforderlich')
+    
+    const cfg = readAppConfig()
+    let orgs = cfg.organizations || []
+    
+    // Handle default org when no organizations are formally defined
+    if (orgId === 'default' && orgs.length === 0) {
+        // Create a formal entry for the default org with the new name
+        const currentRoot = getConfiguredRoot()
+        const defaultOrg = {
+            id: 'default',
+            name: newName.trim(),
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString()
+        }
+        orgs = [defaultOrg]
+        writeAppConfig({ ...cfg, organizations: orgs, activeOrgId: 'default' })
+        return { success: true }
+    }
+    
+    const idx = orgs.findIndex(o => o.id === orgId)
+    if (idx === -1) throw new Error('Organisation nicht gefunden')
+    
+    orgs[idx] = { ...orgs[idx], name: newName.trim() }
+    writeAppConfig({ ...cfg, organizations: orgs })
+    
+    return { success: true }
+}
+
+/**
+ * Delete an organization and optionally its data.
+ * Cannot delete the last organization or the currently active one.
+ */
+export function deleteOrganization(orgId: string, deleteData: boolean = false): { success: boolean } {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    
+    if (orgs.length <= 1) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
+    if (cfg.activeOrgId === orgId) throw new Error('Die aktive Organisation kann nicht gelöscht werden. Wechsle zuerst zu einer anderen.')
+    
+    const org = orgs.find(o => o.id === orgId)
+    if (!org) throw new Error('Organisation nicht gefunden')
+    
+    // Remove from list
+    const newOrgs = orgs.filter(o => o.id !== orgId)
+    writeAppConfig({ ...cfg, organizations: newOrgs })
+    
+    // Optionally delete data folder
+    if (deleteData && org.dbRoot) {
+        try {
+            fs.rmSync(org.dbRoot, { recursive: true, force: true })
+        } catch (e) {
+            console.warn('Could not delete org folder:', e)
+        }
+    }
+    
+    return { success: true }
+}
+
+/**
+ * Get the appearance settings for a specific organization
+ */
+export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    const org = orgs.find(o => o.id === orgId)
+    return {
+        colorTheme: org?.colorTheme || null,
+        backgroundImage: org?.backgroundImage || null,
+        glassModals: org?.glassModals ?? false
+    }
+}
+
+/**
+ * Set the appearance settings for a specific organization
+ */
+export function setOrganizationAppearance(
+    orgId: string, 
+    appearance: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean }
+): { success: boolean } {
+    const cfg = readAppConfig()
+    let orgs = cfg.organizations || []
+    
+    // Ensure the default org exists in the array if we're setting its appearance
+    if (orgs.length === 0) {
+        const currentRoot = getConfiguredRoot()
+        orgs = [{
+            id: 'default',
+            name: 'Standard',
+            dbRoot: currentRoot,
+            createdAt: new Date().toISOString(),
+            colorTheme: undefined,
+            backgroundImage: undefined,
+            glassModals: undefined
+        }]
+    }
+    
+    const idx = orgs.findIndex(o => o.id === orgId)
+    
+    if (idx === -1) {
+        // If org doesn't exist yet (e.g., default), create it
+        if (orgId === 'default') {
+            const currentRoot = getConfiguredRoot()
+            orgs.push({
+                id: 'default',
+                name: 'Standard',
+                dbRoot: currentRoot,
+                createdAt: new Date().toISOString(),
+                colorTheme: appearance.colorTheme,
+                backgroundImage: appearance.backgroundImage,
+                glassModals: appearance.glassModals
+            })
+        } else {
+            throw new Error('Organisation nicht gefunden')
+        }
+    } else {
+        orgs[idx] = { 
+            ...orgs[idx], 
+            ...(appearance.colorTheme !== undefined && { colorTheme: appearance.colorTheme }),
+            ...(appearance.backgroundImage !== undefined && { backgroundImage: appearance.backgroundImage }),
+            ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals })
+        }
+    }
+    
+    writeAppConfig({ ...cfg, organizations: orgs, activeOrgId: cfg.activeOrgId || 'default' })
+    return { success: true }
+}
+
+/**
+ * Get the appearance settings (theme, background, glass) of the currently active organization
+ */
+export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    const activeId = cfg.activeOrgId
+    
+    // If orgs array is empty, return defaults
+    if (orgs.length === 0) {
+        return { colorTheme: null, backgroundImage: null, glassModals: false }
+    }
+    
+    // Find active org
+    const activeOrg = orgs.find(o => o.id === activeId) || orgs[0]
+    return {
+        colorTheme: activeOrg?.colorTheme || null,
+        backgroundImage: activeOrg?.backgroundImage || null,
+        glassModals: activeOrg?.glassModals ?? false
+    }
 }

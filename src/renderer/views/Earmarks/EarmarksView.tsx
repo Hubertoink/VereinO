@@ -132,7 +132,7 @@ export default function EarmarksView({
                 </td>
                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
                   <button
-                    className="btn"
+                    className="btn btn-edit"
                     onClick={() =>
                       setEditBinding({
                         id: b.id,

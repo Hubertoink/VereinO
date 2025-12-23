@@ -40,6 +40,13 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <path d="M12 7V3L1 9l11 6 9-4.91V17h2V9L12 3v4z" />
         </svg>
       )
+    case 'Einreichungen':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+          <path d="M12 16l4-4h-3V8h-2v4H8l4 4z" opacity="0.6" />
+        </svg>
+      )
     case 'Belege':
       return (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -70,6 +77,7 @@ export const navIconPalette: Record<NavKey, string> = {
   Mitglieder: '#26A69A',
   Budgets: '#00C853',
   Zweckbindungen: '#FFD600',
+  Einreichungen: '#FF7043',
   Belege: '#FF9100',
   Reports: '#F50057',
   Einstellungen: '#9C27B0'

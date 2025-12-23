@@ -42,6 +42,8 @@ export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 
 export type JournalRowDensity = 'normal' | 'compact'
 
+export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+
 export type DateFmt = 'ISO' | 'PRETTY'
 
 export type ColKey = 
@@ -126,6 +128,12 @@ export interface SettingsProps {
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (v: JournalRowDensity) => void
+  backgroundImage: BackgroundImage
+  setBackgroundImage: (v: BackgroundImage) => void
+  glassModals: boolean
+  setGlassModals: (v: boolean) => void
+  showSubmissionBadge: boolean
+  setShowSubmissionBadge: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -155,6 +163,10 @@ export interface GeneralPaneProps {
   setJournalRowStyle: (v: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (v: JournalRowDensity) => void
+  backgroundImage: BackgroundImage
+  setBackgroundImage: (v: BackgroundImage) => void
+  glassModals: boolean
+  setGlassModals: (v: boolean) => void
   dateFmt: DateFmt
   setDateFmt: (v: DateFmt) => void
   journalLimit: number
@@ -162,6 +174,8 @@ export interface GeneralPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
+  showSubmissionBadge: boolean
+  setShowSubmissionBadge: (v: boolean) => void
 }
 
 export interface TablePaneProps {

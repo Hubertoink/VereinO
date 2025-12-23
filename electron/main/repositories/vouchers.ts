@@ -27,7 +27,9 @@ export function createVoucher(input: {
     categoryId?: number
     projectId?: number
     earmarkId?: number
+    earmarkAmount?: number | null
     budgetId?: number
+    budgetAmount?: number | null
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
@@ -68,15 +70,16 @@ export function createVoucher(input: {
                 if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
             }
 
-            // Negative-balance protection
+            // Negative-balance protection (using junction table)
             const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
             if (!cfg.allowNegative && input.type === 'OUT') {
                 const balRow = d.prepare(`
                     SELECT
-                      IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END),0) as allocated,
-                      IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END),0) as released
-                    FROM vouchers
-                    WHERE earmark_id = ? AND date <= ?
+                      IFNULL(SUM(CASE WHEN v.type='IN' THEN ve.amount ELSE 0 END),0) as allocated,
+                      IFNULL(SUM(CASE WHEN v.type='OUT' THEN ve.amount ELSE 0 END),0) as released
+                    FROM voucher_earmarks ve
+                    JOIN vouchers v ON v.id = ve.voucher_id
+                    WHERE ve.earmark_id = ? AND v.date <= ?
                 `).get(input.earmarkId, input.date) as any
                 const em2 = d.prepare('SELECT budget FROM earmarks WHERE id=?').get(input.earmarkId) as any
                 const budget = Number(em2?.budget ?? 0) || 0
@@ -103,9 +106,9 @@ export function createVoucher(input: {
 
         const stmt = d.prepare(`
       INSERT INTO vouchers (
-    year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, budget_id, description,
+    year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
         net_amount, vat_rate, vat_amount, gross_amount, payment_method, transfer_from, transfer_to, counterparty, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
         let id: number | null = null
@@ -126,7 +129,9 @@ export function createVoucher(input: {
                     input.categoryId ?? null,
                     input.projectId ?? null,
                     input.earmarkId ?? null,
+                    input.earmarkAmount ?? null,
                     input.budgetId ?? null,
+                    input.budgetAmount ?? null,
                     input.description ?? null,
                     netAmount,
                     input.vatRate,
@@ -230,8 +235,10 @@ export function listRecentVouchers(limit = 20) {
                             v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                             (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                             v.earmark_id as earmarkId,
+                            v.earmark_amount as earmarkAmount,
                             (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
                             v.budget_id as budgetId,
+                            v.budget_amount as budgetAmount,
                             (
                                 SELECT CASE
                                     WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
@@ -293,8 +300,10 @@ export function listVouchersAdvanced(filters: {
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,
+                                        v.earmark_amount as earmarkAmount,
                                         (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
                                         v.budget_id as budgetId,
+                                        v.budget_amount as budgetAmount,
                                         (
                                             SELECT CASE
                                                 WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
@@ -409,8 +418,10 @@ export function listVouchersAdvancedPaged(filters: {
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
+                v.earmark_amount as earmarkAmount,
                 (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
                 v.budget_id as budgetId,
+                v.budget_amount as budgetAmount,
                 (
                     SELECT CASE
                         WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
@@ -745,7 +756,9 @@ export function updateVoucher(input: {
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
     earmarkId?: number | null
+    earmarkAmount?: number | null
     budgetId?: number | null
+    budgetAmount?: number | null
     tags?: string[]
     netAmount?: number
     vatRate?: number
@@ -756,7 +769,8 @@ export function updateVoucher(input: {
     const current = d.prepare(`
         SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
                net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount,
-               earmark_id as earmarkId, budget_id as budgetId,
+               earmark_id as earmarkId, earmark_amount as earmarkAmount,
+               budget_id as budgetId, budget_amount as budgetAmount,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
                description
         FROM vouchers WHERE id=?
@@ -792,10 +806,11 @@ export function updateVoucher(input: {
         if (!cfg.allowNegative && newType === 'OUT') {
             const balRow = d.prepare(`
                 SELECT
-                  IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END),0) as allocated,
-                  IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END),0) as released
-                FROM vouchers
-                WHERE earmark_id = ? AND date <= ? AND id <> ?
+                  IFNULL(SUM(CASE WHEN v.type='IN' THEN ve.amount ELSE 0 END),0) as allocated,
+                  IFNULL(SUM(CASE WHEN v.type='OUT' THEN ve.amount ELSE 0 END),0) as released
+                FROM voucher_earmarks ve
+                JOIN vouchers v ON v.id = ve.voucher_id
+                WHERE ve.earmark_id = ? AND v.date <= ? AND v.id <> ?
             `).get(newEarmarkId, newDate, input.id) as any
             const balance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
             const budget = Number(em?.budget ?? 0) || 0
@@ -825,9 +840,11 @@ export function updateVoucher(input: {
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
     if (input.paymentMethod !== undefined) { fields.push('payment_method = ?'); params.push(input.paymentMethod) }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
+    if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
     if (input.transferFrom !== undefined) { fields.push('transfer_from = ?'); params.push(input.transferFrom) }
     if (input.transferTo !== undefined) { fields.push('transfer_to = ?'); params.push(input.transferTo) }
     if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
+    if (input.budgetAmount !== undefined) { fields.push('budget_amount = ?'); params.push(input.budgetAmount) }
     // If sphere or year changes, re-number voucher (year, seq_no, voucher_no)
     const targetSphere = input.sphere ?? current.sphere
     const targetYear = Number(newDate?.slice(0, 4) || String(current.year))
@@ -897,7 +914,8 @@ export function updateVoucher(input: {
     try {
         const after = d.prepare(`
             SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-                   earmark_id as earmarkId, budget_id as budgetId, net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount
+                   earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
+                   net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount
             FROM vouchers WHERE id=?
         `).get(input.id) as any
         const afterTags = getTagsForVoucher(input.id)
@@ -910,7 +928,7 @@ export function updateVoucher(input: {
 export function deleteVoucher(id: number) {
     const d = getDb()
     // Snapshot before deletion for audit
-    const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, budget_id as budgetId FROM vouchers WHERE id=?').get(id) as any
+    const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount FROM vouchers WHERE id=?').get(id) as any
     if (!snap) throw new Error('Beleg nicht gefunden')
     // Block deletion in closed year
     ensurePeriodOpen(snap.date, d)
@@ -1013,4 +1031,128 @@ export function deleteVoucherFile(fileId: number) {
     d.prepare('DELETE FROM voucher_files WHERE id=?').run(fileId)
     try { if (row?.filePath && fs.existsSync(row.filePath)) fs.unlinkSync(row.filePath) } catch { /* ignore */ }
     return { id: fileId }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Junction table functions for multiple budgets/earmarks per voucher
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type VoucherBudgetAssignment = { id: number; budgetId: number; amount: number; label?: string }
+export type VoucherEarmarkAssignment = { id: number; earmarkId: number; amount: number; code?: string; name?: string }
+
+/** Get all budget assignments for a voucher */
+export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
+    const d = getDb()
+    const rows = d.prepare(`
+        SELECT vb.id, vb.budget_id as budgetId, vb.amount,
+               CASE
+                   WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
+                   WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
+                   WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
+                   ELSE printf('%04d-%s', b.year, b.sphere)
+               END as label
+        FROM voucher_budgets vb
+        JOIN budgets b ON b.id = vb.budget_id
+        WHERE vb.voucher_id = ?
+        ORDER BY vb.id
+    `).all(voucherId) as VoucherBudgetAssignment[]
+    return rows
+}
+
+/** Get all earmark assignments for a voucher */
+export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[] {
+    const d = getDb()
+    const rows = d.prepare(`
+        SELECT ve.id, ve.earmark_id as earmarkId, ve.amount,
+               e.code, e.name
+        FROM voucher_earmarks ve
+        JOIN earmarks e ON e.id = ve.earmark_id
+        WHERE ve.voucher_id = ?
+        ORDER BY ve.id
+    `).all(voucherId) as VoucherEarmarkAssignment[]
+    return rows
+}
+
+/** Set budget assignments for a voucher (replaces existing) */
+export function setVoucherBudgets(voucherId: number, assignments: Array<{ budgetId: number; amount: number }>) {
+    const d = getDb()
+    d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(voucherId)
+    const stmt = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
+    for (const a of assignments) {
+        if (a.budgetId && a.amount > 0) {
+            stmt.run(voucherId, a.budgetId, a.amount)
+        }
+    }
+    // Sync legacy columns for backwards compatibility (use first assignment)
+    if (assignments.length > 0 && assignments[0].budgetId) {
+        d.prepare('UPDATE vouchers SET budget_id = ?, budget_amount = ? WHERE id = ?')
+            .run(assignments[0].budgetId, assignments[0].amount, voucherId)
+    } else {
+        d.prepare('UPDATE vouchers SET budget_id = NULL, budget_amount = NULL WHERE id = ?').run(voucherId)
+    }
+}
+
+/** Set earmark assignments for a voucher (replaces existing) */
+export function setVoucherEarmarks(voucherId: number, assignments: Array<{ earmarkId: number; amount: number }>) {
+    const d = getDb()
+    d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(voucherId)
+    const stmt = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
+    for (const a of assignments) {
+        if (a.earmarkId && a.amount > 0) {
+            stmt.run(voucherId, a.earmarkId, a.amount)
+        }
+    }
+    // Sync legacy columns for backwards compatibility (use first assignment)
+    if (assignments.length > 0 && assignments[0].earmarkId) {
+        d.prepare('UPDATE vouchers SET earmark_id = ?, earmark_amount = ? WHERE id = ?')
+            .run(assignments[0].earmarkId, assignments[0].amount, voucherId)
+    } else {
+        d.prepare('UPDATE vouchers SET earmark_id = NULL, earmark_amount = NULL WHERE id = ?').run(voucherId)
+    }
+}
+
+/** Add a single budget assignment to a voucher */
+export function addVoucherBudget(voucherId: number, budgetId: number, amount: number): { id: number } {
+    const d = getDb()
+    const info = d.prepare('INSERT OR REPLACE INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
+        .run(voucherId, budgetId, amount)
+    return { id: Number(info.lastInsertRowid) }
+}
+
+/** Add a single earmark assignment to a voucher */
+export function addVoucherEarmark(voucherId: number, earmarkId: number, amount: number): { id: number } {
+    const d = getDb()
+    const info = d.prepare('INSERT OR REPLACE INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
+        .run(voucherId, earmarkId, amount)
+    return { id: Number(info.lastInsertRowid) }
+}
+
+/** Remove a budget assignment by id */
+export function removeVoucherBudget(assignmentId: number) {
+    const d = getDb()
+    d.prepare('DELETE FROM voucher_budgets WHERE id = ?').run(assignmentId)
+    return { id: assignmentId }
+}
+
+/** Remove an earmark assignment by id */
+export function removeVoucherEarmark(assignmentId: number) {
+    const d = getDb()
+    d.prepare('DELETE FROM voucher_earmarks WHERE id = ?').run(assignmentId)
+    return { id: assignmentId }
+}
+
+/** Get total budget allocation for a voucher */
+export function getVoucherBudgetTotal(voucherId: number): number {
+    const d = getDb()
+    const row = d.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM voucher_budgets WHERE voucher_id = ?')
+        .get(voucherId) as { total: number }
+    return row.total
+}
+
+/** Get total earmark allocation for a voucher */
+export function getVoucherEarmarkTotal(voucherId: number): number {
+    const d = getDb()
+    const row = d.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM voucher_earmarks WHERE voucher_id = ?')
+        .get(voucherId) as { total: number }
+    return row.total
 }

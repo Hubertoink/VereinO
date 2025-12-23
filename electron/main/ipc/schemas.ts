@@ -21,7 +21,9 @@ export const VoucherCreateInput = z
         categoryId: z.number().optional(),
         projectId: z.number().optional(),
         earmarkId: z.number().optional(),
+        earmarkAmount: z.number().nullable().optional(),
         budgetId: z.number().optional(),
+        budgetAmount: z.number().nullable().optional(),
         files: z
             .array(
                 z.object({
@@ -86,6 +88,7 @@ export const FiscalReportInput = z.object({
     fiscalYear: z.number(),
     includeBindings: z.boolean().optional(),
     includeVoucherList: z.boolean().optional(),
+    includeBudgets: z.boolean().optional(),
     orgName: z.string().optional()
 })
 export const FiscalReportOutput = z.object({ filePath: z.string() })
@@ -235,11 +238,27 @@ export const VouchersListOutput = z.object({
             grossAmount: z.number(),
             fileCount: z.number().optional(),
             earmarkId: z.number().nullable().optional(),
+            earmarkAmount: z.number().nullable().optional(),
             earmarkCode: z.string().nullable().optional(),
             budgetId: z.number().nullable().optional(),
+            budgetAmount: z.number().nullable().optional(),
             budgetLabel: z.string().nullable().optional(),
             budgetColor: z.string().nullable().optional(),
-            tags: z.array(z.string()).optional()
+            tags: z.array(z.string()).optional(),
+            // Multiple assignments
+            budgets: z.array(z.object({
+                id: z.number(),
+                budgetId: z.number(),
+                amount: z.number(),
+                label: z.string().optional()
+            })).optional(),
+            earmarksAssigned: z.array(z.object({
+                id: z.number(),
+                earmarkId: z.number(),
+                amount: z.number(),
+                code: z.string().optional(),
+                name: z.string().optional()
+            })).optional()
         })
     ),
     total: z.number()
@@ -291,7 +310,7 @@ export const InvoicesListInput = z.object({
     limit: z.number().min(1).max(100).default(20).optional(),
     offset: z.number().min(0).default(0).optional(),
     sort: z.enum(['ASC', 'DESC']).optional(),
-    sortBy: z.enum(['date', 'due', 'amount']).optional(),
+    sortBy: z.enum(['date', 'due', 'amount', 'status']).optional(),
     status: z.enum(['OPEN', 'PARTIAL', 'PAID', 'ALL']).optional(),
     sphere: Sphere.optional(),
     budgetId: z.number().optional(),
@@ -425,6 +444,15 @@ export type TVouchersRecentInput = z.infer<typeof VouchersRecentInput>
 export type TVouchersRecentOutput = z.infer<typeof VouchersRecentOutput>
 
 // Update/Delete
+export const VoucherBudgetAssignment = z.object({
+    budgetId: z.number(),
+    amount: z.number()
+})
+export const VoucherEarmarkAssignment = z.object({
+    earmarkId: z.number(),
+    amount: z.number()
+})
+
 export const VoucherUpdateInput = z.object({
     id: z.number(),
     date: z.string().optional(),
@@ -435,7 +463,12 @@ export const VoucherUpdateInput = z.object({
     transferFrom: PaymentMethod.nullable().optional(),
     transferTo: PaymentMethod.nullable().optional(),
     earmarkId: z.number().nullable().optional(),
+    earmarkAmount: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
+    budgetAmount: z.number().nullable().optional(),
+    // New: multiple budget/earmark assignments
+    budgets: z.array(VoucherBudgetAssignment).optional(),
+    earmarks: z.array(VoucherEarmarkAssignment).optional(),
     // amounts (optional): provide either netAmount (+ optional vatRate) OR grossAmount
     netAmount: z.number().optional(),
     vatRate: z.number().optional(),
@@ -809,3 +842,126 @@ export const DbSmartRestoreApplyInput = z.object({ action: z.enum(['useDefault',
 export const DbSmartRestoreApplyOutput = z.object({ ok: z.boolean() })
 export type TDbSmartRestoreApplyInput = z.infer<typeof DbSmartRestoreApplyInput>
 export type TDbSmartRestoreApplyOutput = z.infer<typeof DbSmartRestoreApplyOutput>
+
+// Submissions (voucher submissions from members for review)
+export const SubmissionsListInput = z.object({
+    status: z.enum(['pending', 'approved', 'rejected']).optional(),
+    limit: z.number().min(1).max(200).default(100).optional(),
+    offset: z.number().min(0).default(0).optional()
+}).optional()
+
+export const SubmissionSchema = z.object({
+    id: z.number(),
+    externalId: z.string().nullable().optional(),
+    date: z.string(),
+    type: z.enum(['IN', 'OUT']),
+    sphere: Sphere.nullable().optional(),
+    paymentMethod: PaymentMethod.nullable().optional(),
+    description: z.string().nullable().optional(),
+    grossAmount: z.number(),
+    categoryHint: z.string().nullable().optional(),
+    counterparty: z.string().nullable().optional(),
+    submittedBy: z.string(),
+    submittedAt: z.string(),
+    status: z.enum(['pending', 'approved', 'rejected']),
+    reviewedAt: z.string().nullable().optional(),
+    reviewerNotes: z.string().nullable().optional(),
+    voucherId: z.number().nullable().optional(),
+    attachments: z.array(z.object({
+        id: z.number(),
+        filename: z.string(),
+        mimeType: z.string().nullable().optional()
+    }))
+})
+
+export const SubmissionsListOutput = z.object({
+    rows: z.array(SubmissionSchema),
+    total: z.number()
+})
+
+export const SubmissionGetInput = z.object({ id: z.number() })
+export const SubmissionGetOutput = SubmissionSchema.nullable()
+
+export const SubmissionsImportInput = z.object({
+    submissions: z.array(z.object({
+        externalId: z.string().optional(),
+        date: z.string(),
+        type: z.enum(['IN', 'OUT']).optional(),
+        sphere: Sphere.optional(),
+        paymentMethod: PaymentMethod.optional(),
+        description: z.string().optional(),
+        grossAmount: z.number(),
+        categoryHint: z.string().optional(),
+        counterparty: z.string().optional(),
+        submittedBy: z.string(),
+        attachments: z.array(z.object({
+            filename: z.string(),
+            mimeType: z.string().optional(),
+            data: z.string() // Base64
+        })).optional()
+    }))
+})
+export const SubmissionsImportOutput = z.object({
+    imported: z.number(),
+    ids: z.array(z.number())
+})
+
+export const SubmissionApproveInput = z.object({
+    id: z.number(),
+    reviewerNotes: z.string().optional()
+})
+export const SubmissionApproveOutput = z.object({ ok: z.boolean() })
+
+export const SubmissionRejectInput = z.object({
+    id: z.number(),
+    reviewerNotes: z.string().optional()
+})
+export const SubmissionRejectOutput = z.object({ ok: z.boolean() })
+
+export const SubmissionDeleteInput = z.object({ id: z.number() })
+export const SubmissionDeleteOutput = z.object({ ok: z.boolean() })
+
+export const SubmissionConvertInput = z.object({
+    id: z.number(),
+    sphere: Sphere,
+    paymentMethod: PaymentMethod.optional(),
+    categoryId: z.number().optional(),
+    earmarkId: z.number().optional(),
+    budgetId: z.number().optional()
+})
+export const SubmissionConvertOutput = z.object({
+    ok: z.boolean(),
+    voucherId: z.number().optional()
+})
+
+export const SubmissionsSummaryOutput = z.object({
+    pending: z.number(),
+    approved: z.number(),
+    rejected: z.number(),
+    total: z.number()
+})
+
+export const SubmissionAttachmentReadInput = z.object({ attachmentId: z.number() })
+export const SubmissionAttachmentReadOutput = z.object({
+    filename: z.string(),
+    mimeType: z.string().nullable().optional(),
+    dataBase64: z.string()
+})
+
+export type TSubmissionsListInput = z.infer<typeof SubmissionsListInput>
+export type TSubmissionsListOutput = z.infer<typeof SubmissionsListOutput>
+export type TSubmissionGetInput = z.infer<typeof SubmissionGetInput>
+export type TSubmissionGetOutput = z.infer<typeof SubmissionGetOutput>
+export type TSubmissionsImportInput = z.infer<typeof SubmissionsImportInput>
+export type TSubmissionsImportOutput = z.infer<typeof SubmissionsImportOutput>
+export type TSubmissionApproveInput = z.infer<typeof SubmissionApproveInput>
+export type TSubmissionApproveOutput = z.infer<typeof SubmissionApproveOutput>
+export type TSubmissionRejectInput = z.infer<typeof SubmissionRejectInput>
+export type TSubmissionRejectOutput = z.infer<typeof SubmissionRejectOutput>
+export type TSubmissionDeleteInput = z.infer<typeof SubmissionDeleteInput>
+export type TSubmissionDeleteOutput = z.infer<typeof SubmissionDeleteOutput>
+export type TSubmissionConvertInput = z.infer<typeof SubmissionConvertInput>
+export type TSubmissionConvertOutput = z.infer<typeof SubmissionConvertOutput>
+export type TSubmissionsSummaryOutput = z.infer<typeof SubmissionsSummaryOutput>
+export type TSubmissionAttachmentReadInput = z.infer<typeof SubmissionAttachmentReadInput>
+export type TSubmissionAttachmentReadOutput = z.infer<typeof SubmissionAttachmentReadOutput>

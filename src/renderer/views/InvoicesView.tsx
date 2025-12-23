@@ -35,7 +35,7 @@ export default function InvoicesView() {
   const [summary, setSummary] = useState<{ count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number } | null>(null)
   // Sorting (persist to localStorage)
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
-  const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount') || 'due') } catch { return 'due' } })
+  const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount' | 'status'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount' | 'status') || 'due') } catch { return 'due' } })
   // Due date modal state and available years
   const [showDueFilter, setShowDueFilter] = useState<boolean>(false)
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
@@ -475,7 +475,12 @@ export default function InvoicesView() {
                 </th>
                 {colPrefs.showBezahlt && <th align="right">Bezahlt</th>}
                 {colPrefs.showRest && <th align="right">Rest</th>}
-                <th align="left">Status</th>
+                <th align="left">
+                  <button className="btn ghost invoices-sort-btn" title="Nach Status sortieren" onClick={() => { setSortBy('status'); setSortDir(prev => (sortBy === 'status' ? (prev === 'DESC' ? 'ASC' : 'DESC') : (prev || 'ASC'))); setOffset(0) }}>
+                    <span>Status</span>
+                    <span aria-hidden="true" className={sortBy === 'status' ? 'invoices-sort-icon-active' : 'invoices-sort-icon'}>{sortBy === 'status' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
+                  </button>
+                </th>
                 {colPrefs.showAttachments && <th align="center" title="Anhänge">📎</th>}
                 <th align="center">Aktionen</th>
               </tr>
@@ -534,7 +539,7 @@ export default function InvoicesView() {
                     <td align="center" className="invoices-actions-nowrap">
                       <button className="btn" title="Details" onClick={() => openDetails(r.id)}>ℹ</button>
                       {r.status !== 'PAID' && (
-                        <button className="btn" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
+                        <button className="btn btn-edit" title="Bearbeiten" onClick={() => openEdit(r)}>✎</button>
                       )}
                       {remaining > 0 && r.status !== 'PAID' && (
                         <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: r.id, party: r.party, invoiceNo: r.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>{'€+'}</button>

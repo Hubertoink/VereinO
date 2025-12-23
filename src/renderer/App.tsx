@@ -8,6 +8,7 @@ import MembersView from './views/Mitglieder/MembersView'
 import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
+import SubmissionsView from './views/Submissions/SubmissionsView'
 import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
@@ -31,6 +32,7 @@ import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
+import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
@@ -61,7 +63,7 @@ function contrastText(bg?: string | null) {
 }
 
 const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-function TopHeaderOrg() {
+function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
     const [org, setOrg] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
     useEffect(() => {
@@ -85,6 +87,7 @@ function TopHeaderOrg() {
     return (
         <div className="inline-flex items-center gap-8">
             <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />
+            <OrgSwitcher notify={notify} />
             {text ? (
                 <div className="helper text-ellipsis" title={text}>{text}</div>
             ) : null}
@@ -111,8 +114,54 @@ function AppInner() {
         journalRowStyle,
         setJournalRowStyle,
         journalRowDensity,
-        setJournalRowDensity
+        setJournalRowDensity,
+        backgroundImage,
+        setBackgroundImage,
+        glassModals,
+        setGlassModals,
+        showSubmissionBadge,
+        setShowSubmissionBadge
     } = useUIPreferences()
+    
+    // Pending submissions count for nav badge
+    const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadPendingCount() {
+            try {
+                // Use limit: 1 and total from API (efficient count)
+                const res = await (window as any).api?.submissions?.list?.({ status: 'pending', limit: 1 })
+                if (!cancelled) {
+                    setPendingSubmissionsCount(res?.total || 0)
+                }
+            } catch { /* ignore */ }
+        }
+        loadPendingCount()
+        const onChanged = () => loadPendingCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+    
+    // Open invoices count for nav badge
+    const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadOpenCount() {
+            try {
+                // Count OPEN and PARTIAL invoices using total from API (limit: 1 to minimize data transfer)
+                const resOpen = await (window as any).api?.invoices?.list?.({ status: 'OPEN', limit: 1 })
+                const resPartial = await (window as any).api?.invoices?.list?.({ status: 'PARTIAL', limit: 1 })
+                if (!cancelled) {
+                    const openCount = (resOpen?.total || 0) + (resPartial?.total || 0)
+                    setOpenInvoicesCount(openCount)
+                }
+            } catch { /* ignore */ }
+        }
+        loadOpenCount()
+        const onChanged = () => loadOpenCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
     
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
@@ -123,10 +172,14 @@ function AppInner() {
     // Map backend errors to friendlier messages (esp. earmark period issues)
     const friendlyError = (e: any) => {
         const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgew?hlten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgew?hlten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgew?hlte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung w?rde den verf?gbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese ?nderung w?rde den verf?gbaren Rahmen der Zweckbindung unterschreiten.'
+        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
+        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
+        // SQLite UNIQUE constraint errors for budget/earmark duplicates
+        if (/UNIQUE constraint failed.*voucher_budgets/i.test(msg)) return 'Fehler: Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Budget-Einträge.'
+        if (/UNIQUE constraint failed.*voucher_earmarks/i.test(msg)) return 'Fehler: Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Einträge.'
+        if (/UNIQUE constraint failed/i.test(msg)) return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
         return 'Fehler: ' + msg
     }
     // Dynamic available years from vouchers
@@ -203,6 +256,7 @@ function AppInner() {
     const [fiscalYear, setFiscalYear] = useState<number>(new Date().getFullYear())
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
+    const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -679,7 +733,7 @@ function AppInner() {
     }
     const isTopNav = navLayout === 'top'
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : `${sidebarCollapsed ? '64px' : '240px'} 1fr`, gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
             {/* Topbar with organisation header line */}
             <header
                 style={{ gridArea: 'top', position: 'sticky', top: 0, zIndex: 1000, display: 'grid', gridTemplateColumns: isTopNav ? '1fr auto 1fr 104px' : '1fr 104px', alignItems: 'center', gap: 12, padding: '4px 8px', borderBottom: '1px solid var(--border)', backdropFilter: 'var(--blur)', background: 'color-mix(in oklab, var(--surface) 50%, transparent)', WebkitAppRegion: 'drag' } as any}
@@ -691,20 +745,7 @@ function AppInner() {
                 }}
             >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
-                    {!isTopNav && (
-                        <button
-                            className="btn ghost icon-btn"
-                            title={sidebarCollapsed ? 'Seitenleiste erweitern' : 'Seitenleiste komprimieren'}
-                            aria-label="Seitenleiste umschalten"
-                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" strokeWidth="2" />
-                                <rect x="3" y="5" width="5" height="14" />
-                            </svg>
-                        </button>
-                    )}
-                    <TopHeaderOrg />
+                    <TopHeaderOrg notify={notify} />
                 </div>
                 {isTopNav ? (
                     <div style={{ display: 'inline-flex', WebkitAppRegion: 'no-drag' } as any}>
@@ -712,6 +753,9 @@ function AppInner() {
                             activePage={activePage}
                             onNavigate={setActivePage}
                             navIconColorMode={navIconColorMode}
+                            pendingSubmissionsCount={pendingSubmissionsCount}
+                            openInvoicesCount={openInvoicesCount}
+                            showBadges={showSubmissionBadge}
                         />
                     </div>
                 ) : null}
@@ -735,7 +779,10 @@ function AppInner() {
                         activePage={activePage}
                         onNavigate={setActivePage}
                         navIconColorMode={navIconColorMode}
-                        collapsed={sidebarCollapsed}
+                        collapsed={true}
+                        pendingSubmissionsCount={pendingSubmissionsCount}
+                        openInvoicesCount={openInvoicesCount}
+                        showBadges={showSubmissionBadge}
                     />
                 </aside>
             )}
@@ -788,6 +835,10 @@ function AppInner() {
                             journalLimit={journalLimit}
                             setJournalLimit={(n: number) => { setJournalLimit(n); setPage(1) }}
                             dateFmt={dateFmt}
+                            cols={cols}
+                            setCols={setCols}
+                            order={order}
+                            setOrder={setOrder}
                             from={from}
                             to={to}
                             filterSphere={filterSphere}
@@ -836,6 +887,12 @@ function AppInner() {
                             setJournalRowStyle={setJournalRowStyle}
                             journalRowDensity={journalRowDensity}
                             setJournalRowDensity={setJournalRowDensity}
+                            backgroundImage={backgroundImage}
+                            setBackgroundImage={setBackgroundImage}
+                            glassModals={glassModals}
+                            setGlassModals={setGlassModals}
+                            showSubmissionBadge={showSubmissionBadge}
+                            setShowSubmissionBadge={setShowSubmissionBadge}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}
@@ -906,6 +963,18 @@ function AppInner() {
 
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
+                    )}
+
+                    {activePage === 'Einreichungen' && (
+                        <SubmissionsView
+                            notify={notify}
+                            bumpDataVersion={bumpDataVersion}
+                            eurFmt={eurFmt}
+                            fmtDate={fmtDate}
+                            earmarks={earmarks}
+                            budgetsForEdit={budgetsForEdit}
+                            tagDefs={tagDefs}
+                        />
                     )}
             </main>
 
@@ -1003,6 +1072,8 @@ function AppInner() {
                     setJournalRowStyle={(v) => { setJournalRowStyle(v); try { localStorage.setItem('ui.journalRowStyle', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-style', v) } catch {} }}
                     journalRowDensity={journalRowDensity}
                     setJournalRowDensity={(v) => { setJournalRowDensity(v); try { localStorage.setItem('ui.journalRowDensity', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-density', v) } catch {} }}
+                    backgroundImage={backgroundImage}
+                    setBackgroundImage={(v) => { setBackgroundImage(v); try { localStorage.setItem('ui.backgroundImage', v) } catch {}; try { document.documentElement.setAttribute('data-background-image', v) } catch {} }}
                     existingTags={tagDefs as any}
                     notify={notify}
                 />
@@ -1031,6 +1102,8 @@ function AppInner() {
                     setIncludeBindings={setIncludeBindings}
                     includeVoucherList={includeVoucherList}
                     setIncludeVoucherList={setIncludeVoucherList}
+                    includeBudgets={includeBudgets}
+                    setIncludeBudgets={setIncludeBudgets}
                     onExport={async (fmt) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -1039,6 +1112,7 @@ function AppInner() {
                                     fiscalYear,
                                     includeBindings,
                                     includeVoucherList,
+                                    includeBudgets,
                                     orgName: exportOrgName || undefined
                                 })
                                 if (res) {

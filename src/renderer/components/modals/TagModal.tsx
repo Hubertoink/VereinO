@@ -27,32 +27,102 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
     const canSave = (v.name || '').trim().length > 0
     return createPortal(
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <h2 style={{ margin: 0 }}>{v.id ? 'Tag bearbeiten' : 'Tag anlegen'}</h2>
-                    <button className="btn danger" onClick={onClose}>Schließen</button>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 20 }}>🏷️</span>
+                        <h2 style={{ margin: 0 }}>{v.id ? 'Tag bearbeiten' : 'Neuer Tag'}</h2>
+                    </div>
+                    <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ padding: '4px 8px', fontSize: 18 }}>✕</button>
                 </header>
-                <div className="row">
+                
+                {/* Preview */}
+                <div className="card" style={{ padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, background: v.color ? `${v.color}20` : 'var(--muted)' }}>
+                    <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 8, 
+                        background: v.color || 'var(--border)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: v.color ? contrastText(v.color) : 'var(--text)',
+                        fontWeight: 700,
+                        fontSize: 18
+                    }}>
+                        {(v.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{v.name || 'Tag-Name'}</div>
+                        <div className="helper" style={{ fontSize: 11 }}>Vorschau</div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: 16 }}>
                     <div className="field">
                         <label>Name</label>
-                        <input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
+                        <input 
+                            className="input" 
+                            value={v.name} 
+                            onChange={(e) => setV({ ...v, name: e.target.value })} 
+                            placeholder="z.B. Mitgliedsbeitrag, Material, Event..."
+                            autoFocus
+                        />
                     </div>
-                    <div className="field" style={{ gridColumn: '1 / span 2' }}>
+                    
+                    <div className="field">
                         <label>Farbe</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                             {PALETTE.map((c) => (
-                                <button key={c} type="button" className="btn" onClick={() => setV({ ...v, color: c })} title={c} style={{ padding: 0, width: 28, height: 28, borderRadius: 6, border: v.color === c ? '2px solid var(--text)' : '2px solid transparent', background: c }}>
-                                    <span aria-hidden="true" />
-                                </button>
+                                <button 
+                                    key={c} 
+                                    type="button" 
+                                    onClick={() => setV({ ...v, color: c })} 
+                                    title={c} 
+                                    style={{ 
+                                        padding: 0, 
+                                        width: 32, 
+                                        height: 32, 
+                                        borderRadius: 8, 
+                                        border: v.color === c ? '3px solid var(--text)' : '2px solid transparent', 
+                                        background: c,
+                                        cursor: 'pointer',
+                                        transition: 'transform 0.1s ease',
+                                        transform: v.color === c ? 'scale(1.1)' : 'scale(1)'
+                                    }}
+                                />
                             ))}
-                            <button type="button" className="btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ height: 28, background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
-                                Eigene…
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                onClick={() => setShowColorPicker(true)} 
+                                style={{ 
+                                    flex: 1,
+                                    background: v.color && !PALETTE.includes(v.color) ? v.color : 'var(--muted)', 
+                                    color: v.color && !PALETTE.includes(v.color) ? contrastText(v.color) : 'var(--text)',
+                                    border: v.color && !PALETTE.includes(v.color) ? '2px solid var(--text)' : undefined
+                                }}
+                            >
+                                🎨 Eigene Farbe…
                             </button>
-                            <button type="button" className="btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe" style={{ height: 28 }}>Keine</button>
+                            <button 
+                                type="button" 
+                                className="btn" 
+                                onClick={() => setV({ ...v, color: null })} 
+                                style={{ 
+                                    flex: 1,
+                                    border: !v.color ? '2px solid var(--text)' : undefined 
+                                }}
+                            >
+                                Keine Farbe
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
                     <button className="btn" onClick={onClose}>Abbrechen</button>
                     <button className="btn primary" disabled={!canSave} onClick={async () => {
                         try {

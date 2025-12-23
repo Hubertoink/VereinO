@@ -8,13 +8,20 @@ function contrastText(bg?: string | null) {
     if (hex.length === 3 || hex.length === 6) {
       const full = hex.length === 3 ? hex.split('').map(h => h + h).join('') : hex
       const r = parseInt(full.slice(0,2),16), g = parseInt(full.slice(2,4),16), b = parseInt(full.slice(4,6),16)
-      // WCAG relative luminance
       const sr = r/255, sg = g/255, sb = b/255
       const lum = 0.2126*sr + 0.7152*sg + 0.0722*sb
       return lum > 0.5 ? '#000' : '#fff'
     }
   } catch { /* ignore */ }
   return 'var(--text)'
+}
+
+// Status colors based on usage percentage
+function getStatusColor(pct: number): { bg: string; text: string; label: string; icon: string } {
+  if (pct >= 100) return { bg: 'rgba(198, 40, 40, 0.15)', text: '#ef5350', label: 'Überschritten', icon: '⚠️' }
+  if (pct >= 80) return { bg: 'rgba(255, 152, 0, 0.15)', text: '#ffa726', label: 'Fast aufgebraucht', icon: '⚡' }
+  if (pct >= 50) return { bg: 'rgba(255, 235, 59, 0.15)', text: '#ffee58', label: 'Zur Hälfte', icon: '📊' }
+  return { bg: 'rgba(76, 175, 80, 0.15)', text: '#66bb6a', label: 'Im Plan', icon: '✓' }
 }
 
 export interface EarmarkUsageCardBinding {
@@ -54,70 +61,151 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
     run()
     return () => { alive = false }
   }, [bindings, from, to, sphere])
+  
   const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+  
   if (!bindings.length) return null
+  
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginTop: 12 }}>
       {bindings.map(b => {
         const u = usage[b.id]
-        const bg = b.color || undefined
+        const bg = b.color || '#8b5cf6'
         const fg = contrastText(bg)
         const budget = u?.budget ?? b.budget ?? 0
         const allocated = Math.max(0, u?.allocated ?? 0)
         const released = Math.max(0, u?.released ?? 0)
-        // Progress: OUT / (Budget + IN) to account for additional income
-        const availableFunds = budget + allocated
-        const pct = availableFunds > 0 ? Math.min(100, Math.round((released / availableFunds) * 100)) : 0
+        const balance = u?.balance ?? (allocated - released)
+        const remaining = u?.remaining ?? (budget + balance)
+        // Net consumption = OUT - IN (how much of budget was actually consumed)
+        const netSpent = released - allocated
+        const pct = budget > 0 ? Math.max(0, Math.min(100, Math.round((netSpent / budget) * 100))) : 0
+        const status = getStatusColor(pct)
         const startDate = b.startDate ?? u?.startDate ?? null
         const endDate = b.endDate ?? u?.endDate ?? null
         const totalCount = u?.totalCount as number | undefined
-        const outsideCount = u?.outsideCount as number | undefined
+        
         return (
           <div
             key={b.id}
             className="card"
-            style={{ padding: 10, borderTop: bg ? `4px solid ${bg}` : undefined }}
-            title={`Zweckbindung ${b.code} – Klick auf Filter oder Buttons für Aktionen`}
+            style={{ 
+              padding: 0, 
+              overflow: 'hidden',
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+            }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-              <span className="badge" style={{ background: bg, color: fg }}>{b.code}</span>
-              <span className="helper" style={{ fontWeight: 600, flex: 1 }}>{b.name}</span>
-              {!!b.enforceTimeRange && (
-                <span title="Strikter Zeitraum aktiv" style={{ fontSize: '1.2em' }}>🔒</span>
-              )}
+            {/* Header with color */}
+            <div style={{ 
+              background: `linear-gradient(135deg, ${bg}, ${bg}dd)`, 
+              padding: '14px 16px',
+              color: fg
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 2 }}>
+                    <span style={{ 
+                      background: 'rgba(255,255,255,0.2)', 
+                      padding: '2px 6px', 
+                      borderRadius: 4, 
+                      fontSize: 10, 
+                      fontWeight: 600 
+                    }}>{b.code}</span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.name}>
+                    {b.name}
+                  </div>
+                </div>
+                {!!b.enforceTimeRange && (
+                  <span title="Strikter Zeitraum aktiv" style={{ fontSize: 16 }}>🔒</span>
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-              <span className="badge in">IN: {fmt.format(u?.allocated ?? 0)}</span>
-              <span className="badge out">OUT: {fmt.format(released)}</span>
-              <span className="badge">Saldo: {fmt.format(u?.balance ?? 0)}</span>
-              {budget > 0 && (
-                <>
-                  <span className="badge" title="Anfangsbudget">Budget: {fmt.format(budget)}</span>
-                  <span className="badge" title="Verfügbar" style={{ fontWeight: 600, textDecoration: 'underline', textDecorationStyle: 'double' }}>Rest: {fmt.format(u?.remaining ?? (budget - released))}</span>
-                </>
-              )}
-            </div>
-            <div className="helper" style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {(startDate || endDate) && (
-                <span title="Zeitraum">🗓 {fmtDate(startDate)} – {fmtDate(endDate)}</span>
-              )}
-              {(totalCount != null) && (
-                <span title="Zugeordnete Buchungen">
-                  📄 {totalCount}{(outsideCount ?? 0) > 0 ? ` · (außerhalb: ${outsideCount})` : ''}
-                </span>
-              )}
-            </div>
-            {budget > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <div className="helper">Fortschritt</div>
-                <div style={{ height: 10, background: 'color-mix(in oklab, var(--accent) 15%, transparent)', borderRadius: 6, position: 'relative' }} aria-label={`Verbrauch ${pct}%`} title={`${pct}%`}>
-                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: bg || 'var(--accent)', borderRadius: 6 }} />
+
+            {/* Body */}
+            <div style={{ padding: '14px 16px' }}>
+              {/* Amount Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #66bb6a' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Zugewiesen</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#66bb6a' }}>{fmt.format(allocated)}</div>
+                </div>
+                <div style={{ padding: '8px 10px', background: 'rgba(239, 83, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef5350' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Verbraucht</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#ef5350' }}>{fmt.format(released)}</div>
                 </div>
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginTop: 8 }}>
-              <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)} title="Zu Buchungen springen">📄 Zu Buchungen</button>
-              {onEdit && <button className="btn" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
+
+              {/* Budget & Remaining */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Anfangsbudget</div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>{fmt.format(budget)}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Saldo</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: balance >= 0 ? '#66bb6a' : '#ef5350' }}>
+                    {fmt.format(balance)}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Verfügbar</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: remaining >= 0 ? '#66bb6a' : '#ef5350' }}>
+                    {fmt.format(remaining)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              {(budget > 0 || allocated > 0) && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Verbrauch</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: status.text }}>{status.icon} {pct}%</span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--muted)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ 
+                      height: '100%', 
+                      width: `${Math.min(100, pct)}%`, 
+                      background: pct >= 100 ? 'linear-gradient(90deg, #ef5350, #f44336)' : 
+                                 pct >= 80 ? 'linear-gradient(90deg, #ffa726, #ff9800)' : 
+                                 `linear-gradient(90deg, ${bg}, ${bg}cc)`,
+                      borderRadius: 4,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Meta Info */}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+                {(startDate || endDate) && (
+                  <span>🗓️ {fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                )}
+                {totalCount != null && totalCount > 0 && (
+                  <span>📄 {totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  className="btn ghost" 
+                  onClick={() => onGoToBookings?.(b.id)} 
+                  style={{ flex: 1, fontSize: 12 }}
+                >
+                  📄 Buchungen
+                </button>
+                {onEdit && (
+                  <button 
+                    className="btn btn-edit" 
+                    onClick={() => onEdit(b)} 
+                    title="Bearbeiten"
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )
