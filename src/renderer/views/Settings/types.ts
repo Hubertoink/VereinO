@@ -16,7 +16,6 @@ export type TileKey =
   | 'org'
   | 'tags'
   | 'yearEnd'
-  | 'cloud'
   | 'tutorial' 
   | 'about'
 

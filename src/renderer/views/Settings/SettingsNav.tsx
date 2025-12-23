@@ -20,7 +20,6 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'org', icon: '🏢', label: 'Organisation' },
     { key: 'tags', icon: '🏷️', label: 'Tags' },
     { key: 'yearEnd', icon: '📆', label: 'Jahresabschluss' },
-    { key: 'cloud', icon: '☁️', label: 'Cloud-Modus' },
   ]
 
   return (

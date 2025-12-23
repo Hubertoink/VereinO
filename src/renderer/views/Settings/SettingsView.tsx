@@ -8,7 +8,23 @@ import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
 import { YearEndPane } from './panes/YearEndPane'
-import { CloudPane } from './panes/CloudPane'
+
+const VALID_SETTINGS_TILES: readonly TileKey[] = [
+  'general',
+  'table',
+  'storage',
+  'import',
+  'org',
+  'tags',
+  'yearEnd',
+  'tutorial',
+  'about',
+] as const
+
+function normalizeTileKey(value: unknown): TileKey {
+  if (typeof value !== 'string') return 'general'
+  return (VALID_SETTINGS_TILES as readonly string[]).includes(value) ? (value as TileKey) : 'general'
+}
 
 /**
  * SettingsView - Main Settings Container
@@ -21,7 +37,7 @@ export function SettingsView(props: SettingsProps) {
   const [activeTile, setActiveTile] = useState<TileKey>(() => {
     try {
       const saved = sessionStorage.getItem('settingsActiveTile')
-      return (saved as TileKey) || 'general'
+      return normalizeTileKey(saved)
     } catch {
       return 'general'
     }
@@ -121,8 +137,6 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
           />
         )}
-        
-        {activeTile === 'cloud' && <CloudPane />}
       </div>
 
       {/* Developer Badge - edge anchored handle; panel retracts on mouse leave */}
