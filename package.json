@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "test": "jest",
     "test:e2e": "playwright test",
-    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');cp.spawnSync('npm',['rebuild','better-sqlite3','--runtime=electron','--target='+v,'--disturl=https://electronjs.org/headers'],{stdio:'inherit',shell:true});\"",
+    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');cp.spawnSync('npm',['rebuild','better-sqlite3','--build-from-source'],{stdio:'inherit',shell:true,env:{...process.env,npm_config_runtime:'electron',npm_config_target:v,npm_config_disturl:'https://electronjs.org/headers'}});\"",
     "postinstall": "playwright install",
     "package": "electron-builder -c electron-builder.yml",
     "start": "npm run dev"

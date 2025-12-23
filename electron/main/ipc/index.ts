@@ -1672,7 +1672,20 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('organizations.switch', async (_e, payload: { orgId: string }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+        const before = getActiveOrganization()
+        const beforeId = before?.id || 'default'
         const result = switchOrganization(payload.orgId)
+
+        // Ensure DB is initialized for the newly active organization.
+        // This is critical because renderer reload does NOT restart the main process.
+        try {
+            const db = getDb()
+            applyMigrations(db)
+        } catch (err) {
+            // Roll back config to the previous org to avoid leaving the app in a broken state.
+            try { switchOrganization(beforeId) } catch { /* ignore rollback errors */ }
+            throw err
+        }
         // Signal renderer to reload
         const win = BrowserWindow.getFocusedWindow()
         if (win) {
@@ -1688,7 +1701,26 @@ export function registerIpcHandlers() {
     
     ipcMain.handle('organizations.delete', async (_e, payload: { orgId: string; deleteData?: boolean }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return deleteOrganization(payload.orgId, payload.deleteData ?? false)
+
+        const before = getActiveOrganization()
+        const beforeId = before?.id || 'default'
+        const result = deleteOrganization(payload.orgId, payload.deleteData ?? false)
+
+        const after = getActiveOrganization()
+        const afterId = after?.id || 'default'
+
+        // If the active organization changed (e.g. deleted active org), ensure DB is initialized.
+        if (afterId !== beforeId) {
+            const db = getDb()
+            applyMigrations(db)
+
+            const win = BrowserWindow.getFocusedWindow()
+            if (win && after) {
+                win.webContents.send('organizations:switched', { id: after.id, name: after.name, dbRoot: after.dbRoot })
+            }
+        }
+
+        return result
     })
     
     ipcMain.handle('organizations.getAppearance', async (_e, payload: { orgId: string }) => {

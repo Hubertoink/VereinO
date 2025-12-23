@@ -13,11 +13,15 @@ export function StoragePane({ notify }: StoragePaneProps) {
   const { autoMode, intervalDays, backups, busy: backupBusy, refreshBackups, makeBackup, updateAutoMode, updateInterval, chooseBackupDir, backupDir, openBackupFolder } = useBackupSettings()
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
+  const [busyDanger, setBusyDanger] = React.useState(false)
   // Data management & security (moved from GeneralPane)
   const [importPick, setImportPick] = React.useState<null | { filePath: string; size?: number; mtime?: number; counts?: Record<string, number>; currentCounts?: Record<string, number> }>(null)
   const [busyImport, setBusyImport] = React.useState(false)
   const [showDeleteAll, setShowDeleteAll] = React.useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = React.useState('')
+  const [showDeleteOrg, setShowDeleteOrg] = React.useState(false)
+  const [deleteOrgConfirmText, setDeleteOrgConfirmText] = React.useState('')
+  const [activeOrg, setActiveOrg] = React.useState<null | { id: string; name: string }>(null)
   // Unified comparison modal state
   const [compareModal, setCompareModal] = React.useState<null | {
     mode: 'folder' | 'default'
@@ -185,6 +189,13 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
   React.useEffect(() => { refreshBackups(); refreshLoc() }, [])
 
+  async function ensureActiveOrgLoaded() {
+    if (activeOrg) return
+    const org = await window.api?.organizations?.active?.()
+    const o = org?.organization
+    if (o?.id && o?.name) setActiveOrg({ id: o.id, name: o.name })
+  }
+
   return (
     <div className="storage-pane">
       <div>
@@ -286,6 +297,31 @@ export function StoragePane({ notify }: StoragePaneProps) {
           <div>
             <button className="btn danger" onClick={() => { setDeleteConfirmText(''); setShowDeleteAll(true) }}>
               Alle Buchungen löschen…
+            </button>
+          </div>
+        </div>
+
+        <div className="muted-sep" />
+        <div className="storage-data-management">
+          <div>
+            <strong>Gefährliche Aktion</strong>
+            <div className="helper">Die aktuell aktive Organisation wird dauerhaft gelöscht (inkl. Datenbank und Dateien). Dies kann nicht rückgängig gemacht werden.</div>
+          </div>
+          <div>
+            <button
+              className="btn danger"
+              disabled={busyDanger}
+              onClick={async () => {
+                try {
+                  await ensureActiveOrgLoaded()
+                  setDeleteOrgConfirmText('')
+                  setShowDeleteOrg(true)
+                } catch (e: any) {
+                  notify('error', e?.message || String(e))
+                }
+              }}
+            >
+              Orga löschen…
             </button>
           </div>
         </div>
@@ -416,6 +452,63 @@ export function StoragePane({ notify }: StoragePaneProps) {
                 }}
               >
                 Ja, alles löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Organization Confirmation Modal */}
+      {showDeleteOrg && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal modal-grid">
+            <div className="modal-header">
+              <h2>Organisation löschen</h2>
+              <button className="btn ghost" onClick={() => setShowDeleteOrg(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="helper">
+              Diese Aktion löscht die aktuell aktive Organisation{activeOrg?.name ? ` "${activeOrg.name}"` : ''} inklusive aller Daten.
+            </div>
+            <div className="field">
+              <label>Zur Bestätigung bitte exakt "LÖSCHEN" eingeben</label>
+              <input
+                className="input"
+                value={deleteOrgConfirmText}
+                onChange={(e) => setDeleteOrgConfirmText(e.currentTarget.value)}
+                placeholder="LÖSCHEN"
+              />
+            </div>
+            <div className="modal-actions-end">
+              <button className="btn" disabled={busyDanger} onClick={() => setShowDeleteOrg(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="btn danger"
+                disabled={busyDanger || deleteOrgConfirmText !== 'LÖSCHEN'}
+                onClick={async () => {
+                  setBusyDanger(true)
+                  try {
+                    await ensureActiveOrgLoaded()
+                    const orgId = activeOrg?.id
+                    if (!orgId) throw new Error('Keine aktive Organisation gefunden')
+
+                    await window.api?.organizations?.delete?.({ orgId, deleteData: true })
+                    notify('success', 'Organisation gelöscht. Neu laden …')
+                    window.dispatchEvent(new Event('data-changed'))
+                    window.setTimeout(() => window.location.reload(), 600)
+                  } catch (e: any) {
+                    notify('error', e?.message || String(e))
+                  } finally {
+                    setBusyDanger(false)
+                    setShowDeleteOrg(false)
+                    setDeleteOrgConfirmText('')
+                    setActiveOrg(null)
+                  }
+                }}
+              >
+                Ja, Organisation löschen
               </button>
             </div>
           </div>

@@ -350,14 +350,23 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
     const orgs = cfg.organizations || []
     
     if (orgs.length <= 1) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
-    if (cfg.activeOrgId === orgId) throw new Error('Die aktive Organisation kann nicht gelöscht werden. Wechsle zuerst zu einer anderen.')
+    const activeOrgId = cfg.activeOrgId ?? (orgs[0]?.id || 'default')
     
     const org = orgs.find(o => o.id === orgId)
     if (!org) throw new Error('Organisation nicht gefunden')
     
     // Remove from list
     const newOrgs = orgs.filter(o => o.id !== orgId)
-    writeAppConfig({ ...cfg, organizations: newOrgs })
+
+    // If deleting the active org, automatically switch to another remaining org.
+    if (activeOrgId === orgId) {
+        const next = newOrgs[0]
+        if (!next) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
+        closeDb()
+        writeAppConfig({ ...cfg, organizations: newOrgs, activeOrgId: next.id, dbRoot: next.dbRoot })
+    } else {
+        writeAppConfig({ ...cfg, organizations: newOrgs })
+    }
     
     // Optionally delete data folder
     if (deleteData && org.dbRoot) {

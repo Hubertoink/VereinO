@@ -195,6 +195,18 @@ declare global {
                     apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) => Promise<{ ok: boolean }>
                 }
             }
+            organizations: {
+                list: () => Promise<{ organizations: Array<{ id: string; name: string; dbRoot: string; createdAt: string; isActive: boolean }> }>
+                active: () => Promise<{ organization: { id: string; name: string; dbRoot: string; createdAt: string } | null }>
+                create: (payload: { name: string }) => Promise<{ organization: { id: string; name: string; dbRoot: string; createdAt: string } }>
+                switch: (payload: { orgId: string }) => Promise<{ success: boolean; org: { id: string; name: string; dbRoot: string } }>
+                rename: (payload: { orgId: string; name: string }) => Promise<{ success: boolean }>
+                delete: (payload: { orgId: string; deleteData?: boolean }) => Promise<{ success: boolean }>
+                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; glassModals: boolean }>
+                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => Promise<{ success: boolean }>
+                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; glassModals: boolean }>
+                onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => () => void
+            }
             shell: {
                 showItemInFolder: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
                 openPath: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>
