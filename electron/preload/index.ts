@@ -208,7 +208,7 @@ contextBridge.exposeInMainWorld('api', {
         rename: (payload: { orgId: string; name: string }) => ipcRenderer.invoke('organizations.rename', payload),
         delete: (payload: { orgId: string; deleteData?: boolean }) => ipcRenderer.invoke('organizations.delete', payload),
         getAppearance: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.getAppearance', payload),
-        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => 
+        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => 
             ipcRenderer.invoke('organizations.setAppearance', payload),
         activeAppearance: () => ipcRenderer.invoke('organizations.activeAppearance'),
         onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => {

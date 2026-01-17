@@ -41,7 +41,7 @@ export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 
 export type JournalRowDensity = 'normal' | 'compact'
 
-export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
 
 export type DateFmt = 'ISO' | 'PRETTY'
 
@@ -129,6 +129,8 @@ export interface SettingsProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
   showSubmissionBadge: boolean
@@ -164,6 +166,8 @@ export interface GeneralPaneProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
   dateFmt: DateFmt

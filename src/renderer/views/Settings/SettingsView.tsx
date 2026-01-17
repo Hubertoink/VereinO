@@ -82,6 +82,8 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowDensity={props.setJournalRowDensity}
             backgroundImage={props.backgroundImage}
             setBackgroundImage={props.setBackgroundImage}
+            customBackgroundImage={props.customBackgroundImage}
+            setCustomBackgroundImage={props.setCustomBackgroundImage}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
             dateFmt={props.dateFmt}

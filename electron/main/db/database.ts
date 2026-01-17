@@ -46,6 +46,7 @@ type AppConfig = {
         createdAt: string
         colorTheme?: string
         backgroundImage?: string
+        customBackgroundImage?: string
         glassModals?: boolean
     }>
 }
@@ -383,13 +384,14 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
 /**
  * Get the appearance settings for a specific organization
  */
-export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const org = orgs.find(o => o.id === orgId)
     return {
         colorTheme: org?.colorTheme || null,
         backgroundImage: org?.backgroundImage || null,
+        customBackgroundImage: org?.customBackgroundImage || null,
         glassModals: org?.glassModals ?? false
     }
 }
@@ -399,7 +401,7 @@ export function getOrganizationAppearance(orgId: string): { colorTheme: string |
  */
 export function setOrganizationAppearance(
     orgId: string, 
-    appearance: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean }
+    appearance: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }
 ): { success: boolean } {
     const cfg = readAppConfig()
     let orgs = cfg.organizations || []
@@ -414,6 +416,7 @@ export function setOrganizationAppearance(
             createdAt: new Date().toISOString(),
             colorTheme: undefined,
             backgroundImage: undefined,
+            customBackgroundImage: undefined,
             glassModals: undefined
         }]
     }
@@ -431,6 +434,7 @@ export function setOrganizationAppearance(
                 createdAt: new Date().toISOString(),
                 colorTheme: appearance.colorTheme,
                 backgroundImage: appearance.backgroundImage,
+                customBackgroundImage: appearance.customBackgroundImage === undefined ? undefined : (appearance.customBackgroundImage ?? undefined),
                 glassModals: appearance.glassModals
             })
         } else {
@@ -441,6 +445,7 @@ export function setOrganizationAppearance(
             ...orgs[idx], 
             ...(appearance.colorTheme !== undefined && { colorTheme: appearance.colorTheme }),
             ...(appearance.backgroundImage !== undefined && { backgroundImage: appearance.backgroundImage }),
+            ...(appearance.customBackgroundImage !== undefined && { customBackgroundImage: appearance.customBackgroundImage ?? undefined }),
             ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals })
         }
     }
@@ -452,14 +457,14 @@ export function setOrganizationAppearance(
 /**
  * Get the appearance settings (theme, background, glass) of the currently active organization
  */
-export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; glassModals: boolean } {
+export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
     
     // If orgs array is empty, return defaults
     if (orgs.length === 0) {
-        return { colorTheme: null, backgroundImage: null, glassModals: false }
+        return { colorTheme: null, backgroundImage: null, customBackgroundImage: null, glassModals: false }
     }
     
     // Find active org
@@ -467,6 +472,7 @@ export function getActiveOrganizationAppearance(): { colorTheme: string | null; 
     return {
         colorTheme: activeOrg?.colorTheme || null,
         backgroundImage: activeOrg?.backgroundImage || null,
+        customBackgroundImage: activeOrg?.customBackgroundImage || null,
         glassModals: activeOrg?.glassModals ?? false
     }
 }

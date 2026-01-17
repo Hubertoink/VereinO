@@ -6,9 +6,9 @@ type NavIconColorMode = 'color' | 'mono'
 type DateFormat = 'de' | 'iso'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
 
-const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow']
+const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom']
 
 // Glassmorphism: transparent modals with blur
 
@@ -37,6 +37,8 @@ interface UIPreferencesContextValue {
   setShowSubmissionBadge: (val: boolean) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
+  customBackgroundImage: string | null
+  setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean
   setGlassModals: (val: boolean) => void
 }
@@ -56,6 +58,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [colorTheme, setColorThemeState] = useState<ColorTheme>('default')
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
+  const [customBackgroundImage, setCustomBackgroundImageState] = useState<string | null>(null)
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
   
   // Track current org ID for appearance persistence
@@ -64,6 +67,33 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   
   // Load appearance settings from organization on mount
   useEffect(() => {
+    const applyAppearance = (appearance: any) => {
+      // Apply color theme
+      if (isValidTheme(appearance?.colorTheme)) {
+        setColorThemeState(appearance.colorTheme)
+        localStorage.setItem('ui.colorTheme', appearance.colorTheme)
+        document.documentElement.setAttribute('data-color-theme', appearance.colorTheme)
+      }
+      // Apply custom background image payload (data URL)
+      if (typeof appearance?.customBackgroundImage === 'string' && appearance.customBackgroundImage) {
+        setCustomBackgroundImageState(appearance.customBackgroundImage)
+        localStorage.setItem('ui.customBackgroundImage', appearance.customBackgroundImage)
+        document.documentElement.style.setProperty('--custom-background-image', `url(\"${appearance.customBackgroundImage}\")`)
+      }
+      // Apply background image
+      if (appearance?.backgroundImage && VALID_BACKGROUNDS.includes(appearance.backgroundImage)) {
+        setBackgroundImageState(appearance.backgroundImage)
+        localStorage.setItem('ui.backgroundImage', appearance.backgroundImage)
+        document.documentElement.setAttribute('data-background-image', appearance.backgroundImage)
+      }
+      // Apply glass modals
+      if (typeof appearance?.glassModals === 'boolean') {
+        setGlassModalsState(appearance.glassModals)
+        localStorage.setItem('ui.glassModals', String(appearance.glassModals))
+        document.documentElement.setAttribute('data-glass-modals', String(appearance.glassModals))
+      }
+    }
+
     async function loadOrgAppearance() {
       try {
         // Get active organization
@@ -74,24 +104,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
           // Get saved appearance for this org
           const appearance = await (window as any).api?.organizations?.activeAppearance?.()
           if (appearance) {
-            // Apply color theme
-            if (isValidTheme(appearance.colorTheme)) {
-              setColorThemeState(appearance.colorTheme)
-              localStorage.setItem('ui.colorTheme', appearance.colorTheme)
-              document.documentElement.setAttribute('data-color-theme', appearance.colorTheme)
-            }
-            // Apply background image
-            if (appearance.backgroundImage && VALID_BACKGROUNDS.includes(appearance.backgroundImage)) {
-              setBackgroundImageState(appearance.backgroundImage)
-              localStorage.setItem('ui.backgroundImage', appearance.backgroundImage)
-              document.documentElement.setAttribute('data-background-image', appearance.backgroundImage)
-            }
-            // Apply glass modals
-            if (typeof appearance.glassModals === 'boolean') {
-              setGlassModalsState(appearance.glassModals)
-              localStorage.setItem('ui.glassModals', String(appearance.glassModals))
-              document.documentElement.setAttribute('data-glass-modals', String(appearance.glassModals))
-            }
+            applyAppearance(appearance)
             appearanceInitializedRef.current = true
             return
           }
@@ -106,6 +119,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         if (storedBg && VALID_BACKGROUNDS.includes(storedBg as BackgroundImage)) {
           setBackgroundImageState(storedBg as BackgroundImage)
           document.documentElement.setAttribute('data-background-image', storedBg)
+        }
+        const storedCustomBg = localStorage.getItem('ui.customBackgroundImage')
+        if (storedCustomBg) {
+          setCustomBackgroundImageState(storedCustomBg)
+          document.documentElement.style.setProperty('--custom-background-image', `url("${storedCustomBg}")`)
         }
         const storedGlass = localStorage.getItem('ui.glassModals')
         setGlassModalsState(storedGlass === 'true')
@@ -123,10 +141,25 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
     loadOrgAppearance()
+
+    const off = (window as any).api?.organizations?.onSwitched?.(async (org: { id: string }) => {
+      try {
+        setCurrentOrgId(org?.id || null)
+        appearanceInitializedRef.current = false
+        const appearance = await (window as any).api?.organizations?.activeAppearance?.()
+        if (appearance) applyAppearance(appearance)
+      } finally {
+        appearanceInitializedRef.current = true
+      }
+    })
+
+    return () => {
+      if (typeof off === 'function') off()
+    }
   }, [])
   
   // Helper to save appearance to organization
-  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => {
+  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
@@ -142,6 +175,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const setBackgroundImage = (val: BackgroundImage) => {
     setBackgroundImageState(val)
     saveAppearanceToOrg({ backgroundImage: val })
+  }
+
+  const setCustomBackgroundImage = (val: string | null) => {
+    setCustomBackgroundImageState(val)
+    saveAppearanceToOrg({ customBackgroundImage: val })
   }
   
   // Wrapper to save glass modals to organization when changed
@@ -216,6 +254,16 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [backgroundImage])
 
   useEffect(() => {
+    if (customBackgroundImage) {
+      localStorage.setItem('ui.customBackgroundImage', customBackgroundImage)
+      document.documentElement.style.setProperty('--custom-background-image', `url("${customBackgroundImage}")`)
+    } else {
+      localStorage.removeItem('ui.customBackgroundImage')
+      document.documentElement.style.removeProperty('--custom-background-image')
+    }
+  }, [customBackgroundImage])
+
+  useEffect(() => {
     localStorage.setItem('ui.glassModals', String(glassModals))
     document.documentElement.setAttribute('data-glass-modals', String(glassModals))
   }, [glassModals])
@@ -241,6 +289,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setShowSubmissionBadge,
         backgroundImage,
         setBackgroundImage,
+        customBackgroundImage,
+        setCustomBackgroundImage,
         glassModals,
         setGlassModals
       }}

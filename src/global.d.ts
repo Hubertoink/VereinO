@@ -202,9 +202,9 @@ declare global {
                 switch: (payload: { orgId: string }) => Promise<{ success: boolean; org: { id: string; name: string; dbRoot: string } }>
                 rename: (payload: { orgId: string; name: string }) => Promise<{ success: boolean }>
                 delete: (payload: { orgId: string; deleteData?: boolean }) => Promise<{ success: boolean }>
-                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; glassModals: boolean }>
-                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => Promise<{ success: boolean }>
-                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; glassModals: boolean }>
+                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
+                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => Promise<{ success: boolean }>
+                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
                 onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => () => void
             }
             shell: {

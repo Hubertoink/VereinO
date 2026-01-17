@@ -117,6 +117,8 @@ function AppInner() {
         setJournalRowDensity,
         backgroundImage,
         setBackgroundImage,
+        customBackgroundImage,
+        setCustomBackgroundImage,
         glassModals,
         setGlassModals,
         showSubmissionBadge,
@@ -889,6 +891,8 @@ function AppInner() {
                             setJournalRowDensity={setJournalRowDensity}
                             backgroundImage={backgroundImage}
                             setBackgroundImage={setBackgroundImage}
+                            customBackgroundImage={customBackgroundImage}
+                            setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
                             showSubmissionBadge={showSubmissionBadge}
@@ -1074,6 +1078,8 @@ function AppInner() {
                     setJournalRowDensity={(v) => { setJournalRowDensity(v); try { localStorage.setItem('ui.journalRowDensity', v) } catch {}; try { document.documentElement.setAttribute('data-journal-row-density', v) } catch {} }}
                     backgroundImage={backgroundImage}
                     setBackgroundImage={(v) => { setBackgroundImage(v); try { localStorage.setItem('ui.backgroundImage', v) } catch {}; try { document.documentElement.setAttribute('data-background-image', v) } catch {} }}
+                    customBackgroundImage={customBackgroundImage}
+                    setCustomBackgroundImage={(v) => { setCustomBackgroundImage(v) }}
                     existingTags={tagDefs as any}
                     notify={notify}
                 />

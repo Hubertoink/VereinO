@@ -1,5 +1,6 @@
 import React from 'react'
 import { GeneralPaneProps } from '../types'
+import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 
 /**
  * GeneralPane - Darstellung & Layout Settings
@@ -33,12 +34,48 @@ export function GeneralPane({
   setShowSubmissionBadge,
   backgroundImage,
   setBackgroundImage,
+  customBackgroundImage,
+  setCustomBackgroundImage,
   glassModals,
   setGlassModals,
 }: GeneralPaneProps) {
   // Date format examples
   const sample = '2025-01-15'
   const pretty = '15. Jan 2025'
+
+  const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  const openCustomBgPicker = () => {
+    customBgInputRef.current?.click()
+  }
+
+  const handleCustomBgUpload = async (file: File) => {
+    // Guardrail: don't attempt to load extremely large files
+    const MAX_FILE_BYTES = 25 * 1024 * 1024
+    if (file.size > MAX_FILE_BYTES) {
+      notify('error', 'Bitte ein kleineres Bild auswählen (max. 25 MB).')
+      return
+    }
+
+    try {
+      const result = await compressImageFileToDataUrl(file, {
+        maxDimension: 3000,
+        targetBytes: 2 * 1024 * 1024,
+      })
+
+      setCustomBackgroundImage(result.dataUrl)
+      setBackgroundImage('custom')
+      notify('success', `Eigenes Hintergrundbild gespeichert (${Math.round(result.bytes / 1024)} KB).`)
+    } catch (e) {
+      notify('error', `Bild konnte nicht verarbeitet werden: ${String((e as any)?.message || e)}`)
+    }
+  }
+
+  const handleRemoveCustomBg = () => {
+    setCustomBackgroundImage(null)
+    if (backgroundImage === 'custom') setBackgroundImage('none')
+    notify('info', 'Eigenes Hintergrundbild entfernt.')
+  }
 
   return (
     <div className="settings-pane">
@@ -91,7 +128,48 @@ export function GeneralPane({
               <option value="cherry-blossom">🌸 Kirschblüten</option>
               <option value="foggy-forest">🌲 Nebliger Wald</option>
               <option value="mountain-snow">🏔️ Schneeberge</option>
+              <option value="custom">🖼️ Eigenes Bild…</option>
             </select>
+            {(backgroundImage === 'custom' || !!customBackgroundImage) && (
+              <div className="custom-bg-controls">
+                <input
+                  ref={customBgInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleCustomBgUpload(file)
+                    // allow re-upload of the same file
+                    e.currentTarget.value = ''
+                  }}
+                />
+                <div className="custom-bg-row">
+                  {customBackgroundImage ? (
+                    <div
+                      className="custom-bg-preview"
+                      aria-label="Vorschau Hintergrundbild"
+                      style={{ backgroundImage: `url(${customBackgroundImage})` }}
+                    />
+                  ) : (
+                    <div className="custom-bg-preview custom-bg-preview--empty" aria-hidden="true" />
+                  )}
+                  <div className="custom-bg-actions">
+                    <button type="button" className="btn" onClick={openCustomBgPicker}>
+                      {customBackgroundImage ? 'Bild ändern…' : 'Bild auswählen…'}
+                    </button>
+                    {customBackgroundImage && (
+                      <button type="button" className="btn btn-secondary" onClick={handleRemoveCustomBg}>
+                        Entfernen
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="helper">
+                  Das Bild wird komprimiert und pro Organisation gespeichert.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

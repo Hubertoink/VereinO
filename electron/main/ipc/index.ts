@@ -1728,11 +1728,12 @@ export function registerIpcHandlers() {
         return getOrganizationAppearance(payload.orgId)
     })
     
-    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; glassModals?: boolean }) => {
+    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
         return setOrganizationAppearance(payload.orgId, {
             colorTheme: payload.colorTheme,
             backgroundImage: payload.backgroundImage,
+            customBackgroundImage: payload.customBackgroundImage,
             glassModals: payload.glassModals
         })
     })

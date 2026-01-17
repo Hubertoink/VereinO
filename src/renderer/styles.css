@@ -15,6 +15,24 @@
 .settings-pane-card { padding: 12px; }
 .settings-pane-actions { margin-top: 8px; }
 
+@media (max-width: 600px) {
+    .settings-container { padding: 12px; }
+    .settings-content { padding: 12px; }
+}
+
+/* Visually hidden (still accessible to screen readers) */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Settings Navigation - Aktenreiter (file tab) style */
 .settings-tabs {
     display: flex;
@@ -86,6 +104,41 @@
     .settings-row-3col {
         grid-template-columns: 1fr;
     }
+}
+
+/* Custom background controls */
+.custom-bg-controls {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+}
+
+.custom-bg-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.custom-bg-preview {
+    width: 64px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: color-mix(in oklab, var(--muted) 35%, transparent);
+}
+
+.custom-bg-preview--empty {
+    opacity: 0.6;
+}
+
+.custom-bg-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* Inline toggle with label */
@@ -605,7 +658,8 @@ html,
 body,
 #root {
     height: 100%;
-    min-width: 1264px; /* safety net: matches BrowserWindow minWidth incl. left sidebar */
+    min-width: 0;
+    width: 100%;
 }
 
 body {
@@ -614,6 +668,7 @@ body {
     color: var(--text);
     font-family: Inter, "Plus Jakarta Sans", Segoe UI, system-ui, -apple-system, sans-serif;
     line-height: 1.4;
+    overflow-x: hidden;
 }
 
 h1 {
@@ -622,15 +677,15 @@ h1 {
 }
 
 h2 {
+    font-size: 18px;
+    margin: 24px 0 8px;
+}
 
 /* Subtle hover highlight for buttons used in Setup Wizard */
 .btn.hover-highlight:hover {
     background: color-mix(in oklab, var(--accent) 16%, transparent);
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent) inset;
     transition: background 120ms ease, box-shadow 120ms ease;
-}
-    font-size: 18px;
-    margin: 24px 0 8px;
 }
 
 code,
@@ -1697,27 +1752,33 @@ textarea:focus {
     color: var(--accent);
     width: 48px;
     height: 48px;
-    padding: 0;
+    padding: 0 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fab-buchung-icon {
     font-size: 24px;
     font-weight: 300;
     line-height: 1;
-    transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fab-buchung-text {
     opacity: 0;
-    width: 0;
+    max-width: 0;
     overflow: hidden;
     white-space: nowrap;
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-left: 0;
 }
 
@@ -1725,19 +1786,19 @@ textarea:focus {
     background: color-mix(in oklab, var(--accent) 40%, transparent);
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
-    color: var(--accent);
-    width: auto;
-    padding-left: 16px;
-    padding-right: 16px;
+    /* Ensure label text stays readable across themes */
+    color: var(--text);
+    width: 140px;
+    padding: 0 16px;
 }
 
 .fab-buchung:hover .fab-buchung-icon {
-    font-size: 20px;
+    transform: scale(0.85);
 }
 
 .fab-buchung:hover .fab-buchung-text {
     opacity: 1;
-    width: auto;
+    max-width: 100px;
     margin-left: 6px;
 }
 
@@ -3428,6 +3489,10 @@ html[data-background-image="mountain-snow"]::before {
     background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
 }
 
+html[data-background-image="custom"]::before {
+    background-image: var(--custom-background-image);
+}
+
 /* ========================================
    Glassmorphism Modals
    ======================================== */
@@ -3752,6 +3817,14 @@ html[data-glass-modals="true"] .flyout-arrow {
 .background-preview.bg-none::after {
     content: '—';
     color: var(--muted);
+}
+
+.background-preview.bg-custom {
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
 }
 
 .background-preview.bg-cherry-blossom {

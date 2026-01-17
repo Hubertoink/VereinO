@@ -1,12 +1,13 @@
 ﻿ 
 import React, { useEffect, useMemo, useState } from 'react'
+import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 
 type NavLayout = 'left' | 'top'
 type NavIconColorMode = 'color' | 'mono'
 type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm' | 'soft-blush' | 'professional-light'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow'
+type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
@@ -41,6 +42,7 @@ export default function SetupWizardModal({
     journalRowStyle, setJournalRowStyle,
     journalRowDensity, setJournalRowDensity,
     backgroundImage, setBackgroundImage,
+    customBackgroundImage, setCustomBackgroundImage,
     existingTags,
     notify
 }: {
@@ -57,6 +59,8 @@ export default function SetupWizardModal({
     setJournalRowDensity: (v: JournalRowDensity) => void
     backgroundImage: BackgroundImage
     setBackgroundImage: (v: BackgroundImage) => void
+    customBackgroundImage: string | null
+    setCustomBackgroundImage: (v: string | null) => void
     existingTags: Array<{ name: string; color?: string | null }>
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
@@ -113,6 +117,42 @@ export default function SetupWizardModal({
     const [backupMode, setBackupMode] = useState<'SILENT' | 'PROMPT' | 'OFF'>('PROMPT')
     const [backupIntervalDays, setBackupIntervalDays] = useState<number>(7)
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
+
+    const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
+    const [isCustomBgProcessing, setIsCustomBgProcessing] = useState<boolean>(false)
+
+    const openCustomBgPicker = () => {
+        customBgInputRef.current?.click()
+    }
+
+    const handleCustomBgUpload = async (file: File) => {
+        const MAX_FILE_BYTES = 25 * 1024 * 1024
+        if (file.size > MAX_FILE_BYTES) {
+            notify('error', 'Bitte ein kleineres Bild auswählen (max. 25 MB).')
+            return
+        }
+
+        setIsCustomBgProcessing(true)
+        try {
+            const result = await compressImageFileToDataUrl(file, {
+                maxDimension: 3000,
+                targetBytes: 2 * 1024 * 1024,
+            })
+            setCustomBackgroundImage(result.dataUrl)
+            setBackgroundImage('custom')
+            notify('success', `Eigenes Hintergrundbild gespeichert (${Math.round(result.bytes / 1024)} KB).`)
+        } catch (e: any) {
+            notify('error', `Bild konnte nicht verarbeitet werden: ${String(e?.message || e)}`)
+        } finally {
+            setIsCustomBgProcessing(false)
+        }
+    }
+
+    const handleRemoveCustomBg = () => {
+        setCustomBackgroundImage(null)
+        if (backgroundImage === 'custom') setBackgroundImage('none')
+        notify('info', 'Eigenes Hintergrundbild entfernt.')
+    }
 
     function applyTablePreset(preset: TablePreset) {
         if (preset === 'custom') return // custom handled by direct edits
@@ -393,7 +433,8 @@ export default function SetupWizardModal({
                 { value: 'none', label: 'Keiner' },
                 { value: 'cherry-blossom', label: 'Kirschblüten' },
                 { value: 'foggy-forest', label: 'Nebelwald' },
-                { value: 'mountain-snow', label: 'Bergschnee' }
+                { value: 'mountain-snow', label: 'Bergschnee' },
+                { value: 'custom', label: 'Eigenes…' }
             ]
             return (
                 <div className="card setup-appearance-card">
@@ -471,13 +512,68 @@ export default function SetupWizardModal({
                                     key={bg.value}
                                     type="button"
                                     className={`background-chip ${backgroundImage === bg.value ? 'active' : ''}`}
-                                    onClick={() => setBackgroundImage(bg.value)}
+                                    onClick={() => {
+                                        if (bg.value !== 'custom') {
+                                            setBackgroundImage(bg.value)
+                                            return
+                                        }
+                                        // Custom: if we already have an image, just select; otherwise open picker
+                                        if (customBackgroundImage) {
+                                            setBackgroundImage('custom')
+                                        } else {
+                                            openCustomBgPicker()
+                                        }
+                                    }}
                                 >
-                                    <span className={`background-preview bg-${bg.value}`} />
+                                    {bg.value === 'custom' ? (
+                                        <span
+                                            className={`background-preview bg-custom${customBackgroundImage ? '' : ' custom-bg-preview--empty'}`}
+                                            style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
+                                        >
+                                            {!customBackgroundImage ? '🖼️' : null}
+                                        </span>
+                                    ) : (
+                                        <span className={`background-preview bg-${bg.value}`} />
+                                    )}
                                     <span>{bg.label}</span>
                                 </button>
                             ))}
                         </div>
+
+                        <input
+                            ref={customBgInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                e.target.value = ''
+                                if (f) void handleCustomBgUpload(f)
+                            }}
+                        />
+
+                        {(backgroundImage === 'custom' || !!customBackgroundImage) && (
+                            <div className="custom-bg-controls">
+                                <div className="custom-bg-row">
+                                    <div
+                                        className={`custom-bg-preview ${customBackgroundImage ? '' : 'custom-bg-preview--empty'}`}
+                                        style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
+                                        aria-label={customBackgroundImage ? 'Eigenes Hintergrundbild' : 'Kein eigenes Hintergrundbild'}
+                                    />
+                                    <div className="custom-bg-actions">
+                                        <button className="btn" type="button" onClick={openCustomBgPicker} disabled={isCustomBgProcessing}>
+                                            {customBackgroundImage ? 'Bild ersetzen…' : 'Bild auswählen…'}
+                                        </button>
+                                        <button className="btn danger" type="button" onClick={handleRemoveCustomBg} disabled={!customBackgroundImage || isCustomBgProcessing}>
+                                            Entfernen
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="helper">
+                                    {isCustomBgProcessing ? 'Bild wird verarbeitet…' : 'Tipp: Große Fotos werden automatisch komprimiert.'}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     
                     {/* Preview row */}
