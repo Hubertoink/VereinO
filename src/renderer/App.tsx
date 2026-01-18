@@ -825,6 +825,8 @@ function AppInner() {
                             setActivePage={setActivePage}
                             setShowTimeFilter={setShowTimeFilter}
                             setShowMetaFilter={setShowMetaFilter}
+                            yearsAvail={yearsAvail}
+                            budgets={budgets}
                             earmarks={earmarks}
                             tagDefs={tagDefs}
                             budgetsForEdit={budgetsForEdit}
