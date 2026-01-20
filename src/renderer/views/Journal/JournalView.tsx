@@ -3,7 +3,7 @@ import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
-import { BatchAssignDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
+import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
@@ -38,6 +38,24 @@ type VoucherRow = {
 }
 
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+
+const DEFAULT_ORDER: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+
+const LABEL_FOR_COL: Record<ColKey, string> = {
+    actions: 'Aktionen',
+    date: 'Datum',
+    voucherNo: 'Nr.',
+    type: 'Art',
+    sphere: 'Sphäre',
+    description: 'Beschreibung',
+    earmark: 'Zweckbindung',
+    budget: 'Budget',
+    paymentMethod: 'Zahlweg',
+    attachments: 'Anhänge',
+    net: 'Netto',
+    vat: 'MwSt',
+    gross: 'Brutto'
+}
 
 interface JournalViewProps {
     // Props die von App.tsx kommen
@@ -202,6 +220,119 @@ export default function JournalView({
 
     // Column preferences now come from props (shared with Settings)
 
+    const hasCustomCols = useMemo(() => Object.values(cols).some((v) => v === false), [cols])
+    const hasCustomOrder = useMemo(() => {
+        if (order.length !== DEFAULT_ORDER.length) return true
+        return order.some((k, idx) => k !== DEFAULT_ORDER[idx])
+    }, [order])
+
+    // Drag-and-drop state for column reorder
+    const [draggedCol, setDraggedCol] = useState<ColKey | null>(null)
+    const [dropTarget, setDropTarget] = useState<number | null>(null)
+
+    const moveCol = useCallback(
+        (col: ColKey, toIndex: number) => {
+            const fromIndex = order.indexOf(col)
+            if (fromIndex === -1 || fromIndex === toIndex || fromIndex === toIndex - 1) return
+            const next = order.filter((c) => c !== col)
+            // Wenn wir nach unten verschieben, müssen wir den Index anpassen
+            const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
+            next.splice(insertAt, 0, col)
+            setOrder(next)
+        },
+        [order, setOrder]
+    )
+
+    const presetStandard = useCallback(() => {
+        const nextCols: Record<ColKey, boolean> = {
+            actions: true,
+            date: true,
+            voucherNo: false,
+            type: true,
+            sphere: true,
+            description: true,
+            earmark: true,
+            budget: true,
+            paymentMethod: true,
+            attachments: true,
+            net: false,
+            vat: false,
+            gross: true
+        }
+        const nextOrder: ColKey[] = [
+            'actions',
+            'date',
+            'type',
+            'sphere',
+            'description',
+            'earmark',
+            'budget',
+            'paymentMethod',
+            'attachments',
+            'gross',
+            'voucherNo',
+            'net',
+            'vat'
+        ]
+        setCols(nextCols)
+        setOrder(nextOrder)
+    }, [setCols, setOrder])
+
+    const presetMinimal = useCallback(() => {
+        const nextCols: Record<ColKey, boolean> = {
+            actions: true,
+            date: true,
+            voucherNo: false,
+            type: false,
+            sphere: false,
+            description: true,
+            earmark: false,
+            budget: false,
+            paymentMethod: false,
+            attachments: false,
+            net: false,
+            vat: false,
+            gross: true
+        }
+        const nextOrder: ColKey[] = [
+            'actions',
+            'date',
+            'description',
+            'gross',
+            'voucherNo',
+            'type',
+            'sphere',
+            'earmark',
+            'budget',
+            'paymentMethod',
+            'attachments',
+            'net',
+            'vat'
+        ]
+        setCols(nextCols)
+        setOrder(nextOrder)
+    }, [setCols, setOrder])
+
+    const presetDetails = useCallback(() => {
+        const nextCols: Record<ColKey, boolean> = {
+            actions: true,
+            date: true,
+            voucherNo: true,
+            type: true,
+            sphere: true,
+            description: true,
+            earmark: true,
+            budget: true,
+            paymentMethod: true,
+            attachments: true,
+            net: true,
+            vat: true,
+            gross: true
+        }
+        setCols(nextCols)
+        setOrder(DEFAULT_ORDER)
+    }, [setCols, setOrder])
+
     // Modal states
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
     const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
@@ -353,39 +484,192 @@ export default function JournalView({
                     aria-label="Suche"
                 />
 
-                <TimeFilterDropdown
-                    yearsAvail={yearsAvail}
-                    from={activeFrom}
-                    to={activeTo}
-                    onApply={({ from: nf, to: nt }) => {
-                        activeSetFrom(nf)
-                        activeSetTo(nt)
-                        activeSetPage(1)
-                    }}
-                />
+                <div className="filter-divider" />
 
-                <MetaFilterDropdown
-                    budgets={budgets}
-                    earmarks={earmarks}
-                    tagDefs={tagDefs}
-                    filterType={activeFilterType}
-                    filterPM={activeFilterPM}
-                    filterTag={activeFilterTag}
-                    sphere={activeFilterSphere}
-                    earmarkId={activeFilterEarmark}
-                    budgetId={activeFilterBudgetId}
-                    onApply={({ filterType, filterPM, filterTag, sphere, earmarkId, budgetId }) => {
-                        activeSetFilterType(filterType)
-                        activeSetFilterPM(filterPM)
-                        activeSetFilterTag(filterTag)
-                        activeSetFilterSphere(sphere)
-                        activeSetFilterEarmark(earmarkId)
-                        activeSetFilterBudgetId(budgetId)
-                        activeSetPage(1)
-                    }}
-                />
+                {/* Filter-Cluster: Zeit- und Meta-Filter */}
+                <div className="toolbar-icon has-tooltip" data-tooltip="Zeitraum filtern">
+                    <TimeFilterDropdown
+                        yearsAvail={yearsAvail}
+                        from={activeFrom}
+                        to={activeTo}
+                        onApply={({ from: nf, to: nt }) => {
+                            activeSetFrom(nf)
+                            activeSetTo(nt)
+                            activeSetPage(1)
+                        }}
+                    />
+                </div>
 
-                <BatchAssignDropdown
+                <div className="toolbar-icon has-tooltip" data-tooltip="Filter nach Art, Sphäre, Tags …">
+                    <MetaFilterDropdown
+                        budgets={budgets}
+                        earmarks={earmarks}
+                        tagDefs={tagDefs}
+                        filterType={activeFilterType}
+                        filterPM={activeFilterPM}
+                        filterTag={activeFilterTag}
+                        sphere={activeFilterSphere}
+                        earmarkId={activeFilterEarmark}
+                        budgetId={activeFilterBudgetId}
+                        onApply={({ filterType, filterPM, filterTag, sphere, earmarkId, budgetId }) => {
+                            activeSetFilterType(filterType)
+                            activeSetFilterPM(filterPM)
+                            activeSetFilterTag(filterTag)
+                            activeSetFilterSphere(sphere)
+                            activeSetFilterEarmark(earmarkId)
+                            activeSetFilterBudgetId(budgetId)
+                            activeSetPage(1)
+                        }}
+                    />
+                </div>
+
+                <div className="filter-divider" />
+
+                {/* Anzeige-Cluster: Spaltenauswahl */}
+                <div className="toolbar-icon has-tooltip" data-tooltip="Spalten & Reihenfolge">
+                    <FilterDropdown
+                        trigger={
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
+                            </svg>
+                        }
+                        title="Spalten"
+                        hasActiveFilters={false}
+                        alignRight
+                        width={380}
+                        ariaLabel="Spalten wählen"
+                        buttonTitle="Spalten wählen"
+                        colorVariant="display"
+                    >
+                        <div className="filter-dropdown__actions" style={{ marginTop: 0 }}>
+                            <button className="btn" type="button" onClick={presetStandard}>Standard</button>
+                            <button className="btn" type="button" onClick={presetMinimal}>Minimal</button>
+                            <div className="filter-dropdown__actions-right">
+                                <button className="btn" type="button" onClick={presetDetails}>Details</button>
+                            </div>
+                        </div>
+
+                        {!cols['actions'] && (
+                            <div className="helper" style={{ color: 'var(--danger)', marginTop: 8 }}>
+                                Ohne „Aktionen" kannst du Zeilen nicht bearbeiten oder löschen.
+                            </div>
+                        )}
+
+                        <div className="filter-dropdown__info" style={{ marginTop: 10, marginBottom: 6 }}>
+                            Ziehe Zeilen per Drag & Drop – der Balken zeigt die Einfügeposition.
+                        </div>
+
+                        <div
+                            className="filter-dropdown__col-list"
+                            onDragOver={(e) => {
+                                if (!draggedCol) return
+                                e.preventDefault()
+                            }}
+                            onDragLeave={(e) => {
+                                // Nur clearen wenn wir wirklich die Liste verlassen
+                                const relatedTarget = e.relatedTarget as Node | null
+                                if (!e.currentTarget.contains(relatedTarget)) {
+                                    setDropTarget(null)
+                                }
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault()
+                                if (!draggedCol || dropTarget == null) {
+                                    setDraggedCol(null)
+                                    setDropTarget(null)
+                                    return
+                                }
+                                moveCol(draggedCol, dropTarget)
+                                setDraggedCol(null)
+                                setDropTarget(null)
+                            }}
+                        >
+                            {order.map((k, idx) => {
+                                const fromIdx = order.indexOf(draggedCol!)
+                                // Indikator vor diesem Element anzeigen?
+                                const showIndicatorBefore = dropTarget === idx && draggedCol && fromIdx !== idx && fromIdx !== idx - 1
+                                // Indikator nach dem letzten Element?
+                                const isLast = idx === order.length - 1
+                                const showIndicatorAfter = isLast && dropTarget === order.length && draggedCol && fromIdx !== order.length - 1
+
+                                return (
+                                    <React.Fragment key={k}>
+                                        {showIndicatorBefore && <div className="filter-dropdown__drop-indicator" />}
+                                        <div
+                                            className={`filter-dropdown__col-row ${draggedCol === k ? 'dragging' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                setDraggedCol(k)
+                                                setDropTarget(null)
+                                                e.dataTransfer.effectAllowed = 'move'
+                                                e.dataTransfer.setData('text/plain', k)
+                                                // Kurze Verzögerung damit der Browser das Ghost-Image korrekt erstellt
+                                                requestAnimationFrame(() => {
+                                                    setDropTarget(idx)
+                                                })
+                                            }}
+                                            onDragEnd={() => {
+                                                setDraggedCol(null)
+                                                setDropTarget(null)
+                                            }}
+                                            onDragOver={(e) => {
+                                                if (!draggedCol || draggedCol === k) return
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                e.dataTransfer.dropEffect = 'move'
+
+                                                const rowEl = e.currentTarget as HTMLDivElement
+                                                const rect = rowEl.getBoundingClientRect()
+                                                const midY = rect.top + rect.height / 2
+                                                const newTarget = e.clientY < midY ? idx : idx + 1
+                                                if (newTarget !== dropTarget) {
+                                                    setDropTarget(newTarget)
+                                                }
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                if (!draggedCol || dropTarget == null) return
+                                                moveCol(draggedCol, dropTarget)
+                                                setDraggedCol(null)
+                                                setDropTarget(null)
+                                            }}
+                                        >
+                                            <div className="filter-dropdown__col-drag-handle" aria-hidden="true" title="Ziehen zum Sortieren">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                                    <circle cx="9" cy="5" r="2" />
+                                                    <circle cx="15" cy="5" r="2" />
+                                                    <circle cx="9" cy="12" r="2" />
+                                                    <circle cx="15" cy="12" r="2" />
+                                                    <circle cx="9" cy="19" r="2" />
+                                                    <circle cx="15" cy="19" r="2" />
+                                                </svg>
+                                            </div>
+                                            <label className="filter-dropdown__col-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!cols[k]}
+                                                    onChange={(e) => {
+                                                        e.stopPropagation()
+                                                        setCols({ ...cols, [k]: e.target.checked })
+                                                    }}
+                                                />
+                                                <span>{LABEL_FOR_COL[k] || k}</span>
+                                            </label>
+                                        </div>
+                                        {showIndicatorAfter && <div className="filter-dropdown__drop-indicator" />}
+                                    </React.Fragment>
+                                )
+                            })}
+                        </div>
+                    </FilterDropdown>
+                </div>
+
+                <div className="filter-divider" />
+
+                {/* Aktionen-Cluster: Batch-Zuweisung */}
+                <div className="toolbar-icon has-tooltip" data-tooltip="Batch-Zuweisung auf gefilterte Buchungen">
+                    <BatchAssignDropdown
                     earmarks={earmarks}
                     tagDefs={tagDefs}
                     budgets={budgetsForEdit}
@@ -407,7 +691,8 @@ export default function JournalView({
                         }
                     }}
                     notify={notify}
-                />
+                    />
+                </div>
             </div>
 
             {/* Active Filter Chips */}

@@ -1,5 +1,11 @@
 :root {
     --radius: 12px;
+
+    /* Toolbar dropdown color variants */
+    --dropdown-variant-display: #8b5cf6;
+    --dropdown-variant-time: #f59e0b;
+    --dropdown-variant-filter: #3b82f6;
+    --dropdown-variant-action: #10b981;
 }
 
 /* Settings layout */
@@ -3853,6 +3859,17 @@ html[data-glass-modals="true"] .flyout-arrow {
     flex: 1 1 260px;
 }
 
+.journal-filter-toolbar .toolbar-icon {
+    display: inline-flex;
+}
+
+.journal-filter-toolbar .filter-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
 /* ==================== Filter Dropdown ==================== */
 .sr-only {
     position: absolute;
@@ -3886,6 +3903,53 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .filter-dropdown__trigger.has-filters {
     color: var(--accent);
+}
+
+/* Color variants for visual grouping */
+.filter-dropdown__trigger--display {
+    color: var(--dropdown-variant-display);
+}
+.filter-dropdown__trigger--display:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-display) 15%, transparent);
+}
+
+.filter-dropdown__trigger--time {
+    color: var(--dropdown-variant-time);
+}
+.filter-dropdown__trigger--time:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-time) 15%, transparent);
+}
+
+.filter-dropdown__trigger--filter {
+    color: var(--dropdown-variant-filter);
+}
+.filter-dropdown__trigger--filter:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-filter) 15%, transparent);
+}
+
+.filter-dropdown__trigger--action {
+    color: var(--dropdown-variant-action);
+}
+.filter-dropdown__trigger--action:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-action) 15%, transparent);
+}
+
+/* Active filter state overrides color variant */
+.filter-dropdown__trigger--time.has-filters {
+    color: var(--dropdown-variant-time);
+    background: color-mix(in oklab, var(--dropdown-variant-time) 20%, transparent);
+}
+.filter-dropdown__trigger--filter.has-filters {
+    color: var(--dropdown-variant-filter);
+    background: color-mix(in oklab, var(--dropdown-variant-filter) 20%, transparent);
+}
+.filter-dropdown__trigger--display.has-filters {
+    color: var(--dropdown-variant-display);
+    background: color-mix(in oklab, var(--dropdown-variant-display) 20%, transparent);
+}
+.filter-dropdown__trigger--action.has-filters {
+    color: var(--dropdown-variant-action);
+    background: color-mix(in oklab, var(--dropdown-variant-action) 20%, transparent);
 }
 
 .filter-dropdown__indicator {
@@ -4041,11 +4105,30 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .filter-dropdown__checkbox {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    padding: 10px 12px;
     margin-top: 10px;
+    background: color-mix(in oklab, var(--surface) 90%, var(--text-dim));
+    border-radius: var(--radius);
+    cursor: pointer;
     user-select: none;
+    font-size: 13px;
+    color: var(--text);
+    transition: background 120ms ease;
+}
+
+.filter-dropdown__checkbox:hover {
+    background: color-mix(in oklab, var(--surface) 85%, var(--text-dim));
+}
+
+.filter-dropdown__checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .filter-dropdown__info {
@@ -4082,4 +4165,110 @@ html[data-glass-modals="true"] .flyout-arrow {
     font-size: 13px;
     color: var(--text);
     margin-bottom: 10px;
+}
+
+.filter-dropdown__col-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    background: var(--bg);
+    border-radius: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.filter-dropdown__col-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--surface);
+    transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+    user-select: none;
+}
+
+.filter-dropdown__col-row:hover:not(.dragging) {
+    background: color-mix(in oklab, var(--surface) 80%, var(--accent));
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.filter-dropdown__col-row.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+    background: color-mix(in oklab, var(--surface) 90%, var(--accent));
+}
+
+.filter-dropdown__col-drag-handle {
+    width: 22px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--text-dim);
+    background: transparent;
+    flex-shrink: 0;
+    cursor: grab;
+    transition: color 0.12s ease, background 0.12s ease;
+}
+
+.filter-dropdown__col-row:hover .filter-dropdown__col-drag-handle {
+    color: var(--text);
+    background: color-mix(in oklab, var(--accent) 15%, transparent);
+}
+
+.filter-dropdown__col-row:active .filter-dropdown__col-drag-handle,
+.filter-dropdown__col-row.dragging .filter-dropdown__col-drag-handle {
+    cursor: grabbing;
+    color: var(--accent);
+}
+
+.filter-dropdown__drop-indicator {
+    height: 3px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 8px color-mix(in oklab, var(--accent) 50%, transparent);
+    margin: 2px 8px;
+    animation: drop-indicator-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes drop-indicator-pulse {
+    from {
+        opacity: 0.7;
+        transform: scaleX(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+.filter-dropdown__col-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    flex: 1;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.filter-dropdown__col-label input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.filter-dropdown__col-label span {
+    color: var(--text);
+}
+
+.filter-dropdown__col-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }

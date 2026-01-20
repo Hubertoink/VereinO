@@ -59,6 +59,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
       width={340}
       ariaLabel="Zeitraum wählen"
       buttonTitle="Zeitraum wählen"
+      colorVariant="time"
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">
@@ -88,7 +89,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
           Zurücksetzen
         </button>
         <div className="filter-dropdown__actions-right">
-          <button className="btn" type="button" onClick={() => onApply({ from: f, to: t })}>
+          <button className="btn primary" type="button" onClick={() => onApply({ from: f, to: t })}>
             Übernehmen
           </button>
         </div>

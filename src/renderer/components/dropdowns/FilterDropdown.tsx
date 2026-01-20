@@ -9,6 +9,7 @@ export interface FilterDropdownProps {
   width?: number | string
   ariaLabel?: string
   buttonTitle?: string
+  colorVariant?: 'default' | 'display' | 'time' | 'filter' | 'action'
 }
 
 export default function FilterDropdown({
@@ -19,7 +20,8 @@ export default function FilterDropdown({
   alignRight = false,
   width = 320,
   ariaLabel,
-  buttonTitle
+  buttonTitle,
+  colorVariant = 'default'
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -53,12 +55,38 @@ export default function FilterDropdown({
     }
   }, [open])
 
+  // Adjust position if panel would overflow viewport
+  useEffect(() => {
+    if (!open || !panelRef.current) return
+    const panel = panelRef.current
+    // Reset any prior auto-adjustment
+    panel.style.left = ''
+    panel.style.right = ''
+    panel.style.maxHeight = ''
+
+    const rect = panel.getBoundingClientRect()
+    // Check right overflow
+    if (rect.right > window.innerWidth - 16) {
+      panel.style.left = 'auto'
+      panel.style.right = '0'
+    }
+    // Check left overflow (rare but possible on narrow screens)
+    if (rect.left < 16) {
+      panel.style.left = '0'
+      panel.style.right = 'auto'
+    }
+    // Check bottom overflow
+    if (rect.bottom > window.innerHeight - 16) {
+      panel.style.maxHeight = `${Math.max(200, window.innerHeight - rect.top - 32)}px`
+    }
+  }, [open])
+
   return (
     <div className="filter-dropdown">
       <button
         ref={buttonRef}
         type="button"
-        className={`btn ghost filter-dropdown__trigger ${hasActiveFilters ? 'has-filters' : ''}`}
+        className={`btn ghost filter-dropdown__trigger filter-dropdown__trigger--${colorVariant} ${hasActiveFilters ? 'has-filters' : ''}`}
         onClick={() => setOpen((v) => !v)}
         aria-label={ariaLabel}
         title={buttonTitle}

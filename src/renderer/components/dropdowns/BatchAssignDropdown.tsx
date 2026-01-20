@@ -146,6 +146,7 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
       width={460}
       ariaLabel="Batch zuweisen"
       buttonTitle="Batch zuweisen"
+      colorVariant="action"
     >
       <div className="filter-dropdown__mode">
         <button type="button" className={`btn ${mode === 'EARMARK' ? 'primary' : ''}`} onClick={() => { setMode('EARMARK'); setConfirm(false) }}>

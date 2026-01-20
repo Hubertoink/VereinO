@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../context/ToastContext'
-import TimeFilterModal from '../components/modals/TimeFilterModal'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
+import ColumnSelectDropdown from '../components/dropdowns/ColumnSelectDropdown'
+import InvoiceFilterDropdown from '../components/dropdowns/InvoiceFilterDropdown'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {
@@ -37,7 +38,6 @@ export default function InvoicesView() {
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
   const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount' | 'status'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount' | 'status') || 'due') } catch { return 'due' } })
   // Due date modal state and available years
-  const [showDueFilter, setShowDueFilter] = useState<boolean>(false)
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
 
   // Data
@@ -49,7 +49,6 @@ export default function InvoicesView() {
   const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
 
   // Column preferences
-  const [showColumnsModal, setShowColumnsModal] = useState(false)
   const [colPrefs, setColPrefs] = useState<{ showTags: boolean; showBezahlt: boolean; showRest: boolean; showAttachments: boolean }>(() => {
     try {
       const raw = localStorage.getItem('invoices.columns')
@@ -401,35 +400,57 @@ export default function InvoicesView() {
         <h1>Verbindlichkeiten</h1>
         <div className="invoices-filters">
           <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
-          <select className="input" value={status} onChange={e => { setStatus(e.target.value as any); setOffset(0) }} aria-label="Status filtern">
-            <option value="ALL">Alle</option>
-            <option value="OPEN">Offen</option>
-            <option value="PARTIAL">Teilweise</option>
-            <option value="PAID">Bezahlt</option>
-          </select>
-          <select className="input" value={sphere} onChange={e => { setSphere((e.target.value || '') as any); setOffset(0) }} aria-label="Sphäre filtern">
-            <option value="">Sphäre: alle</option>
-            <option value="IDEELL">IDEELL</option>
-            <option value="ZWECK">ZWECK</option>
-            <option value="VERMOEGEN">VERMÖGEN</option>
-            <option value="WGB">WGB</option>
-          </select>
-          <select className="input" value={String(budgetId)} onChange={e => { const v = e.target.value; setBudgetId(v && v !== '' ? Number(v) : ''); setOffset(0) }} aria-label="Budget filtern">
-            <option value="">Budget: alle</option>
-            {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
-          </select>
-          <select className="input" value={tag} onChange={e => { setTag(e.target.value); setOffset(0) }} aria-label="Tag filtern">
-            <option value="">Tag: alle</option>
-            {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Fällig:</span>
-          <button className="btn" title="Fälligkeits-Zeitraum/Jahr wählen" onClick={() => setShowDueFilter(true)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11.013 11.013 0 0 0 12 1Zm0 20a9 9 0 1 1 9-9 9.01 9.01 0 0 1-9 9Zm.5-14h-2v6l5.2 3.12 1-1.64-4.2-2.48Z" /></svg>
-          </button>
-          {(dueFrom || dueTo) && (<span className="helper">{dueFrom || '—'} – {dueTo || '—'}</span>)}
-          <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
-          </button>
+          <InvoiceFilterDropdown
+            status={status}
+            sphere={sphere}
+            budgetId={budgetId}
+            tag={tag}
+            dueFrom={dueFrom}
+            dueTo={dueTo}
+            budgets={budgets}
+            tags={tags}
+            yearsAvail={yearsAvail}
+            onApply={(vals) => {
+              setStatus(vals.status)
+              setSphere(vals.sphere)
+              setBudgetId(vals.budgetId)
+              setTag(vals.tag)
+              setDueFrom(vals.dueFrom)
+              setDueTo(vals.dueTo)
+              setOffset(0)
+            }}
+          />
+
+          <ColumnSelectDropdown
+            title="Spalten"
+            tip="Tipp: Blende Spalten aus, die du nicht benötigst, um die Übersicht zu verbessern."
+            columns={[
+              {
+                key: 'showTags',
+                label: 'Tags anzeigen',
+                checked: colPrefs.showTags,
+                onChange: (checked) => setColPrefs((p) => ({ ...p, showTags: checked }))
+              },
+              {
+                key: 'showBezahlt',
+                label: 'Bezahlt anzeigen',
+                checked: colPrefs.showBezahlt,
+                onChange: (checked) => setColPrefs((p) => ({ ...p, showBezahlt: checked }))
+              },
+              {
+                key: 'showRest',
+                label: 'Rest anzeigen',
+                checked: colPrefs.showRest,
+                onChange: (checked) => setColPrefs((p) => ({ ...p, showRest: checked }))
+              },
+              {
+                key: 'showAttachments',
+                label: 'Anhänge (📎) anzeigen',
+                checked: colPrefs.showAttachments,
+                onChange: (checked) => setColPrefs((p) => ({ ...p, showAttachments: checked }))
+              }
+            ]}
+          />
           {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
           <div className="filter-divider" />
           <button className="btn primary" onClick={() => openCreate()}>+ Neu</button>
@@ -586,9 +607,6 @@ export default function InvoicesView() {
           </div>
         </>
       )}
-
-      <TimeFilterModal open={showDueFilter} onClose={() => setShowDueFilter(false)} yearsAvail={yearsAvail} from={dueFrom} to={dueTo} onApply={({ from: nf, to: nt }) => { setDueFrom(nf); setDueTo(nt); setOffset(0) }} />
-
       {showPayModal && createPortal((() => {
         const rowData = rows.find(r => r.id === showPayModal.id)
         const isIN = rowData?.voucherType === 'IN'
@@ -1042,41 +1060,6 @@ export default function InvoicesView() {
         </div>,
         document.body
       )}
-
-      {/* Column selection modal */}
-      {showColumnsModal && (
-        <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
-              <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
-            </header>
-            <div className="card" style={{ padding: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={colPrefs.showTags} onChange={(e) => setColPrefs(p => ({ ...p, showTags: e.target.checked }))} />
-                Tags anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showBezahlt} onChange={(e) => setColPrefs(p => ({ ...p, showBezahlt: e.target.checked }))} />
-                Bezahlt anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showRest} onChange={(e) => setColPrefs(p => ({ ...p, showRest: e.target.checked }))} />
-                Rest anzeigen
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <input type="checkbox" checked={colPrefs.showAttachments} onChange={(e) => setColPrefs(p => ({ ...p, showAttachments: e.target.checked }))} />
-                Anhänge (📎) anzeigen
-              </label>
-              <div className="helper" style={{ marginTop: 8 }}>Tipp: Blende Spalten aus, die du nicht benötigst, um die Übersicht zu verbessern.</div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setShowColumnsModal(false)}>Schließen</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>

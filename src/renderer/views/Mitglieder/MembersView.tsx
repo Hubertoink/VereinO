@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
+import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 
 export default function MembersView() {
     const [q, setQ] = useState('')
@@ -32,7 +33,6 @@ export default function MembersView() {
     useEffect(() => { try { localStorage.setItem('invite.body', inviteBody) } catch {} }, [inviteBody])
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
 
-    const [showColumnsModal, setShowColumnsModal] = useState(false)
     const [colPrefs, setColPrefs] = useState<{ showMemberNo: boolean; showIBAN: boolean; showContribution: boolean; showAddress: boolean; showNotes: boolean }>(() => {
         try {
             const raw = localStorage.getItem('members.columns')
@@ -253,9 +253,42 @@ export default function MembersView() {
                         <option value="PAUSED">Pause</option>
                         <option value="LEFT">Ausgetreten</option>
                     </select>
-                    <button className="btn ghost" title="Anzuzeigende Spalten wählen" onClick={() => setShowColumnsModal(true)}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
-                    </button>
+                    <ColumnSelectDropdown
+                        title="Spalten"
+                        tip="Tipp: Du kannst IBAN/Beitrag ausblenden und stattdessen die Adresse anzeigen."
+                        columns={[
+                            {
+                                key: 'showMemberNo',
+                                label: 'Nr. anzeigen',
+                                checked: colPrefs.showMemberNo,
+                                onChange: (checked) => setColPrefs((p) => ({ ...p, showMemberNo: checked }))
+                            },
+                            {
+                                key: 'showIBAN',
+                                label: 'IBAN anzeigen',
+                                checked: colPrefs.showIBAN,
+                                onChange: (checked) => setColPrefs((p) => ({ ...p, showIBAN: checked }))
+                            },
+                            {
+                                key: 'showContribution',
+                                label: 'Beitrag anzeigen',
+                                checked: colPrefs.showContribution,
+                                onChange: (checked) => setColPrefs((p) => ({ ...p, showContribution: checked }))
+                            },
+                            {
+                                key: 'showAddress',
+                                label: 'Adresse anzeigen',
+                                checked: colPrefs.showAddress,
+                                onChange: (checked) => setColPrefs((p) => ({ ...p, showAddress: checked }))
+                            },
+                            {
+                                key: 'showNotes',
+                                label: 'Anmerkungen anzeigen',
+                                checked: colPrefs.showNotes,
+                                onChange: (checked) => setColPrefs((p) => ({ ...p, showNotes: checked }))
+                            }
+                        ]}
+                    />
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
                         <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
                     ) : null })()}
@@ -593,42 +626,6 @@ export default function MembersView() {
                                 } catch (e: any) { alert(e?.message || String(e)) }
                             }}>Speichern</button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showColumnsModal && (
-                <div className="modal-overlay" onClick={() => setShowColumnsModal(false)}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Spalten auswählen</h3>
-                            <button className="btn" onClick={() => setShowColumnsModal(false)}>×</button>
-                        </header>
-                        <div className="card" style={{ padding: 10 }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <input type="checkbox" checked={colPrefs.showMemberNo} onChange={(e)=>setColPrefs(p=>({ ...p, showMemberNo: e.target.checked }))} />
-                                Nr. anzeigen
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                                <input type="checkbox" checked={colPrefs.showIBAN} onChange={(e)=>setColPrefs(p=>({ ...p, showIBAN: e.target.checked }))} />
-                                IBAN anzeigen
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                                <input type="checkbox" checked={colPrefs.showContribution} onChange={(e)=>setColPrefs(p=>({ ...p, showContribution: e.target.checked }))} />
-                                Beitrag anzeigen
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                                <input type="checkbox" checked={colPrefs.showAddress} onChange={(e)=>setColPrefs(p=>({ ...p, showAddress: e.target.checked }))} />
-                                Adresse anzeigen
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                                <input type="checkbox" checked={colPrefs.showNotes} onChange={(e)=>setColPrefs(p=>({ ...p, showNotes: e.target.checked }))} />
-                                Anmerkungen anzeigen
-                            </label>
-                            <div className="helper" style={{ marginTop: 8 }}>Tipp: Du kannst IBAN/Beitrag ausblenden und stattdessen die Adresse anzeigen.</div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                            <button className="btn" onClick={() => setShowColumnsModal(false)}>Schließen</button>
                         </div>
                     </div>
                 </div>

@@ -91,6 +91,7 @@ export default function MetaFilterDropdown({
       width={420}
       ariaLabel="Filter"
       buttonTitle="Filter"
+      colorVariant="filter"
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">
@@ -168,7 +169,7 @@ export default function MetaFilterDropdown({
           Zurücksetzen
         </button>
         <div className="filter-dropdown__actions-right">
-          <button className="btn" type="button" onClick={handleApply}>
+          <button className="btn primary" type="button" onClick={handleApply}>
             Übernehmen
           </button>
         </div>
