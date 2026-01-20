@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface FilterDropdownProps {
   trigger: React.ReactNode
@@ -10,7 +11,10 @@ export interface FilterDropdownProps {
   ariaLabel?: string
   buttonTitle?: string
   colorVariant?: 'default' | 'display' | 'time' | 'filter' | 'action'
+  tooltip?: string
 }
+
+type TooltipPlacement = 'bottom' | 'top'
 
 export default function FilterDropdown({
   trigger,
@@ -21,12 +25,68 @@ export default function FilterDropdown({
   width = 320,
   ariaLabel,
   buttonTitle,
-  colorVariant = 'default'
+  colorVariant = 'default',
+  tooltip
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const labelId = useId()
+  const tooltipId = useId()
+  const [showTooltip, setShowTooltip] = useState(false)
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({ left: 0, top: 0 })
+  const [tooltipPlacement, setTooltipPlacement] = useState<TooltipPlacement>('bottom')
+
+  useEffect(() => {
+    if (!open) return
+    setShowTooltip(false)
+  }, [open])
+
+  const updateTooltipPosition = () => {
+    if (!tooltip || !showTooltip) return
+    if (!buttonRef.current || !tooltipRef.current) return
+
+    const margin = 8
+    const gap = 8
+
+    const anchor = buttonRef.current.getBoundingClientRect()
+    const tip = tooltipRef.current.getBoundingClientRect()
+
+    let left = anchor.left + anchor.width / 2 - tip.width / 2
+    left = Math.min(Math.max(left, margin), window.innerWidth - tip.width - margin)
+
+    let top = anchor.bottom + gap
+    let placement: TooltipPlacement = 'bottom'
+
+    if (top + tip.height + margin > window.innerHeight) {
+      top = anchor.top - tip.height - gap
+      placement = 'top'
+    }
+
+    setTooltipPlacement(placement)
+    setTooltipStyle({ left, top })
+  }
+
+  useLayoutEffect(() => {
+    if (!tooltip || !showTooltip) return
+    updateTooltipPosition()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tooltip, showTooltip])
+
+  useEffect(() => {
+    if (!tooltip || !showTooltip) return
+
+    const onReposition = () => updateTooltipPosition()
+    window.addEventListener('resize', onReposition)
+    // capture scroll from any scroll container
+    window.addEventListener('scroll', onReposition, true)
+    return () => {
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tooltip, showTooltip])
 
   useEffect(() => {
     if (!open) return
@@ -93,6 +153,17 @@ export default function FilterDropdown({
         aria-expanded={open}
         aria-haspopup="true"
         aria-labelledby={labelId}
+        aria-describedby={tooltip && showTooltip && !open ? tooltipId : undefined}
+        onMouseEnter={() => {
+          if (!tooltip || open) return
+          setShowTooltip(true)
+        }}
+        onMouseLeave={() => setShowTooltip(false)}
+        onFocus={() => {
+          if (!tooltip || open) return
+          setShowTooltip(true)
+        }}
+        onBlur={() => setShowTooltip(false)}
       >
         {trigger}
         <span id={labelId} className="sr-only">
@@ -100,6 +171,21 @@ export default function FilterDropdown({
         </span>
         {hasActiveFilters && <span className="filter-dropdown__indicator" />}
       </button>
+
+      {tooltip && showTooltip && !open &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            id={tooltipId}
+            className={`tooltip-portal tooltip-portal--${tooltipPlacement}`}
+            style={tooltipStyle}
+            role="tooltip"
+            aria-hidden="true"
+          >
+            {tooltip}
+          </div>,
+          document.body
+        )}
 
       {open && (
         <div

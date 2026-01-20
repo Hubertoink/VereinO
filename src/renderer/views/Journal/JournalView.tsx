@@ -487,11 +487,12 @@ export default function JournalView({
                 <div className="filter-divider" />
 
                 {/* Filter-Cluster: Zeit- und Meta-Filter */}
-                <div className="toolbar-icon has-tooltip" data-tooltip="Zeitraum filtern">
+                <div className="toolbar-icon">
                     <TimeFilterDropdown
                         yearsAvail={yearsAvail}
                         from={activeFrom}
                         to={activeTo}
+                        tooltip="Zeitraum filtern"
                         onApply={({ from: nf, to: nt }) => {
                             activeSetFrom(nf)
                             activeSetTo(nt)
@@ -500,7 +501,7 @@ export default function JournalView({
                     />
                 </div>
 
-                <div className="toolbar-icon has-tooltip" data-tooltip="Filter nach Art, Sphäre, Tags …">
+                <div className="toolbar-icon">
                     <MetaFilterDropdown
                         budgets={budgets}
                         earmarks={earmarks}
@@ -511,6 +512,7 @@ export default function JournalView({
                         sphere={activeFilterSphere}
                         earmarkId={activeFilterEarmark}
                         budgetId={activeFilterBudgetId}
+                        tooltip="Filter nach Art, Sphäre, Tags …"
                         onApply={({ filterType, filterPM, filterTag, sphere, earmarkId, budgetId }) => {
                             activeSetFilterType(filterType)
                             activeSetFilterPM(filterPM)
@@ -526,7 +528,7 @@ export default function JournalView({
                 <div className="filter-divider" />
 
                 {/* Anzeige-Cluster: Spaltenauswahl */}
-                <div className="toolbar-icon has-tooltip" data-tooltip="Spalten & Reihenfolge">
+                <div className="toolbar-icon">
                     <FilterDropdown
                         trigger={
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -540,6 +542,7 @@ export default function JournalView({
                         ariaLabel="Spalten wählen"
                         buttonTitle="Spalten wählen"
                         colorVariant="display"
+                        tooltip="Spalten & Reihenfolge"
                     >
                         <div className="filter-dropdown__actions" style={{ marginTop: 0 }}>
                             <button className="btn" type="button" onClick={presetStandard}>Standard</button>
@@ -668,11 +671,12 @@ export default function JournalView({
                 <div className="filter-divider" />
 
                 {/* Aktionen-Cluster: Batch-Zuweisung */}
-                <div className="toolbar-icon has-tooltip" data-tooltip="Batch-Zuweisung auf gefilterte Buchungen">
+                <div className="toolbar-icon">
                     <BatchAssignDropdown
                     earmarks={earmarks}
                     tagDefs={tagDefs}
                     budgets={budgetsForEdit}
+                    tooltip="Batch-Zuweisung auf gefilterte Buchungen"
                     currentFilters={{
                         paymentMethod: activeFilterPM || undefined,
                         sphere: activeFilterSphere || undefined,

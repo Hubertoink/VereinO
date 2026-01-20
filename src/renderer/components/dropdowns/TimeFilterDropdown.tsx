@@ -6,9 +6,10 @@ export interface TimeFilterDropdownProps {
   from: string
   to: string
   onApply: (v: { from: string; to: string }) => void
+  tooltip?: string
 }
 
-export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: TimeFilterDropdownProps) {
+export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tooltip }: TimeFilterDropdownProps) {
   const [f, setF] = useState<string>(from)
   const [t, setT] = useState<string>(to)
 
@@ -60,6 +61,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply }: Ti
       ariaLabel="Zeitraum wählen"
       buttonTitle="Zeitraum wählen"
       colorVariant="time"
+      tooltip={tooltip}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

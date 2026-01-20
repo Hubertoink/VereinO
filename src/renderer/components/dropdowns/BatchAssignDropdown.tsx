@@ -18,11 +18,12 @@ export interface BatchAssignDropdownProps {
   }
   onApplied: (updated: number) => void
   notify: (type: 'info' | 'success' | 'error', text: string, duration?: number) => void
+  tooltip?: string
 }
 
 type Mode = 'EARMARK' | 'TAGS' | 'BUDGET'
 
-export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, currentFilters, onApplied, notify }: BatchAssignDropdownProps) {
+export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, currentFilters, onApplied, notify, tooltip }: BatchAssignDropdownProps) {
   const [mode, setMode] = useState<Mode>('EARMARK')
   const [earmarkId, setEarmarkId] = useState<number | ''>('')
   const [budgetId, setBudgetId] = useState<number | ''>('')
@@ -147,6 +148,7 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
       ariaLabel="Batch zuweisen"
       buttonTitle="Batch zuweisen"
       colorVariant="action"
+      tooltip={tooltip}
     >
       <div className="filter-dropdown__mode">
         <button type="button" className={`btn ${mode === 'EARMARK' ? 'primary' : ''}`} onClick={() => { setMode('EARMARK'); setConfirm(false) }}>

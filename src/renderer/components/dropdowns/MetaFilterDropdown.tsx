@@ -13,6 +13,7 @@ export interface MetaFilterDropdownProps {
   sphere: Sphere
   earmarkId: number | null
   budgetId: number | null
+  tooltip?: string
   onApply: (v: {
     filterType: 'IN' | 'OUT' | 'TRANSFER' | null
     filterPM: 'BAR' | 'BANK' | null
@@ -33,7 +34,8 @@ export default function MetaFilterDropdown({
   sphere,
   earmarkId,
   budgetId,
-  onApply
+  onApply,
+  tooltip
 }: MetaFilterDropdownProps) {
   const [type, setType] = useState<MetaFilterDropdownProps['filterType']>(filterType)
   const [pm, setPm] = useState<MetaFilterDropdownProps['filterPM']>(filterPM)
@@ -92,6 +94,7 @@ export default function MetaFilterDropdown({
       ariaLabel="Filter"
       buttonTitle="Filter"
       colorVariant="filter"
+      tooltip={tooltip}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

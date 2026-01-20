@@ -253,11 +253,56 @@
 
 /* InvoicesView utility classes */
 .invoices-text-danger { color: var(--danger); }
-.invoices-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.invoices-table { width: 100%; border-collapse: collapse; table-layout: auto; }
 .invoices-table th:last-child, .invoices-table td:last-child { width: 1%; white-space: nowrap; }
 .invoices-table td { vertical-align: middle; }
-.invoices-sort-btn { padding: 0; display: inline-flex; gap: 6px; align-items: center; }
-.invoices-sort-icon { color: var(--text-dim); }
+
+/* Match journal-table row styling */
+.invoices-table th,
+.invoices-table td {
+    border-bottom: 1px solid var(--table-row-sep, var(--border));
+    padding: 8px 10px;
+    text-align: left;
+}
+.invoices-table tbody tr:nth-child(even) {
+    background: var(--table-row-alt, color-mix(in oklab, var(--accent) 4%, transparent));
+}
+
+/* Unified header styling: match journal-table exactly */
+.invoices-table thead th {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    white-space: nowrap;
+    cursor: default;
+}
+
+/* Sort buttons: completely transparent, inheriting header look */
+/* Higher specificity to override .btn styles */
+.invoices-table .invoices-sort-btn,
+.invoices-table .btn.ghost.invoices-sort-btn { 
+    padding: 0; 
+    margin: 0;
+    background: none !important;
+    border: none;
+    border-radius: 0;
+    display: inline-flex; 
+    gap: 4px; 
+    align-items: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+.invoices-table .invoices-sort-btn:hover,
+.invoices-table .btn.ghost.invoices-sort-btn:hover {
+    color: var(--text);
+    background: none !important;
+}
+.invoices-sort-icon { 
+    color: var(--text-dim); 
+    font-size: 12px;
+}
 .invoices-sort-icon-active { color: var(--warning); }
 .invoices-type-badge { background: var(--danger); color: white; padding: 2px 6px; }
 .invoices-type-badge-in { background: var(--success); }
@@ -614,6 +659,14 @@ input[type="checkbox"].toggle:disabled { opacity: .6; cursor: not-allowed !impor
     --text-dim: #555B6E;   /* blue-slate - gedämpftes Blaugrau */
     --accent: #6B8F8D;     /* abgeleitet von muted-teal, etwas dunkler */
     --accent-hover: #89B0AE; /* muted-teal */
+
+    /* Buttons: in Light Theme weniger "schwer"/dunkel */
+    --btn-primary-bg: color-mix(in oklab, var(--accent) 70%, white);
+    --btn-primary-bg-hover: color-mix(in oklab, var(--accent) 82%, white);
+    --btn-primary-fg: var(--text);
+    --btn-accent-bg: color-mix(in oklab, var(--accent) 70%, white);
+    --btn-accent-bg-hover: color-mix(in oklab, var(--accent) 82%, white);
+    --btn-accent-fg: var(--text);
     --success: #5A9D60;    /* professionelles Grün */
     --warning: #D4A574;    /* warmes Beige */
     --danger: #C97064;     /* gedämpftes Rot */
@@ -753,17 +806,21 @@ pre {
 }
 
 .btn.primary {
-    background: var(--accent);
-    color: #0B0E14;
+    background: var(--btn-primary-bg, var(--accent));
+    color: var(--btn-primary-fg, #0B0E14);
 }
 
 .btn.primary:hover {
-    background: var(--accent-hover);
+    background: var(--btn-primary-bg-hover, var(--accent-hover));
 }
 
 .btn-accent {
-    background: var(--accent);
-    color: #000;
+    background: var(--btn-accent-bg, var(--accent));
+    color: var(--btn-accent-fg, #000);
+}
+
+.btn-accent:hover {
+    background: var(--btn-accent-bg-hover, var(--accent-hover));
 }
 
 .btn.ghost {
@@ -1055,6 +1112,24 @@ tbody tr:nth-child(even):hover {
     opacity: 1;
 }
 
+/* Unified header styling for journal-table */
+.journal-table thead th {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    padding: 8px 10px;
+}
+
+/* Sortable headers: look like regular headers but with pointer cursor */
+.journal-table thead th[style*="cursor: pointer"],
+.journal-table thead th.sortable {
+    cursor: pointer;
+}
+.journal-table thead th[style*="cursor: pointer"]:hover,
+.journal-table thead th.sortable:hover {
+    color: var(--text);
+}
+
 /* Sticky headers for Buchungen (journal) and Verbindlichkeiten tables */
 .journal-table thead th,
 .invoices-table thead th {
@@ -1076,17 +1151,12 @@ tbody tr:nth-child(even):hover {
     z-index: 3;
 }
 /* Enhanced shadow when scrolling to make header stand out */
-.journal-table thead th { 
-    box-shadow: 
-        0 2px 8px -1px rgba(0,0,0,0.2),
-        0 4px 12px -2px rgba(0,0,0,0.15),
-        0 1px 0 0 var(--table-row-sep); 
-}
+.journal-table thead th,
 .invoices-table thead th { 
     box-shadow: 
         0 2px 8px -1px rgba(0,0,0,0.2),
         0 4px 12px -2px rgba(0,0,0,0.15),
-        0 1px 0 0 var(--border); 
+        0 1px 0 0 var(--table-row-sep, var(--border)); 
 }
 
 /* Brutto colorization in journal table */
@@ -1111,9 +1181,12 @@ td.gross-transfer {
 /* Sort indicator icons for table headers/buttons */
 .sort-icon {
     display: inline-block;
-    font-size: 0.9em;
-    opacity: 0.9;
+    font-size: 12px;
     margin-left: 4px;
+    color: var(--text-dim);
+}
+.sort-icon.active {
+    color: var(--warning);
 }
 .sort-icon.inactive {
     opacity: 0.6;
@@ -2238,6 +2311,43 @@ textarea:focus {
 .has-tooltip:hover::before {
   opacity: 1;
   visibility: visible;
+}
+
+/* Portal tooltip (used for dropdown trigger icons near window edges) */
+.tooltip-portal {
+    position: fixed;
+    padding: 6px 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    max-width: min(320px, calc(100vw - 24px));
+    white-space: normal;
+    overflow-wrap: anywhere;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    z-index: 10050;
+    pointer-events: none;
+}
+
+.tooltip-portal::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+}
+
+.tooltip-portal--bottom::after {
+    top: -12px;
+    border-bottom-color: var(--border);
+}
+
+.tooltip-portal--top::after {
+    bottom: -12px;
+    border-top-color: var(--border);
 }
 
 /* Tooltip right (for sidebar) */
