@@ -118,81 +118,145 @@ export function GeneralPane({
         <div className="settings-sub">
           Diese Einstellungen werden pro Organisation gespeichert.
         </div>
-        
-        {/* Theme and Background */}
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="field">
-            <label htmlFor="select-color-theme">Farb-Theme</label>
-            <select id="select-color-theme" className="input" value={colorTheme} onChange={(e) => setColorTheme(e.target.value as any)}>
-              <option value="default">Standard ◐</option>
-              <option value="fiery-ocean">Fiery Ocean ●</option>
-              <option value="peachy-delight">Peachy Delight ●</option>
-              <option value="pastel-dreamland">Pastel Dreamland ●</option>
-              <option value="ocean-breeze">Ocean Breeze ●</option>
-              <option value="earthy-tones">Earthy Tones ●</option>
-              <option value="monochrome-harmony">Monochrome Harmony ●</option>
-              <option value="vintage-charm">Vintage Charm ●</option>
-              <option value="soft-blush">Soft Blush ○</option>
-              <option value="professional-light">Professional Light ○</option>
-            </select>
-            <div className="helper">● = Dark | ○ = Light</div>
-          </div>
-          <div className="field">
-            <label htmlFor="select-background-image">Hintergrundbild</label>
-            <select id="select-background-image" className="input" value={backgroundImage} onChange={(e) => setBackgroundImage(e.target.value as any)}>
-              <option value="none">Kein Hintergrundbild</option>
-              <option value="cherry-blossom">🌸 Kirschblüten</option>
-              <option value="foggy-forest">🌲 Nebliger Wald</option>
-              <option value="mountain-snow">🏔️ Schneeberge</option>
-              <option value="custom">🖼️ Eigenes Bild…</option>
-            </select>
-            {(backgroundImage === 'custom' || !!customBackgroundImage) && (
-              <div className="custom-bg-controls">
-                <input
-                  ref={customBgInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) void handleCustomBgUpload(file)
-                    // allow re-upload of the same file
-                    e.currentTarget.value = ''
-                  }}
-                />
-                <div className="custom-bg-row">
-                  {customBackgroundImage ? (
-                    <div
-                      className="custom-bg-preview"
-                      aria-label="Vorschau Hintergrundbild"
-                      style={{ backgroundImage: `url(${customBackgroundImage})` }}
-                    />
-                  ) : (
-                    <div className="custom-bg-preview custom-bg-preview--empty" aria-hidden="true" />
-                  )}
-                  <div className="custom-bg-actions">
-                    <button type="button" className="btn" onClick={openCustomBgPicker}>
-                      {customBackgroundImage ? 'Bild ändern…' : 'Bild auswählen…'}
-                    </button>
-                    {customBackgroundImage && (
-                      <button type="button" className="btn btn-secondary" onClick={handleRemoveCustomBg}>
-                        Entfernen
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="helper">
-                  Das Bild wird komprimiert und pro Organisation gespeichert.
-                </div>
-              </div>
-            )}
+
+        {/* Visual Theme Picker */}
+        <div className="field" style={{ marginTop: 16 }}>
+          <label>Farb-Theme</label>
+          <div className="theme-picker-grid">
+            {[
+              { id: 'default', name: 'Standard', mode: 'auto' },
+              { id: 'fiery-ocean', name: 'Fiery Ocean', mode: 'dark' },
+              { id: 'peachy-delight', name: 'Peachy Delight', mode: 'dark' },
+              { id: 'pastel-dreamland', name: 'Pastel Dreamland', mode: 'dark' },
+              { id: 'ocean-breeze', name: 'Ocean Breeze', mode: 'dark' },
+              { id: 'earthy-tones', name: 'Earthy Tones', mode: 'dark' },
+              { id: 'monochrome-harmony', name: 'Monochrome', mode: 'dark' },
+              { id: 'vintage-charm', name: 'Vintage Charm', mode: 'dark' },
+              { id: 'soft-blush', name: 'Soft Blush', mode: 'light' },
+              { id: 'professional-light', name: 'Professional', mode: 'light' },
+            ].map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={`theme-card ${colorTheme === theme.id ? 'active' : ''}`}
+                onClick={() => setColorTheme(theme.id as any)}
+                aria-pressed={colorTheme === theme.id}
+                title={theme.name}
+              >
+                <div className="theme-card__swatch" data-theme={theme.id} />
+                <span className="theme-card__name">{theme.name}</span>
+                <span className="theme-card__mode">
+                  {theme.mode === 'dark' ? '●' : theme.mode === 'light' ? '○' : '◐'}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Glass effect toggle */}
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
+        {/* Visual Background Picker */}
+        <div className="field" style={{ marginTop: 20 }}>
+          <label>Hintergrundbild</label>
+          <div className="bg-picker-grid">
+            {/* None */}
+            <button
+              type="button"
+              className={`bg-card ${backgroundImage === 'none' ? 'active' : ''}`}
+              onClick={() => setBackgroundImage('none')}
+              aria-pressed={backgroundImage === 'none'}
+            >
+              <div className="bg-card__preview bg-card__preview--none">
+                <span>—</span>
+              </div>
+              <span className="bg-card__name">Keins</span>
+            </button>
+            {/* Cherry Blossom */}
+            <button
+              type="button"
+              className={`bg-card ${backgroundImage === 'cherry-blossom' ? 'active' : ''}`}
+              onClick={() => setBackgroundImage('cherry-blossom')}
+              aria-pressed={backgroundImage === 'cherry-blossom'}
+            >
+              <div className="bg-card__preview bg-card__preview--cherry-blossom" />
+              <span className="bg-card__name">🌸 Kirschblüten</span>
+            </button>
+            {/* Foggy Forest */}
+            <button
+              type="button"
+              className={`bg-card ${backgroundImage === 'foggy-forest' ? 'active' : ''}`}
+              onClick={() => setBackgroundImage('foggy-forest')}
+              aria-pressed={backgroundImage === 'foggy-forest'}
+            >
+              <div className="bg-card__preview bg-card__preview--foggy-forest" />
+              <span className="bg-card__name">🌲 Nebliger Wald</span>
+            </button>
+            {/* Mountain Snow */}
+            <button
+              type="button"
+              className={`bg-card ${backgroundImage === 'mountain-snow' ? 'active' : ''}`}
+              onClick={() => setBackgroundImage('mountain-snow')}
+              aria-pressed={backgroundImage === 'mountain-snow'}
+            >
+              <div className="bg-card__preview bg-card__preview--mountain-snow" />
+              <span className="bg-card__name">🏔️ Schneeberge</span>
+            </button>
+            {/* Custom */}
+            <button
+              type="button"
+              className={`bg-card ${backgroundImage === 'custom' ? 'active' : ''}`}
+              onClick={() => {
+                if (customBackgroundImage) {
+                  setBackgroundImage('custom')
+                } else {
+                  openCustomBgPicker()
+                }
+              }}
+              aria-pressed={backgroundImage === 'custom'}
+            >
+              <div
+                className="bg-card__preview bg-card__preview--custom"
+                style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
+              >
+                {!customBackgroundImage && <span>＋</span>}
+              </div>
+              <span className="bg-card__name">🖼️ Eigenes</span>
+            </button>
+          </div>
+          {/* Custom image controls */}
+          {(backgroundImage === 'custom' || !!customBackgroundImage) && (
+            <div className="custom-bg-inline-controls">
+              <input
+                ref={customBgInputRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleCustomBgUpload(file)
+                  e.currentTarget.value = ''
+                }}
+              />
+              <button type="button" className="btn btn-sm" onClick={openCustomBgPicker}>
+                {customBackgroundImage ? 'Ändern…' : 'Auswählen…'}
+              </button>
+              {customBackgroundImage && (
+                <button type="button" className="btn btn-sm btn-secondary" onClick={handleRemoveCustomBg}>
+                  Entfernen
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Glass effect toggle - inline with preview */}
+        <div className="field" style={{ marginTop: 20 }}>
+          <div className="glass-toggle-row">
+            <div className="glass-toggle-info">
+              <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
+              <span className="helper">Transparente Fenster mit Unschärfe-Effekt</span>
+            </div>
+            <div className="glass-toggle-preview" data-enabled={glassModals}>
+              <div className="glass-toggle-preview__window" />
+            </div>
             <input
               id="toggle-glass-modals"
               role="switch"
@@ -203,7 +267,6 @@ export function GeneralPane({
               onChange={(e) => setGlassModals(e.target.checked)}
             />
           </div>
-          <div className="helper" style={{ alignSelf: 'center' }}>Transparente Fenster mit Unschärfe-Effekt</div>
         </div>
       </div>
 

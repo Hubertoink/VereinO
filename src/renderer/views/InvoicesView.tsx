@@ -590,19 +590,28 @@ export default function InvoicesView() {
               {rows.length === 0 && (<tr><td colSpan={12} className="helper">Keine Verbindlichkeiten gefunden.</td></tr>)}
             </tbody>
           </table>
-          <div className="invoices-pagination">
-            <div className="helper">Gesamt: {total}</div>
-            <div className="pagination-controls">
-              <label className="helper">Pro Seite</label>
-              <select className="input" value={limit} onChange={e => { setLimit(Number(e.target.value)); setOffset(0) }} aria-label="Einträge pro Seite">
+          <div className="pagination-bar" style={{ marginTop: 12, marginBottom: 0 }}>
+            <div className="pagination-bar__info">
+              <div className="pagination-bar__stat">
+                <span>Gesamt:</span>
+                <span className="pagination-bar__stat-value">{total}</span>
+              </div>
+              <div className="pagination-bar__divider" />
+              <div className="pagination-bar__stat">
+                <span>Seite:</span>
+                <span className="pagination-bar__stat-value">{page} / {pages}</span>
+              </div>
+            </div>
+            <div className="pagination-bar__controls">
+              <select className="input" style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }} value={limit} onChange={e => { setLimit(Number(e.target.value)); setOffset(0) }} aria-label="Einträge pro Seite" title="Einträge pro Seite">
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
               </select>
-              <span className="helper">Seite {page} / {pages}</span>
-              <button className="btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">«</button>
-              <button className="btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück">‹</button>
-              <button className="btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter">›</button>
+              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">«</button>
+              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück">‹</button>
+              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter">›</button>
+              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(Math.min((pages - 1) * limit, offset + limit))} title="Letzte">»</button>
             </div>
           </div>
         </>

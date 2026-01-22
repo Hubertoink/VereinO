@@ -2332,6 +2332,59 @@ textarea:focus {
     pointer-events: none;
 }
 
+/* Rich tooltip modal (used for FilterTotals hover cards, etc.) */
+.tooltip-modal {
+    padding: 10px 12px;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.tooltip-modal__title {
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+.tooltip-modal__list {
+    margin-top: 8px;
+    display: grid;
+    gap: 6px;
+}
+
+.tooltip-modal__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.tooltip-modal__key {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.92;
+}
+
+.tooltip-modal__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--tooltip-dot, var(--border));
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
+}
+
+.tooltip-modal__val {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.tooltip-modal__hint {
+    margin-top: 8px;
+    font-size: 11px;
+    opacity: 0.78;
+}
+
 .tooltip-portal::after {
     content: '';
     position: absolute;
@@ -3839,6 +3892,104 @@ html[data-glass-modals="true"] .flyout-arrow {
     gap: 8px;
 }
 
+/* ==================== Visual Theme Picker ==================== */
+.theme-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    max-width: 100%;
+}
+
+.theme-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px 8px;
+    background: color-mix(in oklab, var(--surface) 60%, transparent);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.theme-card:hover {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+    transform: translateY(-1px);
+}
+
+.theme-card.active {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 15%, var(--surface));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.theme-card__swatch {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 -2px 6px rgba(0,0,0,0.15);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-card__name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-card__mode {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 9px;
+    color: var(--text-dim);
+    opacity: 0.7;
+}
+
+/* Smooth radial gradient swatches */
+.theme-card__swatch[data-theme="default"] { 
+    background: radial-gradient(circle at 30% 30%, #00BCD4 0%, #7C4DFF 70%);
+}
+.theme-card__swatch[data-theme="fiery-ocean"] { 
+    background: radial-gradient(circle at 30% 30%, #2196F3 0%, #FF5722 70%);
+}
+.theme-card__swatch[data-theme="peachy-delight"] { 
+    background: radial-gradient(circle at 30% 30%, #FFCCBC 0%, #FF8A65 70%);
+}
+.theme-card__swatch[data-theme="pastel-dreamland"] { 
+    background: radial-gradient(circle at 30% 30%, #90CAF9 0%, #CE93D8 70%);
+}
+.theme-card__swatch[data-theme="ocean-breeze"] { 
+    background: radial-gradient(circle at 30% 30%, #4DD0E1 0%, #26A69A 70%);
+}
+.theme-card__swatch[data-theme="earthy-tones"] { 
+    background: radial-gradient(circle at 30% 30%, #A5D6A7 0%, #8D6E63 70%);
+}
+.theme-card__swatch[data-theme="monochrome-harmony"] { 
+    background: radial-gradient(circle at 30% 30%, #CFD8DC 0%, #78909C 70%);
+}
+.theme-card__swatch[data-theme="vintage-charm"] { 
+    background: radial-gradient(circle at 30% 30%, #F9CB9C 0%, #8E7CC3 70%);
+}
+.theme-card__swatch[data-theme="soft-blush"] { 
+    background: radial-gradient(circle at 30% 30%, #FCE4EC 0%, #F48FB1 70%);
+}
+.theme-card__swatch[data-theme="professional-light"] { 
+    background: radial-gradient(circle at 30% 30%, #E8EAF6 0%, #5C6BC0 70%);
+}
+
+/* Legacy chip styles (keep for compatibility) */
 .theme-chip {
     display: flex;
     align-items: center;
@@ -3882,7 +4033,141 @@ html[data-glass-modals="true"] .flyout-arrow {
 .theme-swatch[data-theme="soft-blush"] { background: linear-gradient(135deg, #F48FB1 50%, #FCE4EC 50%); }
 .theme-swatch[data-theme="professional-light"] { background: linear-gradient(135deg, #5C6BC0 50%, #E8EAF6 50%); }
 
-/* Background Image Picker */
+/* ==================== Visual Background Picker ==================== */
+.bg-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+}
+
+.bg-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: color-mix(in oklab, var(--surface) 60%, transparent);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bg-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.bg-card.active {
+    border-color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.bg-card__preview {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: 6px;
+    background-size: cover;
+    background-position: center;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bg-card__preview--none {
+    background: var(--surface-alt);
+    color: var(--muted);
+    font-size: 18px;
+}
+
+.bg-card__preview--custom {
+    background: var(--surface-alt);
+    color: var(--text-dim);
+    font-size: 24px;
+    font-weight: 300;
+}
+
+.bg-card__preview--cherry-blossom {
+    background-image: url('./assets/a_close_up_of_a_tree_branch_with_pink_flowers.jpg');
+}
+
+.bg-card__preview--foggy-forest {
+    background-image: url('./assets/a_foggy_forest_with_trees.png');
+}
+
+.bg-card__preview--mountain-snow {
+    background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+}
+
+.bg-card__name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: center;
+}
+
+.custom-bg-inline-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* ==================== Glass Toggle Row ==================== */
+.glass-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: color-mix(in oklab, var(--surface-alt) 50%, transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.glass-toggle-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.glass-toggle-info label {
+    font-weight: 500;
+    margin: 0;
+}
+
+.glass-toggle-info .helper {
+    margin: 0;
+    font-size: 12px;
+}
+
+.glass-toggle-preview {
+    width: 60px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-toggle-preview__window {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.glass-toggle-preview[data-enabled="true"] .glass-toggle-preview__window {
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(8px);
+    border-color: rgba(255,255,255,0.2);
+}
+
+/* Legacy background styles (keep for compatibility) */
 .background-picker {
     display: flex;
     flex-wrap: wrap;
@@ -4377,8 +4662,1007 @@ html[data-glass-modals="true"] .flyout-arrow {
     color: var(--text);
 }
 
+/* ==================== Filter Totals Card (Modern) ==================== */
+.filter-totals-card {
+    background: color-mix(in oklab, var(--surface) 85%, transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Visual Flow Bar */
+.filter-totals-flow {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--surface-alt);
+}
+
+.filter-totals-flow__in {
+    background: linear-gradient(90deg, var(--success) 0%, color-mix(in oklab, var(--success) 70%, var(--accent)) 100%);
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+.filter-totals-flow__out {
+    background: linear-gradient(90deg, color-mix(in oklab, var(--danger) 70%, var(--warning)) 0%, var(--danger) 100%);
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+/* Stats Grid */
+.filter-totals-stats {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.filter-totals-stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    min-width: 140px;
+    flex: 1;
+    transition: all 0.15s ease;
+    cursor: default;
+}
+
+.filter-totals-stat:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.filter-totals-stat__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.filter-totals-stat--in .filter-totals-stat__icon {
+    background: color-mix(in oklab, var(--success) 20%, transparent);
+    color: var(--success);
+}
+
+.filter-totals-stat--out .filter-totals-stat__icon {
+    background: color-mix(in oklab, var(--danger) 20%, transparent);
+    color: var(--danger);
+}
+
+.filter-totals-stat--diff .filter-totals-stat__icon {
+    background: color-mix(in oklab, var(--muted) 20%, transparent);
+    color: var(--muted);
+}
+
+.filter-totals-stat--diff.positive .filter-totals-stat__icon {
+    background: color-mix(in oklab, var(--success) 20%, transparent);
+    color: var(--success);
+}
+
+.filter-totals-stat--diff.negative .filter-totals-stat__icon {
+    background: color-mix(in oklab, var(--danger) 20%, transparent);
+    color: var(--danger);
+}
+
+.filter-totals-stat__content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.filter-totals-stat__label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.filter-totals-stat__value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.filter-totals-stat--in .filter-totals-stat__value {
+    color: var(--success);
+}
+
+.filter-totals-stat--out .filter-totals-stat__value {
+    color: var(--danger);
+}
+
+.filter-totals-stat--diff.positive .filter-totals-stat__value {
+    color: var(--success);
+}
+
+.filter-totals-stat--diff.negative .filter-totals-stat__value {
+    color: var(--danger);
+}
+
+/* Divider */
+.filter-totals-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    color: var(--muted);
+    font-size: 18px;
+    font-weight: 300;
+    opacity: 0.6;
+}
+
+/* Sphere badges */
+.filter-totals-spheres {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+}
+
+.filter-totals-sphere-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: color-mix(in oklab, var(--sphere-color, var(--muted)) 12%, transparent);
+    border: 1px solid color-mix(in oklab, var(--sphere-color, var(--muted)) 30%, transparent);
+    font-size: 11px;
+    cursor: default;
+    transition: all 0.15s ease;
+}
+
+.filter-totals-sphere-badge:hover {
+    background: color-mix(in oklab, var(--sphere-color, var(--muted)) 20%, transparent);
+}
+
+.filter-totals-sphere-badge__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sphere-color, var(--muted));
+}
+
+.filter-totals-sphere-badge__label {
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.filter-totals-sphere-badge__value {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .filter-totals-stats {
+        flex-direction: column;
+    }
+    
+    .filter-totals-divider {
+        display: none;
+    }
+    
+    .filter-totals-stat {
+        min-width: 100%;
+    }
+}
+
 .filter-dropdown__col-actions {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MEMBER FEE STATUS MODAL - Modern Design
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.fee-modal {
+    width: min(96vw, 900px);
+    max-width: 900px;
+    max-height: 90vh;
+    display: grid;
+    gap: 16px;
+    margin: 24px auto 0 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.fee-modal__header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fee-modal__header--sticky {
+    position: sticky;
+    top: -16px;
+    margin: -16px -24px 0 -24px;
+    padding: 16px 24px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+}
+
+.fee-modal__header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.fee-modal__header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fee-modal__title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.fee-modal__subtitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.fee-modal__info-bar {
+    display: flex;
+    gap: 24px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.fee-modal__info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fee-modal__info-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fee-modal__info-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-modal__status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.fee-modal__status-badge--ok {
+    background: color-mix(in oklab, var(--success) 15%, transparent);
+    color: var(--success);
+    border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
+}
+
+.fee-modal__status-badge--overdue {
+    background: color-mix(in oklab, var(--danger) 15%, transparent);
+    color: var(--danger);
+    border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent);
+}
+
+.fee-modal__status-badge--left {
+    background: color-mix(in oklab, var(--warning) 15%, transparent);
+    color: var(--warning);
+    border: 1px solid color-mix(in oklab, var(--warning) 30%, transparent);
+}
+
+/* Timeline Section */
+.fee-timeline {
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.fee-timeline__title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.fee-timeline__track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 8px 0;
+    overflow-x: auto;
+}
+
+.fee-timeline__line {
+    position: absolute;
+    top: 50%;
+    left: 24px;
+    right: 24px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    transform: translateY(-50%);
+}
+
+.fee-timeline__item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
+    z-index: 1;
+}
+
+.fee-timeline__dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--border);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fee-timeline__dot--paid {
+    background: var(--success);
+    box-shadow: 0 0 0 2px var(--success);
+}
+
+.fee-timeline__dot--overdue {
+    background: var(--danger);
+    box-shadow: 0 0 0 2px var(--danger);
+}
+
+.fee-timeline__dot--current {
+    background: var(--warning);
+    box-shadow: 0 0 0 2px var(--warning);
+}
+
+.fee-timeline__dot--future {
+    background: var(--muted);
+}
+
+.fee-timeline__item:hover .fee-timeline__dot {
+    transform: scale(1.2);
+}
+
+.fee-timeline__label {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.fee-timeline__status {
+    font-size: 10px;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.fee-timeline__status--paid { color: var(--success); }
+.fee-timeline__status--overdue { color: var(--danger); }
+.fee-timeline__status--current { color: var(--warning); }
+
+/* Timeline V2 - Compact bar-based design */
+.fee-timeline-v2 {
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.fee-timeline-v2__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fee-timeline-v2__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-timeline-v2__legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.fee-timeline-v2__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.fee-timeline-v2__legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.fee-timeline-v2__legend-dot--paid { background: var(--success); }
+.fee-timeline-v2__legend-dot--overdue { background: var(--danger); }
+.fee-timeline-v2__legend-dot--current { background: var(--warning); }
+
+.fee-timeline-v2__bar {
+    display: flex;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--border);
+    height: 32px;
+}
+
+.fee-timeline-v2__segment {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: opacity 0.15s ease, filter 0.15s ease;
+    cursor: default;
+}
+
+.fee-timeline-v2__segment:hover {
+    filter: brightness(1.1);
+}
+
+.fee-timeline-v2__segment--paid {
+    background: var(--success);
+}
+
+.fee-timeline-v2__segment--overdue {
+    background: var(--danger);
+}
+
+.fee-timeline-v2__segment--current {
+    background: var(--warning);
+}
+
+.fee-timeline-v2__segment--future {
+    background: color-mix(in oklab, var(--muted) 40%, transparent);
+}
+
+.fee-timeline-v2__segment--inactive {
+    background: color-mix(in oklab, var(--muted) 20%, transparent);
+}
+
+.fee-timeline-v2__segment-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 4px;
+}
+
+.fee-timeline-v2__segment--future .fee-timeline-v2__segment-label,
+.fee-timeline-v2__segment--inactive .fee-timeline-v2__segment-label {
+    color: var(--text-dim);
+    text-shadow: none;
+}
+
+.fee-timeline-v2__segment--clickable {
+    cursor: pointer;
+}
+
+.fee-timeline-v2__segment--clickable:hover {
+    filter: brightness(1.15);
+    transform: scaleY(1.1);
+}
+
+.fee-timeline-v2__segment--selected {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+/* Quick Action Panel - appears when clicking timeline segments */
+.fee-quick-action {
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 2px solid var(--primary);
+    animation: fee-quick-action-in 0.2s ease;
+}
+
+@keyframes fee-quick-action-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fee-quick-action__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.fee-quick-action__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-quick-action__info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fee-quick-action__row {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.fee-quick-action__label {
+    color: var(--text-dim);
+    min-width: 90px;
+}
+
+.fee-quick-action__assign {
+    display: flex;
+    flex-direction: column;
+}
+
+.fee-quick-action__amount {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--danger);
+    margin-bottom: 12px;
+}
+
+/* Due Periods Section */
+.fee-due-section {
+    display: grid;
+    gap: 12px;
+}
+
+.fee-due-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fee-due-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-due-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+}
+
+.fee-due-empty__icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+/* Due Period Card */
+.fee-period-card {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    align-items: start;
+    transition: border-color 0.15s ease;
+}
+
+.fee-period-card--selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.fee-period-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fee-period-card__period {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-period-card__amount {
+    font-size: 14px;
+    color: var(--warning);
+    font-weight: 500;
+}
+
+.fee-period-card__link {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.fee-period-card__link-title {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+/* Suggestion Cards */
+.fee-suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fee-suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.fee-suggestion:hover {
+    background: color-mix(in oklab, var(--primary) 8%, var(--background));
+    border-color: var(--primary);
+}
+
+.fee-suggestion--selected {
+    background: color-mix(in oklab, var(--primary) 12%, var(--background));
+    border-color: var(--primary);
+}
+
+.fee-suggestion__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.fee-suggestion__main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.fee-suggestion__no {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fee-suggestion__date {
+    color: var(--text-dim);
+}
+
+.fee-suggestion__amount {
+    font-weight: 600;
+    color: var(--success);
+}
+
+.fee-suggestion__desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fee-suggestion__score {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.fee-suggestion__score--high {
+    background: color-mix(in oklab, var(--success) 15%, transparent);
+    color: var(--success);
+}
+
+.fee-suggestion__score--medium {
+    background: color-mix(in oklab, var(--warning) 15%, transparent);
+    color: var(--warning);
+}
+
+.fee-suggestion__score--low {
+    background: color-mix(in oklab, var(--muted) 15%, transparent);
+    color: var(--text-dim);
+}
+
+.fee-suggestion__check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.fee-suggestion--selected .fee-suggestion__check {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+/* Manual Search Fallback */
+.fee-manual-search {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+}
+
+.fee-manual-search__input {
+    flex: 1;
+}
+
+/* Action Button */
+.fee-period-card__action {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+/* History Section */
+.fee-history {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.fee-history__title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fee-history__table {
+    width: 100%;
+}
+
+.fee-history__table th {
+    text-align: left;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.fee-history__table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.fee-history__table tr:last-child td {
+    border-bottom: none;
+}
+
+.fee-history__voucher-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+/* Pagination */
+.fee-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.fee-pagination__btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* Footer */
+.fee-modal__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+/* Progress indicator */
+.fee-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.fee-progress__bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.fee-progress__fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.fee-progress__label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .fee-period-card {
+        grid-template-columns: 1fr;
+    }
+    
+    .fee-period-card__action {
+        flex-direction: row;
+        width: 100%;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAGINATION INFO BAR - Modern Design
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.pagination-bar__info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.pagination-bar__stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.pagination-bar__stat-value {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pagination-bar__divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+}
+
+.pagination-bar__controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagination-bar__btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.15s ease;
+}
+
+.pagination-bar__btn:disabled {
+    opacity: 0.35;
+}
+
+.pagination-bar__page {
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 0 8px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.pagination-bar__page strong {
+    color: var(--text);
 }

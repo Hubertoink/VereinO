@@ -53,7 +53,7 @@ export function listDue(params: { interval: Interval; periodKey?: string; from?:
   const args: any[] = []
   if (memberId != null) { wh.push('m.id = ?'); args.push(memberId) }
   if (q && q.trim()) { wh.push('(m.name LIKE ? OR m.email LIKE ? OR m.member_no LIKE ?)'); const like = `%${q.trim()}%`; args.push(like, like, like) }
-  const members = d.prepare(`SELECT m.id, m.name, m.member_no as memberNo, m.contribution_amount as amount, m.contribution_interval as interval, m.next_due_date as nextDue, m.join_date as joinDate, m.status
+  const members = d.prepare(`SELECT m.id, m.name, m.member_no as memberNo, m.contribution_amount as amount, m.contribution_interval as interval, m.next_due_date as nextDue, m.join_date as joinDate, m.leave_date as leaveDate, m.status
     FROM members m
     WHERE ${wh.join(' AND ')}
     ORDER BY m.name COLLATE NOCASE ASC`).all(...args) as any[]
@@ -103,10 +103,16 @@ export function listDue(params: { interval: Interval; periodKey?: string; from?:
       // Clamp lower bound to max(joinDate, nextDue) to avoid listing periods before initial due
       const joinDate = (m.joinDate as string | undefined) || undefined
       const nextDueDate = (m.nextDue as string | undefined) || undefined
+      const leaveDate = (m.leaveDate as string | undefined) || undefined
       let effFrom = from
       if (joinDate && effFrom < joinDate) effFrom = joinDate
       if (nextDueDate && effFrom < nextDueDate) effFrom = nextDueDate
-      const { startKey, endKey } = clampRangeForInterval(intv, effFrom, to)
+      // Clamp upper bound to leave date if member has left
+      let effTo = to
+      if (leaveDate && effTo > leaveDate) effTo = leaveDate
+      // Skip if effective range is invalid (member left before due period started)
+      if (effFrom > effTo) continue
+      const { startKey, endKey } = clampRangeForInterval(intv, effFrom, effTo)
       for (const pk of iteratePeriods(intv, startKey, endKey)) {
         const paid = d.prepare('SELECT id, voucher_id as voucherId, verified, date_paid as datePaid FROM membership_payments WHERE member_id = ? AND period_key = ?').get(m.id, pk) as any
         out.push({
@@ -181,7 +187,7 @@ export function unmark(input: { memberId: number; periodKey: string }) {
   return { ok: true }
 }
 
-export function suggestVouchers(input: { name?: string; amount: number; periodKey: string }) {
+export function suggestVouchers(input: { name?: string; amount: number; periodKey: string; memberId?: number }) {
   const d = getDb()
   const { amount, name, periodKey } = input
   // Widen window: from period start - 60 days up to today (helps for older dues)
@@ -190,21 +196,44 @@ export function suggestVouchers(input: { name?: string; amount: number; periodKe
   const today = new Date()
   const startISO = start.toISOString().slice(0,10)
   const endISO = today.toISOString().slice(0,10)
-  const likeName = name ? `%${normalize(name)}%` : null
+  
+  // Match exact amount OR multiples (2x, 3x, 4x, 5x, 6x) for combined payments
+  // Build amount conditions: amount ±0.05, 2*amount ±0.10, 3*amount ±0.15, etc.
+  const amountConditions: string[] = []
+  for (let mult = 1; mult <= 6; mult++) {
+    const target = amount * mult
+    const tolerance = 0.05 * mult
+    amountConditions.push(`ABS(v.gross_amount - ${target}) <= ${tolerance}`)
+  }
+  const amountClause = `(${amountConditions.join(' OR ')})`
+  
+  // Build name conditions: match ANY part of the name (firstname OR lastname)
+  // This helps find "Umut Mitgliedsbeitrag" when searching for "Umut Tanis"
+  let nameClause = '1=1'  // Default: no name filter
+  const nameParams: string[] = []
+  if (name) {
+    const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length >= 2)
+    if (nameParts.length > 0) {
+      const nameConditions = nameParts.map(() => 
+        `LOWER(IFNULL(v.description,'') || ' ' || IFNULL(v.counterparty,'')) LIKE ?`
+      )
+      // Match if ANY name part is found OR contains 'mitglied'/'beitrag'
+      nameClause = `(${nameConditions.join(' OR ')} OR LOWER(IFNULL(v.description,'')) LIKE '%mitglied%' OR LOWER(IFNULL(v.description,'')) LIKE '%beitrag%')`
+      nameParts.forEach(p => nameParams.push(`%${p}%`))
+    }
+  }
+  
+  // Exclude vouchers already assigned to ANY member
   const rows = d.prepare(`
     SELECT v.id, v.voucher_no as voucherNo, v.date, v.description, v.counterparty, v.gross_amount as gross
     FROM vouchers v
     WHERE v.date BETWEEN ? AND ?
-      AND ABS(v.gross_amount - ?) <= 0.05
-      AND (
-        ? IS NULL OR (
-          LOWER(IFNULL(v.description,'') || ' ' || IFNULL(v.counterparty,'')) LIKE ? OR
-          LOWER(IFNULL(v.description,'')) LIKE '%mitglied%' OR LOWER(IFNULL(v.description,'')) LIKE '%beitrag%'
-        )
-      )
+      AND ${amountClause}
+      AND ${nameClause}
+      AND v.id NOT IN (SELECT voucher_id FROM membership_payments WHERE voucher_id IS NOT NULL)
     ORDER BY v.date DESC
-    LIMIT 5
-  `).all(startISO, endISO, amount, likeName, likeName) as any[]
+    LIMIT 10
+  `).all(startISO, endISO, ...nameParams) as any[]
   return { rows }
 }
 
@@ -254,10 +283,11 @@ export function history(input: { memberId: number; limit?: number; offset?: numb
 
 export function status(input: { memberId: number }) {
   const d = getDb()
-  const m = d.prepare('SELECT contribution_interval as interval, contribution_amount as amount, next_due_date as nextDue, join_date as joinDate FROM members WHERE id = ?').get(input.memberId) as any
+  const m = d.prepare('SELECT contribution_interval as interval, contribution_amount as amount, next_due_date as nextDue, join_date as joinDate, leave_date as leaveDate FROM members WHERE id = ?').get(input.memberId) as any
   if (!m || !m.interval) return { hasPlan: 0, state: 'NONE' as const }
   const interval = m.interval as Interval
   const amount = Number(m.amount || 0)
+  const leaveDate = m.leaveDate as string | null
   let nextDue = m.nextDue as string | null
   // last paid
   const last = d.prepare('SELECT period_key as periodKey, date_paid as datePaid FROM membership_payments WHERE member_id = ? ORDER BY period_key DESC LIMIT 1').get(input.memberId) as any
@@ -275,24 +305,27 @@ export function status(input: { memberId: number }) {
   // Build set of paid period keys for overdue calc
   const paidRows = d.prepare('SELECT period_key as periodKey FROM membership_payments WHERE member_id = ?').all(input.memberId) as any[]
   const paidSet = new Set((paidRows || []).map(r => r.periodKey))
-  // derive first unpaid (candidate): iterate forward from join or nextDue to find earliest unpaid up to today
+  // Determine effective end key: if member left, use leave date period, else today
+  const leaveKey = leaveDate ? periodKeyFromDate(new Date(leaveDate), interval) : null
+  const effectiveEndKey = leaveKey && comparePeriodKeys(leaveKey, todayKey, interval) < 0 ? leaveKey : todayKey
+  // derive first unpaid (candidate): iterate forward from join or nextDue to find earliest unpaid up to effective end
   const startKeyForScan = (() => {
     if (nextDue) return periodKeyFromDate(new Date(nextDue), interval)
     if (lastPeriod) return nextPeriod(lastPeriod, interval)
     return periodKeyFromDate(new Date(m.joinDate || today.toISOString().slice(0,10)), interval)
   })()
-  // count overdue: iterate periods from earliest candidate up to today inclusive; also keep track of firstOverdue
+  // count overdue: iterate periods from earliest candidate up to effective end inclusive; also keep track of firstOverdue
   let overdue = 0
   let cur = startKeyForScan
   let firstOverdue: string | null = null
-  const { end: todayEnd } = periodRange(todayKey, interval)
-  while (comparePeriodKeys(cur, todayKey, interval) <= 0) {
+  const { end: effectiveEnd } = periodRange(effectiveEndKey, interval)
+  while (comparePeriodKeys(cur, effectiveEndKey, interval) <= 0) {
     const { end } = periodRange(cur, interval)
-    if (end <= todayEnd && !paidSet.has(cur)) { overdue++; if (!firstOverdue) firstOverdue = cur }
+    if (end <= effectiveEnd && !paidSet.has(cur)) { overdue++; if (!firstOverdue) firstOverdue = cur }
     cur = nextPeriod(cur, interval)
   }
   const state = overdue > 0 ? 'OVERDUE' as const : 'OK' as const
-  return { hasPlan: 1, interval, amount, lastPeriod, lastDate, nextDue: nextDue || null, overdue, state, joinDate: m.joinDate || null, firstOverdue: firstOverdue || null }
+  return { hasPlan: 1, interval, amount, lastPeriod, lastDate, nextDue: nextDue || null, overdue, state, joinDate: m.joinDate || null, leaveDate: leaveDate || null, firstOverdue: firstOverdue || null }
 }
 
 export function nextPeriod(pk: string, interval: Interval): string {

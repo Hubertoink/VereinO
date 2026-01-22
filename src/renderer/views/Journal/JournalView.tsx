@@ -753,13 +753,23 @@ export default function JournalView({
             <div>
                 <div className="card">
                     {/* Pagination controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                        <div className="helper">Seite {activePage} von {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} — {totalRows} Einträge</div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
-                            <button className="btn" onClick={() => { activeSetPage(Math.max(1, activePage - 1)) }} disabled={activePage <= 1} title="Zurück">‹</button>
-                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(Math.min(maxP, activePage + 1)) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter">›</button>
-                            <button className="btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(maxP) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte">»</button>
+                    <div className="pagination-bar">
+                        <div className="pagination-bar__info">
+                            <div className="pagination-bar__stat">
+                                <span>Gesamt:</span>
+                                <span className="pagination-bar__stat-value">{totalRows}</span>
+                            </div>
+                            <div className="pagination-bar__divider" />
+                            <div className="pagination-bar__stat">
+                                <span>Seite:</span>
+                                <span className="pagination-bar__stat-value">{activePage} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
+                            </div>
+                        </div>
+                        <div className="pagination-bar__controls">
+                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
+                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(Math.max(1, activePage - 1)) }} disabled={activePage <= 1} title="Zurück">‹</button>
+                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(Math.min(maxP, activePage + 1)) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter">›</button>
+                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(maxP) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte">»</button>
                         </div>
                     </div>
 

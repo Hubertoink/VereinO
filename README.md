@@ -13,7 +13,7 @@
 - [Features](#-features)
 - [Installation](#-installation)
 - [Verwendung](#-verwendung)
-- [Online-Plattform](#-online-plattform--submission-portal)
+- [Online-Plattform](#-online-plattform--submission-portal)r
 - [Technologie-Stack](#-technologie-stack)
 - [Lizenz](#-lizenz)
 
