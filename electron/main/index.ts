@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
-import { applyMigrations } from './db/migrations'
+import { applyMigrations, ensureVoucherJunctionTables } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -111,6 +111,9 @@ app.whenReady().then(async () => {
     try {
         const db = getDb()
         ; (global as any).singletonDb = db
+
+        // Defensive: legacy DBs may miss junction tables even when most data loads.
+        ensureVoucherJunctionTables(db)
         applyMigrations(db)
         
         // CRITICAL FIX: Always ensure enforce_time_range columns exist

@@ -45,6 +45,23 @@ interface UIPreferencesContextValue {
 
 const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(null)
 
+function safeLocalStorageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch (e) {
+    // QuotaExceededError (or private mode) should not break UI updates
+    console.warn(`localStorage.setItem failed for ${key}:`, e)
+  }
+}
+
+function safeLocalStorageRemove(key: string) {
+  try {
+    localStorage.removeItem(key)
+  } catch (e) {
+    console.warn(`localStorage.removeItem failed for ${key}:`, e)
+  }
+}
+
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [navLayout, setNavLayout] = useState<NavLayout>(() => {
     const stored = localStorage.getItem('ui.navLayout')
@@ -71,25 +88,25 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       // Apply color theme
       if (isValidTheme(appearance?.colorTheme)) {
         setColorThemeState(appearance.colorTheme)
-        localStorage.setItem('ui.colorTheme', appearance.colorTheme)
+        safeLocalStorageSet('ui.colorTheme', appearance.colorTheme)
         document.documentElement.setAttribute('data-color-theme', appearance.colorTheme)
       }
       // Apply custom background image payload (data URL)
       if (typeof appearance?.customBackgroundImage === 'string' && appearance.customBackgroundImage) {
         setCustomBackgroundImageState(appearance.customBackgroundImage)
-        localStorage.setItem('ui.customBackgroundImage', appearance.customBackgroundImage)
-        document.documentElement.style.setProperty('--custom-background-image', `url(\"${appearance.customBackgroundImage}\")`)
+        document.documentElement.style.setProperty('--custom-background-image', `url("${appearance.customBackgroundImage}")`)
+        safeLocalStorageSet('ui.customBackgroundImage', appearance.customBackgroundImage)
       }
       // Apply background image
       if (appearance?.backgroundImage && VALID_BACKGROUNDS.includes(appearance.backgroundImage)) {
         setBackgroundImageState(appearance.backgroundImage)
-        localStorage.setItem('ui.backgroundImage', appearance.backgroundImage)
+        safeLocalStorageSet('ui.backgroundImage', appearance.backgroundImage)
         document.documentElement.setAttribute('data-background-image', appearance.backgroundImage)
       }
       // Apply glass modals
       if (typeof appearance?.glassModals === 'boolean') {
         setGlassModalsState(appearance.glassModals)
-        localStorage.setItem('ui.glassModals', String(appearance.glassModals))
+        safeLocalStorageSet('ui.glassModals', String(appearance.glassModals))
         document.documentElement.setAttribute('data-glass-modals', String(appearance.glassModals))
       }
     }
@@ -214,57 +231,57 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   })
 
   useEffect(() => {
-    localStorage.setItem('ui.navLayout', navLayout)
+    safeLocalStorageSet('ui.navLayout', navLayout)
   }, [navLayout])
 
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed))
+    safeLocalStorageSet('sidebarCollapsed', String(sidebarCollapsed))
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    localStorage.setItem('ui.colorTheme', colorTheme)
+    safeLocalStorageSet('ui.colorTheme', colorTheme)
     document.documentElement.setAttribute('data-color-theme', colorTheme)
   }, [colorTheme])
 
   useEffect(() => {
-    localStorage.setItem('navIconColorMode', navIconColorMode)
+    safeLocalStorageSet('navIconColorMode', navIconColorMode)
   }, [navIconColorMode])
 
   useEffect(() => {
-    localStorage.setItem('dateFormat', dateFormat)
+    safeLocalStorageSet('dateFormat', dateFormat)
   }, [dateFormat])
 
   useEffect(() => {
-    localStorage.setItem('ui.journalRowStyle', journalRowStyle)
+    safeLocalStorageSet('ui.journalRowStyle', journalRowStyle)
     document.documentElement.setAttribute('data-journal-row-style', journalRowStyle)
   }, [journalRowStyle])
 
   useEffect(() => {
-    localStorage.setItem('ui.journalRowDensity', journalRowDensity)
+    safeLocalStorageSet('ui.journalRowDensity', journalRowDensity)
     document.documentElement.setAttribute('data-journal-row-density', journalRowDensity)
   }, [journalRowDensity])
 
   useEffect(() => {
-    localStorage.setItem('ui.showSubmissionBadge', String(showSubmissionBadge))
+    safeLocalStorageSet('ui.showSubmissionBadge', String(showSubmissionBadge))
   }, [showSubmissionBadge])
 
   useEffect(() => {
-    localStorage.setItem('ui.backgroundImage', backgroundImage)
+    safeLocalStorageSet('ui.backgroundImage', backgroundImage)
     document.documentElement.setAttribute('data-background-image', backgroundImage)
   }, [backgroundImage])
 
   useEffect(() => {
     if (customBackgroundImage) {
-      localStorage.setItem('ui.customBackgroundImage', customBackgroundImage)
       document.documentElement.style.setProperty('--custom-background-image', `url("${customBackgroundImage}")`)
+      safeLocalStorageSet('ui.customBackgroundImage', customBackgroundImage)
     } else {
-      localStorage.removeItem('ui.customBackgroundImage')
+      safeLocalStorageRemove('ui.customBackgroundImage')
       document.documentElement.style.removeProperty('--custom-background-image')
     }
   }, [customBackgroundImage])
 
   useEffect(() => {
-    localStorage.setItem('ui.glassModals', String(glassModals))
+    safeLocalStorageSet('ui.glassModals', String(glassModals))
     document.documentElement.setAttribute('data-glass-modals', String(glassModals))
   }, [glassModals])
 

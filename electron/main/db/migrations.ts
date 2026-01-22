@@ -507,13 +507,13 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
 
     -- Migrate existing budget assignments to junction table
-    INSERT INTO voucher_budgets (voucher_id, budget_id, amount)
+    INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
     SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
     FROM vouchers
     WHERE budget_id IS NOT NULL;
 
     -- Migrate existing earmark assignments to junction table
-    INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount)
+    INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
     SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
     FROM vouchers
     WHERE earmark_id IS NOT NULL;
@@ -527,6 +527,75 @@ export function ensureMigrationsTable(db: DB) {
   ).run()
 }
 
+export function ensureVoucherJunctionTables(db: DB) {
+  // Defensive schema heal for legacy DBs where migration 24 didn't run.
+  // Keep this idempotent and safe to run on every startup.
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS voucher_budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+        budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(voucher_id, budget_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_voucher_budgets_voucher ON voucher_budgets(voucher_id);
+      CREATE INDEX IF NOT EXISTS idx_voucher_budgets_budget ON voucher_budgets(budget_id);
+
+      CREATE TABLE IF NOT EXISTS voucher_earmarks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+        earmark_id INTEGER NOT NULL REFERENCES earmarks(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(voucher_id, earmark_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_voucher ON voucher_earmarks(voucher_id);
+      CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
+    `)
+  } catch (e) {
+    // If base tables are missing, migrations will handle it later.
+    return
+  }
+
+  // Best-effort backfill from legacy single-assignment columns.
+  // Do not throw: table presence is more important than full backfill.
+  try {
+    const voucherCols = db.prepare("PRAGMA table_info(vouchers)").all() as Array<{ name: string }>
+    const hasBudgetAmount = voucherCols.some((c) => c.name === 'budget_amount')
+    const hasEarmarkAmount = voucherCols.some((c) => c.name === 'earmark_amount')
+    const hasGrossAmount = voucherCols.some((c) => c.name === 'gross_amount')
+
+    const budgetAmountExpr = hasGrossAmount
+      ? (hasBudgetAmount ? 'COALESCE(budget_amount, gross_amount)' : 'gross_amount')
+      : '0'
+    const earmarkAmountExpr = hasGrossAmount
+      ? (hasEarmarkAmount ? 'COALESCE(earmark_amount, gross_amount)' : 'gross_amount')
+      : '0'
+
+    try {
+      db.exec(`
+        INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
+        SELECT id, budget_id, ${budgetAmountExpr}
+        FROM vouchers
+        WHERE budget_id IS NOT NULL;
+      `)
+    } catch { /* ignore */ }
+
+    try {
+      db.exec(`
+        INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
+        SELECT id, earmark_id, ${earmarkAmountExpr}
+        FROM vouchers
+        WHERE earmark_id IS NOT NULL;
+      `)
+    } catch { /* ignore */ }
+  } catch {
+    // ignore
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -536,6 +605,9 @@ export function getAppliedVersions(db: DB): Set<number> {
 }
 
 export function applyMigrations(db: DB) {
+  // Ensure critical junction tables exist even if migrations are partially applied.
+  ensureVoucherJunctionTables(db)
+
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue

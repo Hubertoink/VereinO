@@ -58,10 +58,26 @@ export function GeneralPane({
     }
 
     try {
-      const result = await compressImageFileToDataUrl(file, {
-        maxDimension: 3000,
-        targetBytes: 2 * 1024 * 1024,
+      // Keep this comfortably below common storage / IPC payload sizes.
+      // Two-pass approach: try higher quality first, then fall back to smaller.
+      const TARGET_BYTES = 1_200_000
+
+      let result = await compressImageFileToDataUrl(file, {
+        maxDimension: 2800,
+        targetBytes: TARGET_BYTES,
       })
+
+      if (result.bytes > TARGET_BYTES) {
+        result = await compressImageFileToDataUrl(file, {
+          maxDimension: 2048,
+          targetBytes: TARGET_BYTES,
+        })
+      }
+
+      if (result.bytes > TARGET_BYTES) {
+        notify('error', 'Bild ist nach Kompression noch zu groß. Bitte ein kleineres Bild wählen oder vorher zuschneiden.')
+        return
+      }
 
       setCustomBackgroundImage(result.dataUrl)
       setBackgroundImage('custom')
