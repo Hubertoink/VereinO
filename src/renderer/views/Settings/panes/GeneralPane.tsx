@@ -95,6 +95,18 @@ export function GeneralPane({
 
   return (
     <div className="settings-pane">
+      <input
+        ref={customBgInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label="Eigenes Hintergrundbild auswählen"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void handleCustomBgUpload(file)
+          e.currentTarget.value = ''
+        }}
+      />
       {/* Setup (Erststart) – Reopen wizard */}
       <div className="card settings-pane-card">
         <div className="settings-title">
@@ -217,34 +229,43 @@ export function GeneralPane({
                 style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
               >
                 {!customBackgroundImage && <span>＋</span>}
+                {/* Overlay icons for change/remove when image exists */}
+                {customBackgroundImage && (
+                  <div className="bg-card__overlay">
+                    <button
+                      type="button"
+                      className="bg-card__icon-btn"
+                      aria-label="Bild ändern"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openCustomBgPicker()
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                        <path d="m15 5 4 4"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="bg-card__icon-btn bg-card__icon-btn--danger"
+                      aria-label="Bild entfernen"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveCustomBg()
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
               <span className="bg-card__name">🖼️ Eigenes</span>
             </button>
           </div>
-          {/* Custom image controls */}
-          {(backgroundImage === 'custom' || !!customBackgroundImage) && (
-            <div className="custom-bg-inline-controls">
-              <input
-                ref={customBgInputRef}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void handleCustomBgUpload(file)
-                  e.currentTarget.value = ''
-                }}
-              />
-              <button type="button" className="btn btn-sm" onClick={openCustomBgPicker}>
-                {customBackgroundImage ? 'Ändern…' : 'Auswählen…'}
-              </button>
-              {customBackgroundImage && (
-                <button type="button" className="btn btn-sm btn-secondary" onClick={handleRemoveCustomBg}>
-                  Entfernen
-                </button>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Glass effect toggle - inline with preview */}

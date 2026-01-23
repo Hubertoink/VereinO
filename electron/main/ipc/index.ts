@@ -6,6 +6,7 @@ import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, postInvoiceToVoucher, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
+import { exportMembers, MembersExportOptions } from '../services/membersExport'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
 import { createSubmissionsRepository } from '../repositories/submissions'
@@ -1064,6 +1065,12 @@ export function registerIpcHandlers() {
         const parsed = MemberGetInput.parse(payload)
         const res = getMemberById(parsed.id)
         return MemberGetOutput.parse(res)
+    })
+
+    // Members export (Excel/PDF)
+    ipcMain.handle('members.export', async (_e, payload: MembersExportOptions) => {
+        const result = await exportMembers(payload)
+        return result
     })
 
     // Membership payments

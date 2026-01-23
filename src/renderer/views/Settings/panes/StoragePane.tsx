@@ -214,36 +214,90 @@ export function StoragePane({ notify }: StoragePaneProps) {
       </section>
 
       <section className="card storage-section">
-        <div className="helper">Automatische Sicherungen</div>
-        <div className="storage-auto-settings">
-          <div className="field">
-            <label htmlFor="auto-backup-mode">Modus</label>
-            <select id="auto-backup-mode" className="input" value={autoMode} onChange={(e) => updateAutoMode(e.target.value as any)}>
-              <option value="OFF">Aus</option>
-              <option value="PROMPT">Nachfragen</option>
-              <option value="SILENT">Still</option>
-            </select>
+        <div className="backup-section-header">
+          <div className="backup-section-title">
+            <span aria-hidden="true">🛡️</span>
+            <div>
+              <strong>Datensicherung</strong>
+              <div className="helper">Schütze deine Daten mit automatischen und manuellen Sicherungen.</div>
+            </div>
           </div>
-          <div className="field storage-field-min-160">
-            <label htmlFor="auto-backup-interval">Intervall (Tage)</label>
-            <input id="auto-backup-interval" title="Intervall (Tage)" className="input" type="number" min={1} value={intervalDays} onChange={(e) => updateInterval(Number(e.target.value) || 1)} />
+          <button className="btn primary" disabled={busy} onClick={doMakeBackup}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Jetzt sichern
+          </button>
+        </div>
+
+        <div className="backup-settings-grid">
+          {/* Auto-backup config */}
+          <div className="backup-auto-card">
+            <div className="backup-auto-header">
+              <span className="backup-auto-icon" aria-hidden="true">⏱️</span>
+              <span className="backup-auto-label">Automatische Sicherung</span>
+              <select 
+                id="auto-backup-mode" 
+                className="backup-mode-select" 
+                value={autoMode} 
+                onChange={(e) => updateAutoMode(e.target.value as any)}
+                aria-label="Automatischer Sicherungsmodus"
+              >
+                <option value="OFF">Aus</option>
+                <option value="PROMPT">Nachfragen</option>
+                <option value="SILENT">Still</option>
+              </select>
+            </div>
+            {autoMode !== 'OFF' && (
+              <div className="backup-auto-details">
+                <div className="backup-interval-row">
+                  <label htmlFor="auto-backup-interval">Intervall:</label>
+                  <div className="backup-interval-input">
+                    <input 
+                      id="auto-backup-interval" 
+                      className="input" 
+                      type="number" 
+                      min={1} 
+                      value={intervalDays} 
+                      onChange={(e) => updateInterval(Number(e.target.value) || 1)} 
+                    />
+                    <span>Tage</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="field storage-field-min-240">
-            <label>Backup-Verzeichnis</label>
-            <div className="storage-backup-dir">
-              <code className="storage-backup-code">{backupDir || 'Standard'}</code>
-              <button className="btn" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis gesetzt') }}>Ändern…</button>
-              <button className="btn" disabled={backupBusy} onClick={openBackupFolder}>Öffnen…</button>
+
+          {/* Backup directory config */}
+          <div className="backup-dir-card">
+            <div className="backup-dir-header">
+              <span className="backup-dir-icon" aria-hidden="true">📁</span>
+              <span className="backup-dir-label">Speicherort</span>
+            </div>
+            <div className="backup-dir-path">
+              <code>{backupDir || 'Standard-Verzeichnis'}</code>
+            </div>
+            <div className="backup-dir-actions">
+              <button className="btn btn-sm" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis gesetzt') }}>
+                Ändern
+              </button>
+              <button className="btn btn-sm" disabled={backupBusy} onClick={openBackupFolder}>
+                Öffnen
+              </button>
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="card storage-section">
-        <div className="storage-actions">
-          <button className="btn" disabled={busy} onClick={doMakeBackup}>Jetzt sichern</button>
+        {/* Backup list */}
+        <div className="backup-list-section">
+          <div className="backup-list-header">
+            <span>Vorhandene Sicherungen</span>
+            <span className="backup-count">{backups.length}</span>
+          </div>
+          <BackupList backups={backups} onRestore={doRestore} />
         </div>
-        <BackupList backups={backups} onRestore={doRestore} />
       </section>
 
       {/* Datenverwaltung & Sicherheit */}

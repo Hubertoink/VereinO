@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
+import MembersExportModal from '../../components/modals/MembersExportModal'
 
 export default function MembersView() {
     const [q, setQ] = useState('')
@@ -24,6 +25,7 @@ export default function MembersView() {
     const [deleteBusy, setDeleteBusy] = useState(false)
     const [boardRoleError, setBoardRoleError] = useState<string | null>(null)
     const [showInvite, setShowInvite] = useState(false)
+    const [showExport, setShowExport] = useState(false)
     const [inviteBusy, setInviteBusy] = useState(false)
     const [inviteEmails, setInviteEmails] = useState<string[]>([])
     const [inviteSubject, setInviteSubject] = useState<string>(() => { try { return localStorage.getItem('invite.subject') || 'Einladung zur Sitzung' } catch { return 'Einladung zur Sitzung' } })
@@ -294,7 +296,7 @@ export default function MembersView() {
                     ) : null })()}
                 </div>
                 <div className="members-header-right">
-                    <div className="helper">{busy ? <LoadingState size="small" message="" /> : `Seite ${page}/${pages} – ${total} Einträge`}</div>
+                    <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}>📄</button>
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
                     <button className="btn btn-accent" onClick={() => { setRequiredTouched(false); setMissingRequired([]); setAddrStreet(''); setAddrZip(''); setAddrCity(''); setForm({ mode: 'create', draft: {
                         name: '', status: 'ACTIVE', boardRole: null, memberNo: null, email: null, phone: null, address: null,
@@ -414,12 +416,23 @@ export default function MembersView() {
                     )})()}
                 </tbody>
             </table>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
-                <div className="helper">{total} Einträge</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">«</button>
-                    <button className="btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
-                    <button className="btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
+            <div className="pagination-bar" style={{ marginTop: 12, marginBottom: 0 }}>
+                <div className="pagination-bar__info">
+                    <div className="pagination-bar__stat">
+                        <span>Gesamt:</span>
+                        <span className="pagination-bar__stat-value">{total}</span>
+                    </div>
+                    <div className="pagination-bar__divider" />
+                    <div className="pagination-bar__stat">
+                        <span>Seite:</span>
+                        <span className="pagination-bar__stat-value">{page} / {pages}</span>
+                    </div>
+                </div>
+                <div className="pagination-bar__controls">
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">«</button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset((pages - 1) * limit)} disabled={offset + limit >= total} title="Letzte">»</button>
                 </div>
             </div>
 
@@ -691,6 +704,14 @@ export default function MembersView() {
             )}
             {showPayments && (
                 <PaymentsAssignModal onClose={() => setShowPayments(false)} />
+            )}
+            {showExport && (
+                <MembersExportModal
+                    open={showExport}
+                    onClose={() => setShowExport(false)}
+                    currentFilter={status}
+                    currentQuery={q}
+                />
             )}
             {missingRequired.length > 0 && (
                 createPortal(

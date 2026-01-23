@@ -55,6 +55,29 @@ export const IconArrow = ({ size = 14 }: { size?: number }) => (
     </svg>
 )
 
+// Budget icon (bar chart style - matches nav)
+export const IconBudget = ({ size = 16, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="20" x2="12" y2="10" />
+        <line x1="18" y1="20" x2="18" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+)
+
+// Earmark/Zweckbindung icon (bookmark style - matches nav)
+export const IconEarmark = ({ size = 16, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+)
+
+// Attachment/clip icon
+export const IconAttachment = ({ size = 16, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+)
+
 // Helper-Funktion für Platzhalter-Text
 export function emptyValue(value: any): string {
     if (value === null || value === undefined || value === '') {

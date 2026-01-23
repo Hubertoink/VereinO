@@ -30,11 +30,13 @@ Die Anwendung unterstützt die besonderen Anforderungen gemeinnütziger Organisa
 ## ✨ Features
 
 ### 📊 Dashboard
+
 - **KPI-Karten**: Kassenstand, Einnahmen/Ausgaben pro Monat, offene Zweckmittel, nicht zugeordnete Belege
 - **Charts**: Visualisierung von Einnahmen/Ausgaben nach Sphäre, Budget vs. Ist-Vergleich
 - **Aktivitätsfeed**: Übersicht der letzten Buchungen, Abschlüsse und Import/Export-Vorgänge
 
 ### 💰 Buchungsverwaltung (Journal)
+
 - Erfassung von Einnahmen, Ausgaben und Umbuchungen
 - Unterstützung für Bar- und Bankzahlungen
 - Automatische Belegnummerierung
@@ -42,37 +44,44 @@ Die Anwendung unterstützt die besonderen Anforderungen gemeinnütziger Organisa
 - Kategorisierung nach Sphären (IDEELL, ZWECK, VERMÖGEN, WGB)
 
 ### 🏷️ Zweckbindungen (Earmarks)
+
 - Verwaltung zweckgebundener Spenden und Fördermittel
 - Nachverfolgung der Mittelverwendung
 - Automatische Prüfung auf korrekte Verwendung
 
 ### 📈 Budgets
+
 - Jahresbudgets pro Sphäre und Kategorie
 - Echtzeit-Verfolgung von Budget vs. tatsächlichen Ausgaben
 - Zeitraumbasierte Budgetierung
 
 ### 👥 Mitgliederverwaltung
+
 - Vollständige Mitgliederdatenbank
 - Verknüpfung mit Buchungen (Spenden, Beiträge)
 - Such- und Filterfunktionen
 
 ### 📎 Belegverwaltung
+
 - Digitale Erfassung und Speicherung von Belegen
 - Verknüpfung mit Buchungen
 - Anhänge-Management
 
 ### 📑 Reports & Export
+
 - Export-Funktionen für Berichte
 - Excel-Export (ExcelJS)
 - Individuelle Auswertungen
 
 ### 🔒 Datensicherheit
+
 - **Lokale SQLite-Datenbank**: Alle Daten bleiben auf deinem Gerät
 - **Backup & Restore**: Einfacher Export/Import der Datenbank
 - **Smart Restore**: Intelligente Wiederherstellung bei Datenbankproblemen
 - **Audit-Trail**: Protokollierung aller Änderungen
 
 ### ⚙️ Einstellungen
+
 - Anpassbare Geschäftsjahre
 - Perioden-Sperrung für abgeschlossene Zeiträume
 - Vereinsdaten und Freistellungsbescheid
@@ -101,7 +110,17 @@ cd VereinO
 npm install
 ```
 
-### Schritt 3: Entwicklung starten (optional)
+### Schritt 3: Native Module neu bauen (wichtig!)
+
+Nach der Installation oder bei Problemen mit `better-sqlite3` müssen die nativen Module für Electron neu kompiliert werden:
+
+```bash
+npm run rebuild:native
+```
+
+> ⚠️ Dieser Schritt ist erforderlich, wenn du Fehler wie "Module was compiled against a different Node.js version" erhältst.
+
+### Schritt 4: Entwicklung starten (optional)
 
 Um die App im Entwicklungsmodus zu starten:
 
@@ -109,7 +128,7 @@ Um die App im Entwicklungsmodus zu starten:
 npm run dev
 ```
 
-### Schritt 4: Ausführbare Datei (EXE) erstellen
+### Schritt 5: Ausführbare Datei (EXE) erstellen
 
 Um eine installierbare Desktop-Anwendung zu erstellen:
 
@@ -123,11 +142,11 @@ npm run package
 
 Nach dem Paketieren findest du die erstellten Dateien im `dist/` oder `out/` Ordner:
 
-| Betriebssystem | Dateiformat |
-|----------------|-------------|
+| Betriebssystem | Dateiformat        |
+| -------------- | ------------------ |
 | Windows        | `.exe` (Installer) |
-| macOS          | `.dmg` |
-| Linux          | `.AppImage` |
+| macOS          | `.dmg`             |
+| Linux          | `.AppImage`        |
 
 ### Alternative: Direkte Release-Downloads
 
@@ -169,12 +188,14 @@ Für Vereinsmitglieder, die Ausgaben einreichen möchten, steht ein **Submission
 Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
 
 #### Für Mitglieder (Einreicher)
+
 - **Buchungen anlegen**: Ausgaben mit allen relevanten Daten erfassen
 - **Belege hochladen**: Digitale Kopien von Quittungen und Rechnungen anhängen
 - **Als JSON exportieren**: Eingereichte Buchungen als JSON-Datei herunterladen
 - **An Kassierer senden**: JSON-Export per E-Mail oder Dateifreigabe übermitteln
 
 #### Für Kassierer (in der VereinO Desktop-App)
+
 - **JSON importieren**: Eingereichte Buchungen in der App prüfen
 - **Validieren**: Belege und Beträge kontrollieren
 - **Übernehmen**: Geprüfte Buchungen in die offizielle Buchhaltung aufnehmen
@@ -195,6 +216,7 @@ Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
 ```
 
 Diese Trennung ermöglicht:
+
 - **Dezentrale Erfassung**: Mitglieder können von überall Ausgaben einreichen
 - **Zentrale Kontrolle**: Der Kassierer behält die volle Kontrolle über die Buchhaltung
 - **Offline-Fähigkeit**: Die Hauptbuchhaltung bleibt offline und sicher
@@ -204,6 +226,7 @@ Diese Trennung ermöglicht:
 ## 🛠️ Technologie-Stack
 
 ### Desktop-App (Frontend)
+
 - **Electron** – Cross-Platform Desktop Framework
 - **React** – UI-Bibliothek
 - **TypeScript** – Typsichere Entwicklung
@@ -211,6 +234,7 @@ Diese Trennung ermöglicht:
 - **SQLite (better-sqlite3)** – Lokale Datenbank
 
 ### Backend (Submission Portal)
+
 - **Fastify** – Web-Framework
 - **PostgreSQL** – Relationale Datenbank
 - **Zod** – Schema-Validierung
@@ -218,6 +242,7 @@ Diese Trennung ermöglicht:
 - **Docker** – Container-Deployment
 
 ### Entwicklungstools
+
 - **ESLint & Prettier** – Code-Qualität
 - **Playwright** – E2E-Tests
 - **VS Code** – IDE-Integration mit Tasks & Debugging

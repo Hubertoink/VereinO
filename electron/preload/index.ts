@@ -97,7 +97,8 @@ contextBridge.exposeInMainWorld('api', {
         update: (payload: any) => ipcRenderer.invoke('members.update', payload),
         delete: (payload: any) => ipcRenderer.invoke('members.delete', payload),
         get: (payload: any) => ipcRenderer.invoke('members.get', payload),
-        writeLetter: (payload: any) => ipcRenderer.invoke('members.writeLetter', payload)
+        writeLetter: (payload: any) => ipcRenderer.invoke('members.writeLetter', payload),
+        export: (payload: any) => ipcRenderer.invoke('members.export', payload)
     },
     payments: {
         listDue: (payload: any) => ipcRenderer.invoke('payments.listDue', payload),
