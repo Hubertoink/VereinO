@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "test": "jest",
     "test:e2e": "playwright test",
-    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');cp.spawnSync('npm',['rebuild','better-sqlite3','--build-from-source'],{stdio:'inherit',shell:true,env:{...process.env,npm_config_runtime:'electron',npm_config_target:v,npm_config_disturl:'https://electronjs.org/headers'}});\"",
+    "rebuild:native": "node -e \"const v=require('electron/package.json').version;const cp=require('node:child_process');const npmCmd=process.platform==='win32'?'npm.cmd':'npm';const env={...process.env,npm_config_runtime:'electron',npm_config_target:v,npm_config_disturl:'https://electronjs.org/headers'};const run=(args)=>cp.spawnSync(npmCmd,args,{stdio:'inherit',shell:false,env});let r=run(['rebuild','better-sqlite3']);if(r.status!==0){console.error('\\n[rebuild:native] Prebuild failed; falling back to source build (requires VS Build Tools on Windows).');r=run(['rebuild','--build-from-source','better-sqlite3']);}process.exit(r.status??1);\"",
     "postinstall": "playwright install",
     "package": "electron-builder -c electron-builder.yml",
     "start": "npm run dev"

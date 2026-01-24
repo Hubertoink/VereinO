@@ -1,4 +1,19 @@
-import React from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+
+// Preview row type
+interface PreviewRow {
+  id: number
+  date: string
+  voucherNo: number
+  type: 'IN' | 'OUT' | 'TRANSFER'
+  sphere: string
+  description: string
+  paymentMethod: string
+  netAmount: number
+  vatRate: number
+  grossAmount: number
+  tags?: string[]
+}
 
 export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets }: {
   open: boolean
@@ -73,6 +88,65 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
       console.error('Failed to apply journal columns:', e)
     }
   }
+
+  // Preview data state
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewTotal, setPreviewTotal] = useState(0)
+  const PREVIEW_LIMIT = 5
+
+  // Load preview data when modal opens or filters change
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+
+    async function loadPreview() {
+      setPreviewLoading(true)
+      try {
+        // Determine date range based on export type
+        let from = dateFrom || ''
+        let to = dateTo || ''
+        if (exportType === 'fiscal' && fiscalYear) {
+          from = `${fiscalYear}-01-01`
+          to = `${fiscalYear}-12-31`
+        }
+
+        const res = await (window as any).api?.vouchers?.list?.({
+          from,
+          to,
+          limit: PREVIEW_LIMIT,
+          offset: 0,
+          sort: sortDir
+        })
+
+        if (!cancelled && res) {
+          setPreviewData(res.rows || [])
+          setPreviewTotal(res.total || 0)
+        }
+      } catch (e) {
+        console.error('Failed to load preview:', e)
+      } finally {
+        if (!cancelled) setPreviewLoading(false)
+      }
+    }
+
+    loadPreview()
+    return () => { cancelled = true }
+  }, [open, dateFrom, dateTo, exportType, fiscalYear, sortDir])
+
+  // Format currency
+  const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+
+  // Format amount based on mode
+  const formatAmount = (amount: number, type: string) => {
+    if (amountMode === 'OUT_NEGATIVE' && type === 'OUT') {
+      return eurFmt.format(-Math.abs(amount))
+    }
+    return eurFmt.format(amount)
+  }
+
+  // Get field label
+  const getFieldLabel = (key: string) => all.find(f => f.key === key)?.label || key
   
   if (!open) return null
   
@@ -81,7 +155,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: '95vw' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <h2 style={{ margin: 0 }}>Export Optionen</h2>
@@ -92,7 +166,14 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             )}
           </div>
-          <button className="btn danger" onClick={onClose}>Schließen</button>
+          <button 
+            className="btn ghost" 
+            onClick={onClose} 
+            aria-label="Schließen"
+            style={{ width: 32, height: 32, padding: 0, display: 'grid', placeItems: 'center', fontSize: 18 }}
+          >
+            ×
+          </button>
         </header>
         
         {/* Export Type Selection */}
@@ -220,15 +301,150 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
           </div>
         </div>
+
+        {/* Preview Section */}
+        {exportType === 'standard' && fields.length > 0 && (
+          <div className="field" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                Vorschau
+                <span className="helper" style={{ fontWeight: 400 }}>
+                  ({previewTotal} Buchungen, zeige {Math.min(PREVIEW_LIMIT, previewData.length)})
+                </span>
+              </label>
+            </div>
+            <div style={{ 
+              border: '1px solid var(--border)', 
+              borderRadius: 8, 
+              overflow: 'hidden',
+              background: 'var(--surface)'
+            }}>
+              {previewLoading ? (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)' }}>
+                  Lade Vorschau...
+                </div>
+              ) : previewData.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)' }}>
+                  Keine Buchungen im gewählten Zeitraum
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table" style={{ fontSize: 12, marginBottom: 0 }}>
+                    <thead>
+                      <tr>
+                        {fields.map(key => (
+                          <th key={key} style={{ whiteSpace: 'nowrap', padding: '8px 10px' }}>
+                            {getFieldLabel(key)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.map(row => (
+                        <tr key={row.id}>
+                          {fields.map(key => {
+                            let value: React.ReactNode = ''
+                            switch (key) {
+                              case 'date':
+                                value = row.date
+                                break
+                              case 'voucherNo':
+                                value = row.voucherNo
+                                break
+                              case 'type':
+                                value = (
+                                  <span className={`badge ${row.type.toLowerCase()}`}>
+                                    {row.type === 'IN' ? '↓ E' : row.type === 'OUT' ? '↑ A' : '⇄ U'}
+                                  </span>
+                                )
+                                break
+                              case 'sphere':
+                                value = row.sphere || '—'
+                                break
+                              case 'description':
+                                value = (
+                                  <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                    {row.description || '—'}
+                                  </span>
+                                )
+                                break
+                              case 'paymentMethod':
+                                value = row.paymentMethod === 'CASH' ? '💵 Bar' : row.paymentMethod === 'BANK' ? '🏦 Bank' : '—'
+                                break
+                              case 'netAmount':
+                                value = <span style={{ color: row.type === 'OUT' && amountMode === 'OUT_NEGATIVE' ? 'var(--danger)' : undefined }}>{formatAmount(row.netAmount, row.type)}</span>
+                                break
+                              case 'vatAmount':
+                                const vatAmount = row.grossAmount - row.netAmount
+                                value = eurFmt.format(vatAmount)
+                                break
+                              case 'grossAmount':
+                                value = <span style={{ color: row.type === 'OUT' && amountMode === 'OUT_NEGATIVE' ? 'var(--danger)' : undefined, fontWeight: 500 }}>{formatAmount(row.grossAmount, row.type)}</span>
+                                break
+                              case 'tags':
+                                value = row.tags?.length ? row.tags.join(', ') : '—'
+                                break
+                            }
+                            return (
+                              <td key={key} style={{ padding: '8px 10px', whiteSpace: key === 'description' ? 'normal' : 'nowrap' }}>
+                                {value}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {previewTotal > PREVIEW_LIMIT && !previewLoading && (
+                <div style={{ 
+                  padding: '8px 12px', 
+                  background: 'color-mix(in oklab, var(--accent) 8%, transparent)',
+                  borderTop: '1px solid var(--border)',
+                  fontSize: 11,
+                  color: 'var(--text-dim)',
+                  textAlign: 'center'
+                }}>
+                  ... und {previewTotal - PREVIEW_LIMIT} weitere Buchungen
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           {exportType === 'fiscal' ? (
-            <button className="btn primary" onClick={() => onExport('PDF_FISCAL')}>📄 PDF (Finanzamt)</button>
+            <button 
+              className="btn" 
+              onClick={() => onExport('PDF_FISCAL')}
+              style={{ background: 'color-mix(in oklab, #e53935 85%, transparent)', color: '#fff' }}
+            >
+              📄 PDF (Finanzamt)
+            </button>
           ) : (
             <>
-              <button className="btn" onClick={() => onExport('CSV')}>CSV</button>
-              <button className="btn" onClick={() => onExport('PDF')}>PDF</button>
-              <button className="btn primary" onClick={() => onExport('XLSX')}>XLSX</button>
+              <button 
+                className="btn" 
+                onClick={() => onExport('CSV')}
+                style={{ background: 'color-mix(in oklab, #607d8b 75%, transparent)', color: '#fff' }}
+              >
+                CSV
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => onExport('PDF')}
+                style={{ background: 'color-mix(in oklab, #e53935 85%, transparent)', color: '#fff' }}
+              >
+                PDF
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => onExport('XLSX')}
+                style={{ background: 'color-mix(in oklab, #43a047 85%, transparent)', color: '#fff' }}
+              >
+                XLSX
+              </button>
             </>
           )}
         </div>

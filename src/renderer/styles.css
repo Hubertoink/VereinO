@@ -1153,8 +1153,6 @@ pre {
 
 .card {
     background: color-mix(in oklab, var(--surface) 85%, transparent);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-1);
@@ -2692,6 +2690,12 @@ textarea:focus {
     width: 22px;
     display: inline-flex;
     justify-content: center;
+    transition: transform 0.15s ease;
+}
+
+/* Subtle hover tilt for menu icons */
+.sidebar-nav .btn.ghost:hover .sidebar-button__icon {
+    transform: rotate(-10deg);
 }
 .btn.ghost.is-active {
     background: color-mix(in oklab, var(--accent) 15%, transparent);
@@ -2779,7 +2783,33 @@ textarea:focus {
   opacity: 0.6;
 }
 .nav-label { font-size: 14px; }
-.icon-wrapper { width: 22px; min-width: 22px; display: inline-flex; justify-content: center; align-items: center; }
+.icon-wrapper {
+    width: 22px;
+    min-width: 22px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.15s ease;
+}
+
+/* Hover tilt animation for nav icons */
+.nav-btn:hover > .icon-wrapper,
+.top-nav .nav-btn:hover > .icon-wrapper,
+.side-nav .nav-btn:hover > .icon-wrapper {
+    transform: rotate(-12deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-button__icon,
+    .icon-wrapper {
+        transition: none;
+    }
+
+    .sidebar-nav .btn.ghost:hover .sidebar-button__icon,
+    .nav-btn:hover .icon-wrapper {
+        transform: none;
+    }
+}
 .app-sidebar { grid-area: side; display: flex; flex-direction: column; padding: 8px 4px; border-right: 1px solid var(--border); overflow: visible; }
 .side-nav { overflow: visible; }
 
@@ -4215,17 +4245,20 @@ html[data-background-image="custom"]::before {
    ======================================== */
 
 /* When glass modals are enabled, make modal backgrounds translucent with blur */
-html[data-glass-modals="true"] .modal-content,
-html[data-glass-modals="true"] .card {
+html[data-glass-modals="true"] .modal-content {
     background: color-mix(in oklab, var(--surface) 75%, transparent) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
 }
 
+/* Keep cards translucent in glass mode, but avoid blur (too expensive on scroll-heavy views). */
+html[data-glass-modals="true"] .card {
+    background: color-mix(in oklab, var(--surface) 75%, transparent) !important;
+}
+
 html[data-glass-modals="true"] .settings-content {
     background: color-mix(in oklab, var(--surface) 70%, transparent) !important;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    /* Avoid backdrop blur on large scroll containers (choppy on weak GPUs). */
 }
 
 /* Slightly more translucent for nested cards in glass mode */

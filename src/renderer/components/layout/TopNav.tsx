@@ -40,7 +40,7 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
               aria-label={item.label}
               data-tooltip={item.label}
             >
-              <span className={colorClass}>
+              <span className={`icon-wrapper ${colorClass}`.trim()}>
                 {getNavIcon(item.key)}
               </span>
               {showBadge && (

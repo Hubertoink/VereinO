@@ -178,8 +178,8 @@ function DevBadge({ appVersion }: { appVersion: string }) {
         ref={panelRef}
         style={{
           background: 'color-mix(in oklab, var(--accent) 8%, var(--surface))',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          backdropFilter: open ? 'blur(12px)' : 'none',
+          WebkitBackdropFilter: open ? 'blur(12px)' : 'none',
           border: '1px solid color-mix(in oklab, var(--accent) 20%, transparent)',
           borderRight: 'none',
           borderRadius: '8px 0 0 8px',
