@@ -98,7 +98,13 @@ contextBridge.exposeInMainWorld('api', {
         delete: (payload: any) => ipcRenderer.invoke('members.delete', payload),
         get: (payload: any) => ipcRenderer.invoke('members.get', payload),
         writeLetter: (payload: any) => ipcRenderer.invoke('members.writeLetter', payload),
-        export: (payload: any) => ipcRenderer.invoke('members.export', payload)
+        export: (payload: any) => ipcRenderer.invoke('members.export', payload),
+        import: {
+            preview: (payload: { fileBase64: string }) => ipcRenderer.invoke('members.import.preview', payload),
+            execute: (payload: { fileBase64: string; mapping: Record<string, string | null>; updateExisting?: boolean }) => ipcRenderer.invoke('members.import.execute', payload),
+            template: () => ipcRenderer.invoke('members.import.template'),
+            testdata: () => ipcRenderer.invoke('members.import.testdata')
+        }
     },
     payments: {
         listDue: (payload: any) => ipcRenderer.invoke('payments.listDue', payload),

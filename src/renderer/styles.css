@@ -90,6 +90,13 @@
 .settings-tab-icon {
     font-size: 16px;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-tab-icon svg {
+    flex-shrink: 0;
 }
 
 /* Settings pane layout improvements */
@@ -2289,6 +2296,65 @@ textarea:focus {
 
 .fg-defaults {
     border-left: 4px solid color-mix(in oklab, #AAB3C2 60%, transparent);
+}
+
+/* ===========================================
+   Members Import Compact Mapping Grid
+   =========================================== */
+.members-mapping-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 200px));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.mapping-section {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: color-mix(in oklab, var(--surface) 90%, transparent);
+}
+
+.mapping-section .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+}
+
+/* Mapping field - label above select */
+.mapping-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.mapping-field-label {
+    font-size: 10px;
+    color: var(--text);
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.mapping-field-label .required-mark {
+    color: var(--danger);
+    margin-left: 2px;
+}
+
+.mapping-select {
+    width: 100%;
+    padding: 3px 5px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.mapping-select:focus {
+    outline: none;
+    border-color: var(--primary);
 }
 
 .muted-sep {

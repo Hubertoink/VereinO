@@ -18,6 +18,7 @@ import { getTaxExemptionCertificate, saveTaxExemptionCertificate, deleteTaxExemp
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
+import { previewMembersXlsx, executeMembersImport, createMembersTemplate, createMembersTestData } from '../services/membersImport'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
@@ -1071,6 +1072,26 @@ export function registerIpcHandlers() {
     ipcMain.handle('members.export', async (_e, payload: MembersExportOptions) => {
         const result = await exportMembers(payload)
         return result
+    })
+
+    // Members import (Excel)
+    ipcMain.handle('members.import.preview', async (_e, payload: { fileBase64: string }) => {
+        const res = await previewMembersXlsx(payload.fileBase64)
+        return res
+    })
+    ipcMain.handle('members.import.execute', async (_e, payload: { fileBase64: string; mapping: Record<string, string | null>; updateExisting?: boolean; rowEdits?: Record<number, Record<string, string>> }) => {
+        // Safety: backup before potentially large data modification
+        try { await backup.makeBackup('preMembersImport') } catch { /* ignore */ }
+        const res = await executeMembersImport(payload.fileBase64, payload.mapping, { updateExisting: payload.updateExisting, rowEdits: payload.rowEdits })
+        return res
+    })
+    ipcMain.handle('members.import.template', async () => {
+        const res = await createMembersTemplate()
+        return res
+    })
+    ipcMain.handle('members.import.testdata', async () => {
+        const res = await createMembersTestData()
+        return res
     })
 
     // Membership payments

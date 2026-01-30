@@ -2,12 +2,16 @@ import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
 import { ImportXlsxCard } from '../components/ImportXlsxCard'
+import { MembersImportCard } from '../components/MembersImportCard'
+
+type ImportTab = 'vouchers' | 'members'
 
 /**
  * ImportPane - Data Import (XLSX & camt.053 XML)
  * Provides full import functionality: file upload, preview, mapping, and execution.
  */
 export function ImportPane({ notify }: ImportPaneProps) {
+  const [activeTab, setActiveTab] = React.useState<ImportTab>('vouchers')
   const [showLog, setShowLog] = React.useState(false)
   const [logRows, setLogRows] = React.useState<Array<{ id: number; createdAt: string; entity: string; action: string; diff?: any | null }>>([])
   const [busy, setBusy] = React.useState(false)
@@ -18,7 +22,9 @@ export function ImportPane({ notify }: ImportPaneProps) {
     try {
       const res = await window.api?.audit?.recent?.({ limit: 50 })
       const all = res?.rows || []
-      const onlyImports = all.filter((r: any) => r.entity === 'imports' && r.action === 'EXECUTE')
+      const onlyImports = all.filter((r: any) => 
+        (r.entity === 'imports' || r.entity === 'members_import') && r.action === 'EXECUTE'
+      )
       setLogRows(onlyImports)
     } catch (e: any) { setErr(e?.message || String(e)) }
     finally { setBusy(false) }
@@ -29,9 +35,42 @@ export function ImportPane({ notify }: ImportPaneProps) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gap: 6 }}>
           <strong>Datenimport</strong>
-          <div className="helper">Excel (.xlsx) oder camt.053 XML (.xml). Vorschau → Zuordnung prüfen → Import.</div>
-          {/* Erklärungstext dauerhaft unter der Überschrift */}
-          <div className="helper">
+          <div className="helper">Importiere Buchungen oder Mitglieder aus Excel-Dateien.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}>📝 Log</button>
+        </div>
+      </div>
+
+      {/* Tab Buttons */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        <button
+          className={`btn ${activeTab === 'vouchers' ? 'primary' : ''}`}
+          onClick={() => setActiveTab('vouchers')}
+          style={{ 
+            borderRadius: '8px 8px 0 0',
+            borderBottom: activeTab === 'vouchers' ? '2px solid var(--accent)' : '2px solid transparent'
+          }}
+        >
+          📋 Buchungen
+        </button>
+        <button
+          className={`btn ${activeTab === 'members' ? 'primary' : ''}`}
+          onClick={() => setActiveTab('members')}
+          style={{ 
+            borderRadius: '8px 8px 0 0',
+            borderBottom: activeTab === 'members' ? '2px solid var(--accent)' : '2px solid transparent'
+          }}
+        >
+          👥 Mitglieder
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'vouchers' && (
+        <div>
+          <div className="helper" style={{ marginBottom: 8 }}>
+            Excel (.xlsx) oder camt.053 XML (.xml). Vorschau → Zuordnung prüfen → Import.
             <ul style={{ margin: '4px 0 0 16px' }}>
               <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
               <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden ignoriert.</li>
@@ -39,14 +78,24 @@ export function ImportPane({ notify }: ImportPaneProps) {
               <li>Bank-/Bar-Split: Alternativ die vier Spalten Bank+/-, Bar+/- verwenden (erzeugt ggf. mehrere Buchungen pro Zeile).</li>
             </ul>
           </div>
+          <ImportXlsxCard notify={notify} />
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}>📝 Log</button>
-        </div>
-      </div>
+      )}
 
-      {/* Full Excel/camt.053 XML import functionality */}
-      <ImportXlsxCard notify={notify} />
+      {activeTab === 'members' && (
+        <div>
+          <div className="helper" style={{ marginBottom: 8 }}>
+            Excel (.xlsx) mit Mitgliederdaten. Vorschau → Zuordnung prüfen → Import.
+            <ul style={{ margin: '4px 0 0 16px' }}>
+              <li>Pflichtfelder: Mitgliedsnummer, Eintrittsdatum und Name (oder Vor-/Nachname).</li>
+              <li>Optional: E-Mail, Telefon, Adresse, Status, Beitrag, SEPA-Daten, Notizen.</li>
+              <li>Adresse kann vollständig oder als Straße/PLZ/Ort aufgeteilt sein.</li>
+              <li>Bestehende Mitglieder können optional aktualisiert werden (nach Mitgliedsnummer).</li>
+            </ul>
+          </div>
+          <MembersImportCard notify={notify} />
+        </div>
+      )}
 
       {showLog && createPortal(
         <div className="modal-overlay" onClick={() => setShowLog(false)} role="dialog" aria-modal="true">
@@ -66,8 +115,9 @@ export function ImportPane({ notify }: ImportPaneProps) {
                   <thead>
                     <tr>
                       <th align="left">Zeit</th>
-                      <th align="left">Format</th>
+                      <th align="left">Typ</th>
                       <th align="right">Importiert</th>
+                      <th align="right">Aktualisiert</th>
                       <th align="right">Übersprungen</th>
                       <th align="right">Fehler</th>
                       <th align="left">Fehler-Datei</th>
@@ -76,13 +126,15 @@ export function ImportPane({ notify }: ImportPaneProps) {
                   <tbody>
                     {logRows.map((r, i) => {
                       const d = r.diff || {}
-                      const fmt = d.format || 'XLSX'
+                      const isMember = r.entity === 'members_import'
+                      const fmt = isMember ? 'Mitglieder' : (d.format || 'Buchungen')
                       const errCnt = Number(d.errorCount || 0)
                       return (
                         <tr key={r.id || i}>
                           <td>{new Date(r.createdAt || d.when || '').toLocaleString()}</td>
                           <td>{fmt}</td>
                           <td align="right">{d.imported ?? '—'}</td>
+                          <td align="right">{d.updated ?? '—'}</td>
                           <td align="right">{d.skipped ?? '—'}</td>
                           <td align="right" style={{ color: errCnt > 0 ? 'var(--danger)' : undefined }}>{errCnt}</td>
                           <td>{d.errorFilePath ? (
@@ -92,7 +144,7 @@ export function ImportPane({ notify }: ImportPaneProps) {
                       )
                     })}
                     {logRows.length === 0 && (
-                      <tr><td colSpan={6} className="helper">Keine Einträge vorhanden.</td></tr>
+                      <tr><td colSpan={7} className="helper">Keine Einträge vorhanden.</td></tr>
                     )}
                   </tbody>
                 </table>

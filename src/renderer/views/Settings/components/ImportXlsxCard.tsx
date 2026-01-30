@@ -142,44 +142,44 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     }
   ]
 
-  // Helper to render a single mapping field with label and select
+  // Helper to render a single mapping field with label and select (compact design)
   const Field = ({ keyName, tooltip }: { keyName: string; tooltip?: string }) => {
     const f = fieldKeys.find((k) => k.key === keyName)!
     const current = mapping[f.key] || ''
-    const requiredMark = f.required ? ' *' : ''
+    const isAssigned = !!current && !f.enumValues
     return (
-      <label key={f.key} title={tooltip} className="field-row">
-        <span className="field-label">
+      <div className="mapping-field" title={tooltip}>
+        <div className="mapping-field-label">
           {f.label}
-          {requiredMark}
-        </span>
+          {f.required && <span className="required-mark">*</span>}
+        </div>
         {f.enumValues ? (
           <select
-            className="input"
+            className="mapping-select"
             value={current}
             onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || null })}
           >
             {f.enumValues.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
+              <option key={v} value={v}>{v}</option>
             ))}
           </select>
         ) : (
           <select
-            className="input"
+            className="mapping-select"
             value={current}
             onChange={(e) => setMapping({ ...mapping, [f.key]: e.target.value || null })}
+            style={{
+              borderColor: isAssigned ? 'var(--success)' : undefined,
+              background: isAssigned ? 'color-mix(in oklab, var(--success) 8%, var(--bg))' : undefined
+            }}
           >
             <option value="">— nicht zuordnen —</option>
             {headers.map((h) => (
-              <option key={h} value={h}>
-                {h || '(leer)'}
-              </option>
+              <option key={h} value={h}>{h || '(leer)'}</option>
             ))}
           </select>
         )}
-      </label>
+      </div>
     )
   }
 
@@ -282,54 +282,37 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
             </ul>
           </div>
           <div className="helper">Ordne die Felder den Spaltenüberschriften deiner Datei zu.</div>
-          <div className="group-grid" style={{ marginTop: 8 }}>
-            <div className="field-group fg-meta">
-              <div className="group-title">📋 Basisdaten</div>
+          <div className="members-mapping-grid" style={{ marginTop: 8 }}>
+            <div className="mapping-section">
+              <div className="section-title">📋 Basisdaten</div>
               <Field keyName="date" tooltip="Datum der Buchung" />
               <Field keyName="description" tooltip="Beschreibung / Verwendungszweck" />
-              <Field
-                keyName="type"
-                tooltip="Art der Buchung: Einnahme (IN), Ausgabe (OUT), Umbuchung (TRANSFER)"
-              />
-              <Field
-                keyName="sphere"
-                tooltip="Sphäre aus der Datei. Wenn leer, wird die Standard-Sphäre genutzt."
-              />
-              <Field keyName="earmarkCode" tooltip="Zweckbindung als Code/Abkürzung" />
+              <Field keyName="type" tooltip="Art: IN, OUT, TRANSFER" />
+              <Field keyName="sphere" tooltip="Sphäre aus der Datei" />
+              <Field keyName="earmarkCode" tooltip="Zweckbindung als Code" />
             </div>
-            <div className="field-group fg-amounts">
-              <div className="group-title">💶 Beträge</div>
+            <div className="mapping-section">
+              <div className="section-title">💶 Beträge</div>
               <Field keyName="netAmount" tooltip="Netto-Betrag" />
-              <Field keyName="vatRate" tooltip="Umsatzsteuersatz in Prozent" />
+              <Field keyName="vatRate" tooltip="USt-Satz in %" />
               <Field keyName="grossAmount" tooltip="Brutto-Betrag" />
-              <Field keyName="inGross" tooltip="Einnahmen (Brutto) — alternative Spalte" />
-              <Field keyName="outGross" tooltip="Ausgaben (Brutto) — alternative Spalte" />
+              <Field keyName="inGross" tooltip="Einnahmen (Brutto)" />
+              <Field keyName="outGross" tooltip="Ausgaben (Brutto)" />
             </div>
-            <div className="field-group fg-payment">
-              <div className="group-title">💳 Zahlungsart</div>
+            <div className="mapping-section">
+              <div className="section-title">💳 Zahlung</div>
               <Field keyName="paymentMethod" tooltip="Zahlweg: BAR oder BANK" />
             </div>
-            <div className="field-group fg-accounts">
-              <div className="group-title">🏪 Kontenspalten</div>
-              <Field keyName="bankIn" tooltip="Bankkonto Einnahmen (+)" />
-              <Field keyName="bankOut" tooltip="Bankkonto Ausgaben (-)" />
-              <Field keyName="cashIn" tooltip="Barkonto Einnahmen (+)" />
-              <Field keyName="cashOut" tooltip="Barkonto Ausgaben (-)" />
+            <div className="mapping-section">
+              <div className="section-title">🏪 Konten</div>
+              <Field keyName="bankIn" tooltip="Bank Einnahmen (+)" />
+              <Field keyName="bankOut" tooltip="Bank Ausgaben (-)" />
+              <Field keyName="cashIn" tooltip="Bar Einnahmen (+)" />
+              <Field keyName="cashOut" tooltip="Bar Ausgaben (-)" />
             </div>
-            <div className="field-group fg-defaults">
-              <div className="group-title">⚙️ Standardwerte</div>
-              <div className="field-row" style={{ alignItems: 'center' }}>
-                <Field
-                  keyName="defaultSphere"
-                  tooltip="Fallback Sphäre, wenn keine Sphäre-Spalte zugeordnet ist"
-                />
-                <span
-                  className="badge badge-default"
-                  title="Wird verwendet, wenn keine Sphäre-Spalte gewählt ist"
-                >
-                  Fallback
-                </span>
-              </div>
+            <div className="mapping-section">
+              <div className="section-title">⚙️ Standard</div>
+              <Field keyName="defaultSphere" tooltip="Fallback Sphäre" />
             </div>
           </div>
           <details className="mapping-summary" style={{ marginTop: 8 }}>
@@ -371,11 +354,13 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         <div style={{ marginTop: 12 }}>
           <strong>Vorschau (erste 20 Zeilen)</strong>
           <div style={{ overflowX: 'auto', marginTop: 6 }}>
-            <table cellPadding={6}>
+            <table cellPadding={4} style={{ fontSize: 11 }}>
               <thead>
                 <tr>
+                  <th style={{ width: 30, textAlign: 'center' }}>#</th>
+                  <th style={{ width: 50, textAlign: 'center' }}>Status</th>
                   {headers.map((h) => (
-                    <th key={h} align="left">
+                    <th key={h} align="left" style={{ padding: '4px 6px' }}>
                       {h || '(leer)'}
                     </th>
                   ))}
@@ -383,20 +368,39 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               </thead>
               <tbody>
                 {sample.map((row, i) => {
-                  // If we have a recent result, color-code by status: green for imported, dim/red for skipped/errors.
-                  const st = result?.rowStatuses?.find(
-                    (rs) => rs.row === (headerRowIndex || 1) + 1 + i
-                  )
+                  const rowNum = (headerRowIndex || 1) + 1 + i
+                  const st = result?.rowStatuses?.find((rs) => rs.row === rowNum)
                   const bg = st
                     ? st.ok
                       ? 'color-mix(in oklab, var(--success) 12%, transparent)'
                       : 'color-mix(in oklab, var(--danger) 10%, transparent)'
                     : undefined
-                  const title = st?.message
                   return (
-                    <tr key={i} style={{ background: bg }} title={title}>
+                    <tr key={i} style={{ background: bg }} title={st?.message}>
+                      <td style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
+                        {rowNum}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {st ? (
+                          st.ok ? (
+                            <span style={{ fontSize: 9, color: 'var(--success)' }}>✓</span>
+                          ) : (
+                            <span style={{ fontSize: 9, color: 'var(--danger)' }}>✗</span>
+                          )
+                        ) : (
+                          <span style={{ fontSize: 9, color: 'var(--muted)' }}>—</span>
+                        )}
+                      </td>
                       {headers.map((h) => (
-                        <td key={h}>{String(row[h] ?? '')}</td>
+                        <td key={h} style={{
+                          padding: '4px 6px',
+                          maxWidth: 150,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {String(row[h] ?? '')}
+                        </td>
                       ))}
                     </tr>
                   )

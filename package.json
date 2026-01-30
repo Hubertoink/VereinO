@@ -22,7 +22,7 @@
     "start": "npm run dev"
   },
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "^12.6.2",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.2.5",
