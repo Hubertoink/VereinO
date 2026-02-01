@@ -691,247 +691,239 @@ export default function InvoicesView() {
 
       {form && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal invoice-modal invoices-modal-grid" onClick={e => e.stopPropagation()}>
-            <div className="card invoices-form-header">
-              <div className="invoices-form-header-top">
-                <div className="invoices-form-header-info">
-                  <h2 style={{ margin: 0 }}>{(() => {
-                    const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
-                    return form.mode === 'create' ? `${type} anlegen` : `${type} bearbeiten`
-                  })()}</h2>
-                </div>
-                <div className="invoices-form-header-actions">
-                  {form.mode === 'edit' && form.sourceRow?.status && <span className="badge" title="Zahlstatus">{String(form.sourceRow.status)}</span>}
-                  <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">✕</button>
-                </div>
-              </div>
-              <div className="helper invoices-form-header-helper">
-                <span>Buchungstyp: <strong style={{ color: form.draft.voucherType === 'IN' ? 'var(--success)' : 'var(--danger)' }}>{form.draft.voucherType}</strong></span>
-                <span>Betrag: <strong>{(() => { const a = parseAmount(form.draft.grossAmount); return a != null && a > 0 ? eurFmt.format(a) : '—' })()}</strong></span>
-                <span>Fällig: <strong>{form.draft.dueDate || '—'}</strong></span>
-                <span>Zahlweg: <strong>{form.draft.paymentMethod || '—'}</strong></span>
-                <span>Sphäre: <strong>{form.draft.sphere}</strong></span>
-              </div>
+          <div className="modal invoice-modal invoices-modal-redesign" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="invoices-modal-header">
+              <h2 style={{ margin: 0 }}>{(() => {
+                const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
+                return form.mode === 'create' ? `+ ${type}` : `${type} bearbeiten`
+              })()}</h2>
+              <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">×</button>
             </div>
 
-            {formError && <div className="invoices-text-danger">{formError}</div>}
+            {formError && <div className="invoices-text-danger" style={{ padding: '0 16px' }}>{formError}</div>}
 
-            <div className="invoices-form-grid">
-              <div className="card invoices-form-card">
-                {/* Reihenlayout angepasst */}
-                {/* Reihe 1: Datum | Fälligkeit */}
-                <div className="invoices-left-grid">
+            {/* Main Content - 2-Column Card Layout like Buchungen */}
+            <div className="invoices-modal-body">
+              {/* Left Column: Basis + Beschreibung & Tags */}
+              <div className="invoices-modal-left">
+                {/* Basis Card */}
+                <div className="card" style={{ padding: 10 }}>
+                  <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
+                  <div className="row">
+                    <div className="field">
+                      <label>Datum <span className="req-asterisk">*</span></label>
+                      <input className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined} />
+                    </div>
+                    <div className="field">
+                      <label>Art</label>
+                      <div className="btn-group" role="group">
+                        <button type="button" className={`btn ${form.draft.voucherType === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } }))}>IN</button>
+                        <button type="button" className={`btn ${form.draft.voucherType === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } }))}>OUT</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field">
+                      <label>Sphäre</label>
+                      <select className="input" value={form.draft.sphere} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, sphere: e.target.value as any } }))}>
+                        <option value="IDEELL">IDEELL</option>
+                        <option value="ZWECK">ZWECK</option>
+                        <option value="VERMOEGEN">VERMÖGEN</option>
+                        <option value="WGB">WGB</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Zahlweg</label>
+                      <div className="btn-group" role="group">
+                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } }))}>Bar</button>
+                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } }))}>Bank</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Beschreibung & Tags Card */}
+                <div className="card" style={{ padding: 10 }}>
+                  <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
                   <div className="field">
-                    <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                    <input className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined} />
-                    {requiredTouched && !form.draft.date && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Datum angeben</div>)}
-                  </div>
-                  <div className="field">
-                    <label>Fälligkeit</label>
-                    <input className="input" type="date" value={form.draft.dueDate || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, dueDate: e.target.value || null } }))} />
-                  </div>
-                  {/* Reihe 2: Partei */}
-                  <div className="field invoices-form-field-span2">
-                    <label>Partei <span className="req-asterisk" aria-hidden="true">*</span></label>
-                    <input className="input party-input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
-                    {requiredTouched && (!form.draft.party?.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Bitte Partei angeben</div>)}
-                  </div>
-                  {/* Reihe 3: Verbindlichkeitsnummer/Forderungsnummer + Betrag */}
-                  <div className="field">
-                    <label>{form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'} <span className="req-asterisk" aria-hidden="true">*</span></label>
-                    <input
-                      className="input"
-                      value={form.draft.invoiceNo || ''}
-                      onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))}
-                      placeholder="z. B. 2025-001"
-                      style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
-                      aria-label={form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'}
-                    />
-                    {requiredTouched && !(form.draft.invoiceNo || '').trim() && (
-                      <div className="helper" style={{ color: 'var(--danger)' }}>Bitte {form.draft.voucherType === 'IN' ? 'Forderungsnummer' : 'Verbindlichkeitsnummer'} angeben</div>
-                    )}
-                  </div>
-                  <div className="field">
-                    <label>Betrag (EUR) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                    <input className="input amount-input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} aria-label={`${form.draft.voucherType === 'IN' ? 'Forderungs' : 'Verbindlichkeits'}betrag in Euro`} />
-                    {/* Entfernte Helfer-Ausgabe des formatierten Betrags unter dem Eingabefeld (Duplikat) */}
-                  </div>
-                  {/* Reihe 4: Beschreibung (volle Breite) */}
-                  <div className="field invoices-form-field-span2">
                     <label>Beschreibung</label>
-                    <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="Kurzbeschreibung" />
+                    <input className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
                   </div>
-                  {/* Reihe 5: Zahlweg | Buchungstyp */}
-                  <div className="field">
-                    <label>Zahlweg</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button type="button" className="btn" style={{ width: 56, justifyContent: 'center', background: !form.draft.paymentMethod ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: '' } }))} title="Kein Zahlweg">—</button>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.paymentMethod === 'BAR' ? 'color-mix(in oklab, var(--accent) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } }))} title="Bar">💵 Bar</button>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.paymentMethod === 'BANK' ? 'color-mix(in oklab, var(--accent) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } }))} title="Bank">🏦 Bank</button>
-                    </div>
-                  </div>
-                  <div className="field">
-                    <label>Buchungstyp</label>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.voucherType === 'IN' ? 'color-mix(in oklab, var(--success) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } }))}>IN</button>
-                      <button type="button" className="btn" style={{ width: 80, justifyContent: 'center', background: form.draft.voucherType === 'OUT' ? 'color-mix(in oklab, var(--danger) 25%, transparent)' : undefined }} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } }))}>OUT</button>
-                    </div>
-                  </div>
-                  {/* Reihe 6: Tags (schmaler) */}
-                  <div className="field invoices-form-field-span2 invoices-tags-narrow">
-                    <TagsEditor label="Tags" value={form.draft.tags} onChange={tags => setForm(f => f && ({ ...f, draft: { ...f.draft, tags } }))} tagDefs={tags} className="tags-editor" />
-                  </div>
+                  <TagsEditor
+                    label="Tags"
+                    value={form.draft.tags}
+                    onChange={tags => setForm(f => f && ({ ...f, draft: { ...f.draft, tags } }))}
+                    tagDefs={tags}
+                  />
                 </div>
               </div>
 
-              <div className="card invoices-form-card">
-                <div className="field">
-                  <label>Sphäre <span className="helper">(Steuerlicher Bereich)</span></label>
-                  <select className="input" value={form.draft.sphere} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, sphere: e.target.value as any } }))} aria-label="Sphäre auswählen">
-                    <option value="IDEELL">IDEELL</option>
-                    <option value="ZWECK">ZWECK</option>
-                    <option value="VERMOEGEN">VERMÖGEN</option>
-                    <option value="WGB">WGB</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Zweckbindung</label>
-                  <select className="input" value={(form.draft.earmarkId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, earmarkId: e.target.value ? Number(e.target.value) : '' } }))} aria-label="Zweckbindung auswählen">
-                    <option value="">—</option>
-                    {earmarks.map(em => (<option key={em.id} value={em.id}>{em.code} – {em.name}</option>))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Budget</label>
-                  <select className="input" value={(form.draft.budgetId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, budgetId: e.target.value ? Number(e.target.value) : '' } }))} aria-label="Budget auswählen">
-                    <option value="">—</option>
-                    {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Auto-Buchung</label>
-                  <select className="input" value={form.draft.autoPost ? '1' : '0'} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, autoPost: e.target.value === '1' } }))} aria-label="Automatische Buchung">
-                    <option value="1">Ja</option>
-                    <option value="0">Nein</option>
-                  </select>
-                </div>
-
-                {form.mode === 'create' && (
+              {/* Right Column: Finanzen + Anhänge */}
+              <div className="invoices-modal-right">
+                {/* Finanzen Card */}
+                <div className="card" style={{ padding: 10 }}>
+                  <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                   <div className="field">
-                    <label>Dateien</label>
-                    <div onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const fl = e.dataTransfer?.files; if (fl && fl.length) setFormFiles(prev => [...prev, ...Array.from(fl)]) }} className="card" style={{ padding: 10, border: '1px dashed var(--muted)', background: 'color-mix(in oklab, var(--accent) 10%, transparent)' }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input ref={fileInputRef} type="file" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => { const f = Array.from(e.target.files || []); if (f.length) setFormFiles(prev => [...prev, ...f]); if (fileInputRef.current) fileInputRef.current.value = '' }} />
-                        <button className="btn" onClick={() => fileInputRef.current?.click()}>+ Dateien auswählen</button>
-                        <span className="helper">oder hierher ziehen</span>
-                      </div>
-                      {formFiles.length > 0 && (
-                        <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                          <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="center">Aktion</th></tr></thead>
-                          <tbody>
-                            {formFiles.map((f, i) => {
-                              const sizeMB = f.size != null ? (f.size / 1024 / 1024) : 0
-                              return (
-                                <tr key={i}>
-                                  <td className="invoices-file-name" title={f.name}>{f.name}</td>
-                                  <td align="right">{sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)} MB</td>
-                                  <td align="center"><button className="btn danger" onClick={() => removeFileAt(i)}>Entfernen</button></td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      )}
+                    <label>Partei <span className="req-asterisk">*</span></label>
+                    <input className="input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                  </div>
+                  <div className="row">
+                    <div className="field">
+                      <label>{form.draft.voucherType === 'IN' ? 'Forderungs-Nr.' : 'Verbindl.-Nr.'} <span className="req-asterisk">*</span></label>
+                      <input className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined} />
+                    </div>
+                    <div className="field">
+                      <label>Fälligkeit</label>
+                      <input className="input" type="date" value={form.draft.dueDate || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, dueDate: e.target.value || null } }))} />
                     </div>
                   </div>
-                )}
+                  <div className="row">
+                    <div className="field">
+                      <label>Betrag <span className="req-asterisk">*</span></label>
+                      <span className="adorn-wrap">
+                        <input className="input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} />
+                        <span className="adorn-suffix">€</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field">
+                      <label>Budget</label>
+                      <select className="input" value={(form.draft.budgetId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, budgetId: e.target.value ? Number(e.target.value) : '' } }))}>
+                        <option value="">—</option>
+                        {budgets.map(b => (<option key={b.id} value={b.id}>{b.year}{b.name ? ` – ${b.name}` : ''}</option>))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Zweckbindung</label>
+                      <select className="input" value={(form.draft.earmarkId ?? '') as any} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, earmarkId: e.target.value ? Number(e.target.value) : '' } }))}>
+                        <option value="">—</option>
+                        {earmarks.map(em => (<option key={em.id} value={em.id}>{em.code} – {em.name}</option>))}
+                      </select>
+                    </div>
+                  </div>
+                  {/* Auto-Buchung Toggle */}
+                  <div className="invoices-auto-post-inline">
+                    <label htmlFor="autoPostToggle">Auto-Buchung</label>
+                    <input
+                      type="checkbox"
+                      id="autoPostToggle"
+                      className="toggle"
+                      checked={form.draft.autoPost}
+                      onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, autoPost: e.target.checked } }))}
+                    />
+                  </div>
+                  <div className="helper" style={{ fontSize: 11 }}>Bei vollständiger Zahlung wird automatisch eine Buchung erstellt.</div>
+                </div>
 
-                {form.mode === 'edit' && (
-                  <div className="field">
-                    <label>Dateien</label>
-                    <div onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }} onDrop={async (e) => {
-                      e.preventDefault(); e.stopPropagation()
-                      const fl = e.dataTransfer?.files
-                      if (fl && fl.length && (form.draft as any).id) {
-                        for (const f of Array.from(fl)) {
-                          const buf = await f.arrayBuffer()
-                          let binary = ''
-                          const bytes = new Uint8Array(buf)
-                          const chunk = 0x8000
-                          for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any) }
-                          const dataBase64 = btoa(binary)
-                          await window.api?.invoiceFiles?.add?.({ invoiceId: (form.draft as any).id, fileName: f.name, dataBase64, mimeType: (f as any).type || undefined })
-                        }
-                        const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id })
-                        setEditInvoiceFiles(res?.files || [])
+                {/* Anhänge Card - Kompakt */}
+                <div 
+                  className="card" 
+                  style={{ padding: 10 }}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onDrop={async (e) => {
+                    e.preventDefault(); e.stopPropagation()
+                    const fl = e.dataTransfer?.files
+                    if (form.mode === 'create') {
+                      if (fl && fl.length) setFormFiles(prev => [...prev, ...Array.from(fl)])
+                    } else if (fl && fl.length && (form.draft as any).id) {
+                      for (const f of Array.from(fl)) {
+                        const buf = await f.arrayBuffer()
+                        let binary = ''
+                        const bytes = new Uint8Array(buf)
+                        const chunk = 0x8000
+                        for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any) }
+                        const dataBase64 = btoa(binary)
+                        await window.api?.invoiceFiles?.add?.({ invoiceId: (form.draft as any).id, fileName: f.name, dataBase64, mimeType: (f as any).type || undefined })
                       }
-                    }} className="card" style={{ padding: 10, border: '1px dashed var(--muted)', background: 'color-mix(in oklab, var(--accent) 10%, transparent)' }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input ref={editInvoiceFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
-                          const files = Array.from(e.target.files || [])
-                          try {
-                            if (files.length && (form.draft as any).id) {
-                              for (const f of files) {
-                                const buf = await f.arrayBuffer()
-                                let binary = ''
-                                const bytes = new Uint8Array(buf)
-                                const chunk = 0x8000
-                                for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any) }
-                                const dataBase64 = btoa(binary)
-                                await window.api?.invoiceFiles?.add?.({ invoiceId: (form.draft as any).id, fileName: f.name, dataBase64, mimeType: (f as any).type || undefined })
-                              }
-                              const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id })
-                              setEditInvoiceFiles(res?.files || [])
+                      const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id })
+                      setEditInvoiceFiles(res?.files || [])
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>Anhänge</strong>
+                    <input ref={form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
+                      const files = Array.from(e.target.files || [])
+                      if (form.mode === 'create') {
+                        if (files.length) setFormFiles(prev => [...prev, ...files])
+                        if (fileInputRef.current) fileInputRef.current.value = ''
+                      } else {
+                        try {
+                          if (files.length && (form.draft as any).id) {
+                            for (const f of files) {
+                              const buf = await f.arrayBuffer()
+                              let binary = ''
+                              const bytes = new Uint8Array(buf)
+                              const chunk = 0x8000
+                              for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any) }
+                              const dataBase64 = btoa(binary)
+                              await window.api?.invoiceFiles?.add?.({ invoiceId: (form.draft as any).id, fileName: f.name, dataBase64, mimeType: (f as any).type || undefined })
                             }
-                          } finally { if (editInvoiceFileInputRef.current) editInvoiceFileInputRef.current.value = '' }
-                        }} />
-                        <button className="btn" onClick={() => editInvoiceFileInputRef.current?.click?.()}>+ Dateien auswählen</button>
-                        <span className="helper">oder hierher ziehen</span>
-                      </div>
-                      <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                        <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="center">Aktion</th></tr></thead>
-                        <tbody>
-                          {(editInvoiceFiles || []).map((f) => {
-                            const sizeMB = f.size != null ? (Number(f.size) / 1024 / 1024) : null
-                            return (
-                              <tr key={f.id}>
-                                <td className="invoices-file-name" title={f.fileName}>{f.fileName}</td>
-                                <td align="right">{sizeMB != null ? (sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)) + ' MB' : '—'}</td>
-                                <td align="center"><button className="btn danger" onClick={async () => {
-                                  try { await window.api?.invoiceFiles?.delete?.({ fileId: f.id }); const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id }); setEditInvoiceFiles(res?.files || []) } catch (e: any) { alert(e?.message || String(e)) }
-                                }}>Entfernen</button></td>
-                              </tr>
-                            )
-                          })}
-                          {(editInvoiceFiles || []).length === 0 && <tr><td colSpan={3} className="helper">Keine Dateien.</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
+                            const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id })
+                            setEditInvoiceFiles(res?.files || [])
+                          }
+                        } finally { if (editInvoiceFileInputRef.current) editInvoiceFileInputRef.current.value = '' }
+                      }
+                    }} />
+                    <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}>+ Datei(en)</button>
                   </div>
-                )}
+                  {(() => {
+                    const filesList = form.mode === 'create' ? formFiles : editInvoiceFiles
+                    if (filesList.length > 0) {
+                      return (
+                        <ul style={{ margin: '6px 0 0', paddingLeft: 16, fontSize: 12 }}>
+                          {form.mode === 'create' ? formFiles.map((f, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                              <button type="button" className="btn ghost" style={{ padding: '2px 6px', fontSize: 12 }} onClick={() => removeFileAt(i)}>×</button>
+                            </li>
+                          )) : editInvoiceFiles.map((f) => (
+                            <li key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</span>
+                              <button type="button" className="btn ghost" style={{ padding: '2px 6px', fontSize: 12 }} onClick={async () => {
+                                try { await window.api?.invoiceFiles?.delete?.({ fileId: f.id }); const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id }); setEditInvoiceFiles(res?.files || []) } catch (e: any) { alert(e?.message || String(e)) }
+                              }}>×</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    }
+                    return (
+                      <div 
+                        className="invoices-dropzone-compact"
+                        onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}
+                      >
+                        <span style={{ fontSize: 18 }}>📎</span>
+                        <span className="helper" style={{ fontSize: 11 }}>Dateien hierher ziehen oder klicken</span>
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
             </div>
 
-            {(() => {
-              const missing: string[] = []
-              if (!form!.draft.date) missing.push('Datum')
-              if (!(form!.draft.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
-              if (!form!.draft.party?.trim()) missing.push('Partei')
-              const a = parseAmount(form!.draft.grossAmount)
-              if (a == null || a <= 0) missing.push('Betrag')
-              return (
-                <div className="invoices-form-footer">
-                  <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-                  <div className="invoices-form-footer-actions">
-                    {form.mode === 'edit' && form.draft.id && (
-                      <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
-                    )}
-                    <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                    <button className="btn primary" onClick={() => { setRequiredTouched(true); if (missing.length > 0) { setMissingRequired(missing); return } saveForm() }}>Speichern</button>
-                  </div>
-                </div>
-              )
-            })()}
+            {/* Footer */}
+            <div className="invoices-modal-footer">
+              <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {form.mode === 'edit' && form.draft.id && (
+                  <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
+                )}
+                <button className="btn primary" onClick={() => {
+                  setRequiredTouched(true)
+                  const missing: string[] = []
+                  if (!form!.draft.date) missing.push('Datum')
+                  if (!(form!.draft.invoiceNo || '').trim()) missing.push('Verbindlichkeitsnummer')
+                  if (!form!.draft.party?.trim()) missing.push('Partei')
+                  const a = parseAmount(form!.draft.grossAmount)
+                  if (a == null || a <= 0) missing.push('Betrag')
+                  if (missing.length > 0) { setMissingRequired(missing); return }
+                  saveForm()
+                }}>Speichern</button>
+              </div>
+            </div>
             <datalist id="party-suggestions">{partySuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>
             <datalist id="desc-suggestions">{descSuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>
           </div>

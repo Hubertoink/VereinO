@@ -648,6 +648,104 @@
 .invoices-missing-list { margin-top: 6px; }
 .invoices-missing-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
+/* Invoices Modal Redesign - Matching Buchungen Modal Style */
+.invoices-modal-redesign {
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 96vw);
+  max-height: min(600px, 88vh);
+  padding: 0;
+  overflow: hidden;
+}
+
+.invoices-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.invoices-modal-header h2 {
+  font-size: 1.1rem;
+}
+
+.invoices-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.invoices-modal-left,
+.invoices-modal-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.invoices-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Auto-Buchung Inline Toggle */
+.invoices-auto-post-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  margin-top: 6px;
+}
+
+.invoices-auto-post-inline label {
+  margin: 0;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Compact dropzone */
+.invoices-dropzone-compact {
+  margin-top: 6px;
+  padding: 12px;
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.invoices-dropzone-compact:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+/* Responsive: Stack on smaller screens */
+@media (max-width: 768px) {
+  .invoices-modal-body {
+    grid-template-columns: 1fr;
+  }
+  
+  .invoices-modal-redesign {
+    max-height: 90vh;
+  }
+}
+
 /* Tiny table preview */
 /* Inline label + control */
 .label-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
