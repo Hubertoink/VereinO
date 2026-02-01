@@ -6,6 +6,37 @@ import { MembersImportCard } from '../components/MembersImportCard'
 
 type ImportTab = 'vouchers' | 'members'
 
+// Lucide-style icon props
+const iconProps = {
+  width: 16,
+  height: 16,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+}
+
+// Vouchers/Receipt icon
+const VouchersIcon = () => (
+  <svg {...iconProps}>
+    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+    <path d="M8 10h8" />
+    <path d="M8 14h4" />
+  </svg>
+)
+
+// Members/Users icon
+const MembersIcon = () => (
+  <svg {...iconProps}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
 /**
  * ImportPane - Data Import (XLSX & camt.053 XML)
  * Provides full import functionality: file upload, preview, mapping, and execution.
@@ -49,20 +80,26 @@ export function ImportPane({ notify }: ImportPaneProps) {
           onClick={() => setActiveTab('vouchers')}
           style={{ 
             borderRadius: '8px 8px 0 0',
-            borderBottom: activeTab === 'vouchers' ? '2px solid var(--accent)' : '2px solid transparent'
+            borderBottom: activeTab === 'vouchers' ? '2px solid var(--accent)' : '2px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
           }}
         >
-          📋 Buchungen
+          <VouchersIcon /> Buchungen
         </button>
         <button
           className={`btn ${activeTab === 'members' ? 'primary' : ''}`}
           onClick={() => setActiveTab('members')}
           style={{ 
             borderRadius: '8px 8px 0 0',
-            borderBottom: activeTab === 'members' ? '2px solid var(--accent)' : '2px solid transparent'
+            borderBottom: activeTab === 'members' ? '2px solid var(--accent)' : '2px solid transparent',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
           }}
         >
-          👥 Mitglieder
+          <MembersIcon /> Mitglieder
         </button>
       </div>
 

@@ -89,8 +89,9 @@ const PreviewTable = memo(function PreviewTable({
   
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-        <strong>Vorschau (erste 20 Zeilen)</strong>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+        <strong>Vorschau</strong>
+        <span className="helper" style={{ fontSize: 11 }}>Pflichtfelder können direkt in der Tabelle bearbeitet werden</span>
         {hintRowCount > 0 && (
           <span style={{ 
             fontSize: 11, 

@@ -352,7 +352,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       )}
       {sample.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <strong>Vorschau (erste 20 Zeilen)</strong>
+          <strong>Vorschau</strong>
           <div style={{ overflowX: 'auto', marginTop: 6 }}>
             <table cellPadding={4} style={{ fontSize: 11 }}>
               <thead>
