@@ -4,6 +4,8 @@ import { createVoucher } from '../repositories/vouchers'
 import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
+import { dialog, app } from 'electron'
+import path from 'path'
 
 export type ImportPreview = {
     headers: string[]
@@ -607,17 +609,19 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     tips.getColumn(1).width = 140
     tips.getRow(10).alignment = { vertical: 'top', wrapText: true }
 
-    // Save file
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const os = await import('node:os')
+    // Save file with dialog
     let filePath = destPath
     if (!filePath) {
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-        const when = new Date()
-        const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-        filePath = path.join(baseDir, `Import_Vorlage_${stamp}.xlsx`)
+        const result = await dialog.showSaveDialog({
+            title: 'Buchungen-Vorlage speichern',
+            defaultPath: path.join(app.getPath('downloads'), 'Buchungen-Vorlage.xlsx'),
+            filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+        })
+        
+        if (result.canceled || !result.filePath) {
+            throw new Error('Abbruch durch Benutzer')
+        }
+        filePath = result.filePath
     }
     await wb.xlsx.writeFile(filePath!)
     return { filePath: filePath! }

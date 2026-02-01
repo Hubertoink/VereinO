@@ -572,12 +572,22 @@ export async function createMembersTemplate(): Promise<{ filePath: string }> {
   // Set columns
   ws.columns = columns.map(c => ({ header: c.header, key: c.key, width: c.width }))
   
+  // Required column indices (1-based): Mitgliedsnummer (1), Eintrittsdatum (12)
+  const requiredColumnIndices = [1, 12] // memberNo and join_date
+  
   // Style header row
   const headerRow = ws.getRow(1)
   headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } }
   headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
   headerRow.height = 28
+  
+  // Apply yellow background to required columns
+  requiredColumnIndices.forEach(colIdx => {
+    const cell = headerRow.getCell(colIdx)
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } } // Light yellow
+    cell.font = { bold: true, color: { argb: 'FF000000' } } // Black text for contrast
+  })
   
   // Add hint row
   const hintRow = ws.addRow(columns.map(c => c.hint))
