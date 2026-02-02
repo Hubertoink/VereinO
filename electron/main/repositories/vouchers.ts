@@ -1063,8 +1063,8 @@ export function deleteVoucherFile(fileId: number) {
 // Junction table functions for multiple budgets/earmarks per voucher
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type VoucherBudgetAssignment = { id: number; budgetId: number; amount: number; label?: string }
-export type VoucherEarmarkAssignment = { id: number; earmarkId: number; amount: number; code?: string; name?: string }
+export type VoucherBudgetAssignment = { id: number; budgetId: number; amount: number; label?: string; color?: string | null }
+export type VoucherEarmarkAssignment = { id: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
 
 /** Get all budget assignments for a voucher */
 export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
@@ -1076,7 +1076,8 @@ export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] 
                    WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
                    WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
                    ELSE printf('%04d-%s', b.year, b.sphere)
-               END as label
+               END as label,
+               b.color
         FROM voucher_budgets vb
         JOIN budgets b ON b.id = vb.budget_id
         WHERE vb.voucher_id = ?
@@ -1090,7 +1091,7 @@ export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[
     const d = getDb()
     const rows = d.prepare(`
         SELECT ve.id, ve.earmark_id as earmarkId, ve.amount,
-               e.code, e.name
+               e.code, e.name, e.color
         FROM voucher_earmarks ve
         JOIN earmarks e ON e.id = ve.earmark_id
         WHERE ve.voucher_id = ?

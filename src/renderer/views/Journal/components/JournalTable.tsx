@@ -31,6 +31,10 @@ function saveColumnWidths(widths: Record<string, number>) {
     } catch { /* ignore */ }
 }
 
+// Types for multiple budget/earmark assignments
+type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
+type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
+
 interface JournalTableProps {
     rows: Array<{
         id: number
@@ -52,6 +56,9 @@ interface JournalTableProps {
         budgetId?: number | null
         budgetLabel?: string | null
         tags?: string[]
+        // Multiple assignments
+        budgets?: BudgetAssignment[]
+        earmarksAssigned?: EarmarkAssignment[]
     }>
     order: string[]
     cols: Record<string, boolean>
@@ -302,22 +309,62 @@ export default function JournalTable({
                 </div>
             </td>
         ) : k === 'earmark' ? (
-            <td key={k} align="center">{r.earmarkCode ? (() => {
-                const em = earmarks.find(e => e.code === r.earmarkCode)
-                const bg = em?.color
-                const fg = contrastText(bg)
-                const id = r.earmarkId as number | null | undefined
-                return (
-                    <button
-                        className="badge-earmark"
-                        title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
-                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                        onClick={(e) => { e.stopPropagation(); if (id != null) onEarmarkClick?.(id); }}
-                    >
-                        {r.earmarkCode}
-                    </button>
-                )
-            })() : ''}</td>
+            <td key={k} align="center">
+                {(() => {
+                    // Use earmarksAssigned array if available, otherwise fall back to single earmark
+                    const assignments = r.earmarksAssigned && r.earmarksAssigned.length > 0 
+                        ? r.earmarksAssigned 
+                        : r.earmarkId && r.earmarkCode 
+                            ? [{ earmarkId: r.earmarkId, code: r.earmarkCode, amount: 0 }] 
+                            : []
+                    
+                    if (assignments.length === 0) return ''
+                    
+                    // Function to truncate text for table display
+                    const truncate = (text: string, maxLen: number = 8) => 
+                        text.length > maxLen ? text.slice(0, maxLen) + '…' : text
+                    
+                    return (
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {assignments.slice(0, 3).map((ea: any, idx: number) => {
+                                const code = ea.code || earmarks.find(e => e.id === ea.earmarkId)?.code || `#${ea.earmarkId}`
+                                const em = earmarks.find(e => e.id === ea.earmarkId || e.code === code)
+                                const bg = ea.color || em?.color
+                                const fg = contrastText(bg)
+                                const fullLabel = code
+                                const displayLabel = truncate(code)
+                                return (
+                                    <button
+                                        key={idx}
+                                        className="badge-earmark"
+                                        title={`${fullLabel}${ea.amount ? ` (${eurFmt.format(ea.amount)})` : ''}`}
+                                        style={{ 
+                                            background: bg || undefined, 
+                                            color: bg ? fg : undefined, 
+                                            cursor: 'pointer', 
+                                            border: bg ? `1px solid ${bg}` : undefined,
+                                            fontSize: 10,
+                                            padding: '2px 4px',
+                                            maxWidth: 70,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); if (ea.earmarkId) onEarmarkClick?.(ea.earmarkId); }}
+                                    >
+                                        {displayLabel}
+                                    </button>
+                                )
+                            })}
+                            {assignments.length > 3 && (
+                                <span className="badge" style={{ fontSize: 10, padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
+                                    +{assignments.length - 3}
+                                </span>
+                            )}
+                        </div>
+                    )
+                })()}
+            </td>
         ) : k === 'paymentMethod' ? (
             <td key={k}>
                 {r.type === 'TRANSFER' ? (
@@ -346,23 +393,60 @@ export default function JournalTable({
                 )}
             </td>
         ) : k === 'budget' ? (
-            <td key={k} align="center">{r.budgetLabel ? (
-                (() => {
-                    const bg = (r as any).budgetColor || undefined
-                    const fg = contrastText(bg)
-                    const id = r.budgetId as number | null | undefined
+            <td key={k} align="center">
+                {(() => {
+                    // Use budgets array if available, otherwise fall back to single budget
+                    const assignments = r.budgets && r.budgets.length > 0 
+                        ? r.budgets 
+                        : r.budgetId && r.budgetLabel 
+                            ? [{ budgetId: r.budgetId, label: r.budgetLabel, amount: 0, color: (r as any).budgetColor }] 
+                            : []
+                    
+                    if (assignments.length === 0) return ''
+                    
+                    // Function to truncate text for table display
+                    const truncate = (text: string, maxLen: number = 8) => 
+                        text.length > maxLen ? text.slice(0, maxLen) + '…' : text
+                    
                     return (
-                        <button
-                            className="badge-budget"
-                            title={`Nach Budget ${r.budgetLabel} filtern`}
-                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer', border: bg ? `1px solid ${bg}` : undefined }}
-                            onClick={(e) => { e.stopPropagation(); if (id != null) onBudgetClick?.(id); }}
-                        >
-                            {r.budgetLabel}
-                        </button>
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {assignments.slice(0, 3).map((ba: any, idx: number) => {
+                                const label = ba.label || `Budget #${ba.budgetId}`
+                                const bg = ba.color || undefined
+                                const fg = contrastText(bg)
+                                const displayLabel = truncate(label)
+                                return (
+                                    <button
+                                        key={idx}
+                                        className="badge-budget"
+                                        title={`${label}${ba.amount ? ` (${eurFmt.format(ba.amount)})` : ''}`}
+                                        style={{ 
+                                            background: bg, 
+                                            color: bg ? fg : undefined, 
+                                            cursor: 'pointer', 
+                                            border: bg ? `1px solid ${bg}` : undefined,
+                                            fontSize: 10,
+                                            padding: '2px 4px',
+                                            maxWidth: 70,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); if (ba.budgetId) onBudgetClick?.(ba.budgetId); }}
+                                    >
+                                        {displayLabel}
+                                    </button>
+                                )
+                            })}
+                            {assignments.length > 3 && (
+                                <span className="badge" style={{ fontSize: 10, padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
+                                    +{assignments.length - 3}
+                                </span>
+                            )}
+                        </div>
                     )
-                })()
-            ) : ''}</td>
+                })()}
+            </td>
         ) : k === 'attachments' ? (
             <td key={k} align="center">{(r.fileCount && r.fileCount > 0) ? <span className="badge" title={`${r.fileCount} Anhang${r.fileCount > 1 ? 'e' : ''}`}>📎</span> : ''}</td>
         ) : k === 'net' ? (

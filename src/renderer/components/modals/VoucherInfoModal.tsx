@@ -2,6 +2,10 @@ import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { IconBank, IconCash, IconArrow } from '../../utils/icons'
 
+// Types for multiple budget/earmark assignments
+type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
+type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
+
 type VoucherInfo = {
   id: number
   voucherNo: string
@@ -19,6 +23,9 @@ type VoucherInfo = {
   budgetLabel?: string | null
   budgetColor?: string | null
   tags?: string[]
+  // Multiple assignments
+  budgets?: BudgetAssignment[]
+  earmarksAssigned?: EarmarkAssignment[]
 }
 
 interface VoucherInfoModalProps {
@@ -49,12 +56,25 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   
-  // Find earmark with color
-  const earmark = earmarks.find(e => e.id === voucher.earmarkId)
-  const earmarkColor = earmark?.color || null
+  // Build budget assignments list
+  const budgetAssignments: BudgetAssignment[] = voucher.budgets && voucher.budgets.length > 0
+    ? voucher.budgets
+    : voucher.budgetId && voucher.budgetLabel
+      ? [{ budgetId: voucher.budgetId, label: voucher.budgetLabel, amount: 0, color: voucher.budgetColor }]
+      : []
   
-  // Budget color comes from voucher row data
-  const budgetColor = voucher.budgetColor || null
+  // Build earmark assignments list
+  const earmarkAssignments: EarmarkAssignment[] = voucher.earmarksAssigned && voucher.earmarksAssigned.length > 0
+    ? voucher.earmarksAssigned
+    : voucher.earmarkId && voucher.earmarkCode
+      ? [{ earmarkId: voucher.earmarkId, code: voucher.earmarkCode, amount: 0 }]
+      : []
+  
+  // Enrich earmark assignments with colors from earmarks list
+  const enrichedEarmarks = earmarkAssignments.map(ea => {
+    const found = earmarks.find(e => e.id === ea.earmarkId || e.code === ea.code)
+    return { ...ea, color: ea.color || found?.color || null, code: ea.code || found?.code || `#${ea.earmarkId}` }
+  })
   
   // Build tag display info
   const tagList = (voucher.tags || []).map(tagName => {
@@ -70,8 +90,12 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     paymentLabel = voucher.paymentMethod === 'BAR' ? 'Bar' : voucher.paymentMethod === 'BANK' ? 'Bank' : '-'
   }
   
-  const budgetDisplay = voucher.budgetLabel || '-'
-  const earmarkDisplay = voucher.earmarkCode || '-'
+  const budgetDisplay = budgetAssignments.length > 0 
+    ? budgetAssignments.map(b => b.label || `#${b.budgetId}`).join(', ') 
+    : '-'
+  const earmarkDisplay = enrichedEarmarks.length > 0 
+    ? enrichedEarmarks.map(e => e.code).join(', ') 
+    : '-'
   const tagsDisplay = voucher.tags && voucher.tags.length > 0 ? voucher.tags.join(', ') : '-'
 
   // Escape key handler
@@ -219,45 +243,61 @@ Tags: ${tagsDisplay}`
           </div>
 
           <div className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'start' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Budget:</span>
-              <div>
-                {voucher.budgetLabel ? (
-                  <span 
-                    className="badge-budget" 
-                    style={{ 
-                      background: budgetColor || undefined, 
-                      color: budgetColor ? contrastText(budgetColor) : undefined,
-                      border: budgetColor ? `1px solid ${budgetColor}` : undefined,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      display: 'inline-block'
-                    }}
-                  >
-                    {voucher.budgetLabel}
-                  </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {budgetAssignments.length > 0 ? (
+                  budgetAssignments.map((ba, idx) => {
+                    const bg = ba.color || undefined
+                    return (
+                      <span 
+                        key={idx}
+                        className="badge-budget" 
+                        style={{ 
+                          background: bg, 
+                          color: bg ? contrastText(bg) : undefined,
+                          border: bg ? `1px solid ${bg}` : undefined,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          display: 'inline-block'
+                        }}
+                        title={ba.amount ? `${eurFmt.format(ba.amount)}` : undefined}
+                      >
+                        {ba.label || `#${ba.budgetId}`}
+                        {ba.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 11 }}>({eurFmt.format(ba.amount)})</span> : null}
+                      </span>
+                    )
+                  })
                 ) : (
                   <span>-</span>
                 )}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'start' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zweckbindung:</span>
-              <div>
-                {voucher.earmarkCode ? (
-                  <span 
-                    className="badge-earmark" 
-                    style={{ 
-                      background: earmarkColor || undefined, 
-                      color: earmarkColor ? contrastText(earmarkColor) : undefined,
-                      border: earmarkColor ? `1px solid ${earmarkColor}` : undefined,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      display: 'inline-block'
-                    }}
-                  >
-                    {voucher.earmarkCode}
-                  </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {enrichedEarmarks.length > 0 ? (
+                  enrichedEarmarks.map((ea, idx) => {
+                    const bg = ea.color || undefined
+                    return (
+                      <span 
+                        key={idx}
+                        className="badge-earmark" 
+                        style={{ 
+                          background: bg, 
+                          color: bg ? contrastText(bg) : undefined,
+                          border: bg ? `1px solid ${bg}` : undefined,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          display: 'inline-block'
+                        }}
+                        title={ea.amount ? `${eurFmt.format(ea.amount)}` : undefined}
+                      >
+                        {ea.code}
+                        {ea.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 11 }}>({eurFmt.format(ea.amount)})</span> : null}
+                      </span>
+                    )
+                  })
                 ) : (
                   <span>-</span>
                 )}

@@ -263,14 +263,16 @@ export const VouchersListOutput = z.object({
                 id: z.number(),
                 budgetId: z.number(),
                 amount: z.number(),
-                label: z.string().optional()
+                label: z.string().optional(),
+                color: z.string().nullable().optional()
             })).optional(),
             earmarksAssigned: z.array(z.object({
                 id: z.number(),
                 earmarkId: z.number(),
                 amount: z.number(),
                 code: z.string().optional(),
-                name: z.string().optional()
+                name: z.string().optional(),
+                color: z.string().nullable().optional()
             })).optional()
         })
     ),

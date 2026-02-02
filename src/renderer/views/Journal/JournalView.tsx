@@ -6,8 +6,8 @@ import TagsEditor from '../../components/TagsEditor'
 import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 
 // Type für Voucher-Zeilen
-type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string }
-type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string }
+type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
+type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
 
 type VoucherRow = {
     id: number
