@@ -210,6 +210,42 @@ function AppInner() {
 
     // Auto-backup prompt (renderer-side modal)
     const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
+
+    // Pre-update backup toast (sent from main process)
+    useEffect(() => {
+        const offOk = (window as any).api?.db?.onPreUpdateBackup?.((info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => {
+            notify(
+                'success',
+                `Update erkannt (${info.fromVersion} → ${info.toVersion}). Sicherheits-Backup erstellt.`,
+                9000,
+                {
+                    label: 'Ordner öffnen',
+                    onClick: () => {
+                        try { (window as any).api?.backup?.openFolder?.() } catch { }
+                    }
+                }
+            )
+        })
+
+        const offFail = (window as any).api?.db?.onPreUpdateBackupFailed?.((info: { fromVersion: string; toVersion: string; error: string }) => {
+            notify(
+                'warn',
+                `Update erkannt (${info.fromVersion} → ${info.toVersion}), aber Sicherheits-Backup fehlgeschlagen: ${info.error}`,
+                12000,
+                {
+                    label: 'Backup-Ordner',
+                    onClick: () => {
+                        try { (window as any).api?.backup?.openFolder?.() } catch { }
+                    }
+                }
+            )
+        })
+
+        return () => {
+            try { offOk?.() } catch { }
+            try { offFail?.() } catch { }
+        }
+    }, [notify])
     useEffect(() => {
         // Decide locally if a prompt should be shown; mirrors logic from main but with modal UX
         let disposed = false

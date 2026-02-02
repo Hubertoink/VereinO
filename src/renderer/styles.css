@@ -1630,9 +1630,20 @@ svg text {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Ensure modals remain interactive even over Electron drag regions */
+    -webkit-app-region: no-drag;
     /* Ensure overlay sits above header (z-index: 1000), FAB (3000), and most overlays */
     z-index: 5000; /* below toasts (9999) */
     animation: modalFadeIn 0.2s ease-out;
+}
+
+/* When the window is short, avoid placing modal header under the titlebar/top nav. */
+@media (max-height: 760px) {
+    .modal-overlay {
+        align-items: flex-start;
+        padding: 64px 12px 12px;
+        overflow-y: auto;
+    }
 }
 
 @keyframes modalFadeIn {
@@ -1708,6 +1719,7 @@ svg text {
     padding: 16px;
     max-height: 80vh;
     overflow: auto;
+    -webkit-app-region: no-drag;
     animation: modalSlideUp 0.25s ease-out;
 }
 
@@ -1719,6 +1731,7 @@ svg text {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    -webkit-app-region: no-drag;
     animation: modalSlideUp 0.25s ease-out;
 }
 

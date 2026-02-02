@@ -155,6 +155,20 @@ contextBridge.exposeInMainWorld('api', {
             const handler = (_: any, info: { message: string }) => { try { cb(info) } catch { } }
             ipcRenderer.on('db:initFailed', handler)
             return () => ipcRenderer.removeListener('db:initFailed', handler)
+        },
+        onPreUpdateBackup: (cb: (info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => void) => {
+            const handler = (_: any, info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => {
+                try { cb(info) } catch { }
+            }
+            ipcRenderer.on('db:preUpdateBackup', handler)
+            return () => ipcRenderer.removeListener('db:preUpdateBackup', handler)
+        },
+        onPreUpdateBackupFailed: (cb: (info: { fromVersion: string; toVersion: string; error: string }) => void) => {
+            const handler = (_: any, info: { fromVersion: string; toVersion: string; error: string }) => {
+                try { cb(info) } catch { }
+            }
+            ipcRenderer.on('db:preUpdateBackupFailed', handler)
+            return () => ipcRenderer.removeListener('db:preUpdateBackupFailed', handler)
         }
     },
     quotes: {

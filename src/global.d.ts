@@ -194,6 +194,10 @@ declare global {
                     }>
                     apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) => Promise<{ ok: boolean }>
                 }
+
+                onInitFailed?: (cb: (info: { message: string }) => void) => () => void
+                onPreUpdateBackup?: (cb: (info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => void) => () => void
+                onPreUpdateBackupFailed?: (cb: (info: { fromVersion: string; toVersion: string; error: string }) => void) => () => void
             }
             organizations: {
                 list: () => Promise<{ organizations: Array<{ id: string; name: string; dbRoot: string; createdAt: string; isActive: boolean }> }>

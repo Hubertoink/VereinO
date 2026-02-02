@@ -38,6 +38,7 @@ let db: DB | undefined
 // Simple app-level JSON config (outside DB) to remember custom DB location
 type AppConfig = { 
     dbRoot?: string
+    lastRunVersion?: string
     activeOrgId?: string
     organizations?: Array<{
         id: string
