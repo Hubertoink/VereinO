@@ -1,6 +1,9 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA } from '../../hooks/useQuickAdd'
+
+type BudgetAssignment = { budgetId: number; amount: number }
+type EarmarkAssignment = { earmarkId: number; amount: number }
 
 interface QuickAddModalProps {
     qa: QA
@@ -14,10 +17,33 @@ interface QuickAddModalProps {
     fileInputRef: React.RefObject<HTMLInputElement>
     fmtDate: (d: string) => string
     eurFmt: Intl.NumberFormat
-    budgetsForEdit: Array<{ id: number; label: string }>
-    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
+    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
+    earmarks: Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
+}
+
+function inRange(dateISO: string, startISO?: string | null, endISO?: string | null) {
+    if (startISO && dateISO < startISO) return false
+    if (endISO && dateISO > endISO) return false
+    return true
+}
+
+function budgetEffectiveRange(b: { year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }) {
+    const enforce = !!b.enforceTimeRange
+    if (!enforce) return { enforce: false as const, start: null as string | null, end: null as string | null }
+
+    const year = typeof b.year === 'number' ? b.year : null
+    const start = b.startDate ?? (year != null ? `${year}-01-01` : null)
+    const end = b.endDate ?? (year != null ? `${year}-12-31` : null)
+    return { enforce: true as const, start, end }
+}
+
+function fmtRange(start?: string | null, end?: string | null) {
+    if (start && end) return `${start} – ${end}`
+    if (start) return `ab ${start}`
+    if (end) return `bis ${end}`
+    return ''
 }
 
 /**
@@ -43,6 +69,44 @@ export default function QuickAddModal({
     tagDefs,
     descSuggest
 }: QuickAddModalProps) {
+    const grossAmt = (() => {
+        if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
+        if ((qa as any).mode === 'GROSS') return Number((qa as any).grossAmount || 0)
+        const n = Number(qa.netAmount || 0)
+        const v = Number(qa.vatRate || 0)
+        return Math.round((n * (1 + v / 100)) * 100) / 100
+    })()
+
+    const budgetsList: BudgetAssignment[] = ((qa as any).budgets || [])
+    const earmarksList: EarmarkAssignment[] = ((qa as any).earmarksAssigned || [])
+
+    const invalidBudgetIds = new Set(
+        budgetsList
+            .filter((b) => !!b.budgetId)
+            .filter((b) => {
+                const info = budgetsForEdit.find((x) => x.id === b.budgetId)
+                if (!info) return false
+                const eff = budgetEffectiveRange(info)
+                if (!eff.enforce) return false
+                return !inRange(qa.date, eff.start, eff.end)
+            })
+            .map((b) => b.budgetId)
+    )
+
+    const invalidEarmarkIds = new Set(
+        earmarksList
+            .filter((e) => !!e.earmarkId)
+            .filter((e) => {
+                const em = earmarks.find((x) => x.id === e.earmarkId)
+                if (!em) return false
+                if (!em.enforceTimeRange) return false
+                return !inRange(qa.date, em.startDate ?? null, em.endDate ?? null)
+            })
+            .map((e) => e.earmarkId)
+    )
+
+    const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
+
     return (
         <div className="modal-overlay">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
@@ -55,7 +119,7 @@ export default function QuickAddModal({
                     </button>
                 </header>
                 
-                <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+                <form onSubmit={(e) => { e.preventDefault(); if (!hasOutOfRange) onSave(); }}>
                     {/* Live Summary */}
                     <div className="card summary-card">
                         <div className="helper">Zusammenfassung</div>
@@ -226,23 +290,196 @@ export default function QuickAddModal({
                                 )}
                             </div>
                             <div className="row">
-                                <div className="field">
-                                    <label>Budget</label>
-                                    <select value={(qa as any).budgetId ?? ''} onChange={(e) => setQa({ ...qa, budgetId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Budget auswählen">
-                                        <option value="">—</option>
-                                        {budgetsForEdit.map(b => (
-                                            <option key={b.id} value={b.id}>{b.label}</option>
-                                        ))}
-                                    </select>
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <div className="helper">Zeitgebundene Budgets/Zweckbindungen sind außerhalb des Zeitraums deaktiviert. Wenn das Buchungsdatum geändert wird, müssen ungültige Zuordnungen entfernt oder das Datum angepasst werden.</div>
+                                    {hasOutOfRange && (
+                                        <div className="helper" style={{ color: 'var(--danger)', marginTop: 6 }}>⚠ Es sind Zuordnungen außerhalb des gültigen Zeitraums ausgewählt. Speichern ist blockiert.</div>
+                                    )}
                                 </div>
-                                <div className="field">
-                                    <label>Zweckbindung</label>
-                                    <select value={(qa as any).earmarkId ?? ''} onChange={(e) => setQa({ ...qa, earmarkId: e.target.value ? Number(e.target.value) : null } as any)} aria-label="Zweckbindung auswählen">
-                                        <option value="">—</option>
-                                        {earmarks.map(em => (
-                                            <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
-                                        ))}
-                                    </select>
+                            </div>
+
+                            {/* Budget Zuordnungen (mehrfach möglich) */}
+                            <div className="row">
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        Budget
+                                        <button
+                                            type="button"
+                                            className="btn ghost"
+                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                            onClick={() => {
+                                                const current = ((qa as any).budgets || []) as BudgetAssignment[]
+                                                setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
+                                            }}
+                                            title="Weiteres Budget hinzufügen"
+                                        >+</button>
+                                    </label>
+                                    {(() => {
+                                        const budgetIds = budgetsList.filter((b) => b.budgetId).map((b) => b.budgetId)
+                                        const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
+                                        const totalBudgetAmount = budgetsList.reduce((sum, b) => sum + (b.amount || 0), 0)
+                                        const exceedsTotal = totalBudgetAmount > grossAmt * 1.001
+                                        return budgetsList.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {budgetsList.map((ba, idx) => {
+                                                    const isDuplicate = budgetIds.filter((id) => id === ba.budgetId).length > 1
+                                                    const isInvalid = ba.budgetId && invalidBudgetIds.has(ba.budgetId)
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <select
+                                                                style={{ flex: 1, borderColor: (isDuplicate || isInvalid) ? 'var(--danger)' : undefined, opacity: isInvalid ? 0.8 : 1 }}
+                                                                value={ba.budgetId || ''}
+                                                                onChange={(e) => {
+                                                                    const next = [...budgetsList]
+                                                                    next[idx] = { ...next[idx], budgetId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    setQa({ ...(qa as any), budgets: next } as any)
+                                                                }}
+                                                            >
+                                                                <option value="">— Budget wählen —</option>
+                                                                {budgetsForEdit.map((b) => {
+                                                                    const eff = budgetEffectiveRange(b)
+                                                                    const disabled = eff.enforce ? !inRange(qa.date, eff.start, eff.end) : false
+                                                                    const suffix = eff.enforce ? ` (${fmtRange(eff.start, eff.end) || 'Zeitraum'})` : ''
+                                                                    return (
+                                                                        <option key={b.id} value={b.id} disabled={disabled}>{b.label}{suffix}</option>
+                                                                    )
+                                                                })}
+                                                            </select>
+                                                            <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                <input
+                                                                    className="input"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={ba.amount ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const next = [...budgetsList]
+                                                                        next[idx] = { ...next[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                        setQa({ ...(qa as any), budgets: next } as any)
+                                                                    }}
+                                                                    title="Betrag für dieses Budget"
+                                                                />
+                                                                <span className="adorn-suffix">€</span>
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                className="btn ghost"
+                                                                style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                onClick={() => {
+                                                                    const next = budgetsList.filter((_, i) => i !== idx)
+                                                                    setQa({ ...(qa as any), budgets: next } as any)
+                                                                }}
+                                                                title="Entfernen"
+                                                            >✕</button>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {hasDuplicateBudgets && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Ein Budget kann nur einmal zugeordnet werden</div>
+                                                )}
+                                                {exceedsTotal && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                                {invalidBudgetIds.size > 0 && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens ein Budget ist für dieses Datum nicht gültig</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
+                                        )
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Zweckbindung Zuordnungen (mehrfach möglich) */}
+                            <div className="row">
+                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        Zweckbindung
+                                        <button
+                                            type="button"
+                                            className="btn ghost"
+                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                            onClick={() => {
+                                                const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
+                                                setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
+                                            }}
+                                            title="Weitere Zweckbindung hinzufügen"
+                                        >+</button>
+                                    </label>
+                                    {(() => {
+                                        const earmarkIds = earmarksList.filter((e) => e.earmarkId).map((e) => e.earmarkId)
+                                        const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
+                                        const totalEarmarkAmount = earmarksList.reduce((sum, e) => sum + (e.amount || 0), 0)
+                                        const exceedsTotal = totalEarmarkAmount > grossAmt * 1.001
+                                        return earmarksList.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {earmarksList.map((ea, idx) => {
+                                                    const isDuplicate = earmarkIds.filter((id) => id === ea.earmarkId).length > 1
+                                                    const isInvalid = ea.earmarkId && invalidEarmarkIds.has(ea.earmarkId)
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <select
+                                                                style={{ flex: 1, borderColor: (isDuplicate || isInvalid) ? 'var(--danger)' : undefined, opacity: isInvalid ? 0.8 : 1 }}
+                                                                value={ea.earmarkId || ''}
+                                                                onChange={(e) => {
+                                                                    const next = [...earmarksList]
+                                                                    next[idx] = { ...next[idx], earmarkId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    setQa({ ...(qa as any), earmarksAssigned: next } as any)
+                                                                }}
+                                                            >
+                                                                <option value="">— Zweckbindung wählen —</option>
+                                                                {earmarks.map((em) => {
+                                                                    const disabled = em.enforceTimeRange ? !inRange(qa.date, em.startDate ?? null, em.endDate ?? null) : false
+                                                                    const suffix = em.enforceTimeRange ? ` (${fmtRange(em.startDate ?? null, em.endDate ?? null) || 'Zeitraum'})` : ''
+                                                                    return (
+                                                                        <option key={em.id} value={em.id} disabled={disabled}>{em.code} – {em.name}{suffix}</option>
+                                                                    )
+                                                                })}
+                                                            </select>
+                                                            <span className="adorn-wrap" style={{ width: 110 }}>
+                                                                <input
+                                                                    className="input"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={ea.amount ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const next = [...earmarksList]
+                                                                        next[idx] = { ...next[idx], amount: e.target.value ? Number(e.target.value) : 0 }
+                                                                        setQa({ ...(qa as any), earmarksAssigned: next } as any)
+                                                                    }}
+                                                                    title="Betrag für diese Zweckbindung"
+                                                                />
+                                                                <span className="adorn-suffix">€</span>
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                className="btn ghost"
+                                                                style={{ padding: '2px 6px', color: 'var(--danger)' }}
+                                                                onClick={() => {
+                                                                    const next = earmarksList.filter((_, i) => i !== idx)
+                                                                    setQa({ ...(qa as any), earmarksAssigned: next } as any)
+                                                                }}
+                                                                title="Entfernen"
+                                                            >✕</button>
+                                                        </div>
+                                                    )
+                                                })}
+                                                {hasDuplicateEarmarks && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Eine Zweckbindung kann nur einmal zugeordnet werden</div>
+                                                )}
+                                                {exceedsTotal && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                                {invalidEarmarkIds.size > 0 && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens eine Zweckbindung ist für dieses Datum nicht gültig</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -301,8 +538,8 @@ export default function QuickAddModal({
                             ) : (
                                 <div 
                                     style={{ 
-                                        marginTop: 8, 
-                                        padding: 20, 
+                                        marginTop: 6, 
+                                        padding: 12, 
                                         border: '2px dashed var(--border)', 
                                         borderRadius: 8, 
                                         textAlign: 'center',
@@ -310,7 +547,7 @@ export default function QuickAddModal({
                                     }}
                                     onClick={openFilePicker}
                                 >
-                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                    <div style={{ fontSize: 20, marginBottom: 4 }}>📎</div>
                                     <div className="helper">Dateien hierher ziehen oder klicken</div>
                                 </div>
                             )}
@@ -319,7 +556,7 @@ export default function QuickAddModal({
                     
                     <div className="modal-footer-actions">
                         <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
-                        <button type="submit" className="btn primary">Speichern</button>
+                        <button type="submit" className="btn primary" disabled={hasOutOfRange}>Speichern</button>
                     </div>
                 </form>
             </div>

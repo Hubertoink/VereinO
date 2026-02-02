@@ -126,7 +126,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
                 />
                 <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
               </label>
-              <div className="helper">Wenn aktiviert, können Buchungen nur im Zeitraum {v.startDate || '...'} bis {v.endDate || '...'} dieser Zweckbindung zugeordnet werden.</div>
+                <div className="helper">Wenn aktiv: Buchungen dürfen diese Zweckbindung nur im Zeitraum Von/Bis nutzen.</div>
             </div>
           )}
           <div className="field">

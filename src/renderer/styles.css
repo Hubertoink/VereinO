@@ -1256,6 +1256,24 @@ pre {
     transform: rotate(-8deg) scale(0.95);
 }
 
+/* Trash icon button: subtle hover + red tint */
+.btn-trash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.btn-trash:hover {
+    color: var(--danger);
+    background: color-mix(in oklab, var(--danger) 18%, transparent);
+    transform: translateY(-1px) scale(1.03);
+}
+
+.btn-trash:active {
+    transform: translateY(0) scale(0.98);
+}
+
 .card {
     background: color-mix(in oklab, var(--surface) 85%, transparent);
     border: 1px solid var(--border);
@@ -1696,8 +1714,19 @@ svg text {
 /* Wider layout for Quick-Add (Buchung) modal */
 .booking-modal {
     width: min(1100px, 96vw);
-    max-height: 90vh;
+    max-height: 94vh;
+    padding: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     animation: modalSlideUp 0.25s ease-out;
+}
+
+/* Keep header/footer visible; scroll only inside form when really needed */
+.booking-modal > form {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 
 /* Wider Members modal similar to booking */
@@ -1967,7 +1996,7 @@ svg text {
 .booking-modal .block-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
 }
 
 /* Booking modal visual refinements */
@@ -2053,6 +2082,7 @@ svg text {
 /* In the wider booking modal, allow denser grids */
 .booking-modal .row {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
 }
 /* First finance row: select + amount + VAT tighter layout */
 .booking-section--finances .row:first-of-type {
@@ -2248,26 +2278,73 @@ tbody tr.row-flash {
 }
 
 .toast {
-    background: color-mix(in oklab, var(--surface) 92%, transparent);
-    border: 1px solid var(--border);
+    background: var(--accent);
+    border: none;
     border-radius: 10px;
-    padding: 10px 12px;
-    box-shadow: var(--shadow-1);
-    color: var(--text);
+    padding: 12px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    color: #fff;
     min-width: 260px;
     max-width: 560px;
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
     flex-wrap: wrap; /* allow long text and action to wrap to the next line */
+    font-weight: 500;
+    animation: toastIn 160ms ease-out both;
+    transform-origin: right bottom;
+}
+
+.toast.closing {
+    animation: toastOut 180ms ease-in both;
+    pointer-events: none;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toastOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        animation: none;
+    }
+    .toast.closing {
+        animation: none;
+    }
 }
 
 .toast.success {
-    border-left: 4px solid var(--success);
+    background: var(--success);
 }
 
 .toast.error {
-    border-left: 4px solid var(--danger);
+    background: var(--danger);
+}
+
+.toast.info {
+    background: var(--accent);
+}
+
+.toast.warn {
+    background: #f59e0b;
 }
 
 .toast .title {
@@ -2278,6 +2355,13 @@ tbody tr.row-flash {
 /* Ensure action buttons in toasts are visible when text is long */
 .toast .btn {
     flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: none;
+}
+
+.toast .btn:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* Activity list icon wrapper */
@@ -3683,12 +3767,38 @@ label .req-asterisk {
 
         /* Block grid spacing */
         .block-grid-mb {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         /* Card padding for form blocks */
         .form-card {
             padding: 12px;
+        }
+
+        /* Slightly denser cards inside booking modal */
+        .booking-modal .summary-card { padding: 8px; margin-bottom: 6px; }
+        .booking-modal .form-card { padding: 10px; }
+        .booking-modal .attachment-card { padding: 10px; }
+        .booking-modal .modal-header-flex { margin-bottom: 6px; }
+        .booking-modal .modal-footer-actions { margin-top: 8px; }
+
+        /* Denser inputs in booking modal */
+        .booking-modal .input,
+        .booking-modal select,
+        .booking-modal textarea {
+            padding: 7px 9px;
+            border-radius: 9px;
+        }
+
+        /* Prevent Tags section from expanding the whole modal */
+        .booking-modal .tags-editor-input {
+            max-height: 86px;
+            overflow-y: auto;
+            align-content: flex-start;
+        }
+        .booking-modal .tags-suggestions {
+            max-height: 78px;
+            overflow-y: auto;
         }
 
         /* Helper text spacing */

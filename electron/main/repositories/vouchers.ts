@@ -30,6 +30,9 @@ export function createVoucher(input: {
     earmarkAmount?: number | null
     budgetId?: number
     budgetAmount?: number | null
+    // New: multiple budget/earmark assignments
+    budgets?: Array<{ budgetId: number; amount: number }>
+    earmarks?: Array<{ earmarkId: number; amount: number }>
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
@@ -58,13 +61,21 @@ export function createVoucher(input: {
             throw new Error('Either netAmount or grossAmount must be provided')
         }
 
-        // Earmark validations (if provided)
-        if (input.earmarkId != null) {
-            const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(input.earmarkId) as any
+        const earmarkAssignments: Array<{ earmarkId: number; amount: number }> = Array.isArray((input as any).earmarks) && (input as any).earmarks.length
+            ? (input as any).earmarks
+            : (input.earmarkId != null ? [{ earmarkId: input.earmarkId, amount: Number(input.earmarkAmount ?? grossAmount ?? 0) }] : [])
+
+        const budgetAssignments: Array<{ budgetId: number; amount: number }> = Array.isArray((input as any).budgets) && (input as any).budgets.length
+            ? (input as any).budgets
+            : (input.budgetId != null ? [{ budgetId: input.budgetId, amount: Number(input.budgetAmount ?? grossAmount ?? 0) }] : [])
+
+        // Earmark validations (single or multiple)
+        for (const ea of earmarkAssignments) {
+            if (!ea?.earmarkId) continue
+            const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange, budget FROM earmarks WHERE id=?').get(ea.earmarkId) as any
             if (!em) throw new Error('Zweckbindung nicht gefunden')
             if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-            
-            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+
             if (em.enforceTimeRange) {
                 if (em.startDate && input.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
                 if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
@@ -80,27 +91,26 @@ export function createVoucher(input: {
                     FROM voucher_earmarks ve
                     JOIN vouchers v ON v.id = ve.voucher_id
                     WHERE ve.earmark_id = ? AND v.date <= ?
-                `).get(input.earmarkId, input.date) as any
-                const em2 = d.prepare('SELECT budget FROM earmarks WHERE id=?').get(input.earmarkId) as any
-                const budget = Number(em2?.budget ?? 0) || 0
+                `).get(ea.earmarkId, input.date) as any
+                const budget = Number(em?.budget ?? 0) || 0
                 const currentBalance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
                 const remaining = Math.round(((budget + currentBalance) * 100)) / 100
-                const wouldBe = Math.round(((remaining - (grossAmount ?? 0)) * 100)) / 100
-                if (wouldBe < 0) {
-                    warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
-                }
+                const wouldBe = Math.round(((remaining - (ea.amount ?? 0)) * 100)) / 100
+                if (wouldBe < 0) warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
             }
         }
 
-        // Budget validations (if provided)
-        if (input.budgetId != null) {
-            const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(input.budgetId) as any
+        // Budget validations (single or multiple)
+        for (const ba of budgetAssignments) {
+            if (!ba?.budgetId) continue
+            const budget = d.prepare('SELECT id, year, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(ba.budgetId) as any
             if (!budget) throw new Error('Budget nicht gefunden')
-            
-            // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
+
             if (budget.enforceTimeRange) {
-                if (budget.startDate && input.date < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
-                if (budget.endDate && input.date > budget.endDate) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${budget.endDate})`)
+                const effStart = budget.startDate ?? (budget.year ? `${budget.year}-01-01` : null)
+                const effEnd = budget.endDate ?? (budget.year ? `${budget.year}-12-31` : null)
+                if (effStart && input.date < effStart) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${effStart})`)
+                if (effEnd && input.date > effEnd) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${effEnd})`)
             }
         }
 
@@ -128,10 +138,10 @@ export function createVoucher(input: {
                     input.sphere,
                     input.categoryId ?? null,
                     input.projectId ?? null,
-                    input.earmarkId ?? null,
-                    input.earmarkAmount ?? null,
-                    input.budgetId ?? null,
-                    input.budgetAmount ?? null,
+                    (earmarkAssignments[0]?.earmarkId ?? input.earmarkId) ?? null,
+                    (earmarkAssignments[0]?.amount ?? input.earmarkAmount) ?? null,
+                    (budgetAssignments[0]?.budgetId ?? input.budgetId) ?? null,
+                    (budgetAssignments[0]?.amount ?? input.budgetAmount) ?? null,
                     input.description ?? null,
                     netAmount,
                     input.vatRate,
@@ -154,6 +164,22 @@ export function createVoucher(input: {
             }
         }
         if (!id) throw new Error('Belegerstellung fehlgeschlagen')
+
+        // Persist multiple assignments into junction tables (if any)
+        if (budgetAssignments.length) {
+            d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(id)
+            const stmtB = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
+            for (const a of budgetAssignments) {
+                if (a.budgetId && a.amount > 0) stmtB.run(id, a.budgetId, a.amount)
+            }
+        }
+        if (earmarkAssignments.length) {
+            d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(id)
+            const stmtE = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
+            for (const a of earmarkAssignments) {
+                if (a.earmarkId && a.amount > 0) stmtE.run(id, a.earmarkId, a.amount)
+            }
+        }
 
         if (input.files?.length) {
             const { filesDir } = getAppDataDir()
@@ -1076,6 +1102,22 @@ export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[
 /** Set budget assignments for a voucher (replaces existing) */
 export function setVoucherBudgets(voucherId: number, assignments: Array<{ budgetId: number; amount: number }>) {
     const d = getDb()
+    const voucher = d.prepare('SELECT date FROM vouchers WHERE id=?').get(voucherId) as any
+    if (!voucher?.date) throw new Error('Beleg nicht gefunden')
+
+    // Validate time range for each budget assignment
+    for (const a of assignments) {
+        if (!a?.budgetId) continue
+        const budget = d.prepare('SELECT id, year, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(a.budgetId) as any
+        if (!budget) throw new Error('Budget nicht gefunden')
+        if (budget.enforceTimeRange) {
+            const effStart = budget.startDate ?? (budget.year ? `${budget.year}-01-01` : null)
+            const effEnd = budget.endDate ?? (budget.year ? `${budget.year}-12-31` : null)
+            if (effStart && voucher.date < effStart) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${effStart})`)
+            if (effEnd && voucher.date > effEnd) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${effEnd})`)
+        }
+    }
+
     d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(voucherId)
     const stmt = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
     for (const a of assignments) {
@@ -1095,6 +1137,21 @@ export function setVoucherBudgets(voucherId: number, assignments: Array<{ budget
 /** Set earmark assignments for a voucher (replaces existing) */
 export function setVoucherEarmarks(voucherId: number, assignments: Array<{ earmarkId: number; amount: number }>) {
     const d = getDb()
+    const voucher = d.prepare('SELECT date FROM vouchers WHERE id=?').get(voucherId) as any
+    if (!voucher?.date) throw new Error('Beleg nicht gefunden')
+
+    // Validate time range and activity for each earmark assignment
+    for (const a of assignments) {
+        if (!a?.earmarkId) continue
+        const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(a.earmarkId) as any
+        if (!em) throw new Error('Zweckbindung nicht gefunden')
+        if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
+        if (em.enforceTimeRange) {
+            if (em.startDate && voucher.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
+            if (em.endDate && voucher.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
+        }
+    }
+
     d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(voucherId)
     const stmt = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
     for (const a of assignments) {

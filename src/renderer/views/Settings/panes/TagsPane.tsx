@@ -1,6 +1,7 @@
 import React from 'react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
+import { IconTrash } from '../../../utils/icons'
 
 /**
  * TagsPane - Tag Management
@@ -135,12 +136,12 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                     ✎
                   </button>
                   <button 
-                    className="btn ghost" 
+                    className="btn ghost btn-trash" 
                     onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
                     title="Löschen"
                     style={{ padding: '6px 8px' }}
                   >
-                    🗑️
+                    <IconTrash size={16} />
                   </button>
                 </div>
               </div>

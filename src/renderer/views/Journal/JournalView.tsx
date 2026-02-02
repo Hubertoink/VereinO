@@ -71,11 +71,11 @@ interface JournalViewProps {
     setShowTimeFilter?: (show: boolean) => void
     setShowMetaFilter?: (show: boolean) => void
     yearsAvail: number[]
-    budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null }>
+    budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; color?: string | null }>
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
-    budgetsForEdit: Array<{ id: number; label: string }>
+    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
     budgetNames: Map<number, string>
     // Helpers
     eurFmt: Intl.NumberFormat
@@ -344,23 +344,27 @@ export default function JournalView({
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
-        const list: Array<{ key: string; label: string; clear: () => void }> = []
+        const list: Array<{ key: string; label: string; clear: () => void; color?: string | null }> = []
         if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
         if (activeFilterSphere) list.push({ key: 'sphere', label: `Sphäre: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
         if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
         if (activeFilterEarmark != null) {
             const em = earmarks.find(e => e.id === activeFilterEarmark)
-            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}` , clear: () => activeSetFilterEarmark(null) })
+            list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}`, clear: () => activeSetFilterEarmark(null), color: em?.color })
         }
         if (activeFilterBudgetId != null) {
             const label = budgetNames.get(activeFilterBudgetId) || `#${activeFilterBudgetId}`
-            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null) })
+            const budgetItem = budgets.find(b => b.id === activeFilterBudgetId)
+            list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null), color: budgetItem?.color })
         }
-        if (activeFilterTag) list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null) })
+        if (activeFilterTag) {
+            const tagDef = tagDefs.find(t => t.name.toLowerCase() === activeFilterTag.toLowerCase())
+            list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null), color: tagDef?.color })
+        }
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, activeQ])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -702,12 +706,16 @@ export default function JournalView({
             {/* Active Filter Chips */}
             {chips.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
-                    {chips.map((c) => (
-                        <span key={c.key} className="chip">
-                            {c.label}
-                            <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`}>×</button>
-                        </span>
-                    ))}
+                    {chips.map((c) => {
+                        const bg = c.color || undefined
+                        const fg = bg ? (parseInt(bg.slice(1), 16) > 0x7fffff ? '#222' : '#fff') : undefined
+                        return (
+                            <span key={c.key} className="chip" style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>
+                                {c.label}
+                                <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={bg ? { color: fg } : undefined}>×</button>
+                            </span>
+                        )
+                    })}
                     {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
                         <button
                             className="btn ghost"

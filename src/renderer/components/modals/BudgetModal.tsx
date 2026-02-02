@@ -137,9 +137,9 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
                   onChange={(e) => setV({ ...v, enforceTimeRange: e.target.checked ? 1 : 0 })} 
                   className="budget-enforce-range-checkbox"
                 />
-                <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
+                  <span>Zeitraum verbindlich machen</span>
               </label>
-              <div className="helper">Wenn aktiviert, können Buchungen nur im Zeitraum {v.startDate || '...'} bis {v.endDate || '...'} diesem Budget zugeordnet werden.</div>
+                <div className="helper">Wenn aktiv: Buchungen dürfen dieses Budget nur im Zeitraum nutzen. Ohne Von/Bis gilt automatisch das Budget-Jahr (01.01.–31.12.).</div>
             </div>
           )}
           <div className="field field-full-width">

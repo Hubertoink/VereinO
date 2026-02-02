@@ -473,7 +473,7 @@ function AppInner() {
     const [reportsFilterType, setReportsFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [reportsFilterPM, setReportsFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     // Global Zweckbindungen (earmarks) for filters/tables
-    const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null }>>([])
+    const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>>([])
     async function loadEarmarks() {
         try {
             const res = await window.api?.bindings?.list?.({ activeOnly: true })
@@ -667,14 +667,14 @@ function AppInner() {
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
     // Zweckbindungen (Bindings) state (kept for Buchungen page dropdowns/filters)
-    const [bindings, setBindings] = useState<Array<{ id: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive: number; color?: string | null; budget?: number | null }>>([])
+    const [bindings, setBindings] = useState<Array<{ id: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive: number; color?: string | null; budget?: number | null; enforceTimeRange?: number }>>([])
     async function loadBindings() {
         const res = await window.api?.bindings.list?.({})
         if (res) setBindings(res.rows)
     }
 
     // Budgets state (kept for Buchungen page dropdowns/filters)
-    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
+    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: number }>>([])
     const budgetsForEdit = useMemo(() => {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
@@ -687,7 +687,14 @@ function AppInner() {
             }
             return String(b.year)
         }
-        return (budgets || []).map((b) => ({ id: b.id, label: makeLabel(b) }))
+        return (budgets || []).map((b) => ({
+            id: b.id,
+            label: makeLabel(b),
+            year: b.year,
+            startDate: b.startDate ?? null,
+            endDate: b.endDate ?? null,
+            enforceTimeRange: (b as any).enforceTimeRange ?? 0
+        }))
     }, [budgets, earmarks])
     async function loadBudgets() {
         const res = await window.api?.budgets.list?.({})

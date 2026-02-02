@@ -14,6 +14,8 @@ type QA = {
     transferTo?: 'BAR' | 'BANK'
     budgetId?: number | null
     earmarkId?: number | null
+    budgets?: Array<{ budgetId: number; amount: number }>
+    earmarksAssigned?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
 }
 
@@ -89,6 +91,32 @@ export function useQuickAdd(
         
         if (typeof (qa as any).earmarkId === 'number') payload.earmarkId = (qa as any).earmarkId
         if (typeof (qa as any).budgetId === 'number') payload.budgetId = (qa as any).budgetId
+
+        // New: multiple assignments (optional)
+        const budgets = Array.isArray((qa as any).budgets)
+            ? ((qa as any).budgets as Array<{ budgetId: number; amount: number }>).
+                filter((b) => b.budgetId && b.amount > 0).
+                map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+            : []
+        const earmarks = Array.isArray((qa as any).earmarksAssigned)
+            ? ((qa as any).earmarksAssigned as Array<{ earmarkId: number; amount: number }>).
+                filter((e) => e.earmarkId && e.amount > 0).
+                map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+            : []
+
+        if (budgets.length) {
+            payload.budgets = budgets
+            // Sync legacy fields (first assignment)
+            payload.budgetId = budgets[0].budgetId
+            payload.budgetAmount = budgets[0].amount
+        }
+        if (earmarks.length) {
+            payload.earmarks = earmarks
+            // Sync legacy fields (first assignment)
+            payload.earmarkId = earmarks[0].earmarkId
+            payload.earmarkAmount = earmarks[0].amount
+        }
+
         if (Array.isArray((qa as any).tags)) payload.tags = (qa as any).tags
 
         // Convert attachments to Base64

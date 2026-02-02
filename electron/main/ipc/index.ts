@@ -57,7 +57,14 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
-        const res = createVoucher(parsed)
+        const res = createVoucher(parsed as any)
+        // Handle multiple budget/earmark assignments if provided
+        if ((parsed as any).budgets !== undefined) {
+            setVoucherBudgets((res as any).id, (parsed as any).budgets)
+        }
+        if ((parsed as any).earmarks !== undefined) {
+            setVoucherEarmarks((res as any).id, (parsed as any).earmarks)
+        }
         return VoucherCreateOutput.parse(res)
     })
 

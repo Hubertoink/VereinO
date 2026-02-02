@@ -4,6 +4,16 @@ export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
 
+// Multiple assignment shapes (shared by create + update)
+export const VoucherBudgetAssignment = z.object({
+    budgetId: z.number(),
+    amount: z.number()
+})
+export const VoucherEarmarkAssignment = z.object({
+    earmarkId: z.number(),
+    amount: z.number()
+})
+
 export const VoucherCreateInput = z
     .object({
         date: z.string(),
@@ -24,6 +34,9 @@ export const VoucherCreateInput = z
         earmarkAmount: z.number().nullable().optional(),
         budgetId: z.number().optional(),
         budgetAmount: z.number().nullable().optional(),
+        // New: multiple budget/earmark assignments
+        budgets: z.array(VoucherBudgetAssignment).optional(),
+        earmarks: z.array(VoucherEarmarkAssignment).optional(),
         files: z
             .array(
                 z.object({
@@ -444,15 +457,6 @@ export type TVouchersRecentInput = z.infer<typeof VouchersRecentInput>
 export type TVouchersRecentOutput = z.infer<typeof VouchersRecentOutput>
 
 // Update/Delete
-export const VoucherBudgetAssignment = z.object({
-    budgetId: z.number(),
-    amount: z.number()
-})
-export const VoucherEarmarkAssignment = z.object({
-    earmarkId: z.number(),
-    amount: z.number()
-})
-
 export const VoucherUpdateInput = z.object({
     id: z.number(),
     date: z.string().optional(),
