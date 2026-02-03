@@ -519,6 +519,15 @@ export const MIGRATIONS: Mig[] = [
     WHERE earmark_id IS NOT NULL;
     `
   }
+  ,
+  {
+    version: 25,
+    up: `
+    -- Budgets: allow archiving instead of deleting
+    ALTER TABLE budgets ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS idx_budgets_archived ON budgets(is_archived);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

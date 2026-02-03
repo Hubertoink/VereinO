@@ -33,6 +33,7 @@ export interface EarmarkUsageCardBinding {
   startDate?: string | null
   endDate?: string | null
   enforceTimeRange?: number
+  isActive?: number | boolean
 }
 
 export interface EarmarkUsageCardsProps {
@@ -85,6 +86,8 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
         const endDate = b.endDate ?? u?.endDate ?? null
         const totalCount = u?.totalCount as number | undefined
         
+        const isArchived = b.isActive === 0 || b.isActive === false
+        
         return (
           <div
             key={b.id}
@@ -92,7 +95,8 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
             style={{ 
               padding: 0, 
               overflow: 'hidden',
-              transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              ...(isArchived ? { opacity: 0.55, filter: 'grayscale(60%)', border: '1px dashed var(--border)' } : {})
             }}
           >
             {/* Header with color */}

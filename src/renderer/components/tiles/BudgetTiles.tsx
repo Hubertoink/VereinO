@@ -35,6 +35,7 @@ export interface BudgetTileBudget {
   startDate?: string | null
   endDate?: string | null
   color?: string | null
+  isArchived?: number
   categoryId?: number | null
   projectId?: number | null
   earmarkId?: number | null
@@ -86,6 +87,8 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
           const endDate = b.endDate ?? usage[b.id]?.endDate ?? null
           const totalCount = (usage[b.id]?.countInside ?? 0) + (usage[b.id]?.countOutside ?? 0)
           
+          const isArchived = !!(b as any).isArchived
+          
           return (
             <div 
               key={b.id} 
@@ -93,7 +96,8 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
               style={{ 
                 padding: 0, 
                 overflow: 'hidden',
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                ...(isArchived ? { opacity: 0.55, filter: 'grayscale(60%)', border: '1px dashed var(--border)' } : {})
               }}
             >
               {/* Header with color */}
@@ -110,7 +114,12 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
                     </div>
                   </div>
                   {!!b.enforceTimeRange && (
-                    <span title="Strikter Zeitraum aktiv" style={{ fontSize: 16 }}>🔒</span>
+                    <span title="Strikter Zeitraum aktiv">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    </span>
                   )}
                 </div>
               </div>

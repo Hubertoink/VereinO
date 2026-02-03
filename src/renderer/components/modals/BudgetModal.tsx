@@ -27,6 +27,7 @@ export type BudgetModalValue = {
   startDate?: string | null
   endDate?: string | null
   color?: string | null
+  isArchived?: number
   categoryId?: number | null
   projectId?: number | null
   earmarkId?: number | null
@@ -61,6 +62,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
       startDate: v.startDate || null,
       endDate: v.endDate || null,
       color: v.color || null,
+      isArchived: !!v.isArchived,
       categoryId: v.categoryId || null,
       projectId: v.projectId || null,
       earmarkId: v.earmarkId || null,
