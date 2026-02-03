@@ -517,7 +517,12 @@ function AppInner() {
             setEarmarks(rows)
         } catch { /* ignore */ }
     }
-    useEffect(() => { loadEarmarks() }, [])
+    useEffect(() => {
+        loadEarmarks()
+        const onChanged = () => loadEarmarks()
+        window.addEventListener('data-changed', onChanged)
+        return () => window.removeEventListener('data-changed', onChanged)
+    }, [])
     // Map of budget id -> friendly label for filter chips
     const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
     const chips = useMemo(() => {
@@ -710,7 +715,7 @@ function AppInner() {
     }
 
     // Budgets state (kept for Buchungen page dropdowns/filters)
-    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; enforceTimeRange?: number }>>([])
+    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; categoryId: number | null; projectId: number | null; earmarkId: number | null; amountPlanned: number; name?: string | null; categoryName?: string | null; projectName?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; isArchived?: number; enforceTimeRange?: number }>>([])
     const budgetsForEdit = useMemo(() => {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
@@ -729,11 +734,14 @@ function AppInner() {
             year: b.year,
             startDate: b.startDate ?? null,
             endDate: b.endDate ?? null,
-            enforceTimeRange: (b as any).enforceTimeRange ?? 0
+            enforceTimeRange: (b as any).enforceTimeRange ?? 0,
+            isArchived: (b as any).isArchived ?? 0,
+            color: (b as any).color ?? null
         }))
     }, [budgets, earmarks])
     async function loadBudgets() {
-        const res = await window.api?.budgets.list?.({})
+        // Include archived budgets so filters/edit views can still resolve labels/colors.
+        const res = await window.api?.budgets.list?.({ includeArchived: true } as any)
         if (res) {
             setBudgets(res.rows)
             try {

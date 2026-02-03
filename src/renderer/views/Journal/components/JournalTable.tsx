@@ -1,6 +1,124 @@
 ﻿import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 
+type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
+type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
+
+function UsageHover({
+    kind,
+    id,
+    title,
+    accent,
+    eurFmt,
+    getUsage,
+    children
+}: {
+    kind: 'budget' | 'earmark'
+    id: number
+    title: string
+    accent?: string | null
+    eurFmt: Intl.NumberFormat
+    getUsage: (id: number) => Promise<any>
+    children: React.ReactNode
+}) {
+    const [open, setOpen] = useState(false)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string>('')
+    const [data, setData] = useState<any>(null)
+    const timerRef = useRef<any>(null)
+    const aliveRef = useRef(true)
+
+    useEffect(() => {
+        return () => {
+            aliveRef.current = false
+            if (timerRef.current) clearTimeout(timerRef.current)
+        }
+    }, [])
+
+    const onEnter = () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(async () => {
+            if (!aliveRef.current) return
+            setOpen(true)
+            if (data || loading) return
+            setLoading(true)
+            setError('')
+            try {
+                const res = await getUsage(id)
+                if (!aliveRef.current) return
+                setData(res)
+            } catch (e: any) {
+                if (!aliveRef.current) return
+                setError(e?.message || String(e))
+            } finally {
+                if (!aliveRef.current) return
+                setLoading(false)
+            }
+        }, 500)
+    }
+    const onLeave = () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+        setOpen(false)
+    }
+
+    const lines: Array<{ label: string; value: string }> = (() => {
+        if (!data) return []
+        if (kind === 'budget') {
+            const u = data as BudgetUsage
+            const inflow = Number(u.inflow || 0) || 0
+            const spent = Number(u.spent || 0) || 0
+            const stand = (u.remaining != null)
+                ? Number(u.remaining || 0)
+                : (u.balance != null ? Number(u.balance || 0) : (inflow - spent))
+            return [
+                { label: 'Einnahmen', value: eurFmt.format(inflow) },
+                { label: 'Ausgaben', value: eurFmt.format(spent) },
+                { label: 'Stand', value: eurFmt.format(stand) }
+            ]
+        }
+        const u = data as EarmarkUsage
+        return [
+            { label: 'Einnahmen', value: eurFmt.format(Number(u.allocated || 0) || 0) },
+            { label: 'Ausgaben', value: eurFmt.format(Number(u.released || 0) || 0) },
+            { label: 'Stand', value: eurFmt.format(Number(u.remaining || 0) || 0) }
+        ]
+    })()
+
+    return (
+        <span className="usage-hover" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+            {children}
+            <div className={`usage-tooltip ${open ? 'usage-tooltip--open' : ''}`} role="tooltip" aria-hidden={!open}>
+                <div className="usage-tooltip__head">
+                    <span className="usage-tooltip__dot" style={{ background: accent || undefined }} />
+                    <span className="usage-tooltip__title">{title}</span>
+                </div>
+                {loading ? (
+                    <div className="usage-tooltip__body">
+                        <div className="usage-tooltip__muted">Lädt…</div>
+                    </div>
+                ) : error ? (
+                    <div className="usage-tooltip__body">
+                        <div className="usage-tooltip__error">{error}</div>
+                    </div>
+                ) : data ? (
+                    <div className="usage-tooltip__body">
+                        {lines.map((l) => (
+                            <div key={l.label} className="usage-tooltip__row">
+                                <span className="usage-tooltip__label">{l.label}</span>
+                                <span className="usage-tooltip__value">{l.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="usage-tooltip__body">
+                        <div className="usage-tooltip__muted">Keine Daten</div>
+                    </div>
+                )}
+            </div>
+        </span>
+    )
+}
+
 // Helper function for contrast text color
 function contrastText(bg?: string | null) {
     if (!bg) return '#000'
@@ -118,6 +236,49 @@ export default function JournalTable({
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
+
+    const budgetUsageCache = useRef(new Map<number, any>())
+    const budgetUsageInFlight = useRef(new Map<number, Promise<any>>())
+    const earmarkUsageCache = useRef(new Map<number, any>())
+    const earmarkUsageInFlight = useRef(new Map<number, Promise<any>>())
+
+    const getBudgetUsage = useCallback(async (budgetId: number) => {
+        const cached = budgetUsageCache.current.get(budgetId)
+        if (cached) return cached
+        const inflight = budgetUsageInFlight.current.get(budgetId)
+        if (inflight) return inflight
+        const p = (async () => {
+            const api = (window as any)?.api
+            const res = await api?.budgets?.usage?.({ budgetId })
+            budgetUsageCache.current.set(budgetId, res)
+            return res
+        })()
+        budgetUsageInFlight.current.set(budgetId, p)
+        try {
+            return await p
+        } finally {
+            budgetUsageInFlight.current.delete(budgetId)
+        }
+    }, [])
+
+    const getEarmarkUsage = useCallback(async (earmarkId: number) => {
+        const cached = earmarkUsageCache.current.get(earmarkId)
+        if (cached) return cached
+        const inflight = earmarkUsageInFlight.current.get(earmarkId)
+        if (inflight) return inflight
+        const p = (async () => {
+            const api = (window as any)?.api
+            const res = await api?.bindings?.usage?.({ earmarkId })
+            earmarkUsageCache.current.set(earmarkId, res)
+            return res
+        })()
+        earmarkUsageInFlight.current.set(earmarkId, p)
+        try {
+            return await p
+        } finally {
+            earmarkUsageInFlight.current.delete(earmarkId)
+        }
+    }, [])
     
     // Column resize state
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
@@ -334,26 +495,35 @@ export default function JournalTable({
                                 const fullLabel = code
                                 const displayLabel = truncate(code)
                                 return (
-                                    <button
+                                    <UsageHover
                                         key={idx}
-                                        className="badge-earmark"
+                                        kind="earmark"
+                                        id={ea.earmarkId}
                                         title={`${fullLabel}${ea.amount ? ` (${eurFmt.format(ea.amount)})` : ''}`}
-                                        style={{ 
-                                            background: bg || undefined, 
-                                            color: bg ? fg : undefined, 
-                                            cursor: 'pointer', 
-                                            border: bg ? `1px solid ${bg}` : undefined,
-                                            fontSize: 10,
-                                            padding: '2px 4px',
-                                            maxWidth: 70,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                        onClick={(e) => { e.stopPropagation(); if (ea.earmarkId) onEarmarkClick?.(ea.earmarkId); }}
+                                        accent={bg}
+                                        eurFmt={eurFmt}
+                                        getUsage={getEarmarkUsage}
                                     >
-                                        {displayLabel}
-                                    </button>
+                                        <button
+                                            className="badge-earmark"
+                                            style={{
+                                                background: bg || undefined,
+                                                color: bg ? fg : undefined,
+                                                cursor: 'pointer',
+                                                border: bg ? `1px solid ${bg}` : undefined,
+                                                fontSize: 10,
+                                                padding: '2px 4px',
+                                                maxWidth: 70,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (ea.earmarkId) onEarmarkClick?.(ea.earmarkId); }}
+                                            aria-label={fullLabel}
+                                        >
+                                            {displayLabel}
+                                        </button>
+                                    </UsageHover>
                                 )
                             })}
                             {assignments.length > 3 && (
@@ -416,26 +586,35 @@ export default function JournalTable({
                                 const fg = contrastText(bg)
                                 const displayLabel = truncate(label)
                                 return (
-                                    <button
+                                    <UsageHover
                                         key={idx}
-                                        className="badge-budget"
+                                        kind="budget"
+                                        id={ba.budgetId}
                                         title={`${label}${ba.amount ? ` (${eurFmt.format(ba.amount)})` : ''}`}
-                                        style={{ 
-                                            background: bg, 
-                                            color: bg ? fg : undefined, 
-                                            cursor: 'pointer', 
-                                            border: bg ? `1px solid ${bg}` : undefined,
-                                            fontSize: 10,
-                                            padding: '2px 4px',
-                                            maxWidth: 70,
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                        onClick={(e) => { e.stopPropagation(); if (ba.budgetId) onBudgetClick?.(ba.budgetId); }}
+                                        accent={bg || null}
+                                        eurFmt={eurFmt}
+                                        getUsage={getBudgetUsage}
                                     >
-                                        {displayLabel}
-                                    </button>
+                                        <button
+                                            className="badge-budget"
+                                            style={{
+                                                background: bg,
+                                                color: bg ? fg : undefined,
+                                                cursor: 'pointer',
+                                                border: bg ? `1px solid ${bg}` : undefined,
+                                                fontSize: 10,
+                                                padding: '2px 4px',
+                                                maxWidth: 70,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (ba.budgetId) onBudgetClick?.(ba.budgetId); }}
+                                            aria-label={label}
+                                        >
+                                            {displayLabel}
+                                        </button>
+                                    </UsageHover>
                                 )
                             })}
                             {assignments.length > 3 && (

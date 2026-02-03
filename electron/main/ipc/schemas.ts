@@ -625,6 +625,9 @@ export const BudgetUsageInput = z.object({ budgetId: z.number(), from: z.string(
 export const BudgetUsageOutput = z.object({
     spent: z.number(),
     inflow: z.number(),
+    planned: z.number().optional(),
+    balance: z.number().optional(),
+    remaining: z.number().optional(),
     count: z.number(),
     lastDate: z.string().nullable(),
     // Optional extras for tiles

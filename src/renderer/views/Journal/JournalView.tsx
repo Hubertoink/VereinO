@@ -75,7 +75,7 @@ interface JournalViewProps {
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
-    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
+    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isArchived?: number; color?: string | null }>
     budgetNames: Map<number, string>
     // Helpers
     eurFmt: Intl.NumberFormat
@@ -1106,9 +1106,25 @@ export default function JournalView({
                                                                             }}
                                                                         >
                                                                             <option value="">— Budget wählen —</option>
-                                                                            {budgetsForEdit.map(b => (
-                                                                                <option key={b.id} value={b.id}>{b.label}</option>
-                                                                            ))}
+                                                                            {(() => {
+                                                                                const active = (budgetsForEdit || []).filter((b: any) => !b?.isArchived)
+                                                                                const activeIds = new Set(active.map((b: any) => b.id))
+                                                                                const selectedId = Number(ba.budgetId || 0)
+                                                                                const selectedMissing = selectedId && !activeIds.has(selectedId)
+                                                                                const selected = selectedMissing ? (budgetsForEdit || []).find((b: any) => b.id === selectedId) : null
+                                                                                return (
+                                                                                    <>
+                                                                                        {selectedMissing ? (
+                                                                                            <option value={selectedId} disabled>
+                                                                                                {(selected as any)?.label ?? `Budget #${selectedId}`} (archiviert)
+                                                                                            </option>
+                                                                                        ) : null}
+                                                                                        {active.map((b: any) => (
+                                                                                            <option key={b.id} value={b.id}>{b.label}</option>
+                                                                                        ))}
+                                                                                    </>
+                                                                                )
+                                                                            })()}
                                                                         </select>
                                                                         <span className="adorn-wrap" style={{ width: 110 }}>
                                                                             <input
@@ -1191,7 +1207,12 @@ export default function JournalView({
                                                                             }}
                                                                         >
                                                                             <option value="">— Zweckbindung wählen —</option>
-                                                                            {earmarks.map(em => (
+                                                                            {ea.earmarkId && !(earmarks || []).some((em: any) => em?.id === ea.earmarkId) ? (
+                                                                                <option key={`arch-${ea.earmarkId}`} value={ea.earmarkId}>
+                                                                                    {(ea.code ? ea.code : ('#' + ea.earmarkId))} – {ea.name || ''} (archiviert)
+                                                                                </option>
+                                                                            ) : null}
+                                                                            {(earmarks || []).map((em: any) => (
                                                                                 <option key={em.id} value={em.id}>{em.code} – {em.name}</option>
                                                                             ))}
                                                                         </select>

@@ -120,6 +120,13 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
         JOIN vouchers v ON v.id = vb.voucher_id
         WHERE vb.budget_id = ?
     `).get(input.budgetId) as any
+
+        const plannedRow = d.prepare(`SELECT amount_planned as planned FROM budgets WHERE id=?`).get(input.budgetId) as any
+        const planned = Number(plannedRow?.planned ?? 0) || 0
+        const spent = Number(row.spent || 0) || 0
+        const inflow = Number(row.inflow || 0) || 0
+        const balance = Math.round((inflow - spent) * 100) / 100
+        const remaining = Math.round((planned + inflow - spent) * 100) / 100
     // Counts inside/outside relative to budget's own date range
     const meta = d.prepare(`SELECT start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
     const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_budgets WHERE budget_id=?`).get(input.budgetId) as any
@@ -137,5 +144,5 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
         countInside = Number(insideRow?.c || 0)
         countOutside = Math.max(0, totalCount - countInside)
     }
-    return { spent: row.spent || 0, inflow: row.inflow || 0, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
+    return { spent, inflow, planned, balance, remaining, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
 }

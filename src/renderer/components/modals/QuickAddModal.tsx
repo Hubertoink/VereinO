@@ -17,7 +17,7 @@ interface QuickAddModalProps {
     fileInputRef: React.RefObject<HTMLInputElement>
     fmtDate: (d: string) => string
     eurFmt: Intl.NumberFormat
-    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
+    budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isArchived?: number; color?: string | null }>
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
@@ -106,6 +106,14 @@ export default function QuickAddModal({
     )
 
     const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
+
+    const activeEarmarks = React.useMemo(() => {
+        return (earmarks || []).filter((em: any) => {
+            // In DB/IPC: archived Zweckbindungen are represented as isActive = 0
+            if (em?.isActive === 0 || em?.isActive === false) return false
+            return true
+        })
+    }, [earmarks])
 
     return (
         <div className="modal-overlay">
@@ -291,7 +299,6 @@ export default function QuickAddModal({
                             </div>
                             <div className="row">
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                    <div className="helper">Zeitgebundene Budgets/Zweckbindungen sind außerhalb des Zeitraums deaktiviert. Wenn das Buchungsdatum geändert wird, müssen ungültige Zuordnungen entfernt oder das Datum angepasst werden.</div>
                                     {hasOutOfRange && (
                                         <div className="helper" style={{ color: 'var(--danger)', marginTop: 6 }}>⚠ Es sind Zuordnungen außerhalb des gültigen Zeitraums ausgewählt. Speichern ist blockiert.</div>
                                     )}
@@ -336,14 +343,30 @@ export default function QuickAddModal({
                                                                 }}
                                                             >
                                                                 <option value="">— Budget wählen —</option>
-                                                                {budgetsForEdit.map((b) => {
+                                                                {(() => {
+                                                                    const active = (budgetsForEdit || []).filter((b: any) => !b?.isArchived)
+                                                                    const activeIds = new Set(active.map((b: any) => b.id))
+                                                                    const selectedId = Number(ba.budgetId || 0)
+                                                                    const selectedMissing = selectedId && !activeIds.has(selectedId)
+                                                                    const selected = selectedMissing ? (budgetsForEdit || []).find((b: any) => b.id === selectedId) : null
+                                                                    return (
+                                                                        <>
+                                                                            {selectedMissing ? (
+                                                                                <option value={selectedId} disabled>
+                                                                                    {(selected as any)?.label ?? `Budget #${selectedId}`} (archiviert)
+                                                                                </option>
+                                                                            ) : null}
+                                                                            {active.map((b: any) => {
                                                                     const eff = budgetEffectiveRange(b)
                                                                     const disabled = eff.enforce ? !inRange(qa.date, eff.start, eff.end) : false
                                                                     const suffix = eff.enforce ? ` (${fmtRange(eff.start, eff.end) || 'Zeitraum'})` : ''
                                                                     return (
                                                                         <option key={b.id} value={b.id} disabled={disabled}>{b.label}{suffix}</option>
                                                                     )
-                                                                })}
+                                                                            })}
+                                                                        </>
+                                                                    )
+                                                                })()}
                                                             </select>
                                                             <span className="adorn-wrap" style={{ width: 110 }}>
                                                                 <input
@@ -429,7 +452,7 @@ export default function QuickAddModal({
                                                                 }}
                                                             >
                                                                 <option value="">— Zweckbindung wählen —</option>
-                                                                {earmarks.map((em) => {
+                                                                {activeEarmarks.map((em) => {
                                                                     const disabled = em.enforceTimeRange ? !inRange(qa.date, em.startDate ?? null, em.endDate ?? null) : false
                                                                     const suffix = em.enforceTimeRange ? ` (${fmtRange(em.startDate ?? null, em.endDate ?? null) || 'Zeitraum'})` : ''
                                                                     return (
