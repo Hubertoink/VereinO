@@ -161,9 +161,10 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
           {(() => {
             let tickEvery = 1
             const total = labels.length
-            if (total > 48) tickEvery = 12
-            else if (total > 24) tickEvery = 6
-            else if (total > 12) tickEvery = 3
+            if (total > 72) tickEvery = 12
+            else if (total > 48) tickEvery = 6
+            else if (total > 24) tickEvery = 3
+            else if (total > 12) tickEvery = 2
             // Check if multi-year range to include year in label
             const yearSpan = from && to ? (Number(to.slice(0,4)) - Number(from.slice(0,4))) : 0
             return labels.map((m, i) => {

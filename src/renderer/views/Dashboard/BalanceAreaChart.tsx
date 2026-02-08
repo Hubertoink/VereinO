@@ -32,7 +32,7 @@ function dayKeys(from: string, to: string): string[] {
   return out
 }
 
-export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
+export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaChartProps) {
   const [rows, setRows] = useState<Bucket[]>([])
   const [loading, setLoading] = useState(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -111,7 +111,7 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
   // Convert signed values (IN positive, OUT negative) into a cumulative saldo over time
   const baseSeries = rows.map(r => Number(r.gross) || 0)
   const series = (() => {
-    let run = 0
+    let run = Number(baseSaldo || 0)
     return baseSeries.map(v => { run += v; return Math.round(run * 100) / 100 })
   })()
   const minV = Math.min(0, ...series)
@@ -155,9 +155,11 @@ export default function BalanceAreaChart({ from, to }: BalanceAreaChartProps) {
     tickEvery = Math.max(1, Math.ceil(labels.length / 6))
   } else {
     const totalMonths = labels.length
-    if (totalMonths > 48) tickEvery = 12
-    else if (totalMonths > 24) tickEvery = 6
-    else if (totalMonths > 12) tickEvery = 3
+    // Denser legends for 3-year view: show quarters instead of half-years.
+    if (totalMonths > 72) tickEvery = 12
+    else if (totalMonths > 48) tickEvery = 6
+    else if (totalMonths > 24) tickEvery = 3
+    else if (totalMonths > 12) tickEvery = 2
     else tickEvery = 1
   }
 

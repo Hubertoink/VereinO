@@ -14,7 +14,7 @@ function monthKeys(from: string, to: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' }) {
+export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; baseSaldo?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; paymentMethod?: 'BAR' | 'BANK' }) {
   const { from: fromProp, to: toProp } = props
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
@@ -105,7 +105,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const labels = rowsAll.map(r => r.month)
   const cumSeries = (() => {
     const arr: number[] = []
-    let s = 0
+    let s = Number(props.baseSaldo || 0)
     for (const b of rowsAll) { s += b.gross; arr.push(s) }
     return arr
   })()
@@ -200,9 +200,10 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     tickEvery = Math.max(1, Math.ceil(labels.length / 6))
   } else {
     const totalMonths = labels.length
-    if (totalMonths > 48) tickEvery = 12
-    else if (totalMonths > 24) tickEvery = 6
-    else if (totalMonths > 12) tickEvery = 3
+    if (totalMonths > 72) tickEvery = 12
+    else if (totalMonths > 48) tickEvery = 6
+    else if (totalMonths > 24) tickEvery = 3
+    else if (totalMonths > 12) tickEvery = 2
     else tickEvery = 1
   }
 

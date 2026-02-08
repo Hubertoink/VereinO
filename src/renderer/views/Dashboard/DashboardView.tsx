@@ -41,18 +41,25 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
     return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
   }, [])
 
-  const [period, setPeriod] = useState<'MONAT' | 'JAHR' | 'GESAMT'>(() => {
+  const [period, setPeriod] = useState<'MONAT' | 'JAHR' | 'DREI_JAHRE' | 'GESAMT'>(() => {
     try { return (localStorage.getItem('dashPeriod') as any) || 'JAHR' } catch { return 'JAHR' }
   })
   useEffect(() => { try { localStorage.setItem('dashPeriod', period) } catch { } }, [period])
+
+  const [includePrevSaldo, setIncludePrevSaldo] = useState<boolean>(() => {
+    try { return (localStorage.getItem('dashIncludePrevSaldo') === '1') } catch { return false }
+  })
+  useEffect(() => { try { localStorage.setItem('dashIncludePrevSaldo', includePrevSaldo ? '1' : '0') } catch { } }, [includePrevSaldo])
+
   const [yearSel, setYearSel] = useState<number | null>(null)
   useEffect(() => {
-    if (period === 'JAHR' && yearsAvail.length > 0 && (yearSel == null || !yearsAvail.includes(yearSel))) {
+    if ((period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 0 && (yearSel == null || !yearsAvail.includes(yearSel))) {
       setYearSel(yearsAvail[0])
     }
   }, [yearsAvail, period])
 
   const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
+  const [openingSaldo, setOpeningSaldo] = useState<number>(0)
   const [refreshKey, setRefreshKey] = useState(0)
   useEffect(() => {
     const onDataChanged = () => setRefreshKey((k) => k + 1)
@@ -62,7 +69,9 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
   useEffect(() => {
     let cancelled = false
     const now = new Date()
-    const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+    const todayIso = String(today || '').slice(0, 10)
+    const clampToToday = (iso: string) => (todayIso && iso > todayIso) ? todayIso : iso
+    const y = ((period === 'JAHR' || period === 'DREI_JAHRE') && yearSel) ? yearSel : now.getUTCFullYear()
     
     let from: string, to: string
     if (period === 'GESAMT') {
@@ -70,26 +79,51 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
       const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
       const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
       from = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
+      to = clampToToday(new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10))
     } else if (period === 'MONAT') {
       from = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+      to = clampToToday(new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10))
+    } else if (period === 'DREI_JAHRE') {
+      // 3-year window: (y-2) .. y
+      from = new Date(Date.UTC(y - 2, 0, 1)).toISOString().slice(0, 10)
+      to = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
     } else {
       // JAHR
       from = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-      to = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+      to = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
     }
-    
-    window.api?.reports.summary?.({ from, to }).then(res => {
-      if (cancelled || !res) return
-      const inGross = res.byType.find(x => x.key === 'IN')?.gross || 0
-      const outGrossRaw = res.byType.find(x => x.key === 'OUT')?.gross || 0
+
+    const dayBefore = (iso: string) => {
+      const d = new Date(iso + 'T00:00:00Z')
+      d.setUTCDate(d.getUTCDate() - 1)
+      return d.toISOString().slice(0, 10)
+    }
+    const diffFromSummary = (res: any) => {
+      const inGross = res?.byType?.find((x: any) => x.key === 'IN')?.gross || 0
+      const outGrossRaw = res?.byType?.find((x: any) => x.key === 'OUT')?.gross || 0
       const outGross = Math.abs(outGrossRaw)
-      const diff = Math.round((inGross - outGross) * 100) / 100
-      setSum({ inGross, outGross, diff })
-    })
+      const diff = Math.round((Number(inGross || 0) - Number(outGross || 0)) * 100) / 100
+      return { inGross: Number(inGross || 0), outGross: Number(outGross || 0), diff }
+    }
+
+    ;(async () => {
+      try {
+        const needOpening = includePrevSaldo && period !== 'GESAMT'
+        const [cur, prev] = await Promise.all([
+          window.api?.reports.summary?.({ from, to }),
+          needOpening ? window.api?.reports.summary?.({ to: dayBefore(from) }) : Promise.resolve(null)
+        ])
+        if (cancelled || !cur) return
+        const curD = diffFromSummary(cur)
+        const open = (needOpening && prev) ? diffFromSummary(prev).diff : 0
+        setOpeningSaldo(open)
+        setSum({ inGross: curD.inGross, outGross: curD.outGross, diff: curD.diff })
+      } catch {
+        if (!cancelled) { setOpeningSaldo(0); setSum(null) }
+      }
+    })()
     return () => { cancelled = true }
-  }, [period, yearSel, refreshKey, yearsAvail])
+  }, [period, yearSel, refreshKey, yearsAvail, includePrevSaldo, today])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [invOpenCount, setInvOpenCount] = useState<number>(0)
@@ -245,27 +279,46 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
           <div className="btn-group" role="group" aria-label="Zeitraum">
               <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
               <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
+              <button className={`btn ghost ${period === 'DREI_JAHRE' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('DREI_JAHRE')}>3 Jahre</button>
               <button className={`btn ghost ${period === 'GESAMT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('GESAMT')}>Gesamt</button>
           </div>
-          {period === 'JAHR' && yearsAvail.length > 1 && (
-            <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label="Jahr auswählen">
+          {(period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 1 && (
+            <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label={period === 'DREI_JAHRE' ? 'Endjahr auswählen' : 'Jahr auswählen'}>
               {yearsAvail.map((y) => (
                 <option key={y} value={String(y)}>{y}</option>
               ))}
             </select>
           )}
+
+          {(period === 'MONAT' || period === 'JAHR' || period === 'DREI_JAHRE') && (
+            <div className="label-row" style={{ marginLeft: 8 }} title="Wenn aktiv: Saldo startet mit dem kumulierten Saldo vor dem gewählten Zeitraum.">
+              <label htmlFor="toggle-prev-saldo" className="helper" style={{ cursor: 'pointer' }}>Vorheriger Zeitraumssaldo</label>
+              <input
+                id="toggle-prev-saldo"
+                type="checkbox"
+                role="switch"
+                className="toggle"
+                checked={includePrevSaldo}
+                onChange={(e) => setIncludePrevSaldo(e.target.checked)}
+              />
+            </div>
+          )}
         </div>
           <div className="card card--success summary-card">
-          <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
+          <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
         </div>
           <div className="card card--danger summary-card">
-          <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
+          <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
         </div>
           <div className="card card--accent summary-card">
-          <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : 'Gesamt'})</div>
-            <div className="summary-value" style={{ color: (sum && sum.diff >= 0) ? 'var(--success)' : 'var(--danger)' }}>{eur.format(sum?.diff || 0)}</div>
+          <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'}{(includePrevSaldo && period !== 'GESAMT') ? ' inkl. Anfangsbestand' : ''})</div>
+            {(() => {
+              const base = (includePrevSaldo && period !== 'GESAMT') ? (openingSaldo || 0) : 0
+              const val = Math.round(((sum?.diff || 0) + base) * 100) / 100
+              return <div className="summary-value" style={{ color: val >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eur.format(val)}</div>
+            })()}
         </div>
       </div>
         <div className="card card--accent chart-card-overflow">
@@ -345,34 +398,45 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
 
       {(() => {
         const now = new Date()
-        const y = (period === 'JAHR' && yearSel) ? yearSel : now.getUTCFullYear()
+        const todayIso = String(today || '').slice(0, 10)
+        const clampToToday = (iso: string) => (todayIso && iso > todayIso) ? todayIso : iso
+        const y = ((period === 'JAHR' || period === 'DREI_JAHRE') && yearSel) ? yearSel : now.getUTCFullYear()
         
         // Jahresbereich für Jahres-Charts
         const yearFrom = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-        const yearTo = new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
+        const yearTo = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
         const yearFilters: CommonFilters = { from: yearFrom, to: yearTo }
+
+        // 3-Jahresbereich (für Charts)
+        const threeFrom = new Date(Date.UTC(y - 2, 0, 1)).toISOString().slice(0, 10)
+        const threeTo = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
+        const threeYearFilters: CommonFilters = { from: threeFrom, to: threeTo }
 
         // Monatsbereich (für Tagesverlauf im Kassenstand, wenn "Monat" gewählt ist)
         const curMonthFrom = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-        const curMonthTo = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+        const curMonthTo = clampToToday(new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10))
         
         // Gesamtbereich über alle Jahre
         const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
         const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
         const gesamtFrom = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
-        const gesamtTo = new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10)
+        const gesamtTo = clampToToday(new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10))
         
         const balanceFilters: CommonFilters = period === 'GESAMT'
           ? { from: gesamtFrom, to: gesamtTo }
           : period === 'MONAT'
             ? { from: curMonthFrom, to: curMonthTo }
-            : yearFilters
+            : period === 'DREI_JAHRE'
+              ? threeYearFilters
+              : yearFilters
+
+        const baseSaldo = (includePrevSaldo && period !== 'GESAMT') ? (openingSaldo || 0) : 0
 
         return (
           <>
             {/* Alle Komponenten untereinander in einer Spalte */}
             <div style={{ display: 'grid', gap: 12 }}>
-              <BalanceAreaChart {...balanceFilters} />
+              <BalanceAreaChart {...balanceFilters} baseSaldo={baseSaldo} />
               {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
               {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
@@ -389,7 +453,7 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
                   {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
                 </div>
               </div>
-              <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} />
+              <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} />
               <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
               <SphereShareCard from={yearFilters.from} to={yearFilters.to} />
               <IncomeExpenseBars {...balanceFilters} />

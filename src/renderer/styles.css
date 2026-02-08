@@ -3768,8 +3768,13 @@ label .req-asterisk {
         /* Auto-fit grid for cards */
         .dashboard-grid-auto {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 12px;
+        }
+
+        /* Keep dashboard summary titles on one line */
+        .dashboard-grid-auto .summary-card .helper {
+            white-space: nowrap;
         }
 
         /* Period selector row */
