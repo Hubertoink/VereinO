@@ -103,6 +103,15 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M2 12l10 5 10-5" />
         </svg>
       )
+    case 'cashCheck':
+      // Wallet/Cash-check icon
+      return (
+        <svg {...iconProps}>
+          <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+          <path d="M21 10h-4a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h4" />
+          <path d="M7 9h5" />
+        </svg>
+      )
     case 'yearEnd':
       // Calendar/Year-End icon
       return (
