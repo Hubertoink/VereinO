@@ -15,6 +15,7 @@ export type TileKey =
   | 'import'
   | 'org'
   | 'tags'
+  | 'cashCheck'
   | 'yearEnd'
   | 'tutorial' 
   | 'about'
@@ -211,6 +212,11 @@ export interface OrgPaneProps {
 }
 
 export interface YearEndPaneProps {
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
+  bumpDataVersion: () => void
+}
+
+export interface CashCheckPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
 }

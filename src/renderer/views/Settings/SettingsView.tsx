@@ -7,6 +7,7 @@ import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { TagsPane } from './panes/TagsPane'
+import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
@@ -16,6 +17,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'import',
   'org',
   'tags',
+  'cashCheck',
   'yearEnd',
   'tutorial',
   'about',
@@ -130,6 +132,13 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openTagsManager={props.openTagsManager}
+          />
+        )}
+
+        {activeTile === 'cashCheck' && (
+          <CashCheckPane
+            notify={props.notify}
+            bumpDataVersion={props.bumpDataVersion}
           />
         )}
         

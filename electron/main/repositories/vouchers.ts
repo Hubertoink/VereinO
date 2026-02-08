@@ -30,7 +30,6 @@ export function createVoucher(input: {
     earmarkAmount?: number | null
     budgetId?: number
     budgetAmount?: number | null
-    // New: multiple budget/earmark assignments
     budgets?: Array<{ budgetId: number; amount: number }>
     earmarks?: Array<{ earmarkId: number; amount: number }>
     createdBy?: number | null
@@ -43,7 +42,6 @@ export function createVoucher(input: {
         const date = new Date(input.date)
         const year = date.getFullYear()
         // sequence and voucherNo will be (re)generated inside retry loop
-
         // compute based on provided net or gross
         let netAmount: number
         let grossAmount: number
@@ -442,6 +440,7 @@ export function listVouchersAdvancedPaged(filters: {
     const rows = d.prepare(
         `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
+                EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
                 v.earmark_amount as earmarkAmount,
@@ -466,7 +465,11 @@ export function listVouchersAdvancedPaged(filters: {
          ORDER BY ${orderExpr} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
          LIMIT ? OFFSET ?`
     ).all(...params, limit, offset) as any[]
-    const mapped = rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
+    const mapped = rows.map(r => ({
+        ...r,
+        isCashCheck: !!(r as any).isCashCheck,
+        tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : []
+    }))
     return { rows: mapped, total }
 }
 
@@ -805,6 +808,11 @@ export function updateVoucher(input: {
     // Capture tags before update for audit
     const beforeTags = getTagsForVoucher(input.id)
     const currentFull = { ...current, tags: beforeTags }
+
+    // System lock: cash-check vouchers are audit-relevant and must not be editable
+    const cashCheckRef = d.prepare('SELECT id FROM cash_checks WHERE voucher_id = ? LIMIT 1').get(input.id) as any
+    if (cashCheckRef) throw new Error('Kassenprüfungsbuchungen sind systemgeneriert und können nicht bearbeitet werden.')
+
     // Enforce period lock for the voucher's existing date (block edits in closed year)
     ensurePeriodOpen(current.date, d)
 
@@ -968,7 +976,6 @@ export function deleteVoucher(id: number) {
     try { writeAudit(d as any, null, 'vouchers', id, 'DELETE', { snapshot: snap }) } catch { }
     return { id }
 }
-
 export function clearAllVouchers() {
     return withTransaction((d: DB) => {
         // Collect file paths before deletion
@@ -989,21 +996,39 @@ export function clearAllVouchers() {
     })
 }
 
-export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
+export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number }) {
     const d = getDb()
     const to = params.to ?? new Date().toISOString().slice(0, 10)
     const year = to.slice(0, 4)
     // Wenn 'from' übergeben wird, nutze es; sonst Jahresanfang
     const from = params.from ?? `${year}-01-01`
-    const wh: string[] = ["date >= ?", "date <= ?"]
-    const vals: any[] = [from, to]
-    if (params.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
+    const wh: string[] = ["v.date >= @from", "v.date <= @to"]
+    const bind: Record<string, any> = { from, to }
+    if (params.sphere) { wh.push('v.sphere = @sphere'); bind.sphere = params.sphere }
+
+    const budgetId = (typeof params.budgetId === 'number' && Number.isFinite(params.budgetId)) ? params.budgetId : undefined
+
+    let joinSql = ''
+    let grossExpr = 'v.gross_amount'
+    if (budgetId != null) {
+        bind.budgetId = budgetId
+        // When budgetId is provided, compute movement based on budget allocation amounts.
+        // Prefer junction table voucher_budgets; fallback to legacy columns (budget_id/budget_amount).
+        joinSql = ' LEFT JOIN voucher_budgets vb ON vb.voucher_id = v.id AND vb.budget_id = @budgetId '
+        wh.push('(vb.budget_id IS NOT NULL OR v.budget_id = @budgetId)')
+        grossExpr = `CASE
+            WHEN vb.amount IS NOT NULL THEN vb.amount
+            WHEN v.budget_id = @budgetId THEN COALESCE(v.budget_amount, v.gross_amount)
+            ELSE 0
+        END`
+    }
+
     const whereSql = ' WHERE ' + wh.join(' AND ')
     const rows = d.prepare(`
-        SELECT payment_method as pm, type, IFNULL(SUM(gross_amount), 0) as gross
-        FROM vouchers${whereSql}
-        GROUP BY payment_method, type
-    `).all(...vals) as any[]
+        SELECT v.payment_method as pm, v.type as type, IFNULL(SUM(${grossExpr}), 0) as gross
+        FROM vouchers v${joinSql}${whereSql}
+        GROUP BY v.payment_method, v.type
+    `).all(bind) as any[]
     let bar = 0, bank = 0
     for (const r of rows) {
         const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0

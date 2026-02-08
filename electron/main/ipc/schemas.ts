@@ -34,7 +34,7 @@ export const VoucherCreateInput = z
         earmarkAmount: z.number().nullable().optional(),
         budgetId: z.number().optional(),
         budgetAmount: z.number().nullable().optional(),
-        // New: multiple budget/earmark assignments
+        // Optional: multiple budget/earmark assignments
         budgets: z.array(VoucherBudgetAssignment).optional(),
         earmarks: z.array(VoucherEarmarkAssignment).optional(),
         files: z
@@ -144,6 +144,68 @@ export const YearEndCloseOutput = z.object({ ok: z.boolean(), closedUntil: z.str
 export type TYearEndCloseInput = z.infer<typeof YearEndCloseInput>
 export type TYearEndCloseOutput = z.infer<typeof YearEndCloseOutput>
 
+// Cash checks (Kassenprüfung)
+export const CashChecksListInput = z.object({ year: z.number() })
+export const CashChecksListOutput = z.object({
+    rows: z.array(
+        z.object({
+            id: z.number(),
+            year: z.number(),
+            date: z.string(),
+            soll: z.number(),
+            ist: z.number(),
+            diff: z.number(),
+            voucherId: z.number().nullable(),
+            voucherNo: z.string().nullable(),
+            budgetId: z.number().nullable(),
+            budgetLabel: z.string().nullable(),
+            note: z.string().nullable(),
+            inspector1Name: z.string().nullable(),
+            inspector2Name: z.string().nullable(),
+            createdAt: z.string()
+        })
+    )
+})
+
+export const CashChecksCreateInput = z.object({
+    year: z.number(),
+    date: z.string(),
+    soll: z.number(),
+    ist: z.number(),
+    diff: z.number(),
+    voucherId: z.number().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    note: z.string().nullable().optional()
+})
+export const CashChecksCreateOutput = z.object({ id: z.number() })
+
+export const CashChecksSetInspectorsInput = z.object({
+    id: z.number(),
+    inspector1Name: z.string().nullable().optional(),
+    inspector2Name: z.string().nullable().optional()
+})
+export const CashChecksSetInspectorsOutput = z.object({ id: z.number() })
+
+export const CashChecksExportPdfInput = z.object({ id: z.number() })
+export const CashChecksExportPdfOutput = z.object({ filePath: z.string() })
+
+export const CashChecksGetInspectorDefaultsInput = z.object({}).optional()
+export const CashChecksGetInspectorDefaultsOutput = z.object({
+    inspector1Name: z.string().nullable(),
+    inspector2Name: z.string().nullable()
+})
+
+export type TCashChecksListInput = z.infer<typeof CashChecksListInput>
+export type TCashChecksListOutput = z.infer<typeof CashChecksListOutput>
+export type TCashChecksCreateInput = z.infer<typeof CashChecksCreateInput>
+export type TCashChecksCreateOutput = z.infer<typeof CashChecksCreateOutput>
+export type TCashChecksSetInspectorsInput = z.infer<typeof CashChecksSetInspectorsInput>
+export type TCashChecksSetInspectorsOutput = z.infer<typeof CashChecksSetInspectorsOutput>
+export type TCashChecksExportPdfInput = z.infer<typeof CashChecksExportPdfInput>
+export type TCashChecksExportPdfOutput = z.infer<typeof CashChecksExportPdfOutput>
+export type TCashChecksGetInspectorDefaultsInput = z.infer<typeof CashChecksGetInspectorDefaultsInput>
+export type TCashChecksGetInspectorDefaultsOutput = z.infer<typeof CashChecksGetInspectorDefaultsOutput>
+
 export const YearEndReopenInput = z.object({ year: z.number() })
 export const YearEndReopenOutput = z.object({ ok: z.boolean(), closedUntil: z.string().nullable() })
 export type TYearEndReopenInput = z.infer<typeof YearEndReopenInput>
@@ -205,7 +267,8 @@ export type TReportsMonthlyOutput = z.infer<typeof ReportsMonthlyOutput>
 export const ReportsCashBalanceInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
-    sphere: Sphere.optional()
+    sphere: Sphere.optional(),
+    budgetId: z.number().optional()
 })
 export const ReportsCashBalanceOutput = z.object({
     BAR: z.number(),
@@ -241,6 +304,7 @@ export const VouchersListOutput = z.object({
             date: z.string(),
             type: VoucherType,
             sphere: Sphere,
+            isCashCheck: z.boolean().optional(),
             paymentMethod: PaymentMethod.nullable().optional(),
             transferFrom: PaymentMethod.nullable().optional(),
             transferTo: PaymentMethod.nullable().optional(),

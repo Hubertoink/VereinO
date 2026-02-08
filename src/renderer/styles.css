@@ -99,6 +99,10 @@
     flex-shrink: 0;
 }
 
+.settings-tab-label--short {
+    display: none;
+}
+
 /* Settings pane layout improvements */
 .settings-row-2col {
     display: grid;
@@ -113,6 +117,23 @@
 }
 
 @media (max-width: 900px) {
+    .settings-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .settings-tab {
+        padding: 8px 10px;
+    }
+
+    .settings-tab-label--full {
+        display: none;
+    }
+
+    .settings-tab-label--short {
+        display: inline;
+    }
+
     .settings-row-2col,
     .settings-row-3col {
         grid-template-columns: 1fr;
@@ -3305,7 +3326,7 @@ textarea:focus {
 .tooltip-portal::after {
     content: '';
     position: absolute;
-    left: 50%;
+    left: var(--tooltip-arrow-x, 50%);
     transform: translateX(-50%);
     border: 6px solid transparent;
 }
@@ -5274,6 +5295,8 @@ html[data-glass-modals="true"] .flyout-arrow {
     background: var(--border);
     margin: 0 4px;
 }
+
+
 
 /* ==================== Filter Dropdown ==================== */
 .sr-only {

@@ -3,6 +3,7 @@ import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherRe
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
+import { createCashCheck, getCashCheckInspectorDefaults, listCashChecks, setCashCheckInspectors } from '../repositories/cashChecks'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, postInvoiceToVoucher, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
@@ -26,6 +27,9 @@ import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSma
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
+import { generateCashCheckPDF } from '../services/cashCheckReport'
+
+import { CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsInput, CashChecksGetInspectorDefaultsOutput } from './schemas'
 
 export function registerIpcHandlers() {
     // App info
@@ -116,7 +120,7 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.cashBalance', async (_e, payload) => {
         const parsed = ReportsCashBalanceInput.parse(payload)
-        const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any })
+        const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any, budgetId: (parsed as any).budgetId })
         return ReportsCashBalanceOutput.parse(res)
     })
 
@@ -1157,6 +1161,33 @@ export function registerIpcHandlers() {
     ipcMain.handle('yearEnd.status', async () => {
         const res = yearEnd.status()
         return YearEndStatusOutput.parse(res as any)
+    })
+
+    // Cash checks (Kassenprüfung)
+    ipcMain.handle('cashChecks.list', async (_e, payload) => {
+        const parsed = CashChecksListInput.parse(payload)
+        const res = listCashChecks({ year: parsed.year })
+        return CashChecksListOutput.parse(res)
+    })
+    ipcMain.handle('cashChecks.create', async (_e, payload) => {
+        const parsed = CashChecksCreateInput.parse(payload)
+        const res = createCashCheck(parsed as any)
+        return CashChecksCreateOutput.parse(res)
+    })
+    ipcMain.handle('cashChecks.setInspectors', async (_e, payload) => {
+        const parsed = CashChecksSetInspectorsInput.parse(payload)
+        const res = setCashCheckInspectors(parsed as any)
+        return CashChecksSetInspectorsOutput.parse(res)
+    })
+    ipcMain.handle('cashChecks.exportPdf', async (_e, payload) => {
+        const parsed = CashChecksExportPdfInput.parse(payload)
+        const res = await generateCashCheckPDF({ cashCheckId: parsed.id })
+        return CashChecksExportPdfOutput.parse(res)
+    })
+    ipcMain.handle('cashChecks.getInspectorDefaults', async (_e, payload) => {
+        CashChecksGetInspectorDefaultsInput.parse(payload)
+        const res = getCashCheckInspectorDefaults()
+        return CashChecksGetInspectorDefaultsOutput.parse(res)
     })
 
     // Work queue (dashboard): lightweight summary counts

@@ -26,7 +26,11 @@ declare global {
                     categoryId?: number
                     projectId?: number
                     earmarkId?: number
+                    earmarkAmount?: number | null
                     budgetId?: number
+                    budgetAmount?: number | null
+                    budgets?: { budgetId: number; amount: number }[]
+                    earmarks?: { earmarkId: number; amount: number }[]
                     files?: { name: string; dataBase64: string; mime?: string }[]
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
@@ -78,6 +82,38 @@ declare global {
                 close?: (payload: { year: number }) => Promise<{ ok: boolean; closedUntil: string }>
                 reopen?: (payload: { year: number }) => Promise<{ ok: boolean; closedUntil: string | null }>
                 status?: () => Promise<{ closedUntil: string | null }>
+            }
+            cashChecks?: {
+                list: (payload: { year: number }) => Promise<{
+                    rows: Array<{
+                        id: number
+                        year: number
+                        date: string
+                        soll: number
+                        ist: number
+                        diff: number
+                        voucherId?: number | null
+                        voucherNo?: string | null
+                        budgetId?: number | null
+                        budgetLabel?: string | null
+                        note?: string | null
+                        inspector1Name?: string | null
+                        inspector2Name?: string | null
+                    }>
+                }>
+                create: (payload: {
+                    year: number
+                    date: string
+                    soll: number
+                    ist: number
+                    diff: number
+                    voucherId?: number | null
+                    budgetId?: number | null
+                    note?: string | null
+                }) => Promise<{ id: number }>
+                setInspectors: (payload: { id: number; inspector1Name?: string | null; inspector2Name?: string | null }) => Promise<{ ok: true }>
+                exportPdf: (payload: { id: number }) => Promise<{ filePath: string }>
+                getInspectorDefaults: () => Promise<{ inspector1Name: string | null; inspector2Name: string | null }>
             }
             bindings: {
                 list: (payload?: { activeOnly?: boolean }) => Promise<{ rows: Array<{ id: number; code: string; name: string; description?: string | null; startDate?: string | null; endDate?: string | null; isActive: number; color?: string | null; budget?: number | null }> }>

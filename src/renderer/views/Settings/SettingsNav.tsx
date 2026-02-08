@@ -30,6 +30,7 @@ const settingsIconColors: Record<TileKey, string> = {
   import: '#F50057',      // Pink/Red - Import
   org: '#26A69A',         // Teal - Organization
   tags: '#FFD600',        // Yellow - Tags
+  cashCheck: '#00C853',   // Reuse Year End green
   yearEnd: '#00C853',     // Green - Year End
   tutorial: '#FF7043',    // Orange - Tutorial
   about: '#9C27B0',       // Purple - About
@@ -146,14 +147,15 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
  * File tab (Aktenreiter) layout for switching between settings categories
  */
 export function SettingsNav({ active, onSelect }: SettingsNavProps) {
-  const tiles: Array<{ key: TileKey; label: string }> = [
-    { key: 'general', label: 'Darstellung' },
-    { key: 'table', label: 'Tabelle' },
-    { key: 'storage', label: 'Speicher & Backup' },
-    { key: 'import', label: 'Import' },
-    { key: 'org', label: 'Organisation' },
-    { key: 'tags', label: 'Tags' },
-    { key: 'yearEnd', label: 'Jahresabschluss' },
+  const tiles: Array<{ key: TileKey; label: string; shortLabel: string }> = [
+    { key: 'general', label: 'Darstellung', shortLabel: 'Darst.' },
+    { key: 'table', label: 'Tabelle', shortLabel: 'Tab.' },
+    { key: 'storage', label: 'Speicher & Backup', shortLabel: 'Speicher' },
+    { key: 'import', label: 'Import', shortLabel: 'Import' },
+    { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
+    { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
+    { key: 'cashCheck', label: 'Kassenprüfung', shortLabel: 'Kassenpr.' },
+    { key: 'yearEnd', label: 'Jahresabschluss', shortLabel: 'Jahresab.' },
   ]
 
   return (
@@ -164,6 +166,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
           className={`settings-tab ${active === tile.key ? 'active' : ''}`}
           onClick={() => onSelect(tile.key)}
           aria-current={active === tile.key ? 'page' : undefined}
+          title={tile.label}
         >
           <span 
             className="settings-tab-icon" 
@@ -172,7 +175,8 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
           >
             {getSettingsIcon(tile.key)}
           </span>
-          <span>{tile.label}</span>
+          <span className="settings-tab-label settings-tab-label--full">{tile.label}</span>
+          <span className="settings-tab-label settings-tab-label--short">{tile.shortLabel}</span>
         </button>
       ))}
     </div>

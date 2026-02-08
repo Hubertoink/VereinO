@@ -60,6 +60,13 @@ contextBridge.exposeInMainWorld('api', {
             reopen: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.reopen', payload),
             status: () => ipcRenderer.invoke('yearEnd.status')
         },
+    cashChecks: {
+        list: (payload: any) => ipcRenderer.invoke('cashChecks.list', payload),
+        create: (payload: any) => cleanInvoke('cashChecks.create', payload),
+        setInspectors: (payload: any) => cleanInvoke('cashChecks.setInspectors', payload),
+        exportPdf: (payload: any) => cleanInvoke('cashChecks.exportPdf', payload),
+        getInspectorDefaults: () => cleanInvoke('cashChecks.getInspectorDefaults', {})
+    },
     attachments: {
         list: (payload: any) => ipcRenderer.invoke('attachments.list', payload),
         open: (payload: any) => ipcRenderer.invoke('attachments.open', payload),

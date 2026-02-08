@@ -5,6 +5,7 @@ import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsSphereDonut from '../../components/reports/ReportsSphereDonut'
 import ReportsPaymentMethodBars from '../../components/reports/ReportsPaymentMethodBars'
 import ReportsInOutLines from '../../components/reports/ReportsInOutLines'
+import { MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 
 export default function ReportsView(props: {
   from: string
@@ -26,63 +27,164 @@ export default function ReportsView(props: {
 
   const hasActiveFilters = filterSphere || filterType || filterPM || from || to
 
+  const fmtDateDe = (iso: string) => {
+    const s = (iso || '').trim()
+    const parts = s.split('-')
+    if (parts.length !== 3) return s
+    const [y, m, d] = parts
+    if (!y || !m || !d) return s
+    return `${d}.${m}.${y}`
+  }
+
+  const badges: Array<{ key: string; label: string; onClear: () => void }> = (() => {
+    const list: Array<{ key: string; label: string; onClear: () => void }> = []
+
+    if (from && to) {
+      list.push({
+        key: 'range',
+        label: `Zeitraum: ${fmtDateDe(from)} – ${fmtDateDe(to)}`,
+        onClear: () => {
+          setFrom('')
+          setTo('')
+        }
+      })
+    } else if (from) {
+      list.push({
+        key: 'from',
+        label: `Von: ${fmtDateDe(from)}`,
+        onClear: () => setFrom('')
+      })
+    } else if (to) {
+      list.push({
+        key: 'to',
+        label: `Bis: ${fmtDateDe(to)}`,
+        onClear: () => setTo('')
+      })
+    }
+
+    if (filterSphere) {
+      list.push({
+        key: 'sphere',
+        label: `Sphäre: ${filterSphere}`,
+        onClear: () => setFilterSphere(null)
+      })
+    }
+    if (filterType) {
+      list.push({
+        key: 'type',
+        label: `Art: ${filterType}`,
+        onClear: () => setFilterType(null)
+      })
+    }
+    if (filterPM) {
+      list.push({
+        key: 'pm',
+        label: `Zahlweg: ${filterPM === 'BAR' ? 'Bar' : 'Bank'}`,
+        onClear: () => setFilterPM(null)
+      })
+    }
+    return list
+  })()
+
+  const badgeStyle = (key: string): React.CSSProperties => {
+    // Stable pseudo-random palette based on key (no hard-coded colors, uses theme vars)
+    const palette = ['--accent', '--success', '--warning', '--danger', '--badge-in', '--badge-out'] as const
+    let h = 0
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+    const varName = palette[h % palette.length]
+    return {
+      background: `color-mix(in oklab, var(${varName}) 18%, transparent)`,
+      borderColor: `color-mix(in oklab, var(${varName}) 28%, var(--border))`
+    }
+  }
+
   return (
     <>
-      <div className="card" style={{ padding: 12 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--text-dim)' }}>Zeitraum:</span>
-          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 140 }} />
-          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 140 }} />
-          <span style={{ color: 'var(--text-dim)' }}>Jahr:</span>
-          <select className="input" value={(() => {
-            if (!from || !to) return ''
-            const fy = from.slice(0, 4)
-            const ty = to.slice(0, 4)
-            if (from === `${fy}-01-01` && to === `${fy}-12-31` && fy === ty) return fy
-            return ''
-          })()} onChange={(e) => {
-            const y = e.target.value
-            if (!y) { setFrom(''); setTo(''); return }
-            const yr = Number(y)
-            const f = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-            const t = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-            setFrom(f); setTo(t)
-          }} style={{ width: 100 }}>
-            <option value="">Alle</option>
-            {yearsAvail.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Sphäre:</span>
-          <select className="input" value={filterSphere ?? ''} onChange={(e) => setFilterSphere((e.target.value as Sphere | any) || null)} style={{ width: 120 }}>
-            <option value="">Alle</option>
-            <option value="IDEELL">IDEELL</option>
-            <option value="ZWECK">ZWECK</option>
-            <option value="VERMOEGEN">VERMOEGEN</option>
-            <option value="WGB">WGB</option>
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Art:</span>
-          <select className="input" value={filterType ?? ''} onChange={(e) => setFilterType((e.target.value as VoucherType | any) || null)} style={{ width: 120 }}>
-            <option value="">Alle</option>
-            <option value="IN">IN</option>
-            <option value="OUT">OUT</option>
-            <option value="TRANSFER">TRANSFER</option>
-          </select>
-          <span style={{ color: 'var(--text-dim)' }}>Zahlweg:</span>
-          <select className="input" value={filterPM ?? ''} onChange={(e) => { const v = e.target.value as PaymentMethod | any; props.setFilterPM(v || null) }} style={{ width: 100 }}>
-            <option value="">Alle</option>
-            <option value="BAR">Bar</option>
-            <option value="BANK">Bank</option>
-          </select>
+      <header className="flex justify-between items-center mb-16">
+        <div>
+          <h1 style={{ margin: 0 }}>Report</h1>
+          <p className="helper">Auswertungen für den gewählten Zeitraum und die Filter.</p>
+        </div>
+
+        <div className="flex gap-8 items-center">
+          <div className="toolbar-icon">
+            <TimeFilterDropdown
+              yearsAvail={yearsAvail}
+              from={from}
+              to={to}
+              tooltip="Zeitraum filtern"
+              onApply={({ from: nf, to: nt }) => {
+                setFrom(nf)
+                setTo(nt)
+              }}
+            />
+          </div>
+
+          <div className="toolbar-icon">
+            <MetaFilterDropdown
+              budgets={[]}
+              earmarks={[]}
+              tagDefs={[]}
+              filterType={filterType}
+              filterPM={filterPM}
+              filterTag={null}
+              sphere={filterSphere}
+              earmarkId={null}
+              budgetId={null}
+              tooltip="Filter nach Art, Sphäre, Zahlweg"
+              onApply={({ filterType: ft, filterPM: pm, sphere: sp }) => {
+                setFilterType(ft)
+                setFilterPM(pm)
+                setFilterSphere(sp)
+              }}
+            />
+          </div>
+
           {hasActiveFilters && (
-            <button className="btn danger" title="Filter zurücksetzen" onClick={() => { setFilterSphere(null); setFilterType(null); setFilterPM(null); setFrom(''); setTo(''); }} style={{ width: 32, height: 32, padding: 0, display: 'grid', placeContent: 'center' }}>
-              ✕
+            <button
+              className="btn ghost"
+              title="Alle Filter zurücksetzen"
+              onClick={() => {
+                setFilterSphere(null)
+                setFilterType(null)
+                setFilterPM(null)
+                setFrom('')
+                setTo('')
+              }}
+              style={{ padding: '4px 8px', color: 'var(--accent)' }}
+              aria-label="Alle Filter zurücksetzen"
+              type="button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
             </button>
           )}
-          <div style={{ flex: 1 }} />
-          <button className="btn" title="Exportieren" onClick={() => onOpenExport()} style={{ width: 32, height: 32, padding: 0, display: 'grid', placeContent: 'center', background: '#c62828', color: '#fff' }}>
+
+          <button
+            className="btn danger"
+            title="Exportieren"
+            onClick={() => onOpenExport()}
+            style={{ width: 32, height: 32, padding: 0, display: 'grid', placeContent: 'center' }}
+            aria-label="Exportieren"
+            type="button"
+          >
             📄
           </button>
         </div>
-      </div>
+      </header>
+
+      {badges.length > 0 && (
+        <div className="mb-16" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} aria-label="Aktive Filter">
+          {badges.map((b) => (
+            <span key={b.key} className="chip" title={b.label} style={badgeStyle(b.key)}>
+              <span>{b.label}</span>
+              <button className="chip-x" type="button" onClick={b.onClear} aria-label={`Filter entfernen: ${b.label}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* KPIs and charts */}
       <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />

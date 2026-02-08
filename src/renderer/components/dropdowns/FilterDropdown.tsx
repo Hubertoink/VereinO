@@ -53,8 +53,15 @@ export default function FilterDropdown({
     const anchor = buttonRef.current.getBoundingClientRect()
     const tip = tooltipRef.current.getBoundingClientRect()
 
+    const anchorCenterX = anchor.left + anchor.width / 2
+
     let left = anchor.left + anchor.width / 2 - tip.width / 2
     left = Math.min(Math.max(left, margin), window.innerWidth - tip.width - margin)
+
+    // Keep tooltip within window, but ensure arrow points to trigger.
+    // (When clamped, centered arrow would be wrong.)
+    let arrowX = anchorCenterX - left
+    arrowX = Math.min(Math.max(arrowX, 12), tip.width - 12)
 
     let top = anchor.bottom + gap
     let placement: TooltipPlacement = 'bottom'
@@ -65,7 +72,9 @@ export default function FilterDropdown({
     }
 
     setTooltipPlacement(placement)
-    setTooltipStyle({ left, top })
+    const style: React.CSSProperties = { left, top }
+    ;(style as any)['--tooltip-arrow-x'] = `${arrowX}px`
+    setTooltipStyle(style)
   }
 
   useLayoutEffect(() => {
