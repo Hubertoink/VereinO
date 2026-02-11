@@ -60,13 +60,6 @@ contextBridge.exposeInMainWorld('api', {
             reopen: (payload: { year: number }) => ipcRenderer.invoke('yearEnd.reopen', payload),
             status: () => ipcRenderer.invoke('yearEnd.status')
         },
-    cashChecks: {
-        list: (payload: any) => ipcRenderer.invoke('cashChecks.list', payload),
-        create: (payload: any) => cleanInvoke('cashChecks.create', payload),
-        setInspectors: (payload: any) => cleanInvoke('cashChecks.setInspectors', payload),
-        exportPdf: (payload: any) => cleanInvoke('cashChecks.exportPdf', payload),
-        getInspectorDefaults: () => cleanInvoke('cashChecks.getInspectorDefaults', {})
-    },
     attachments: {
         list: (payload: any) => ipcRenderer.invoke('attachments.list', payload),
         open: (payload: any) => ipcRenderer.invoke('attachments.open', payload),
@@ -105,13 +98,7 @@ contextBridge.exposeInMainWorld('api', {
         delete: (payload: any) => ipcRenderer.invoke('members.delete', payload),
         get: (payload: any) => ipcRenderer.invoke('members.get', payload),
         writeLetter: (payload: any) => ipcRenderer.invoke('members.writeLetter', payload),
-        export: (payload: any) => ipcRenderer.invoke('members.export', payload),
-        import: {
-            preview: (payload: { fileBase64: string }) => ipcRenderer.invoke('members.import.preview', payload),
-            execute: (payload: { fileBase64: string; mapping: Record<string, string | null>; updateExisting?: boolean }) => ipcRenderer.invoke('members.import.execute', payload),
-            template: () => ipcRenderer.invoke('members.import.template'),
-            testdata: () => ipcRenderer.invoke('members.import.testdata')
-        }
+        export: (payload: any) => ipcRenderer.invoke('members.export', payload)
     },
     payments: {
         listDue: (payload: any) => ipcRenderer.invoke('payments.listDue', payload),
@@ -162,20 +149,6 @@ contextBridge.exposeInMainWorld('api', {
             const handler = (_: any, info: { message: string }) => { try { cb(info) } catch { } }
             ipcRenderer.on('db:initFailed', handler)
             return () => ipcRenderer.removeListener('db:initFailed', handler)
-        },
-        onPreUpdateBackup: (cb: (info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => void) => {
-            const handler = (_: any, info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => {
-                try { cb(info) } catch { }
-            }
-            ipcRenderer.on('db:preUpdateBackup', handler)
-            return () => ipcRenderer.removeListener('db:preUpdateBackup', handler)
-        },
-        onPreUpdateBackupFailed: (cb: (info: { fromVersion: string; toVersion: string; error: string }) => void) => {
-            const handler = (_: any, info: { fromVersion: string; toVersion: string; error: string }) => {
-                try { cb(info) } catch { }
-            }
-            ipcRenderer.on('db:preUpdateBackupFailed', handler)
-            return () => ipcRenderer.removeListener('db:preUpdateBackupFailed', handler)
         }
     },
     quotes: {

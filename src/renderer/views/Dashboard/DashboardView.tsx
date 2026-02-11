@@ -12,7 +12,17 @@ import SphereShareCard from './SphereShareCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
 
-export default function DashboardView({ today, onGoToInvoices }: { today: string; onGoToInvoices: () => void }) {
+type GoToVoucherArgs = { voucherId: number; recordDate?: string | null }
+
+export default function DashboardView({
+  today,
+  onGoToInvoices,
+  onGoToVoucher
+}: {
+  today: string
+  onGoToInvoices: () => void
+  onGoToVoucher?: (args: GoToVoucherArgs) => void
+}) {
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cashier, setCashier] = useState<string>('')
@@ -462,12 +472,16 @@ export default function DashboardView({ today, onGoToInvoices }: { today: string
         )
       })()}
 
-      <DashboardRecentActivity />
+      <DashboardRecentActivity onGoToVoucher={onGoToVoucher} />
     </div>
   )
 }
 
-function DashboardRecentActivity() {
+function DashboardRecentActivity({
+  onGoToVoucher
+}: {
+  onGoToVoucher?: (args: GoToVoucherArgs) => void
+}) {
   const [rows, setRows] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(false)
   const [earmarks, setEarmarks] = React.useState<Array<{ id: number; code: string; name: string }>>([])
@@ -671,6 +685,8 @@ function DashboardRecentActivity() {
           }).replace(',', '') : '—'
           const recDateRaw = r.recordDate ? String(r.recordDate).slice(0, 10) : null
           const color = info.tone === 'err' ? 'var(--danger)' : info.tone === 'warn' ? '#f9a825' : 'var(--accent)'
+          const isVoucherEntity = (String(r.entity || '').toUpperCase() === 'VOUCHERS' || String(r.entity || '').toUpperCase() === 'VOUCHER')
+          const canGoToVoucher = !!onGoToVoucher && isVoucherEntity && Number(r.entityId) > 0 && String(r.action || '').toUpperCase() !== 'DELETE'
           return (
             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'baseline' }}>
               <div className="helper" style={{ whiteSpace: 'nowrap' }}>{tsAct}</div>
@@ -682,11 +698,24 @@ function DashboardRecentActivity() {
                     </span>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.title}</div>
                   </div>
-                  {recDateRaw ? (
-                    <div className="helper" style={{ whiteSpace: 'nowrap', marginLeft: 8 }}>
-                      Belegdatum: {recDateRaw}
-                    </div>
-                  ) : null}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+                    {canGoToVoucher ? (
+                      <button
+                        type="button"
+                        className="btn ghost icon-btn"
+                        title="Zum Beleg"
+                        aria-label="Zum Beleg"
+                        onClick={() => onGoToVoucher?.({ voucherId: Number(r.entityId), recordDate: recDateRaw })}
+                      >
+                        ↗
+                      </button>
+                    ) : null}
+                    {recDateRaw ? (
+                      <div className="helper" style={{ whiteSpace: 'nowrap' }}>
+                        Belegdatum: {recDateRaw}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 {info.details ? <div className="helper" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.details}</div> : null}
               </div>

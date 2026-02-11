@@ -3,7 +3,6 @@ import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherRe
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
-import { createCashCheck, getCashCheckInspectorDefaults, listCashChecks, setCashCheckInspectors } from '../repositories/cashChecks'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, postInvoiceToVoucher, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
@@ -19,7 +18,6 @@ import { getTaxExemptionCertificate, saveTaxExemptionCertificate, deleteTaxExemp
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
-import { previewMembersXlsx, executeMembersImport, createMembersTemplate, createMembersTestData } from '../services/membersImport'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { applyMigrations } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
@@ -27,9 +25,6 @@ import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSma
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
-import { generateCashCheckPDF } from '../services/cashCheckReport'
-
-import { CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsInput, CashChecksGetInspectorDefaultsOutput } from './schemas'
 
 export function registerIpcHandlers() {
     // App info
@@ -61,14 +56,7 @@ export function registerIpcHandlers() {
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
-        const res = createVoucher(parsed as any)
-        // Handle multiple budget/earmark assignments if provided
-        if ((parsed as any).budgets !== undefined) {
-            setVoucherBudgets((res as any).id, (parsed as any).budgets)
-        }
-        if ((parsed as any).earmarks !== undefined) {
-            setVoucherEarmarks((res as any).id, (parsed as any).earmarks)
-        }
+        const res = createVoucher(parsed)
         return VoucherCreateOutput.parse(res)
     })
 
@@ -120,7 +108,7 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('reports.cashBalance', async (_e, payload) => {
         const parsed = ReportsCashBalanceInput.parse(payload)
-        const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any, budgetId: (parsed as any).budgetId })
+        const res = cashBalance({ from: (parsed as any).from, to: parsed.to, sphere: parsed.sphere as any })
         return ReportsCashBalanceOutput.parse(res)
     })
 
@@ -1085,26 +1073,6 @@ export function registerIpcHandlers() {
         return result
     })
 
-    // Members import (Excel)
-    ipcMain.handle('members.import.preview', async (_e, payload: { fileBase64: string }) => {
-        const res = await previewMembersXlsx(payload.fileBase64)
-        return res
-    })
-    ipcMain.handle('members.import.execute', async (_e, payload: { fileBase64: string; mapping: Record<string, string | null>; updateExisting?: boolean; rowEdits?: Record<number, Record<string, string>> }) => {
-        // Safety: backup before potentially large data modification
-        try { await backup.makeBackup('preMembersImport') } catch { /* ignore */ }
-        const res = await executeMembersImport(payload.fileBase64, payload.mapping, { updateExisting: payload.updateExisting, rowEdits: payload.rowEdits })
-        return res
-    })
-    ipcMain.handle('members.import.template', async () => {
-        const res = await createMembersTemplate()
-        return res
-    })
-    ipcMain.handle('members.import.testdata', async () => {
-        const res = await createMembersTestData()
-        return res
-    })
-
     // Membership payments
     ipcMain.handle('payments.listDue', async (_e, payload) => {
         const parsed = PaymentsListDueInput.parse(payload)
@@ -1161,33 +1129,6 @@ export function registerIpcHandlers() {
     ipcMain.handle('yearEnd.status', async () => {
         const res = yearEnd.status()
         return YearEndStatusOutput.parse(res as any)
-    })
-
-    // Cash checks (Kassenprüfung)
-    ipcMain.handle('cashChecks.list', async (_e, payload) => {
-        const parsed = CashChecksListInput.parse(payload)
-        const res = listCashChecks({ year: parsed.year })
-        return CashChecksListOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.create', async (_e, payload) => {
-        const parsed = CashChecksCreateInput.parse(payload)
-        const res = createCashCheck(parsed as any)
-        return CashChecksCreateOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.setInspectors', async (_e, payload) => {
-        const parsed = CashChecksSetInspectorsInput.parse(payload)
-        const res = setCashCheckInspectors(parsed as any)
-        return CashChecksSetInspectorsOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.exportPdf', async (_e, payload) => {
-        const parsed = CashChecksExportPdfInput.parse(payload)
-        const res = await generateCashCheckPDF({ cashCheckId: parsed.id })
-        return CashChecksExportPdfOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.getInspectorDefaults', async (_e, payload) => {
-        CashChecksGetInspectorDefaultsInput.parse(payload)
-        const res = getCashCheckInspectorDefaults()
-        return CashChecksGetInspectorDefaultsOutput.parse(res)
     })
 
     // Work queue (dashboard): lightweight summary counts

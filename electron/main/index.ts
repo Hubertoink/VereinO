@@ -1,6 +1,5 @@
 import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
-import fs from 'node:fs'
-import { getDb, getCurrentDbInfo, readAppConfig, writeAppConfig } from './db/database'
+import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
 import { applyMigrations, ensureVoucherJunctionTables } from './db/migrations'
@@ -111,51 +110,11 @@ function createMenu() {
 }
 
 app.whenReady().then(async () => {
-    const currentVersion = (() => {
-        try { return app.getVersion() } catch { return '0.0.0' }
-    })()
-    const lastRunVersion = (() => {
-        try { return readAppConfig()?.lastRunVersion } catch { return undefined }
-    })()
-    const isUpdateRun = !!lastRunVersion && lastRunVersion !== currentVersion
-
-    let preUpdateBackup:
-        | { fromVersion: string; toVersion: string; filePath: string; dir: string }
-        | null = null
-    let preUpdateBackupFailed:
-        | { fromVersion: string; toVersion: string; error: string }
-        | null = null
-
     // Try DB init + migrations, but don't exit on failure – let renderer handle recovery
     let dbInitError: any = null
     try {
         const db = getDb()
         ; (global as any).singletonDb = db
-
-        // Pre-migration safety backup on first run after an app update.
-        // Only triggers when a DB already exists (to avoid creating backups on first install).
-        if (isUpdateRun) {
-            try {
-                const { dbPath } = getCurrentDbInfo()
-                if (fs.existsSync(dbPath)) {
-                    const res = await backup.makeBackup(`update_${lastRunVersion}_to_${currentVersion}`)
-                    preUpdateBackup = {
-                        fromVersion: String(lastRunVersion),
-                        toVersion: String(currentVersion),
-                        filePath: res.filePath,
-                        dir: backup.getBackupDir()
-                    }
-                    console.log('[Startup] Pre-update DB backup created:', res.filePath)
-                }
-            } catch (e: any) {
-                preUpdateBackupFailed = {
-                    fromVersion: String(lastRunVersion),
-                    toVersion: String(currentVersion),
-                    error: String(e?.message || e)
-                }
-                console.error('[Startup] Pre-update DB backup FAILED:', preUpdateBackupFailed.error)
-            }
-        }
 
         // Defensive: legacy DBs may miss junction tables even when most data loads.
         ensureVoucherJunctionTables(db)
@@ -188,13 +147,6 @@ app.whenReady().then(async () => {
         console.error('DB init/migrations failed', err)
         dbInitError = err
         // Do NOT block startup. We'll inform the renderer via an event so it can present recovery options.
-    } finally {
-        // Persist last run version so we can detect updates next time.
-        try {
-            writeAppConfig({ ...readAppConfig(), lastRunVersion: currentVersion })
-        } catch {
-            // ignore
-        }
     }
     // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers()
@@ -205,23 +157,6 @@ app.whenReady().then(async () => {
     if (dbInitError && win) {
         const send = () => {
             try { win.webContents.send('db:initFailed', { message: String(dbInitError?.message || dbInitError) }) } catch { /* ignore */ }
-        }
-        if (win.webContents.isLoading()) {
-            win.webContents.once('did-finish-load', () => send())
-        } else {
-            send()
-        }
-    }
-
-    // Inform renderer about pre-update backup result (toast UX lives in renderer)
-    if ((preUpdateBackup || preUpdateBackupFailed) && win) {
-        const send = () => {
-            try {
-                if (preUpdateBackup) win.webContents.send('db:preUpdateBackup', preUpdateBackup)
-                if (preUpdateBackupFailed) win.webContents.send('db:preUpdateBackupFailed', preUpdateBackupFailed)
-            } catch {
-                /* ignore */
-            }
         }
         if (win.webContents.isLoading()) {
             win.webContents.once('did-finish-load', () => send())

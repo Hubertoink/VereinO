@@ -13,6 +13,15 @@ function round2(n: number) {
     return Math.round(n * 100) / 100
 }
 
+function normalizeVoucherSearchQuery(raw?: string): { text: string; id: number | null } | null {
+    if (!raw) return null
+    const trimmed = String(raw).trim()
+    if (!trimmed) return null
+    const text = trimmed.startsWith('#') ? trimmed.slice(1).trim() : trimmed
+    const id = /^\d+$/.test(text) ? Number(text) : null
+    return { text, id }
+}
+
 export function createVoucher(input: {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER'
@@ -352,10 +361,18 @@ export function listVouchersAdvanced(filters: {
     if (to) { wh.push('v.date <= ?'); params.push(to) }
     if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
     if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
-    if (q && q.trim()) {
-        const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+                params.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+                params.push(like, like, like, like)
+            }
+        }
     }
     if (tag) {
         sql += ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
@@ -411,10 +428,18 @@ export function listVouchersAdvancedPaged(filters: {
     if (to) { wh.push('v.date <= ?'); params.push(to) }
     if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
     if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
-    if (q && q.trim()) {
-        const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-        params.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+                params.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
+                params.push(like, like, like, like)
+            }
+        }
     }
     let joinSql = ''
     if (tag) {
@@ -492,10 +517,18 @@ export function batchAssignEarmark(params: {
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    if (params.q && params.q.trim()) {
-        const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-        args.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(params.q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(like, like, like, like)
+            }
+        }
     }
     if (params.onlyWithout) wh.push('earmark_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -543,10 +576,18 @@ export function batchAssignBudget(params: {
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    if (params.q && params.q.trim()) {
-        const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-        args.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(params.q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(like, like, like, like)
+            }
+        }
     }
     if (params.onlyWithout) wh.push('budget_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -591,10 +632,18 @@ export function batchAssignTags(params: {
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    if (params.q && params.q.trim()) {
-        const like = `%${params.q.trim()}%`
-        wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-        args.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(params.q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
+                args.push(like, like, like, like)
+            }
+        }
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     // Collect voucher ids
@@ -664,10 +713,18 @@ export function summarizeVouchers(filters: {
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
-    if (q && q.trim()) {
-        const like = `%${q.trim()}%`
-        wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
-        paramsBase.push(like, like, like, like)
+    {
+        const nq = normalizeVoucherSearchQuery(q)
+        if (nq) {
+            const like = `%${nq.text}%`
+            if (nq.id != null) {
+                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
+                paramsBase.push(nq.id, like, like, like, like)
+            } else {
+                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
+                paramsBase.push(like, like, like, like)
+            }
+        }
     }
     if (tag) {
         joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
