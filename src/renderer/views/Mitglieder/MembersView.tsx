@@ -28,9 +28,14 @@ export default function MembersView() {
     const [showExport, setShowExport] = useState(false)
     const [inviteBusy, setInviteBusy] = useState(false)
     const [inviteEmails, setInviteEmails] = useState<string[]>([])
+    const inviteSubjectRef = useRef<HTMLInputElement | null>(null)
+    const [inviteFeedback, setInviteFeedback] = useState<null | { type: 'info' | 'success' | 'error'; text: string }>(null)
+    const [inviteStats, setInviteStats] = useState<{ candidates: number; withoutEmail: number }>({ candidates: 0, withoutEmail: 0 })
+    const [inviteBatchIndex, setInviteBatchIndex] = useState(0)
     const [inviteSubject, setInviteSubject] = useState<string>(() => { try { return localStorage.getItem('invite.subject') || 'Einladung zur Sitzung' } catch { return 'Einladung zur Sitzung' } })
     const [inviteBody, setInviteBody] = useState<string>(() => { try { return localStorage.getItem('invite.body') || 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } catch { return 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } })
     const [inviteActiveOnly, setInviteActiveOnly] = useState<boolean>(() => { try { return localStorage.getItem('invite.activeOnly') === '1' } catch { return false } })
+    const INVITE_BCC_BATCH_SIZE = 50
     useEffect(() => { try { localStorage.setItem('invite.subject', inviteSubject) } catch {} }, [inviteSubject])
     useEffect(() => { try { localStorage.setItem('invite.body', inviteBody) } catch {} }, [inviteBody])
     useEffect(() => { try { localStorage.setItem('invite.activeOnly', inviteActiveOnly ? '1' : '0') } catch {} }, [inviteActiveOnly])
@@ -144,6 +149,8 @@ export default function MembersView() {
     useEffect(() => { load() }, [q, status, limit, offset, sortBy, sort])
     useEffect(() => {
         if (!showInvite) return
+        setInviteFeedback(null)
+        setInviteBatchIndex(0)
         let alive = true
         ;(async () => {
             setInviteBusy(true)
@@ -152,22 +159,117 @@ export default function MembersView() {
                 let ofs = 0
                 let emails: string[] = []
                 let totalCount = 0
+                let candidateCount = 0
+                let withoutEmailCount = 0
                 do {
                     const effectiveStatus = inviteActiveOnly ? 'ACTIVE' : status
                     const res = await (window as any).api?.members?.list?.({ q: q || undefined, status: effectiveStatus, limit: pageSize, offset: ofs })
                     const rows = res?.rows || []
                     totalCount = res?.total || rows.length
-                    emails = emails.concat(rows.map((r: any) => String(r.email || '').trim()).filter((e: string) => !!e && /@/.test(e)))
+                    candidateCount += rows.length
+                    rows.forEach((r: any) => {
+                        const email = String(r.email || '').trim()
+                        if (!!email && /@/.test(email)) emails.push(email)
+                        else withoutEmailCount += 1
+                    })
                     ofs += pageSize
                 } while (ofs < totalCount)
                 const seen = new Set<string>()
                 const unique = emails.filter(e => { const k = e.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
-                if (alive) setInviteEmails(unique)
-            } catch { if (alive) setInviteEmails([]) }
+                if (alive) {
+                    setInviteEmails(unique)
+                    setInviteStats({ candidates: candidateCount, withoutEmail: withoutEmailCount })
+                }
+            } catch {
+                if (alive) {
+                    setInviteEmails([])
+                    setInviteStats({ candidates: 0, withoutEmail: 0 })
+                }
+            }
             finally { if (alive) setInviteBusy(false) }
         })()
         return () => { alive = false }
     }, [showInvite, q, status, inviteActiveOnly])
+
+    const inviteEmailBatches = useMemo(() => {
+        if (!inviteEmails.length) return [] as string[][]
+        const batches: string[][] = []
+        for (let i = 0; i < inviteEmails.length; i += INVITE_BCC_BATCH_SIZE) {
+            batches.push(inviteEmails.slice(i, i + INVITE_BCC_BATCH_SIZE))
+        }
+        return batches
+    }, [inviteEmails, INVITE_BCC_BATCH_SIZE])
+
+    const inviteTotalBatches = inviteEmailBatches.length
+    const inviteCurrentBatch = inviteEmailBatches[inviteBatchIndex] || []
+
+    useEffect(() => {
+        if (inviteBatchIndex < inviteTotalBatches) return
+        setInviteBatchIndex(inviteTotalBatches > 0 ? inviteTotalBatches - 1 : 0)
+    }, [inviteBatchIndex, inviteTotalBatches])
+
+    useEffect(() => {
+        if (!showInvite) return
+        const timer = window.setTimeout(() => inviteSubjectRef.current?.focus(), 0)
+        function onKeydown(e: KeyboardEvent) {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setShowInvite(false)
+            }
+        }
+        window.addEventListener('keydown', onKeydown)
+        return () => {
+            window.clearTimeout(timer)
+            window.removeEventListener('keydown', onKeydown)
+        }
+    }, [showInvite])
+
+    const copyInviteBcc = useCallback(async (emails: string[]) => {
+        if (!emails.length) {
+            setInviteFeedback({ type: 'info', text: 'Keine E-Mail-Adressen zum Kopieren vorhanden.' })
+            return false
+        }
+        try {
+            await navigator.clipboard.writeText(emails.join('; '))
+            setInviteFeedback({ type: 'success', text: `${emails.length} E-Mail-Adressen als BCC kopiert.` })
+            return true
+        } catch {
+            setInviteFeedback({ type: 'error', text: 'Kopieren nicht möglich.' })
+            return false
+        }
+    }, [])
+
+    const openInviteMailClient = useCallback(async () => {
+        if (!inviteCurrentBatch.length) {
+            setInviteFeedback({ type: 'info', text: 'Keine Empfänger im aktuellen Batch.' })
+            return
+        }
+        const subject = encodeURIComponent(inviteSubject || '')
+        const body = encodeURIComponent(inviteBody || '')
+        const bccRaw = inviteCurrentBatch.join(',')
+        const mailto = `mailto:?bcc=${encodeURIComponent(bccRaw)}&subject=${subject}&body=${body}`
+        if (mailto.length <= 1800) {
+            try {
+                window.location.href = mailto
+                setInviteFeedback({
+                    type: 'info',
+                    text: inviteTotalBatches > 1
+                        ? `Mail-Programm für Batch ${inviteBatchIndex + 1}/${inviteTotalBatches} geöffnet.`
+                        : 'Mail-Programm geöffnet.'
+                })
+            } catch {
+                setInviteFeedback({ type: 'error', text: 'Mail-Programm konnte nicht geöffnet werden.' })
+            }
+            return
+        }
+        const copied = await copyInviteBcc(inviteCurrentBatch)
+        if (copied) {
+            setInviteFeedback({
+                type: 'info',
+                text: `Link zu lang – Batch ${inviteBatchIndex + 1}/${inviteTotalBatches} wurde als BCC kopiert.`
+            })
+        }
+    }, [copyInviteBcc, inviteCurrentBatch, inviteSubject, inviteBody, inviteBatchIndex, inviteTotalBatches])
 
     useEffect(() => {
         if (!form) return
@@ -644,59 +746,72 @@ export default function MembersView() {
                 </div>
             )}
             {showInvite && (
-                <div className="modal-overlay" onClick={() => setShowInvite(false)}>
-                    <div className="modal invite-modal" onClick={(e)=>e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Einladung per E-Mail</h3>
-                            <button className="btn" onClick={()=>setShowInvite(false)}>×</button>
+                <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" onClick={() => setShowInvite(false)}>
+                    <div className="modal invite-modal" onClick={(e)=>e.stopPropagation()}>
+                        <header className="invite-modal-header">
+                            <h3 id="invite-modal-title">Einladung per E-Mail</h3>
+                            <button className="btn" onClick={()=>setShowInvite(false)} aria-label="Schließen">×</button>
                         </header>
-                        <div className="card" style={{ padding: 10 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <div className="helper">Aktuelle Filter: Status = {status}, Suche = {q ? `"${q}"` : '—'}</div>
-                                <label className="helper" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <div className="card invite-modal-content">
+                            <div className="invite-summary-row">
+                                <div className="invite-summary-stats">
+                                    <div className="invite-stat-card">
+                                        <div className="helper">Gefunden (mit E-Mail)</div>
+                                        <strong>{inviteEmails.length}</strong>
+                                    </div>
+                                    <div className="invite-stat-card">
+                                        <div className="helper">Ohne E-Mail</div>
+                                        <strong>{inviteStats.withoutEmail}</strong>
+                                    </div>
+                                    <div className="invite-stat-card">
+                                        <div className="helper">In Ansicht gesamt</div>
+                                        <strong>{inviteStats.candidates}</strong>
+                                    </div>
+                                </div>
+                                <label className="helper invite-active-toggle">
                                     <input type="checkbox" checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
                                     Nur aktive einladen
                                 </label>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                            <div className="helper invite-filter-hint">Aktuelle Filter: Status = {inviteActiveOnly ? 'ACTIVE' : status}, Suche = {q ? `"${q}"` : '—'}</div>
+                            <div className="invite-grid">
                                 <div className="field">
                                     <label>Betreff</label>
-                                    <input className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
+                                    <input ref={inviteSubjectRef} className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
                                 </div>
                                 <div className="field">
-                                    <label>Anzahl Empfänger (BCC)</label>
-                                    <input className="input" value={inviteEmails.length || 0} readOnly />
-                                </div>
-                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                    <label>Nachricht</label>
-                                    <textarea className="input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} style={{ resize: 'vertical' }} />
-                                </div>
-                                <div className="field" style={{ gridColumn: '1 / span 2' }}>
-                                    <label>Empfänger (BCC)</label>
-                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <input className="input" readOnly value={inviteEmails.join('; ')} style={{ flex: 1 }} />
-                                        <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert('E-Mail-Adressen kopiert') } catch { alert('Kopieren nicht möglich') } }}>Kopieren</button>
+                                    <label>Empfänger im Batch (BCC)</label>
+                                    <div className="invite-batch-count-display" aria-live="polite">
+                                        <strong>{inviteCurrentBatch.length || 0}</strong>
+                                        <span>automatisch aus aktueller Auswahl</span>
                                     </div>
+                                </div>
+                                <div className="field invite-grid-span">
+                                    <label>Nachricht</label>
+                                    <textarea className="input invite-message-input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} />
+                                </div>
+                                <div className="field invite-grid-span">
+                                    <label>Empfänger (BCC)</label>
+                                    <textarea className="input invite-bcc-input" readOnly rows={3} value={inviteCurrentBatch.join('; ')} />
+                                    {inviteTotalBatches > 1 && (
+                                        <div className="invite-batch-row">
+                                            <div className="helper">Batch {inviteBatchIndex + 1} von {inviteTotalBatches} (max. {INVITE_BCC_BATCH_SIZE} Empfänger je E-Mail)</div>
+                                            <div className="invite-batch-actions">
+                                                <button className="btn" disabled={inviteBatchIndex <= 0} onClick={() => setInviteBatchIndex((v) => Math.max(0, v - 1))}>Vorheriger Batch</button>
+                                                <button className="btn" disabled={inviteBatchIndex >= inviteTotalBatches - 1} onClick={() => setInviteBatchIndex((v) => Math.min(inviteTotalBatches - 1, v + 1))}>Nächster Batch</button>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="helper">Die Liste basiert auf der aktuellen Ansicht (Filter & Suche) und enthält nur Kontakte mit E-Mail.</div>
                                 </div>
                             </div>
+                            {inviteFeedback && <div className={`invite-feedback invite-feedback-${inviteFeedback.type}`}>{inviteFeedback.text}</div>}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="invite-modal-footer">
                             <div className="helper">{inviteBusy ? 'Sammle E-Mail-Adressen…' : `${inviteEmails.length} Empfänger gefunden`}</div>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="btn" onClick={()=>setShowInvite(false)}>Abbrechen</button>
-                                <button className="btn" onClick={async ()=>{ try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen kopiert (BCC).`) } catch { alert('Kopieren nicht möglich') } }}>Nur BCC kopieren</button>
-                                <button className="btn primary" disabled={!inviteEmails.length} onClick={() => {
-                                    const subject = encodeURIComponent(inviteSubject || '')
-                                    const body = encodeURIComponent(inviteBody || '')
-                                    const bccRaw = inviteEmails.join(',')
-                                    const mailto = `mailto:?bcc=${encodeURIComponent(bccRaw)}&subject=${subject}&body=${body}`
-                                    if (mailto.length <= 1800 && inviteEmails.length <= 50) {
-                                        try { window.location.href = mailto } catch { /* ignore */ }
-                                    } else {
-                                        (async () => { try { await navigator.clipboard.writeText(inviteEmails.join('; ')); alert(`${inviteEmails.length} E-Mail-Adressen in die Zwischenablage kopiert. Füge sie als BCC in dein E-Mail-Programm ein.`) } catch { alert('Link zu lang – E-Mail-Adressen konnten nicht automatisch kopiert werden.') } })()
-                                    }
-                                }}>Im Mail-Programm öffnen</button>
+                            <div className="invite-footer-actions">
+                                <button className="btn" disabled={!inviteCurrentBatch.length} onClick={() => copyInviteBcc(inviteCurrentBatch)}>BCC kopieren</button>
+                                <button className="btn primary" disabled={!inviteCurrentBatch.length} onClick={() => { void openInviteMailClient() }}>Im Mail-Programm öffnen ({inviteCurrentBatch.length})</button>
                             </div>
                         </div>
                     </div>

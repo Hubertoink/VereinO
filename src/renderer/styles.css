@@ -1785,8 +1785,154 @@ svg text {
     max-height: 90vh;
     display: flex;
     flex-direction: column;
+    gap: 10px;
     margin: auto; /* sichert vertikale Zentrierung bei flex overlay */
     animation: modalSlideUp 0.25s ease-out;
+}
+.invite-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.invite-modal-header h3 {
+    margin: 0;
+}
+.invite-modal-content {
+    padding: 12px;
+    display: grid;
+    gap: 12px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+.invite-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.invite-summary-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    gap: 8px;
+    flex: 1;
+}
+.invite-stat-card {
+    border: 1px solid var(--border);
+    background: color-mix(in oklab, var(--surface) 86%, transparent);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: grid;
+    gap: 2px;
+}
+.invite-stat-card strong {
+    font-size: 1.05rem;
+}
+.invite-active-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.invite-filter-hint {
+    margin-top: -2px;
+}
+.invite-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.invite-grid-span {
+    grid-column: 1 / span 2;
+}
+.invite-batch-count-display {
+    height: 38px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--muted) 35%, transparent);
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.invite-batch-count-display strong {
+    font-size: 1rem;
+    line-height: 1;
+}
+.invite-batch-count-display span {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+.invite-message-input {
+    resize: vertical;
+}
+.invite-bcc-input {
+    resize: vertical;
+    min-height: 72px;
+}
+.invite-batch-row {
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.invite-batch-actions {
+    display: flex;
+    gap: 8px;
+}
+.invite-feedback {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.92rem;
+}
+.invite-feedback-info {
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+.invite-feedback-success {
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+    border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+}
+.invite-feedback-error {
+    background: color-mix(in oklab, var(--danger) 14%, transparent);
+    border-color: color-mix(in oklab, var(--danger) 45%, var(--border));
+}
+.invite-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+.invite-footer-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+@media (max-width: 920px) {
+    .invite-grid {
+        grid-template-columns: 1fr;
+    }
+    .invite-grid-span {
+        grid-column: 1;
+    }
+}
+@media (max-width: 720px) {
+    .invite-summary-stats {
+        grid-template-columns: 1fr;
+    }
+    .invite-footer-actions {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
 }
 
 /* Members Export Modal */
