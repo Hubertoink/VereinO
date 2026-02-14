@@ -1491,6 +1491,21 @@ td {
     background: var(--table-row-alt);
 }
 
+.journal-table tbody tr.journal-row-advance-placeholder {
+    background: color-mix(in oklab, var(--warning) 16%, transparent) !important;
+}
+
+.journal-table tbody tr.journal-row-advance-placeholder:hover {
+    background: color-mix(in oklab, var(--warning) 22%, transparent) !important;
+}
+
+.badge-advance-placeholder,
+.badge-advance-placeholder-lock {
+    background: color-mix(in oklab, var(--warning) 26%, transparent);
+    color: var(--text);
+    border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--border));
+}
+
 tbody tr:hover,
 tbody tr:nth-child(even):hover {
     background: color-mix(in oklab, var(--accent) 12%, transparent) !important;
@@ -3225,6 +3240,7 @@ textarea:focus {
 .icon-color-Buchungen { color: #2962FF; }
 .icon-color-Verbindlichkeiten { color: #00B8D4; }
 .icon-color-Mitglieder { color: #26A69A; }
+.icon-color-Vorschuesse { color: #4CAF50; }
 .icon-color-Budgets { color: #00C853; }
 .icon-color-Zweckbindungen { color: #FFD600; }
 .icon-color-Belege { color: #FF9100; }
@@ -4076,6 +4092,53 @@ label .req-asterisk {
         .booking-modal .tags-suggestions {
             max-height: 78px;
             overflow-y: auto;
+        }
+
+        /* Compact tags inside booking modal */
+        .booking-modal .chip {
+            font-size: 10px;
+            padding: 1px 5px;
+            gap: 3px;
+        }
+        .booking-modal .chip .chip-x {
+            font-size: 11px;
+            line-height: 1;
+        }
+        .booking-modal .tags-editor-input {
+            gap: 4px;
+            min-height: 30px;
+        }
+        .booking-modal .tag-suggestion-btn {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 8px;
+        }
+        .booking-modal .tags-suggestions {
+            gap: 4px;
+            padding: 4px;
+            margin-top: 4px;
+        }
+
+        /* Highlight the amount input field to make Brutto / Netto stand out */
+        .booking-modal .finance-amount-highlight .adorn-wrap .input {
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent);
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+        .booking-modal .finance-amount-highlight .adorn-suffix {
+            font-size: 1.05rem;
+            color: var(--accent);
+        }
+
+        /* Finanzen card emphasis */
+        .booking-modal .card-finance {
+            border-left: 3px solid var(--accent);
+        }
+
+        /* Give Beschreibung & Tags more space than Anhänge in the C+D grid */
+        .booking-modal .block-grid-meta {
+            grid-template-columns: 3fr 2fr;
         }
 
         /* Helper text spacing */
@@ -7158,4 +7221,161 @@ html[data-glass-modals="true"] .flyout-arrow {
 .attachments-modal__icon-btn:disabled:hover {
     background: transparent;
     color: var(--text-dim);
+}
+
+/* Vorschüsse (MVP) */
+.advances-page {
+    display: grid;
+    gap: 12px;
+}
+
+.advances-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.advances-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.advances-summary-card {
+    padding: 12px;
+}
+
+.advances-summary-value {
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.advances-layout {
+    display: grid;
+    grid-template-columns: minmax(360px, 420px) 1fr;
+    gap: 12px;
+    align-items: start;
+}
+
+.advances-list-card,
+.advances-detail-card {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.advances-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 170px;
+    gap: 8px;
+}
+
+.advances-list-table-wrap {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.advances-list-table {
+    margin-bottom: 0;
+}
+
+.advances-list-table tbody tr {
+    cursor: pointer;
+}
+
+.advances-row-active {
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.advances-status {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+}
+
+.advances-status.open {
+    color: var(--warning);
+    border-color: color-mix(in oklab, var(--warning) 35%, var(--border));
+    background: color-mix(in oklab, var(--warning) 14%, transparent);
+}
+
+.advances-status.resolved {
+    color: var(--success);
+    border-color: color-mix(in oklab, var(--success) 35%, var(--border));
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+}
+
+.advances-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.advances-detail-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.advances-detail-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.advances-detail-kpis > div {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--surface) 80%, transparent);
+    padding: 10px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.advances-kpi-overdrawn {
+    border-color: color-mix(in oklab, var(--warning) 50%, var(--border)) !important;
+    background: color-mix(in oklab, var(--warning) 12%, transparent) !important;
+    color: var(--warning);
+}
+
+.advances-kpi-negative {
+    border-color: color-mix(in oklab, var(--danger) 50%, var(--border)) !important;
+    background: color-mix(in oklab, var(--danger) 12%, transparent) !important;
+    color: var(--danger);
+}
+
+.advances-subtitle {
+    margin: 0;
+    font-size: 16px;
+}
+
+.advances-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.advances-modal-actions {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+@media (max-width: 1100px) {
+    .advances-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .advances-toolbar {
+        grid-template-columns: 1fr;
+    }
 }

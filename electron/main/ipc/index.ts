@@ -9,6 +9,7 @@ import { listMembers, createMember, updateMember, deleteMember, getMemberById } 
 import { exportMembers, MembersExportOptions } from '../services/membersExport'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
+import { listAdvances, createAdvance, getAdvanceById, settleAdvance, deleteAdvance, addAdvancePurchase, deleteAdvancePurchase, updateAdvancePurchase, resolveAdvance } from '../repositories/advances'
 import { createSubmissionsRepository } from '../repositories/submissions'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -25,6 +26,7 @@ import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSma
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
+import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
 
 export function registerIpcHandlers() {
     // App info
@@ -76,6 +78,7 @@ export function registerIpcHandlers() {
             to: parsed.to,
             // extend filters with optional earmarkId
             ...(parsed.earmarkId != null ? { earmarkId: parsed.earmarkId } as any : {}),
+            ...(parsed.budgetId != null ? { budgetId: parsed.budgetId } as any : {}),
             q: (parsed as any).q,
             tag: (parsed as any).tag
         } as any)
@@ -89,7 +92,9 @@ export function registerIpcHandlers() {
             to: parsed.to,
             paymentMethod: parsed.paymentMethod as any,
             sphere: parsed.sphere as any,
-            type: parsed.type as any
+            type: parsed.type as any,
+            earmarkId: (parsed as any).earmarkId,
+            budgetId: (parsed as any).budgetId
         })
         return ReportsMonthlyOutput.parse({ buckets })
     })
@@ -101,7 +106,9 @@ export function registerIpcHandlers() {
             to: parsed.to,
             paymentMethod: parsed.paymentMethod as any,
             sphere: parsed.sphere as any,
-            type: parsed.type as any
+            type: parsed.type as any,
+            earmarkId: (parsed as any).earmarkId,
+            budgetId: (parsed as any).budgetId
         })
         return { buckets } // Same output format, just date instead of month
     })
@@ -163,9 +170,19 @@ export function registerIpcHandlers() {
                 sphere: (parsed.filters?.sphere as any) || undefined,
                 type: (parsed.filters?.type as any) || undefined,
                 from: parsed.from,
-                to: parsed.to
+                to: parsed.to,
+                earmarkId: (parsed.filters as any)?.earmarkId,
+                budgetId: (parsed.filters as any)?.budgetId
             } as any)
-            const buckets = monthlyVouchers({ from: parsed.from, to: parsed.to, paymentMethod: (parsed.filters?.paymentMethod as any) || undefined, sphere: (parsed.filters?.sphere as any) || undefined, type: (parsed.filters?.type as any) || undefined })
+            const buckets = monthlyVouchers({
+                from: parsed.from,
+                to: parsed.to,
+                paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+                sphere: (parsed.filters?.sphere as any) || undefined,
+                type: (parsed.filters?.type as any) || undefined,
+                earmarkId: (parsed.filters as any)?.earmarkId,
+                budgetId: (parsed.filters as any)?.budgetId
+            })
             // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
             const d2 = getDb()
             const p2: any[] = []
@@ -174,6 +191,8 @@ export function registerIpcHandlers() {
             if (parsed.to) { wh2.push('date <= ?'); p2.push(parsed.to) }
             if (parsed.filters?.paymentMethod) { wh2.push('payment_method = ?'); p2.push(parsed.filters.paymentMethod) }
             if (parsed.filters?.sphere) { wh2.push('sphere = ?'); p2.push(parsed.filters.sphere) }
+            if ((parsed.filters as any)?.earmarkId != null) { wh2.push('earmark_id = ?'); p2.push((parsed.filters as any).earmarkId) }
+            if ((parsed.filters as any)?.budgetId != null) { wh2.push('budget_id = ?'); p2.push((parsed.filters as any).budgetId) }
             const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
             const detailed = d2.prepare(`
                 SELECT strftime('%Y-%m', date) as month,
@@ -709,6 +728,57 @@ export function registerIpcHandlers() {
         const parsed = BudgetUsageInput.parse(payload)
         const res = budgetUsage({ budgetId: parsed.budgetId, from: parsed.from, to: parsed.to })
         return BudgetUsageOutput.parse(res)
+    })
+
+    // Vorschüsse
+    ipcMain.handle('advances.list', async (_e, payload) => {
+        const parsed = AdvancesListInput.parse(payload)
+        const res = listAdvances(parsed ?? undefined)
+        return AdvancesListOutput.parse(res)
+    })
+    ipcMain.handle('advances.create', async (_e, payload) => {
+        const parsed = AdvanceCreateInput.parse(payload)
+        const res = createAdvance(parsed as any)
+        return AdvanceCreateOutput.parse(res)
+    })
+    ipcMain.handle('advances.get', async (_e, payload) => {
+        const parsed = AdvanceGetInput.parse(payload)
+        const res = getAdvanceById({ id: parsed.id })
+        return AdvanceGetOutput.parse(res)
+    })
+    ipcMain.handle('advances.settle', async (_e, payload) => {
+        const parsed = AdvanceSettleInput.parse(payload)
+        const res = settleAdvance(parsed as any)
+        return AdvanceSettleOutput.parse(res)
+    })
+    ipcMain.handle('advances.delete', async (_e, payload) => {
+        const parsed = AdvanceDeleteInput.parse(payload)
+        const res = deleteAdvance({ id: parsed.id })
+        return AdvanceDeleteOutput.parse(res)
+    })
+
+    ipcMain.handle('advances.purchases.create', async (_e, payload) => {
+        const parsed = AdvancePurchaseCreateInput.parse(payload)
+        const res = addAdvancePurchase(parsed as any)
+        return AdvancePurchaseCreateOutput.parse(res)
+    })
+
+    ipcMain.handle('advances.purchases.delete', async (_e, payload) => {
+        const parsed = AdvancePurchaseDeleteInput.parse(payload)
+        const res = deleteAdvancePurchase(parsed)
+        return AdvancePurchaseDeleteOutput.parse(res)
+    })
+
+    ipcMain.handle('advances.purchases.update', async (_e, payload) => {
+        const parsed = AdvancePurchaseUpdateInput.parse(payload)
+        const res = updateAdvancePurchase(parsed as any)
+        return AdvancePurchaseUpdateOutput.parse(res)
+    })
+
+    ipcMain.handle('advances.resolve', async (_e, payload) => {
+        const parsed = AdvanceResolveInput.parse(payload)
+        const res = resolveAdvance({ id: parsed.id })
+        return AdvanceResolveOutput.parse(res)
     })
 
     // Quotes

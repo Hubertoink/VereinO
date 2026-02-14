@@ -556,6 +556,84 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_cash_checks_voucher ON cash_checks(voucher_id);
     `
   }
+  ,
+  {
+    version: 27,
+    up: `
+    -- Vorschüsse an Mitglieder/Personen + Auflösungen
+    CREATE TABLE IF NOT EXISTS member_advances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER,
+      recipient_name TEXT NOT NULL,
+      issued_at TEXT NOT NULL,
+      amount REAL NOT NULL,
+      notes TEXT,
+      budget_id INTEGER,
+      earmark_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE SET NULL,
+      FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+      FOREIGN KEY(earmark_id) REFERENCES earmarks(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS member_advance_settlements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advance_id INTEGER NOT NULL,
+      settled_at TEXT NOT NULL,
+      amount REAL NOT NULL,
+      note TEXT,
+      voucher_id INTEGER,
+      invoice_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+      FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_member_advances_member ON member_advances(member_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advances_issued ON member_advances(issued_at);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_advance ON member_advance_settlements(advance_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_settled ON member_advance_settlements(settled_at);
+    `
+  }
+  ,
+  {
+    version: 28,
+    up: `
+    -- Vorschüsse: Platzhalter-Beleg + Buchungen (Entwürfe) + Auflösen-Status
+    ALTER TABLE member_advances ADD COLUMN placeholder_voucher_id INTEGER;
+    ALTER TABLE member_advances ADD COLUMN resolved_at TEXT;
+
+    CREATE TABLE IF NOT EXISTS member_advance_purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advance_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT CHECK(type IN ('IN','OUT')) NOT NULL DEFAULT 'OUT',
+      sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL DEFAULT 'IDEELL',
+      description TEXT,
+      net_amount NUMERIC NOT NULL DEFAULT 0,
+      gross_amount NUMERIC NOT NULL DEFAULT 0,
+      vat_rate NUMERIC NOT NULL DEFAULT 0,
+      payment_method TEXT,
+      category_id INTEGER,
+      project_id INTEGER,
+      budgets_json TEXT,
+      earmarks_json TEXT,
+      tags_json TEXT,
+      files_json TEXT,
+      voucher_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {

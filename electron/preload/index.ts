@@ -80,6 +80,19 @@ contextBridge.exposeInMainWorld('api', {
         delete: (payload: any) => ipcRenderer.invoke('budgets.delete', payload),
         usage: (payload: any) => ipcRenderer.invoke('budgets.usage', payload)
     },
+    advances: {
+        list: (payload?: any) => ipcRenderer.invoke('advances.list', payload),
+        create: (payload: any) => ipcRenderer.invoke('advances.create', payload),
+        get: (payload: any) => ipcRenderer.invoke('advances.get', payload),
+        settle: (payload: any) => ipcRenderer.invoke('advances.settle', payload),
+        delete: (payload: any) => ipcRenderer.invoke('advances.delete', payload),
+        purchases: {
+            create: (payload: any) => ipcRenderer.invoke('advances.purchases.create', payload),
+            update: (payload: any) => ipcRenderer.invoke('advances.purchases.update', payload),
+            delete: (payload: any) => ipcRenderer.invoke('advances.purchases.delete', payload)
+        },
+        resolve: (payload: any) => ipcRenderer.invoke('advances.resolve', payload)
+    },
     invoices: {
         create: (payload: any) => ipcRenderer.invoke('invoices.create', payload),
         update: (payload: any) => ipcRenderer.invoke('invoices.update', payload),

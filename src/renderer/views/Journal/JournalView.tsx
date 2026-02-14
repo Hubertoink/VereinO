@@ -16,6 +16,7 @@ type VoucherRow = {
     type: 'IN' | 'OUT' | 'TRANSFER'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
+    isAdvancePlaceholder?: boolean
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
@@ -1017,11 +1018,11 @@ export default function JournalView({
                                     </div>
 
                                     {/* Block B – Finanzdetails */}
-                                    <div className="card" style={{ padding: 12 }}>
+                                    <div className="card card-finance" style={{ padding: 12 }}>
                                         <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                                         <div className="row">
                                             {editRow.type === 'TRANSFER' ? (
-                                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                <div className="field finance-amount-highlight" style={{ gridColumn: '1 / -1' }}>
                                                     <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                     <span className="adorn-wrap">
                                                         <input className="input input-transfer" type="number" step="0.01" value={(editRow as any).grossAmount ?? ''}
@@ -1035,7 +1036,7 @@ export default function JournalView({
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <div className="field">
+                                                    <div className="field finance-amount-highlight">
                                                         <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                         <div style={{ display: 'flex', gap: 8 }}>
                                                             <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
@@ -1262,7 +1263,7 @@ export default function JournalView({
                                 </div>
 
                                 {/* Block C+D – Beschreibung & Tags + Anhänge */}
-                                <div className="block-grid" style={{ marginBottom: 8 }}>
+                                <div className="block-grid block-grid-meta" style={{ marginBottom: 8 }}>
                                     {/* Block C – Beschreibung & Tags */}
                                     <div className="card" style={{ padding: 12 }}>
                                         <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>

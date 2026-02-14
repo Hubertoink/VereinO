@@ -62,6 +62,16 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       )
+    case 'Vorschuesse':
+      // Hand coin icon
+      return (
+        <svg {...iconProps}>
+          <circle cx="16" cy="8" r="3" />
+          <path d="M3 17h7a3 3 0 0 0 3-3v0a2 2 0 0 0-2-2H6" />
+          <path d="M3 13h3.5a2 2 0 0 1 0 4H5" />
+          <path d="M3 17v2a2 2 0 0 0 2 2h6.5a5 5 0 0 0 3.5-1.4L21 14" />
+        </svg>
+      )
     case 'Budgets':
       // Bar chart icon
       return (
@@ -122,6 +132,7 @@ export const navIconPalette: Record<NavKey, string> = {
   Buchungen: '#2962FF',
   Verbindlichkeiten: '#00B8D4',
   Mitglieder: '#26A69A',
+  Vorschuesse: '#4CAF50',
   Budgets: '#00C853',
   Zweckbindungen: '#FFD600',
   Einreichungen: '#FF7043',

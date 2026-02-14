@@ -156,13 +156,45 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: '95vw' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h2 style={{ margin: 0 }}>Export Optionen</h2>
-            {(dateFrom || dateTo) && (
-              <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                <span>📅</span>
-                <span>{dateFrom || '…'} – {dateTo || '…'}</span>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0 }}>Export Optionen</h2>
+              {(dateFrom || dateTo) && (
+                <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <span>📅</span>
+                  <span>{dateFrom || '…'} – {dateTo || '…'}</span>
+                </div>
+              )}
+            </div>
+
+            {setExportType && (
+              <div>
+                <div className="btn-group" role="tablist" aria-label="Export-Art">
+                  <button
+                    className="btn"
+                    role="tab"
+                    aria-selected={exportType === 'standard'}
+                    onClick={() => setExportType('standard')}
+                    style={{ background: exportType === 'standard' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+                  >
+                    📊 Standard (Controlling)
+                  </button>
+                  <button
+                    className="btn"
+                    role="tab"
+                    aria-selected={exportType === 'fiscal'}
+                    onClick={() => setExportType('fiscal')}
+                    style={{ background: exportType === 'fiscal' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+                  >
+                    🏛️ Finanzamt (Jahresabschluss)
+                  </button>
+                </div>
+                <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                  {exportType === 'standard'
+                    ? 'Standard-Export für Controlling und Analyse mit frei wählbaren Feldern und Zeitraum'
+                    : 'Spezieller Jahresabschluss-Report für das Finanzamt nach § 64 AO mit Sphärentrennung'}
+                </div>
               </div>
             )}
           </div>
@@ -175,34 +207,6 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             ×
           </button>
         </header>
-        
-        {/* Export Type Selection */}
-        {setExportType && (
-          <div className="field" style={{ marginBottom: 16 }}>
-            <label>Export-Art</label>
-            <div className="btn-group" role="group">
-              <button 
-                className="btn" 
-                onClick={() => setExportType('standard')} 
-                style={{ background: exportType === 'standard' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-              >
-                📊 Standard (Controlling)
-              </button>
-              <button 
-                className="btn" 
-                onClick={() => setExportType('fiscal')} 
-                style={{ background: exportType === 'fiscal' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
-              >
-                🏛️ Finanzamt (Jahresabschluss)
-              </button>
-            </div>
-            <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
-              {exportType === 'standard' 
-                ? 'Standard-Export für Controlling und Analyse mit frei wählbaren Feldern und Zeitraum' 
-                : 'Spezieller Jahresabschluss-Report für das Finanzamt nach § 64 AO mit Sphärentrennung'}
-            </div>
-          </div>
-        )}
         
         {/* Fiscal Year Selection (only for fiscal export) */}
         {exportType === 'fiscal' && setFiscalYear && (
@@ -278,18 +282,20 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
               <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags" gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
             </div>
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-              <label>Betragsdarstellung</label>
-              <div className="btn-group" role="group">
-                <button className="btn" onClick={() => setAmountMode('POSITIVE_BOTH')} style={{ background: amountMode === 'POSITIVE_BOTH' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Beide positiv</button>
-                <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Betragsdarstellung</label>
+                <div className="btn-group" role="group">
+                  <button className="btn" onClick={() => setAmountMode('POSITIVE_BOTH')} style={{ background: amountMode === 'POSITIVE_BOTH' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Beide positiv</button>
+                  <button className="btn" onClick={() => setAmountMode('OUT_NEGATIVE')} style={{ background: amountMode === 'OUT_NEGATIVE' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Ausgaben negativ</button>
+                </div>
               </div>
-            </div>
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
-              <label>Sortierung (Datum)</label>
-              <div className="btn-group" role="group">
-                <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
-                <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Sortierung (Datum)</label>
+                <div className="btn-group" role="group">
+                  <button className="btn" onClick={() => setSortDir('ASC')} style={{ background: sortDir === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
+                  <button className="btn" onClick={() => setSortDir('DESC')} style={{ background: sortDir === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
+                </div>
               </div>
             </div>
           </>

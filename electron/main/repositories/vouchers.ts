@@ -22,6 +22,16 @@ function normalizeVoucherSearchQuery(raw?: string): { text: string; id: number |
     return { text, id }
 }
 
+function getAdvancePlaceholderRef(d: DB, voucherId: number) {
+        return d.prepare(`
+                SELECT id
+                FROM member_advances
+                WHERE placeholder_voucher_id = ?
+                    AND (resolved_at IS NULL OR resolved_at = '')
+                LIMIT 1
+        `).get(voucherId) as any
+}
+
 export function createVoucher(input: {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER'
@@ -466,6 +476,7 @@ export function listVouchersAdvancedPaged(filters: {
         `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                 v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
                 EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
+            EXISTS(SELECT 1 FROM member_advances ma WHERE ma.placeholder_voucher_id = v.id AND (ma.resolved_at IS NULL OR ma.resolved_at = '')) as isAdvancePlaceholder,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                 v.earmark_id as earmarkId,
                 v.earmark_amount as earmarkAmount,
@@ -493,6 +504,7 @@ export function listVouchersAdvancedPaged(filters: {
     const mapped = rows.map(r => ({
         ...r,
         isCashCheck: !!(r as any).isCashCheck,
+        isAdvancePlaceholder: !!(r as any).isAdvancePlaceholder,
         tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : []
     }))
     return { rows: mapped, total }
@@ -699,11 +711,12 @@ export function summarizeVouchers(filters: {
     from?: string
     to?: string
     earmarkId?: number
+    budgetId?: number
     q?: string
     tag?: string
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, type, from, to, earmarkId, q, tag } = filters
+    const { paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
@@ -713,6 +726,7 @@ export function summarizeVouchers(filters: {
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
+    if (budgetId != null) { wh.push('v.budget_id = ?'); paramsBase.push(budgetId) }
     {
         const nq = normalizeVoucherSearchQuery(q)
         if (nq) {
@@ -780,9 +794,11 @@ export function monthlyVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
+    earmarkId?: number
+    budgetId?: number
 }) {
     const d = getDb()
-    const { from, to, paymentMethod, sphere, type } = filters
+    const { from, to, paymentMethod, sphere, type, earmarkId, budgetId } = filters
     const params: any[] = []
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
@@ -790,6 +806,8 @@ export function monthlyVouchers(filters: {
     if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
     if (type) { wh.push('type = ?'); params.push(type) }
+    if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
+    if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const rows = d.prepare(`
         SELECT strftime('%Y-%m', date) as month,
@@ -809,9 +827,11 @@ export function dailyVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
+    earmarkId?: number
+    budgetId?: number
 }) {
     const d = getDb()
-    const { from, to, paymentMethod, sphere, type } = filters
+    const { from, to, paymentMethod, sphere, type, earmarkId, budgetId } = filters
     const params: any[] = []
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
@@ -819,6 +839,8 @@ export function dailyVouchers(filters: {
     if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
     if (type) { wh.push('type = ?'); params.push(type) }
+    if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
+    if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     const rows = d.prepare(`
         SELECT date,
@@ -869,6 +891,9 @@ export function updateVoucher(input: {
     // System lock: cash-check vouchers are audit-relevant and must not be editable
     const cashCheckRef = d.prepare('SELECT id FROM cash_checks WHERE voucher_id = ? LIMIT 1').get(input.id) as any
     if (cashCheckRef) throw new Error('Kassenprüfungsbuchungen sind systemgeneriert und können nicht bearbeitet werden.')
+
+    const advancePlaceholderRef = getAdvancePlaceholderRef(d, input.id)
+    if (advancePlaceholderRef) throw new Error('Vorschuss-Platzhalter sind systemgeneriert und können nicht bearbeitet werden.')
 
     // Enforce period lock for the voucher's existing date (block edits in closed year)
     ensurePeriodOpen(current.date, d)
@@ -1016,11 +1041,17 @@ export function updateVoucher(input: {
     return { id: input.id, warnings }
 }
 
-export function deleteVoucher(id: number) {
+export function deleteVoucher(id: number, options?: { allowAdvancePlaceholder?: boolean }) {
     const d = getDb()
     // Snapshot before deletion for audit
     const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount FROM vouchers WHERE id=?').get(id) as any
     if (!snap) throw new Error('Beleg nicht gefunden')
+
+    if (!options?.allowAdvancePlaceholder) {
+        const advancePlaceholderRef = getAdvancePlaceholderRef(d, id)
+        if (advancePlaceholderRef) throw new Error('Vorschuss-Platzhalter sind systemgeneriert und können nicht gelöscht werden.')
+    }
+
     // Block deletion in closed year
     ensurePeriodOpen(snap.date, d)
     // Optional: cascade delete files on disk

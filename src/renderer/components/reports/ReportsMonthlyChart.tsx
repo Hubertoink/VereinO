@@ -21,7 +21,7 @@ function monthKeys(from?: string, to?: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod }) {
+export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
@@ -71,15 +71,15 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     let cancelled = false
     setLoading(true)
     Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod })
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId }),
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
       setInBuckets((inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
       setOutBuckets((outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
   // Build the X-axis months based on filters
   // - With explicit from/to: show full continuous range (all months)

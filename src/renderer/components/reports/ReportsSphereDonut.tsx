@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sphere } from './types'
+import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSphereDonut(props: { refreshKey?: number; from?: string; to?: string }) {
+export default function ReportsSphereDonut(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<Array<{ key: Sphere; gross: number }>>([])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -10,14 +10,14 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to })
+    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
       .then((res: any) => {
         if (cancelled || !res) return
         setRows(res.bySphere.map((r: any) => ({ key: r.key, gross: r.gross })))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.refreshKey])
+  }, [props.from, props.to, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
   const total = rows.reduce((a, b) => a + Math.abs(b.gross), 0) || 1
   const colors: Record<string, string> = { IDEELL: '#7e57c2', ZWECK: '#26a69a', VERMOEGEN: '#8d6e63', WGB: '#42a5f5' }
   const size = { w: 320, h: 220 }

@@ -161,6 +161,7 @@ interface JournalTableProps {
         type: 'IN' | 'OUT' | 'TRANSFER'
         sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
         description?: string | null
+        isAdvancePlaceholder?: boolean
         isCashCheck?: boolean
         paymentMethod?: 'BAR' | 'BANK' | null
         transferFrom?: 'BAR' | 'BANK' | null
@@ -439,6 +440,8 @@ export default function JournalTable({
                     <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
                 ) : r.isCashCheck ? (
                     <span className="badge" title="Kassenprüfung-Buchung (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
+                ) : r.isAdvancePlaceholder ? (
+                    <span className="badge badge-advance-placeholder-lock" title="Vorschuss-Platzhalter (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
                 ) : (
                     <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
@@ -455,6 +458,7 @@ export default function JournalTable({
             <td key={k}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
+                    {r.isAdvancePlaceholder ? <span className="badge badge-advance-placeholder">Vorschuss</span> : null}
                     {(r.tags || []).map((t: string) => {
                         const bg = colorFor(t) || undefined
                         const fg = contrastText(bg)
@@ -669,7 +673,10 @@ export default function JournalTable({
                 {rows.map((r) => (
                     <tr 
                         key={r.id} 
-                        className={highlightId === r.id ? 'row-flash' : undefined}
+                        className={[
+                            highlightId === r.id ? 'row-flash' : '',
+                            r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : ''
+                        ].filter(Boolean).join(' ') || undefined}
                         onDoubleClick={() => onRowDoubleClick?.(r)}
                     >
                         {visibleOrder.map((k) => tdFor(k, r))}

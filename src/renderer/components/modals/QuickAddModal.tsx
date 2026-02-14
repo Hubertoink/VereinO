@@ -21,6 +21,7 @@ interface QuickAddModalProps {
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
+    title?: string
 }
 
 function inRange(dateISO: string, startISO?: string | null, endISO?: string | null) {
@@ -67,7 +68,8 @@ export default function QuickAddModal({
     budgetsForEdit,
     earmarks,
     tagDefs,
-    descSuggest
+    descSuggest,
+    title
 }: QuickAddModalProps) {
     const grossAmt = (() => {
         if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
@@ -119,7 +121,7 @@ export default function QuickAddModal({
         <div className="modal-overlay">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 <header className="modal-header-flex">
-                    <h2>+ Buchung</h2>
+                    <h2>{title || '+ Buchung'}</h2>
                     <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -215,11 +217,11 @@ export default function QuickAddModal({
                         </div>
 
                         {/* Block B – Finanzdetails */}
-                        <div className="card form-card">
+                        <div className="card form-card card-finance">
                             <div className="helper helper-mb">Finanzen</div>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
-                                    <div className="field field-full-width">
+                                    <div className="field field-full-width finance-amount-highlight">
                                         <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <span className="adorn-wrap">
                                             <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
@@ -234,7 +236,7 @@ export default function QuickAddModal({
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="field">
+                                        <div className="field finance-amount-highlight">
                                             <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <div className="flex-gap-8">
                                                 <select
@@ -509,7 +511,7 @@ export default function QuickAddModal({
                     </div>
 
                     {/* Blocks C+D in a side-by-side grid */}
-                    <div className="block-grid block-grid-mb">
+                    <div className="block-grid block-grid-mb block-grid-meta">
                         {/* Block C – Beschreibung & Tags */}
                         <div className="card form-card">
                             <div className="helper helper-mb">Beschreibung & Tags</div>

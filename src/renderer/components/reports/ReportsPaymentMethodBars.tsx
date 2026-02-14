@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { PaymentMethod } from './types'
+import { PaymentMethod, Sphere, VoucherType } from './types'
 
-export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string }) {
+export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Array<{ key: PaymentMethod; inGross: number; outGross: number }>>([])
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -10,9 +10,16 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    const emptySummary = Promise.resolve({ byPaymentMethod: [] })
+    const inSummary = (props.type === 'OUT' || props.type === 'TRANSFER')
+      ? emptySummary
+      : (window as any).api?.reports.summary?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', earmarkId: props.earmarkId, budgetId: props.budgetId })
+    const outSummary = (props.type === 'IN' || props.type === 'TRANSFER')
+      ? emptySummary
+      : (window as any).api?.reports.summary?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', earmarkId: props.earmarkId, budgetId: props.budgetId })
     Promise.all([
-      (window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: 'IN' }),
-      (window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: 'OUT' })
+      inSummary,
+      outSummary
     ]).then(([sumIn, sumOut]) => {
       if (cancelled) return
       const keys: Array<PaymentMethod> = ['BAR', 'BANK']
@@ -22,7 +29,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
       setData(keys.map(k => ({ key: k, inGross: map[k].inGross || 0, outGross: map[k].outGross || 0 })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.earmarkId, props.budgetId, props.refreshKey])
   const maxVal = Math.max(1, ...data.map(d => Math.max(d.inGross, d.outGross)))
   const margin = { top: 22, right: 24, bottom: 48, left: 100 }
   const rowH = 30

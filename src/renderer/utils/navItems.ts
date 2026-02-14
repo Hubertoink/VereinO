@@ -1,4 +1,4 @@
-export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'Belege' | 'Reports' | 'Einstellungen'
+export type NavKey = 'Dashboard' | 'Buchungen' | 'Verbindlichkeiten' | 'Mitglieder' | 'Vorschuesse' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'Belege' | 'Reports' | 'Einstellungen'
 
 /**
  * Navigation groups for visual separation:
@@ -26,6 +26,7 @@ export const navItems: NavItem[] = [
   { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'transactions' },
   // Vereinsstruktur & Planung
   { key: 'Mitglieder', label: 'Mitglieder', group: 'organization' },
+  { key: 'Vorschuesse', label: 'Vorschüsse', group: 'organization' },
   { key: 'Budgets', label: 'Budgets', group: 'organization' },
   { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'organization' },
   { key: 'Einreichungen', label: 'Einreichungen', group: 'organization' },

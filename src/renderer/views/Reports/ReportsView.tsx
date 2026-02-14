@@ -19,13 +19,40 @@ export default function ReportsView(props: {
   setFilterType: (v: VoucherType | null) => void
   filterPM: PaymentMethod | null
   setFilterPM: (v: PaymentMethod | null) => void
+  filterEarmark: number | null
+  setFilterEarmark: (v: number | null) => void
+  filterBudgetId: number | null
+  setFilterBudgetId: (v: number | null) => void
+  budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
+  earmarks: Array<{ id: number; code: string; name?: string | null }>
   onOpenExport: () => void
   refreshKey: number
   activateKey: number
 }) {
-  const { from, to, setFrom, setTo, yearsAvail, filterSphere, setFilterSphere, filterType, setFilterType, filterPM, setFilterPM, onOpenExport, refreshKey, activateKey } = props
+  const {
+    from,
+    to,
+    setFrom,
+    setTo,
+    yearsAvail,
+    filterSphere,
+    setFilterSphere,
+    filterType,
+    setFilterType,
+    filterPM,
+    setFilterPM,
+    filterEarmark,
+    setFilterEarmark,
+    filterBudgetId,
+    setFilterBudgetId,
+    budgets,
+    earmarks,
+    onOpenExport,
+    refreshKey,
+    activateKey
+  } = props
 
-  const hasActiveFilters = filterSphere || filterType || filterPM || from || to
+  const hasActiveFilters = filterSphere || filterType || filterPM || filterEarmark != null || filterBudgetId != null || from || to
 
   const fmtDateDe = (iso: string) => {
     const s = (iso || '').trim()
@@ -83,6 +110,27 @@ export default function ReportsView(props: {
         onClear: () => setFilterPM(null)
       })
     }
+    if (filterEarmark != null) {
+      const earmark = earmarks.find((item) => item.id === filterEarmark)
+      list.push({
+        key: 'earmark',
+        label: `Zweckbindung: ${earmark ? earmark.code : `#${filterEarmark}`}`,
+        onClear: () => setFilterEarmark(null)
+      })
+    }
+    if (filterBudgetId != null) {
+      const budget = budgets.find((item) => item.id === filterBudgetId)
+      const budgetLabel =
+        (budget?.name && budget.name.trim()) ||
+        budget?.categoryName ||
+        budget?.projectName ||
+        (budget ? String(budget.year) : `#${filterBudgetId}`)
+      list.push({
+        key: 'budget',
+        label: `Budget: ${budgetLabel}`,
+        onClear: () => setFilterBudgetId(null)
+      })
+    }
     return list
   })()
 
@@ -122,45 +170,25 @@ export default function ReportsView(props: {
 
           <div className="toolbar-icon">
             <MetaFilterDropdown
-              budgets={[]}
-              earmarks={[]}
+              budgets={budgets}
+              earmarks={earmarks}
               tagDefs={[]}
               filterType={filterType}
               filterPM={filterPM}
               filterTag={null}
               sphere={filterSphere}
-              earmarkId={null}
-              budgetId={null}
-              tooltip="Filter nach Art, Sphäre, Zahlweg"
-              onApply={({ filterType: ft, filterPM: pm, sphere: sp }) => {
+              earmarkId={filterEarmark}
+              budgetId={filterBudgetId}
+              tooltip="Filter nach Art, Sphäre, Zahlweg, Zweckbindung, Budget"
+              onApply={({ filterType: ft, filterPM: pm, sphere: sp, earmarkId, budgetId }) => {
                 setFilterType(ft)
                 setFilterPM(pm)
                 setFilterSphere(sp)
+                setFilterEarmark(earmarkId)
+                setFilterBudgetId(budgetId)
               }}
             />
           </div>
-
-          {hasActiveFilters && (
-            <button
-              className="btn ghost"
-              title="Alle Filter zurücksetzen"
-              onClick={() => {
-                setFilterSphere(null)
-                setFilterType(null)
-                setFilterPM(null)
-                setFrom('')
-                setTo('')
-              }}
-              style={{ padding: '4px 8px', color: 'var(--accent)' }}
-              aria-label="Alle Filter zurücksetzen"
-              type="button"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          )}
 
           <button
             className="btn danger"
@@ -183,18 +211,41 @@ export default function ReportsView(props: {
               <button className="chip-x" type="button" onClick={b.onClear} aria-label={`Filter entfernen: ${b.label}`}>×</button>
             </span>
           ))}
+          {hasActiveFilters && (
+            <button
+              className="btn ghost"
+              title="Alle Filter zurücksetzen"
+              onClick={() => {
+                setFilterSphere(null)
+                setFilterType(null)
+                setFilterPM(null)
+                setFilterEarmark(null)
+                setFilterBudgetId(null)
+                setFrom('')
+                setTo('')
+              }}
+              style={{ padding: '4px 8px', color: 'var(--accent)' }}
+              aria-label="Alle Filter zurücksetzen"
+              type="button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
       )}
 
       {/* KPIs and charts */}
-      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
+      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
-        <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} />
+        <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
       <div style={{ height: 12 }} />
-      <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} />
-      <ReportsInOutLines activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} />
+      <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+      <ReportsInOutLines activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
     </>
   )
 }

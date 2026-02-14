@@ -222,6 +222,7 @@ export const ReportsSummaryInput = z.object({
     sphere: Sphere.optional(),
     type: VoucherType.optional(),
     earmarkId: z.number().optional(),
+    budgetId: z.number().optional(),
     q: z.string().optional(),
     tag: z.string().optional()
 })
@@ -246,7 +247,9 @@ export const ReportsMonthlyInput = z.object({
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
     sphere: Sphere.optional(),
-    type: VoucherType.optional()
+    type: VoucherType.optional(),
+    earmarkId: z.number().optional(),
+    budgetId: z.number().optional()
 })
 
 export const ReportsMonthlyOutput = z.object({
@@ -305,6 +308,7 @@ export const VouchersListOutput = z.object({
             type: VoucherType,
             sphere: Sphere,
             isCashCheck: z.boolean().optional(),
+            isAdvancePlaceholder: z.boolean().optional(),
             paymentMethod: PaymentMethod.nullable().optional(),
             transferFrom: PaymentMethod.nullable().optional(),
             transferTo: PaymentMethod.nullable().optional(),
@@ -708,6 +712,195 @@ export type TBudgetListInput = z.infer<typeof BudgetListInput>
 export type TBudgetDeleteInput = z.infer<typeof BudgetDeleteInput>
 export type TBudgetUsageInput = z.infer<typeof BudgetUsageInput>
 export type TBudgetUsageOutput = z.infer<typeof BudgetUsageOutput>
+
+// Vorschüsse (Mitglieder/Personen)
+export const AdvanceStatus = z.enum(['OPEN', 'RESOLVED'])
+export const AdvancePurchaseType = z.enum(['IN', 'OUT'])
+
+export const AdvancesListInput = z.object({
+    q: z.string().optional(),
+    status: z.union([AdvanceStatus, z.literal('ALL')]).optional(),
+    memberId: z.number().optional(),
+    limit: z.number().optional(),
+    offset: z.number().optional()
+}).optional()
+
+export const AdvancesListOutput = z.object({
+    rows: z.array(z.object({
+        id: z.number(),
+        memberId: z.number().nullable().optional(),
+        recipientName: z.string(),
+        memberName: z.string(),
+        issuedAt: z.string(),
+        amount: z.number(),
+        settledAmount: z.number(),
+        purchaseAmount: z.number().optional(),
+        openAmount: z.number(),
+        settlementCount: z.number(),
+        purchaseCount: z.number().optional(),
+        status: AdvanceStatus,
+        notes: z.string().nullable().optional(),
+        budgetId: z.number().nullable().optional(),
+        earmarkId: z.number().nullable().optional(),
+        placeholderVoucherId: z.number().nullable().optional(),
+        resolvedAt: z.string().nullable().optional(),
+        createdAt: z.string().optional()
+    })),
+    total: z.number()
+})
+
+export const AdvanceCreateInput = z.object({
+    recipientName: z.string(),
+    issuedAt: z.string(),
+    amount: z.number(),
+    notes: z.string().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    earmarkId: z.number().nullable().optional()
+})
+export const AdvanceCreateOutput = z.object({ id: z.number() })
+
+export const AdvanceGetInput = z.object({ id: z.number() })
+export const AdvanceGetOutput = z.object({
+    id: z.number(),
+    memberId: z.number().nullable().optional(),
+    recipientName: z.string(),
+    memberName: z.string(),
+    issuedAt: z.string(),
+    amount: z.number(),
+    settledAmount: z.number(),
+    purchaseAmount: z.number().optional(),
+    openAmount: z.number(),
+    settlementCount: z.number(),
+    status: AdvanceStatus,
+    notes: z.string().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    earmarkId: z.number().nullable().optional(),
+    placeholderVoucherId: z.number().nullable().optional(),
+    resolvedAt: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+    settlements: z.array(z.object({
+        id: z.number(),
+        advanceId: z.number(),
+        settledAt: z.string(),
+        amount: z.number(),
+        note: z.string().nullable().optional(),
+        voucherId: z.number().nullable().optional(),
+        invoiceId: z.number().nullable().optional(),
+        voucherNo: z.string().nullable().optional(),
+        invoiceNo: z.string().nullable().optional(),
+        createdAt: z.string().optional()
+    })),
+    purchases: z.array(z.object({
+        id: z.number(),
+        advanceId: z.number(),
+        date: z.string(),
+        type: AdvancePurchaseType,
+        sphere: Sphere,
+        description: z.string().nullable().optional(),
+        netAmount: z.number(),
+        grossAmount: z.number(),
+        vatRate: z.number(),
+        paymentMethod: PaymentMethod.nullable().optional(),
+        categoryId: z.number().nullable().optional(),
+        projectId: z.number().nullable().optional(),
+        budgets: z.array(VoucherBudgetAssignment).optional(),
+        earmarks: z.array(VoucherEarmarkAssignment).optional(),
+        tags: z.array(z.string()).optional(),
+        files: z.array(z.object({ name: z.string(), dataBase64: z.string(), mime: z.string().optional() })).optional(),
+        voucherId: z.number().nullable().optional(),
+        voucherNo: z.string().nullable().optional(),
+        createdAt: z.string().optional()
+    }))
+}).nullable()
+
+export const AdvancePurchaseCreateInput = z.object({
+    advanceId: z.number(),
+    date: z.string(),
+    type: AdvancePurchaseType,
+    sphere: Sphere,
+    description: z.string().optional(),
+    netAmount: z.number().optional(),
+    grossAmount: z.number().optional(),
+    vatRate: z.number(),
+    paymentMethod: PaymentMethod.optional(),
+    categoryId: z.number().optional(),
+    projectId: z.number().optional(),
+    budgets: z.array(VoucherBudgetAssignment).optional(),
+    earmarks: z.array(VoucherEarmarkAssignment).optional(),
+    files: z
+        .array(
+            z.object({
+                name: z.string(),
+                dataBase64: z.string(),
+                mime: z.string().optional()
+            })
+        )
+        .optional(),
+    tags: z.array(z.string()).optional()
+}).refine((v) => v.netAmount != null || v.grossAmount != null, {
+    message: 'Either netAmount or grossAmount must be provided'
+})
+export const AdvancePurchaseCreateOutput = z.object({ id: z.number() })
+
+export const AdvancePurchaseDeleteInput = z.object({ id: z.number() })
+export const AdvancePurchaseDeleteOutput = z.object({ id: z.number() })
+
+export const AdvancePurchaseUpdateInput = z.object({
+    id: z.number(),
+    date: z.string(),
+    type: AdvancePurchaseType,
+    sphere: Sphere,
+    description: z.string().optional(),
+    netAmount: z.number().optional(),
+    grossAmount: z.number().optional(),
+    vatRate: z.number(),
+    paymentMethod: PaymentMethod.optional(),
+    categoryId: z.number().optional(),
+    projectId: z.number().optional(),
+    budgets: z.array(VoucherBudgetAssignment).optional(),
+    earmarks: z.array(VoucherEarmarkAssignment).optional(),
+    files: z
+        .array(
+            z.object({
+                name: z.string(),
+                dataBase64: z.string(),
+                mime: z.string().optional()
+            })
+        )
+        .optional(),
+    tags: z.array(z.string()).optional()
+}).refine((v) => v.netAmount != null || v.grossAmount != null, {
+    message: 'Either netAmount or grossAmount must be provided'
+})
+export const AdvancePurchaseUpdateOutput = z.object({ id: z.number() })
+
+export const AdvanceResolveInput = z.object({ id: z.number() })
+export const AdvanceResolveOutput = z.object({ id: z.number() })
+
+export const AdvanceSettleInput = z.object({
+    id: z.number(),
+    settledAt: z.string(),
+    amount: z.number(),
+    note: z.string().nullable().optional(),
+    voucherId: z.number().nullable().optional(),
+    invoiceId: z.number().nullable().optional()
+})
+export const AdvanceSettleOutput = z.object({ id: z.number() })
+
+export const AdvanceDeleteInput = z.object({ id: z.number() })
+export const AdvanceDeleteOutput = z.object({ id: z.number() })
+
+export type TAdvancesListInput = z.infer<typeof AdvancesListInput>
+export type TAdvancesListOutput = z.infer<typeof AdvancesListOutput>
+export type TAdvanceCreateInput = z.infer<typeof AdvanceCreateInput>
+export type TAdvanceGetInput = z.infer<typeof AdvanceGetInput>
+export type TAdvanceSettleInput = z.infer<typeof AdvanceSettleInput>
+export type TAdvanceDeleteInput = z.infer<typeof AdvanceDeleteInput>
+
+export type TAdvancePurchaseCreateInput = z.infer<typeof AdvancePurchaseCreateInput>
+export type TAdvancePurchaseDeleteInput = z.infer<typeof AdvancePurchaseDeleteInput>
+export type TAdvancePurchaseUpdateInput = z.infer<typeof AdvancePurchaseUpdateInput>
+export type TAdvanceResolveInput = z.infer<typeof AdvanceResolveInput>
 
 // Quotes (weekly)
 export const QuoteWeeklyInput = z.object({ date: z.string().optional() }).optional()

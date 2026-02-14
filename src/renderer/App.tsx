@@ -9,6 +9,7 @@ import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
 import SubmissionsView from './views/Submissions/SubmissionsView'
+import AdvancesView from './views/Advances/AdvancesView'
 import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
@@ -508,6 +509,8 @@ function AppInner() {
     const [reportsFilterSphere, setReportsFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
     const [reportsFilterType, setReportsFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [reportsFilterPM, setReportsFilterPM] = useState<'BAR' | 'BANK' | null>(null)
+    const [reportsFilterEarmark, setReportsFilterEarmark] = useState<number | null>(null)
+    const [reportsFilterBudgetId, setReportsFilterBudgetId] = useState<number | null>(null)
     // Global Zweckbindungen (earmarks) for filters/tables
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>>([])
     async function loadEarmarks() {
@@ -767,6 +770,7 @@ function AppInner() {
     useEffect(() => {
         // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
         if (activePage === 'Buchungen') { loadBindings(); loadBudgets() }
+        if (activePage === 'Reports') { loadBudgets() }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activePage])
 
@@ -778,6 +782,7 @@ function AppInner() {
         'Buchungen': '#2962FF',
         'Verbindlichkeiten': '#00B8D4',
         'Mitglieder': '#26A69A',
+        'Vorschuesse': '#4CAF50',
         'Budgets': '#00C853',
         'Zweckbindungen': '#FFD600',
         'Belege': '#FF9100',
@@ -856,6 +861,12 @@ function AppInner() {
                             setFilterType={setReportsFilterType}
                             filterPM={reportsFilterPM}
                             setFilterPM={setReportsFilterPM}
+                            filterEarmark={reportsFilterEarmark}
+                            setFilterEarmark={setReportsFilterEarmark}
+                            filterBudgetId={reportsFilterBudgetId}
+                            setFilterBudgetId={setReportsFilterBudgetId}
+                            budgets={budgets}
+                            earmarks={earmarks}
                             onOpenExport={() => setShowExportOptions(true)}
                             refreshKey={refreshKey}
                             activateKey={reportsActivateKey}
@@ -1051,6 +1062,10 @@ function AppInner() {
                         <MembersView />
                     )}
 
+                    {activePage === 'Vorschuesse' && (
+                        <AdvancesView />
+                    )}
+
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView />
                     )}
@@ -1090,7 +1105,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && (
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
                 <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>
@@ -1220,7 +1235,13 @@ function AppInner() {
                                     format: fmt,
                                     from: reportsFrom || '',
                                     to: reportsTo || '',
-                                    filters: { paymentMethod: reportsFilterPM || undefined, sphere: reportsFilterSphere || undefined, type: reportsFilterType || undefined },
+                                    filters: {
+                                        paymentMethod: reportsFilterPM || undefined,
+                                        sphere: reportsFilterSphere || undefined,
+                                        type: reportsFilterType || undefined,
+                                        earmarkId: reportsFilterEarmark || undefined,
+                                        budgetId: reportsFilterBudgetId || undefined
+                                    },
                                     fields: exportFields,
                                     orgName: exportOrgName || undefined,
                                     amountMode: exportAmountMode,
