@@ -177,6 +177,9 @@ contextBridge.exposeInMainWorld('api', {
         delete: () => ipcRenderer.invoke('taxExemption.delete'),
         updateValidity: (payload: any) => ipcRenderer.invoke('taxExemption.updateValidity', payload)
     },
+    donations: {
+        exportMoneyReceipt: (payload: any) => ipcRenderer.invoke('donations.exportMoneyReceipt', payload)
+    },
     backup: {
         make: (reason?: string) => ipcRenderer.invoke('backup.make', { reason }),
         list: () => ipcRenderer.invoke('backup.list'),

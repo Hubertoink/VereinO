@@ -26,6 +26,7 @@ export default function DashboardView({
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cashier, setCashier] = useState<string>('')
+  const [orgLogo, setOrgLogo] = useState<string>('')
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -34,6 +35,8 @@ export default function DashboardView({
       try {
         const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
         if (!cancelled) setCashier((cn?.value as any) || '')
+        const logo = await (window as any).api?.settings?.get?.({ key: 'org.logoDataUrl' })
+        if (!cancelled) setOrgLogo((logo?.value as any) || '')
       } catch { }
     }
     load()
@@ -274,9 +277,12 @@ export default function DashboardView({
   return (
     <div className="card dashboard-card">
       <div className="dashboard-header">
-        <div>
-          <div className="dashboard-title">Hallo{cashier ? ` ${cashier}` : ''}</div>
-          <div className="helper">Willkommen zurück – hier ist dein Überblick.</div>
+        <div className="dashboard-header-left">
+          {orgLogo && <img src={orgLogo} alt="Vereinslogo" className="dashboard-header-logo" />}
+          <div>
+            <div className="dashboard-title">Hallo{cashier ? ` ${cashier}` : ''}</div>
+            <div className="helper">Willkommen zurück – hier ist dein Überblick.</div>
+          </div>
         </div>
         <div className="dashboard-quote">
           <div className="helper">Satz der Woche</div>

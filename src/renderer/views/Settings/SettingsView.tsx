@@ -6,6 +6,7 @@ import { TablePane } from './panes/TablePane'
 import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
+import { DonationsPane } from './panes/DonationsPane'
 import { TagsPane } from './panes/TagsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
@@ -16,6 +17,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'storage',
   'import',
   'org',
+  'donations',
   'tags',
   'cashCheck',
   'yearEnd',
@@ -46,6 +48,7 @@ export function SettingsView(props: SettingsProps) {
   })
 
   const [appVersion, setAppVersion] = useState<string>('')
+  const [orgLogo, setOrgLogo] = useState<string>('')
 
   useEffect(() => {
     try {
@@ -53,6 +56,13 @@ export function SettingsView(props: SettingsProps) {
     } catch {
       // ignore
     }
+  }, [activeTile])
+
+  // Reload logo when navigating away from org pane (in case it was updated)
+  useEffect(() => {
+    ;(window as any).api?.settings?.get?.({ key: 'org.logoDataUrl' })
+      .then((res: any) => setOrgLogo(res?.value || ''))
+      .catch(() => {/* ignore */})
   }, [activeTile])
 
   useEffect(() => {
@@ -63,7 +73,10 @@ export function SettingsView(props: SettingsProps) {
 
   return (
     <div className="settings-container">
-      <h1>Einstellungen</h1>
+      <div className="settings-heading">
+        <h1>Einstellungen</h1>
+        {orgLogo && <img src={orgLogo} alt="Vereinslogo" className="settings-heading-logo" />}
+      </div>
       
       <SettingsNav active={activeTile} onSelect={setActiveTile} />
       
@@ -124,6 +137,8 @@ export function SettingsView(props: SettingsProps) {
   {activeTile === 'import' && <ImportPane notify={props.notify} />}
 
   {activeTile === 'org' && <OrgPane notify={props.notify} />}
+
+      {activeTile === 'donations' && <DonationsPane notify={props.notify} />}
         
         {activeTile === 'tags' && (
           <TagsPane

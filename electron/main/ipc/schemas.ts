@@ -1090,6 +1090,36 @@ export type TTaxExemptionDeleteOutput = z.infer<typeof TaxExemptionDeleteOutput>
 export type TTaxExemptionUpdateValidityInput = z.infer<typeof TaxExemptionUpdateValidityInput>
 export type TTaxExemptionUpdateValidityOutput = z.infer<typeof TaxExemptionUpdateValidityOutput>
 
+// Donation receipts (Spendenbescheinigung - Geldzuwendung)
+export const DonationsExportMoneyReceiptInput = z.object({
+    receiptType: z.enum(['MONEY', 'IN_KIND']).optional(),
+    donorName: z.string(),
+    donorAddress: z.string(),
+    amount: z.number().positive(),
+    itemDescription: z.string().optional(),
+    itemCondition: z.string().optional(),
+    itemOrigin: z.enum(['PRIVAT', 'BETRIEB', 'UNBEKANNT']).optional(),
+    valuationMethod: z.string().optional(),
+    donationDate: z.string(),
+    purpose: z.string(),
+    receiptDate: z.string(),
+    place: z.string().optional(),
+    waiverReimbursement: z.boolean().optional(),
+    directUse: z.boolean().optional(),
+    forwardedToOtherEntity: z.boolean().optional(),
+    forwardedRecipient: z.string().optional(),
+    orgName: z.string(),
+    orgAddress: z.string(),
+    cashier: z.string().optional(),
+    orgLogoDataUrl: z.string().optional(),
+    taxOffice: z.string().optional(),
+    taxNumber: z.string().optional(),
+    exemptionNoticeDate: z.string().optional()
+})
+export const DonationsExportMoneyReceiptOutput = z.object({ filePath: z.string() })
+export type TDonationsExportMoneyReceiptInput = z.infer<typeof DonationsExportMoneyReceiptInput>
+export type TDonationsExportMoneyReceiptOutput = z.infer<typeof DonationsExportMoneyReceiptOutput>
+
 // Audit: recent actions
 export const AuditRecentInput = z.object({ limit: z.number().min(1).max(100).default(20) }).optional()
 export const AuditRecentOutput = z.object({

@@ -190,6 +190,33 @@ declare global {
                     validUntil?: string 
                 }) => Promise<{ ok: boolean }>
             }
+            donations: {
+                exportMoneyReceipt: (payload: {
+                    receiptType?: 'MONEY' | 'IN_KIND'
+                    donorName: string
+                    donorAddress: string
+                    amount: number
+                    itemDescription?: string
+                    itemCondition?: string
+                    itemOrigin?: 'PRIVAT' | 'BETRIEB' | 'UNBEKANNT'
+                    valuationMethod?: string
+                    donationDate: string
+                    purpose: string
+                    receiptDate: string
+                    place?: string
+                    waiverReimbursement?: boolean
+                    directUse?: boolean
+                    forwardedToOtherEntity?: boolean
+                    forwardedRecipient?: string
+                    orgName: string
+                    orgAddress: string
+                    cashier?: string
+                    orgLogoDataUrl?: string
+                    taxOffice?: string
+                    taxNumber?: string
+                    exemptionNoticeDate?: string
+                }) => Promise<{ filePath: string }>
+            }
             quotes: {
                 weekly: (payload?: { date?: string }) => Promise<{ text: string; author?: string; source?: string; id?: number }>
             }

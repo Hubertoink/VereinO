@@ -19,6 +19,7 @@ interface ActiveOrg {
  * - Tax Exemption Certificate (Steuerbefreiungsbescheid)
  */
 export function OrgPane({ notify }: OrgPaneProps) {
+  const logoInputRef = React.useRef<HTMLInputElement | null>(null)
   // Active organization (for the switcher)
   const [activeOrg, setActiveOrg] = React.useState<ActiveOrg | null>(null)
   const [activeOrgName, setActiveOrgName] = React.useState<string>('')
@@ -26,7 +27,9 @@ export function OrgPane({ notify }: OrgPaneProps) {
   
   // Organization display settings
   const [orgName, setOrgName] = React.useState<string>('')
+  const [orgAddress, setOrgAddress] = React.useState<string>('')
   const [cashier, setCashier] = React.useState<string>('')
+  const [orgLogoDataUrl, setOrgLogoDataUrl] = React.useState<string>('')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string>('')
   const [showTaxExemptionModal, setShowTaxExemptionModal] = React.useState(false)
@@ -58,10 +61,14 @@ export function OrgPane({ notify }: OrgPaneProps) {
     async function load() {
       try {
         const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
+        const oa = await (window as any).api?.settings?.get?.({ key: 'org.address' })
         const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
+        const logo = await (window as any).api?.settings?.get?.({ key: 'org.logoDataUrl' })
         if (!cancelled) {
           setOrgName((on?.value as any) || '')
+          setOrgAddress((oa?.value as any) || '')
           setCashier((cn?.value as any) || '')
+          setOrgLogoDataUrl((logo?.value as any) || '')
         }
       } catch (e: any) {
         if (!cancelled) setError(e?.message || String(e))
@@ -91,13 +98,42 @@ export function OrgPane({ notify }: OrgPaneProps) {
     setError('')
     try {
       await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
+      await (window as any).api?.settings?.set?.({ key: 'org.address', value: orgAddress })
       await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
+      await (window as any).api?.settings?.set?.({ key: 'org.logoDataUrl', value: orgLogoDataUrl || null })
       notify('success', 'Einstellungen gespeichert')
       window.dispatchEvent(new Event('data-changed'))
     } catch (e: any) {
       setError(e?.message || String(e))
       notify('error', e?.message || String(e))
     } finally { setBusy(false) }
+  }
+
+  async function handleLogoUpload(ev: React.ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      notify('error', 'Bitte ein Bild für das Logo auswählen')
+      return
+    }
+    const maxBytes = 2 * 1024 * 1024
+    if (file.size > maxBytes) {
+      notify('error', 'Logo ist zu groß (max. 2 MB)')
+      return
+    }
+    try {
+      const reader = new FileReader()
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onerror = () => reject(reader.error)
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.readAsDataURL(file)
+      })
+      setOrgLogoDataUrl(dataUrl)
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    } finally {
+      ev.target.value = ''
+    }
   }
 
   return (
@@ -144,6 +180,41 @@ export function OrgPane({ notify }: OrgPaneProps) {
         <div className="field">
           <label>Name (Kassier)</label>
           <input className="input" value={cashier} onChange={(e) => setCashier(e.target.value)} placeholder="z. B. Max Mustermann" />
+        </div>
+      </div>
+      <div className="row">
+        <div className="field">
+          <label>Anschrift Verein</label>
+          <textarea
+            className="input"
+            value={orgAddress}
+            onChange={(e) => setOrgAddress(e.target.value)}
+            placeholder="Straße Hausnummer&#10;PLZ Ort"
+            rows={3}
+          />
+        </div>
+        <div className="field">
+          <label>Logo (optional)</label>
+          <div className="flex gap-8 items-center">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoUpload}
+              aria-label="Logo auswählen"
+              title="Logo auswählen"
+              hidden
+            />
+            <button className="btn" onClick={() => logoInputRef.current?.click()}>VereinO Datei auswählen</button>
+            {orgLogoDataUrl ? (
+              <button className="btn" onClick={() => setOrgLogoDataUrl('')}>Logo entfernen</button>
+            ) : null}
+          </div>
+          {orgLogoDataUrl ? (
+            <div className="helper" style={{ marginTop: 6 }}>Logo hinterlegt</div>
+          ) : (
+            <div className="helper" style={{ marginTop: 6 }}>Kein Logo hinterlegt</div>
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

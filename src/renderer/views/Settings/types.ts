@@ -14,6 +14,7 @@ export type TileKey =
   | 'storage'
   | 'import'
   | 'org'
+  | 'donations'
   | 'tags'
   | 'cashCheck'
   | 'yearEnd'
