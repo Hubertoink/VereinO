@@ -711,6 +711,24 @@ export function ensureVoucherJunctionTables(db: DB) {
   }
 }
 
+function ensureBudgetColumns(db: DB) {
+  try {
+    const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
+    const names = new Set(budgetCols.map((c) => c.name))
+
+    if (!names.has('is_archived')) {
+      db.exec('ALTER TABLE budgets ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;')
+    }
+    if (!names.has('enforce_time_range')) {
+      db.exec('ALTER TABLE budgets ADD COLUMN enforce_time_range INTEGER NOT NULL DEFAULT 0;')
+    }
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_budgets_archived ON budgets(is_archived);')
+  } catch {
+    // budgets table may not exist yet on fresh/partial schemas; normal migrations handle this.
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -722,6 +740,8 @@ export function getAppliedVersions(db: DB): Set<number> {
 export function applyMigrations(db: DB) {
   // Ensure critical junction tables exist even if migrations are partially applied.
   ensureVoucherJunctionTables(db)
+  // Heal critical budgets columns for legacy/inconsistent DB states.
+  ensureBudgetColumns(db)
 
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
@@ -744,6 +764,22 @@ export function applyMigrations(db: DB) {
         // If check fails, try to apply migration anyway
       }
     }
+
+    // Special handling for migration 25 - check if archive column already exists
+    if (mig.version === 25) {
+      try {
+        const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
+        const hasArchivedInBudgets = budgetCols.some((c: { name: string }) => c.name === 'is_archived')
+
+        if (hasArchivedInBudgets) {
+          console.log('[Migration 25] Column already exists, marking as applied')
+          db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+          continue
+        }
+      } catch (e) {
+        console.warn('[Migration 25] Failed to check if columns exist:', e)
+      }
+    }
     
     try {
       const exec = db.transaction(() => {
@@ -754,9 +790,9 @@ export function applyMigrations(db: DB) {
       console.log(`[Migration ${mig.version}] Applied successfully`)
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
-      // For migration 20 specifically, try to continue anyway if it's a duplicate column error
-      if (mig.version === 20 && error.message?.includes('duplicate column')) {
-        console.log('[Migration 20] Column already exists, marking as applied')
+      // For migrations that add known columns, continue on duplicate-column errors.
+      if ((mig.version === 20 || mig.version === 25) && error.message?.includes('duplicate column')) {
+        console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {
         throw error

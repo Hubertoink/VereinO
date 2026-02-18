@@ -355,8 +355,12 @@ export default function JournalView({
             list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}`, clear: () => activeSetFilterEarmark(null), color: em?.color })
         }
         if (activeFilterBudgetId != null) {
-            const label = budgetNames.get(activeFilterBudgetId) || `#${activeFilterBudgetId}`
-            const budgetItem = budgets.find(b => b.id === activeFilterBudgetId)
+            const normalizedBudgetId = Number(activeFilterBudgetId)
+            const budgetItem = budgets.find(b => Number(b.id) === normalizedBudgetId)
+            const label =
+                budgetNames.get(normalizedBudgetId) ||
+                ((budgetItem?.name && budgetItem.name.trim()) || budgetItem?.categoryName || budgetItem?.projectName ||
+                    (budgetItem ? String(budgetItem.year) : `#${normalizedBudgetId}`))
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => activeSetFilterBudgetId(null), color: budgetItem?.color })
         }
         if (activeFilterTag) {
@@ -822,7 +826,9 @@ export default function JournalView({
                             await loadRecent()
                         }}
                         onBudgetClick={async (id) => {
-                            activeSetFilterBudgetId(id)
+                            const normalizedId = Number(id)
+                            if (!Number.isFinite(normalizedId) || normalizedId <= 0) return
+                            activeSetFilterBudgetId(normalizedId)
                             setActivePage('Buchungen')
                             activeSetPage(1)
                             await loadRecent()
