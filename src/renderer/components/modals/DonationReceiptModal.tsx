@@ -19,6 +19,7 @@ export interface DonationReceiptDraft {
   directUse: boolean
   forwardedToOtherEntity: boolean
   forwardedRecipient: string
+  signerName: string
 }
 
 interface DonationReceiptDefaults {
@@ -62,7 +63,8 @@ function createEmptyDraft(defaults: DonationReceiptDefaults): DonationReceiptDra
     waiverReimbursement: true,
     directUse: true,
     forwardedToOtherEntity: false,
-    forwardedRecipient: ''
+    forwardedRecipient: '',
+    signerName: defaults.cashier || ''
   }
 }
 
@@ -134,7 +136,7 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
         amount: Number(draft.amount),
         orgName: defaults.orgName,
         orgAddress: defaults.orgAddress,
-        cashier: defaults.cashier,
+        cashier: draft.signerName || defaults.cashier,
         orgLogoDataUrl: defaults.orgLogoDataUrl || undefined,
         taxOffice: defaults.taxOffice,
         taxNumber: defaults.taxNumber,
@@ -301,7 +303,7 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
             </div>
             <div className="field">
               <label>Unterzeichner (aus Organisation)</label>
-              <input className="input" value={defaults.cashier || ''} disabled title="Unterzeichner" placeholder="Kassierer" />
+              <input className="input" value={draft.signerName} onChange={(e) => update('signerName', e.target.value)} title="Unterzeichner" placeholder="Kassierer" />
             </div>
           </div>
         </section>

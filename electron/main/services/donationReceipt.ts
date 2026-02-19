@@ -137,7 +137,7 @@ export async function exportMoneyDonationReceiptPdf(input: ExportMoneyDonationRe
     .row3 > div:first-child { border-left:1px solid #222; }
     .small { font-size: 11px; }
     .checks { margin-top: 10px; display:grid; gap: 6px; }
-    .sign { margin-top: 20px; border-top:1px solid #222; padding-top: 8px; }
+    .sign { margin-top: 40px; border-top:1px solid #222; padding-top: 10px; }
     .hint { margin-top: 20px; font-size: 10px; }
     .orghead { display:flex; justify-content:space-between; align-items:flex-start; gap: 16px; margin-bottom: 8px; }
     .orglogo { max-height: 56px; max-width: 140px; object-fit: contain; }
