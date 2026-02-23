@@ -729,6 +729,116 @@ function ensureBudgetColumns(db: DB) {
   }
 }
 
+function ensureCashChecksAndAdvancesSchema(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cash_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        soll REAL NOT NULL,
+        ist REAL NOT NULL,
+        diff REAL NOT NULL,
+        voucher_id INTEGER,
+        budget_id INTEGER,
+        note TEXT,
+        inspector1_member_id INTEGER,
+        inspector1_name TEXT,
+        inspector2_member_id INTEGER,
+        inspector2_name TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+        FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+        FOREIGN KEY(inspector1_member_id) REFERENCES members(id) ON DELETE SET NULL,
+        FOREIGN KEY(inspector2_member_id) REFERENCES members(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_cash_checks_year_date ON cash_checks(year, date);
+      CREATE INDEX IF NOT EXISTS idx_cash_checks_voucher ON cash_checks(voucher_id);
+
+      CREATE TABLE IF NOT EXISTS member_advances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER,
+        recipient_name TEXT NOT NULL,
+        issued_at TEXT NOT NULL,
+        amount REAL NOT NULL,
+        notes TEXT,
+        budget_id INTEGER,
+        earmark_id INTEGER,
+        placeholder_voucher_id INTEGER,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE SET NULL,
+        FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+        FOREIGN KEY(earmark_id) REFERENCES earmarks(id) ON DELETE SET NULL,
+        FOREIGN KEY(placeholder_voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS member_advance_settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        advance_id INTEGER NOT NULL,
+        settled_at TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        voucher_id INTEGER,
+        invoice_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+        FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+        FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS member_advance_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        advance_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        type TEXT CHECK(type IN ('IN','OUT')) NOT NULL DEFAULT 'OUT',
+        sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL DEFAULT 'IDEELL',
+        description TEXT,
+        net_amount NUMERIC NOT NULL DEFAULT 0,
+        gross_amount NUMERIC NOT NULL DEFAULT 0,
+        vat_rate NUMERIC NOT NULL DEFAULT 0,
+        payment_method TEXT,
+        category_id INTEGER,
+        project_id INTEGER,
+        budgets_json TEXT,
+        earmarks_json TEXT,
+        tags_json TEXT,
+        files_json TEXT,
+        voucher_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+        FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+        FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_member_advances_member ON member_advances(member_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advances_issued ON member_advances(issued_at);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_advance ON member_advance_settlements(advance_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_settled ON member_advance_settlements(settled_at);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+    `)
+  } catch {
+    // Base tables may still be migrating; regular migrations continue and may complete schema later.
+    return
+  }
+
+  try {
+    const advanceCols = db.prepare("PRAGMA table_info(member_advances)").all() as Array<{ name: string }>
+    const names = new Set(advanceCols.map((c) => c.name))
+    if (!names.has('placeholder_voucher_id')) {
+      db.exec('ALTER TABLE member_advances ADD COLUMN placeholder_voucher_id INTEGER;')
+    }
+    if (!names.has('resolved_at')) {
+      db.exec('ALTER TABLE member_advances ADD COLUMN resolved_at TEXT;')
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -742,6 +852,8 @@ export function applyMigrations(db: DB) {
   ensureVoucherJunctionTables(db)
   // Heal critical budgets columns for legacy/inconsistent DB states.
   ensureBudgetColumns(db)
+  // Heal cash check + advances schema for legacy/inconsistent DB states.
+  ensureCashChecksAndAdvancesSchema(db)
 
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {

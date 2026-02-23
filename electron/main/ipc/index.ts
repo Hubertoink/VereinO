@@ -29,6 +29,34 @@ import * as mp from '../repositories/members_payments'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
 import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
 
+function isMissingTableError(error: unknown, tableNames: string[]): boolean {
+    const message = String((error as any)?.message ?? '')
+    if (!message.includes('no such table:')) return false
+    return tableNames.some((table) => message.includes(`no such table: ${table}`))
+}
+
+async function withSchemaHealRetry<T>(run: () => T, tableNames: string[]): Promise<T> {
+    try {
+        return run()
+    } catch (error) {
+        if (!isMissingTableError(error, tableNames)) throw error
+        try {
+            const db = getDb()
+            applyMigrations(db as any)
+        } catch {
+        }
+
+        try {
+            return run()
+        } catch (retryError) {
+            if (isMissingTableError(retryError, tableNames)) {
+                throw new Error('Die Datenbankstruktur war unvollständig und konnte nicht automatisch repariert werden. Bitte App neu starten und erneut versuchen.')
+            }
+            throw retryError
+        }
+    }
+}
+
 export function registerIpcHandlers() {
     // App info
     ipcMain.handle('app.version', async () => {
@@ -614,29 +642,30 @@ export function registerIpcHandlers() {
     })
 
     ipcMain.handle('vouchers.list', async (_e, payload) => {
-        const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
-        const { rows, total } = listVouchersAdvancedPaged({
-            limit: parsed.limit,
-            offset: parsed.offset ?? 0,
-            sort: (parsed.sort as any) || 'DESC',
-            sortBy: (parsed as any).sortBy,
-            paymentMethod: parsed.paymentMethod as any,
-            sphere: parsed.sphere as any,
-            type: parsed.type as any,
-            from: parsed.from,
-            to: parsed.to,
-            earmarkId: parsed.earmarkId,
-            budgetId: (parsed as any).budgetId,
-            q: parsed.q,
-            tag: (parsed as any).tag
-        })
-        // Enrich with budget/earmark assignments from junction tables
-        const enrichedRows = rows.map((r: any) => ({
-            ...r,
-            budgets: getVoucherBudgets(r.id),
-            earmarksAssigned: getVoucherEarmarks(r.id)
-        }))
-        return VouchersListOutput.parse({ rows: enrichedRows, total })
+        return withSchemaHealRetry(() => {
+            const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
+            const { rows, total } = listVouchersAdvancedPaged({
+                limit: parsed.limit,
+                offset: parsed.offset ?? 0,
+                sort: (parsed.sort as any) || 'DESC',
+                sortBy: (parsed as any).sortBy,
+                paymentMethod: parsed.paymentMethod as any,
+                sphere: parsed.sphere as any,
+                type: parsed.type as any,
+                from: parsed.from,
+                to: parsed.to,
+                earmarkId: parsed.earmarkId,
+                budgetId: (parsed as any).budgetId,
+                q: parsed.q,
+                tag: (parsed as any).tag
+            })
+            const enrichedRows = rows.map((r: any) => ({
+                ...r,
+                budgets: getVoucherBudgets(r.id),
+                earmarksAssigned: getVoucherEarmarks(r.id)
+            }))
+            return VouchersListOutput.parse({ rows: enrichedRows, total })
+        }, ['cash_checks'])
     })
 
     ipcMain.handle('vouchers.update', async (_e, payload) => {
@@ -733,9 +762,11 @@ export function registerIpcHandlers() {
 
     // Vorschüsse
     ipcMain.handle('advances.list', async (_e, payload) => {
-        const parsed = AdvancesListInput.parse(payload)
-        const res = listAdvances(parsed ?? undefined)
-        return AdvancesListOutput.parse(res)
+        return withSchemaHealRetry(() => {
+            const parsed = AdvancesListInput.parse(payload)
+            const res = listAdvances(parsed ?? undefined)
+            return AdvancesListOutput.parse(res)
+        }, ['member_advances'])
     })
     ipcMain.handle('advances.create', async (_e, payload) => {
         const parsed = AdvanceCreateInput.parse(payload)
