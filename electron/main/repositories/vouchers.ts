@@ -305,15 +305,15 @@ export function listRecentVouchers(limit = 20) {
 
 export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: number; paymentMethod?: 'BAR' | 'BANK' }) {
     const d = getDb()
-    let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description,
+    let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo, description,
                                         net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = vouchers.id) as fileCount
                          FROM vouchers`
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) {
-        wh.push(`payment_method = ?`)
-        params.push(paymentMethod)
+        wh.push(`(payment_method = ? OR (type = 'TRANSFER' AND (transfer_from = ? OR transfer_to = ?)))`)
+        params.push(paymentMethod, paymentMethod, paymentMethod)
     }
     if (wh.length) sql += ` WHERE ` + wh.join(' AND ')
     sql += ` ORDER BY date DESC, id DESC LIMIT ?`
@@ -364,7 +364,7 @@ export function listVouchersAdvanced(filters: {
                          FROM vouchers v`
     const params: any[] = []
     const wh: string[] = []
-    if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
+    if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
@@ -431,7 +431,7 @@ export function listVouchersAdvancedPaged(filters: {
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
-    if (paymentMethod) { wh.push('v.payment_method = ?'); params.push(paymentMethod) }
+    if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
@@ -524,7 +524,7 @@ export function batchAssignEarmark(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
-    if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
+    if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
@@ -583,7 +583,7 @@ export function batchAssignBudget(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
-    if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
+    if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
@@ -639,7 +639,7 @@ export function batchAssignTags(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
-    if (params.paymentMethod) { wh.push('payment_method = ?'); args.push(params.paymentMethod) }
+    if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
@@ -720,7 +720,7 @@ export function summarizeVouchers(filters: {
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
-    if (paymentMethod) { wh.push('v.payment_method = ?'); paramsBase.push(paymentMethod) }
+    if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); paramsBase.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
     if (type) { wh.push('v.type = ?'); paramsBase.push(type) }
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
@@ -747,6 +747,14 @@ export function summarizeVouchers(filters: {
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
 
+    // When paymentMethod filter is active, remap transfer direction via type:
+    // transfer_from = pm → treated as OUT (money leaves this Zahlweg)
+    // transfer_to = pm → treated as IN (money enters this Zahlweg)
+    // Amounts stay positive (same convention as regular IN/OUT vouchers in the DB).
+    const pmAdjustedType = paymentMethod
+        ? `CASE WHEN v.type = 'TRANSFER' AND v.transfer_from = '${paymentMethod}' THEN 'OUT' WHEN v.type = 'TRANSFER' AND v.transfer_to = '${paymentMethod}' THEN 'IN' ELSE v.type END`
+        : 'v.type'
+
     const totals = d.prepare(`
         SELECT
             IFNULL(SUM(v.net_amount), 0) as net,
@@ -765,24 +773,28 @@ export function summarizeVouchers(filters: {
         ORDER BY v.sphere
     `).all(...paramsBase) as any[]
 
+    const byPaymentMethodKeyExpr = paymentMethod
+        ? `'${paymentMethod}'`
+        : 'v.payment_method'
+
     const byPaymentMethod = d.prepare(`
-        SELECT v.payment_method as key,
+        SELECT ${byPaymentMethodKeyExpr} as key,
                IFNULL(SUM(v.net_amount), 0) as net,
                IFNULL(SUM(v.vat_amount), 0) as vat,
                IFNULL(SUM(v.gross_amount), 0) as gross
         FROM vouchers v${joinSql}${whereSql}
-        GROUP BY v.payment_method
-        ORDER BY v.payment_method IS NULL, v.payment_method
+        GROUP BY ${byPaymentMethodKeyExpr}
+        ORDER BY ${byPaymentMethodKeyExpr} IS NULL, ${byPaymentMethodKeyExpr}
     `).all(...paramsBase) as any[]
 
     const byType = d.prepare(`
-        SELECT v.type as key,
+        SELECT ${pmAdjustedType} as key,
                IFNULL(SUM(v.net_amount), 0) as net,
                IFNULL(SUM(v.vat_amount), 0) as vat,
                IFNULL(SUM(v.gross_amount), 0) as gross
         FROM vouchers v${joinSql}${whereSql}
-        GROUP BY v.type
-        ORDER BY v.type
+        GROUP BY ${pmAdjustedType}
+        ORDER BY ${pmAdjustedType}
     `).all(...paramsBase) as any[]
 
     return { totals, bySphere, byPaymentMethod, byType }
@@ -803,17 +815,27 @@ export function monthlyVouchers(filters: {
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
     if (to) { wh.push('date <= ?'); params.push(to) }
-    if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
+    if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
     if (type) { wh.push('type = ?'); params.push(type) }
     if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
     if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+    // When paymentMethod is active, remap transfers: transfer_from=pm → outflow, transfer_to=pm → inflow
+    const netExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(net_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(net_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END`
+    const vatExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(vat_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(vat_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END`
+    const grossExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(gross_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(gross_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END`
     const rows = d.prepare(`
         SELECT strftime('%Y-%m', date) as month,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END), 0) as net,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END), 0) as vat,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END), 0) as gross
+               IFNULL(SUM(${netExpr}), 0) as net,
+               IFNULL(SUM(${vatExpr}), 0) as vat,
+               IFNULL(SUM(${grossExpr}), 0) as gross
         FROM vouchers${whereSql}
         GROUP BY strftime('%Y-%m', date)
         ORDER BY month ASC
@@ -836,17 +858,27 @@ export function dailyVouchers(filters: {
     const wh: string[] = []
     if (from) { wh.push('date >= ?'); params.push(from) }
     if (to) { wh.push('date <= ?'); params.push(to) }
-    if (paymentMethod) { wh.push('payment_method = ?'); params.push(paymentMethod) }
+    if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
     if (type) { wh.push('type = ?'); params.push(type) }
     if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
     if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+    // When paymentMethod is active, remap transfers: transfer_from=pm → outflow, transfer_to=pm → inflow
+    const netExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(net_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(net_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END`
+    const vatExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(vat_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(vat_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END`
+    const grossExpr = paymentMethod
+        ? `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(gross_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(gross_amount) ELSE 0 END`
+        : `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END`
     const rows = d.prepare(`
         SELECT date,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END), 0) as net,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END), 0) as vat,
-               IFNULL(SUM(CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END), 0) as gross
+               IFNULL(SUM(${netExpr}), 0) as net,
+               IFNULL(SUM(${vatExpr}), 0) as vat,
+               IFNULL(SUM(${grossExpr}), 0) as gross
         FROM vouchers${whereSql}
         GROUP BY date
         ORDER BY date ASC

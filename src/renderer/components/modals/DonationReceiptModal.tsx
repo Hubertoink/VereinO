@@ -60,8 +60,8 @@ function createEmptyDraft(defaults: DonationReceiptDefaults): DonationReceiptDra
       const cityMatch = last.match(/\d{4,5}\s+(.+)$/)
       return cityMatch?.[1] || ''
     })(),
-    waiverReimbursement: true,
-    directUse: true,
+    waiverReimbursement: false,
+    directUse: false,
     forwardedToOtherEntity: false,
     forwardedRecipient: '',
     signerName: defaults.cashier || ''
@@ -76,6 +76,7 @@ const RECEIPT_TABS: { key: DonationReceiptDraft['receiptType']; label: string; i
 export default function DonationReceiptModal({ notify, defaults, initialDraft, onClose, onSaveDraft }: DonationReceiptModalProps) {
   const [draft, setDraft] = React.useState<DonationReceiptDraft>(() => initialDraft || createEmptyDraft(defaults))
   const [busy, setBusy] = React.useState(false)
+  const [infoModal, setInfoModal] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -159,6 +160,21 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
   }
 
   const isMoney = draft.receiptType === 'MONEY'
+
+  const verwendungInfos: Record<string, { title: string; text: string }> = {
+    waiverReimbursement: {
+      title: 'Verzicht auf Aufwendungserstattung',
+      text: 'Der Zuwendende erklärt, dass es sich um den Verzicht auf die Erstattung von Aufwendungen handelt (§ 10b Abs. 3 Satz 5 EStG). Dies betrifft z.\u00A0B. ehrenamtliche Tätigkeiten, bei denen auf eine Vergütung oder Kostenerstattung verzichtet wird.'
+    },
+    directUse: {
+      title: 'Unmittelbar für den angegebenen Zweck',
+      text: 'Die Zuwendung wird unmittelbar und ausschließlich für den auf der Bescheinigung angegebenen steuerbegünstigten Zweck verwendet. Es erfolgt keine Weiterleitung an Dritte.'
+    },
+    forwardedToOtherEntity: {
+      title: 'Weitergeleitet an andere Körperschaft',
+      text: 'Die Zuwendung wird an eine andere steuerbegünstigte Körperschaft weitergeleitet, die die Mittel für ihre satzungsmäßigen Zwecke verwendet. Der Empfänger muss im Feld „Empfänger (Weiterleitung)" angegeben werden.'
+    }
+  }
 
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
@@ -282,10 +298,45 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
         <section className="card donations-modal-section">
           <strong>3) Verwendung</strong>
           <div className="donations-checks-grid">
-            <label className="donations-check"><input type="checkbox" checked={draft.waiverReimbursement} onChange={(e) => update('waiverReimbursement', e.target.checked)} /> Verzicht auf Aufwendungserstattung</label>
-            <label className="donations-check"><input type="checkbox" checked={draft.directUse} onChange={(e) => update('directUse', e.target.checked)} /> Unmittelbar für den angegebenen Zweck</label>
-            <label className="donations-check"><input type="checkbox" checked={draft.forwardedToOtherEntity} onChange={(e) => update('forwardedToOtherEntity', e.target.checked)} /> Weitergeleitet an andere Körperschaft</label>
+            <label className="donations-check">
+              <input type="checkbox" checked={draft.waiverReimbursement} onChange={(e) => update('waiverReimbursement', e.target.checked)} />
+              Verzicht auf Aufwendungserstattung
+              <button type="button" className="donations-info-btn" onClick={(e) => { e.preventDefault(); setInfoModal('waiverReimbursement') }} aria-label="Info: Verzicht auf Aufwendungserstattung">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+              </button>
+            </label>
+            <label className="donations-check">
+              <input type="checkbox" checked={draft.directUse} onChange={(e) => update('directUse', e.target.checked)} />
+              Unmittelbar für den angegebenen Zweck
+              <button type="button" className="donations-info-btn" onClick={(e) => { e.preventDefault(); setInfoModal('directUse') }} aria-label="Info: Unmittelbar für den angegebenen Zweck">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+              </button>
+            </label>
+            <label className="donations-check">
+              <input type="checkbox" checked={draft.forwardedToOtherEntity} onChange={(e) => update('forwardedToOtherEntity', e.target.checked)} />
+              Weitergeleitet an andere Körperschaft
+              <button type="button" className="donations-info-btn" onClick={(e) => { e.preventDefault(); setInfoModal('forwardedToOtherEntity') }} aria-label="Info: Weitergeleitet an andere Körperschaft">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+              </button>
+            </label>
           </div>
+
+          {/* Info modal for Verwendung items */}
+          {infoModal && verwendungInfos[infoModal] && createPortal(
+            <div className="modal-overlay" onClick={() => setInfoModal(null)}>
+              <div className="modal donations-info-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="modal-header">
+                  <h3>{verwendungInfos[infoModal].title}</h3>
+                  <button className="btn ghost" onClick={() => setInfoModal(null)} aria-label="Schließen">✕</button>
+                </div>
+                <p className="donations-info-modal-text">{verwendungInfos[infoModal].text}</p>
+                <div className="modal-actions">
+                  <button className="btn primary" onClick={() => setInfoModal(null)}>Verstanden</button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
           {draft.forwardedToOtherEntity && (
             <div className="field">
               <label>Empfänger (Weiterleitung)</label>

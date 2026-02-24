@@ -7548,3 +7548,55 @@ html[data-glass-modals="true"] .flyout-arrow {
     gap: 6px;
     font-size: 13px;
 }
+
+/* Inline info button next to checkbox labels */
+.donations-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.15s;
+}
+
+.donations-info-btn:hover {
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
+    transform: scale(1.1);
+}
+
+.donations-info-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Small info modal for Verwendung explanations */
+.donations-info-modal {
+    max-width: 440px;
+    width: 90vw;
+    padding: 20px 24px;
+    animation: modal-in 0.15s ease-out;
+}
+
+.donations-info-modal .modal-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.donations-info-modal-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    margin: 12px 0 16px;
+}
+
+.donations-info-modal .modal-actions {
+    justify-content: flex-end;
+}
