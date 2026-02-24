@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import FilterDropdown from './FilterDropdown'
 
 export type InvoiceStatus = 'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'
@@ -32,6 +32,7 @@ export default function InvoiceFilterDropdown({
   yearsAvail,
   onApply
 }: InvoiceFilterDropdownProps) {
+  const closeRef = useRef<(() => void) | null>(null)
   const [status, setStatus] = useState<InvoiceStatus>(statusProp)
   const [sphere, setSphere] = useState<Sphere>(sphereProp)
   const [budgetId, setBudgetId] = useState<number | ''>(budgetIdProp)
@@ -77,6 +78,7 @@ export default function InvoiceFilterDropdown({
 
   function handleApply() {
     onApply({ status, sphere, budgetId, tag, dueFrom, dueTo })
+    closeRef.current?.()
   }
 
   function handleReset() {
@@ -104,6 +106,7 @@ export default function InvoiceFilterDropdown({
       ariaLabel="Filter"
       buttonTitle="Filter"
       colorVariant="filter"
+      closeRef={closeRef}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

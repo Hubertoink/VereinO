@@ -506,17 +506,23 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_voucher ON voucher_earmarks(voucher_id);
     CREATE INDEX IF NOT EXISTS idx_voucher_earmarks_earmark ON voucher_earmarks(earmark_id);
 
-    -- Migrate existing budget assignments to junction table
+    -- Migrate existing budget assignments to junction table.
+    -- Guard against legacy inconsistent data where vouchers.budget_id points
+    -- to a non-existing budget, which would otherwise fail FK checks.
     INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
-    SELECT id, budget_id, COALESCE(budget_amount, gross_amount)
-    FROM vouchers
-    WHERE budget_id IS NOT NULL;
+    SELECT v.id, v.budget_id, COALESCE(v.budget_amount, v.gross_amount)
+    FROM vouchers v
+    INNER JOIN budgets b ON b.id = v.budget_id
+    WHERE v.budget_id IS NOT NULL;
 
-    -- Migrate existing earmark assignments to junction table
+    -- Migrate existing earmark assignments to junction table.
+    -- Guard against legacy inconsistent data where vouchers.earmark_id points
+    -- to a non-existing earmark, which would otherwise fail FK checks.
     INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
-    SELECT id, earmark_id, COALESCE(earmark_amount, gross_amount)
-    FROM vouchers
-    WHERE earmark_id IS NOT NULL;
+    SELECT v.id, v.earmark_id, COALESCE(v.earmark_amount, v.gross_amount)
+    FROM vouchers v
+    INNER JOIN earmarks e ON e.id = v.earmark_id
+    WHERE v.earmark_id IS NOT NULL;
     `
   }
   ,
@@ -892,7 +898,23 @@ export function applyMigrations(db: DB) {
         console.warn('[Migration 25] Failed to check if columns exist:', e)
       }
     }
-    
+
+    // Special handling for migration 28 - ensureCashChecksAndAdvancesSchema may have already created the full table
+    if (mig.version === 28) {
+      try {
+        const advCols = db.prepare("PRAGMA table_info(member_advances)").all() as Array<{ name: string }>
+        const hasPlaceholder = advCols.some((c: { name: string }) => c.name === 'placeholder_voucher_id')
+
+        if (hasPlaceholder) {
+          console.log('[Migration 28] Columns already exist (created by schema heal), marking as applied')
+          db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+          continue
+        }
+      } catch (e) {
+        console.warn('[Migration 28] Failed to check if columns exist:', e)
+      }
+    }
+
     try {
       const exec = db.transaction(() => {
         db.exec(mig.up)
@@ -903,7 +925,7 @@ export function applyMigrations(db: DB) {
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
       // For migrations that add known columns, continue on duplicate-column errors.
-      if ((mig.version === 20 || mig.version === 25) && error.message?.includes('duplicate column')) {
+      if ((mig.version === 20 || mig.version === 25 || mig.version === 28) && error.message?.includes('duplicate column')) {
         console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {

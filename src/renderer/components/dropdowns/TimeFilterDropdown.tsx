@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import FilterDropdown from './FilterDropdown'
 
 export interface TimeFilterDropdownProps {
@@ -10,6 +10,7 @@ export interface TimeFilterDropdownProps {
 }
 
 export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tooltip }: TimeFilterDropdownProps) {
+  const closeRef = useRef<(() => void) | null>(null)
   const [f, setF] = useState<string>(from)
   const [t, setT] = useState<string>(to)
 
@@ -62,6 +63,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
       buttonTitle="Zeitraum wählen"
       colorVariant="time"
       tooltip={tooltip}
+      closeRef={closeRef}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">
@@ -91,7 +93,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
           Zurücksetzen
         </button>
         <div className="filter-dropdown__actions-right">
-          <button className="btn primary" type="button" onClick={() => onApply({ from: f, to: t })}>
+          <button className="btn primary" type="button" onClick={() => { onApply({ from: f, to: t }); closeRef.current?.() }}>
             Übernehmen
           </button>
         </div>

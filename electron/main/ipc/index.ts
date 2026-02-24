@@ -1826,8 +1826,14 @@ export function registerIpcHandlers() {
 
         // If the active organization changed (e.g. deleted active org), ensure DB is initialized.
         if (afterId !== beforeId) {
-            const db = getDb()
-            applyMigrations(db)
+            try {
+                const db = getDb()
+                applyMigrations(db)
+            } catch (err) {
+                // Deletion already succeeded (config/data updated).
+                // Do not fail the delete call because a follow-up migration failed.
+                console.warn('[organizations.delete] post-switch migration failed:', err)
+            }
 
             const win = BrowserWindow.getFocusedWindow()
             if (win && after) {

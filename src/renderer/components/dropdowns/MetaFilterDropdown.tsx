@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import FilterDropdown from './FilterDropdown'
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -37,6 +37,7 @@ export default function MetaFilterDropdown({
   onApply,
   tooltip
 }: MetaFilterDropdownProps) {
+  const closeRef = useRef<(() => void) | null>(null)
   const [type, setType] = useState<MetaFilterDropdownProps['filterType']>(filterType)
   const [pm, setPm] = useState<MetaFilterDropdownProps['filterPM']>(filterPM)
   const [tag, setTag] = useState<string | null>(filterTag)
@@ -82,6 +83,7 @@ export default function MetaFilterDropdown({
 
   const handleApply = () => {
     onApply({ filterType: type, filterPM: pm, filterTag: tag, sphere: s, earmarkId: e, budgetId: b })
+    closeRef.current?.()
   }
 
   return (
@@ -99,6 +101,7 @@ export default function MetaFilterDropdown({
       buttonTitle="Filter"
       colorVariant="filter"
       tooltip={tooltip}
+      closeRef={closeRef}
     >
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">

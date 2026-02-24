@@ -722,7 +722,17 @@ export function summarizeVouchers(filters: {
     let joinSql = ''
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); paramsBase.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
-    if (type) { wh.push('v.type = ?'); paramsBase.push(type) }
+    // When both type and paymentMethod are active, include TRANSFERs that act as
+    // the requested type for this payment method (e.g. transfer_to=pm → IN).
+    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
+        if (type === 'IN') {
+            wh.push(`(v.type = 'IN' OR (v.type = 'TRANSFER' AND v.transfer_to = ?))`)
+            paramsBase.push(paymentMethod)
+        } else {
+            wh.push(`(v.type = 'OUT' OR (v.type = 'TRANSFER' AND v.transfer_from = ?))`)
+            paramsBase.push(paymentMethod)
+        }
+    } else if (type) { wh.push('v.type = ?'); paramsBase.push(type) }
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
@@ -773,19 +783,43 @@ export function summarizeVouchers(filters: {
         ORDER BY v.sphere
     `).all(...paramsBase) as any[]
 
-    const byPaymentMethodKeyExpr = paymentMethod
-        ? `'${paymentMethod}'`
-        : 'v.payment_method'
-
-    const byPaymentMethod = d.prepare(`
-        SELECT ${byPaymentMethodKeyExpr} as key,
-               IFNULL(SUM(v.net_amount), 0) as net,
-               IFNULL(SUM(v.vat_amount), 0) as vat,
-               IFNULL(SUM(v.gross_amount), 0) as gross
-        FROM vouchers v${joinSql}${whereSql}
-        GROUP BY ${byPaymentMethodKeyExpr}
-        ORDER BY ${byPaymentMethodKeyExpr} IS NULL, ${byPaymentMethodKeyExpr}
-    `).all(...paramsBase) as any[]
+    let byPaymentMethod: any[]
+    if (paymentMethod) {
+        // When paymentMethod filter is active, all matched vouchers belong to that pm
+        byPaymentMethod = d.prepare(`
+            SELECT '${paymentMethod}' as key,
+                   IFNULL(SUM(v.net_amount), 0) as net,
+                   IFNULL(SUM(v.vat_amount), 0) as vat,
+                   IFNULL(SUM(v.gross_amount), 0) as gross
+            FROM vouchers v${joinSql}${whereSql}
+            GROUP BY key
+            ORDER BY key IS NULL, key
+        `).all(...paramsBase) as any[]
+    } else {
+        // Without filter: use CTE to correctly split TRANSFER amounts between
+        // their source (transfer_from) and destination (transfer_to) payment methods
+        byPaymentMethod = d.prepare(`
+            WITH filtered AS (
+                SELECT v.payment_method, v.type, v.transfer_from, v.transfer_to,
+                       v.net_amount, v.vat_amount, v.gross_amount
+                FROM vouchers v${joinSql}${whereSql}
+            )
+            SELECT pm as key,
+                   IFNULL(SUM(net_amount), 0) as net,
+                   IFNULL(SUM(vat_amount), 0) as vat,
+                   IFNULL(SUM(gross_amount), 0) as gross
+            FROM (
+                SELECT CASE WHEN type != 'TRANSFER' THEN payment_method ELSE transfer_from END as pm,
+                       net_amount, vat_amount, gross_amount
+                FROM filtered
+                UNION ALL
+                SELECT transfer_to as pm, net_amount, vat_amount, gross_amount
+                FROM filtered WHERE type = 'TRANSFER'
+            ) sub
+            GROUP BY pm
+            ORDER BY pm IS NULL, pm
+        `).all(...paramsBase) as any[]
+    }
 
     const byType = d.prepare(`
         SELECT ${pmAdjustedType} as key,
@@ -817,7 +851,17 @@ export function monthlyVouchers(filters: {
     if (to) { wh.push('date <= ?'); params.push(to) }
     if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
-    if (type) { wh.push('type = ?'); params.push(type) }
+    // When both type and paymentMethod are active, include TRANSFERs that act as
+    // the requested type for this payment method (e.g. transfer_to=pm → IN).
+    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
+        if (type === 'IN') {
+            wh.push(`(type = 'IN' OR (type = 'TRANSFER' AND transfer_to = ?))`)
+            params.push(paymentMethod)
+        } else {
+            wh.push(`(type = 'OUT' OR (type = 'TRANSFER' AND transfer_from = ?))`)
+            params.push(paymentMethod)
+        }
+    } else if (type) { wh.push('type = ?'); params.push(type) }
     if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
     if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -860,7 +904,17 @@ export function dailyVouchers(filters: {
     if (to) { wh.push('date <= ?'); params.push(to) }
     if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
-    if (type) { wh.push('type = ?'); params.push(type) }
+    // When both type and paymentMethod are active, include TRANSFERs that act as
+    // the requested type for this payment method (e.g. transfer_to=pm → IN).
+    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
+        if (type === 'IN') {
+            wh.push(`(type = 'IN' OR (type = 'TRANSFER' AND transfer_to = ?))`)
+            params.push(paymentMethod)
+        } else {
+            wh.push(`(type = 'OUT' OR (type = 'TRANSFER' AND transfer_from = ?))`)
+            params.push(paymentMethod)
+        }
+    } else if (type) { wh.push('type = ?'); params.push(type) }
     if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
     if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
@@ -1102,10 +1156,29 @@ export function clearAllVouchers() {
         const files = d.prepare('SELECT file_path FROM voucher_files').all() as any[]
         const countRow = d.prepare('SELECT COUNT(1) as c FROM vouchers').get() as any
         const deleted = Number(countRow?.c || 0)
+
+        // Clear self-referencing FKs (no CASCADE) so vouchers can be deleted
+        d.prepare('UPDATE vouchers SET reversed_by_id = NULL, original_id = NULL').run()
+
+        // Clear FK references from invoices (no CASCADE)
+        d.prepare('UPDATE invoices SET posted_voucher_id = NULL WHERE posted_voucher_id IS NOT NULL').run()
+
+        // Clear FK references from membership_payments (ON DELETE SET NULL, but be explicit)
+        d.prepare('UPDATE membership_payments SET voucher_id = NULL WHERE voucher_id IS NOT NULL').run()
+
+        // Delete from junction/child tables (CASCADE should handle these,
+        // but explicit deletion avoids issues if PRAGMA foreign_keys is off in the transaction)
+        d.prepare('DELETE FROM voucher_budgets').run()
+        d.prepare('DELETE FROM voucher_earmarks').run()
+        d.prepare('DELETE FROM voucher_tags').run()
         d.prepare('DELETE FROM voucher_files').run()
+
+        // Now safe to delete all vouchers
         d.prepare('DELETE FROM vouchers').run()
-        // Optionally reset sequences
+
+        // Reset sequences
         d.prepare('DELETE FROM voucher_sequences').run()
+
         // Remove files from disk
         for (const f of files) {
             try { fs.unlinkSync(f.file_path) } catch { }
@@ -1145,15 +1218,24 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
 
     const whereSql = ' WHERE ' + wh.join(' AND ')
     const rows = d.prepare(`
-        SELECT v.payment_method as pm, v.type as type, IFNULL(SUM(${grossExpr}), 0) as gross
+        SELECT v.payment_method as pm, v.type as type, v.transfer_from as transferFrom, v.transfer_to as transferTo, IFNULL(SUM(${grossExpr}), 0) as gross
         FROM vouchers v${joinSql}${whereSql}
-        GROUP BY v.payment_method, v.type
+        GROUP BY v.payment_method, v.type, v.transfer_from, v.transfer_to
     `).all(bind) as any[]
     let bar = 0, bank = 0
     for (const r of rows) {
-        const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0
-        if (r.pm === 'BAR') bar += sign * (r.gross || 0)
-        if (r.pm === 'BANK') bank += sign * (r.gross || 0)
+        if (r.type === 'TRANSFER') {
+            // Transfer: subtract from source, add to destination
+            const amt = r.gross || 0
+            if (r.transferFrom === 'BAR') bar -= amt
+            if (r.transferFrom === 'BANK') bank -= amt
+            if (r.transferTo === 'BAR') bar += amt
+            if (r.transferTo === 'BANK') bank += amt
+        } else {
+            const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0
+            if (r.pm === 'BAR') bar += sign * (r.gross || 0)
+            if (r.pm === 'BANK') bank += sign * (r.gross || 0)
+        }
     }
     return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100 }
 }

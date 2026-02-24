@@ -12,6 +12,8 @@ export interface FilterDropdownProps {
   buttonTitle?: string
   colorVariant?: 'default' | 'display' | 'time' | 'filter' | 'action'
   tooltip?: string
+  /** Mutable ref that receives the close function once mounted */
+  closeRef?: React.MutableRefObject<(() => void) | null>
 }
 
 type TooltipPlacement = 'bottom' | 'top'
@@ -26,11 +28,17 @@ export default function FilterDropdown({
   ariaLabel,
   buttonTitle,
   colorVariant = 'default',
-  tooltip
+  tooltip,
+  closeRef
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
+
+  // Expose close function via ref so parent components can close the dropdown
+  const closePanel = () => { setOpen(false); buttonRef.current?.focus() }
+  if (closeRef) closeRef.current = closePanel
+
   const labelId = useId()
   const tooltipId = useId()
   const [showTooltip, setShowTooltip] = useState(false)
