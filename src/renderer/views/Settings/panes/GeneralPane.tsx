@@ -356,20 +356,6 @@ export function GeneralPane({
 
         {/* Row 3: Toggles in a grid */}
         <div className="settings-row-3col" style={{ marginTop: 16 }}>
-          {navLayout === 'left' && (
-            <div className="settings-inline-toggle">
-              <label htmlFor="toggle-sidebar-compact">Kompakte Seitenleiste</label>
-              <input
-                id="toggle-sidebar-compact"
-                role="switch"
-                aria-checked={sidebarCollapsed}
-                className="toggle"
-                type="checkbox"
-                checked={sidebarCollapsed}
-                onChange={(e) => setSidebarCollapsed(e.target.checked)}
-              />
-            </div>
-          )}
           <div className="settings-inline-toggle">
             <label htmlFor="toggle-menu-icons">Farbige Menüicons</label>
             <input

@@ -228,13 +228,15 @@ Tags: ${tagsDisplay}`
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zahlweg:</span>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {voucher.type === 'TRANSFER' ? (
-                  <>
-                    {voucher.transferFrom === 'BAR' ? <IconCash /> : <IconBank />}
-                    <IconArrow />
-                    {voucher.transferTo === 'BAR' ? <IconCash /> : <IconBank />}
-                  </>
+                  <span className={`badge pm-transfer pm-transfer-${(voucher.transferFrom || '').toLowerCase()}-${(voucher.transferTo || '').toLowerCase()}`}>
+                    <span className="pm-icon">{voucher.transferFrom === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
+                    <span className="transfer-arrow">→</span>
+                    <span className="pm-icon">{voucher.transferTo === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
+                  </span>
                 ) : voucher.paymentMethod ? (
-                  <>{voucher.paymentMethod === 'BAR' ? <IconCash /> : <IconBank />}</>
+                  <span className={`badge pm-${voucher.paymentMethod.toLowerCase()}`}>
+                    {voucher.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
+                  </span>
                 ) : (
                   <span>-</span>
                 )}

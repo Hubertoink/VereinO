@@ -16,7 +16,7 @@ async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
-    minWidth: 1264,
+        minWidth: 580,
         minHeight: 640,
         show: false,
         autoHideMenuBar: true,

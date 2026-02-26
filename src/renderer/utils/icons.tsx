@@ -30,16 +30,30 @@ export const ICONS = {
 } as const
 
 // React Icon-Komponenten
-export const IconBank = ({ size = 14 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M2 6h12M2 6l6-4 6 4M2 6v6a1 1 0 001 1h10a1 1 0 001-1V6M4 8v3M8 8v3M12 8v3M2 14h12" strokeLinecap="round" />
+// Bank icon – filled temple/building, default blue
+export const IconBank = ({ size = 14, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Roof / triangle */}
+        <path d="M10 2L1 8h18L10 2z" fill={color || '#3b82f6'} />
+        {/* Pillars */}
+        <rect x="3" y="9" width="2" height="6" rx="0.5" fill={color || '#3b82f6'} />
+        <rect x="7" y="9" width="2" height="6" rx="0.5" fill={color || '#3b82f6'} />
+        <rect x="11" y="9" width="2" height="6" rx="0.5" fill={color || '#3b82f6'} />
+        <rect x="15" y="9" width="2" height="6" rx="0.5" fill={color || '#3b82f6'} />
+        {/* Base */}
+        <rect x="1" y="15.5" width="18" height="2.5" rx="0.5" fill={color || '#3b82f6'} />
     </svg>
 )
 
-export const IconCash = ({ size = 14 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="2" y="4" width="12" height="8" rx="1" />
-        <circle cx="8" cy="8" r="2" />
+// Cash icon – banknote with € symbol, default green
+export const IconCash = ({ size = 14, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Banknote body */}
+        <rect x="1" y="4" width="18" height="12" rx="2" fill={color || '#22c55e'} />
+        {/* Inner border */}
+        <rect x="3" y="6" width="14" height="8" rx="1" fill="none" stroke={color || '#16a34a'} strokeWidth="0.8" strokeDasharray="2 1" opacity="0.5" />
+        {/* Euro symbol */}
+        <text x="10" y="13" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff" fontFamily="sans-serif">€</text>
     </svg>
 )
 
@@ -49,8 +63,9 @@ export const IconTransfer = ({ size = 14 }: { size?: number }) => (
     </svg>
 )
 
-export const IconArrow = ({ size = 14 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+// Transfer arrow – bold chevron with color
+export const IconArrow = ({ size = 14, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color || 'currentColor'} strokeWidth="2">
         <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 )
@@ -104,9 +119,9 @@ export function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK
 // Helper für Transfer-Anzeige mit Icons
 export function TransferDisplay({ from, to, size = 14 }: { from: 'BAR' | 'BANK' | null | undefined; to: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span className="pm-transfer-display">
             {from === 'BAR' ? <IconCash size={size} /> : from === 'BANK' ? <IconBank size={size} /> : ICONS.EMPTY}
-            <IconArrow size={size} />
+            <IconArrow size={size} color="var(--text-dim)" />
             {to === 'BAR' ? <IconCash size={size} /> : to === 'BANK' ? <IconBank size={size} /> : ICONS.EMPTY}
         </span>
     )

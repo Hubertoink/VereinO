@@ -125,7 +125,21 @@ function AppInner() {
         showSubmissionBadge,
         setShowSubmissionBadge
     } = useUIPreferences()
-    
+
+    // ── Auto-switch: force side-nav when window is too narrow for top-nav ──
+    const NAV_SWITCH_THRESHOLD = 960
+    const [narrowOverride, setNarrowOverride] = useState(false)
+
+    useEffect(() => {
+        const check = () => setNarrowOverride(window.innerWidth < NAV_SWITCH_THRESHOLD)
+        check() // initial
+        window.addEventListener('resize', check)
+        return () => window.removeEventListener('resize', check)
+    }, [])
+
+    // Effective layout: user preference wins when wide enough, side-nav forced when narrow
+    const effectiveNavLayout = (narrowOverride && navLayout === 'top') ? 'left' : navLayout
+
     // Pending submissions count for nav badge
     const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
     useEffect(() => {
@@ -789,12 +803,12 @@ function AppInner() {
         'Reports': '#F50057',
         'Einstellungen': '#9C27B0'
     }
-    const isTopNav = navLayout === 'top'
+    const isTopNav = effectiveNavLayout === 'top'
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: isTopNav ? '1fr' : '64px 1fr', gridTemplateRows: '56px 1fr', gridTemplateAreas: isTopNav ? '"top" "main"' : '"top top" "side main"', height: '100vh', overflow: 'hidden' }}>
+        <div className={`app-root-grid ${isTopNav ? 'app-root-grid--top' : 'app-root-grid--side'}`}>
             {/* Topbar with organisation header line */}
             <header
-                style={{ gridArea: 'top', position: 'sticky', top: 0, zIndex: 1000, display: 'grid', gridTemplateColumns: isTopNav ? '1fr auto 1fr 104px' : '1fr 104px', alignItems: 'center', gap: 12, padding: '4px 8px', borderBottom: '1px solid var(--border)', backdropFilter: 'var(--blur)', background: 'color-mix(in oklab, var(--surface) 50%, transparent)', WebkitAppRegion: 'drag' } as any}
+                className={`app-header ${isTopNav ? 'app-header-top' : 'app-header-left'}`}
                 onDoubleClick={(e) => {
                     const target = e.target as HTMLElement
                     // Ignore double-clicks on interactive elements
@@ -846,7 +860,7 @@ function AppInner() {
             )}
 
             {/* Main content */}
-            <main style={{ gridArea: 'main', padding: 16, overflowY: 'auto' }}>
+            <main className="app-main">
                     
                     {activePage === 'Reports' && (
                         <ReportsView
@@ -1862,19 +1876,23 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from} ? ${to}` : 'Transfer'
+                        const title = from && to ? `${from === 'BAR' ? 'Bar' : 'Bank'} → ${to === 'BAR' ? 'Bar' : 'Bank'}` : 'Transfer'
                         return (
-                            <span className="badge inline-flex items-center gap-6" title={title} aria-label={title}>
-                                {from === 'BAR' ? <IconCash /> : <IconBank />}
-                                <IconArrow />
-                                {to === 'BAR' ? <IconCash /> : <IconBank />}
+                            <span className={`badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} title={title} aria-label={title}>
+                                <span className="pm-icon">
+                                    {from === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
+                                </span>
+                                <span className="transfer-arrow">→</span>
+                                <span className="pm-icon">
+                                    {to === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
+                                </span>
                             </span>
                         )
                     })()
                 ) : (
                     r.paymentMethod ? (
-                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod} aria-label={`Zahlweg: ${r.paymentMethod}`} style={{ display: 'inline-grid', placeItems: 'center' }}>
-                            {r.paymentMethod === 'BAR' ? <IconCash /> : <IconBank />}
+                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'} aria-label={`Zahlweg: ${r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'}`}>
+                            {r.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
                         </span>
                     ) : ''
                 )}
@@ -1907,6 +1925,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
         )
     )
     return (
+        <div className="journal-table-scroll-wrapper">
         <table className="journal-table" cellPadding={6}>
             <thead>
                 <tr>
@@ -1926,29 +1945,30 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
                 )}
             </tbody>
         </table>
+        </div>
     )
 }
 
 // Small inline icons used in table badges
 function IconBank({ size = 14 }: { size?: number }) {
-    const s = size
     return (
-        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10h18" />
-            <path d="M5 10v8M10 10v8M14 10v8M19 10v8" />
-            <path d="M2 10l10-6 10 6" />
-            <path d="M3 18h18" />
+        <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2L1 8h18L10 2z" fill="#3b82f6" />
+            <rect x="3" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
+            <rect x="7" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
+            <rect x="11" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
+            <rect x="15" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
+            <rect x="1" y="15.5" width="18" height="2.5" rx="0.5" fill="#3b82f6" />
         </svg>
     )
 }
 
 function IconCash({ size = 14 }: { size?: number }) {
-    const s = size
     return (
-        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="6" width="18" height="12" rx="2" />
-            <circle cx="12" cy="12" r="3" />
-            <path d="M7 9h.01M17 15h.01" />
+        <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="4" width="18" height="12" rx="2" fill="#22c55e" />
+            <rect x="3" y="6" width="14" height="8" rx="1" fill="none" stroke="#16a34a" strokeWidth="0.8" strokeDasharray="2 1" opacity="0.5" />
+            <text x="10" y="13" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff" fontFamily="sans-serif">€</text>
         </svg>
     )
 }

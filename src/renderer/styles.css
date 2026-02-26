@@ -1401,25 +1401,54 @@ button.badge:hover { filter: brightness(1.03); }
     font-weight: 600;
 }
 
+/* ── Payment Method (Zahlweg) Badges ── */
+
+/* Bar (Cash) badge – green tinted background with green icon */
 .badge.pm-bar {
-    background: color-mix(in oklab, var(--pm-bar) 36%, transparent);
-    color: #0f2a14;
+    display: inline-grid;
+    place-items: center;
+    background: color-mix(in oklab, #22c55e 18%, transparent);
+    border: 1.5px solid color-mix(in oklab, #22c55e 35%, transparent);
+    border-radius: 6px;
+    padding: 3px 6px;
+    line-height: 1;
 }
 
+/* Bank badge – blue tinted background with blue icon */
 .badge.pm-bank {
-    background: color-mix(in oklab, var(--pm-bank) 36%, transparent);
-    color: #0B0E14;
+    display: inline-grid;
+    place-items: center;
+    background: color-mix(in oklab, #3b82f6 18%, transparent);
+    border: 1.5px solid color-mix(in oklab, #3b82f6 35%, transparent);
+    border-radius: 6px;
+    padding: 3px 6px;
+    line-height: 1;
 }
 
-/* Transfer badge with colored payment method icons */
+/* Transfer badge – combined flow indicator */
 .badge.pm-transfer {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    background: linear-gradient(90deg,
-        color-mix(in oklab, var(--pm-bar) 30%, transparent) 0%,
-        color-mix(in oklab, var(--pm-bank) 30%, transparent) 100%);
-    padding: 4px 8px;
+    gap: 3px;
+    border-radius: 6px;
+    padding: 3px 7px;
+    line-height: 1;
+}
+
+/* Bar → Bank: green to blue flow */
+.badge.pm-transfer.pm-transfer-bar-bank {
+    background: linear-gradient(105deg,
+        color-mix(in oklab, #22c55e 18%, transparent) 0%,
+        color-mix(in oklab, #3b82f6 18%, transparent) 100%);
+    border: 1.5px solid color-mix(in oklab, #22c55e 25%, color-mix(in oklab, #3b82f6 25%, transparent));
+}
+
+/* Bank → Bar: blue to green flow */
+.badge.pm-transfer.pm-transfer-bank-bar {
+    background: linear-gradient(105deg,
+        color-mix(in oklab, #3b82f6 18%, transparent) 0%,
+        color-mix(in oklab, #22c55e 18%, transparent) 100%);
+    border: 1.5px solid color-mix(in oklab, #3b82f6 25%, color-mix(in oklab, #22c55e 25%, transparent));
 }
 
 .badge.pm-transfer .pm-icon {
@@ -1428,23 +1457,26 @@ button.badge:hover { filter: brightness(1.03); }
     justify-content: center;
 }
 
-.badge.pm-transfer .pm-bar-icon {
-    color: #0f2a14;
-}
-
-.badge.pm-transfer .pm-bank-icon {
-    color: #0B0E14;
-}
-
 .badge.pm-transfer .transfer-arrow {
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 1px;
 }
 
-/* Force SVG icons inside payment badges to use a lighter stroke for better contrast */
+/* TransferDisplay helper (used in summaries etc.) */
+.pm-transfer-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* SVG icons inside payment badges should NOT override fill with stroke */
 .badge.pm-bar svg,
-.badge.pm-bank svg {
-    stroke: color-mix(in oklab, var(--text) 36%, var(--surface) 0%);
+.badge.pm-bank svg,
+.badge.pm-transfer svg {
+    /* Let the SVG's own fill colors shine through */
+    stroke: none;
 }
 
 /* Make SVG icons inside badges align nicely */
@@ -3270,6 +3302,17 @@ textarea:focus {
     height: 100vh;
     overflow: hidden;
 }
+/* Top-nav mode: single column, no sidebar */
+.app-root-grid--top {
+    grid-template-columns: 1fr;
+    grid-template-areas: "top" "main";
+}
+/* Side-nav mode: sidebar + content */
+.app-root-grid--side {
+    grid-template-columns: 64px 1fr;
+    grid-template-areas: "top top" "side main";
+}
+
 .app-header {
     grid-area: top;
     position: sticky;
@@ -3283,6 +3326,7 @@ textarea:focus {
     -webkit-backdrop-filter: var(--blur);
     backdrop-filter: var(--blur);
     background: color-mix(in oklab, var(--surface) 50%, transparent);
+    -webkit-app-region: drag;
 }
 .app-header-top { grid-template-columns: 1fr auto 1fr 104px; }
 .app-header-left { grid-template-columns: 1fr 104px; }
@@ -3533,7 +3577,7 @@ textarea:focus {
   border-bottom-color: transparent;
 }
 
-.app-main { grid-area: main; padding: 16px; overflow-y: auto; }
+.app-main { grid-area: main; padding: 16px; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 .app-logo { border-radius: 4px; display: block; }
 .toast-row { display: flex; align-items: center; gap: 12px; }
 .modal-wide { width: min(96vw, 1200px); max-width: 1200px; display: grid; gap: 10px; }
@@ -7599,4 +7643,193 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .donations-info-modal .modal-actions {
     justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NARROW / HALF-SCREEN RESPONSIVE (Windows Snap 50:50)
+   Target: ~580px–960px window width
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Journal table horizontal scroll wrapper ── */
+.journal-table-scroll-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    /* subtle scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--text-dim) 30%, transparent) transparent;
+}
+
+.journal-table-scroll-wrapper::-webkit-scrollbar {
+    height: 6px;
+}
+.journal-table-scroll-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+.journal-table-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text-dim) 30%, transparent);
+    border-radius: 3px;
+}
+
+/* Inside the scroll wrapper, table must be able to exceed container width */
+.journal-table-scroll-wrapper .journal-table,
+.journal-table-scroll-wrapper .resizable-table {
+    min-width: 780px;
+    width: max(100%, 780px);
+}
+
+/* Card must not clip horizontal overflow so scroll wrapper works */
+.card:has(.journal-table-scroll-wrapper) {
+    overflow: visible;
+}
+
+/* ── Narrow: sidebar shrinks ── */
+@media (max-width: 840px) {
+    .app-root-grid--side {
+        grid-template-columns: 48px 1fr;
+    }
+    .app-sidebar {
+        width: 48px;
+        padding: 8px 2px;
+    }
+    .side-nav .nav-btn {
+        padding: 4px;
+    }
+}
+
+/* ── Narrow: pagination bar wraps ── */
+@media (max-width: 700px) {
+    .pagination-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+    }
+    .pagination-bar__info {
+        gap: 10px;
+        flex: 1 1 auto;
+        justify-content: flex-start;
+    }
+    .pagination-bar__controls {
+        flex: 0 0 auto;
+    }
+}
+
+/* ── Narrow: filter totals stat cards stack earlier ── */
+@media (max-width: 740px) {
+    .filter-totals-stat {
+        min-width: 110px;
+        padding: 8px 10px;
+    }
+    .filter-totals-stat__icon {
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+    }
+    .filter-totals-stat__value {
+        font-size: 14px;
+    }
+    .filter-totals-stat__label {
+        font-size: 10px;
+    }
+}
+
+/* ── Narrow: main content reduced padding ── */
+@media (max-width: 840px) {
+    .app-main,
+    main[style*="gridArea"] {
+        padding: 10px !important;
+    }
+}
+
+/* ── Narrow: filter toolbar ── */
+@media (max-width: 740px) {
+    .journal-filter-toolbar__search {
+        min-width: 160px;
+        flex: 1 1 200px;
+    }
+}
+
+/* ── Narrow: modals fill viewport better ── */
+@media (max-width: 740px) {
+    .modal {
+        width: min(98vw, 100%);
+        padding: 12px;
+    }
+    .booking-modal {
+        width: min(98vw, 100%);
+        padding: 10px;
+    }
+    .fee-modal {
+        width: min(98vw, 100%);
+    }
+}
+
+/* ── Very narrow: sidebar collapses to icon rail ── */
+@media (max-width: 640px) {
+    .app-root-grid--side {
+        grid-template-columns: 40px 1fr;
+    }
+    .app-sidebar {
+        width: 40px;
+        padding: 6px 1px;
+    }
+    .side-nav .nav-btn {
+        padding: 3px;
+        min-height: 32px;
+    }
+    .icon-wrapper {
+        width: 20px;
+        height: 20px;
+    }
+    .icon-wrapper svg {
+        width: 16px;
+        height: 16px;
+    }
+    .has-tooltip::after {
+        font-size: 11px;
+    }
+}
+
+/* ── Very narrow: filter totals go vertical ── */
+@media (max-width: 580px) {
+    .filter-totals-stats {
+        flex-direction: column;
+    }
+    .filter-totals-stat {
+        min-width: 100%;
+    }
+    .filter-totals-divider {
+        display: none;
+    }
+    .filter-totals-card {
+        padding: 8px 10px;
+    }
+    .filter-totals-spheres {
+        flex-wrap: wrap;
+    }
+}
+
+/* ── Very narrow: booking modal single-column fields ── */
+@media (max-width: 640px) {
+    .booking-modal .row {
+        grid-template-columns: 1fr;
+    }
+    .booking-meta-grid {
+        grid-template-columns: 1fr;
+    }
+    .booking-section--finances .row:first-of-type {
+        grid-template-columns: 1fr;
+    }
+    .segment-group {
+        flex-wrap: wrap;
+    }
+}
+
+/* ── Narrow header: tighter ── */
+@media (max-width: 840px) {
+    .app-header,
+    header[style*="gridArea"] {
+        padding: 4px 6px !important;
+        gap: 8px !important;
+    }
 }
