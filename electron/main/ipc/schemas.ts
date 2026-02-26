@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
+export const VoucherAmountMode = z.enum(['NET', 'GROSS'])
 
 // Multiple assignment shapes (shared by create + update)
 export const VoucherBudgetAssignment = z.object({
@@ -317,6 +318,7 @@ export const VouchersListOutput = z.object({
             vatRate: z.number(),
             vatAmount: z.number(),
             grossAmount: z.number(),
+            amountMode: VoucherAmountMode.optional(),
             fileCount: z.number().optional(),
             earmarkId: z.number().nullable().optional(),
             earmarkAmount: z.number().nullable().optional(),
@@ -519,7 +521,8 @@ export const VouchersRecentOutput = z.object({
             budgetId: z.number().nullable().optional(),
             budgetLabel: z.string().nullable().optional(),
             budgetColor: z.string().nullable().optional(),
-            tags: z.array(z.string()).optional()
+            tags: z.array(z.string()).optional(),
+            amountMode: VoucherAmountMode.optional()
         })
     )
 })
@@ -547,6 +550,7 @@ export const VoucherUpdateInput = z.object({
     netAmount: z.number().optional(),
     vatRate: z.number().optional(),
     grossAmount: z.number().optional(),
+    amountMode: VoucherAmountMode.optional(),
     tags: z.array(z.string()).optional()
 })
 export const VoucherUpdateOutput = z.object({ id: z.number(), warnings: z.array(z.string()).optional() })

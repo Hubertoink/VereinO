@@ -24,6 +24,7 @@ type VoucherRow = {
     vatRate: number
     vatAmount: number
     grossAmount: number
+    amountMode?: 'NET' | 'GROSS'
     hasFiles?: boolean
     earmarkId?: number | null
     earmarkCode?: string | null
@@ -797,8 +798,7 @@ export default function JournalView({
                         fmtDate={fmtDate}
                         onEdit={(r) => setEditRow({
                             ...r,
-                            // Modus-Inferenz: Wenn Netto-Betrag gespeichert wurde (>0) => NETTO, sonst BRUTTO
-                            mode: ((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS',
+                            mode: (r as any).amountMode ?? (((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS'),
                             netAmount: (r as any).netAmount ?? null,
                             grossAmount: (r as any).grossAmount ?? null,
                             vatRate: (r as any).vatRate ?? 0
@@ -927,9 +927,11 @@ export default function JournalView({
                                     if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
                                         payload.grossAmount = Number((editRow as any).grossAmount)
                                         payload.vatRate = 0 // Bei Brutto keine MwSt-Aufschlüsselung
+                                        payload.amountMode = 'GROSS'
                                     } else if ((editRow as any).mode === 'NET' && (editRow as any).netAmount != null && (editRow as any).netAmount !== '') {
                                         payload.netAmount = Number((editRow as any).netAmount)
                                         if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
+                                        payload.amountMode = 'NET'
                                     }
                                     const res = await window.api?.vouchers.update?.(payload)
                                     notify('success', 'Buchung gespeichert')
@@ -1045,7 +1047,25 @@ export default function JournalView({
                                                     <div className="field finance-amount-highlight">
                                                         <label>{(editRow as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
                                                         <div style={{ display: 'flex', gap: 8 }}>
-                                                            <select className="input" value={(editRow as any).mode ?? 'NET'} onChange={(e) => setEditRow({ ...(editRow as any), mode: e.target.value as any } as any)}>
+                                                            <select
+                                                                className="input"
+                                                                value={(editRow as any).mode ?? 'NET'}
+                                                                onChange={(e) => {
+                                                                    const nextMode = e.target.value as 'NET' | 'GROSS'
+                                                                    if (nextMode === 'NET') {
+                                                                        const currentNet = Number((editRow as any).netAmount)
+                                                                        const currentGross = Number((editRow as any).grossAmount)
+                                                                        const shouldPrefillFromGross = (!Number.isFinite(currentNet) || currentNet === 0) && Number.isFinite(currentGross)
+                                                                        setEditRow({
+                                                                            ...(editRow as any),
+                                                                            mode: nextMode,
+                                                                            ...(shouldPrefillFromGross ? { netAmount: currentGross } : {})
+                                                                        } as any)
+                                                                        return
+                                                                    }
+                                                                    setEditRow({ ...(editRow as any), mode: nextMode } as any)
+                                                                }}
+                                                            >
                                                                 <option value="NET">Netto</option>
                                                                 <option value="GROSS">Brutto</option>
                                                             </select>

@@ -640,6 +640,36 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
     `
   }
+  ,
+  {
+    version: 29,
+    up: `
+    -- Legacy-Fix: Bei Brutto-Buchungen mit 0% USt wurde netto teils als 0 gespeichert.
+    -- Für diese Datensätze netto auf brutto setzen (USt bleibt 0).
+    UPDATE vouchers
+    SET net_amount = gross_amount
+    WHERE gross_amount <> 0
+      AND IFNULL(net_amount, 0) = 0
+      AND IFNULL(vat_rate, 0) = 0
+      AND IFNULL(vat_amount, 0) = 0;
+    `
+  }
+  ,
+  {
+    version: 30,
+    up: `
+    -- Persistierter Eingabe-Modus für Buchungen (damit Bearbeiten-Modus stabil bleibt)
+    ALTER TABLE vouchers ADD COLUMN amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'NET';
+
+    -- Backfill-Heuristik für Bestandsdaten:
+    -- 0% USt + netto==brutto => historisch typischer Brutto-Flow
+    UPDATE vouchers
+    SET amount_mode = 'GROSS'
+    WHERE IFNULL(vat_rate, 0) = 0
+      AND IFNULL(vat_amount, 0) = 0
+      AND ABS(IFNULL(net_amount, 0) - IFNULL(gross_amount, 0)) < 0.000001;
+    `
+  }
 ]
 
 export function ensureMigrationsTable(db: DB) {
@@ -925,7 +955,7 @@ export function applyMigrations(db: DB) {
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
       // For migrations that add known columns, continue on duplicate-column errors.
-      if ((mig.version === 20 || mig.version === 25 || mig.version === 28) && error.message?.includes('duplicate column')) {
+      if ((mig.version === 20 || mig.version === 25 || mig.version === 28 || mig.version === 30) && error.message?.includes('duplicate column')) {
         console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {

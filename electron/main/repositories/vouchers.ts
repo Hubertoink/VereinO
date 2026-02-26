@@ -70,10 +70,11 @@ export function createVoucher(input: {
             vatAmount = round2((netAmount * input.vatRate) / 100)
             grossAmount = round2(netAmount + vatAmount)
         } else if (typeof input.grossAmount === 'number') {
-            // User provided gross; do not infer VAT/net automatically
+            // User provided gross; derive net/vat from vatRate (0% => net === gross)
             grossAmount = input.grossAmount
-            netAmount = 0
-            vatAmount = 0
+            const rate = Number(input.vatRate ?? 0)
+            netAmount = round2(grossAmount / (1 + rate / 100))
+            vatAmount = round2(grossAmount - netAmount)
         } else {
             throw new Error('Either netAmount or grossAmount must be provided')
         }
@@ -134,8 +135,8 @@ export function createVoucher(input: {
         const stmt = d.prepare(`
       INSERT INTO vouchers (
     year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
-        net_amount, vat_rate, vat_amount, gross_amount, payment_method, transfer_from, transfer_to, counterparty, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, counterparty, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
         let id: number | null = null
@@ -164,6 +165,7 @@ export function createVoucher(input: {
                     input.vatRate,
                     vatAmount,
                     grossAmount,
+                    typeof input.grossAmount === 'number' ? 'GROSS' : 'NET',
                     input.paymentMethod ?? null,
                     input.transferFrom ?? null,
                     input.transferTo ?? null,
@@ -241,8 +243,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         const stmt = d.prepare(`
       INSERT INTO vouchers (
         year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, description,
-        net_amount, vat_rate, vat_amount, gross_amount, payment_method, counterparty, created_by, original_id
-      ) VALUES (?, ?, ?, date('now'), ?, ?, ?, ?, ?, ?, 'Storno', ?, ?, ?, ?, NULL, NULL, ?, ?)
+                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, counterparty, created_by, original_id
+            ) VALUES (?, ?, ?, date('now'), ?, ?, ?, ?, ?, ?, 'Storno', ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
     `)
         const info = stmt.run(
             year,
@@ -258,6 +260,7 @@ export function reverseVoucher(originalId: number, userId: number | null) {
             original.vat_rate,
             -original.vat_amount,
             -original.gross_amount,
+            original.amount_mode ?? 'NET',
             userId ?? null,
             originalId
         )
@@ -275,7 +278,7 @@ export function listRecentVouchers(limit = 20) {
     const rows = (d
         .prepare(
             `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
-                            v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
+                            v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                             (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                             v.earmark_id as earmarkId,
                             v.earmark_amount as earmarkAmount,
@@ -306,7 +309,7 @@ export function listRecentVouchers(limit = 20) {
 export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: number; paymentMethod?: 'BAR' | 'BANK' }) {
     const d = getDb()
     let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo, description,
-                                        net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount,
+                                        net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, amount_mode as amountMode,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = vouchers.id) as fileCount
                          FROM vouchers`
     const params: any[] = []
@@ -340,7 +343,7 @@ export function listVouchersAdvanced(filters: {
     const d = getDb()
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
     let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
-                                        v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
+                                        v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,
                                         v.earmark_amount as earmarkAmount,
@@ -474,7 +477,7 @@ export function listVouchersAdvancedPaged(filters: {
     })()
     const rows = d.prepare(
         `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
-                v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount,
+            v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                 EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
             EXISTS(SELECT 1 FROM member_advances ma WHERE ma.placeholder_voucher_id = v.id AND (ma.resolved_at IS NULL OR ma.resolved_at = '')) as isAdvancePlaceholder,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
@@ -957,6 +960,7 @@ export function updateVoucher(input: {
     netAmount?: number
     vatRate?: number
     grossAmount?: number
+    amountMode?: 'NET' | 'GROSS'
 }) {
     const d = getDb()
     const warnings: string[] = []
@@ -966,7 +970,7 @@ export function updateVoucher(input: {
                earmark_id as earmarkId, earmark_amount as earmarkAmount,
                budget_id as budgetId, budget_amount as budgetAmount,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-               description
+               description, amount_mode as amountMode
         FROM vouchers WHERE id=?
     `).get(input.id) as any
     if (!current) throw new Error('Beleg nicht gefunden')
@@ -1047,6 +1051,7 @@ export function updateVoucher(input: {
     if (input.transferTo !== undefined) { fields.push('transfer_to = ?'); params.push(input.transferTo) }
     if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
     if (input.budgetAmount !== undefined) { fields.push('budget_amount = ?'); params.push(input.budgetAmount) }
+    if (input.amountMode !== undefined) { fields.push('amount_mode = ?'); params.push(input.amountMode) }
     // If sphere or year changes, re-number voucher (year, seq_no, voucher_no)
     const targetSphere = input.sphere ?? current.sphere
     const targetYear = Number(newDate?.slice(0, 4) || String(current.year))
@@ -1069,6 +1074,10 @@ export function updateVoucher(input: {
     if (input.grossAmount != null) {
         fields.push('gross_amount = ?')
         params.push(input.grossAmount)
+        if (input.amountMode === undefined) {
+            fields.push('amount_mode = ?')
+            params.push('GROSS')
+        }
         // If gross is provided, we don't infer net/vat unless vatRate also provided
         if (input.vatRate != null) {
             fields.push('vat_rate = ?')
@@ -1084,6 +1093,10 @@ export function updateVoucher(input: {
     } else if (input.netAmount != null) {
         fields.push('net_amount = ?')
         params.push(input.netAmount)
+        if (input.amountMode === undefined) {
+            fields.push('amount_mode = ?')
+            params.push('NET')
+        }
         const rate = input.vatRate != null ? Number(input.vatRate) : (current.vatRate ?? 0)
         fields.push('vat_rate = ?')
         params.push(rate)
@@ -1117,7 +1130,7 @@ export function updateVoucher(input: {
         const after = d.prepare(`
             SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
                    earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
-                   net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount
+                     net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount, amount_mode as amountMode
             FROM vouchers WHERE id=?
         `).get(input.id) as any
         const afterTags = getTagsForVoucher(input.id)

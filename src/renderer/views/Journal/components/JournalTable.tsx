@@ -170,6 +170,7 @@ interface JournalTableProps {
         vatRate: number
         vatAmount: number
         grossAmount: number
+        amountMode?: 'NET' | 'GROSS'
         fileCount?: number
         earmarkId?: number | null
         earmarkCode?: string | null
@@ -202,6 +203,7 @@ interface JournalTableProps {
         netAmount?: number
         grossAmount?: number
         vatRate?: number
+        amountMode?: 'NET' | 'GROSS'
     }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
     onToggleSort: (col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => void
@@ -443,7 +445,7 @@ export default function JournalTable({
                 ) : r.isAdvancePlaceholder ? (
                     <span className="badge badge-advance-placeholder-lock" title="Vorschuss-Platzhalter (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -548,23 +550,23 @@ export default function JournalTable({
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from} → ${to}` : 'Transfer'
+                        const title = from && to ? `${from === 'BAR' ? 'Bar' : 'Bank'} → ${to === 'BAR' ? 'Bar' : 'Bank'}` : 'Transfer'
                         return (
-                            <span className="badge pm-transfer" title={title} aria-label={title}>
-                                <span className={`pm-icon ${from === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
-                                    {from === 'BAR' ? <IconCash /> : <IconBank />}
+                            <span className={`badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} title={title} aria-label={title}>
+                                <span className="pm-icon">
+                                    {from === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
                                 </span>
                                 <span className="transfer-arrow">→</span>
-                                <span className={`pm-icon ${to === 'BAR' ? 'pm-bar-icon' : 'pm-bank-icon'}`}>
-                                    {to === 'BAR' ? <IconCash /> : <IconBank />}
+                                <span className="pm-icon">
+                                    {to === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
                                 </span>
                             </span>
                         )
                     })()
                 ) : (
                     r.paymentMethod ? (
-                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod} aria-label={`Zahlweg: ${r.paymentMethod}`} style={{ display: 'inline-grid', placeItems: 'center' }}>
-                            {r.paymentMethod === 'BAR' ? <IconCash /> : <IconBank />}
+                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'} aria-label={`Zahlweg: ${r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'}`}>
+                            {r.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
                         </span>
                     ) : ''
                 )}
@@ -644,6 +646,7 @@ export default function JournalTable({
         )
     )
     return (
+        <div className="journal-table-scroll-wrapper">
         <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
             <colgroup>
                 {visibleOrder.map((k) => (
@@ -689,5 +692,6 @@ export default function JournalTable({
                 )}
             </tbody>
         </table>
+        </div>
     )
 }
