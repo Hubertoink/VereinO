@@ -10,6 +10,7 @@ import { DonationsPane } from './panes/DonationsPane'
 import { TagsPane } from './panes/TagsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
+import { ChangelogModal } from '../../components/modals/ChangelogModal'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'general',
@@ -173,6 +174,7 @@ export function SettingsView(props: SettingsProps) {
 
 function DevBadge({ appVersion }: { appVersion: string }) {
   const [open, setOpen] = React.useState(false)
+  const [showChangelog, setShowChangelog] = React.useState(false)
   const panelRef = React.useRef<HTMLDivElement | null>(null)
   const [panelHeight, setPanelHeight] = React.useState<number>(0)
 
@@ -219,7 +221,16 @@ function DevBadge({ appVersion }: { appVersion: string }) {
           pointerEvents: open ? 'auto' : 'none'
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 12 }}>VereinO {appVersion && `(v${appVersion})`}</div>
+        <div
+          style={{ fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+          onClick={() => setShowChangelog(true)}
+          title="Changelog anzeigen"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowChangelog(true) }}
+        >
+          VereinO {appVersion && `(v${appVersion})`} <span style={{ fontSize: 10, opacity: 0.6 }}>📋</span>
+        </div>
         <div style={{ opacity: 0.85 }}>
           erstellt von{' '}
           <a
@@ -258,6 +269,13 @@ function DevBadge({ appVersion }: { appVersion: string }) {
       >
         {open ? '×' : '<'}
       </button>
+
+      {showChangelog && (
+        <ChangelogModal
+          onClose={() => setShowChangelog(false)}
+          appVersion={appVersion}
+        />
+      )}
     </div>
   )
 }

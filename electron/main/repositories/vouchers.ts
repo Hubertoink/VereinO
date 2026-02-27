@@ -1205,11 +1205,11 @@ export function clearAllVouchers() {
 export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number }) {
     const d = getDb()
     const to = params.to ?? new Date().toISOString().slice(0, 10)
-    const year = to.slice(0, 4)
-    // Wenn 'from' übergeben wird, nutze es; sonst Jahresanfang
-    const from = params.from ?? `${year}-01-01`
-    const wh: string[] = ["v.date >= @from", "v.date <= @to"]
-    const bind: Record<string, any> = { from, to }
+    // Wenn 'from' übergeben wird, nutze es; sonst gesamter Zeitraum (kein Untergrenze)
+    const from = params.from
+    const wh: string[] = ["v.date <= @to"]
+    const bind: Record<string, any> = { to }
+    if (from) { wh.push('v.date >= @from'); bind.from = from }
     if (params.sphere) { wh.push('v.sphere = @sphere'); bind.sphere = params.sphere }
 
     const budgetId = (typeof params.budgetId === 'number' && Number.isFinite(params.budgetId)) ? params.budgetId : undefined

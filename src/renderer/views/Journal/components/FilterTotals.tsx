@@ -23,7 +23,11 @@ interface SummaryData {
     count?: number
     transferGross?: number
     inBySphere?: Array<{ key: string; gross: number }>
+    inByPaymentMethod?: Array<{ key: string | null; gross: number }>
     outByPaymentMethod?: Array<{ key: string | null; gross: number }>
+    /** Net cash position per payment method (includes transfers) from cashBalance API */
+    cashBalanceBAR?: number
+    cashBalanceBANK?: number
     inCount?: number
     outCount?: number
 }
@@ -95,13 +99,16 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                     // “Einnahmen/Ausgaben” tooltips add up correctly.
                     let inRes: any | null = null
                     let outRes: any | null = null
+                    let cbRes: { BAR: number; BANK: number } | null = null
                     if (!type) {
-                        const [ir, or] = await Promise.all([
+                        const [ir, or, cb] = await Promise.all([
                             window.api?.reports.summary?.({ ...basePayload, type: 'IN' }),
-                            window.api?.reports.summary?.({ ...basePayload, type: 'OUT' })
+                            window.api?.reports.summary?.({ ...basePayload, type: 'OUT' }),
+                            window.api?.reports.cashBalance?.({ from, to, sphere, budgetId: undefined })
                         ])
                         inRes = ir || null
                         outRes = or || null
+                        cbRes = cb || null
                     }
 
                     if (alive && res) {
@@ -121,7 +128,10 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                             count: res.totals?.count,
                             transferGross,
                             inBySphere: inRes?.bySphere,
+                            inByPaymentMethod: inRes?.byPaymentMethod,
                             outByPaymentMethod: outRes?.byPaymentMethod,
+                            cashBalanceBAR: cbRes?.BAR,
+                            cashBalanceBANK: cbRes?.BANK,
                             inCount: inRes?.totals?.count,
                             outCount: outRes?.totals?.count
                         })
@@ -248,16 +258,34 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                 <HoverTooltip
                     className="tooltip-modal"
                     content={
-                        <TooltipList
-                            title={diffVal >= 0 ? 'Überschuss' : 'Defizit'}
-                            rows={[
+                        (() => {
+                            const diffRows: Array<{ key: string; value: string; dotColor?: string }> = [
                                 {
                                     key: diffVal >= 0 ? 'Mehr eingenommen als ausgegeben' : 'Mehr ausgegeben als eingenommen',
                                     value: fmt.format(Math.abs(diffVal)),
                                     dotColor: diffVal >= 0 ? 'var(--success)' : 'var(--danger)'
                                 }
-                            ]}
-                        />
+                            ]
+                            // Use cashBalance values (includes transfers) when available
+                            const barVal = values?.cashBalanceBAR
+                            const bankVal = values?.cashBalanceBANK
+                            if (typeof barVal === 'number' || typeof bankVal === 'number') {
+                                const bar = Math.round((barVal || 0) * 100) / 100
+                                const bank = Math.round((bankVal || 0) * 100) / 100
+                                if (bar !== 0 || bank !== 0) {
+                                    diffRows.push(
+                                        { key: 'Bar', value: fmt.format(bar), dotColor: 'var(--warning)' },
+                                        { key: 'Bank', value: fmt.format(bank), dotColor: 'var(--info)' }
+                                    )
+                                }
+                            }
+                            return (
+                                <TooltipList
+                                    title={diffVal >= 0 ? 'Überschuss' : 'Defizit'}
+                                    rows={diffRows}
+                                />
+                            )
+                        })()
                     }
                 >
                     {({ ref, props }) => (

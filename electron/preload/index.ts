@@ -129,6 +129,13 @@ contextBridge.exposeInMainWorld('api', {
         add: (payload: any) => ipcRenderer.invoke('invoiceFiles.add', payload),
         delete: (payload: any) => ipcRenderer.invoke('invoiceFiles.delete', payload)
     },
+    cashChecks: {
+        list: (payload: any) => ipcRenderer.invoke('cashChecks.list', payload),
+        create: (payload: any) => ipcRenderer.invoke('cashChecks.create', payload),
+        setInspectors: (payload: any) => ipcRenderer.invoke('cashChecks.setInspectors', payload),
+        exportPdf: (payload: any) => ipcRenderer.invoke('cashChecks.exportPdf', payload),
+        getInspectorDefaults: () => ipcRenderer.invoke('cashChecks.getInspectorDefaults'),
+    },
     reports: {
         export: (payload: any) => ipcRenderer.invoke('reports.export', payload),
         exportFiscal: (payload: any) => ipcRenderer.invoke('reports.exportFiscal', payload),

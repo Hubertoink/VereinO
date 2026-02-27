@@ -267,7 +267,7 @@ export const ReportsMonthlyOutput = z.object({
 export type TReportsMonthlyInput = z.infer<typeof ReportsMonthlyInput>
 export type TReportsMonthlyOutput = z.infer<typeof ReportsMonthlyOutput>
 
-// Cash balance as of a date (year-to-date inflow-outflow; opening booked as IN at year's start)
+// Cash balance as of a date (cumulative inflow-outflow; defaults to all-time when 'from' is omitted)
 export const ReportsCashBalanceInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),

@@ -208,7 +208,7 @@ export default function CashCheckModal(props: {
         </div>
 
         <div className="helper">
-          Soll wird aus BAR-Buchungen seit Jahresbeginn bis Stichtag
+          Soll wird aus BAR-Buchungen über den gesamten Zeitraum bis Stichtag
           {typeof budgetId === 'number' ? ' (nur für das gewählte Budget)' : ''} berechnet.
         </div>
 

@@ -7833,3 +7833,102 @@ html[data-glass-modals="true"] .flyout-arrow {
         gap: 8px !important;
     }
 }
+
+/* ── Changelog Modal ── */
+.changelog-modal {
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.changelog-modal .modal-header {
+    flex-shrink: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+}
+
+.changelog-version-badge {
+    font-size: 12px;
+    font-weight: 500;
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.changelog-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 2px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.changelog-empty {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 32px;
+}
+
+.changelog-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.changelog-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.changelog-entry-version {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent);
+}
+
+.changelog-entry-date {
+    font-size: 12px;
+    color: var(--text-dim);
+    opacity: 0.8;
+}
+
+.changelog-section {
+    margin-left: 4px;
+}
+
+.changelog-section-heading {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    opacity: 0.9;
+}
+
+.changelog-items {
+    margin: 0;
+    padding-left: 20px;
+    list-style: disc;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.changelog-items li {
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0.85;
+    line-height: 1.5;
+}
+
+.changelog-entry + .changelog-entry {
+    padding-top: 16px;
+    border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
