@@ -109,6 +109,25 @@ export const FiscalReportOutput = z.object({ filePath: z.string() })
 export type TFiscalReportInput = z.infer<typeof FiscalReportInput>
 export type TFiscalReportOutput = z.infer<typeof FiscalReportOutput>
 
+// Treasurer report (Kassierbericht) for club members
+export const TreasurerReportInput = z.object({
+    fiscalYear: z.number(),
+    orgName: z.string().optional(),
+    includeMembers: z.boolean().optional(),
+    includeInvoices: z.boolean().optional(),
+    includeBindings: z.boolean().optional(),
+    includeBudgets: z.boolean().optional(),
+    includeTagSummary: z.boolean().optional(),
+    includeVoucherList: z.boolean().optional(),
+    includeTags: z.boolean().optional(),
+    voucherListFrom: z.string().optional(),
+    voucherListTo: z.string().optional(),
+    voucherListSort: z.enum(['ASC', 'DESC']).optional()
+})
+export const TreasurerReportOutput = z.object({ filePath: z.string() })
+export type TTreasurerReportInput = z.infer<typeof TreasurerReportInput>
+export type TTreasurerReportOutput = z.infer<typeof TreasurerReportOutput>
+
 // Years with vouchers present
 export const ReportsYearsOutput = z.object({ years: z.array(z.number()) })
 export type TReportsYearsOutput = z.infer<typeof ReportsYearsOutput>

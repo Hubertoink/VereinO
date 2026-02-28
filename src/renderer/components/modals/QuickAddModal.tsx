@@ -174,7 +174,7 @@ export default function QuickAddModal({
                                                         (newQa as any).transferTo = 'BANK'
                                                     }
                                                     setQa(newQa)
-                                                }}>{t}</button>
+                                                }}>{t === 'IN' ? '+ IN' : t === 'OUT' ? '− OUT' : '⇄ TRANSFER'}</button>
                                         ))}
                                     </div>
                                 </div>

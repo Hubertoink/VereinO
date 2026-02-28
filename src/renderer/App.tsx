@@ -305,7 +305,7 @@ function AppInner() {
     const [exportOrgName, setExportOrgName] = useState<string>('')
     const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
     const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
-    const [exportType, setExportType] = useState<'standard' | 'fiscal'>('standard')
+    const [exportType, setExportType] = useState<'standard' | 'fiscal' | 'treasurer'>('standard')
     const [fiscalYear, setFiscalYear] = useState<number>(new Date().getFullYear())
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
@@ -1225,9 +1225,31 @@ function AppInner() {
                     setIncludeVoucherList={setIncludeVoucherList}
                     includeBudgets={includeBudgets}
                     setIncludeBudgets={setIncludeBudgets}
-                    onExport={async (fmt) => {
+                    onExport={async (fmt, treasurerOpts) => {
                         try {
-                            if (fmt === 'PDF_FISCAL') {
+                            if (fmt === 'PDF_TREASURER') {
+                                // Treasurer report (Kassierbericht) for members
+                                const res = await (window as any).api?.reports?.exportTreasurer?.({
+                                    fiscalYear,
+                                    orgName: exportOrgName || undefined,
+                                    includeMembers: treasurerOpts?.includeMembers ?? true,
+                                    includeInvoices: treasurerOpts?.includeInvoices ?? true,
+                                    includeBindings: treasurerOpts?.includeBindings ?? true,
+                                    includeBudgets: treasurerOpts?.includeBudgets ?? true,
+                                    includeTagSummary: treasurerOpts?.includeTagSummary ?? false,
+                                    includeVoucherList: treasurerOpts?.includeVoucherList ?? false,
+                                    includeTags: treasurerOpts?.includeTags ?? false,
+                                    voucherListFrom: treasurerOpts?.voucherListFrom,
+                                    voucherListTo: treasurerOpts?.voucherListTo,
+                                    voucherListSort: treasurerOpts?.voucherListSort ?? 'ASC'
+                                })
+                                if (res) {
+                                    notify('success', `Kassierbericht exportiert: ${res.filePath}`, 6000, {
+                                        label: 'Ordner öffnen',
+                                        onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                                    })
+                                }
+                            } else if (fmt === 'PDF_FISCAL') {
                                 // Fiscal year report for tax office
                                 const res = await (window as any).api?.reports?.exportFiscal?.({
                                     fiscalYear,

@@ -19,6 +19,55 @@ type QA = {
     tags?: string[]
 }
 
+/** Read user booking habits from localStorage */
+function getBookingHabits(): { type: 'IN' | 'OUT'; paymentMethod: 'BAR' | 'BANK'; mode: 'NET' | 'GROSS' } {
+    const defaults = { type: 'IN' as const, paymentMethod: 'BAR' as const, mode: 'GROSS' as const }
+    try {
+        const raw = localStorage.getItem('bookingHabits')
+        if (!raw) return defaults
+        const h = JSON.parse(raw)
+        // Determine most frequent for each field
+        const topType = getMostFrequent(h.types, ['IN', 'OUT']) as 'IN' | 'OUT' || defaults.type
+        const topPM = getMostFrequent(h.paymentMethods, ['BAR', 'BANK']) as 'BAR' | 'BANK' || defaults.paymentMethod
+        const topMode = getMostFrequent(h.modes, ['NET', 'GROSS']) as 'NET' | 'GROSS' || defaults.mode
+        return { type: topType, paymentMethod: topPM, mode: topMode }
+    } catch {
+        return defaults
+    }
+}
+
+function getMostFrequent(counts: Record<string, number> | undefined, validKeys: string[]): string | null {
+    if (!counts) return null
+    let best: string | null = null
+    let bestCount = 0
+    for (const key of validKeys) {
+        const c = Number(counts[key]) || 0
+        if (c > bestCount) { bestCount = c; best = key }
+    }
+    return best
+}
+
+/** Track a booking habit in localStorage */
+function trackBookingHabit(type: string, paymentMethod: string | undefined, mode: string | undefined) {
+    try {
+        const raw = localStorage.getItem('bookingHabits')
+        const h = raw ? JSON.parse(raw) : { types: {}, paymentMethods: {}, modes: {} }
+        if (!h.types) h.types = {}
+        if (!h.paymentMethods) h.paymentMethods = {}
+        if (!h.modes) h.modes = {}
+        if (type === 'IN' || type === 'OUT') {
+            h.types[type] = (Number(h.types[type]) || 0) + 1
+        }
+        if (paymentMethod === 'BAR' || paymentMethod === 'BANK') {
+            h.paymentMethods[paymentMethod] = (Number(h.paymentMethods[paymentMethod]) || 0) + 1
+        }
+        if (mode === 'NET' || mode === 'GROSS') {
+            h.modes[mode] = (Number(h.modes[mode]) || 0) + 1
+        }
+        localStorage.setItem('bookingHabits', JSON.stringify(h))
+    } catch { }
+}
+
 /**
  * useQuickAdd Hook
  * 
@@ -32,16 +81,17 @@ export function useQuickAdd(
     notify?: (type: 'success' | 'error' | 'info', text: string) => void
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
+    const habits = getBookingHabits()
     const [qa, setQa] = useState<QA>({ 
         date: today, 
-        type: 'IN', 
+        type: habits.type, 
         sphere: 'IDEELL', 
-        // Standard = BRUTTO laut Anforderung
-        mode: 'GROSS',
-        grossAmount: 100,
+        mode: habits.mode,
+        grossAmount: habits.mode === 'GROSS' ? 100 : undefined,
+        netAmount: habits.mode === 'NET' ? 100 : undefined,
         vatRate: 0, 
         description: '', 
-        paymentMethod: 'BAR'
+        paymentMethod: habits.paymentMethod
     })
     const [files, setFiles] = useState<File[]>([])
 
@@ -137,17 +187,21 @@ export function useQuickAdd(
 
         const res = await create(payload)
         if (res) {
+            // Track user habits for smart defaults
+            trackBookingHabit(qa.type, qa.paymentMethod, (qa as any).mode)
+            const h = getBookingHabits()
             setQuickAdd(false)
             setFiles([])
             setQa({ 
                 date: today, 
-                type: 'IN', 
+                type: h.type, 
                 sphere: 'IDEELL', 
-                mode: 'GROSS',
-                grossAmount: 100,
+                mode: h.mode,
+                grossAmount: h.mode === 'GROSS' ? 100 : undefined,
+                netAmount: h.mode === 'NET' ? 100 : undefined,
                 vatRate: 0, 
                 description: '', 
-                paymentMethod: 'BAR'
+                paymentMethod: h.paymentMethod
             })
         }
     }

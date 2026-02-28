@@ -155,6 +155,7 @@ declare global {
             }
             reports: {
                 export: (payload: any) => Promise<{ filePath: string }>
+                exportTreasurer: (payload: any) => Promise<{ filePath: string }>
                 summary: (payload: any) => Promise<any>
                 monthly: (payload: any) => Promise<any>
                 cashBalance: (payload: any) => Promise<{ BAR: number; BANK: number }>

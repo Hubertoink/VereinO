@@ -26,11 +26,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
   sortDir: 'ASC' | 'DESC'
   setSortDir: (v: 'ASC' | 'DESC') => void
-  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL') => Promise<void>
+  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL' | 'PDF_TREASURER', treasurerOpts?: { includeMembers?: boolean; includeInvoices?: boolean; includeBindings?: boolean; includeBudgets?: boolean; includeTagSummary?: boolean; includeVoucherList?: boolean; includeTags?: boolean; voucherListFrom?: string; voucherListTo?: string; voucherListSort?: 'ASC' | 'DESC' }) => Promise<void>
   dateFrom?: string
   dateTo?: string
-  exportType?: 'standard' | 'fiscal'
-  setExportType?: (t: 'standard' | 'fiscal') => void
+  exportType?: 'standard' | 'fiscal' | 'treasurer'
+  setExportType?: (t: 'standard' | 'fiscal' | 'treasurer') => void
   fiscalYear?: number
   setFiscalYear?: (y: number) => void
   includeBindings?: boolean
@@ -89,11 +89,47 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     }
   }
 
+  // Treasurer report local state
+  const [trIncludeMembers, setTrIncludeMembers] = useState(true)
+  const [trIncludeInvoices, setTrIncludeInvoices] = useState(true)
+  const [trIncludeBindings, setTrIncludeBindings] = useState(true)
+  const [trIncludeBudgets, setTrIncludeBudgets] = useState(true)
+  const [trIncludeTagSummary, setTrIncludeTagSummary] = useState(false)
+  const [trIncludeVoucherList, setTrIncludeVoucherList] = useState(false)
+  const [trIncludeTags, setTrIncludeTags] = useState(false)
+  const [trVoucherListFrom, setTrVoucherListFrom] = useState('')
+  const [trVoucherListTo, setTrVoucherListTo] = useState('')
+  const [trVoucherListSort, setTrVoucherListSort] = useState<'ASC' | 'DESC'>('ASC')
+
+  // Available voucher years
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+
   // Preview data state
   const [previewData, setPreviewData] = useState<PreviewRow[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewTotal, setPreviewTotal] = useState(0)
   const PREVIEW_LIMIT = 5
+
+  // Load available years when modal opens
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    async function loadYears() {
+      try {
+        const res = await (window as any).api?.reports?.years?.()
+        if (!cancelled && res?.years) {
+          const currentYear = new Date().getFullYear()
+          const yrs = new Set<number>(res.years)
+          yrs.add(currentYear)
+          setAvailableYears(Array.from(yrs).sort((a, b) => b - a))
+        }
+      } catch (e) {
+        console.error('Failed to load voucher years:', e)
+      }
+    }
+    loadYears()
+    return () => { cancelled = true }
+  }, [open])
 
   // Load preview data when modal opens or filters change
   useEffect(() => {
@@ -151,7 +187,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   if (!open) return null
   
   const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - i)
+  const years = availableYears.length > 0 ? availableYears : [currentYear]
   
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -189,11 +225,22 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   >
                     🏛️ Finanzamt (Jahresabschluss)
                   </button>
+                  <button
+                    className="btn"
+                    role="tab"
+                    aria-selected={exportType === 'treasurer'}
+                    onClick={() => setExportType('treasurer')}
+                    style={{ background: exportType === 'treasurer' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
+                  >
+                    📋 Kassierbericht (Mitglieder)
+                  </button>
                 </div>
                 <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
                   {exportType === 'standard'
                     ? 'Standard-Export für Controlling und Analyse mit frei wählbaren Feldern und Zeitraum'
-                    : 'Spezieller Jahresabschluss-Report für das Finanzamt nach § 64 AO mit Sphärentrennung'}
+                    : exportType === 'fiscal'
+                    ? 'Spezieller Jahresabschluss-Report für das Finanzamt nach § 64 AO mit Sphärentrennung'
+                    : 'Übersichtlicher Kassenbericht als PDF für die Mitgliederversammlung mit allen wichtigen KPIs'}
                 </div>
               </div>
             )}
@@ -259,6 +306,89 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </label>
               </div>
             </div>
+          </>
+        )}
+
+        {/* Treasurer report options (Kassierbericht) */}
+        {exportType === 'treasurer' && setFiscalYear && (
+          <>
+            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+              <label>Geschäftsjahr</label>
+              <select 
+                className="input" 
+                value={fiscalYear || currentYear} 
+                onChange={(e) => setFiscalYear(Number(e.target.value))}
+              >
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                Berichtszeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
+              </div>
+            </div>
+
+            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+              <label>Sektionen im Bericht</label>
+              <div className="helper" style={{ fontSize: 11, marginBottom: 8, opacity: 0.85 }}>
+                Kassenstand, Einnahmen/Ausgaben, Kassenprüfung und Sphären sind immer enthalten. Leere Sektionen werden automatisch ausgeblendet.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeMembers} onChange={(e) => setTrIncludeMembers(e.target.checked)} style={{ marginRight: 6 }} />
+                  Mitglieder-Statistik
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeInvoices} onChange={(e) => setTrIncludeInvoices(e.target.checked)} style={{ marginRight: 6 }} />
+                  Offene Verbindlichkeiten
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeBindings} onChange={(e) => setTrIncludeBindings(e.target.checked)} style={{ marginRight: 6 }} />
+                  Aktive Zweckbindungen
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeBudgets} onChange={(e) => setTrIncludeBudgets(e.target.checked)} style={{ marginRight: 6 }} />
+                  Budgets
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeTagSummary} onChange={(e) => setTrIncludeTagSummary(e.target.checked)} style={{ marginRight: 6 }} />
+                  Auswertung nach Tags
+                </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={trIncludeVoucherList} onChange={(e) => setTrIncludeVoucherList(e.target.checked)} style={{ marginRight: 6 }} />
+                  Einzelbuchungen als Anhang
+                </label>
+                {trIncludeVoucherList && (
+                  <label className="chip" style={{ cursor: 'pointer', userSelect: 'none', marginLeft: 16 }}>
+                    <input type="checkbox" checked={trIncludeTags} onChange={(e) => setTrIncludeTags(e.target.checked)} style={{ marginRight: 6 }} />
+                    Tags in Buchungsliste anzeigen
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {trIncludeVoucherList && (
+              <div className="field" style={{ gridColumn: '1 / span 2', paddingLeft: 16, borderLeft: '3px solid var(--accent)' }}>
+                <label>Buchungsauflistung – Zeitraum &amp; Sortierung</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 6 }}>
+                  <div>
+                    <label className="helper" style={{ fontSize: 11 }}>Von</label>
+                    <input type="date" className="input" value={trVoucherListFrom || `${fiscalYear || currentYear}-01-01`} onChange={(e) => setTrVoucherListFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="helper" style={{ fontSize: 11 }}>Bis</label>
+                    <input type="date" className="input" value={trVoucherListTo || `${fiscalYear || currentYear}-12-31`} onChange={(e) => setTrVoucherListTo(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="helper" style={{ fontSize: 11 }}>Sortierung</label>
+                    <div className="btn-group" role="group">
+                      <button className="btn" onClick={() => setTrVoucherListSort('ASC')} style={{ background: trVoucherListSort === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
+                      <button className="btn" onClick={() => setTrVoucherListSort('DESC')} style={{ background: trVoucherListSort === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
         
@@ -427,6 +557,25 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               style={{ background: 'color-mix(in oklab, #e53935 85%, transparent)', color: '#fff' }}
             >
               📄 PDF (Finanzamt)
+            </button>
+          ) : exportType === 'treasurer' ? (
+            <button 
+              className="btn" 
+              onClick={() => onExport('PDF_TREASURER', {
+                includeMembers: trIncludeMembers,
+                includeInvoices: trIncludeInvoices,
+                includeBindings: trIncludeBindings,
+                includeBudgets: trIncludeBudgets,
+                includeTagSummary: trIncludeTagSummary,
+                includeVoucherList: trIncludeVoucherList,
+                includeTags: trIncludeVoucherList ? trIncludeTags : false,
+                voucherListFrom: trIncludeVoucherList ? (trVoucherListFrom || `${fiscalYear || currentYear}-01-01`) : undefined,
+                voucherListTo: trIncludeVoucherList ? (trVoucherListTo || `${fiscalYear || currentYear}-12-31`) : undefined,
+                voucherListSort: trVoucherListSort
+              })}
+              style={{ background: 'color-mix(in oklab, #1565c0 85%, transparent)', color: '#fff' }}
+            >
+              📋 PDF (Kassierbericht)
             </button>
           ) : (
             <>

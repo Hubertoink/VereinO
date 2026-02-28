@@ -291,7 +291,8 @@ export default function DashboardView({
         </div>
       </div>
         <div className="dashboard-grid-auto">
-          <div className="dashboard-period-row">
+          <div className="dashboard-period-row card" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', gap: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
           <div className="btn-group" role="group" aria-label="Zeitraum">
               <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
               <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
@@ -458,20 +459,20 @@ export default function DashboardView({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {activeBudgets.map(b => (
-                    <BudgetDetailCard key={b.id} budgetId={b.id} from={yearFilters.from} to={yearFilters.to} />
+                    <BudgetDetailCard key={b.id} budgetId={b.id} from={balanceFilters.from} to={balanceFilters.to} />
                   ))}
                   {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
                 </div>
                 <div style={{ display: 'grid', gap: 12 }}>
                   {activeEarmarks.map(em => (
-                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...yearFilters} />
+                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...balanceFilters} />
                   ))}
                   {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
                 </div>
               </div>
               <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} />
               <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
-              <SphereShareCard from={yearFilters.from} to={yearFilters.to} />
+              <SphereShareCard from={balanceFilters.from} to={balanceFilters.to} />
               <IncomeExpenseBars {...balanceFilters} />
             </div>
           </>

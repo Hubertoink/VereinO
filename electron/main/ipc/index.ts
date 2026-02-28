@@ -643,6 +643,31 @@ export function registerIpcHandlers() {
         return FiscalReportOutput.parse(result)
     })
 
+    ipcMain.handle('reports.exportTreasurer', async (_e, payload) => {
+        const { TreasurerReportInput, TreasurerReportOutput } = await import('./schemas')
+        const parsed = TreasurerReportInput.parse(payload)
+        const { generateTreasurerReportPDF } = await import('../services/treasurerReport')
+        const from = `${parsed.fiscalYear}-01-01`
+        const to = `${parsed.fiscalYear}-12-31`
+        const result = await generateTreasurerReportPDF({
+            fiscalYear: parsed.fiscalYear,
+            from,
+            to,
+            orgName: parsed.orgName,
+            includeMembers: parsed.includeMembers ?? true,
+            includeInvoices: parsed.includeInvoices ?? true,
+            includeBindings: parsed.includeBindings ?? true,
+            includeBudgets: parsed.includeBudgets ?? true,
+            includeTagSummary: parsed.includeTagSummary ?? false,
+            includeVoucherList: parsed.includeVoucherList ?? false,
+            includeTags: parsed.includeTags ?? false,
+            voucherListFrom: parsed.voucherListFrom,
+            voucherListTo: parsed.voucherListTo,
+            voucherListSort: parsed.voucherListSort ?? 'ASC'
+        })
+        return TreasurerReportOutput.parse(result)
+    })
+
     ipcMain.handle('vouchers.list', async (_e, payload) => {
         return withSchemaHealRetry(() => {
             const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
