@@ -390,7 +390,7 @@ function AppInner() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles } = useQuickAdd(
+    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, requestClose, confirmingClose, doClose, cancelClose } = useQuickAdd(
         today, 
         async (p: any) => {
         try {
@@ -1104,6 +1104,10 @@ function AppInner() {
                     setQa={setQa}
                     onSave={onQuickSave}
                     onClose={() => setQuickAdd(false)}
+                    onRequestClose={requestClose}
+                    confirmingClose={confirmingClose}
+                    onConfirmDiscard={doClose}
+                    onCancelDiscard={cancelClose}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}

@@ -81,8 +81,9 @@ export function useQuickAdd(
     notify?: (type: 'success' | 'error' | 'info', text: string) => void
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
+    const [confirmingClose, setConfirmingClose] = useState(false)
     const habits = getBookingHabits()
-    const [qa, setQa] = useState<QA>({ 
+    const makeDefaults = (): QA => ({
         date: today, 
         type: habits.type, 
         sphere: 'IDEELL', 
@@ -93,7 +94,52 @@ export function useQuickAdd(
         description: '', 
         paymentMethod: habits.paymentMethod
     })
+    const [qa, setQa] = useState<QA>(makeDefaults)
     const [files, setFiles] = useState<File[]>([])
+
+    /** Check if form has been meaningfully modified */
+    function isDirty(): boolean {
+        if (qa.description && qa.description.trim().length > 0) return true
+        if (Array.isArray((qa as any).tags) && (qa as any).tags.length > 0) return true
+        if (files.length > 0) return true
+        const defs = makeDefaults()
+        if ((qa.grossAmount ?? 0) !== (defs.grossAmount ?? 0)) return true
+        if ((qa.netAmount ?? 0) !== (defs.netAmount ?? 0)) return true
+        if (qa.vatRate !== defs.vatRate) return true
+        if (Array.isArray((qa as any).budgets) && (qa as any).budgets.length > 0) return true
+        if (Array.isArray((qa as any).earmarksAssigned) && (qa as any).earmarksAssigned.length > 0) return true
+        return false
+    }
+
+    function requestClose() {
+        if (isDirty()) {
+            setConfirmingClose(true)
+        } else {
+            doClose()
+        }
+    }
+
+    function doClose() {
+        setConfirmingClose(false)
+        setQuickAdd(false)
+        setFiles([])
+        const h = getBookingHabits()
+        setQa({
+            date: today,
+            type: h.type,
+            sphere: 'IDEELL',
+            mode: h.mode,
+            grossAmount: h.mode === 'GROSS' ? 100 : undefined,
+            netAmount: h.mode === 'NET' ? 100 : undefined,
+            vatRate: 0,
+            description: '',
+            paymentMethod: h.paymentMethod
+        })
+    }
+
+    function cancelClose() {
+        setConfirmingClose(false)
+    }
 
     function onDropFiles(fileList: FileList | null) {
         if (!fileList) return
@@ -248,7 +294,7 @@ export function useQuickAdd(
             }
             if (e.key === 'Escape') { 
                 if (quickAdd) { 
-                    setQuickAdd(false)
+                    requestClose()
                     e.preventDefault() 
                 } 
                 return 
@@ -260,7 +306,7 @@ export function useQuickAdd(
 
     const openFilePicker = () => onOpenFilePicker?.()
 
-    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles }
+    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, requestClose, confirmingClose, doClose, cancelClose }
 }
 
 export type { QA }

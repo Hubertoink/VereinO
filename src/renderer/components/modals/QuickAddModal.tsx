@@ -10,6 +10,10 @@ interface QuickAddModalProps {
     setQa: (qa: QA) => void
     onSave: () => void
     onClose: () => void
+    onRequestClose?: () => void
+    confirmingClose?: boolean
+    onConfirmDiscard?: () => void
+    onCancelDiscard?: () => void
     files: File[]
     setFiles: (files: File[]) => void
     openFilePicker: () => void
@@ -58,6 +62,10 @@ export default function QuickAddModal({
     setQa,
     onSave,
     onClose,
+    onRequestClose,
+    confirmingClose,
+    onConfirmDiscard,
+    onCancelDiscard,
     files,
     setFiles,
     openFilePicker,
@@ -122,12 +130,33 @@ export default function QuickAddModal({
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 <header className="modal-header-flex">
                     <h2>{title || '+ Buchung'}</h2>
-                    <button className="btn ghost" onClick={() => { onClose(); setFiles([]) }} title="Schließen (ESC)">
+                    <button className="btn ghost" onClick={() => { if (onRequestClose) onRequestClose(); else { onClose(); setFiles([]) } }} title="Schließen (ESC)">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                         </svg>
                     </button>
                 </header>
+
+                {/* Unsaved changes confirmation */}
+                {confirmingClose && (
+                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
+                        <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400, width: '90vw', padding: '24px 28px', borderRadius: 14, border: '2px solid var(--accent)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', textAlign: 'center' }}>
+                            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+                            <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>Ungespeicherte Änderungen</h3>
+                            <p style={{ margin: '0 0 20px', fontSize: 13, opacity: 0.8, lineHeight: 1.5 }}>
+                                Du hast Änderungen an dieser Buchung vorgenommen.<br/>Möchtest du diese wirklich verwerfen?
+                            </p>
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                                <button type="button" className="btn" onClick={onCancelDiscard} style={{ background: 'color-mix(in oklab, var(--accent) 20%, transparent)', fontWeight: 600 }}>
+                                    Fortsetzen
+                                </button>
+                                <button type="button" className="btn" onClick={onConfirmDiscard} style={{ background: 'color-mix(in oklab, var(--danger) 80%, transparent)', color: '#fff', fontWeight: 600 }}>
+                                    Verwerfen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 
                 <form onSubmit={(e) => { e.preventDefault(); if (!hasOutOfRange) onSave(); }}>
                     {/* Live Summary */}
