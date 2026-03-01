@@ -343,6 +343,56 @@ export default function JournalView({
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
+    const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
+    const [editRowInitialSnapshot, setEditRowInitialSnapshot] = useState<string | null>(null)
+
+    const serializeEditRow = useCallback((row: (VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null) => {
+        if (!row) return null
+        return JSON.stringify({
+            date: row.date || '',
+            type: row.type || null,
+            sphere: row.sphere || null,
+            description: (row.description || '').trim(),
+            paymentMethod: row.paymentMethod || null,
+            transferFrom: row.transferFrom || null,
+            transferTo: row.transferTo || null,
+            mode: (row as any).mode || 'GROSS',
+            grossAmount: Number((row as any).grossAmount ?? 0),
+            netAmount: Number((row as any).netAmount ?? 0),
+            vatRate: Number((row as any).vatRate ?? 0),
+            tags: Array.isArray(row.tags) ? [...row.tags].sort() : [],
+            budgets: Array.isArray((row as any).budgets)
+                ? [...(row as any).budgets]
+                    .map((b: any) => ({ budgetId: Number(b.budgetId || 0), amount: Number(b.amount || 0) }))
+                    .sort((a: any, b: any) => a.budgetId - b.budgetId || a.amount - b.amount)
+                : [],
+            earmarksAssigned: Array.isArray((row as any).earmarksAssigned)
+                ? [...(row as any).earmarksAssigned]
+                    .map((e: any) => ({ earmarkId: Number(e.earmarkId || 0), amount: Number(e.amount || 0) }))
+                    .sort((a: any, b: any) => a.earmarkId - b.earmarkId || a.amount - b.amount)
+                : []
+        })
+    }, [])
+
+    const editHasUnsavedChanges = useMemo(() => {
+        if (!editRow || !editRowInitialSnapshot) return false
+        const current = serializeEditRow(editRow)
+        return current !== editRowInitialSnapshot
+    }, [editRow, editRowInitialSnapshot, serializeEditRow])
+
+    const closeEditModalNow = useCallback(() => {
+        setConfirmDiscardEdit(false)
+        setEditRowInitialSnapshot(null)
+        setEditRow(null)
+    }, [])
+
+    const requestCloseEditModal = useCallback(() => {
+        if (editRow && editHasUnsavedChanges) {
+            setConfirmDiscardEdit(true)
+            return
+        }
+        closeEditModalNow()
+    }, [editRow, editHasUnsavedChanges, closeEditModalNow])
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
@@ -469,14 +519,14 @@ export default function JournalView({
             // Escape to close
             if (e.key === 'Escape') {
                 e.preventDefault()
-                setEditRow(null)
+                requestCloseEditModal()
                 return
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [editRow])
+    }, [editRow, requestCloseEditModal])
 
     // ==================== RENDER ====================
     return (
@@ -795,14 +845,19 @@ export default function JournalView({
                         earmarks={earmarks}
                         tagDefs={tagDefs}
                         eurFmt={eurFmt}
-                        fmtDate={fmtDate}
-                        onEdit={(r) => setEditRow({
-                            ...r,
-                            mode: (r as any).amountMode ?? (((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS'),
-                            netAmount: (r as any).netAmount ?? null,
-                            grossAmount: (r as any).grossAmount ?? null,
-                            vatRate: (r as any).vatRate ?? 0
-                        } as any)}
+                        fmtDate={(s?: string) => fmtDate(s || '')}
+                        onEdit={(r) => {
+                            const nextEdit = {
+                                ...r,
+                                mode: (r as any).amountMode ?? (((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS'),
+                                netAmount: (r as any).netAmount ?? null,
+                                grossAmount: (r as any).grossAmount ?? null,
+                                vatRate: (r as any).vatRate ?? 0
+                            } as any
+                            setEditRow(nextEdit)
+                            setEditRowInitialSnapshot(serializeEditRow(nextEdit))
+                            setConfirmDiscardEdit(false)
+                        }}
                         onDelete={(r) => setDeleteRow(r)}
                         onToggleSort={(col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
                             setPage(1)
@@ -849,12 +904,32 @@ export default function JournalView({
                                         return label
                                     })()}
                                 </h2>
-                                <button className="btn ghost" onClick={() => setEditRow(null)} title="Schließen (ESC)">
+                                <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                                     </svg>
                                 </button>
                             </header>
+
+                            {confirmDiscardEdit && (
+                                <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
+                                    <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, width: '90vw', padding: '22px 24px', borderRadius: 14, border: '2px solid var(--accent)' }}>
+                                        <div style={{ fontSize: 28, marginBottom: 6, textAlign: 'center' }}>⚠️</div>
+                                        <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>Ungespeicherte Änderungen</h3>
+                                        <p style={{ margin: '0 0 16px', fontSize: 13, opacity: 0.85, lineHeight: 1.45, textAlign: 'center' }}>
+                                            Diese Buchung wurde verändert. Möchtest du die Änderungen wirklich verwerfen?
+                                        </p>
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                                            <button type="button" className="btn" onClick={() => setConfirmDiscardEdit(false)}>
+                                                Weiter bearbeiten
+                                            </button>
+                                            <button type="button" className="btn danger" onClick={closeEditModalNow}>
+                                                Änderungen verwerfen
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <form onSubmit={async (e) => {
                                 e.preventDefault()
@@ -938,7 +1013,7 @@ export default function JournalView({
                                     const w = (res as any)?.warnings as string[] | undefined
                                     if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
                                     setFlashId(editRow.id); window.setTimeout(() => setFlashId((cur) => (cur === editRow.id ? null : cur)), 3000)
-                                    setEditRow(null); await loadRecent(); bumpDataVersion()
+                                    closeEditModalNow(); await loadRecent(); bumpDataVersion()
                                 } catch (e: any) {
                                     notify('error', friendlyError(e))
                                 }
@@ -1455,7 +1530,7 @@ export default function JournalView({
                                         <button type="button" className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑 Löschen</button>
                                     </div>
                                     <div style={{ display: 'flex', gap: 8 }}>
-                                        <button type="button" className="btn" onClick={() => setEditRow(null)}>Abbrechen</button>
+                                        <button type="button" className="btn" onClick={requestCloseEditModal}>Abbrechen</button>
                                         <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
                                     </div>
                                 </div>
