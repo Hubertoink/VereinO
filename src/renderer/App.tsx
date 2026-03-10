@@ -390,7 +390,7 @@ function AppInner() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, requestClose, confirmingClose, doClose, cancelClose } = useQuickAdd(
+    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles } = useQuickAdd(
         today, 
         async (p: any) => {
         try {
@@ -785,7 +785,7 @@ function AppInner() {
         // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
         if (activePage === 'Buchungen') { loadBindings(); loadBudgets() }
         if (activePage === 'Reports') { loadBudgets() }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [activePage])
 
     // (earmarks loaded above)
@@ -1104,10 +1104,6 @@ function AppInner() {
                     setQa={setQa}
                     onSave={onQuickSave}
                     onClose={() => setQuickAdd(false)}
-                    onRequestClose={requestClose}
-                    confirmingClose={confirmingClose}
-                    onConfirmDiscard={doClose}
-                    onCancelDiscard={cancelClose}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}
@@ -1231,29 +1227,7 @@ function AppInner() {
                     setIncludeBudgets={setIncludeBudgets}
                     onExport={async (fmt, treasurerOpts) => {
                         try {
-                            if (fmt === 'PDF_TREASURER') {
-                                // Treasurer report (Kassierbericht) for members
-                                const res = await (window as any).api?.reports?.exportTreasurer?.({
-                                    fiscalYear,
-                                    orgName: exportOrgName || undefined,
-                                    includeMembers: treasurerOpts?.includeMembers ?? true,
-                                    includeInvoices: treasurerOpts?.includeInvoices ?? true,
-                                    includeBindings: treasurerOpts?.includeBindings ?? true,
-                                    includeBudgets: treasurerOpts?.includeBudgets ?? true,
-                                    includeTagSummary: treasurerOpts?.includeTagSummary ?? false,
-                                    includeVoucherList: treasurerOpts?.includeVoucherList ?? false,
-                                    includeTags: treasurerOpts?.includeTags ?? false,
-                                    voucherListFrom: treasurerOpts?.voucherListFrom,
-                                    voucherListTo: treasurerOpts?.voucherListTo,
-                                    voucherListSort: treasurerOpts?.voucherListSort ?? 'ASC'
-                                })
-                                if (res) {
-                                    notify('success', `Kassierbericht exportiert: ${res.filePath}`, 6000, {
-                                        label: 'Ordner öffnen',
-                                        onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
-                                    })
-                                }
-                            } else if (fmt === 'PDF_FISCAL') {
+                            if (fmt === 'PDF_FISCAL') {
                                 // Fiscal year report for tax office
                                 const res = await (window as any).api?.reports?.exportFiscal?.({
                                     fiscalYear,
@@ -1264,6 +1238,28 @@ function AppInner() {
                                 })
                                 if (res) {
                                     notify('success', `Finanzamt-Report exportiert: ${res.filePath}`, 6000, {
+                                        label: 'Ordner öffnen',
+                                        onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                                    })
+                                }
+                            } else if (fmt === 'PDF_TREASURER') {
+                                const res = await (window as any).api?.reports?.exportTreasurer?.({
+                                    fiscalYear,
+                                    orgName: exportOrgName || undefined,
+                                    cashBalanceDate: treasurerOpts?.cashBalanceDate,
+                                    includeMembers: treasurerOpts?.includeMembers,
+                                    includeInvoices: treasurerOpts?.includeInvoices,
+                                    includeBindings: treasurerOpts?.includeBindings,
+                                    includeBudgets: treasurerOpts?.includeBudgets,
+                                    includeTagSummary: treasurerOpts?.includeTagSummary,
+                                    includeVoucherList: treasurerOpts?.includeVoucherList,
+                                    includeTags: treasurerOpts?.includeTags,
+                                    voucherListFrom: treasurerOpts?.voucherListFrom,
+                                    voucherListTo: treasurerOpts?.voucherListTo,
+                                    voucherListSort: treasurerOpts?.voucherListSort
+                                })
+                                if (res) {
+                                    notify('success', `Kassierbericht exportiert: ${res.filePath}`, 6000, {
                                         label: 'Ordner öffnen',
                                         onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
                                     })

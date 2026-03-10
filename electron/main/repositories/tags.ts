@@ -58,6 +58,23 @@ export function setVoucherTags(voucherId: number, tags: string[]) {
     })
 }
 
+export function tagUsage(tagId: number) {
+    const d = getDb()
+    const row = d.prepare(`
+        SELECT
+          IFNULL(SUM(CASE WHEN v.type='IN'  THEN v.gross_amount ELSE 0 END), 0) as inflow,
+          IFNULL(SUM(CASE WHEN v.type='OUT' THEN v.gross_amount ELSE 0 END), 0) as spent,
+          COUNT(1) as count
+        FROM voucher_tags vt
+        JOIN vouchers v ON v.id = vt.voucher_id
+        WHERE vt.tag_id = ?
+    `).get(tagId) as any
+    const inflow = Number(row?.inflow || 0) || 0
+    const spent = Number(row?.spent || 0) || 0
+    const balance = Math.round((inflow - spent) * 100) / 100
+    return { inflow: Math.round(inflow * 100) / 100, spent: Math.round(spent * 100) / 100, balance, count: row?.count || 0 }
+}
+
 export function getTagsForVoucher(voucherId: number): string[] {
     const d = getDb()
     const rows = d.prepare(`

@@ -1,8 +1,39 @@
-﻿import React, { useRef, useState, useEffect, useCallback } from 'react'
+﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
+import HoverTooltip from '../../../components/common/HoverTooltip'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
+
+function TooltipList({
+    title,
+    rows,
+    hint
+}: {
+    title: string
+    rows: Array<{ key: string; value: string; dotColor?: string }>
+    hint?: string
+}) {
+    return (
+        <div>
+            <div className="tooltip-modal__title">{title}</div>
+            {rows.length > 0 && (
+                <div className="tooltip-modal__list">
+                    {rows.map((row) => (
+                        <div key={row.key} className="tooltip-modal__row">
+                            <span className="tooltip-modal__key" style={{ '--tooltip-dot': row.dotColor || 'var(--border)' } as React.CSSProperties}>
+                                <span className="tooltip-modal__dot" />
+                                {row.key}
+                            </span>
+                            <span className="tooltip-modal__val">{row.value}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {hint ? <div className="tooltip-modal__hint">{hint}</div> : null}
+        </div>
+    )
+}
 
 function UsageHover({
     kind,
@@ -11,58 +42,54 @@ function UsageHover({
     accent,
     eurFmt,
     getUsage,
+    rows,
+    hint,
     children
 }: {
-    kind: 'budget' | 'earmark'
-    id: number
+    kind: 'budget' | 'earmark' | 'tag'
+    id?: number
     title: string
     accent?: string | null
-    eurFmt: Intl.NumberFormat
-    getUsage: (id: number) => Promise<any>
+    eurFmt?: Intl.NumberFormat
+    getUsage?: (id: number) => Promise<any>
+    rows?: Array<{ key: string; value: string; dotColor?: string }>
+    hint?: string
     children: React.ReactNode
 }) {
-    const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string>('')
     const [data, setData] = useState<any>(null)
-    const timerRef = useRef<any>(null)
     const aliveRef = useRef(true)
 
     useEffect(() => {
         return () => {
             aliveRef.current = false
-            if (timerRef.current) clearTimeout(timerRef.current)
         }
     }, [])
 
-    const onEnter = () => {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        timerRef.current = setTimeout(async () => {
+    const loadUsage = useCallback(async () => {
+        if (!getUsage || id == null || data || loading) return
+        setLoading(true)
+        setError('')
+        try {
+            const res = await getUsage(id)
             if (!aliveRef.current) return
-            setOpen(true)
-            if (data || loading) return
-            setLoading(true)
-            setError('')
-            try {
-                const res = await getUsage(id)
-                if (!aliveRef.current) return
-                setData(res)
-            } catch (e: any) {
-                if (!aliveRef.current) return
-                setError(e?.message || String(e))
-            } finally {
-                if (!aliveRef.current) return
-                setLoading(false)
-            }
-        }, 500)
-    }
-    const onLeave = () => {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        setOpen(false)
-    }
+            setData(res)
+        } catch (e: any) {
+            if (!aliveRef.current) return
+            setError(e?.message || String(e))
+        } finally {
+            if (!aliveRef.current) return
+            setLoading(false)
+        }
+    }, [data, getUsage, id, loading])
 
-    const lines: Array<{ label: string; value: string }> = (() => {
-        if (!data) return []
+    const tooltipRows = useMemo(() => {
+        if (!data || !eurFmt) {
+            // For tags with static rows but no loaded data yet, show static rows
+            if (rows && rows.length > 0) return rows
+            return []
+        }
         if (kind === 'budget') {
             const u = data as BudgetUsage
             const inflow = Number(u.inflow || 0) || 0
@@ -70,52 +97,78 @@ function UsageHover({
             const stand = (u.remaining != null)
                 ? Number(u.remaining || 0)
                 : (u.balance != null ? Number(u.balance || 0) : (inflow - spent))
-            return [
-                { label: 'Einnahmen', value: eurFmt.format(inflow) },
-                { label: 'Ausgaben', value: eurFmt.format(spent) },
-                { label: 'Stand', value: eurFmt.format(stand) }
+            const result = [
+                { key: 'Einnahmen', value: eurFmt.format(inflow), dotColor: 'var(--success)' },
+                { key: 'Ausgaben', value: eurFmt.format(spent), dotColor: 'var(--danger)' },
+                { key: 'Saldo', value: eurFmt.format(stand), dotColor: accent || 'var(--accent)' }
             ]
+            const planned = Number(u.planned || 0)
+            if (planned) {
+                result.unshift({ key: 'Budgethöhe', value: eurFmt.format(planned), dotColor: 'var(--accent)' })
+            }
+            return result
         }
-        const u = data as EarmarkUsage
+        if (kind === 'earmark') {
+            const u = data as EarmarkUsage
+            const result = [
+                { key: 'Einnahmen', value: eurFmt.format(Number(u.allocated || 0) || 0), dotColor: 'var(--success)' },
+                { key: 'Ausgaben', value: eurFmt.format(Number(u.released || 0) || 0), dotColor: 'var(--danger)' },
+                { key: 'Saldo', value: eurFmt.format(Number(u.remaining || 0) || 0), dotColor: accent || 'var(--accent)' }
+            ]
+            const budget = Number(u.budget || 0)
+            if (budget) {
+                result.unshift({ key: 'Budgethöhe', value: eurFmt.format(budget), dotColor: 'var(--accent)' })
+            }
+            return result
+        }
+        // kind === 'tag'
+        const u = data as { inflow: number; spent: number; balance: number; count: number }
         return [
-            { label: 'Einnahmen', value: eurFmt.format(Number(u.allocated || 0) || 0) },
-            { label: 'Ausgaben', value: eurFmt.format(Number(u.released || 0) || 0) },
-            { label: 'Stand', value: eurFmt.format(Number(u.remaining || 0) || 0) }
+            { key: 'Einnahmen', value: eurFmt.format(Number(u.inflow || 0)), dotColor: 'var(--success)' },
+            { key: 'Ausgaben', value: eurFmt.format(Number(u.spent || 0)), dotColor: 'var(--danger)' },
+            { key: 'Saldo', value: eurFmt.format(Number(u.balance || 0)), dotColor: accent || 'var(--accent)' },
+            { key: 'Buchungen', value: String(u.count || 0), dotColor: 'var(--text-dim)' }
         ]
-    })()
+    }, [rows, data, eurFmt, kind, accent])
+
+    const content = (
+        <TooltipList
+            title={title}
+            rows={loading ? [] : error ? [] : tooltipRows}
+            hint={loading ? 'Lädt…' : error ? error : hint}
+        />
+    )
 
     return (
-        <span className="usage-hover" onMouseEnter={onEnter} onMouseLeave={onLeave}>
-            {children}
-            <div className={`usage-tooltip ${open ? 'usage-tooltip--open' : ''}`} role="tooltip" aria-hidden={!open}>
-                <div className="usage-tooltip__head">
-                    <span className="usage-tooltip__dot" style={{ background: accent || undefined }} />
-                    <span className="usage-tooltip__title">{title}</span>
-                </div>
-                {loading ? (
-                    <div className="usage-tooltip__body">
-                        <div className="usage-tooltip__muted">Lädt…</div>
-                    </div>
-                ) : error ? (
-                    <div className="usage-tooltip__body">
-                        <div className="usage-tooltip__error">{error}</div>
-                    </div>
-                ) : data ? (
-                    <div className="usage-tooltip__body">
-                        {lines.map((l) => (
-                            <div key={l.label} className="usage-tooltip__row">
-                                <span className="usage-tooltip__label">{l.label}</span>
-                                <span className="usage-tooltip__value">{l.value}</span>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="usage-tooltip__body">
-                        <div className="usage-tooltip__muted">Keine Daten</div>
-                    </div>
-                )}
-            </div>
-        </span>
+        <HoverTooltip<HTMLSpanElement>
+            content={content}
+            className="tooltip-modal journal-usage-tooltip"
+            preferredPlacement="top"
+        >
+            {({ ref, props }) => (
+                <span
+                    ref={ref}
+                    className="usage-hover"
+                    aria-describedby={props['aria-describedby']}
+                    onMouseEnter={(e) => {
+                        void loadUsage()
+                        props.onMouseEnter?.(e)
+                    }}
+                    onMouseLeave={(e) => {
+                        props.onMouseLeave?.(e)
+                    }}
+                    onFocus={(e) => {
+                        void loadUsage()
+                        props.onFocus?.(e)
+                    }}
+                    onBlur={(e) => {
+                        props.onBlur?.(e)
+                    }}
+                >
+                    {children}
+                </span>
+            )}
+        </HoverTooltip>
     )
 }
 
@@ -185,7 +238,7 @@ interface JournalTableProps {
     cols: Record<string, boolean>
     onReorder: (o: string[]) => void
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
-    tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
     eurFmt: Intl.NumberFormat
     fmtDate: (s?: string) => string
     onEdit: (r: {
@@ -281,6 +334,28 @@ export default function JournalTable({
             return await p
         } finally {
             earmarkUsageInFlight.current.delete(earmarkId)
+        }
+    }, [])
+
+    const tagUsageCache = useRef(new Map<number, any>())
+    const tagUsageInFlight = useRef(new Map<number, Promise<any>>())
+
+    const getTagUsage = useCallback(async (tagId: number) => {
+        const cached = tagUsageCache.current.get(tagId)
+        if (cached) return cached
+        const inflight = tagUsageInFlight.current.get(tagId)
+        if (inflight) return inflight
+        const p = (async () => {
+            const api = (window as any)?.api
+            const res = await api?.tags?.usage?.({ tagId })
+            tagUsageCache.current.set(tagId, res)
+            return res
+        })()
+        tagUsageInFlight.current.set(tagId, p)
+        try {
+            return await p
+        } finally {
+            tagUsageInFlight.current.delete(tagId)
         }
     }, [])
     
@@ -396,7 +471,8 @@ export default function JournalTable({
                                                     : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
                                                         : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} style={{ cursor: 'pointer' }}>Brutto {renderSortIcon('gross')}</th>
     )
-    const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
+    const tagDefFor = useCallback((name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase()), [tagDefs])
+    const colorFor = (name: string) => tagDefFor(name)?.color
     const isLocked = (d: string) => {
         if (!lockedUntil) return false
         return String(d) <= String(lockedUntil)
@@ -462,18 +538,29 @@ export default function JournalTable({
                     <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
                     {r.isAdvancePlaceholder ? <span className="badge badge-advance-placeholder">Vorschuss</span> : null}
                     {(r.tags || []).map((t: string) => {
+                        const tagDef = tagDefFor(t)
                         const bg = colorFor(t) || undefined
                         const fg = contrastText(bg)
                         return (
-                            <button
+                            <UsageHover
                                 key={t}
-                                className="chip"
-                                style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
-                                title={`Nach Tag "${t}" filtern`}
-                                onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
+                                kind="tag"
+                                id={tagDef?.id}
+                                title={t}
+                                accent={bg}
+                                eurFmt={eurFmt}
+                                getUsage={getTagUsage}
+                                hint="Klick filtert die Buchungsliste nach diesem Tag."
                             >
-                                {t}
-                            </button>
+                                <button
+                                    className="chip"
+                                    style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
+                                    title={`Nach Tag "${t}" filtern`}
+                                    onClick={(e) => { e.stopPropagation(); onTagClick?.(t); }}
+                                >
+                                    {t}
+                                </button>
+                            </UsageHover>
                         )
                     })}
                 </div>

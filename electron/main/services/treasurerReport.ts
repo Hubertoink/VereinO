@@ -20,6 +20,7 @@ export interface TreasurerReportOptions {
   from: string
   to: string
   orgName?: string
+  cashBalanceDate?: string
   includeMembers?: boolean
   includeInvoices?: boolean
   includeBindings?: boolean
@@ -45,6 +46,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     fiscalYear,
     from,
     to,
+    cashBalanceDate,
     includeMembers = true,
     includeInvoices = true,
     includeBindings = true,
@@ -66,9 +68,10 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
   try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
   const filePath = path.join(baseDir, `Kassierbericht_${fiscalYear}_${stamp}.pdf`)
+  const cashBalanceAsOf = cashBalanceDate || new Date().toISOString().slice(0, 10)
 
-  // 1. Cash balance (all-time current)
-  const currentBalance = cashBalance({})
+  // 1. Cash balance as of the selected cut-off date
+  const currentBalance = cashBalance({ to: cashBalanceAsOf })
   const totalBalance = (currentBalance.BAR || 0) + (currentBalance.BANK || 0)
 
   // 2. Summary for fiscal year
@@ -437,13 +440,14 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   <div class="sub">
     <strong>${esc(orgName)}</strong><br>
     Berichtszeitraum: ${fmtDate(from)} – ${fmtDate(to)} (Geschäftsjahr ${fiscalYear})<br>
+    Kassenstand zum Stichtag: ${fmtDate(cashBalanceAsOf)}<br>
     ${cashierName ? `Kassier: ${esc(cashierName)}<br>` : ''}
     Erstellt am ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
   </div>
 
   <div class="section-block">
-  <!-- 1. Aktueller Kassenstand -->
-  <h2>${nextSection()}. Aktueller Kassenstand</h2>
+  <!-- 1. Kassenstand zum Stichtag -->
+  <h2>${nextSection()}. Kassenstand zum ${fmtDate(cashBalanceAsOf)}</h2>
   <div class="kpi-grid">
     <div class="kpi-box">
       <div class="kpi-label">💵 Bargeld (Bar)</div>

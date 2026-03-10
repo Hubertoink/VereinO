@@ -26,7 +26,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
   sortDir: 'ASC' | 'DESC'
   setSortDir: (v: 'ASC' | 'DESC') => void
-  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL' | 'PDF_TREASURER', treasurerOpts?: { includeMembers?: boolean; includeInvoices?: boolean; includeBindings?: boolean; includeBudgets?: boolean; includeTagSummary?: boolean; includeVoucherList?: boolean; includeTags?: boolean; voucherListFrom?: string; voucherListTo?: string; voucherListSort?: 'ASC' | 'DESC' }) => Promise<void>
+  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL' | 'PDF_TREASURER', treasurerOpts?: { cashBalanceDate?: string; includeMembers?: boolean; includeInvoices?: boolean; includeBindings?: boolean; includeBudgets?: boolean; includeTagSummary?: boolean; includeVoucherList?: boolean; includeTags?: boolean; voucherListFrom?: string; voucherListTo?: string; voucherListSort?: 'ASC' | 'DESC' }) => Promise<void>
   dateFrom?: string
   dateTo?: string
   exportType?: 'standard' | 'fiscal' | 'treasurer'
@@ -97,6 +97,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   const [trIncludeTagSummary, setTrIncludeTagSummary] = useState(false)
   const [trIncludeVoucherList, setTrIncludeVoucherList] = useState(false)
   const [trIncludeTags, setTrIncludeTags] = useState(false)
+  const [trCashBalanceDate, setTrCashBalanceDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [trVoucherListFrom, setTrVoucherListFrom] = useState('')
   const [trVoucherListTo, setTrVoucherListTo] = useState('')
   const [trVoucherListSort, setTrVoucherListSort] = useState<'ASC' | 'DESC'>('ASC')
@@ -232,7 +233,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                     onClick={() => setExportType('treasurer')}
                     style={{ background: exportType === 'treasurer' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}
                   >
-                    📋 Kassierbericht (Mitglieder)
+                    📋 Kassierbericht
                   </button>
                 </div>
                 <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
@@ -325,6 +326,19 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </select>
               <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
                 Berichtszeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
+              </div>
+            </div>
+
+            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+              <label>Kassenstand zum Stichtag</label>
+              <input
+                type="date"
+                className="input"
+                value={trCashBalanceDate}
+                onChange={(e) => setTrCashBalanceDate(e.target.value)}
+              />
+              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                Der Kassenstand im Bericht wird bis zu diesem Datum berechnet. So kannst du z. B. den Kassenstand vom 01.01.2026 im Kassierbericht 2025 ausweisen.
               </div>
             </div>
 
@@ -562,6 +576,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             <button 
               className="btn" 
               onClick={() => onExport('PDF_TREASURER', {
+                cashBalanceDate: trCashBalanceDate,
                 includeMembers: trIncludeMembers,
                 includeInvoices: trIncludeInvoices,
                 includeBindings: trIncludeBindings,

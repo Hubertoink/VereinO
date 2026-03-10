@@ -113,6 +113,7 @@ export type TFiscalReportOutput = z.infer<typeof FiscalReportOutput>
 export const TreasurerReportInput = z.object({
     fiscalYear: z.number(),
     orgName: z.string().optional(),
+    cashBalanceDate: z.string().optional(),
     includeMembers: z.boolean().optional(),
     includeInvoices: z.boolean().optional(),
     includeBindings: z.boolean().optional(),
@@ -1023,6 +1024,8 @@ export const TagUpsertInput = z.object({ id: z.number().optional(), name: z.stri
 export const TagUpsertOutput = z.object({ id: z.number() })
 export const TagDeleteInput = z.object({ id: z.number() })
 export const TagDeleteOutput = z.object({ id: z.number() })
+export const TagUsageInput = z.object({ tagId: z.number() })
+export const TagUsageOutput = z.object({ inflow: z.number(), spent: z.number(), balance: z.number(), count: z.number() })
 export type TTagsListInput = z.infer<typeof TagsListInput>
 export type TTagsListOutput = z.infer<typeof TagsListOutput>
 export type TTagUpsertInput = z.infer<typeof TagUpsertInput>

@@ -2509,6 +2509,49 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: inline-flex;
 }
 
+.journal-usage-tooltip {
+    min-width: 220px;
+    max-width: 320px;
+    background: color-mix(in oklab, var(--surface) 94%, #000 6%);
+    border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
+}
+
+.journal-usage-tooltip .tooltip-modal__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+
+.journal-usage-tooltip .tooltip-modal__list {
+    margin-top: 10px;
+    gap: 10px;
+}
+
+.journal-usage-tooltip .tooltip-modal__row {
+    align-items: center;
+}
+
+.journal-usage-tooltip .tooltip-modal__key {
+    font-weight: 600;
+    color: color-mix(in oklab, var(--text) 88%, var(--text-dim) 12%);
+}
+
+.journal-usage-tooltip .tooltip-modal__val {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.journal-usage-tooltip .tooltip-modal__hint {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+    font-size: 11px;
+    line-height: 1.35;
+    opacity: 0.9;
+}
+
 .usage-tooltip {
     position: absolute;
     left: 50%;

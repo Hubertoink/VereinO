@@ -48,7 +48,8 @@ contextBridge.exposeInMainWorld('api', {
     tags: {
         list: (payload?: any) => ipcRenderer.invoke('tags.list', payload),
         upsert: (payload: any) => ipcRenderer.invoke('tags.upsert', payload),
-        delete: (payload: any) => ipcRenderer.invoke('tags.delete', payload)
+        delete: (payload: any) => ipcRenderer.invoke('tags.delete', payload),
+        usage: (payload: any) => ipcRenderer.invoke('tags.usage', payload)
     },
     audit: {
         recent: (payload?: any) => ipcRenderer.invoke('audit.recent', payload)
