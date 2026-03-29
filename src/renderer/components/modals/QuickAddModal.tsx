@@ -89,6 +89,11 @@ export default function QuickAddModal({
 
     const budgetsList: BudgetAssignment[] = ((qa as any).budgets || [])
     const earmarksList: EarmarkAssignment[] = ((qa as any).earmarksAssigned || [])
+    const availableBudgets = React.useMemo(
+        () => (budgetsForEdit || []).filter((budget) => !budget?.isArchived),
+        [budgetsForEdit]
+    )
+    const hasAvailableBudgets = availableBudgets.length > 0
 
     const invalidBudgetIds = new Set(
         budgetsList
@@ -124,6 +129,33 @@ export default function QuickAddModal({
             return true
         })
     }, [earmarks])
+    const hasAvailableEarmarks = activeEarmarks.length > 0
+
+    const lastGrossAmtRef = React.useRef(grossAmt)
+
+    React.useEffect(() => {
+        const previousGross = lastGrossAmtRef.current
+        if (previousGross === grossAmt) return
+
+        let nextQa: QA | null = null
+
+        if (budgetsList.length === 1 && Math.abs((budgetsList[0]?.amount || 0) - previousGross) < 0.001) {
+            nextQa = {
+                ...(nextQa ?? qa),
+                budgets: [{ ...budgetsList[0], amount: grossAmt }]
+            } as QA
+        }
+
+        if (earmarksList.length === 1 && Math.abs((earmarksList[0]?.amount || 0) - previousGross) < 0.001) {
+            nextQa = {
+                ...(nextQa ?? qa),
+                earmarksAssigned: [{ ...earmarksList[0], amount: grossAmt }]
+            } as QA
+        }
+
+        if (nextQa) setQa(nextQa)
+        lastGrossAmtRef.current = grossAmt
+    }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
     return (
         <div className="modal-overlay">
@@ -341,16 +373,20 @@ export default function QuickAddModal({
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         Budget
-                                        <button
-                                            type="button"
-                                            className="btn ghost"
-                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
-                                            onClick={() => {
-                                                const current = ((qa as any).budgets || []) as BudgetAssignment[]
-                                                setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
-                                            }}
-                                            title="Weiteres Budget hinzufügen"
-                                        >+</button>
+                                        {hasAvailableBudgets ? (
+                                            <button
+                                                type="button"
+                                                className="btn ghost"
+                                                style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                onClick={() => {
+                                                    const current = ((qa as any).budgets || []) as BudgetAssignment[]
+                                                    setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
+                                                }}
+                                                title="Weiteres Budget hinzufügen"
+                                            >+</button>
+                                        ) : (
+                                            <span className="helper" style={{ fontWeight: 400 }}>Kein Budget vorhanden</span>
+                                        )}
                                     </label>
                                     {(() => {
                                         const budgetIds = budgetsList.filter((b) => b.budgetId).map((b) => b.budgetId)
@@ -375,8 +411,7 @@ export default function QuickAddModal({
                                                             >
                                                                 <option value="">— Budget wählen —</option>
                                                                 {(() => {
-                                                                    const active = (budgetsForEdit || []).filter((b: any) => !b?.isArchived)
-                                                                    const activeIds = new Set(active.map((b: any) => b.id))
+                                                                    const activeIds = new Set(availableBudgets.map((b: any) => b.id))
                                                                     const selectedId = Number(ba.budgetId || 0)
                                                                     const selectedMissing = selectedId && !activeIds.has(selectedId)
                                                                     const selected = selectedMissing ? (budgetsForEdit || []).find((b: any) => b.id === selectedId) : null
@@ -387,7 +422,7 @@ export default function QuickAddModal({
                                                                                     {(selected as any)?.label ?? `Budget #${selectedId}`} (archiviert)
                                                                                 </option>
                                                                             ) : null}
-                                                                            {active.map((b: any) => {
+                                                                            {availableBudgets.map((b: any) => {
                                                                     const eff = budgetEffectiveRange(b)
                                                                     const disabled = eff.enforce ? !inRange(qa.date, eff.start, eff.end) : false
                                                                     const suffix = eff.enforce ? ` (${fmtRange(eff.start, eff.end) || 'Zeitraum'})` : ''
@@ -439,7 +474,9 @@ export default function QuickAddModal({
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>
+                                                {hasAvailableBudgets ? 'Kein Budget zugeordnet. Klicke + zum Hinzufügen.' : 'Kein Budget vorhanden.'}
+                                            </div>
                                         )
                                     })()}
                                 </div>
@@ -450,16 +487,20 @@ export default function QuickAddModal({
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         Zweckbindung
-                                        <button
-                                            type="button"
-                                            className="btn ghost"
-                                            style={{ padding: '2px 6px', fontSize: '0.85rem' }}
-                                            onClick={() => {
-                                                const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
-                                                setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
-                                            }}
-                                            title="Weitere Zweckbindung hinzufügen"
-                                        >+</button>
+                                        {hasAvailableEarmarks ? (
+                                            <button
+                                                type="button"
+                                                className="btn ghost"
+                                                style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                onClick={() => {
+                                                    const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
+                                                    setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
+                                                }}
+                                                title="Weitere Zweckbindung hinzufügen"
+                                            >+</button>
+                                        ) : (
+                                            <span className="helper" style={{ fontWeight: 400 }}>Keine Zweckbindung vorhanden</span>
+                                        )}
                                     </label>
                                     {(() => {
                                         const earmarkIds = earmarksList.filter((e) => e.earmarkId).map((e) => e.earmarkId)
@@ -531,7 +572,9 @@ export default function QuickAddModal({
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
+                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>
+                                                {hasAvailableEarmarks ? 'Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.' : 'Keine Zweckbindung vorhanden.'}
+                                            </div>
                                         )
                                     })()}
                                 </div>
