@@ -6,6 +6,7 @@ import ReportsSphereDonut from '../../components/reports/ReportsSphereDonut'
 import ReportsPaymentMethodBars from '../../components/reports/ReportsPaymentMethodBars'
 import ReportsInOutLines from '../../components/reports/ReportsInOutLines'
 import { MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
+import HoverTooltip from '../../components/common/HoverTooltip'
 
 export default function ReportsView(props: {
   from: string
@@ -192,33 +193,43 @@ export default function ReportsView(props: {
             />
           </div>
 
-          <button
-            className="report-toolbar-icon-btn report-toolbar-icon-btn--note"
-            title="Tätigkeitsbericht bearbeiten"
-            onClick={() => onOpenActivityReport()}
-            aria-label="Tätigkeitsbericht bearbeiten"
-            type="button"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-            </svg>
-          </button>
+          <HoverTooltip<HTMLButtonElement> content="Tätigkeitsbericht bearbeiten">
+            {({ ref, props }) => (
+              <button
+                ref={ref}
+                {...props}
+                className="report-toolbar-icon-btn report-toolbar-icon-btn--note"
+                onClick={() => onOpenActivityReport()}
+                aria-label="Tätigkeitsbericht bearbeiten"
+                type="button"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                </svg>
+              </button>
+            )}
+          </HoverTooltip>
 
-          <button
-            className="report-toolbar-icon-btn report-toolbar-icon-btn--export"
-            title="Exportieren"
-            onClick={() => onOpenExport()}
-            aria-label="Exportieren"
-            type="button"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M12 18v-6" />
-              <path d="m9 15 3 3 3-3" />
-            </svg>
-          </button>
+          <HoverTooltip<HTMLButtonElement> content="Exportieren">
+            {({ ref, props }) => (
+              <button
+                ref={ref}
+                {...props}
+                className="report-toolbar-icon-btn report-toolbar-icon-btn--export"
+                onClick={() => onOpenExport()}
+                aria-label="Exportieren"
+                type="button"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M12 18v-6" />
+                  <path d="m9 15 3 3 3-3" />
+                </svg>
+              </button>
+            )}
+          </HoverTooltip>
         </div>
       </header>
 
