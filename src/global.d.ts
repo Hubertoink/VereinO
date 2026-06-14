@@ -163,7 +163,7 @@ declare global {
                 years: () => Promise<{ years: number[] }>
             }
             activityReports: {
-                list: (payload?: {}) => Promise<{ rows: Array<{ fiscalYear: number; updatedAt?: string | null; missingFields: string[]; isEmpty: boolean }> }>
+                list: (payload?: Record<string, never>) => Promise<{ rows: Array<{ fiscalYear: number; updatedAt?: string | null; missingFields: string[]; isEmpty: boolean }> }>
                 get: (payload: { fiscalYear: number }) => Promise<{ fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string; updatedAt?: string | null; missingFields: string[] }>
                 save: (payload: { fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string }) => Promise<{ fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string; updatedAt?: string | null; missingFields: string[] }>
                 delete: (payload: { fiscalYear: number }) => Promise<{ fiscalYear: number }>
