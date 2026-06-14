@@ -149,8 +149,10 @@ contextBridge.exposeInMainWorld('api', {
         years: () => ipcRenderer.invoke('reports.years'),
     },
     activityReports: {
+        list: (payload?: any) => ipcRenderer.invoke('activityReports.list', payload),
         get: (payload: any) => ipcRenderer.invoke('activityReports.get', payload),
-        save: (payload: any) => ipcRenderer.invoke('activityReports.save', payload)
+        save: (payload: any) => ipcRenderer.invoke('activityReports.save', payload),
+        delete: (payload: any) => ipcRenderer.invoke('activityReports.delete', payload)
     },
     db: {
         export: () => ipcRenderer.invoke('db.export'),

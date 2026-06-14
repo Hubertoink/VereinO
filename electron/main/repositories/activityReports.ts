@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
+import { ensureActivityReportsTable } from '../db/migrations'
 
  type DB = InstanceType<typeof Database>
 
@@ -12,6 +13,13 @@ export type ActivityReport = {
   highlights: string
   notes: string
   updatedAt?: string | null
+}
+
+export type ActivityReportListItem = {
+  fiscalYear: number
+  updatedAt?: string | null
+  missingFields: string[]
+  isEmpty: boolean
 }
 
 const EMPTY_REPORT_FIELDS = {
@@ -38,6 +46,7 @@ function mapRow(row: any, fiscalYear: number): ActivityReport {
 
 export function getActivityReport(fiscalYear: number): ActivityReport {
   const d = getDb()
+  ensureActivityReportsTable(d as any)
   const row = d.prepare('SELECT * FROM activity_reports WHERE fiscal_year = ?').get(fiscalYear) as any
   if (!row) return { fiscalYear, ...EMPTY_REPORT_FIELDS, updatedAt: null }
   return mapRow(row, fiscalYear)
@@ -45,6 +54,7 @@ export function getActivityReport(fiscalYear: number): ActivityReport {
 
 export function saveActivityReport(input: ActivityReport): ActivityReport {
   return withTransaction((d: DB) => {
+    ensureActivityReportsTable(d as any)
     d.prepare(`
       INSERT INTO activity_reports (
         fiscal_year, activities, purpose_impact, target_groups, volunteer_work, highlights, notes, updated_at
@@ -67,6 +77,35 @@ export function saveActivityReport(input: ActivityReport): ActivityReport {
       input.notes ?? ''
     )
     return getActivityReportFromDb(d, input.fiscalYear)
+  })
+}
+
+export function listActivityReports(): ActivityReportListItem[] {
+  const d = getDb()
+  ensureActivityReportsTable(d as any)
+  const rows = d.prepare(`
+    SELECT fiscal_year, updated_at, activities, purpose_impact, target_groups, volunteer_work, highlights, notes
+    FROM activity_reports
+    ORDER BY fiscal_year DESC
+  `).all() as Array<any>
+
+  return rows.map((row) => {
+    const report = mapRow(row, row.fiscal_year)
+    const values = [report.activities, report.purposeImpact, report.targetGroups, report.volunteerWork, report.highlights, report.notes]
+    return {
+      fiscalYear: report.fiscalYear,
+      updatedAt: report.updatedAt ?? null,
+      missingFields: validateActivityReport(report),
+      isEmpty: values.every((value) => !String(value || '').trim())
+    }
+  })
+}
+
+export function deleteActivityReport(fiscalYear: number): { fiscalYear: number } {
+  return withTransaction((d: DB) => {
+    ensureActivityReportsTable(d as any)
+    d.prepare('DELETE FROM activity_reports WHERE fiscal_year = ?').run(fiscalYear)
+    return { fiscalYear }
   })
 }
 

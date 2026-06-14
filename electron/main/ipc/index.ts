@@ -30,8 +30,8 @@ import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
 import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
-import { ActivityReportGetInput, ActivityReportGetOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
-import { getActivityReport, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
+import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGetInput, ActivityReportGetOutput, ActivityReportListInput, ActivityReportListOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
+import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
 
 function isMissingTableError(error: unknown, tableNames: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -648,14 +648,26 @@ export function registerIpcHandlers() {
 
     ipcMain.handle('activityReports.get', async (_e, payload) => {
         const parsed = ActivityReportGetInput.parse(payload)
-        const report = getActivityReport(parsed.fiscalYear)
+        const report = await withSchemaHealRetry(() => getActivityReport(parsed.fiscalYear), ['activity_reports'])
         return ActivityReportGetOutput.parse({ ...report, missingFields: validateActivityReport(report) })
+    })
+
+    ipcMain.handle('activityReports.list', async (_e, payload) => {
+        ActivityReportListInput.parse(payload)
+        const rows = await withSchemaHealRetry(() => listActivityReports(), ['activity_reports'])
+        return ActivityReportListOutput.parse({ rows })
     })
 
     ipcMain.handle('activityReports.save', async (_e, payload) => {
         const parsed = ActivityReportSaveInput.parse(payload)
-        const report = saveActivityReport(parsed)
+        const report = await withSchemaHealRetry(() => saveActivityReport(parsed), ['activity_reports'])
         return ActivityReportSaveOutput.parse({ ...report, missingFields: validateActivityReport(report) })
+    })
+
+    ipcMain.handle('activityReports.delete', async (_e, payload) => {
+        const parsed = ActivityReportDeleteInput.parse(payload)
+        const result = await withSchemaHealRetry(() => deleteActivityReport(parsed.fiscalYear), ['activity_reports'])
+        return ActivityReportDeleteOutput.parse(result)
     })
 
     ipcMain.handle('reports.exportTreasurer', async (_e, payload) => {

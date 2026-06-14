@@ -1810,6 +1810,122 @@ svg text {
     animation: modalSlideUp 0.25s ease-out;
 }
 
+.activity-report-modal {
+    width: min(1040px, 96vw);
+    max-height: 92vh;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.activity-report-modal__header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+}
+
+.activity-report-modal__header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.activity-report-modal__body {
+    padding: 16px;
+    overflow: auto;
+    display: grid;
+    gap: 12px;
+}
+
+.activity-report-overview {
+    display: grid;
+    gap: 16px;
+}
+
+.activity-report-overview__create {
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.activity-report-overview__create-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.activity-report-overview__create-actions .input {
+    min-width: 140px;
+}
+
+.activity-report-overview__section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.activity-report-overview__empty {
+    padding: 16px;
+    display: grid;
+    gap: 4px;
+}
+
+.activity-report-overview__cards {
+    display: grid;
+    gap: 10px;
+}
+
+.activity-report-overview__card {
+    padding: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.activity-report-overview__card-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.activity-report-overview__card-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.activity-report-editor-layout {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.activity-report-editor-layout__sidebar {
+    align-content: start;
+}
+
+@media (max-width: 900px) {
+    .activity-report-editor-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Wider layout for Quick-Add (Buchung) modal */
 .booking-modal {
     width: min(1100px, 96vw);

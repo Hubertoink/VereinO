@@ -122,12 +122,27 @@ export const ActivityReportPayload = z.object({
 })
 export const ActivityReportGetInput = z.object({ fiscalYear: z.number() })
 export const ActivityReportGetOutput = ActivityReportPayload.extend({ missingFields: z.array(z.string()) })
+export const ActivityReportListInput = z.object({}).optional()
+export const ActivityReportListOutput = z.object({
+    rows: z.array(z.object({
+        fiscalYear: z.number(),
+        updatedAt: z.string().nullable().optional(),
+        missingFields: z.array(z.string()),
+        isEmpty: z.boolean()
+    }))
+})
 export const ActivityReportSaveInput = ActivityReportPayload.omit({ updatedAt: true })
 export const ActivityReportSaveOutput = ActivityReportPayload.extend({ missingFields: z.array(z.string()) })
+export const ActivityReportDeleteInput = z.object({ fiscalYear: z.number() })
+export const ActivityReportDeleteOutput = z.object({ fiscalYear: z.number() })
 export type TActivityReportGetInput = z.infer<typeof ActivityReportGetInput>
 export type TActivityReportGetOutput = z.infer<typeof ActivityReportGetOutput>
+export type TActivityReportListInput = z.infer<typeof ActivityReportListInput>
+export type TActivityReportListOutput = z.infer<typeof ActivityReportListOutput>
 export type TActivityReportSaveInput = z.infer<typeof ActivityReportSaveInput>
 export type TActivityReportSaveOutput = z.infer<typeof ActivityReportSaveOutput>
+export type TActivityReportDeleteInput = z.infer<typeof ActivityReportDeleteInput>
+export type TActivityReportDeleteOutput = z.infer<typeof ActivityReportDeleteOutput>
 
 // Treasurer report (Kassierbericht) for club members
 export const TreasurerReportInput = z.object({

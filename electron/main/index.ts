@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, Menu, session, dialog } from 'electron'
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
-import { applyMigrations, ensureVoucherJunctionTables } from './db/migrations'
+import { applyMigrations, ensureActivityReportsTable, ensureVoucherJunctionTables } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -118,6 +118,7 @@ app.whenReady().then(async () => {
 
         // Defensive: legacy DBs may miss junction tables even when most data loads.
         ensureVoucherJunctionTables(db)
+        ensureActivityReportsTable(db)
         applyMigrations(db)
         
         // CRITICAL FIX: Always ensure enforce_time_range columns exist
