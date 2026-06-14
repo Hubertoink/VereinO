@@ -105,6 +105,10 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
     return Array.from(set).sort((a, b) => b - a)
   }, [fiscalYear, yearsAvail])
 
+  const reportExistsForNewYear = useMemo(() => {
+    return reportList.some((item) => item.fiscalYear === Number(newYear))
+  }, [newYear, reportList])
+
   const yearBudgets = useMemo(() => {
     return (budgets || [])
       .filter((budget) => budget.year === fiscalYear && !budget.isArchived)
@@ -175,6 +179,12 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
 
   async function createNewReport() {
     const year = Number(newYear || fiscalYear)
+    if (reportList.some((item) => item.fiscalYear === year)) {
+      setError(`Für das Geschäftsjahr ${year} existiert bereits ein Tätigkeitsbericht. Bitte öffne den vorhandenen Bericht statt ihn neu anzulegen.`)
+      setStatus('')
+      notify?.('info', `Tätigkeitsbericht ${year} existiert bereits`, 3500)
+      return
+    }
     setFiscalYear(year)
     setReport(emptyReport(year))
     setError('')
@@ -261,8 +271,25 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                   <select className="input" value={newYear} onChange={(event) => setNewYear(Number(event.target.value))}>
                     {years.map((year) => <option key={year} value={year}>{year}</option>)}
                   </select>
-                  <button className="btn primary" onClick={createNewReport} type="button">Neu anlegen</button>
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      if (reportExistsForNewYear) {
+                        openEditor(Number(newYear))
+                        return
+                      }
+                      createNewReport()
+                    }}
+                    type="button"
+                  >
+                    {reportExistsForNewYear ? 'Vorhandenen öffnen' : 'Neu anlegen'}
+                  </button>
                 </div>
+                {reportExistsForNewYear && (
+                  <div className="helper" style={{ color: 'var(--warning)' }}>
+                    Für {newYear} gibt es bereits einen Tätigkeitsbericht. Ein neuer Bericht würde denselben Jahresdatensatz betreffen, daher kannst du ihn hier nur öffnen.
+                  </div>
+                )}
               </section>
 
               <section className="activity-report-overview__list">
