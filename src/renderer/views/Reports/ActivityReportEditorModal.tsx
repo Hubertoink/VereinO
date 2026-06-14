@@ -97,6 +97,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [newYear, setNewYear] = useState<number>(fiscalYear)
+  const [deleteConfirm, setDeleteConfirm] = useState<null | { fiscalYear: number }>(null)
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear()
@@ -205,8 +206,6 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   }
 
   async function removeReport(year: number) {
-    const confirmed = window.confirm(`Tätigkeitsbericht ${year} wirklich löschen?`)
-    if (!confirmed) return
     setError('')
     try {
       await window.api?.activityReports?.delete?.({ fiscalYear: year })
@@ -218,6 +217,8 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
       }
     } catch (e: any) {
       setError('Tätigkeitsbericht konnte nicht gelöscht werden: ' + (e?.message || String(e)))
+    } finally {
+      setDeleteConfirm(null)
     }
   }
 
@@ -294,7 +295,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                         </div>
                         <div className="activity-report-overview__card-actions">
                           <button className="btn btn-edit" onClick={() => openEditor(item.fiscalYear)} title="Bearbeiten" type="button">✎</button>
-                          <button className="btn ghost btn-trash" onClick={() => removeReport(item.fiscalYear)} title="Löschen" type="button">
+                          <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ fiscalYear: item.fiscalYear })} title="Löschen" type="button">
                             <IconTrash size={16} />
                           </button>
                         </div>
@@ -342,7 +343,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                 <div className="flex justify-between items-center gap-8">
                   <div className="helper">Zuletzt gespeichert: {report.updatedAt ? formatDate(report.updatedAt.slice(0, 10)) : 'noch nicht gespeichert'}</div>
                   <div className="flex gap-8 items-center">
-                    <button className="btn ghost btn-trash" onClick={() => removeReport(fiscalYear)} disabled={saving} title="Löschen" type="button">
+                    <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ fiscalYear })} disabled={saving} title="Löschen" type="button">
                       <IconTrash size={16} />
                     </button>
                     <button className="btn primary" onClick={save} disabled={saving || loading} type="button">
@@ -400,6 +401,25 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
           )}
         </div>
       </div>
+
+      {deleteConfirm && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
+          <div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Tätigkeitsbericht löschen</h3>
+              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen" type="button">✕</button>
+            </div>
+            <div>
+              Möchtest du den Tätigkeitsbericht für <strong>{deleteConfirm.fiscalYear}</strong> wirklich löschen?
+            </div>
+            <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setDeleteConfirm(null)} type="button">Abbrechen</button>
+              <button className="btn danger" onClick={() => removeReport(deleteConfirm.fiscalYear)} type="button">Ja, löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
