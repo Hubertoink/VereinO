@@ -30,6 +30,8 @@ import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
 import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
+import { ActivityReportGetInput, ActivityReportGetOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
+import { getActivityReport, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
 
 function isMissingTableError(error: unknown, tableNames: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -638,9 +640,22 @@ export function registerIpcHandlers() {
             includeBindings: parsed.includeBindings ?? false,
             includeVoucherList: parsed.includeVoucherList ?? false,
             includeBudgets: parsed.includeBudgets ?? false,
+            includeActivityReport: parsed.includeActivityReport ?? false,
             orgName: parsed.orgName
         })
         return FiscalReportOutput.parse(result)
+    })
+
+    ipcMain.handle('activityReports.get', async (_e, payload) => {
+        const parsed = ActivityReportGetInput.parse(payload)
+        const report = getActivityReport(parsed.fiscalYear)
+        return ActivityReportGetOutput.parse({ ...report, missingFields: validateActivityReport(report) })
+    })
+
+    ipcMain.handle('activityReports.save', async (_e, payload) => {
+        const parsed = ActivityReportSaveInput.parse(payload)
+        const report = saveActivityReport(parsed)
+        return ActivityReportSaveOutput.parse({ ...report, missingFields: validateActivityReport(report) })
     })
 
     ipcMain.handle('reports.exportTreasurer', async (_e, payload) => {

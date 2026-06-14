@@ -148,6 +148,10 @@ contextBridge.exposeInMainWorld('api', {
         cashBalance: (payload: any) => ipcRenderer.invoke('reports.cashBalance', payload),
         years: () => ipcRenderer.invoke('reports.years'),
     },
+    activityReports: {
+        get: (payload: any) => ipcRenderer.invoke('activityReports.get', payload),
+        save: (payload: any) => ipcRenderer.invoke('activityReports.save', payload)
+    },
     db: {
         export: () => ipcRenderer.invoke('db.export'),
         import: {

@@ -5,6 +5,25 @@ type DB = InstanceType<typeof Database>
 
 export type Tag = { id: number; name: string; color?: string | null }
 
+const AUTO_TAG_COLORS = ['#2962FF', '#00B8D4', '#26A69A', '#00C853', '#FFD600', '#FF9100', '#FF7043', '#F50057', '#9C27B0', '#7C4DFF']
+
+function colorForTagName(name: string) {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
+    return AUTO_TAG_COLORS[Math.abs(hash) % AUTO_TAG_COLORS.length]
+}
+
+export function ensureTag(d: DB, nameRaw: string): { id: number; name: string; created: boolean } | null {
+    const name = String(nameRaw || '').trim()
+    if (!name) return null
+    const found = d.prepare('SELECT id, name FROM tags WHERE lower(name) = lower(?) LIMIT 1').get(name) as any
+    if (found?.id) return { id: Number(found.id), name: String(found.name), created: false }
+    const info = d.prepare('INSERT OR IGNORE INTO tags(name, color) VALUES (?, ?)').run(name, colorForTagName(name))
+    const row = d.prepare('SELECT id, name FROM tags WHERE lower(name) = lower(?) LIMIT 1').get(name) as any
+    if (!row?.id) return null
+    return { id: Number(row.id), name: String(row.name), created: Number(info.changes || 0) > 0 }
+}
+
 export function listTags(opts?: { q?: string; includeUsage?: boolean }) {
     const d = getDb()
     const wh: string[] = []
@@ -42,13 +61,8 @@ export function setVoucherTags(voucherId: number, tags: string[]) {
         // Ensure tags exist
         const tagIds: number[] = []
         for (const nameRaw of tags) {
-            const name = nameRaw.trim()
-            if (!name) continue
-            const found = d.prepare('SELECT id FROM tags WHERE name = ?').get(name) as any
-            if (found?.id) { tagIds.push(found.id); continue }
-            const info = d.prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)').run(name)
-            const id = Number(info.lastInsertRowid) || (d.prepare('SELECT id FROM tags WHERE name = ?').get(name) as any)?.id
-            if (id) tagIds.push(id)
+            const tag = ensureTag(d, nameRaw)
+            if (tag?.id) tagIds.push(tag.id)
         }
         // Replace links
         d.prepare('DELETE FROM voucher_tags WHERE voucher_id = ?').run(voucherId)

@@ -23,6 +23,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     inGross: null,
     outGross: null,
     earmarkCode: null,
+    tags: null,
     bankIn: null,
     bankOut: null,
     cashIn: null,
@@ -35,6 +36,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     skipped: number
     errors: Array<{ row: number; message: string }>
     rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
+    newTags?: string[]
     errorFilePath?: string
   }>(null)
   const [showErrorsModal, setShowErrorsModal] = useState(false)
@@ -102,7 +104,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         setResult(res)
         // let app know data changed
         window.dispatchEvent(new Event('data-changed'))
-        if ((res.errors?.length || 0) > 0) {
+        if ((res.errors?.length || 0) > 0 || (res.newTags?.length || 0) > 0) {
           setShowErrorsModal(true)
           if (res.errorFilePath) {
             notify?.('info', `Fehler-Excel gespeichert: ${res.errorFilePath}`)
@@ -131,6 +133,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     { key: 'inGross', label: 'Einnahmen (Brutto)' },
     { key: 'outGross', label: 'Ausgaben (Brutto)' },
     { key: 'earmarkCode', label: 'Zweckbindung-Code' },
+    { key: 'tags', label: 'Tags (; oder , getrennt)' },
     { key: 'bankIn', label: 'Bankkonto + (Einnahmen)' },
     { key: 'bankOut', label: 'Bankkonto - (Ausgaben)' },
     { key: 'cashIn', label: 'Barkonto + (Einnahmen)' },
@@ -290,6 +293,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <Field keyName="type" tooltip="Art: IN, OUT, TRANSFER" />
               <Field keyName="sphere" tooltip="Sphäre aus der Datei" />
               <Field keyName="earmarkCode" tooltip="Zweckbindung als Code" />
+              <Field keyName="tags" tooltip="Tags mit Semikolon oder Komma trennen" />
             </div>
             <div className="mapping-section">
               <div className="section-title">💶 Beträge</div>
@@ -335,6 +339,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 erzeugt.
               </li>
               <li>"Standard-Sphäre" wird verwendet, wenn keine Sphäre-Spalte vorhanden ist.</li>
+              <li>Tags können per Semikolon oder Komma getrennt werden; fehlende Tags werden automatisch angelegt.</li>
               <li>
                 Summenzeilen wie "Ergebnis/Summe/Saldo" werden automatisch übersprungen.
               </li>
@@ -416,6 +421,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
           <div className="helper">
             Importiert: {result.imported} | Übersprungen: {result.skipped}
           </div>
+          {(result.newTags?.length || 0) > 0 && (
+            <div className="helper" style={{ marginTop: 6 }}>
+              Neu angelegte Tags: {result.newTags?.join(', ')}
+            </div>
+          )}
           {result.errorFilePath && (
             <div style={{ marginTop: 6 }}>
               <div className="helper">Fehler-Datei gespeichert:</div>
@@ -468,7 +478,9 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 }}
               >
                 <h2 style={{ margin: 0 }}>
-                  Import abgeschlossen — einige Zeilen konnten nicht übernommen werden
+                  {(result.errors?.length || 0) > 0
+                    ? 'Import abgeschlossen — einige Zeilen konnten nicht übernommen werden'
+                    : 'Import abgeschlossen'}
                 </h2>
                 <button className="btn danger" onClick={() => setShowErrorsModal(false)}>
                   Schließen
@@ -478,6 +490,14 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 Importiert: {result.imported} | Übersprungen: {result.skipped} | Fehler:{' '}
                 {result.errors?.length || 0}
               </div>
+              {(result.newTags?.length || 0) > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <strong>Neu angelegte Tags</strong>
+                  <div className="helper" style={{ marginTop: 4 }}>
+                    {result.newTags?.join(', ')}
+                  </div>
+                </div>
+              )}
               {result.errorFilePath && (
                 <div style={{ marginTop: 8 }}>
                   <div className="helper">

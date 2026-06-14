@@ -5686,6 +5686,38 @@ html[data-glass-modals="true"] .flyout-arrow {
     background: color-mix(in oklab, var(--dropdown-variant-action) 15%, transparent);
 }
 
+.report-toolbar-icon-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.report-toolbar-icon-btn:hover {
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.report-toolbar-icon-btn--note {
+    color: var(--dropdown-variant-time);
+}
+
+.report-toolbar-icon-btn--note:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-time) 15%, transparent);
+}
+
+.report-toolbar-icon-btn--export {
+    color: var(--dropdown-variant-action);
+}
+
+.report-toolbar-icon-btn--export:hover {
+    background: color-mix(in oklab, var(--dropdown-variant-action) 15%, transparent);
+}
+
 /* Active filter state overrides color variant */
 .filter-dropdown__trigger--time.has-filters {
     color: var(--dropdown-variant-time);

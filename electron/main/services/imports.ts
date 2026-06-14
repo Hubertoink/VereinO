@@ -19,9 +19,10 @@ export type ImportExecuteResult = {
     skipped: number
     errors: Array<{ row: number; message: string }>
     rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
+    newTags?: string[]
 }
 
-const FIELD_KEYS = ['date', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'bankIn', 'bankOut', 'cashIn', 'cashOut', 'defaultSphere'] as const
+const FIELD_KEYS = ['date', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'tags', 'bankIn', 'bankOut', 'cashIn', 'cashOut', 'defaultSphere'] as const
 export type FieldKey = typeof FIELD_KEYS[number]
 
 function normalizeHeader(h: string) {
@@ -32,7 +33,7 @@ function normalizeHeader(h: string) {
 function suggestMapping(headers: string[]): Record<string, string | null> {
     const map: Record<string, string | null> = {
         date: null, type: null, sphere: null, description: null, paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null,
-        bankIn: null, bankOut: null, cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
+        tags: null, bankIn: null, bankOut: null, cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
     }
     for (const h of headers) {
         const n = normalizeHeader(h)
@@ -47,12 +48,41 @@ function suggestMapping(headers: string[]): Record<string, string | null> {
         else if (!map.outGross && /(ausgab|ausgang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.outGross = h
         else if (!map.grossAmount && /(brutto|gross|betrag|amount)/.test(n)) map.grossAmount = h
         else if (!map.earmarkCode && /(zweckbindung|earmark|code)/.test(n)) map.earmarkCode = h
+        else if (!map.tags && /(tag|tags|schlagwort)/.test(n)) map.tags = h
         else if (!map.bankIn && /bank|konto/.test(n) && (/\+/.test(n) || /(ein|eingang|einnahm)/.test(n))) map.bankIn = h
         else if (!map.bankOut && /bank|konto/.test(n) && (/-/.test(n) || /(ausgab|ausgang)/.test(n))) map.bankOut = h
         else if (!map.cashIn && /(bar|kasse|barkonto)/.test(n) && (/\+/.test(n) || /(ein|einnahm)/.test(n))) map.cashIn = h
         else if (!map.cashOut && /(bar|kasse|barkonto)/.test(n) && (/-/.test(n) || /(ausgab)/.test(n))) map.cashOut = h
     }
     return map
+}
+
+function parseTagsValue(v: any): string[] {
+    if (v == null || v === '') return []
+    const seen = new Set<string>()
+    const tags: string[] = []
+    for (const part of String(v).split(/[;,]/)) {
+        const name = part.trim()
+        const key = name.toLowerCase()
+        if (!name || seen.has(key)) continue
+        seen.add(key)
+        tags.push(name)
+    }
+    return tags
+}
+
+function loadTagNameSet(d = getDb()): Set<string> {
+    const rows = d.prepare('SELECT name FROM tags').all() as any[]
+    return new Set(rows.map(r => String(r.name || '').trim().toLowerCase()).filter(Boolean))
+}
+
+function rememberNewTags(tags: string[], knownTags: Set<string>, newTags: Set<string>) {
+    for (const tag of tags) {
+        const key = tag.trim().toLowerCase()
+        if (!key || knownTags.has(key)) continue
+        knownTags.add(key)
+        newTags.add(tag.trim())
+    }
 }
 
 export async function previewXlsx(base64: string): Promise<ImportPreview> {
@@ -192,7 +222,7 @@ export async function previewCamt(base64: string): Promise<ImportPreview> {
     }))
     const suggestedMapping: Record<string, string | null> = {
         date: 'Datum', type: null, sphere: null, description: 'Text', paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null,
-        bankIn: 'Bank +', bankOut: 'Bank -', cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
+        tags: null, bankIn: 'Bank +', bankOut: 'Bank -', cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
     }
     return { headers, sample, suggestedMapping, headerRowIndex: 1 }
 }
@@ -229,7 +259,7 @@ export async function executeCamt(base64: string, mapping: Record<FieldKey, stri
         }
         row++
     }
-    return { imported, skipped, errors, rowStatuses }
+    return { imported, skipped, errors, rowStatuses, newTags: [] }
 }
 
 export async function previewFile(base64: string): Promise<ImportPreview> {
@@ -252,6 +282,7 @@ export async function executeFile(base64: string, mapping: Record<FieldKey, stri
             imported: res.imported,
             skipped: res.skipped,
             errorCount: (res.errors?.length) || 0,
+            newTagCount: (res.newTags?.length) || 0,
             errorFilePath: res.errorFilePath || null,
             when: new Date().toISOString()
         })
@@ -314,6 +345,8 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
     // Earmark lookup cache
     const d = getDb()
     const earmarkIdByCode = new Map<string, number>()
+    const knownTags = loadTagNameSet(d)
+    const newTags = new Set<string>()
 
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
@@ -342,6 +375,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
             const sphere = parseEnum(get('sphere'), ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || parseEnum(mapping['defaultSphere'] || 'IDEELL', ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
             const description = get('description') != null ? String(get('description')) : undefined
+            const tags = parseTagsValue(get('tags'))
             const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
             let netAmount = parseNumber(get('netAmount'))
             let vatRate = parseNumber(get('vatRate')) ?? 19
@@ -396,7 +430,9 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 for (const op of ops) {
                     const payload: any = { date, type: op.t, sphere, description, paymentMethod: op.pm, vatRate: 0, grossAmount: op.amount }
                     if (earmarkId != null) payload.earmarkId = earmarkId
+                    if (tags.length) payload.tags = tags
                     await Promise.resolve(createVoucher(payload))
+                    rememberNewTags(tags, knownTags, newTags)
                     imported++
                 }
                 track(r, true)
@@ -407,7 +443,9 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 else if (netAmount != null) payload.netAmount = netAmount
                 else { skipped++; track(r, false, 'Kein Betrag (Netto/Brutto)'); continue }
                 if (earmarkId != null) payload.earmarkId = earmarkId
+                if (tags.length) payload.tags = tags
                 await Promise.resolve(createVoucher(payload))
+                rememberNewTags(tags, knownTags, newTags)
                 imported++
                 track(r, true)
             }
@@ -448,7 +486,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             await (errWb as any).xlsx.writeFile(errorFilePath)
         } catch { /* ignore file save errors */ }
     }
-    return { imported, skipped, errors, rowStatuses, errorFilePath }
+    return { imported, skipped, errors, rowStatuses, errorFilePath, newTags: Array.from(newTags).sort((a, b) => a.localeCompare(b, 'de')) }
 }
 
 // Heuristics: detect header row within first 20 rows
@@ -554,9 +592,9 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     ws.addRow([])
     // Define table aligned with app logic
     // Removed 'Anmerkungen' column – not used by the app
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Tags']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
+        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
     ]
     ws.addTable({
         name: 'Buchungen',
@@ -565,7 +603,7 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         totalsRow: false,
         columns: columns.map((c) => ({ name: c })),
         rows: [
-            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '']
+            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'Mitglieder; Beitrag']
         ]
     })
     // Freeze header + intro
@@ -589,7 +627,7 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
     tips.addRow(['Beispiel-M-Code:'])
     const mCode = [
         'let',
-        '  Quelle = Csv.Document(File.Contents("C:/Pfad/zu/datei.csv"),[Delimiter=";", Columns=9, Encoding=65001, QuoteStyle=QuoteStyle.None]),',
+        '  Quelle = Csv.Document(File.Contents("C:/Pfad/zu/datei.csv"),[Delimiter=";", Columns=10, Encoding=65001, QuoteStyle=QuoteStyle.None]),',
         '  Header = Table.PromoteHeaders(Quelle, [PromoteAllScalars=true]),',
         '  Umbenannt = Table.RenameColumns(Header, {',
         '    {"Datum","Datum"},',
@@ -599,7 +637,8 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         '    {"Einnahmen","Einnahmen (Brutto)"},',
         '    {"Ausgaben","Ausgaben (Brutto)"},',
         '    {"USt%","USt %"},',
-        '    {"Sphaere","Sphäre"}',
+        '    {"Sphaere","Sphäre"},',
+        '    {"Tags","Tags"}',
         '  }),',
         '  Typen = Table.TransformColumnTypes(Umbenannt, {{"Datum", type date}, {"Einnahmen (Brutto)", type number}, {"Ausgaben (Brutto)", type number}, {"USt %", type number}})',
         'in',
@@ -639,9 +678,9 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
 
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code']
+    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Tags']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }
+        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
     ]
 
     const today = new Date()
@@ -649,16 +688,16 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     const m = String(today.getMonth() + 1).padStart(2, '0')
 
     const rows: any[] = [
-        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', ''],
-        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', ''],
-        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', ''],
-        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', ''],
-        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', ''],
-        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', ''],
-        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', ''],
-        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', ''],
-        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', ''],
-        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '']
+        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'Mitglieder; Beitrag'],
+        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', '', 'Verwaltung, Material'],
+        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', '', 'Spende'],
+        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', '', 'Instandhaltung'],
+        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', '', 'Veranstaltung; Verkauf'],
+        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', '', 'Miete'],
+        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', '', 'Material'],
+        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', '', 'Fahrtkosten'],
+        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', '', 'Veranstaltung'],
+        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '', '']
     ]
 
     ws.addTable({ name: 'Buchungen', ref: 'A4', headerRow: true, totalsRow: false, columns: columns.map(n => ({ name: n })), rows })

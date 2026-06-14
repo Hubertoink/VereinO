@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ICONS } from './utils/icons'
 import ReportsView from './views/Reports/ReportsView'
+import ActivityReportEditorModal from './views/Reports/ActivityReportEditorModal'
 import { SettingsView } from './views/Settings/SettingsView'
 import DashboardView from './views/Dashboard/DashboardView'
 import InvoicesView from './views/InvoicesView'
@@ -300,6 +301,7 @@ function AppInner() {
     }, [])
     // Export options modal state (Reports)
     const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
+    const [showActivityReportEditor, setShowActivityReportEditor] = useState<boolean>(false)
     type AmountMode = 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
     const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
     const [exportOrgName, setExportOrgName] = useState<string>('')
@@ -310,6 +312,7 @@ function AppInner() {
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
     const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
+    const [includeActivityReport, setIncludeActivityReport] = useState<boolean>(true)
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -882,6 +885,7 @@ function AppInner() {
                             budgets={budgets}
                             earmarks={earmarks}
                             onOpenExport={() => setShowExportOptions(true)}
+                            onOpenActivityReport={() => setShowActivityReportEditor(true)}
                             refreshKey={refreshKey}
                             activateKey={reportsActivateKey}
                         />
@@ -1225,6 +1229,8 @@ function AppInner() {
                     setIncludeVoucherList={setIncludeVoucherList}
                     includeBudgets={includeBudgets}
                     setIncludeBudgets={setIncludeBudgets}
+                    includeActivityReport={includeActivityReport}
+                    setIncludeActivityReport={setIncludeActivityReport}
                     onExport={async (fmt, treasurerOpts) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -1234,6 +1240,7 @@ function AppInner() {
                                     includeBindings,
                                     includeVoucherList,
                                     includeBudgets,
+                                    includeActivityReport,
                                     orgName: exportOrgName || undefined
                                 })
                                 if (res) {
@@ -1296,6 +1303,18 @@ function AppInner() {
                             notify('error', e?.message || String(e))
                         }
                     }}
+                />
+            )}
+
+            {activePage === 'Reports' && showActivityReportEditor && (
+                <ActivityReportEditorModal
+                    open={showActivityReportEditor}
+                    onClose={() => setShowActivityReportEditor(false)}
+                    fiscalYear={fiscalYear}
+                    setFiscalYear={setFiscalYear}
+                    yearsAvail={yearsAvail}
+                    budgets={budgets}
+                    notify={notify}
                 />
             )}
         </div>

@@ -5,7 +5,7 @@ import { withTransaction, getAppDataDir, getDb } from '../db/database'
 import { ensurePeriodOpen, getSetting } from '../services/settings'
 import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
-import { getTagsForVoucher, setVoucherTags } from './tags'
+import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
 
 type DB = InstanceType<typeof Database>
 
@@ -664,21 +664,12 @@ export function batchAssignTags(params: {
     // Collect voucher ids
     const ids = (d.prepare(`SELECT id FROM vouchers${whereSql}`).all(...args) as any[]).map(r => r.id)
     if (!ids.length) return { updated: 0 }
-    // Ensure tags exist (upsert by name)
-    const exist = d.prepare('SELECT id, name FROM tags').all() as any[]
-    const byName = new Map<string, number>(exist.map(r => [String(r.name).toLowerCase(), r.id]))
     const tagIds: number[] = []
     for (const nameRaw of params.tags) {
         const name = String(nameRaw || '').trim()
         if (!name) continue
-        const key = name.toLowerCase()
-        let id = byName.get(key)
-        if (!id) {
-            const info = d.prepare('INSERT INTO tags(name) VALUES (?)').run(name)
-            id = Number(info.lastInsertRowid)
-            byName.set(key, id)
-        }
-        tagIds.push(id!)
+        const tag = ensureTag(d, name)
+        if (tag?.id) tagIds.push(tag.id)
     }
     if (!tagIds.length) return { updated: 0 }
     const stmt = d.prepare('INSERT OR IGNORE INTO voucher_tags(voucher_id, tag_id) VALUES (?, ?)')

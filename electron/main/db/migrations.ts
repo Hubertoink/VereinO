@@ -555,6 +555,24 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_cash_checks_year_date ON cash_checks(year, date);
     CREATE INDEX IF NOT EXISTS idx_cash_checks_voucher ON cash_checks(voucher_id);
     `
+  },
+  {
+    version: 27,
+    up: `
+    -- Activity reports (Taetigkeitsbericht) for tax office year-end review
+    CREATE TABLE IF NOT EXISTS activity_reports (
+      fiscal_year INTEGER PRIMARY KEY,
+      activities TEXT NOT NULL DEFAULT '',
+      purpose_impact TEXT NOT NULL DEFAULT '',
+      target_groups TEXT NOT NULL DEFAULT '',
+      volunteer_work TEXT NOT NULL DEFAULT '',
+      highlights TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_reports_updated_at ON activity_reports(updated_at);
+    `
   }
 ]
 

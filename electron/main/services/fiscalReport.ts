@@ -11,6 +11,7 @@ import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../reposit
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
+import { getActivityReport, validateActivityReport } from '../repositories/activityReports'
 
 export interface FiscalReportOptions {
   fiscalYear: number
@@ -20,6 +21,7 @@ export interface FiscalReportOptions {
   includeBindings?: boolean
   includeVoucherList?: boolean
   includeBudgets?: boolean
+  includeActivityReport?: boolean
 }
 
 interface SphereData {
@@ -38,7 +40,7 @@ interface SphereData {
  * Generate fiscal year report PDF for tax office
  */
 export async function generateFiscalReportPDF(options: FiscalReportOptions): Promise<{ filePath: string }> {
-  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false } = options
+  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false, includeActivityReport = false } = options
   const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
 
   // Create export directory
@@ -140,6 +142,14 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     }
   }
 
+  const activityReport = includeActivityReport ? getActivityReport(fiscalYear) : null
+  if (activityReport) {
+    const missingFields = validateActivityReport(activityReport)
+    if (missingFields.length > 0) {
+      throw new Error(`Tätigkeitsbericht unvollständig. Bitte ergänzen: ${missingFields.join(', ')}`)
+    }
+  }
+
   // 7. Get voucher list if requested
   let voucherRows: any[] = []
   if (includeVoucherList) {
@@ -150,6 +160,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   // Helper functions
   const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
   const euro = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
+  const nl2br = (s: any) => esc(s).replace(/\r?\n/g, '<br>')
   
   const totalInGross = summary.byType.find((t: any) => t.key === 'IN')?.gross || 0
   const totalOutGross = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross || 0)
@@ -161,6 +172,23 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   const closingBalance = (Number(openingBalance) || 0) + yearMovement
   // All-time total balance equals end-of-year closing balance when reporting for a fiscal year
   const totalBalance = closingBalance
+  const activityOffset = activityReport ? 1 : 0
+  const activityReportHtml = activityReport ? `
+  <h2>2. Tätigkeitsbericht ${fiscalYear}</h2>
+  <div class="activity-report">
+    <h3>Aktivitäten und Projekte</h3>
+    <p>${nl2br(activityReport.activities)}</p>
+    <h3>Förderung der gemeinnützigen Zwecke</h3>
+    <p>${nl2br(activityReport.purposeImpact)}</p>
+    <h3>Erreichte Zielgruppen</h3>
+    <p>${nl2br(activityReport.targetGroups)}</p>
+    <h3>Umfang der ehrenamtlichen Arbeit</h3>
+    <p>${nl2br(activityReport.volunteerWork)}</p>
+    <h3>Besondere Ereignisse, Kooperationen und Förderungen</h3>
+    <p>${nl2br(activityReport.highlights)}</p>
+    ${activityReport.notes?.trim() ? `<h3>Ergänzende Angaben</h3><p>${nl2br(activityReport.notes)}</p>` : ''}
+  </div>
+  ` : ''
 
   // Generate HTML
   const html = `<!DOCTYPE html>
@@ -225,6 +253,19 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
       font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
+    .activity-report {
+      border: 1px solid #d7e3f4;
+      background: #f8fbff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 12px 0 18px;
+    }
+    .activity-report p {
+      margin: 0 0 12px;
+      line-height: 1.5;
+      white-space: normal;
+    }
+    .activity-report h3:last-of-type + p { margin-bottom: 0; }
     .positive { color: #2e7d32; }
     .negative { color: #c62828; }
     table { 
@@ -313,7 +354,9 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </div>
   </div>
 
-  <h2>2. Einnahmen nach Sphären</h2>
+  ${activityReportHtml}
+
+  <h2>${2 + activityOffset}. Einnahmen nach Sphären</h2>
   <table>
     <thead>
       <tr>
@@ -335,7 +378,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </tbody>
   </table>
 
-  <h2>3. Ausgaben nach Sphären</h2>
+  <h2>${3 + activityOffset}. Ausgaben nach Sphären</h2>
   <table>
     <thead>
       <tr>
@@ -357,7 +400,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </tbody>
   </table>
 
-  <h2>4. Saldo nach Sphären</h2>
+  <h2>${4 + activityOffset}. Saldo nach Sphären</h2>
   <table>
     <thead>
       <tr>
@@ -386,7 +429,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   </table>
 
   ${includeBindings && bindingsData.length > 0 ? `
-  <h2>5. Zweckgebundene Mittel</h2>
+  <h2>${5 + activityOffset}. Zweckgebundene Mittel</h2>
   <table>
     <thead>
       <tr>
@@ -419,7 +462,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   ` : ''}
 
   ${includeBudgets && budgetsData.length > 0 ? `
-  <h2>${includeBindings && bindingsData.length > 0 ? '6' : '5'}. Budgets ${fiscalYear}</h2>
+  <h2>${(includeBindings && bindingsData.length > 0 ? 6 : 5) + activityOffset}. Budgets ${fiscalYear}</h2>
   <table>
     <thead>
       <tr>

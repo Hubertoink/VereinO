@@ -103,11 +103,31 @@ export const FiscalReportInput = z.object({
     includeBindings: z.boolean().optional(),
     includeVoucherList: z.boolean().optional(),
     includeBudgets: z.boolean().optional(),
+    includeActivityReport: z.boolean().optional(),
     orgName: z.string().optional()
 })
 export const FiscalReportOutput = z.object({ filePath: z.string() })
 export type TFiscalReportInput = z.infer<typeof FiscalReportInput>
 export type TFiscalReportOutput = z.infer<typeof FiscalReportOutput>
+
+export const ActivityReportPayload = z.object({
+    fiscalYear: z.number(),
+    activities: z.string().default(''),
+    purposeImpact: z.string().default(''),
+    targetGroups: z.string().default(''),
+    volunteerWork: z.string().default(''),
+    highlights: z.string().default(''),
+    notes: z.string().default(''),
+    updatedAt: z.string().nullable().optional()
+})
+export const ActivityReportGetInput = z.object({ fiscalYear: z.number() })
+export const ActivityReportGetOutput = ActivityReportPayload.extend({ missingFields: z.array(z.string()) })
+export const ActivityReportSaveInput = ActivityReportPayload.omit({ updatedAt: true })
+export const ActivityReportSaveOutput = ActivityReportPayload.extend({ missingFields: z.array(z.string()) })
+export type TActivityReportGetInput = z.infer<typeof ActivityReportGetInput>
+export type TActivityReportGetOutput = z.infer<typeof ActivityReportGetOutput>
+export type TActivityReportSaveInput = z.infer<typeof ActivityReportSaveInput>
+export type TActivityReportSaveOutput = z.infer<typeof ActivityReportSaveOutput>
 
 // Treasurer report (Kassierbericht) for club members
 export const TreasurerReportInput = z.object({
@@ -949,6 +969,7 @@ export const ImportExecuteOutput = z.object({
     skipped: z.number(),
     errors: z.array(z.object({ row: z.number(), message: z.string() })),
     rowStatuses: z.array(z.object({ row: z.number(), ok: z.boolean(), message: z.string().optional() })).optional(),
+    newTags: z.array(z.string()).optional(),
     errorFilePath: z.string().optional()
 })
 

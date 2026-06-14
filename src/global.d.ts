@@ -155,11 +155,16 @@ declare global {
             }
             reports: {
                 export: (payload: any) => Promise<{ filePath: string }>
+                exportFiscal: (payload: any) => Promise<{ filePath: string }>
                 exportTreasurer: (payload: any) => Promise<{ filePath: string }>
                 summary: (payload: any) => Promise<any>
                 monthly: (payload: any) => Promise<any>
                 cashBalance: (payload: any) => Promise<{ BAR: number; BANK: number }>
                 years: () => Promise<{ years: number[] }>
+            }
+            activityReports: {
+                get: (payload: { fiscalYear: number }) => Promise<{ fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string; updatedAt?: string | null; missingFields: string[] }>
+                save: (payload: { fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string }) => Promise<{ fiscalYear: number; activities: string; purposeImpact: string; targetGroups: string; volunteerWork: string; highlights: string; notes: string; updatedAt?: string | null; missingFields: string[] }>
             }
             settings: {
                 get: (payload: { key: string }) => Promise<{ value: any }>
@@ -234,7 +239,7 @@ declare global {
             }
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
-                execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; errorFilePath?: string }>
+                execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; newTags?: string[]; errorFilePath?: string }>
                 template: () => Promise<{ filePath: string }>
                 testdata: () => Promise<{ filePath: string }>
             }

@@ -15,7 +15,7 @@ interface PreviewRow {
   tags?: string[]
 }
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -39,6 +39,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setIncludeVoucherList?: (v: boolean) => void
   includeBudgets?: boolean
   setIncludeBudgets?: (v: boolean) => void
+  includeActivityReport?: boolean
+  setIncludeActivityReport?: (v: boolean) => void
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -184,7 +186,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
   // Get field label
   const getFieldLabel = (key: string) => all.find(f => f.key === key)?.label || key
-  
+
   if (!open) return null
   
   const currentYear = new Date().getFullYear()
@@ -305,8 +307,18 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   />
                   Detaillierte Belegübersicht anhängen
                 </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeActivityReport ?? false}
+                    onChange={(e) => setIncludeActivityReport?.(e.target.checked)}
+                    style={{ marginRight: 6 }}
+                  />
+                  Gespeicherten Tätigkeitsbericht einbeziehen
+                </label>
               </div>
             </div>
+
           </>
         )}
 
