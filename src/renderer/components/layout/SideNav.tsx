@@ -12,9 +12,11 @@ interface SideNavProps {
   pendingSubmissionsCount?: number
   openInvoicesCount?: number
   showBadges?: boolean
+  showShortcuts?: boolean
+  navShortcuts?: Record<string, string>
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true, showShortcuts = false, navShortcuts }: SideNavProps) {
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
       {navItems.map((item, idx) => {
@@ -44,6 +46,9 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
               <span className={`icon-wrapper ${colorClass}`}>
                 {getNavIcon(item.key)}
               </span>
+              {showShortcuts && navShortcuts && navShortcuts[item.key] && (
+                <span className="nav-shortcut" aria-hidden="true">{navShortcuts[item.key].toUpperCase()}</span>
+              )}
               {showBadge && (
                 <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}

@@ -10,9 +10,12 @@ interface TopNavProps {
   pendingSubmissionsCount?: number
   openInvoicesCount?: number
   showBadges?: boolean
+  // Shortcut overlay
+  showShortcuts?: boolean
+  navShortcuts?: Record<string, string>
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true, showShortcuts = false, navShortcuts }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
       {navItems.map((item, idx) => {
@@ -43,6 +46,9 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
               <span className={`icon-wrapper ${colorClass}`.trim()}>
                 {getNavIcon(item.key)}
               </span>
+              {showShortcuts && navShortcuts && navShortcuts[item.key] && (
+                <span className="nav-shortcut" aria-hidden="true">{navShortcuts[item.key].toUpperCase()}</span>
+              )}
               {showBadge && (
                 <span className="nav-badge" aria-label={`${badgeCount} offen`}>{badgeText}</span>
               )}

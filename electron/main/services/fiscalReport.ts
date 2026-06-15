@@ -22,6 +22,10 @@ export interface FiscalReportOptions {
   includeVoucherList?: boolean
   includeBudgets?: boolean
   includeActivityReport?: boolean
+  includeInactiveBindings?: boolean
+  includeArchivedBudgets?: boolean
+  bindingIds?: number[]
+  budgetIds?: number[]
 }
 
 interface SphereData {
@@ -40,7 +44,19 @@ interface SphereData {
  * Generate fiscal year report PDF for tax office
  */
 export async function generateFiscalReportPDF(options: FiscalReportOptions): Promise<{ filePath: string }> {
-  const { fiscalYear, from, to, includeBindings = true, includeVoucherList = true, includeBudgets = false, includeActivityReport = false } = options
+  const {
+    fiscalYear,
+    from,
+    to,
+    includeBindings = true,
+    includeVoucherList = true,
+    includeBudgets = false,
+    includeActivityReport = false,
+    includeInactiveBindings = false,
+    includeArchivedBudgets = false,
+    bindingIds,
+    budgetIds
+  } = options
   const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
 
   // Create export directory
@@ -94,7 +110,9 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   let bindingsData: any[] = []
   if (includeBindings) {
     try {
-      const bindings = listBindings()
+      const selectedBindingIds = Array.isArray(bindingIds) && bindingIds.length ? new Set(bindingIds.map(Number)) : null
+      const bindings = listBindings({ activeOnly: !includeInactiveBindings })
+        .filter((binding: any) => !selectedBindingIds || selectedBindingIds.has(Number(binding.id)))
       // Calculate opening balance (before fiscal year) for each binding
       const previousYearEndDate = `${fiscalYear - 1}-12-31`
       bindingsData = bindings.map((b: any) => {
@@ -125,7 +143,9 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   let budgetsData: any[] = []
   if (includeBudgets) {
     try {
-      const budgets = listBudgets({ year: fiscalYear })
+      const selectedBudgetIds = Array.isArray(budgetIds) && budgetIds.length ? new Set(budgetIds.map(Number)) : null
+      const budgets = listBudgets({ year: fiscalYear, includeArchived: includeArchivedBudgets })
+        .filter((budget: any) => !selectedBudgetIds || selectedBudgetIds.has(Number(budget.id)))
       budgetsData = budgets.map((b: any) => {
         const usage = budgetUsage({ budgetId: b.id, from, to })
         return {

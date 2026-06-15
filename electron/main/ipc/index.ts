@@ -22,7 +22,7 @@ import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
-import { applyMigrations } from '../db/migrations'
+import { applyMigrations, ensureAdvanceTables, ensureVoucherColumns } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
@@ -33,19 +33,31 @@ import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreat
 import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGetInput, ActivityReportGetOutput, ActivityReportListInput, ActivityReportListOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
 import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
 
-function isMissingTableError(error: unknown, tableNames: string[]): boolean {
+function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
-    if (!message.includes('no such table:')) return false
-    return tableNames.some((table) => message.includes(`no such table: ${table}`))
+    if (message.includes('no such table:')) {
+        return identifiers.some((identifier) => message.includes(`no such table: ${identifier}`))
+    }
+    if (message.includes('no such column:')) {
+        return identifiers.some((identifier) => {
+            const bareIdentifier = identifier.includes('.') ? identifier.split('.').pop() ?? identifier : identifier
+            return message.includes(`no such column: ${identifier}`)
+                || message.includes(`no such column: ${bareIdentifier}`)
+                || message.includes(`no such column: v.${bareIdentifier}`)
+        })
+    }
+    return false
 }
 
-async function withSchemaHealRetry<T>(run: () => T, tableNames: string[]): Promise<T> {
+async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[]): Promise<T> {
     try {
         return run()
     } catch (error) {
-        if (!isMissingTableError(error, tableNames)) throw error
+        if (!isMissingSchemaError(error, schemaIdentifiers)) throw error
         try {
             const db = getDb()
+            ensureVoucherColumns(db as any)
+            ensureAdvanceTables(db as any)
             applyMigrations(db as any)
         } catch {
         }
@@ -53,7 +65,7 @@ async function withSchemaHealRetry<T>(run: () => T, tableNames: string[]): Promi
         try {
             return run()
         } catch (retryError) {
-            if (isMissingTableError(retryError, tableNames)) {
+            if (isMissingSchemaError(retryError, schemaIdentifiers)) {
                 throw new Error('Die Datenbankstruktur war unvollständig und konnte nicht automatisch repariert werden. Bitte App neu starten und erneut versuchen.')
             }
             throw retryError
@@ -641,6 +653,10 @@ export function registerIpcHandlers() {
             includeVoucherList: parsed.includeVoucherList ?? false,
             includeBudgets: parsed.includeBudgets ?? false,
             includeActivityReport: parsed.includeActivityReport ?? false,
+            includeInactiveBindings: parsed.includeInactiveBindings ?? false,
+            includeArchivedBudgets: parsed.includeArchivedBudgets ?? false,
+            bindingIds: parsed.bindingIds,
+            budgetIds: parsed.budgetIds,
             orgName: parsed.orgName
         })
         return FiscalReportOutput.parse(result)
@@ -696,6 +712,8 @@ export function registerIpcHandlers() {
         return TreasurerReportOutput.parse(result)
     })
 
+    const voucherListSchemaIdentifiers = ['cash_checks', 'member_advances', 'amount_mode', 'budget_id', 'budget_amount', 'earmark_amount', 'transfer_from', 'transfer_to']
+
     ipcMain.handle('vouchers.list', async (_e, payload) => {
         return withSchemaHealRetry(() => {
             const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
@@ -720,7 +738,7 @@ export function registerIpcHandlers() {
                 earmarksAssigned: getVoucherEarmarks(r.id)
             }))
             return VouchersListOutput.parse({ rows: enrichedRows, total })
-        }, ['cash_checks'])
+        }, voucherListSchemaIdentifiers)
     })
 
     ipcMain.handle('vouchers.update', async (_e, payload) => {
@@ -816,27 +834,35 @@ export function registerIpcHandlers() {
     })
 
     // Vorschüsse
+    const advanceSchemaTables = ['member_advances', 'member_advance_purchases', 'member_advance_settlements']
+
     ipcMain.handle('advances.list', async (_e, payload) => {
         return withSchemaHealRetry(() => {
             const parsed = AdvancesListInput.parse(payload)
             const res = listAdvances(parsed ?? undefined)
             return AdvancesListOutput.parse(res)
-        }, ['member_advances'])
+        }, advanceSchemaTables)
     })
     ipcMain.handle('advances.create', async (_e, payload) => {
-        const parsed = AdvanceCreateInput.parse(payload)
-        const res = createAdvance(parsed as any)
-        return AdvanceCreateOutput.parse(res)
+        return withSchemaHealRetry(() => {
+            const parsed = AdvanceCreateInput.parse(payload)
+            const res = createAdvance(parsed as any)
+            return AdvanceCreateOutput.parse(res)
+        }, advanceSchemaTables)
     })
     ipcMain.handle('advances.get', async (_e, payload) => {
-        const parsed = AdvanceGetInput.parse(payload)
-        const res = getAdvanceById({ id: parsed.id })
-        return AdvanceGetOutput.parse(res)
+        return withSchemaHealRetry(() => {
+            const parsed = AdvanceGetInput.parse(payload)
+            const res = getAdvanceById({ id: parsed.id })
+            return AdvanceGetOutput.parse(res)
+        }, advanceSchemaTables)
     })
     ipcMain.handle('advances.settle', async (_e, payload) => {
-        const parsed = AdvanceSettleInput.parse(payload)
-        const res = settleAdvance(parsed as any)
-        return AdvanceSettleOutput.parse(res)
+        return withSchemaHealRetry(() => {
+            const parsed = AdvanceSettleInput.parse(payload)
+            const res = settleAdvance(parsed as any)
+            return AdvanceSettleOutput.parse(res)
+        }, advanceSchemaTables)
     })
     ipcMain.handle('advances.delete', async (_e, payload) => {
         const parsed = AdvanceDeleteInput.parse(payload)

@@ -59,7 +59,17 @@ const LABEL_FOR_COL: Record<ColKey, string> = {
     gross: 'Brutto'
 }
 
+type PageShortcutAction = {
+    id: string
+    key: string
+    label: string
+    action: () => void
+}
+
 interface JournalViewProps {
+    showShortcuts?: boolean
+    pageShortcuts?: Record<string, string>
+    registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
     // Props die von App.tsx kommen
     flashId: number | null
     setFlashId: (id: number | null | ((prev: number | null) => number | null)) => void
@@ -118,6 +128,9 @@ interface JournalViewProps {
 export default function JournalView({
     flashId,
     setFlashId,
+    showShortcuts = false,
+    pageShortcuts = {},
+    registerPageShortcuts,
     periodLock,
     refreshKey,
     notify,
@@ -340,6 +353,11 @@ export default function JournalView({
     const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
+    const searchInputRef = useRef<HTMLInputElement | null>(null)
+    const timeFilterRef = useRef<HTMLDivElement | null>(null)
+    const metaFilterRef = useRef<HTMLDivElement | null>(null)
+    const columnsFilterRef = useRef<HTMLDivElement | null>(null)
+    const batchAssignRef = useRef<HTMLDivElement | null>(null)
     const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
     const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
@@ -379,6 +397,81 @@ export default function JournalView({
         const current = serializeEditRow(editRow)
         return current !== editRowInitialSnapshot
     }, [editRow, editRowInitialSnapshot, serializeEditRow])
+
+    const hasActiveFilters = useMemo(() => {
+        return Boolean(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
+    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo])
+
+    const resetAllFilters = useCallback(() => {
+        activeSetFilterType(null)
+        activeSetFilterPM(null)
+        activeSetFilterTag(null)
+        activeSetFilterSphere(null)
+        activeSetFilterEarmark(null)
+        activeSetFilterBudgetId(null)
+        activeSetFrom('')
+        activeSetTo('')
+        activeSetQ('')
+        activeSetPage(1)
+    }, [activeSetFilterBudgetId, activeSetFilterEarmark, activeSetFilterPM, activeSetFilterSphere, activeSetFilterTag, activeSetFilterType, activeSetFrom, activeSetPage, activeSetQ, activeSetTo])
+
+    const clickShortcutTrigger = useCallback((container: HTMLDivElement | null) => {
+        const button = container?.querySelector('button') as HTMLButtonElement | null
+        if (!button) return
+        button.click()
+        button.focus()
+    }, [])
+
+    useEffect(() => {
+        if (!registerPageShortcuts) return
+        const shortcuts: PageShortcutAction[] = [
+            {
+                id: 'journal-search',
+                key: 's',
+                label: 'Suche',
+                action: () => {
+                    searchInputRef.current?.focus()
+                    searchInputRef.current?.select()
+                }
+            },
+            {
+                id: 'journal-time-filter',
+                key: 't',
+                label: 'Zeitraum',
+                action: () => clickShortcutTrigger(timeFilterRef.current)
+            },
+            {
+                id: 'journal-meta-filter',
+                key: 'f',
+                label: 'Filter',
+                action: () => clickShortcutTrigger(metaFilterRef.current)
+            },
+            {
+                id: 'journal-columns',
+                key: 'c',
+                label: 'Spalten',
+                action: () => clickShortcutTrigger(columnsFilterRef.current)
+            },
+            {
+                id: 'journal-batch-assign',
+                key: 'a',
+                label: 'Batch',
+                action: () => clickShortcutTrigger(batchAssignRef.current)
+            }
+        ]
+
+        if (hasActiveFilters) {
+            shortcuts.push({
+                id: 'journal-reset-filters',
+                key: 'x',
+                label: 'Reset',
+                action: resetAllFilters
+            })
+        }
+
+        registerPageShortcuts(shortcuts)
+        return () => registerPageShortcuts([])
+    }, [clickShortcutTrigger, hasActiveFilters, registerPageShortcuts, resetAllFilters])
 
     const closeEditModalNow = useCallback(() => {
         setConfirmDiscardEdit(false)
@@ -533,21 +626,27 @@ export default function JournalView({
         <>
             {/* Filter Toolbar */}
             <div className="journal-filter-toolbar">
-                <input
-                    className="input journal-filter-toolbar__search"
-                    placeholder="Suche (#ID, Text, Betrag …)"
-                    value={activeQ}
-                    onChange={(e) => {
-                        activeSetQ(e.target.value)
-                        activeSetPage(1)
-                    }}
-                    aria-label="Suche"
-                />
+                <div className="journal-filter-toolbar__search-wrap page-shortcut-target">
+                    <input
+                        ref={searchInputRef}
+                        className="input journal-filter-toolbar__search"
+                        placeholder="Suche (#ID, Text, Betrag …)"
+                        value={activeQ}
+                        onChange={(e) => {
+                            activeSetQ(e.target.value)
+                            activeSetPage(1)
+                        }}
+                        aria-label="Suche"
+                    />
+                    {showShortcuts && pageShortcuts['journal-search'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-search'].toUpperCase()}</span>
+                    )}
+                </div>
 
                 <div className="filter-divider" />
 
                 {/* Filter-Cluster: Zeit- und Meta-Filter */}
-                <div className="toolbar-icon">
+                <div ref={timeFilterRef} className="toolbar-icon page-shortcut-target">
                     <TimeFilterDropdown
                         yearsAvail={yearsAvail}
                         from={activeFrom}
@@ -559,9 +658,12 @@ export default function JournalView({
                             activeSetPage(1)
                         }}
                     />
+                    {showShortcuts && pageShortcuts['journal-time-filter'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-time-filter'].toUpperCase()}</span>
+                    )}
                 </div>
 
-                <div className="toolbar-icon">
+                <div ref={metaFilterRef} className="toolbar-icon page-shortcut-target">
                     <MetaFilterDropdown
                         budgets={budgets}
                         earmarks={earmarks}
@@ -583,12 +685,15 @@ export default function JournalView({
                             activeSetPage(1)
                         }}
                     />
+                    {showShortcuts && pageShortcuts['journal-meta-filter'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-meta-filter'].toUpperCase()}</span>
+                    )}
                 </div>
 
                 <div className="filter-divider" />
 
                 {/* Anzeige-Cluster: Spaltenauswahl */}
-                <div className="toolbar-icon">
+                <div ref={columnsFilterRef} className="toolbar-icon page-shortcut-target">
                     <FilterDropdown
                         trigger={
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -726,12 +831,15 @@ export default function JournalView({
                             })}
                         </div>
                     </FilterDropdown>
+                    {showShortcuts && pageShortcuts['journal-columns'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-columns'].toUpperCase()}</span>
+                    )}
                 </div>
 
                 <div className="filter-divider" />
 
                 {/* Aktionen-Cluster: Batch-Zuweisung */}
-                <div className="toolbar-icon">
+                <div ref={batchAssignRef} className="toolbar-icon page-shortcut-target">
                     <BatchAssignDropdown
                     earmarks={earmarks}
                     tagDefs={tagDefs}
@@ -756,6 +864,9 @@ export default function JournalView({
                     }}
                     notify={notify}
                     />
+                    {showShortcuts && pageShortcuts['journal-batch-assign'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-batch-assign'].toUpperCase()}</span>
+                    )}
                 </div>
             </div>
 
@@ -772,24 +883,16 @@ export default function JournalView({
                             </span>
                         )
                     })}
-                    {(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim()) && (
+                    {hasActiveFilters && (
                         <button
-                            className="btn ghost"
+                            className="btn ghost page-shortcut-target"
                             title="Alle Filter zurücksetzen"
-                            onClick={() => { 
-                                activeSetFilterType(null);
-                                activeSetFilterPM(null);
-                                activeSetFilterTag(null);
-                                activeSetFilterSphere(null);
-                                activeSetFilterEarmark(null);
-                                activeSetFilterBudgetId(null);
-                                activeSetFrom('');
-                                activeSetTo('');
-                                activeSetQ('');
-                                activeSetPage(1);
-                            }}
+                            onClick={resetAllFilters}
                             style={{ padding: '4px 8px', color: 'var(--accent)' }}
                         >
+                            {showShortcuts && pageShortcuts['journal-reset-filters'] && (
+                                <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-reset-filters'].toUpperCase()}</span>
+                            )}
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
                                 <line x1="6" y1="6" x2="18" y2="18"></line>

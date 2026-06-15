@@ -15,6 +15,49 @@ interface PreviewRow {
   tags?: string[]
 }
 
+type FiscalReportExportOptions = {
+  includeBindings?: boolean
+  includeVoucherList?: boolean
+  includeBudgets?: boolean
+  includeActivityReport?: boolean
+  includeInactiveBindings?: boolean
+  includeArchivedBudgets?: boolean
+  selectedBindingIds?: number[]
+  selectedBudgetIds?: number[]
+}
+
+type TreasurerReportExportOptions = {
+  cashBalanceDate?: string
+  includeMembers?: boolean
+  includeInvoices?: boolean
+  includeBindings?: boolean
+  includeBudgets?: boolean
+  includeTagSummary?: boolean
+  includeVoucherList?: boolean
+  includeTags?: boolean
+  voucherListFrom?: string
+  voucherListTo?: string
+  voucherListSort?: 'ASC' | 'DESC'
+}
+
+type FiscalBindingOption = {
+  id: number
+  code: string
+  name: string
+  isActive: number
+}
+
+type FiscalBudgetOption = {
+  id: number
+  year: number
+  sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  name?: string | null
+  categoryName?: string | null
+  projectName?: string | null
+  earmarkId?: number | null
+  isArchived?: number | null
+}
+
 export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport }: {
   open: boolean
   onClose: () => void
@@ -26,7 +69,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setAmountMode: (m: 'POSITIVE_BOTH' | 'OUT_NEGATIVE') => void
   sortDir: 'ASC' | 'DESC'
   setSortDir: (v: 'ASC' | 'DESC') => void
-  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL' | 'PDF_TREASURER', treasurerOpts?: { cashBalanceDate?: string; includeMembers?: boolean; includeInvoices?: boolean; includeBindings?: boolean; includeBudgets?: boolean; includeTagSummary?: boolean; includeVoucherList?: boolean; includeTags?: boolean; voucherListFrom?: string; voucherListTo?: string; voucherListSort?: 'ASC' | 'DESC' }) => Promise<void>
+  onExport: (fmt: 'CSV' | 'XLSX' | 'PDF' | 'PDF_FISCAL' | 'PDF_TREASURER', options?: FiscalReportExportOptions | TreasurerReportExportOptions) => Promise<void>
   dateFrom?: string
   dateTo?: string
   exportType?: 'standard' | 'fiscal' | 'treasurer'
@@ -103,6 +146,15 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   const [trVoucherListFrom, setTrVoucherListFrom] = useState('')
   const [trVoucherListTo, setTrVoucherListTo] = useState('')
   const [trVoucherListSort, setTrVoucherListSort] = useState<'ASC' | 'DESC'>('ASC')
+  const [fiscalBindingOptions, setFiscalBindingOptions] = useState<FiscalBindingOption[]>([])
+  const [fiscalBudgetOptions, setFiscalBudgetOptions] = useState<FiscalBudgetOption[]>([])
+  const [fiscalListsLoading, setFiscalListsLoading] = useState(false)
+  const [includeInactiveBindings, setIncludeInactiveBindings] = useState(false)
+  const [includeArchivedBudgets, setIncludeArchivedBudgets] = useState(false)
+  const [limitBindingsSelection, setLimitBindingsSelection] = useState(false)
+  const [limitBudgetsSelection, setLimitBudgetsSelection] = useState(false)
+  const [selectedBindingIds, setSelectedBindingIds] = useState<number[]>([])
+  const [selectedBudgetIds, setSelectedBudgetIds] = useState<number[]>([])
 
   // Available voucher years
   const [availableYears, setAvailableYears] = useState<number[]>([])
@@ -133,6 +185,40 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     loadYears()
     return () => { cancelled = true }
   }, [open])
+
+  useEffect(() => {
+    if (!open || exportType !== 'fiscal') return
+    let cancelled = false
+
+    async function loadFiscalLists() {
+      setFiscalListsLoading(true)
+      try {
+        const [bindingsRes, budgetsRes] = await Promise.all([
+          (window as any).api?.bindings?.list?.({ activeOnly: !includeInactiveBindings }),
+          (window as any).api?.budgets?.list?.({ year: fiscalYear || currentYear, includeArchived: includeArchivedBudgets })
+        ])
+        if (cancelled) return
+
+        const nextBindings = ((bindingsRes as any)?.rows || []) as FiscalBindingOption[]
+        const nextBudgets = ((budgetsRes as any)?.rows || []) as FiscalBudgetOption[]
+        setFiscalBindingOptions(nextBindings)
+        setFiscalBudgetOptions(nextBudgets)
+        setSelectedBindingIds((prev) => prev.filter((id) => nextBindings.some((row) => row.id === id)))
+        setSelectedBudgetIds((prev) => prev.filter((id) => nextBudgets.some((row) => row.id === id)))
+      } catch (e) {
+        console.error('Failed to load fiscal report filters:', e)
+        if (!cancelled) {
+          setFiscalBindingOptions([])
+          setFiscalBudgetOptions([])
+        }
+      } finally {
+        if (!cancelled) setFiscalListsLoading(false)
+      }
+    }
+
+    loadFiscalLists()
+    return () => { cancelled = true }
+  }, [open, exportType, fiscalYear, includeInactiveBindings, includeArchivedBudgets])
 
   // Load preview data when modal opens or filters change
   useEffect(() => {
@@ -175,6 +261,35 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
   // Format currency
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+
+  const formatBudgetOptionLabel = (budget: FiscalBudgetOption) => {
+    const base = (budget.name && String(budget.name).trim())
+      || (budget.categoryName && `${budget.year} • ${budget.sphere} • ${budget.categoryName}`)
+      || (budget.projectName && `${budget.year} • ${budget.sphere} • ${budget.projectName}`)
+      || (budget.earmarkId != null && `${budget.year} • ${budget.sphere} • Zweckbindung #${budget.earmarkId}`)
+      || `${budget.year} • ${budget.sphere} • Budget #${budget.id}`
+    return `${base}${budget.isArchived ? ' (archiviert)' : ''}`
+  }
+
+  const getSelectedNumericValues = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    return Array.from(event.target.selectedOptions)
+      .map((option) => Number(option.value))
+      .filter((value) => Number.isFinite(value))
+  }
+
+  const toggleBindingsSelectionLimit = (checked: boolean) => {
+    setLimitBindingsSelection(checked)
+    if (checked && selectedBindingIds.length === 0) {
+      setSelectedBindingIds(fiscalBindingOptions.map((row) => row.id))
+    }
+  }
+
+  const toggleBudgetsSelectionLimit = (checked: boolean) => {
+    setLimitBudgetsSelection(checked)
+    if (checked && selectedBudgetIds.length === 0) {
+      setSelectedBudgetIds(fiscalBudgetOptions.map((row) => row.id))
+    }
+  }
 
   // Format amount based on mode
   const formatAmount = (amount: number, type: string) => {
@@ -289,6 +404,49 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   />
                   Zweckbindungen einbeziehen
                 </label>
+                {(includeBindings ?? false) && (
+                  <div style={{ marginLeft: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeInactiveBindings}
+                        onChange={(e) => setIncludeInactiveBindings(e.target.checked)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Inaktive Zweckbindungen zusätzlich anzeigen
+                    </label>
+                    <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={limitBindingsSelection}
+                        onChange={(e) => toggleBindingsSelectionLimit(e.target.checked)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Bestimmte Zweckbindungen auswählen
+                    </label>
+                    {limitBindingsSelection && (
+                      <div>
+                        <select
+                          className="input"
+                          multiple
+                          size={Math.min(8, Math.max(3, fiscalBindingOptions.length || 3))}
+                          value={selectedBindingIds.map(String)}
+                          onChange={(e) => setSelectedBindingIds(getSelectedNumericValues(e))}
+                          style={{ minHeight: 120 }}
+                        >
+                          {fiscalBindingOptions.map((binding) => (
+                            <option key={binding.id} value={binding.id}>
+                              {binding.code} • {binding.name}{binding.isActive ? '' : ' (inaktiv)'}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                          Mehrfachauswahl mit `Strg` oder `Shift`. Standardmäßig werden nur aktive Zweckbindungen angeboten.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
                   <input 
                     type="checkbox" 
@@ -298,6 +456,49 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   />
                   Budgets einbeziehen
                 </label>
+                {(includeBudgets ?? false) && (
+                  <div style={{ marginLeft: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeArchivedBudgets}
+                        onChange={(e) => setIncludeArchivedBudgets(e.target.checked)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Archivierte Budgets zusätzlich anzeigen
+                    </label>
+                    <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={limitBudgetsSelection}
+                        onChange={(e) => toggleBudgetsSelectionLimit(e.target.checked)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Bestimmte Budgets auswählen
+                    </label>
+                    {limitBudgetsSelection && (
+                      <div>
+                        <select
+                          className="input"
+                          multiple
+                          size={Math.min(8, Math.max(3, fiscalBudgetOptions.length || 3))}
+                          value={selectedBudgetIds.map(String)}
+                          onChange={(e) => setSelectedBudgetIds(getSelectedNumericValues(e))}
+                          style={{ minHeight: 120 }}
+                        >
+                          {fiscalBudgetOptions.map((budget) => (
+                            <option key={budget.id} value={budget.id}>
+                              {formatBudgetOptionLabel(budget)}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                          Mehrfachauswahl mit `Strg` oder `Shift`. Standardmäßig werden nur unarchivierte Budgets des gewählten Geschäftsjahres angeboten.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
                   <input 
                     type="checkbox" 
@@ -316,6 +517,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   />
                   Gespeicherten Tätigkeitsbericht einbeziehen
                 </label>
+                {fiscalListsLoading && (
+                  <div className="helper" style={{ fontSize: 11, opacity: 0.85 }}>
+                    Lade verfügbare Budgets und Zweckbindungen...
+                  </div>
+                )}
               </div>
             </div>
 
@@ -579,7 +785,16 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           {exportType === 'fiscal' ? (
             <button 
               className="btn" 
-              onClick={() => onExport('PDF_FISCAL')}
+              onClick={() => onExport('PDF_FISCAL', {
+                includeBindings,
+                includeVoucherList,
+                includeBudgets,
+                includeActivityReport,
+                includeInactiveBindings,
+                includeArchivedBudgets,
+                selectedBindingIds: includeBindings && limitBindingsSelection ? selectedBindingIds : undefined,
+                selectedBudgetIds: includeBudgets && limitBudgetsSelection ? selectedBudgetIds : undefined
+              })}
               style={{ background: 'color-mix(in oklab, #e53935 85%, transparent)', color: '#fff' }}
             >
               📄 PDF (Finanzamt)

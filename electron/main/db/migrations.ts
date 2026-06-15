@@ -86,6 +86,7 @@ export const MIGRATIONS: Mig[] = [
       vat_rate NUMERIC NOT NULL DEFAULT 0,
       vat_amount NUMERIC NOT NULL DEFAULT 0,
       gross_amount NUMERIC NOT NULL DEFAULT 0,
+      amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'NET',
       payment_method TEXT,
       counterparty TEXT,
       created_by INTEGER,
@@ -573,6 +574,92 @@ export const MIGRATIONS: Mig[] = [
     );
     CREATE INDEX IF NOT EXISTS idx_activity_reports_updated_at ON activity_reports(updated_at);
     `
+  },
+  {
+    version: 28,
+    up: `
+    -- Member advances / Vorschuesse
+    CREATE TABLE IF NOT EXISTS member_advances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER,
+      recipient_name TEXT NOT NULL,
+      issued_at TEXT NOT NULL,
+      amount REAL NOT NULL,
+      notes TEXT,
+      budget_id INTEGER,
+      earmark_id INTEGER,
+      placeholder_voucher_id INTEGER,
+      resolved_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE SET NULL,
+      FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+      FOREIGN KEY(earmark_id) REFERENCES earmarks(id) ON DELETE SET NULL,
+      FOREIGN KEY(placeholder_voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_member_advances_member ON member_advances(member_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advances_issued_at ON member_advances(issued_at);
+    CREATE INDEX IF NOT EXISTS idx_member_advances_resolved_at ON member_advances(resolved_at);
+    CREATE INDEX IF NOT EXISTS idx_member_advances_placeholder_voucher ON member_advances(placeholder_voucher_id);
+
+    CREATE TABLE IF NOT EXISTS member_advance_purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advance_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('IN','OUT')),
+      sphere TEXT NOT NULL CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')),
+      description TEXT,
+      net_amount REAL NOT NULL DEFAULT 0,
+      gross_amount REAL NOT NULL DEFAULT 0,
+      vat_rate REAL NOT NULL DEFAULT 0,
+      payment_method TEXT CHECK(payment_method IN ('BAR','BANK')),
+      category_id INTEGER,
+      project_id INTEGER,
+      budgets_json TEXT NOT NULL DEFAULT '[]',
+      earmarks_json TEXT NOT NULL DEFAULT '[]',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      files_json TEXT NOT NULL DEFAULT '[]',
+      voucher_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+      FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+
+    CREATE TABLE IF NOT EXISTS member_advance_settlements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advance_id INTEGER NOT NULL,
+      settled_at TEXT NOT NULL,
+      amount REAL NOT NULL,
+      note TEXT,
+      voucher_id INTEGER,
+      invoice_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+      FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+      FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_advance ON member_advance_settlements(advance_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_settled_at ON member_advance_settlements(settled_at);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_voucher ON member_advance_settlements(voucher_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_invoice ON member_advance_settlements(invoice_id);
+    `
+  },
+  {
+    version: 29,
+    up: `
+    -- Persist whether vouchers were entered as net or gross amounts
+    ALTER TABLE vouchers ADD COLUMN amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'NET';
+    UPDATE vouchers
+    SET amount_mode = CASE
+      WHEN IFNULL(net_amount, 0) = 0 AND IFNULL(gross_amount, 0) <> 0 THEN 'GROSS'
+      ELSE 'NET'
+    END
+    WHERE amount_mode IS NULL OR amount_mode = '';
+    `
   }
 ]
 
@@ -672,6 +759,124 @@ export function ensureActivityReportsTable(db: DB) {
   }
 }
 
+export function ensureAdvanceTables(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS member_advances (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER,
+        recipient_name TEXT NOT NULL,
+        issued_at TEXT NOT NULL,
+        amount REAL NOT NULL,
+        notes TEXT,
+        budget_id INTEGER,
+        earmark_id INTEGER,
+        placeholder_voucher_id INTEGER,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE SET NULL,
+        FOREIGN KEY(budget_id) REFERENCES budgets(id) ON DELETE SET NULL,
+        FOREIGN KEY(earmark_id) REFERENCES earmarks(id) ON DELETE SET NULL,
+        FOREIGN KEY(placeholder_voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_member_advances_member ON member_advances(member_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advances_issued_at ON member_advances(issued_at);
+      CREATE INDEX IF NOT EXISTS idx_member_advances_resolved_at ON member_advances(resolved_at);
+      CREATE INDEX IF NOT EXISTS idx_member_advances_placeholder_voucher ON member_advances(placeholder_voucher_id);
+
+      CREATE TABLE IF NOT EXISTS member_advance_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        advance_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('IN','OUT')),
+        sphere TEXT NOT NULL CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')),
+        description TEXT,
+        net_amount REAL NOT NULL DEFAULT 0,
+        gross_amount REAL NOT NULL DEFAULT 0,
+        vat_rate REAL NOT NULL DEFAULT 0,
+        payment_method TEXT CHECK(payment_method IN ('BAR','BANK')),
+        category_id INTEGER,
+        project_id INTEGER,
+        budgets_json TEXT NOT NULL DEFAULT '[]',
+        earmarks_json TEXT NOT NULL DEFAULT '[]',
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        files_json TEXT NOT NULL DEFAULT '[]',
+        voucher_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+        FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+        FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+
+      CREATE TABLE IF NOT EXISTS member_advance_settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        advance_id INTEGER NOT NULL,
+        settled_at TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        voucher_id INTEGER,
+        invoice_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY(advance_id) REFERENCES member_advances(id) ON DELETE CASCADE,
+        FOREIGN KEY(voucher_id) REFERENCES vouchers(id) ON DELETE SET NULL,
+        FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_advance ON member_advance_settlements(advance_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_settled_at ON member_advance_settlements(settled_at);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_voucher ON member_advance_settlements(voucher_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_invoice ON member_advance_settlements(invoice_id);
+    `)
+  } catch {
+    return
+  }
+}
+
+export function ensureVoucherColumns(db: DB) {
+  try {
+    const voucherCols = db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>
+    const names = new Set(voucherCols.map((col) => col.name))
+
+    if (!names.has('budget_id')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN budget_id INTEGER;')
+    }
+    if (!names.has('transfer_from')) {
+      db.exec("ALTER TABLE vouchers ADD COLUMN transfer_from TEXT CHECK(transfer_from IN ('BAR','BANK'));")
+    }
+    if (!names.has('transfer_to')) {
+      db.exec("ALTER TABLE vouchers ADD COLUMN transfer_to TEXT CHECK(transfer_to IN ('BAR','BANK'));")
+    }
+    if (!names.has('budget_amount')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN budget_amount REAL;')
+    }
+    if (!names.has('earmark_amount')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN earmark_amount REAL;')
+    }
+    if (!names.has('amount_mode')) {
+      db.exec("ALTER TABLE vouchers ADD COLUMN amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'NET';")
+    }
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_vouchers_budget ON vouchers(budget_id);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_transfer ON vouchers(transfer_from, transfer_to);
+    `)
+
+    db.exec(`
+      UPDATE vouchers
+      SET amount_mode = CASE
+        WHEN IFNULL(net_amount, 0) = 0 AND IFNULL(gross_amount, 0) <> 0 THEN 'GROSS'
+        ELSE 'NET'
+      END
+      WHERE amount_mode IS NULL OR amount_mode = '';
+    `)
+  } catch {
+    return
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -682,28 +887,41 @@ export function getAppliedVersions(db: DB): Set<number> {
 
 export function applyMigrations(db: DB) {
   // Ensure critical junction tables exist even if migrations are partially applied.
+  ensureVoucherColumns(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
+  ensureAdvanceTables(db)
 
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue
     
     // Special handling for migration 20 - check if columns already exist
-    if (mig.version === 20) {
+    if (mig.version === 20 || mig.version === 29) {
       try {
-        const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
-        const hasEnforceInBudgets = budgetCols.some((c: { name: string }) => c.name === 'enforce_time_range')
-        
-        if (hasEnforceInBudgets) {
-          // Columns already exist, just mark migration as applied
-          console.log('[Migration 20] Columns already exist, marking as applied')
-          db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
-          continue
+        if (mig.version === 20) {
+          const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
+          const hasEnforceInBudgets = budgetCols.some((c: { name: string }) => c.name === 'enforce_time_range')
+
+          if (hasEnforceInBudgets) {
+            console.log('[Migration 20] Columns already exist, marking as applied')
+            db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+            continue
+          }
+        }
+
+        if (mig.version === 29) {
+          const voucherCols = db.prepare("PRAGMA table_info(vouchers)").all() as Array<{ name: string }>
+          const hasAmountMode = voucherCols.some((c: { name: string }) => c.name === 'amount_mode')
+
+          if (hasAmountMode) {
+            console.log('[Migration 29] Column already exists, marking as applied')
+            db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+            continue
+          }
         }
       } catch (e) {
-        console.warn('[Migration 20] Failed to check if columns exist:', e)
-        // If check fails, try to apply migration anyway
+        console.warn(`[Migration ${mig.version}] Failed to check if columns exist:`, e)
       }
     }
     
@@ -717,8 +935,8 @@ export function applyMigrations(db: DB) {
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
       // For migration 20 specifically, try to continue anyway if it's a duplicate column error
-      if (mig.version === 20 && error.message?.includes('duplicate column')) {
-        console.log('[Migration 20] Column already exists, marking as applied')
+      if ((mig.version === 20 || mig.version === 29) && error.message?.includes('duplicate column')) {
+        console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {
         throw error

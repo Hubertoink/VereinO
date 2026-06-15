@@ -36,6 +36,7 @@ import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
+import { navItems } from './utils/navItems'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -95,6 +96,39 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
             ) : null}
         </div>
     )
+}
+
+// Build a simple shortcut map from nav item labels -> unique letters
+function buildNavShortcuts(): Record<string, string> {
+    const map: Record<string, string> = {}
+    const used = new Set<string>()
+    for (const item of navItems) {
+        const label = item.label || item.key
+        let assigned = ''
+        for (const ch of label) {
+            const c = ch.toLowerCase()
+            if (/[a-z0-9]/.test(c) && !used.has(c)) {
+                assigned = c
+                break
+            }
+        }
+        if (!assigned) {
+            // fallback to index-based digit
+            let i = 1
+            while (used.has(String(i))) i++
+            assigned = String(i)
+        }
+        used.add(assigned)
+        map[item.key] = assigned
+    }
+    return map
+}
+
+type PageShortcutAction = {
+    id: string
+    key: string
+    label: string
+    action: () => void
 }
 
 function AppInner() {
@@ -218,6 +252,11 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    // Nav shortcut overlay state
+    const [showNavShortcuts, setShowNavShortcuts] = useState(false)
+    const navShortcuts = useMemo(() => buildNavShortcuts(), [])
+    const navShortcutTimer = useRef<number | null>(null)
+    const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     // When switching to Reports, bump a key to trigger chart re-measures
     const [reportsActivateKey, setReportsActivateKey] = useState(0)
     useEffect(() => {
@@ -313,6 +352,31 @@ function AppInner() {
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
     const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
     const [includeActivityReport, setIncludeActivityReport] = useState<boolean>(true)
+
+    type FiscalExportOptions = {
+        includeBindings?: boolean
+        includeVoucherList?: boolean
+        includeBudgets?: boolean
+        includeActivityReport?: boolean
+        includeInactiveBindings?: boolean
+        includeArchivedBudgets?: boolean
+        selectedBindingIds?: number[]
+        selectedBudgetIds?: number[]
+    }
+
+    type TreasurerExportOptions = {
+        cashBalanceDate?: string
+        includeMembers?: boolean
+        includeInvoices?: boolean
+        includeBindings?: boolean
+        includeBudgets?: boolean
+        includeTagSummary?: boolean
+        includeVoucherList?: boolean
+        includeTags?: boolean
+        voucherListFrom?: string
+        voucherListTo?: string
+        voucherListSort?: 'ASC' | 'DESC'
+    }
 
     // DOM-Debug removed for release
     // const [domDebug, setDomDebug] = useState<boolean>(false)
@@ -438,6 +502,92 @@ function AppInner() {
         load()
         return () => { alive = false }
     }, [quickAdd])
+
+    const openQuickAdd = useCallback(() => setQuickAdd(true), [setQuickAdd])
+
+    const activePageShortcuts = useMemo<PageShortcutAction[]>(() => {
+        const shortcuts = [...registeredPageShortcuts]
+        if (activePage === 'Buchungen') {
+            shortcuts.unshift({ id: 'journal-quick-add', key: 'q', label: 'Buchung', action: openQuickAdd })
+        }
+        return shortcuts
+    }, [activePage, openQuickAdd, registeredPageShortcuts])
+
+    const pageShortcutMap = useMemo(() => {
+        return Object.fromEntries(activePageShortcuts.map((shortcut) => [shortcut.id, shortcut.key])) as Record<string, string>
+    }, [activePageShortcuts])
+
+    useEffect(() => {
+        setRegisteredPageShortcuts([])
+    }, [activePage])
+
+    // Global key handling: Space toggles overlay; when overlay is active, nav and current-page shortcuts are available
+    useEffect(() => {
+        function hideShortcuts() {
+            setShowNavShortcuts(false)
+            if (navShortcutTimer.current) {
+                window.clearTimeout(navShortcutTimer.current)
+                navShortcutTimer.current = null
+            }
+        }
+
+        function isBlockedTarget(target: EventTarget | null) {
+            const element = target instanceof HTMLElement ? target : document.activeElement instanceof HTMLElement ? document.activeElement : null
+            if (!element) return false
+            if (/input|textarea|select/.test(element.tagName.toLowerCase())) return true
+            if (element.isContentEditable) return true
+            if (element.closest('[role="dialog"][aria-modal="true"], .booking-modal')) return true
+            return false
+        }
+
+        function onKeyDown(e: KeyboardEvent) {
+            if (isBlockedTarget(e.target)) return
+
+            if (e.code === 'Space') {
+                e.preventDefault()
+                setShowNavShortcuts((s) => {
+                    const next = !s
+                    if (next) {
+                        navShortcutTimer.current = window.setTimeout(hideShortcuts, 4000)
+                    } else if (navShortcutTimer.current) {
+                        window.clearTimeout(navShortcutTimer.current)
+                        navShortcutTimer.current = null
+                    }
+                    return next
+                })
+                return
+            }
+
+            if (!showNavShortcuts) return
+
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                hideShortcuts()
+                return
+            }
+
+            const pressed = e.key.toLowerCase()
+            const pageShortcut = activePageShortcuts.find((shortcut) => shortcut.key.toLowerCase() === pressed)
+            if (pageShortcut) {
+                e.preventDefault()
+                pageShortcut.action()
+                hideShortcuts()
+                return
+            }
+
+            for (const k of Object.keys(navShortcuts)) {
+                if (navShortcuts[k].toLowerCase() === pressed) {
+                    e.preventDefault()
+                    setActivePage(k as NavKey)
+                    hideShortcuts()
+                    break
+                }
+            }
+        }
+
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [activePageShortcuts, navShortcuts, showNavShortcuts])
 
     async function createSampleVoucher() {
         try {
@@ -831,6 +981,8 @@ function AppInner() {
                             pendingSubmissionsCount={pendingSubmissionsCount}
                             openInvoicesCount={openInvoicesCount}
                             showBadges={showSubmissionBadge}
+                            showShortcuts={showNavShortcuts}
+                            navShortcuts={navShortcuts}
                         />
                     </div>
                 ) : null}
@@ -858,6 +1010,8 @@ function AppInner() {
                         pendingSubmissionsCount={pendingSubmissionsCount}
                         openInvoicesCount={openInvoicesCount}
                         showBadges={showSubmissionBadge}
+                        showShortcuts={showNavShortcuts}
+                        navShortcuts={navShortcuts}
                     />
                 </aside>
             )}
@@ -932,6 +1086,9 @@ function AppInner() {
                         <JournalView
                             flashId={flashId}
                             setFlashId={setFlashId}
+                            showShortcuts={showNavShortcuts}
+                            pageShortcuts={pageShortcutMap}
+                            registerPageShortcuts={setRegisteredPageShortcuts}
                             periodLock={periodLock}
                             refreshKey={refreshKey}
                             notify={notify}
@@ -1124,7 +1281,10 @@ function AppInner() {
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
-                <button className="fab fab-buchung" onClick={() => setQuickAdd(true)} title="+ Buchung">
+                <button className="fab fab-buchung page-shortcut-target" onClick={openQuickAdd} title="+ Buchung">
+                    {showNavShortcuts && activePage === 'Buchungen' && pageShortcutMap['journal-quick-add'] && (
+                        <span className="page-shortcut" aria-hidden="true">{pageShortcutMap['journal-quick-add'].toUpperCase()}</span>
+                    )}
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>
                 </button>
@@ -1231,16 +1391,21 @@ function AppInner() {
                     setIncludeBudgets={setIncludeBudgets}
                     includeActivityReport={includeActivityReport}
                     setIncludeActivityReport={setIncludeActivityReport}
-                    onExport={async (fmt, treasurerOpts) => {
+                    onExport={async (fmt, reportOpts) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
+                                const fiscalOpts = (reportOpts || {}) as FiscalExportOptions
                                 // Fiscal year report for tax office
                                 const res = await (window as any).api?.reports?.exportFiscal?.({
                                     fiscalYear,
-                                    includeBindings,
-                                    includeVoucherList,
-                                    includeBudgets,
-                                    includeActivityReport,
+                                    includeBindings: fiscalOpts.includeBindings ?? includeBindings,
+                                    includeVoucherList: fiscalOpts.includeVoucherList ?? includeVoucherList,
+                                    includeBudgets: fiscalOpts.includeBudgets ?? includeBudgets,
+                                    includeActivityReport: fiscalOpts.includeActivityReport ?? includeActivityReport,
+                                    includeInactiveBindings: fiscalOpts.includeInactiveBindings ?? false,
+                                    includeArchivedBudgets: fiscalOpts.includeArchivedBudgets ?? false,
+                                    bindingIds: fiscalOpts.selectedBindingIds,
+                                    budgetIds: fiscalOpts.selectedBudgetIds,
                                     orgName: exportOrgName || undefined
                                 })
                                 if (res) {
@@ -1250,6 +1415,7 @@ function AppInner() {
                                     })
                                 }
                             } else if (fmt === 'PDF_TREASURER') {
+                                const treasurerOpts = (reportOpts || {}) as TreasurerExportOptions
                                 const res = await (window as any).api?.reports?.exportTreasurer?.({
                                     fiscalYear,
                                     orgName: exportOrgName || undefined,
