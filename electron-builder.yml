@@ -14,7 +14,7 @@ win:
     - target: nsis
       arch: [x64]
   icon: build/Icon.ico
-artifactName: '${productName} Setup ${version}-${arch}.${ext}'
+artifactName: '${productName}-Setup-${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance
 linux:
