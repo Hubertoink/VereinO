@@ -89,7 +89,8 @@ export function useQuickAdd(
     today: string, 
     create: (p: any) => Promise<any>, 
     onOpenFilePicker?: () => void,
-    notify?: (type: 'success' | 'error' | 'info', text: string) => void
+    notify?: (type: 'success' | 'error' | 'info', text: string) => void,
+    draftTabsEnabled: boolean = true
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
     const [drafts, setDrafts] = useState<QuickAddDraft[]>([])
@@ -126,10 +127,10 @@ export function useQuickAdd(
             qa: makeDefaults(),
             files: []
         }
-        setDrafts((prev) => [...prev, draft])
+        setDrafts((prev) => draftTabsEnabled ? [...prev, draft] : [draft])
         setActiveDraftId(draft.id)
         setQuickAdd(true)
-    }, [makeDefaults])
+    }, [draftTabsEnabled, makeDefaults])
 
     const reopenDraft = useCallback((draftId: string) => {
         setActiveDraftId(draftId)
@@ -137,8 +138,12 @@ export function useQuickAdd(
     }, [])
 
     const parkQuickAdd = useCallback(() => {
+        if (!draftTabsEnabled) {
+            setDrafts([])
+            setActiveDraftId(null)
+        }
         setQuickAdd(false)
-    }, [])
+    }, [draftTabsEnabled])
 
     const closeDraft = useCallback((draftId: string) => {
         const remaining = drafts.filter((draft) => draft.id !== draftId)
@@ -154,6 +159,12 @@ export function useQuickAdd(
         setActiveDraftId(null)
         setQuickAdd(false)
     }, [])
+
+    useEffect(() => {
+        if (draftTabsEnabled || quickAdd || drafts.length === 0) return
+        setDrafts([])
+        setActiveDraftId(null)
+    }, [draftTabsEnabled, drafts.length, quickAdd])
 
     const setQa = useCallback((nextQa: QA) => {
         if (!activeDraftId) return
@@ -342,7 +353,7 @@ export function useQuickAdd(
         reopenDraft,
         closeDraft,
         clearDrafts,
-        hasOpenDrafts: drafts.length > 0
+        hasOpenDrafts: draftTabsEnabled && drafts.length > 0
     }
 }
 

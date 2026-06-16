@@ -498,7 +498,7 @@ function AppInner() {
             notify('error', friendlyError(e))
             return null
         }
-    }, () => fileInputRef.current?.click(), notify)
+    }, () => fileInputRef.current?.click(), notify, showBookingDraftTabs)
 
     const [showOpenBookingTabsClosePrompt, setShowOpenBookingTabsClosePrompt] = useState(false)
 
