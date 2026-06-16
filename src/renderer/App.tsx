@@ -255,7 +255,6 @@ function AppInner() {
     // Nav shortcut overlay state
     const [showNavShortcuts, setShowNavShortcuts] = useState(false)
     const navShortcuts = useMemo(() => buildNavShortcuts(), [])
-    const navShortcutTimer = useRef<number | null>(null)
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     // When switching to Reports, bump a key to trigger chart re-measures
     const [reportsActivateKey, setReportsActivateKey] = useState(0)
@@ -571,43 +570,62 @@ function AppInner() {
         setRegisteredPageShortcuts([])
     }, [activePage])
 
-    // Global key handling: Space toggles overlay; when overlay is active, nav and current-page shortcuts are available
+    // Global key handling: Alt shows shortcut badges; Alt+letter triggers nav and current-page actions.
     useEffect(() => {
         function hideShortcuts() {
             setShowNavShortcuts(false)
-            if (navShortcutTimer.current) {
-                window.clearTimeout(navShortcutTimer.current)
-                navShortcutTimer.current = null
-            }
         }
 
-        function isBlockedTarget(target: EventTarget | null) {
+        function hasOpenModal() {
+            return Boolean(document.querySelector('[role="dialog"][aria-modal="true"], .booking-modal'))
+        }
+
+        function isTextEntryTarget(target: EventTarget | null) {
             const element = target instanceof HTMLElement ? target : document.activeElement instanceof HTMLElement ? document.activeElement : null
             if (!element) return false
             if (/input|textarea|select/.test(element.tagName.toLowerCase())) return true
             if (element.isContentEditable) return true
-            if (element.closest('[role="dialog"][aria-modal="true"], .booking-modal')) return true
+            return false
+        }
+
+        function runShortcut(key: string) {
+            const pressed = key.toLowerCase()
+            const pageShortcut = activePageShortcuts.find((shortcut) => shortcut.key.toLowerCase() === pressed)
+            if (pageShortcut) {
+                pageShortcut.action()
+                return true
+            }
+
+            for (const k of Object.keys(navShortcuts)) {
+                if (navShortcuts[k].toLowerCase() === pressed) {
+                    setActivePage(k as NavKey)
+                    return true
+                }
+            }
+
             return false
         }
 
         function onKeyDown(e: KeyboardEvent) {
-            if (isBlockedTarget(e.target)) return
-
-            if (e.code === 'Space') {
-                e.preventDefault()
-                setShowNavShortcuts((s) => {
-                    const next = !s
-                    if (next) {
-                        navShortcutTimer.current = window.setTimeout(hideShortcuts, 4000)
-                    } else if (navShortcutTimer.current) {
-                        window.clearTimeout(navShortcutTimer.current)
-                        navShortcutTimer.current = null
-                    }
-                    return next
-                })
+            if (hasOpenModal()) {
+                if (showNavShortcuts) hideShortcuts()
                 return
             }
 
+            if (e.key === 'Alt') {
+                e.preventDefault()
+                if (!e.repeat) setShowNavShortcuts(true)
+                return
+            }
+
+            if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.length === 1) {
+                if (!runShortcut(e.key)) return
+                e.preventDefault()
+                hideShortcuts()
+                return
+            }
+
+            if (isTextEntryTarget(e.target)) return
             if (!showNavShortcuts) return
 
             if (e.key === 'Escape') {
@@ -616,27 +634,25 @@ function AppInner() {
                 return
             }
 
-            const pressed = e.key.toLowerCase()
-            const pageShortcut = activePageShortcuts.find((shortcut) => shortcut.key.toLowerCase() === pressed)
-            if (pageShortcut) {
+            if (runShortcut(e.key)) {
                 e.preventDefault()
-                pageShortcut.action()
                 hideShortcuts()
-                return
             }
+        }
 
-            for (const k of Object.keys(navShortcuts)) {
-                if (navShortcuts[k].toLowerCase() === pressed) {
-                    e.preventDefault()
-                    setActivePage(k as NavKey)
-                    hideShortcuts()
-                    break
-                }
+        function onKeyUp(e: KeyboardEvent) {
+            if (e.key === 'Alt') {
+                e.preventDefault()
+                hideShortcuts()
             }
         }
 
         window.addEventListener('keydown', onKeyDown)
-        return () => window.removeEventListener('keydown', onKeyDown)
+        window.addEventListener('keyup', onKeyUp)
+        return () => {
+            window.removeEventListener('keydown', onKeyDown)
+            window.removeEventListener('keyup', onKeyUp)
+        }
     }, [activePageShortcuts, navShortcuts, showNavShortcuts])
 
     async function createSampleVoucher() {

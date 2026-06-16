@@ -1,6 +1,7 @@
 import React from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA } from '../../hooks/useQuickAdd'
+import { useShortcutOverlay, type ShortcutOverlayAction } from '../../hooks/useShortcutOverlay'
 
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
@@ -79,6 +80,11 @@ export default function QuickAddModal({
     descSuggest,
     title
 }: QuickAddModalProps) {
+    const dateInputRef = React.useRef<HTMLInputElement | null>(null)
+    const amountInputRef = React.useRef<HTMLInputElement | null>(null)
+    const descriptionInputRef = React.useRef<HTMLInputElement | null>(null)
+    const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
+
     const grossAmt = (() => {
         if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
         if ((qa as any).mode === 'GROSS') return Number((qa as any).grossAmount || 0)
@@ -94,6 +100,14 @@ export default function QuickAddModal({
         [budgetsForEdit]
     )
     const hasAvailableBudgets = availableBudgets.length > 0
+    const activeEarmarks = React.useMemo(() => {
+        return (earmarks || []).filter((em: any) => {
+            // In DB/IPC: archived Zweckbindungen are represented as isActive = 0
+            if (em?.isActive === 0 || em?.isActive === false) return false
+            return true
+        })
+    }, [earmarks])
+    const hasAvailableEarmarks = activeEarmarks.length > 0
 
     const invalidBudgetIds = new Set(
         budgetsList
@@ -122,14 +136,72 @@ export default function QuickAddModal({
 
     const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
 
-    const activeEarmarks = React.useMemo(() => {
-        return (earmarks || []).filter((em: any) => {
-            // In DB/IPC: archived Zweckbindungen are represented as isActive = 0
-            if (em?.isActive === 0 || em?.isActive === false) return false
-            return true
-        })
-    }, [earmarks])
-    const hasAvailableEarmarks = activeEarmarks.length > 0
+    const focusInput = React.useCallback((input: HTMLInputElement | null) => {
+        if (!input) return
+        input.focus()
+        input.select()
+    }, [])
+
+    const addBudgetAssignment = React.useCallback(() => {
+        if (!hasAvailableBudgets) return
+        const current = ((qa as any).budgets || []) as BudgetAssignment[]
+        setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
+    }, [grossAmt, hasAvailableBudgets, qa, setQa])
+
+    const addEarmarkAssignment = React.useCallback(() => {
+        if (!hasAvailableEarmarks) return
+        const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
+        setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
+    }, [grossAmt, hasAvailableEarmarks, qa, setQa])
+
+    const closeModal = React.useCallback(() => {
+        if (onRequestClose) onRequestClose()
+        else {
+            onClose()
+            setFiles([])
+        }
+    }, [onClose, onRequestClose, setFiles])
+
+    const modalShortcuts = React.useMemo<ShortcutOverlayAction[]>(() => [
+        { id: 'quick-add-date-field', key: 'm', label: 'Datum', action: () => focusInput(dateInputRef.current) },
+        { id: 'quick-add-amount-field', key: 'r', label: 'Betrag', action: () => focusInput(amountInputRef.current) },
+        { id: 'quick-add-description-field', key: 'e', label: 'Beschreibung', action: () => focusInput(descriptionInputRef.current) },
+        { id: 'quick-add-tags-field', key: 'g', label: 'Tags', action: () => focusInput(tagsInputRef.current) },
+        { id: 'quick-add-save', key: 's', label: 'Speichern', action: onSave, disabled: hasOutOfRange },
+        { id: 'quick-add-file', key: 'd', label: 'Datei', action: openFilePicker },
+        { id: 'quick-add-income', key: 'i', label: 'Einnahme', action: () => setQa({ ...qa, type: 'IN' }) },
+        { id: 'quick-add-expense', key: 'a', label: 'Ausgabe', action: () => setQa({ ...qa, type: 'OUT' }) },
+        {
+            id: 'quick-add-transfer',
+            key: 't',
+            label: 'Transfer',
+            action: () => {
+                const nextQa = { ...qa, type: 'TRANSFER' as const }
+                if (!(nextQa as any).transferFrom || !(nextQa as any).transferTo) {
+                    ;(nextQa as any).transferFrom = 'BAR'
+                    ;(nextQa as any).transferTo = 'BANK'
+                }
+                setQa(nextQa)
+            }
+        },
+        { id: 'quick-add-cash', key: 'b', label: 'Bar', action: () => setQa({ ...qa, paymentMethod: 'BAR' }), disabled: qa.type === 'TRANSFER' },
+        { id: 'quick-add-bank', key: 'k', label: 'Bank', action: () => setQa({ ...qa, paymentMethod: 'BANK' }), disabled: qa.type === 'TRANSFER' },
+        { id: 'quick-add-budget', key: 'u', label: 'Budget', action: addBudgetAssignment, disabled: !hasAvailableBudgets },
+        { id: 'quick-add-earmark', key: 'z', label: 'Zweckbindung', action: addEarmarkAssignment, disabled: !hasAvailableEarmarks },
+        { id: 'quick-add-close', key: 'x', label: 'Schließen', action: closeModal }
+    ], [addBudgetAssignment, addEarmarkAssignment, closeModal, focusInput, hasAvailableBudgets, hasAvailableEarmarks, hasOutOfRange, onSave, openFilePicker, qa, setQa])
+
+    const { showShortcuts, shortcutMap } = useShortcutOverlay({
+        actions: modalShortcuts,
+        enabled: !confirmingClose,
+        capture: true,
+        stopPropagation: true
+    })
+    const shortcutBadge = React.useCallback((id: string) => {
+        const key = shortcutMap[id]
+        if (!showShortcuts || !key) return null
+        return <span className="modal-shortcut" aria-hidden="true">{key.toUpperCase()}</span>
+    }, [shortcutMap, showShortcuts])
 
     const lastGrossAmtRef = React.useRef(grossAmt)
 
@@ -158,11 +230,12 @@ export default function QuickAddModal({
     }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
     return (
-        <div className="modal-overlay">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
                 <header className="modal-header-flex">
                     <h2>{title || '+ Buchung'}</h2>
-                    <button className="btn ghost" onClick={() => { if (onRequestClose) onRequestClose(); else { onClose(); setFiles([]) } }} title="Schließen (ESC)">
+                    <button className="btn ghost modal-shortcut-target" onClick={closeModal} title="Schließen (ESC)">
+                        {shortcutBadge('quick-add-close')}
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                         </svg>
@@ -219,15 +292,15 @@ export default function QuickAddModal({
                             <div className="helper helper-mb">Basis</div>
                             <div className="row">
                                 <div className="field">
-                                    <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                    <input className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
+                                    <label className="field-label-shortcut">Datum <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-date-field')}</label>
+                                    <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
                                 </div>
                                 <div className="field">
                                     <label>Art</label>
                                     <div className="btn-group" role="group" aria-label="Art wählen">
                                         {(['IN','OUT','TRANSFER'] as const).map(t => (
                                             <button key={t} type="button" 
-                                                className={`btn ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
+                                                className={`btn modal-shortcut-target ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
                                                 onClick={() => {
                                                     const newQa = { ...qa, type: t }
                                                     if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
@@ -235,7 +308,10 @@ export default function QuickAddModal({
                                                         (newQa as any).transferTo = 'BANK'
                                                     }
                                                     setQa(newQa)
-                                                }}>{t === 'IN' ? '+ IN' : t === 'OUT' ? '− OUT' : '⇄ TRANSFER'}</button>
+                                                }}>
+                                                {shortcutBadge(t === 'IN' ? 'quick-add-income' : t === 'OUT' ? 'quick-add-expense' : 'quick-add-transfer')}
+                                                {t === 'IN' ? '+ IN' : t === 'OUT' ? '− OUT' : '⇄ TRANSFER'}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -268,8 +344,11 @@ export default function QuickAddModal({
                                         <div className="btn-group" role="group" aria-label="Zahlweg wählen">
                                             {(['BAR','BANK'] as const).map(pm => (
                                                 <button key={pm} type="button" 
-                                                    className={`btn ${(qa as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`}
-                                                    onClick={() => setQa({ ...qa, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
+                                                    className={`btn modal-shortcut-target ${(qa as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`}
+                                                    onClick={() => setQa({ ...qa, paymentMethod: pm })}>
+                                                    {shortcutBadge(pm === 'BAR' ? 'quick-add-cash' : 'quick-add-bank')}
+                                                    {pm === 'BAR' ? 'Bar' : 'Bank'}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -283,9 +362,9 @@ export default function QuickAddModal({
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field field-full-width finance-amount-highlight">
-                                        <label>Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                        <label className="field-label-shortcut">Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}</label>
                                         <span className="adorn-wrap">
-                                            <input className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
+                                            <input ref={amountInputRef} className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                 onChange={(e) => {
                                                     const v = Number(e.target.value)
                                                     setQa({ ...qa, grossAmount: v })
@@ -298,7 +377,7 @@ export default function QuickAddModal({
                                 ) : (
                                     <>
                                         <div className="field finance-amount-highlight">
-                                            <label>{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                            <label className="field-label-shortcut">{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}</label>
                                             <div className="flex-gap-8">
                                                 <select
                                                     className="input"
@@ -330,7 +409,7 @@ export default function QuickAddModal({
                                                     <option value="GROSS">Brutto</option>
                                                 </select>
                                                 <span className="adorn-wrap flex-1">
-                                                    <input className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
+                                                    <input ref={amountInputRef} className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
                                                         onChange={(e) => {
                                                             const v = Number(e.target.value)
                                                             if ((qa as any).mode === 'GROSS') setQa({ ...qa, grossAmount: v })
@@ -376,14 +455,14 @@ export default function QuickAddModal({
                                         {hasAvailableBudgets ? (
                                             <button
                                                 type="button"
-                                                className="btn ghost"
+                                                className="btn ghost modal-shortcut-target"
                                                 style={{ padding: '2px 6px', fontSize: '0.85rem' }}
-                                                onClick={() => {
-                                                    const current = ((qa as any).budgets || []) as BudgetAssignment[]
-                                                    setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
-                                                }}
+                                                onClick={addBudgetAssignment}
                                                 title="Weiteres Budget hinzufügen"
-                                            >+</button>
+                                            >
+                                                {shortcutBadge('quick-add-budget')}
+                                                +
+                                            </button>
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Kein Budget vorhanden</span>
                                         )}
@@ -490,14 +569,14 @@ export default function QuickAddModal({
                                         {hasAvailableEarmarks ? (
                                             <button
                                                 type="button"
-                                                className="btn ghost"
+                                                className="btn ghost modal-shortcut-target"
                                                 style={{ padding: '2px 6px', fontSize: '0.85rem' }}
-                                                onClick={() => {
-                                                    const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
-                                                    setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
-                                                }}
+                                                onClick={addEarmarkAssignment}
                                                 title="Weitere Zweckbindung hinzufügen"
-                                            >+</button>
+                                            >
+                                                {shortcutBadge('quick-add-earmark')}
+                                                +
+                                            </button>
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Keine Zweckbindung vorhanden</span>
                                         )}
@@ -589,17 +668,19 @@ export default function QuickAddModal({
                             <div className="helper helper-mb">Beschreibung & Tags</div>
                             <div className="row">
                                 <div className="field field-full-width">
-                                    <label>Beschreibung</label>
-                                    <input className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
+                                    <label className="field-label-shortcut">Beschreibung{shortcutBadge('quick-add-description-field')}</label>
+                                    <input ref={descriptionInputRef} className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
                                     <datalist id="desc-suggestions">
                                         {descSuggest.map((d, i) => (<option key={i} value={d} />))}
                                     </datalist>
                                 </div>
                                 <TagsEditor
                                     label="Tags"
+                                    labelAccessory={shortcutBadge('quick-add-tags-field')}
                                     value={(qa as any).tags || []}
                                     onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
                                     tagDefs={tagDefs}
+                                    inputRef={tagsInputRef}
                                 />
                             </div>
                         </div>
@@ -617,7 +698,10 @@ export default function QuickAddModal({
                                 </div>
                                 <div className="flex-gap-8">
                                     <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
-                                    <button type="button" className="btn" onClick={openFilePicker}>+ Datei(en)</button>
+                                    <button type="button" className="btn modal-shortcut-target" onClick={openFilePicker}>
+                                        {shortcutBadge('quick-add-file')}
+                                        + Datei(en)
+                                    </button>
                                     {files.length > 0 && (
                                         <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
                                     )}
@@ -652,8 +736,11 @@ export default function QuickAddModal({
                     </div>
                     
                     <div className="modal-footer-actions">
-                        <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
-                        <button type="submit" className="btn primary" disabled={hasOutOfRange}>Speichern</button>
+                        <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Alt halten = Shortcuts · Esc = Abbrechen</div>
+                        <button type="submit" className="btn primary modal-shortcut-target" disabled={hasOutOfRange}>
+                            {shortcutBadge('quick-add-save')}
+                            Speichern
+                        </button>
                     </div>
                 </form>
             </div>

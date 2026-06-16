@@ -13,7 +13,7 @@ function contrastText(bg?: string | null) {
   return luminance > 0.6 ? '#000' : '#fff'
 }
 
-export default function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: string; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string }) {
+export default function TagsEditor({ label, labelAccessory, value, onChange, tagDefs, className, inputRef }: { label?: string; labelAccessory?: React.ReactNode; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string; inputRef?: React.Ref<HTMLInputElement> }) {
   const [input, setInput] = useState('')
   const suggestions = useMemo(() => {
     const q = input.trim().toLowerCase()
@@ -33,7 +33,7 @@ export default function TagsEditor({ label, value, onChange, tagDefs, className 
   const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
   return (
     <div className={`field field-full-width ${className || ''}`.trim()}>
-      {label && <label>{label}</label>}
+      {label && <label className={labelAccessory ? 'field-label-shortcut' : undefined}>{label}{labelAccessory}</label>}
       <div className="input tags-editor-input">
         {(value || []).map(t => {
           const bg = colorFor(t) || undefined
@@ -46,6 +46,7 @@ export default function TagsEditor({ label, value, onChange, tagDefs, className 
           )
         })}
         <input
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

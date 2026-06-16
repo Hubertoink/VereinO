@@ -261,6 +261,37 @@
 
 .nav-btn { position: relative; }
 .page-shortcut-target { position: relative; }
+.modal-shortcut-target { position: relative; }
+.modal-shortcut {
+    min-width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgba(0,0,0,0.78);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    margin-left: 6px;
+    pointer-events: none;
+    vertical-align: middle;
+}
+.modal-shortcut-target .modal-shortcut {
+    margin-left: 0;
+    margin-right: 5px;
+}
+.field-label-shortcut {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.field-label-shortcut .modal-shortcut {
+    margin-left: 2px;
+}
 
 /* Storage pane specific */
 .storage-pane { display: grid; gap: 12px; }
