@@ -8,7 +8,9 @@ declare global {
                 toggleMaximize: () => Promise<{ ok: boolean; isMaximized?: boolean }>
                 isMaximized: () => Promise<boolean>
                 close: () => Promise<{ ok: boolean }>
+                confirmClose: () => Promise<{ ok: boolean }>
                 onMaximizeChanged: (cb: (isMax: boolean) => void) => () => void
+                onCloseRequested: (cb: () => void) => () => void
             }
             ping: () => string
             vouchers: {

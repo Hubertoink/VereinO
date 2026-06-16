@@ -32,9 +32,25 @@ async function createWindow(): Promise<BrowserWindow> {
         }
     })
 
+    let allowClose = false
+
     win.on('ready-to-show', () => win.show())
     win.on('maximize', () => win.webContents.send('window:maximized', true))
     win.on('unmaximize', () => win.webContents.send('window:unmaximized', false))
+    win.on('close', (event) => {
+        if (allowClose || win.webContents.isDestroyed()) return
+        event.preventDefault()
+        try {
+            win.webContents.send('window:close-requested')
+        } catch {
+            allowClose = true
+            win.close()
+        }
+    })
+
+    ;(win as any).__allowRendererClose = () => {
+        allowClose = true
+    }
 
     // Content Security Policy via headers (relaxed in dev for Vite/HMR)
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

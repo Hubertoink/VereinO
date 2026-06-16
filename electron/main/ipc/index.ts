@@ -74,18 +74,20 @@ async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[])
 }
 
 export function registerIpcHandlers() {
+    const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+
     // App info
     ipcMain.handle('app.version', async () => {
         try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'VereinO' } }
     })
     // Window controls (frameless)
     ipcMain.handle('window.minimize', async () => {
-        const win = BrowserWindow.getFocusedWindow()
+        const win = getCurrentWindow()
         win?.minimize()
         return { ok: true }
     })
     ipcMain.handle('window.toggleMaximize', async () => {
-        const win = BrowserWindow.getFocusedWindow()
+        const win = getCurrentWindow()
         if (win) {
             if (win.isMaximized()) win.unmaximize(); else win.maximize()
             return { ok: true, isMaximized: win.isMaximized() }
@@ -93,12 +95,22 @@ export function registerIpcHandlers() {
         return { ok: false }
     })
     ipcMain.handle('window.close', async () => {
-        const win = BrowserWindow.getFocusedWindow()
+        const win = getCurrentWindow()
         win?.close()
         return { ok: true }
     })
+    ipcMain.handle('window.confirmClose', async () => {
+        const win = getCurrentWindow()
+        if (!win) return { ok: false }
+        try {
+            ;(win as any).__allowRendererClose?.()
+        } catch {
+        }
+        win.close()
+        return { ok: true }
+    })
     ipcMain.handle('window.isMaximized', async () => {
-        const win = BrowserWindow.getFocusedWindow()
+        const win = getCurrentWindow()
         return { isMaximized: !!win?.isMaximized() }
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {

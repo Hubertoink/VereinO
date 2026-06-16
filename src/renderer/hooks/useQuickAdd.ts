@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type QA = {
     date: string
@@ -17,6 +17,17 @@ type QA = {
     budgets?: Array<{ budgetId: number; amount: number }>
     earmarksAssigned?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
+}
+
+type QuickAddDraft = {
+    id: string
+    sequence: number
+    qa: QA
+    files: File[]
+}
+
+function createDraftId() {
+    return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 /** Read user booking habits from localStorage */
@@ -81,121 +92,140 @@ export function useQuickAdd(
     notify?: (type: 'success' | 'error' | 'info', text: string) => void
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
-    const [confirmingClose, setConfirmingClose] = useState(false)
-    const habits = getBookingHabits()
-    const makeDefaults = (): QA => ({
-        date: today, 
-        type: habits.type, 
-        sphere: 'IDEELL', 
-        mode: habits.mode,
-        grossAmount: habits.mode === 'GROSS' ? 100 : undefined,
-        netAmount: habits.mode === 'NET' ? 100 : undefined,
-        vatRate: 0, 
-        description: '', 
-        paymentMethod: habits.paymentMethod
-    })
-    const [qa, setQa] = useState<QA>(makeDefaults)
-    const [files, setFiles] = useState<File[]>([])
+    const [drafts, setDrafts] = useState<QuickAddDraft[]>([])
+    const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
+    const nextSequenceRef = useRef(1)
 
-    /** Check if form has been meaningfully modified */
-    function isDirty(): boolean {
-        if (qa.description && qa.description.trim().length > 0) return true
-        if (Array.isArray((qa as any).tags) && (qa as any).tags.length > 0) return true
-        if (files.length > 0) return true
-        const defs = makeDefaults()
-        if ((qa.grossAmount ?? 0) !== (defs.grossAmount ?? 0)) return true
-        if ((qa.netAmount ?? 0) !== (defs.netAmount ?? 0)) return true
-        if (qa.vatRate !== defs.vatRate) return true
-        if (Array.isArray((qa as any).budgets) && (qa as any).budgets.length > 0) return true
-        if (Array.isArray((qa as any).earmarksAssigned) && (qa as any).earmarksAssigned.length > 0) return true
-        return false
-    }
-
-    function requestClose() {
-        if (isDirty()) {
-            setConfirmingClose(true)
-        } else {
-            doClose()
-        }
-    }
-
-    function doClose() {
-        setConfirmingClose(false)
-        setQuickAdd(false)
-        setFiles([])
-        const h = getBookingHabits()
-        setQa({
+    const makeDefaults = useCallback((): QA => {
+        const habits = getBookingHabits()
+        return {
             date: today,
-            type: h.type,
+            type: habits.type,
             sphere: 'IDEELL',
-            mode: h.mode,
-            grossAmount: h.mode === 'GROSS' ? 100 : undefined,
-            netAmount: h.mode === 'NET' ? 100 : undefined,
+            mode: habits.mode,
+            grossAmount: habits.mode === 'GROSS' ? 100 : undefined,
+            netAmount: habits.mode === 'NET' ? 100 : undefined,
             vatRate: 0,
             description: '',
-            paymentMethod: h.paymentMethod
-        })
-    }
+            paymentMethod: habits.paymentMethod
+        }
+    }, [today])
 
-    function cancelClose() {
-        setConfirmingClose(false)
-    }
+    const activeDraft = useMemo(
+        () => drafts.find((draft) => draft.id === activeDraftId) ?? null,
+        [drafts, activeDraftId]
+    )
+
+    const qa = activeDraft?.qa ?? makeDefaults()
+    const files = activeDraft?.files ?? []
+
+    const openQuickAdd = useCallback(() => {
+        const draft: QuickAddDraft = {
+            id: createDraftId(),
+            sequence: nextSequenceRef.current++,
+            qa: makeDefaults(),
+            files: []
+        }
+        setDrafts((prev) => [...prev, draft])
+        setActiveDraftId(draft.id)
+        setQuickAdd(true)
+    }, [makeDefaults])
+
+    const reopenDraft = useCallback((draftId: string) => {
+        setActiveDraftId(draftId)
+        setQuickAdd(true)
+    }, [])
+
+    const parkQuickAdd = useCallback(() => {
+        setQuickAdd(false)
+    }, [])
+
+    const closeDraft = useCallback((draftId: string) => {
+        const remaining = drafts.filter((draft) => draft.id !== draftId)
+        setDrafts(remaining)
+        if (activeDraftId === draftId) {
+            setActiveDraftId(remaining.at(-1)?.id ?? null)
+            setQuickAdd(false)
+        }
+    }, [drafts, activeDraftId])
+
+    const clearDrafts = useCallback(() => {
+        setDrafts([])
+        setActiveDraftId(null)
+        setQuickAdd(false)
+    }, [])
+
+    const setQa = useCallback((nextQa: QA) => {
+        if (!activeDraftId) return
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === activeDraftId ? { ...draft, qa: nextQa } : draft
+        )))
+    }, [activeDraftId])
+
+    const setFiles = useCallback((nextFiles: File[]) => {
+        if (!activeDraftId) return
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === activeDraftId ? { ...draft, files: nextFiles } : draft
+        )))
+    }, [activeDraftId])
 
     function onDropFiles(fileList: FileList | null) {
         if (!fileList) return
         const arr = Array.from(fileList)
-        setFiles((prev) => [...prev, ...arr])
+        setFiles([...files, ...arr])
     }
 
     async function onQuickSave() {
+        if (!activeDraft) return
+
         // Validate transfer direction
-        if (qa.type === 'TRANSFER' && (!(qa as any).transferFrom || !(qa as any).transferTo)) {
+        if (activeDraft.qa.type === 'TRANSFER' && (!(activeDraft.qa as any).transferFrom || !(activeDraft.qa as any).transferTo)) {
             notify?.('error', 'Bitte wähle eine Richtung für den Transfer aus.')
             return
         }
         
         const payload: any = {
-            date: qa.date,
-            type: qa.type,
-            sphere: qa.sphere,
-            description: qa.description || undefined,
-            vatRate: qa.vatRate
+            date: activeDraft.qa.date,
+            type: activeDraft.qa.type,
+            sphere: activeDraft.qa.sphere,
+            description: activeDraft.qa.description || undefined,
+            vatRate: activeDraft.qa.vatRate
         }
         
-        if (qa.type === 'TRANSFER') {
+        if (activeDraft.qa.type === 'TRANSFER') {
             delete payload.paymentMethod
-            payload.transferFrom = (qa as any).transferFrom
-            payload.transferTo = (qa as any).transferTo
+            payload.transferFrom = (activeDraft.qa as any).transferFrom
+            payload.transferTo = (activeDraft.qa as any).transferTo
             payload.vatRate = 0
-            payload.grossAmount = (qa as any).grossAmount ?? 0
+            payload.grossAmount = (activeDraft.qa as any).grossAmount ?? 0
             delete payload.netAmount
         } else {
-            payload.paymentMethod = qa.paymentMethod
+            payload.paymentMethod = activeDraft.qa.paymentMethod
             payload.transferFrom = undefined
             payload.transferTo = undefined
         }
         
-        if (qa.mode === 'GROSS') {
-            payload.grossAmount = qa.grossAmount ?? 0
+        if (activeDraft.qa.mode === 'GROSS') {
+            payload.grossAmount = activeDraft.qa.grossAmount ?? 0
             payload.vatRate = 0 // Brutto immer ohne Aufteilung
             delete payload.netAmount
         } else {
-            payload.netAmount = qa.netAmount ?? 0
+            payload.netAmount = activeDraft.qa.netAmount ?? 0
             // vatRate bleibt (0/7/19)
             delete payload.grossAmount
         }
         
-        if (typeof (qa as any).earmarkId === 'number') payload.earmarkId = (qa as any).earmarkId
-        if (typeof (qa as any).budgetId === 'number') payload.budgetId = (qa as any).budgetId
+        if (typeof (activeDraft.qa as any).earmarkId === 'number') payload.earmarkId = (activeDraft.qa as any).earmarkId
+        if (typeof (activeDraft.qa as any).budgetId === 'number') payload.budgetId = (activeDraft.qa as any).budgetId
 
         // New: multiple assignments (optional)
-        const budgets = Array.isArray((qa as any).budgets)
-            ? ((qa as any).budgets as Array<{ budgetId: number; amount: number }>).
+        const budgets = Array.isArray((activeDraft.qa as any).budgets)
+            ? ((activeDraft.qa as any).budgets as Array<{ budgetId: number; amount: number }>).
                 filter((b) => b.budgetId && b.amount > 0).
                 map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
             : []
-        const earmarks = Array.isArray((qa as any).earmarksAssigned)
-            ? ((qa as any).earmarksAssigned as Array<{ earmarkId: number; amount: number }>).
+        const earmarks = Array.isArray((activeDraft.qa as any).earmarksAssigned)
+            ? ((activeDraft.qa as any).earmarksAssigned as Array<{ earmarkId: number; amount: number }>).
                 filter((e) => e.earmarkId && e.amount > 0).
                 map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
             : []
@@ -213,10 +243,10 @@ export function useQuickAdd(
             payload.earmarkAmount = earmarks[0].amount
         }
 
-        if (Array.isArray((qa as any).tags)) payload.tags = (qa as any).tags
+        if (Array.isArray((activeDraft.qa as any).tags)) payload.tags = (activeDraft.qa as any).tags
 
         // Convert attachments to Base64
-        if (files.length) {
+        if (activeDraft.files.length) {
             const enc = async (f: File) => {
                 const buf = await f.arrayBuffer()
                 let binary = ''
@@ -228,27 +258,17 @@ export function useQuickAdd(
                 const dataBase64 = btoa(binary)
                 return { name: f.name, dataBase64, mime: f.type || undefined }
             }
-            payload.files = await Promise.all(files.map(enc))
+            payload.files = await Promise.all(activeDraft.files.map(enc))
         }
 
         const res = await create(payload)
         if (res) {
             // Track user habits for smart defaults
-            trackBookingHabit(qa.type, qa.paymentMethod, (qa as any).mode)
-            const h = getBookingHabits()
+            trackBookingHabit(activeDraft.qa.type, activeDraft.qa.paymentMethod, (activeDraft.qa as any).mode)
+            const remaining = drafts.filter((draft) => draft.id !== activeDraft.id)
+            setDrafts(remaining)
+            setActiveDraftId(remaining.at(-1)?.id ?? null)
             setQuickAdd(false)
-            setFiles([])
-            setQa({ 
-                date: today, 
-                type: h.type, 
-                sphere: 'IDEELL', 
-                mode: h.mode,
-                grossAmount: h.mode === 'GROSS' ? 100 : undefined,
-                netAmount: h.mode === 'NET' ? 100 : undefined,
-                vatRate: 0, 
-                description: '', 
-                paymentMethod: h.paymentMethod
-            })
         }
     }
 
@@ -272,7 +292,7 @@ export function useQuickAdd(
 
             // Open Quick-Add robustly via Ctrl+Shift+N (no bare 'n')
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
-                setQuickAdd(true)
+                openQuickAdd()
                 e.preventDefault()
                 return
             }
@@ -294,7 +314,7 @@ export function useQuickAdd(
             }
             if (e.key === 'Escape') { 
                 if (quickAdd) { 
-                    requestClose()
+                    parkQuickAdd()
                     e.preventDefault() 
                 } 
                 return 
@@ -302,11 +322,28 @@ export function useQuickAdd(
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [qa, files, quickAdd, onQuickSave, onOpenFilePicker])
+    }, [quickAdd, onQuickSave, onOpenFilePicker, openQuickAdd, parkQuickAdd])
 
     const openFilePicker = () => onOpenFilePicker?.()
 
-    return { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles, requestClose, confirmingClose, doClose, cancelClose }
+    return {
+        quickAdd,
+        qa,
+        setQa,
+        onQuickSave,
+        files,
+        setFiles,
+        openFilePicker,
+        onDropFiles,
+        openQuickAdd,
+        parkQuickAdd,
+        bookingDrafts: drafts,
+        activeDraftId,
+        reopenDraft,
+        closeDraft,
+        clearDrafts,
+        hasOpenDrafts: drafts.length > 0
+    }
 }
 
-export type { QA }
+export type { QA, QuickAddDraft }

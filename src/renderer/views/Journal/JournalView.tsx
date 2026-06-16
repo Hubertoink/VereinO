@@ -123,6 +123,9 @@ interface JournalViewProps {
     setQ?: (v: string) => void
     page?: number
     setPage?: (v: number) => void
+    bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean }>
+    onOpenBookingDraft?: (draftId: string) => void
+    onCloseBookingDraft?: (draftId: string) => void
 }
 
 export default function JournalView({
@@ -176,7 +179,10 @@ export default function JournalView({
     setFilterTag: setFilterTagProp,
     setQ: setQProp,
     page: pageProp,
-    setPage: setPageProp
+    setPage: setPageProp,
+    bookingDraftTabs = [],
+    onOpenBookingDraft,
+    onCloseBookingDraft
 }: JournalViewProps) {
     // ==================== STATE ====================
     // Pagination & Sorting
@@ -919,6 +925,33 @@ export default function JournalView({
             {/* Main Table Card */}
             <div>
                 <div className="card">
+                    {bookingDraftTabs.length > 0 && (
+                        <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
+                            {bookingDraftTabs.map((draft) => (
+                                <div
+                                    key={draft.id}
+                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}`}
+                                >
+                                    <button
+                                        type="button"
+                                        className="booking-draft-tab__open"
+                                        title={draft.title}
+                                        onClick={() => onOpenBookingDraft?.(draft.id)}
+                                    >
+                                        <span className="booking-draft-tab__label">{draft.label}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="booking-draft-tab__close"
+                                        aria-label={`${draft.label} schließen`}
+                                        onClick={() => onCloseBookingDraft?.(draft.id)}
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {/* Pagination controls */}
                     <div className="pagination-bar">
                         <div className="pagination-bar__info">

@@ -457,7 +457,24 @@ function AppInner() {
 
     // Quick-Add modal state and actions
     const fileInputRef = useRef<HTMLInputElement | null>(null)
-    const { quickAdd, setQuickAdd, qa, setQa, onQuickSave, files, setFiles, openFilePicker, onDropFiles } = useQuickAdd(
+    const {
+        quickAdd,
+        qa,
+        setQa,
+        onQuickSave,
+        files,
+        setFiles,
+        openFilePicker,
+        onDropFiles,
+        openQuickAdd,
+        parkQuickAdd,
+        bookingDrafts,
+        activeDraftId,
+        reopenDraft,
+        closeDraft,
+        clearDrafts,
+        hasOpenDrafts
+    } = useQuickAdd(
         today, 
         async (p: any) => {
         try {
@@ -482,6 +499,8 @@ function AppInner() {
         }
     }, () => fileInputRef.current?.click(), notify)
 
+    const [showOpenBookingTabsClosePrompt, setShowOpenBookingTabsClosePrompt] = useState(false)
+
     // Recent description suggestions for Quick-Add (autocomplete)
     const [descSuggest, setDescSuggest] = useState<string[]>([])
     useEffect(() => {
@@ -503,7 +522,38 @@ function AppInner() {
         return () => { alive = false }
     }, [quickAdd])
 
-    const openQuickAdd = useCallback(() => setQuickAdd(true), [setQuickAdd])
+    const bookingDraftTabs = useMemo(() => {
+        return bookingDrafts.map((draft) => {
+            const desc = draft.qa.description.trim()
+            const dateLabel = fmtDate(draft.qa.date)
+            return {
+                id: draft.id,
+                label: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · #${draft.sequence}`,
+                title: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`,
+                isActive: draft.id === activeDraftId
+            }
+        })
+    }, [activeDraftId, bookingDrafts, fmtDate])
+
+    useEffect(() => {
+        return window.api?.window?.onCloseRequested?.(() => {
+            if (hasOpenDrafts) {
+                setShowOpenBookingTabsClosePrompt(true)
+                return
+            }
+            void window.api?.window?.confirmClose?.()
+        })
+    }, [hasOpenDrafts])
+
+    const confirmCloseWithOpenDrafts = useCallback(() => {
+        clearDrafts()
+        setShowOpenBookingTabsClosePrompt(false)
+        void window.api?.window?.confirmClose?.()
+    }, [clearDrafts])
+
+    const cancelCloseWithOpenDrafts = useCallback(() => {
+        setShowOpenBookingTabsClosePrompt(false)
+    }, [])
 
     const activePageShortcuts = useMemo<PageShortcutAction[]>(() => {
         const shortcuts = [...registeredPageShortcuts]
@@ -1133,6 +1183,9 @@ function AppInner() {
                             setQ={setQ}
                             page={page}
                             setPage={setPage}
+                            bookingDraftTabs={bookingDraftTabs}
+                            onOpenBookingDraft={reopenDraft}
+                            onCloseBookingDraft={closeDraft}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -1264,7 +1317,8 @@ function AppInner() {
                     qa={qa}
                     setQa={setQa}
                     onSave={onQuickSave}
-                    onClose={() => setQuickAdd(false)}
+                    onClose={parkQuickAdd}
+                    onRequestClose={parkQuickAdd}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}
@@ -1277,6 +1331,25 @@ function AppInner() {
                     tagDefs={tagDefs}
                     descSuggest={descSuggest}
                 />
+            )}
+            {showOpenBookingTabsClosePrompt && (
+                <div className="modal-overlay" role="dialog" aria-modal="true">
+                    <div className="modal booking-close-guard-modal" onClick={(e) => e.stopPropagation()}>
+                        <header className="booking-close-guard-modal__header">
+                            <h2>Offene Buchungstabs</h2>
+                            <button className="btn ghost" onClick={cancelCloseWithOpenDrafts} aria-label="Schließen">
+                                ✕
+                            </button>
+                        </header>
+                        <p className="booking-close-guard-modal__text">
+                            Es sind noch {bookingDraftTabs.length} offene Buchungstabs vorhanden. Sollen diese verworfen und VereinO geschlossen werden?
+                        </p>
+                        <div className="booking-close-guard-modal__actions">
+                            <button className="btn" onClick={cancelCloseWithOpenDrafts}>Abbrechen</button>
+                            <button className="btn danger" onClick={confirmCloseWithOpenDrafts}>Tabs schließen</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}

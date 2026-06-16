@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
         toggleMaximize: () => ipcRenderer.invoke('window.toggleMaximize'),
         isMaximized: () => ipcRenderer.invoke('window.isMaximized').then(r => !!r?.isMaximized),
         close: () => ipcRenderer.invoke('window.close'),
+        confirmClose: () => ipcRenderer.invoke('window.confirmClose'),
         onMaximizeChanged: (cb: (isMax: boolean) => void) => {
             const handler = (_: any, v: boolean) => cb(!!v)
             ipcRenderer.on('window:maximized', handler)
@@ -27,6 +28,11 @@ contextBridge.exposeInMainWorld('api', {
                 ipcRenderer.removeListener('window:maximized', handler)
                 ipcRenderer.removeAllListeners('window:unmaximized')
             }
+        },
+        onCloseRequested: (cb: () => void) => {
+            const handler = () => cb()
+            ipcRenderer.on('window:close-requested', handler)
+            return () => ipcRenderer.removeListener('window:close-requested', handler)
         }
     },
     workQueue: {
