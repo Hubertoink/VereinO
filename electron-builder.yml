@@ -20,3 +20,8 @@ mac:
 linux:
   target: [AppImage]
   category: Finance
+publish:
+  provider: github
+  owner: Hubertoink
+  repo: VereinO
+  releaseType: release

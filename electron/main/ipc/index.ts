@@ -32,6 +32,7 @@ import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
 import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
 import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGetInput, ActivityReportGetOutput, ActivityReportListInput, ActivityReportListOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
 import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
+import { checkForAppUpdates, getUpdateState, installAppUpdate } from '../updateManager'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -80,6 +81,9 @@ export function registerIpcHandlers() {
     ipcMain.handle('app.version', async () => {
         try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'VereinO' } }
     })
+    ipcMain.handle('updates.getState', async () => getUpdateState())
+    ipcMain.handle('updates.check', async () => checkForAppUpdates())
+    ipcMain.handle('updates.install', async () => installAppUpdate())
     // Window controls (frameless)
     ipcMain.handle('window.minimize', async () => {
         const win = getCurrentWindow()

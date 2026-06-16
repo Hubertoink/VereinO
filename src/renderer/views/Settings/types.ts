@@ -137,6 +137,8 @@ export interface SettingsProps {
   setGlassModals: (v: boolean) => void
   showSubmissionBadge: boolean
   setShowSubmissionBadge: (v: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (v: boolean) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -181,6 +183,8 @@ export interface GeneralPaneProps {
   openSetupWizard?: () => void
   showSubmissionBadge: boolean
   setShowSubmissionBadge: (v: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (v: boolean) => void
 }
 
 export interface TablePaneProps {

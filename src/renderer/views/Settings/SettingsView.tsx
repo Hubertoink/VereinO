@@ -111,6 +111,8 @@ export function SettingsView(props: SettingsProps) {
             openSetupWizard={props.openSetupWizard}
             showSubmissionBadge={props.showSubmissionBadge}
             setShowSubmissionBadge={props.setShowSubmissionBadge}
+            showBookingDraftTabs={props.showBookingDraftTabs}
+            setShowBookingDraftTabs={props.setShowBookingDraftTabs}
           />
         )}
         

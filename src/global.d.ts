@@ -241,6 +241,43 @@ declare global {
                 inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
                 restore: (filePath: string) => Promise<{ ok: boolean; error?: string }>
             }
+            updates: {
+                getState: () => Promise<{
+                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    currentVersion: string
+                    availableVersion: string | null
+                    downloadedVersion: string | null
+                    downloadProgress: number | null
+                    message: string | null
+                }>
+                check: () => Promise<{
+                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    currentVersion: string
+                    availableVersion: string | null
+                    downloadedVersion: string | null
+                    downloadProgress: number | null
+                    message: string | null
+                }>
+                install: () => Promise<{
+                    ok: boolean
+                    state: {
+                        status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                        currentVersion: string
+                        availableVersion: string | null
+                        downloadedVersion: string | null
+                        downloadProgress: number | null
+                        message: string | null
+                    }
+                }>
+                onStateChanged: (cb: (state: {
+                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    currentVersion: string
+                    availableVersion: string | null
+                    downloadedVersion: string | null
+                    downloadProgress: number | null
+                    message: string | null
+                }) => void) => () => void
+            }
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
                 execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; newTags?: string[]; errorFilePath?: string }>

@@ -158,7 +158,9 @@ function AppInner() {
         glassModals,
         setGlassModals,
         showSubmissionBadge,
-        setShowSubmissionBadge
+        setShowSubmissionBadge,
+        showBookingDraftTabs,
+        setShowBookingDraftTabs
     } = useUIPreferences()
 
     // ── Auto-switch: force side-nav when window is too narrow for top-nav ──
@@ -1199,6 +1201,7 @@ function AppInner() {
                             setQ={setQ}
                             page={page}
                             setPage={setPage}
+                            showBookingDraftTabs={showBookingDraftTabs}
                             bookingDraftTabs={bookingDraftTabs}
                             onOpenBookingDraft={reopenDraft}
                             onCloseBookingDraft={closeDraft}
@@ -1238,6 +1241,8 @@ function AppInner() {
                             setGlassModals={setGlassModals}
                             showSubmissionBadge={showSubmissionBadge}
                             setShowSubmissionBadge={setShowSubmissionBadge}
+                            showBookingDraftTabs={showBookingDraftTabs}
+                            setShowBookingDraftTabs={setShowBookingDraftTabs}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}

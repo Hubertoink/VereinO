@@ -215,6 +215,16 @@ contextBridge.exposeInMainWorld('api', {
     app: {
         version: () => ipcRenderer.invoke('app.version')
     },
+    updates: {
+        getState: () => ipcRenderer.invoke('updates.getState'),
+        check: () => ipcRenderer.invoke('updates.check'),
+        install: () => ipcRenderer.invoke('updates.install'),
+        onStateChanged: (cb: (state: any) => void) => {
+            const handler = (_: any, state: any) => cb(state)
+            ipcRenderer.on('updates:state', handler)
+            return () => ipcRenderer.removeListener('updates:state', handler)
+        }
+    },
     imports: {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),

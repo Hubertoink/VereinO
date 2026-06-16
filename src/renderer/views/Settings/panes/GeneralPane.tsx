@@ -2,6 +2,15 @@ import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 
+type UpdateState = {
+  status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+  currentVersion: string
+  availableVersion: string | null
+  downloadedVersion: string | null
+  downloadProgress: number | null
+  message: string | null
+}
+
 /**
  * GeneralPane - Darstellung & Layout Settings
  *
@@ -29,9 +38,12 @@ export function GeneralPane({
   setJournalLimit,
   dateFmt,
   setDateFmt,
+  notify,
   openSetupWizard,
   showSubmissionBadge,
   setShowSubmissionBadge,
+  showBookingDraftTabs,
+  setShowBookingDraftTabs,
   backgroundImage,
   setBackgroundImage,
   customBackgroundImage,
@@ -42,8 +54,62 @@ export function GeneralPane({
   // Date format examples
   const sample = '2025-01-15'
   const pretty = '15. Jan 2025'
+  const [appVersion, setAppVersion] = React.useState('')
+  const [updateState, setUpdateState] = React.useState<UpdateState>({
+    status: 'idle',
+    currentVersion: '',
+    availableVersion: null,
+    downloadedVersion: null,
+    downloadProgress: null,
+    message: null,
+  })
 
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    let alive = true
+
+    void window.api?.app?.version?.().then((res) => {
+      if (!alive) return
+      setAppVersion(res?.version || '')
+    }).catch(() => {})
+
+    void window.api?.updates?.getState?.().then((state) => {
+      if (!alive || !state) return
+      setUpdateState(state)
+    }).catch(() => {})
+
+    const off = window.api?.updates?.onStateChanged?.((state) => {
+      if (!alive || !state) return
+      setUpdateState(state)
+    })
+
+    return () => {
+      alive = false
+      if (typeof off === 'function') off()
+    }
+  }, [])
+
+  const checkForUpdates = async () => {
+    try {
+      const state = await window.api?.updates?.check?.()
+      if (state) setUpdateState(state)
+      if (state?.status === 'unsupported') notify('info', state.message || 'Updates sind in der Entwicklungsumgebung nicht verfügbar.')
+    } catch (e) {
+      notify('error', `Update-Prüfung fehlgeschlagen: ${String((e as any)?.message || e)}`)
+    }
+  }
+
+  const installUpdate = async () => {
+    try {
+      const res = await window.api?.updates?.install?.()
+      if (!res?.ok) {
+        notify('info', res?.state?.message || 'Es ist kein installierbares Update vorhanden.')
+      }
+    } catch (e) {
+      notify('error', `Update-Installation fehlgeschlagen: ${String((e as any)?.message || e)}`)
+    }
+  }
 
   const openCustomBgPicker = () => {
     customBgInputRef.current?.click()
@@ -119,6 +185,35 @@ export function GeneralPane({
           <button className="btn" onClick={() => openSetupWizard?.()}>
             Setup erneut öffnen…
           </button>
+        </div>
+      </div>
+
+      <div className="card settings-pane-card">
+        <div className="settings-title">
+          <span aria-hidden="true">⬇️</span> <strong>Updates</strong>
+        </div>
+        <div className="settings-sub">
+          Installierte Version: {appVersion || updateState.currentVersion || 'unbekannt'}
+        </div>
+        {updateState.message && (
+          <div className="helper" style={{ marginTop: 8 }}>
+            {updateState.message}
+            {updateState.status === 'downloading' && typeof updateState.downloadProgress === 'number' ? ` (${updateState.downloadProgress}%)` : ''}
+          </div>
+        )}
+        <div className="settings-pane-actions flex gap-8" style={{ marginTop: 12 }}>
+          <button
+            className="btn"
+            onClick={() => { void checkForUpdates() }}
+            disabled={updateState.status === 'checking' || updateState.status === 'downloading'}
+          >
+            {updateState.status === 'checking' ? 'Suche läuft…' : updateState.status === 'downloading' ? 'Download läuft…' : 'Nach Updates suchen'}
+          </button>
+          {updateState.status === 'downloaded' && (
+            <button className="btn primary" onClick={() => { void installUpdate() }}>
+              Update installieren
+            </button>
+          )}
         </div>
       </div>
 
@@ -378,6 +473,18 @@ export function GeneralPane({
               type="checkbox"
               checked={showSubmissionBadge}
               onChange={(e) => setShowSubmissionBadge(e.target.checked)}
+            />
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-booking-draft-tabs">Buchungsreiter</label>
+            <input
+              id="toggle-booking-draft-tabs"
+              role="switch"
+              aria-checked={showBookingDraftTabs}
+              className="toggle"
+              type="checkbox"
+              checked={showBookingDraftTabs}
+              onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
             />
           </div>
         </div>

@@ -4,6 +4,7 @@ import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
 import { applyMigrations, ensureActivityReportsTable, ensureAdvanceTables, ensureVoucherColumns, ensureVoucherJunctionTables } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
+import { initUpdateManager } from './updateManager'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -169,6 +170,7 @@ app.whenReady().then(async () => {
     }
     // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers()
+    initUpdateManager()
     createMenu()
     const win = await createWindow()
 

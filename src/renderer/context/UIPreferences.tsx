@@ -35,6 +35,8 @@ interface UIPreferencesContextValue {
   setJournalRowDensity: (val: JournalRowDensity) => void
   showSubmissionBadge: boolean
   setShowSubmissionBadge: (val: boolean) => void
+  showBookingDraftTabs: boolean
+  setShowBookingDraftTabs: (val: boolean) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
   customBackgroundImage: string | null
@@ -230,6 +232,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored !== 'false' // default true
   })
 
+  const [showBookingDraftTabs, setShowBookingDraftTabs] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ui.showBookingDraftTabs')
+    return stored === 'true' // default false
+  })
+
   useEffect(() => {
     safeLocalStorageSet('ui.navLayout', navLayout)
   }, [navLayout])
@@ -264,6 +271,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     safeLocalStorageSet('ui.showSubmissionBadge', String(showSubmissionBadge))
   }, [showSubmissionBadge])
+
+  useEffect(() => {
+    safeLocalStorageSet('ui.showBookingDraftTabs', String(showBookingDraftTabs))
+  }, [showBookingDraftTabs])
 
   useEffect(() => {
     safeLocalStorageSet('ui.backgroundImage', backgroundImage)
@@ -304,6 +315,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setJournalRowDensity,
         showSubmissionBadge,
         setShowSubmissionBadge,
+        showBookingDraftTabs,
+        setShowBookingDraftTabs,
         backgroundImage,
         setBackgroundImage,
         customBackgroundImage,

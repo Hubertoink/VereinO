@@ -123,6 +123,7 @@ interface JournalViewProps {
     setQ?: (v: string) => void
     page?: number
     setPage?: (v: number) => void
+    showBookingDraftTabs?: boolean
     bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean }>
     onOpenBookingDraft?: (draftId: string) => void
     onCloseBookingDraft?: (draftId: string) => void
@@ -180,6 +181,7 @@ export default function JournalView({
     setQ: setQProp,
     page: pageProp,
     setPage: setPageProp,
+    showBookingDraftTabs = false,
     bookingDraftTabs = [],
     onOpenBookingDraft,
     onCloseBookingDraft
@@ -925,7 +927,7 @@ export default function JournalView({
             {/* Main Table Card */}
             <div>
                 <div className="card">
-                    {bookingDraftTabs.length > 0 && (
+                    {showBookingDraftTabs && bookingDraftTabs.length > 0 && (
                         <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
                             {bookingDraftTabs.map((draft) => (
                                 <div
