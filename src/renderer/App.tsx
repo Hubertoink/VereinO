@@ -258,6 +258,9 @@ function AppInner() {
     const [showNavShortcuts, setShowNavShortcuts] = useState(false)
     const navShortcuts = useMemo(() => buildNavShortcuts(), [])
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
+    const registerPageShortcuts = useCallback((shortcuts: PageShortcutAction[]) => {
+        setRegisteredPageShortcuts(shortcuts)
+    }, [])
     // When switching to Reports, bump a key to trigger chart re-measures
     const [reportsActivateKey, setReportsActivateKey] = useState(0)
     useEffect(() => {
@@ -567,10 +570,6 @@ function AppInner() {
     const pageShortcutMap = useMemo(() => {
         return Object.fromEntries(activePageShortcuts.map((shortcut) => [shortcut.id, shortcut.key])) as Record<string, string>
     }, [activePageShortcuts])
-
-    useEffect(() => {
-        setRegisteredPageShortcuts([])
-    }, [activePage])
 
     // Global key handling: Alt shows shortcut badges; Alt+letter triggers nav and current-page actions.
     useEffect(() => {
@@ -1156,7 +1155,7 @@ function AppInner() {
                             setFlashId={setFlashId}
                             showShortcuts={showNavShortcuts}
                             pageShortcuts={pageShortcutMap}
-                            registerPageShortcuts={setRegisteredPageShortcuts}
+                            registerPageShortcuts={registerPageShortcuts}
                             periodLock={periodLock}
                             refreshKey={refreshKey}
                             notify={notify}
@@ -1308,7 +1307,11 @@ function AppInner() {
                     )}
 
                     {activePage === 'Mitglieder' && (
-                        <MembersView />
+                        <MembersView
+                            showShortcuts={showNavShortcuts}
+                            pageShortcuts={pageShortcutMap}
+                            registerPageShortcuts={registerPageShortcuts}
+                        />
                     )}
 
                     {activePage === 'Vorschuesse' && (
@@ -1316,7 +1319,11 @@ function AppInner() {
                     )}
 
                     {activePage === 'Verbindlichkeiten' && (
-                        <InvoicesView />
+                        <InvoicesView
+                            showShortcuts={showNavShortcuts}
+                            pageShortcuts={pageShortcutMap}
+                            registerPageShortcuts={registerPageShortcuts}
+                        />
                     )}
 
                     {activePage === 'Einreichungen' && (

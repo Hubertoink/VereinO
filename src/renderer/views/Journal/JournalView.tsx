@@ -430,8 +430,7 @@ export default function JournalView({
         button.focus()
     }, [])
 
-    useEffect(() => {
-        if (!registerPageShortcuts) return
+    const journalPageShortcuts = useMemo<PageShortcutAction[]>(() => {
         const shortcuts: PageShortcutAction[] = [
             {
                 id: 'journal-search',
@@ -477,9 +476,18 @@ export default function JournalView({
             })
         }
 
-        registerPageShortcuts(shortcuts)
+        return shortcuts
+    }, [clickShortcutTrigger, hasActiveFilters, resetAllFilters])
+
+    useEffect(() => {
+        if (!registerPageShortcuts) return
+        registerPageShortcuts(journalPageShortcuts)
+    }, [journalPageShortcuts, registerPageShortcuts])
+
+    useEffect(() => {
+        if (!registerPageShortcuts) return
         return () => registerPageShortcuts([])
-    }, [clickShortcutTrigger, hasActiveFilters, registerPageShortcuts, resetAllFilters])
+    }, [registerPageShortcuts])
 
     const closeEditModalNow = useCallback(() => {
         setConfirmDiscardEdit(false)

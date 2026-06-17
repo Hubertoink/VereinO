@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.1] – 2026-06-17
+
+### Hinzugefügt
+
+- Buchungen: Buchungsreiter (Booking Draft Tabs) hinzugefügt, damit mehrere Buchungsentwürfe parallel geöffnet und wieder aufgenommen werden können.
+- Tastatur-Shortcuts: `Alt`-Overlay auf Verbindlichkeiten- und Mitglieder-Modale erweitert.
+- Tastatur-Shortcuts: `Alt+Q` für „+ Neu“ in Verbindlichkeiten und Mitglieder ergänzt.
+
+### Geändert
+
+- Buchungen: Shortcut-Badges für Suche, Zeitraum, Filter, Spalten und Batch-Zuordnung werden beim ersten Laden der Buchungsansicht zuverlässig registriert.
+
+### Behoben
+
+- Verbindlichkeiten: Renderer-Crash beim Wechsel in den Verbindlichkeiten-Reiter behoben.
+- Buchungen: Tag-Hover zeigt lokale Fallback-Werte und bleibt im Dev-Build nicht mehr dauerhaft auf „Lädt…“ hängen.
+- Tastatur-Shortcuts: Stabilere Registrierung der Buchungs-Toolbar-Shortcuts nach Seitenwechseln und Filteränderungen.
+
 ## [1.8.4] – 2026-03-01
 
 ### Hinzugefügt

@@ -134,8 +134,8 @@ function UsageHover({
     const content = (
         <TooltipList
             title={title}
-            rows={loading ? [] : error ? [] : tooltipRows}
-            hint={loading ? 'Lädt…' : error ? error : hint}
+            rows={tooltipRows}
+            hint={loading ? (tooltipRows.length > 0 ? 'Aktualisiere vollständige Werte…' : 'Lädt…') : error ? error : hint}
         />
     )
 
@@ -347,7 +347,12 @@ export default function JournalTable({
         if (inflight) return inflight
         const p = (async () => {
             const api = (window as any)?.api
-            const res = await api?.tags?.usage?.({ tagId })
+            if (!api?.tags?.usage) throw new Error('Tag-Auswertung ist lokal nicht verfügbar.')
+            const timeout = new Promise((_resolve, reject) => {
+                window.setTimeout(() => reject(new Error('Tag-Auswertung dauert zu lange.')), 4500)
+            })
+            const res = await Promise.race([api.tags.usage({ tagId }), timeout])
+            if (!res) throw new Error('Tag-Auswertung lieferte keine Daten.')
             tagUsageCache.current.set(tagId, res)
             return res
         })()
@@ -473,6 +478,32 @@ export default function JournalTable({
     )
     const tagDefFor = useCallback((name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase()), [tagDefs])
     const colorFor = (name: string) => tagDefFor(name)?.color
+    const tagUsageFallbackRows = useMemo(() => {
+        const totals = new Map<string, { inflow: number; spent: number; count: number }>()
+        for (const row of rows || []) {
+            for (const tagName of row.tags || []) {
+                const key = String(tagName || '').toLowerCase()
+                if (!key) continue
+                const current = totals.get(key) || { inflow: 0, spent: 0, count: 0 }
+                const amount = Number(row.grossAmount || 0) || 0
+                if (row.type === 'IN') current.inflow += amount
+                else if (row.type === 'OUT') current.spent += amount
+                current.count += 1
+                totals.set(key, current)
+            }
+        }
+        const formatted = new Map<string, Array<{ key: string; value: string; dotColor?: string }>>()
+        totals.forEach((value, key) => {
+            const balance = Math.round((value.inflow - value.spent) * 100) / 100
+            formatted.set(key, [
+                { key: 'Einnahmen', value: eurFmt.format(Math.round(value.inflow * 100) / 100), dotColor: 'var(--success)' },
+                { key: 'Ausgaben', value: eurFmt.format(Math.round(value.spent * 100) / 100), dotColor: 'var(--danger)' },
+                { key: 'Saldo', value: eurFmt.format(balance), dotColor: colorFor(key) || 'var(--accent)' },
+                { key: 'Buchungen', value: String(value.count), dotColor: 'var(--text-dim)' }
+            ])
+        })
+        return formatted
+    }, [colorFor, eurFmt, rows])
     const isLocked = (d: string) => {
         if (!lockedUntil) return false
         return String(d) <= String(lockedUntil)
@@ -550,6 +581,7 @@ export default function JournalTable({
                                 accent={bg}
                                 eurFmt={eurFmt}
                                 getUsage={getTagUsage}
+                                rows={tagUsageFallbackRows.get(String(t || '').toLowerCase())}
                                 hint="Klick filtert die Buchungsliste nach diesem Tag."
                             >
                                 <button
