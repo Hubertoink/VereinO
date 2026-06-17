@@ -6,6 +6,7 @@
 // ===== State =====
 let submissions = []
 let currentImage = null
+let categoryCatalog = null
 
 // ===== DOM Elements =====
 const form = document.getElementById('submission-form')
@@ -30,6 +31,16 @@ const amountInput = document.getElementById('amount')
 const descriptionInput = document.getElementById('description')
 const counterpartyInput = document.getElementById('counterparty')
 const categoryInput = document.getElementById('category')
+const catalogInput = document.getElementById('catalog-input')
+const catalogButton = document.getElementById('catalog-button')
+const catalogClear = document.getElementById('catalog-clear')
+const catalogStatus = document.getElementById('catalog-status')
+const budgetGroup = document.getElementById('budget-group')
+const budgetInput = document.getElementById('budget')
+const earmarkGroup = document.getElementById('earmark-group')
+const earmarkInput = document.getElementById('earmark')
+const tagsGroup = document.getElementById('tags-group')
+const tagOptions = document.getElementById('tag-options')
 const submitterInput = document.getElementById('submitter')
 const imageInput = document.getElementById('image-input')
 const imageUpload = document.getElementById('image-upload')
@@ -50,6 +61,7 @@ function init() {
     
     // Load saved data
     loadFromStorage()
+    loadCatalogFromStorage()
     
     // Load saved submitter name
     const savedName = localStorage.getItem('vereino-submitter')
@@ -100,6 +112,11 @@ function setupEventListeners() {
         e.preventDefault()
         showSphereHelp()
     })
+
+    // Category catalog import
+    catalogButton.addEventListener('click', () => catalogInput.click())
+    catalogInput.addEventListener('change', handleCatalogSelect)
+    catalogClear.addEventListener('click', clearCatalog)
     
     // Navigation
     navForm.addEventListener('click', () => showView('form'))
@@ -128,6 +145,10 @@ function handleFormSubmit(e) {
         return
     }
     
+    const selectedBudget = findCatalogItem('budgets', budgetInput.value)
+    const selectedEarmark = findCatalogItem('earmarks', earmarkInput.value)
+    const selectedTags = getSelectedTags()
+    
     // Create submission object
     const submission = {
         id: generateId(),
@@ -139,6 +160,27 @@ function handleFormSubmit(e) {
         description: descriptionInput.value.trim(),
         counterparty: counterpartyInput.value.trim() || null,
         categoryHint: categoryInput.value.trim() || null,
+        budgetId: selectedBudget?.id ?? null,
+        budgetLabel: selectedBudget?.label ?? null,
+        budget: selectedBudget ? {
+            id: selectedBudget.id,
+            label: selectedBudget.label,
+            year: selectedBudget.year ?? null,
+            sphere: selectedBudget.sphere ?? null
+        } : null,
+        earmarkId: selectedEarmark?.id ?? null,
+        earmarkLabel: selectedEarmark?.label ?? null,
+        earmark: selectedEarmark ? {
+            id: selectedEarmark.id,
+            code: selectedEarmark.code ?? null,
+            name: selectedEarmark.name ?? selectedEarmark.label,
+            label: selectedEarmark.label
+        } : null,
+        tags: selectedTags.map(tag => ({
+            id: tag.id,
+            name: tag.name,
+            color: tag.color ?? null
+        })),
         submittedBy: submitterInput.value.trim(),
         submittedAt: new Date().toISOString(),
         attachment: currentImage
@@ -163,6 +205,11 @@ function resetForm() {
     descriptionInput.value = ''
     counterpartyInput.value = ''
     categoryInput.value = ''
+    budgetInput.value = ''
+    earmarkInput.value = ''
+    tagOptions.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.checked = false
+    })
     clearImage()
     
     // Reset type to OUT
@@ -306,6 +353,9 @@ function renderSubmissionsList() {
                 ${sub.paymentMethod === 'BAR' ? '💵' : '🏦'} ${sub.sphere === 'W' ? 'Wirtschaftlich' : 'Ideell'}
                 ${sub.counterparty ? ` · ${escapeHtml(sub.counterparty)}` : ''}
                 ${sub.categoryHint ? ` · ${escapeHtml(sub.categoryHint)}` : ''}
+                ${sub.budgetLabel ? ` · Budget: ${escapeHtml(sub.budgetLabel)}` : ''}
+                ${sub.earmarkLabel ? ` · Zweckbindung: ${escapeHtml(sub.earmarkLabel)}` : ''}
+                ${sub.tags?.length ? ` · Tags: ${sub.tags.map(tag => escapeHtml(tag.name || tag)).join(', ')}` : ''}
             </div>
             ${sub.attachment ? '<div class="submission-image-indicator">📎 Beleg angehängt</div>' : ''}
         </div>
@@ -358,8 +408,12 @@ function handleDownload() {
     
     // Prepare export data
     const exportData = {
-        version: '1.0',
+        version: '1.1',
         exportedAt: new Date().toISOString(),
+        sourceCatalog: categoryCatalog ? {
+            organization: categoryCatalog.organization || null,
+            exportedAt: categoryCatalog.exportedAt || null
+        } : null,
         submissions: submissions.map(sub => ({
             externalId: sub.id,
             date: sub.date,
@@ -370,6 +424,13 @@ function handleDownload() {
             description: sub.description,
             counterparty: sub.counterparty,
             categoryHint: sub.categoryHint,
+            budgetId: sub.budgetId ?? null,
+            budgetLabel: sub.budgetLabel ?? null,
+            budget: sub.budget ?? null,
+            earmarkId: sub.earmarkId ?? null,
+            earmarkLabel: sub.earmarkLabel ?? null,
+            earmark: sub.earmark ?? null,
+            tags: sub.tags || [],
             submittedBy: sub.submittedBy,
             submittedAt: sub.submittedAt,
             attachment: sub.attachment
@@ -414,6 +475,141 @@ function loadFromStorage() {
         console.error('Failed to load from localStorage', e)
         submissions = []
     }
+}
+
+// ===== Category Catalog =====
+function handleCatalogSelect(e) {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+        try {
+            const parsed = JSON.parse(event.target.result)
+            categoryCatalog = normalizeCatalog(parsed)
+            saveCatalogToStorage()
+            renderCatalogControls()
+            showToast('Kategorien importiert', 'success')
+        } catch (err) {
+            console.error('Invalid catalog file', err)
+            showToast('Kategorien-Datei konnte nicht gelesen werden', 'error')
+        } finally {
+            catalogInput.value = ''
+        }
+    }
+    reader.readAsText(file)
+}
+
+function normalizeCatalog(data) {
+    const categories = data?.categories || data || {}
+    const budgets = Array.isArray(categories.budgets) ? categories.budgets : []
+    const earmarks = Array.isArray(categories.earmarks || categories.purposeBindings) ? (categories.earmarks || categories.purposeBindings) : []
+    const tags = Array.isArray(categories.tags) ? categories.tags : []
+
+    return {
+        type: 'vereino-submission-catalog',
+        version: data?.version || '1.0',
+        exportedAt: data?.exportedAt || null,
+        organization: data?.organization || null,
+        categories: {
+            budgets: budgets.map(item => ({
+                ...item,
+                id: Number(item.id),
+                label: item.label || item.name || [item.year, item.categoryName || item.projectName].filter(Boolean).join(' - ') || `Budget ${item.id}`,
+                color: normalizeColor(item.color)
+            })).filter(item => Number.isFinite(item.id)),
+            earmarks: earmarks.map(item => ({
+                ...item,
+                id: Number(item.id),
+                label: item.label || [item.code, item.name].filter(Boolean).join(' - ') || `Zweckbindung ${item.id}`,
+                color: normalizeColor(item.color)
+            })).filter(item => Number.isFinite(item.id)),
+            tags: tags.map(item => ({
+                ...item,
+                id: Number(item.id),
+                name: String(item.name || '').trim(),
+                color: normalizeColor(item.color)
+            })).filter(item => Number.isFinite(item.id) && item.name)
+        }
+    }
+}
+
+function normalizeColor(color) {
+    const value = String(color || '').trim()
+    return /^#[0-9a-f]{3,8}$/i.test(value) ? value : null
+}
+
+function saveCatalogToStorage() {
+    try {
+        localStorage.setItem('vereino-category-catalog', JSON.stringify(categoryCatalog))
+    } catch (e) {
+        console.error('Failed to save catalog', e)
+    }
+}
+
+function loadCatalogFromStorage() {
+    try {
+        const saved = localStorage.getItem('vereino-category-catalog')
+        if (saved) categoryCatalog = normalizeCatalog(JSON.parse(saved))
+    } catch (e) {
+        console.error('Failed to load catalog', e)
+        categoryCatalog = null
+    }
+    renderCatalogControls()
+}
+
+function clearCatalog() {
+    categoryCatalog = null
+    localStorage.removeItem('vereino-category-catalog')
+    budgetInput.value = ''
+    earmarkInput.value = ''
+    renderCatalogControls()
+    showToast('Kategorien entfernt', 'success')
+}
+
+function renderCatalogControls() {
+    const budgets = categoryCatalog?.categories?.budgets || []
+    const earmarks = categoryCatalog?.categories?.earmarks || []
+    const tags = categoryCatalog?.categories?.tags || []
+    const orgName = categoryCatalog?.organization?.name
+
+    catalogStatus.textContent = categoryCatalog
+        ? `${orgName ? `${orgName}: ` : ''}${budgets.length} Budget(s), ${earmarks.length} Zweckbindung(en), ${tags.length} Tag(s)`
+        : 'Optional: Kategorien-Datei vom Kassier importieren.'
+    catalogClear.hidden = !categoryCatalog
+
+    budgetGroup.hidden = budgets.length === 0
+    budgetInput.innerHTML = '<option value="">Kein Budget</option>' + budgets.map(item => (
+        `<option value="${item.id}">${escapeHtml(item.label)}</option>`
+    )).join('')
+
+    earmarkGroup.hidden = earmarks.length === 0
+    earmarkInput.innerHTML = '<option value="">Keine Zweckbindung</option>' + earmarks.map(item => (
+        `<option value="${item.id}">${escapeHtml(item.label)}</option>`
+    )).join('')
+
+    tagsGroup.hidden = tags.length === 0
+    tagOptions.innerHTML = tags.map(item => {
+        const colorStyle = item.color ? ` style="--tag-color: ${escapeHtml(item.color)}"` : ''
+        return `
+            <label class="tag-option"${colorStyle}>
+                <input type="checkbox" value="${item.id}">
+                <span>${escapeHtml(item.name)}</span>
+            </label>
+        `
+    }).join('')
+}
+
+function findCatalogItem(type, id) {
+    if (!id || !categoryCatalog?.categories?.[type]) return null
+    const numericId = Number(id)
+    return categoryCatalog.categories[type].find(item => item.id === numericId) || null
+}
+
+function getSelectedTags() {
+    const tags = categoryCatalog?.categories?.tags || []
+    const selectedIds = new Set(Array.from(tagOptions.querySelectorAll('input[type="checkbox"]:checked')).map(input => Number(input.value)))
+    return tags.filter(tag => selectedIds.has(tag.id))
 }
 
 // ===== UI Helpers =====

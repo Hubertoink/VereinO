@@ -1,6 +1,6 @@
 {
   "name": "vereino-submission-web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Mobile-first web app for submitting vouchers to VereinO",
   "type": "module",
   "scripts": {

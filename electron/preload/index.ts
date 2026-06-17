@@ -218,6 +218,7 @@ contextBridge.exposeInMainWorld('api', {
     updates: {
         getState: () => ipcRenderer.invoke('updates.getState'),
         check: () => ipcRenderer.invoke('updates.check'),
+        download: () => ipcRenderer.invoke('updates.download'),
         install: () => ipcRenderer.invoke('updates.install'),
         onStateChanged: (cb: (state: any) => void) => {
             const handler = (_: any, state: any) => cb(state)
@@ -241,6 +242,7 @@ contextBridge.exposeInMainWorld('api', {
         get: (payload: any) => ipcRenderer.invoke('submissions.get', payload),
         import: (payload: any) => ipcRenderer.invoke('submissions.import', payload),
         importFromFile: () => ipcRenderer.invoke('submissions.importFromFile'),
+        exportCatalog: () => ipcRenderer.invoke('submissions.exportCatalog'),
         approve: (payload: any) => ipcRenderer.invoke('submissions.approve', payload),
         reject: (payload: any) => ipcRenderer.invoke('submissions.reject', payload),
         delete: (payload: any) => ipcRenderer.invoke('submissions.delete', payload),

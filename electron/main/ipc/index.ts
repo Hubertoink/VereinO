@@ -1,5 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, TagUsageInput, TagUsageOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput, DonationsExportMoneyReceiptInput, DonationsExportMoneyReceiptOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsOutput } from './schemas'
+import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, TagUsageInput, TagUsageOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput, SubmissionsExportCatalogOutput, DonationsExportMoneyReceiptInput, DonationsExportMoneyReceiptOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
@@ -1711,6 +1711,76 @@ export function registerIpcHandlers() {
         return SubmissionsImportOutput.parse(result)
     })
 
+    // Export category catalog for the public submission web form
+    ipcMain.handle('submissions.exportCatalog', async () => {
+        const activeOrg = getActiveOrganization()
+        const bindings = listBindings({ activeOnly: true })
+        const budgets = listBudgets({ includeArchived: false } as any)
+        const tags = listTags({})
+        const bindingById = new Map(bindings.map((binding: any) => [binding.id, binding]))
+
+        const labelForBudget = (budget: any) => {
+            if (budget.name && String(budget.name).trim()) return String(budget.name).trim()
+            if (budget.categoryName && String(budget.categoryName).trim()) return `${budget.year} - ${budget.categoryName}`
+            if (budget.projectName && String(budget.projectName).trim()) return `${budget.year} - ${budget.projectName}`
+            if (budget.earmarkId) {
+                const binding = bindingById.get(budget.earmarkId)
+                if (binding) return `${budget.year} - ${binding.code} ${binding.name}`
+            }
+            return `Budget ${budget.year}`
+        }
+
+        const exportData = {
+            type: 'vereino-submission-catalog',
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            organization: activeOrg ? {
+                id: activeOrg.id,
+                name: activeOrg.name
+            } : null,
+            categories: {
+                budgets: budgets.map((budget: any) => ({
+                    id: budget.id,
+                    label: labelForBudget(budget),
+                    year: budget.year,
+                    sphere: budget.sphere,
+                    amountPlanned: budget.amountPlanned,
+                    startDate: budget.startDate ?? null,
+                    endDate: budget.endDate ?? null,
+                    color: budget.color ?? null
+                })),
+                earmarks: bindings.map((binding: any) => ({
+                    id: binding.id,
+                    code: binding.code,
+                    name: binding.name,
+                    label: `${binding.code} - ${binding.name}`,
+                    startDate: binding.startDate ?? null,
+                    endDate: binding.endDate ?? null,
+                    color: binding.color ?? null
+                })),
+                tags: tags.map((tag: any) => ({
+                    id: tag.id,
+                    name: tag.name,
+                    color: tag.color ?? null
+                }))
+            }
+        }
+
+        const orgPart = (activeOrg?.name || 'verein').replace(/[^a-zA-Z0-9_-]+/g, '_')
+        const date = new Date().toISOString().slice(0, 10)
+        const save = await dialog.showSaveDialog({
+            title: 'Webformular-Kategorien exportieren',
+            defaultPath: `${orgPart}-${date}.vereino-catalog.json`,
+            filters: [{ name: 'VereinO Webformular-Kategorien', extensions: ['vereino-catalog.json', 'json'] }]
+        })
+        if (save.canceled || !save.filePath) {
+            return SubmissionsExportCatalogOutput.parse({ filePath: '' })
+        }
+
+        fs.writeFileSync(save.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+        return SubmissionsExportCatalogOutput.parse({ filePath: save.filePath })
+    })
+
     // Import submissions from file picker
     ipcMain.handle('submissions.importFromFile', async () => {
         const result = await dialog.showOpenDialog({
@@ -1741,6 +1811,11 @@ export function registerIpcHandlers() {
                         grossAmount: sub.grossAmount,
                         categoryHint: sub.categoryHint,
                         counterparty: sub.counterparty,
+                        budgetId: sub.budgetId ?? sub.budget?.id ?? null,
+                        budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
+                        earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
+                        earmarkLabel: sub.earmarkLabel ?? sub.earmark?.label ?? (sub.earmark ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ') : null),
+                        tags: Array.isArray(sub.tags) ? sub.tags.map((tag: any) => typeof tag === 'string' ? tag : tag?.name).filter(Boolean) : [],
                         submittedBy: sub.submittedBy,
                         submittedAt: sub.submittedAt,
                         // Convert single attachment to attachments array
@@ -1768,6 +1843,11 @@ export function registerIpcHandlers() {
                         grossAmount: sub.grossAmount,
                         categoryHint: sub.categoryHint,
                         counterparty: sub.counterparty,
+                        budgetId: sub.budgetId ?? sub.budget?.id ?? null,
+                        budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
+                        earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
+                        earmarkLabel: sub.earmarkLabel ?? sub.earmark?.label ?? (sub.earmark ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ') : null),
+                        tags: Array.isArray(sub.tags) ? sub.tags.map((tag: any) => typeof tag === 'string' ? tag : tag?.name).filter(Boolean) : [],
                         submittedBy: sub.submittedBy,
                         submittedAt: sub.submittedAt,
                         attachments: sub.attachment ? [{
@@ -1798,6 +1878,9 @@ export function registerIpcHandlers() {
         const db = getDb()
         const repo = createSubmissionsRepository(db)
         const result = repo.approve(parsed.id, { reviewerNotes: parsed.reviewerNotes })
+        if (result.ok && parsed.voucherId) {
+            repo.linkToVoucher(parsed.id, parsed.voucherId)
+        }
         return SubmissionApproveOutput.parse(result)
     })
 

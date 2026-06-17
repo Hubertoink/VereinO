@@ -1248,6 +1248,11 @@ export const SubmissionSchema = z.object({
     grossAmount: z.number(),
     categoryHint: z.string().nullable().optional(),
     counterparty: z.string().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    budgetLabel: z.string().nullable().optional(),
+    earmarkId: z.number().nullable().optional(),
+    earmarkLabel: z.string().nullable().optional(),
+    tags: z.array(z.string()).optional(),
     submittedBy: z.string(),
     submittedAt: z.string(),
     status: z.enum(['pending', 'approved', 'rejected']),
@@ -1280,6 +1285,11 @@ export const SubmissionsImportInput = z.object({
         grossAmount: z.number(),
         categoryHint: z.string().optional(),
         counterparty: z.string().optional(),
+        budgetId: z.number().nullable().optional(),
+        budgetLabel: z.string().nullable().optional(),
+        earmarkId: z.number().nullable().optional(),
+        earmarkLabel: z.string().nullable().optional(),
+        tags: z.array(z.string()).optional(),
         submittedBy: z.string(),
         attachments: z.array(z.object({
             filename: z.string(),
@@ -1295,7 +1305,8 @@ export const SubmissionsImportOutput = z.object({
 
 export const SubmissionApproveInput = z.object({
     id: z.number(),
-    reviewerNotes: z.string().optional()
+    reviewerNotes: z.string().optional(),
+    voucherId: z.number().optional()
 })
 export const SubmissionApproveOutput = z.object({ ok: z.boolean() })
 
@@ -1335,6 +1346,10 @@ export const SubmissionAttachmentReadOutput = z.object({
     dataBase64: z.string()
 })
 
+export const SubmissionsExportCatalogOutput = z.object({
+    filePath: z.string()
+})
+
 export type TSubmissionsListInput = z.infer<typeof SubmissionsListInput>
 export type TSubmissionsListOutput = z.infer<typeof SubmissionsListOutput>
 export type TSubmissionGetInput = z.infer<typeof SubmissionGetInput>
@@ -1352,3 +1367,4 @@ export type TSubmissionConvertOutput = z.infer<typeof SubmissionConvertOutput>
 export type TSubmissionsSummaryOutput = z.infer<typeof SubmissionsSummaryOutput>
 export type TSubmissionAttachmentReadInput = z.infer<typeof SubmissionAttachmentReadInput>
 export type TSubmissionAttachmentReadOutput = z.infer<typeof SubmissionAttachmentReadOutput>
+export type TSubmissionsExportCatalogOutput = z.infer<typeof SubmissionsExportCatalogOutput>

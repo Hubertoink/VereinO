@@ -190,6 +190,7 @@ Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
 #### Für Mitglieder (Einreicher)
 
 - **Buchungen anlegen**: Ausgaben mit allen relevanten Daten erfassen
+- **Kategorien übernehmen**: Optional vom Kassierer exportierte Budgets, Zweckbindungen und Tags importieren
 - **Belege hochladen**: Digitale Kopien von Quittungen und Rechnungen anhängen
 - **Als JSON exportieren**: Eingereichte Buchungen als JSON-Datei herunterladen
 - **An Kassierer senden**: JSON-Export per E-Mail oder Dateifreigabe übermitteln
@@ -197,6 +198,7 @@ Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
 #### Für Kassierer (in der VereinO Desktop-App)
 
 - **JSON importieren**: Eingereichte Buchungen in der App prüfen
+- **Kategorien bereitstellen**: Budgets, Zweckbindungen und Tags als Katalogdatei für das Portal exportieren
 - **Validieren**: Belege und Beträge kontrollieren
 - **Übernehmen**: Geprüfte Buchungen in die offizielle Buchhaltung aufnehmen
 

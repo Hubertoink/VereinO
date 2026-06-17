@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.2] – 2026-06-17
+
+### Hinzugefügt
+
+- Einreichungen: Export einer Webformular-Katalogdatei mit Organisation, Budgets, Zweckbindungen und Tags.
+- Submission Web: Import der Katalogdatei und Auswahl von Budget, Zweckbindung und Tags pro Einreichung.
+
+### Geändert
+
+- Einreichungen: Import und Review übernehmen vorgeschlagene Kategorien aus dem Webformular als Vorauswahl.
+- Submission Web: JSON-Export auf Version `1.1` erweitert und Dokumentation für HTTP/HTTPS-Testbetrieb ergänzt.
+
 ## [1.9.1] – 2026-06-17
 
 ### Hinzugefügt

@@ -79,6 +79,35 @@
                     <input type="text" id="category" placeholder="z.B. Vereinsfest, Material, etc.">
                 </div>
 
+                <div class="form-group form-group--full catalog-panel">
+                    <label>VereinO-Kategorien</label>
+                    <div class="catalog-import">
+                        <input type="file" id="catalog-input" accept=".json,.vereino-catalog.json,application/json" hidden>
+                        <button type="button" class="btn-secondary" id="catalog-button">📤 Kategorien importieren</button>
+                        <button type="button" class="btn-secondary btn-compact" id="catalog-clear" hidden>×</button>
+                    </div>
+                    <div class="catalog-status" id="catalog-status">Optional: Kategorien-Datei vom Kassier importieren.</div>
+                </div>
+
+                <div class="form-group" id="budget-group" hidden>
+                    <label for="budget">Budget</label>
+                    <select id="budget">
+                        <option value="">Kein Budget</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="earmark-group" hidden>
+                    <label for="earmark">Zweckbindung</label>
+                    <select id="earmark">
+                        <option value="">Keine Zweckbindung</option>
+                    </select>
+                </div>
+
+                <div class="form-group form-group--full" id="tags-group" hidden>
+                    <label>Tags</label>
+                    <div class="tag-options" id="tag-options"></div>
+                </div>
+
                 <div class="form-group">
                     <label for="submitter">Dein Name *</label>
                     <input type="text" id="submitter" placeholder="Vor- und Nachname" required>
@@ -171,6 +200,7 @@
                 <h3 class="modal-title">Über VereinO</h3>
                 <div class="modal-message info-content">
                     <p>Mit dieser Web-App können Sie Buchungsvorschläge für Ihren Verein erstellen.</p>
+                    <p>Wenn der Kassier eine VereinO-Kategorien-Datei bereitstellt, können Budgets, Zweckbindungen und Tags direkt im Formular ausgewählt und mit der Einreichung übermittelt werden.</p>
                     <p><strong>Weitere Informationen:</strong></p>
                     <ul class="info-links">
                         <li>

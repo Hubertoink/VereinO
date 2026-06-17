@@ -7,6 +7,7 @@ Mobile-first Web-App zum Einreichen von Buchungen für VereinO.
 - 📱 **Mobile-first Design** – Optimiert für Smartphones
 - 📷 **Beleg-Foto** – Direkt Foto aufnehmen oder Bild hochladen
 - 📋 **Mehrere Buchungen** – Beliebig viele Buchungen sammeln
+- 🏷️ **VereinO-Kategorien** – Budgets, Zweckbindungen und Tags aus einer Kassier-Datei importieren
 - 📥 **JSON Export** – Als `.vereino-submission.json` herunterladen
 - 💾 **Lokale Speicherung** – Daten bleiben im Browser erhalten
 - 🌙 **Dark Mode** – Unterstützt System-Präferenz
@@ -22,6 +23,8 @@ npm run dev
 ```
 
 Öffne http://localhost:3000
+
+> Hinweis: Die App muss über HTTP/HTTPS laufen. Direktes Öffnen der `src/index.html` per `file://` blockiert moderne Browser-Modulskripte und Datei-Interaktionen.
 
 ## Deployment mit Docker
 
@@ -89,23 +92,32 @@ server {
 ## Workflow
 
 1. **Mitglied** öffnet die Web-App auf dem Handy
-2. Gibt Buchungsdaten ein (Datum, Betrag, Beschreibung)
-3. Fotografiert optional den Beleg
-4. Fügt mehrere Buchungen zur Liste hinzu
-5. Lädt JSON-Datei herunter
-6. Sendet die Datei per E-Mail an den Kassier
+2. Importiert optional die vom Kassier exportierte `.vereino-catalog.json`
+3. Gibt Buchungsdaten ein (Datum, Betrag, Beschreibung)
+4. Wählt optional Budget, Zweckbindung und Tags
+5. Fotografiert optional den Beleg
+6. Fügt mehrere Buchungen zur Liste hinzu
+7. Lädt JSON-Datei herunter
+8. Sendet die Datei per E-Mail an den Kassier
 
-7. **Kassier** importiert die Datei in VereinO Desktop
-8. Prüft die Einreichungen
-9. Kann Details vor Genehmigung bearbeiten
-10. Genehmigt → Buchung wird automatisch erstellt
+9. **Kassier** importiert die Datei in VereinO Desktop
+10. Prüft die Einreichungen mit vorgeschlagenen Kategorien
+11. Kann Details vor Genehmigung bearbeiten
+12. Genehmigt → Buchung wird automatisch erstellt
 
 ## JSON Format
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "exportedAt": "2024-12-03T10:30:00.000Z",
+  "sourceCatalog": {
+    "organization": {
+      "id": "default",
+      "name": "Musterverein"
+    },
+    "exportedAt": "2024-12-03T09:00:00.000Z"
+  },
   "submissions": [
     {
       "externalId": "abc123",
@@ -115,6 +127,17 @@ server {
       "description": "Büromaterial",
       "counterparty": "Büro Schmidt",
       "categoryHint": "Verwaltung",
+      "budgetId": 12,
+      "budgetLabel": "Verwaltung 2024",
+      "earmarkId": 5,
+      "earmarkLabel": "Z-01 - Sommerfest",
+      "tags": [
+        {
+          "id": 3,
+          "name": "Material",
+          "color": "#2962FF"
+        }
+      ],
       "submittedBy": "Max Mustermann",
       "submittedAt": "2024-12-03T10:30:00.000Z",
       "attachment": {

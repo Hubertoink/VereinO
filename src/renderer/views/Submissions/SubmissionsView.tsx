@@ -5,6 +5,7 @@ import TagsEditor from '../../components/TagsEditor'
 
 // Unicode icons for buttons
 const ICON_IMPORT = '📥'
+const ICON_EXPORT = '📤'
 const ICON_DELETE = ICONS.DELETE
 
 // Type matching the backend schema
@@ -19,6 +20,11 @@ interface Submission {
     grossAmount: number
     categoryHint?: string | null
     counterparty?: string | null
+    budgetId?: number | null
+    budgetLabel?: string | null
+    earmarkId?: number | null
+    earmarkLabel?: string | null
+    tags?: string[]
     submittedBy: string
     submittedAt: string
     status: 'pending' | 'approved' | 'rejected'
@@ -88,6 +94,8 @@ function ReviewModal({
     const [existingAttachments, setExistingAttachments] = useState(submission.attachments || [])
     const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([])
     const [newAttachments, setNewAttachments] = useState<Array<{ filename: string; mimeType: string; dataBase64: string }>>([])
+    const budgetExists = useMemo(() => !!submission.budgetId && budgetsForEdit.some((b) => b.id === submission.budgetId), [budgetsForEdit, submission.budgetId])
+    const earmarkExists = useMemo(() => !!submission.earmarkId && earmarks.some((em) => em.id === submission.earmarkId), [earmarks, submission.earmarkId])
     
     // Editable voucher draft - convert from cents to euros for display
     const [draft, setDraft] = useState<VoucherDraft>(() => ({
@@ -98,9 +106,9 @@ function ReviewModal({
         grossAmount: submission.grossAmount, // stored in cents
         vatRate: 0,
         paymentMethod: submission.paymentMethod || 'BANK',
-        earmarkId: null,
-        budgetId: null,
-        tags: [],
+        earmarkId: submission.earmarkId && earmarks.some((em) => em.id === submission.earmarkId) ? submission.earmarkId : null,
+        budgetId: submission.budgetId && budgetsForEdit.some((b) => b.id === submission.budgetId) ? submission.budgetId : null,
+        tags: submission.tags || [],
         counterparty: submission.counterparty || ''
     }))
 
@@ -168,6 +176,15 @@ function ReviewModal({
                             {submission.description || '–'} · Von: {submission.submittedBy}
                             {submission.categoryHint && ` · Hinweis: ${submission.categoryHint}`}
                         </div>
+                        {(submission.budgetLabel || submission.earmarkLabel || (submission.tags && submission.tags.length > 0)) && (
+                            <div className="helper mt-4">
+                                {submission.budgetLabel && `Budget: ${submission.budgetLabel}${budgetExists ? '' : ' (nicht gefunden)'}`}
+                                {submission.budgetLabel && (submission.earmarkLabel || (submission.tags && submission.tags.length > 0)) ? ' · ' : ''}
+                                {submission.earmarkLabel && `Zweckbindung: ${submission.earmarkLabel}${earmarkExists ? '' : ' (nicht gefunden)'}`}
+                                {submission.earmarkLabel && submission.tags && submission.tags.length > 0 ? ' · ' : ''}
+                                {submission.tags && submission.tags.length > 0 && `Tags: ${submission.tags.join(', ')}`}
+                            </div>
+                        )}
                         {submission.attachments && submission.attachments.length > 0 && !editMode && (
                             <div className="mt-8 flex flex-wrap gap-4">
                                 {submission.attachments.map((att) => (
@@ -682,6 +699,17 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         }
     }
 
+    const handleExportCatalog = async () => {
+        try {
+            const res = await (window as any).api?.submissions?.exportCatalog?.()
+            if (res?.filePath) {
+                notify('success', `Webformular-Kategorien exportiert: ${res.filePath}`)
+            }
+        } catch (e: any) {
+            notify('error', 'Export fehlgeschlagen: ' + (e?.message || e))
+        }
+    }
+
     // Approve submission with edited voucher data
     const handleApprove = async (notes: string, draft: VoucherDraft) => {
         if (!reviewSubmission) return
@@ -782,7 +810,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         try {
             await (window as any).api?.submissions?.reject?.({
                 id: reviewSubmission.id,
-                notes
+                reviewerNotes: notes
             })
             notify('info', 'Einreichung abgelehnt')
             setReviewSubmission(null)
@@ -886,12 +914,15 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                             </p>
                             <p className="flyout-text" style={{ marginBottom: 0 }}>
                                 Am Ende wird eine Datei (<code>.vereino-submission.json</code>) erstellt, die das Mitglied an den Kassenwart sendet.
-                                Diese Datei kann über den <strong>Importieren</strong>-Button eingelesen werden.
+                                Über <strong>Kategorien</strong> kann vorher eine Katalogdatei für Budgets, Zweckbindungen und Tags exportiert werden.
                             </p>
                         </div>
                     )}
                     <button className="btn" onClick={handleImport} title="JSON-Datei importieren">
                         {ICON_IMPORT} Importieren
+                    </button>
+                    <button className="btn" onClick={handleExportCatalog} title="Budgets, Zweckbindungen und Tags für das Webformular exportieren">
+                        {ICON_EXPORT} Kategorien
                     </button>
                 </div>
             </header>

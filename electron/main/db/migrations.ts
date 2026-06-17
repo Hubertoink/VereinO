@@ -660,6 +660,19 @@ export const MIGRATIONS: Mig[] = [
     END
     WHERE amount_mode IS NULL OR amount_mode = '';
     `
+  },
+  {
+    version: 30,
+    up: `
+    -- Submissions: member-proposed budget, earmark, and tags from the web form
+    ALTER TABLE submissions ADD COLUMN budget_id INTEGER;
+    ALTER TABLE submissions ADD COLUMN budget_label TEXT;
+    ALTER TABLE submissions ADD COLUMN earmark_id INTEGER;
+    ALTER TABLE submissions ADD COLUMN earmark_label TEXT;
+    ALTER TABLE submissions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
+    CREATE INDEX IF NOT EXISTS idx_submissions_budget ON submissions(budget_id);
+    CREATE INDEX IF NOT EXISTS idx_submissions_earmark ON submissions(earmark_id);
+    `
   }
 ]
 
@@ -835,6 +848,26 @@ export function ensureAdvanceTables(db: DB) {
   }
 }
 
+export function ensureSubmissionColumns(db: DB) {
+  try {
+    const submissionCols = db.prepare('PRAGMA table_info(submissions)').all() as Array<{ name: string }>
+    const names = new Set(submissionCols.map((col) => col.name))
+
+    if (!names.has('budget_id')) db.exec('ALTER TABLE submissions ADD COLUMN budget_id INTEGER;')
+    if (!names.has('budget_label')) db.exec('ALTER TABLE submissions ADD COLUMN budget_label TEXT;')
+    if (!names.has('earmark_id')) db.exec('ALTER TABLE submissions ADD COLUMN earmark_id INTEGER;')
+    if (!names.has('earmark_label')) db.exec('ALTER TABLE submissions ADD COLUMN earmark_label TEXT;')
+    if (!names.has('tags_json')) db.exec("ALTER TABLE submissions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';")
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_submissions_budget ON submissions(budget_id);
+      CREATE INDEX IF NOT EXISTS idx_submissions_earmark ON submissions(earmark_id);
+    `)
+  } catch {
+    return
+  }
+}
+
 export function ensureVoucherColumns(db: DB) {
   try {
     const voucherCols = db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>
@@ -891,13 +924,14 @@ export function applyMigrations(db: DB) {
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)
+  ensureSubmissionColumns(db)
 
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue
     
     // Special handling for migration 20 - check if columns already exist
-    if (mig.version === 20 || mig.version === 29) {
+    if (mig.version === 20 || mig.version === 29 || mig.version === 30) {
       try {
         if (mig.version === 20) {
           const budgetCols = db.prepare("PRAGMA table_info(budgets)").all() as Array<{ name: string }>
@@ -920,6 +954,17 @@ export function applyMigrations(db: DB) {
             continue
           }
         }
+
+        if (mig.version === 30) {
+          const submissionCols = db.prepare("PRAGMA table_info(submissions)").all() as Array<{ name: string }>
+          const hasSubmissionTags = submissionCols.some((c: { name: string }) => c.name === 'tags_json')
+
+          if (hasSubmissionTags) {
+            console.log('[Migration 30] Columns already exist, marking as applied')
+            db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
+            continue
+          }
+        }
       } catch (e) {
         console.warn(`[Migration ${mig.version}] Failed to check if columns exist:`, e)
       }
@@ -935,7 +980,7 @@ export function applyMigrations(db: DB) {
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
       // For migration 20 specifically, try to continue anyway if it's a duplicate column error
-      if ((mig.version === 20 || mig.version === 29) && error.message?.includes('duplicate column')) {
+      if ((mig.version === 20 || mig.version === 29 || mig.version === 30) && error.message?.includes('duplicate column')) {
         console.log(`[Migration ${mig.version}] Column already exists, marking as applied`)
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       } else {

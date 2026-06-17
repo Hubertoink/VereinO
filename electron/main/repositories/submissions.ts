@@ -12,6 +12,11 @@ export interface Submission {
   grossAmount: number
   categoryHint?: string | null
   counterparty?: string | null
+  budgetId?: number | null
+  budgetLabel?: string | null
+  earmarkId?: number | null
+  earmarkLabel?: string | null
+  tags?: string[]
   submittedBy: string
   submittedAt: string
   status: 'pending' | 'approved' | 'rejected'
@@ -43,6 +48,11 @@ export interface CreateSubmissionPayload {
   grossAmount: number
   categoryHint?: string
   counterparty?: string
+  budgetId?: number | null
+  budgetLabel?: string | null
+  earmarkId?: number | null
+  earmarkLabel?: string | null
+  tags?: string[]
   submittedBy: string
   attachments?: Array<{ filename: string; mimeType?: string; data: Buffer }>
 }
@@ -58,9 +68,42 @@ export interface ImportSubmissionPayload {
     grossAmount: number
     categoryHint?: string
     counterparty?: string
+    budgetId?: number | null
+    budgetLabel?: string | null
+    earmarkId?: number | null
+    earmarkLabel?: string | null
+    tags?: string[]
     submittedBy: string
     attachments?: Array<{ filename: string; mimeType?: string; data: string }>
   }>
+}
+
+function parseTags(raw?: string | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item) => typeof item === 'string' ? item : String(item?.name || '').trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function stringifyTags(tags?: string[] | null): string {
+  if (!Array.isArray(tags)) return '[]'
+  const seen = new Set<string>()
+  const clean = tags
+    .map((tag) => String(tag || '').trim())
+    .filter((tag) => {
+      if (!tag) return false
+      const key = tag.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  return JSON.stringify(clean)
 }
 
 export function createSubmissionsRepository(db: DB) {
@@ -76,7 +119,11 @@ export function createSubmissionsRepository(db: DB) {
           s.sphere, s.payment_method as paymentMethod,
           s.description,
           s.gross_amount as grossAmount, s.category_hint as categoryHint,
-          s.counterparty, s.submitted_by as submittedBy, s.submitted_at as submittedAt,
+          s.counterparty,
+          s.budget_id as budgetId, s.budget_label as budgetLabel,
+          s.earmark_id as earmarkId, s.earmark_label as earmarkLabel,
+          s.tags_json as tagsJson,
+          s.submitted_by as submittedBy, s.submitted_at as submittedAt,
           s.status, s.reviewed_at as reviewedAt, s.reviewer_notes as reviewerNotes,
           s.voucher_id as voucherId
         FROM submissions s
@@ -96,7 +143,7 @@ export function createSubmissionsRepository(db: DB) {
       sql += ' ORDER BY s.submitted_at DESC LIMIT ? OFFSET ?'
       values.push(limit, offset)
 
-      const rows = db.prepare(sql).all(...values) as Submission[]
+      const rows = db.prepare(sql).all(...values) as Array<Submission & { tagsJson?: string | null }>
 
       let countSql = 'SELECT COUNT(*) as total FROM submissions s'
       if (conditions.length > 0) {
@@ -112,7 +159,8 @@ export function createSubmissionsRepository(db: DB) {
           WHERE submission_id = ?
         `).all(row.id) as Array<{ id: number; filename: string; mimeType?: string | null }>
         
-        return { ...row, attachments }
+        const { tagsJson, ...rest } = row
+        return { ...rest, tags: parseTags(tagsJson), attachments }
       })
 
       return { rows: result, total: countRow.total }
@@ -124,12 +172,16 @@ export function createSubmissionsRepository(db: DB) {
           id, external_id as externalId, date, type, description,
           gross_amount as grossAmount, category_hint as categoryHint,
           sphere, payment_method as paymentMethod,
-          counterparty, submitted_by as submittedBy, submitted_at as submittedAt,
+          counterparty,
+          budget_id as budgetId, budget_label as budgetLabel,
+          earmark_id as earmarkId, earmark_label as earmarkLabel,
+          tags_json as tagsJson,
+          submitted_by as submittedBy, submitted_at as submittedAt,
           status, reviewed_at as reviewedAt, reviewer_notes as reviewerNotes,
           voucher_id as voucherId
         FROM submissions
         WHERE id = ?
-      `).get(id) as Submission | undefined
+      `).get(id) as (Submission & { tagsJson?: string | null }) | undefined
 
       if (!row) return null
 
@@ -139,13 +191,18 @@ export function createSubmissionsRepository(db: DB) {
         WHERE submission_id = ?
       `).all(id) as Array<{ id: number; filename: string; mimeType?: string | null }>
 
-      return { ...row, attachments }
+      const { tagsJson, ...rest } = row
+      return { ...rest, tags: parseTags(tagsJson), attachments }
     },
 
     create(payload: CreateSubmissionPayload): { id: number } {
       const insertSubmission = db.prepare(`
-        INSERT INTO submissions (external_id, date, type, sphere, payment_method, description, gross_amount, category_hint, counterparty, submitted_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO submissions (
+          external_id, date, type, sphere, payment_method, description, gross_amount,
+          category_hint, counterparty, budget_id, budget_label, earmark_id, earmark_label,
+          tags_json, submitted_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -164,6 +221,11 @@ export function createSubmissionsRepository(db: DB) {
           payload.grossAmount,
           payload.categoryHint || null,
           payload.counterparty || null,
+          payload.budgetId ?? null,
+          payload.budgetLabel ?? null,
+          payload.earmarkId ?? null,
+          payload.earmarkLabel ?? null,
+          stringifyTags(payload.tags),
           payload.submittedBy
         )
         const submissionId = res.lastInsertRowid as number
@@ -182,8 +244,12 @@ export function createSubmissionsRepository(db: DB) {
 
     import(payload: ImportSubmissionPayload): { imported: number; ids: number[] } {
       const insertSubmission = db.prepare(`
-        INSERT INTO submissions (external_id, date, type, sphere, payment_method, description, gross_amount, category_hint, counterparty, submitted_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO submissions (
+          external_id, date, type, sphere, payment_method, description, gross_amount,
+          category_hint, counterparty, budget_id, budget_label, earmark_id, earmark_label,
+          tags_json, submitted_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -205,6 +271,11 @@ export function createSubmissionsRepository(db: DB) {
             sub.grossAmount,
             sub.categoryHint || null,
             sub.counterparty || null,
+            sub.budgetId ?? null,
+            sub.budgetLabel ?? null,
+            sub.earmarkId ?? null,
+            sub.earmarkLabel ?? null,
+            stringifyTags(sub.tags),
             sub.submittedBy
           )
           const submissionId = res.lastInsertRowid as number
