@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 
-export type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
 
 export type UpdateState = {
     status: UpdateStatus
@@ -51,7 +51,7 @@ export function initUpdateManager() {
         return
     }
 
-    autoUpdater.autoDownload = true
+    autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = false
 
     autoUpdater.on('checking-for-update', () => {
@@ -66,11 +66,11 @@ export function initUpdateManager() {
 
     autoUpdater.on('update-available', (info) => {
         setUpdateState({
-            status: 'downloading',
+            status: 'available',
             availableVersion: info.version,
             downloadedVersion: null,
-            downloadProgress: 0,
-            message: `Update ${info.version} wird heruntergeladen...`
+            downloadProgress: null,
+            message: `Update ${info.version} ist verfügbar.`
         })
     })
 
@@ -137,6 +137,43 @@ export async function checkForAppUpdates() {
             status: 'error',
             downloadProgress: null,
             message: `Update-Prüfung fehlgeschlagen: ${toMessage(error)}`
+        })
+    }
+
+    return updateState
+}
+
+export async function downloadAppUpdate() {
+    if (!app.isPackaged) {
+        setUpdateState({
+            status: 'unsupported',
+            message: 'Updates sind nur in der installierten App verfügbar.'
+        })
+        return updateState
+    }
+
+    if (updateState.status === 'downloading' || updateState.status === 'downloaded') {
+        return updateState
+    }
+
+    if (updateState.status !== 'available') {
+        return updateState
+    }
+
+    try {
+        setUpdateState({
+            status: 'downloading',
+            downloadProgress: 0,
+            message: updateState.availableVersion
+                ? `Update ${updateState.availableVersion} wird heruntergeladen...`
+                : 'Update wird heruntergeladen...'
+        })
+        await autoUpdater.downloadUpdate()
+    } catch (error) {
+        setUpdateState({
+            status: 'error',
+            downloadProgress: null,
+            message: `Update-Download fehlgeschlagen: ${toMessage(error)}`
         })
     }
 

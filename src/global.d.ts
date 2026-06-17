@@ -243,7 +243,7 @@ declare global {
             }
             updates: {
                 getState: () => Promise<{
-                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
                     currentVersion: string
                     availableVersion: string | null
                     downloadedVersion: string | null
@@ -251,7 +251,15 @@ declare global {
                     message: string | null
                 }>
                 check: () => Promise<{
-                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    currentVersion: string
+                    availableVersion: string | null
+                    downloadedVersion: string | null
+                    downloadProgress: number | null
+                    message: string | null
+                }>
+                download: () => Promise<{
+                    status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
                     currentVersion: string
                     availableVersion: string | null
                     downloadedVersion: string | null
@@ -261,7 +269,7 @@ declare global {
                 install: () => Promise<{
                     ok: boolean
                     state: {
-                        status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                        status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
                         currentVersion: string
                         availableVersion: string | null
                         downloadedVersion: string | null
@@ -270,7 +278,7 @@ declare global {
                     }
                 }>
                 onStateChanged: (cb: (state: {
-                    status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+                    status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
                     currentVersion: string
                     availableVersion: string | null
                     downloadedVersion: string | null

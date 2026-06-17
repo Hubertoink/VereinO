@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom'
 import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
+import UpdateAvailableModal, { type UpdateModalState } from './components/modals/UpdateAvailableModal'
 import MetaFilterModal from './components/modals/MetaFilterModal'
 import TimeFilterModal from './components/modals/TimeFilterModal'
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
@@ -269,6 +270,13 @@ function AppInner() {
 
     // Auto-backup prompt (renderer-side modal)
     const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
+    const [updatePrompt, setUpdatePrompt] = useState<UpdateModalState | null>(null)
+    const updatePromptRef = useRef<UpdateModalState | null>(null)
+    const autoUpdateCheckInFlight = useRef(false)
+
+    useEffect(() => {
+        updatePromptRef.current = updatePrompt
+    }, [updatePrompt])
 
     // Pre-update backup toast (sent from main process)
     useEffect(() => {
@@ -321,6 +329,54 @@ function AppInner() {
             } catch { /* ignore */ }
         })()
         return () => { disposed = true }
+    }, [])
+
+    useEffect(() => {
+        let disposed = false
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
+        const off = window.api?.updates?.onStateChanged?.((state) => {
+            if (disposed || !state) return
+            if (state.status === 'available' || state.status === 'downloaded') {
+                if (autoUpdateCheckInFlight.current || updatePromptRef.current) {
+                    setUpdatePrompt(state as UpdateModalState)
+                }
+                return
+            }
+            if (updatePromptRef.current && (state.status === 'downloading' || state.status === 'error')) {
+                setUpdatePrompt(state as UpdateModalState)
+            }
+        })
+
+        ;(async () => {
+            try {
+                const initial = await window.api?.updates?.getState?.()
+                if (initial?.status === 'unsupported') return
+
+                const enabled = (await window.api?.settings?.get?.({ key: 'updates.autoCheck' }))?.value
+                if (enabled === false) return
+
+                const lastAutoCheck = Number((await window.api?.settings?.get?.({ key: 'updates.lastAutoCheck' }))?.value || 0)
+                const now = Date.now()
+                if (lastAutoCheck && now - lastAutoCheck < WEEK_MS) return
+
+                autoUpdateCheckInFlight.current = true
+                const state = await window.api?.updates?.check?.()
+                await window.api?.settings?.set?.({ key: 'updates.lastAutoCheck', value: now })
+                if (!disposed && (state?.status === 'available' || state?.status === 'downloaded')) {
+                    setUpdatePrompt(state as UpdateModalState)
+                }
+            } catch {
+                // Automatic checks should stay quiet unless an update is actually found.
+            } finally {
+                autoUpdateCheckInFlight.current = false
+            }
+        })()
+
+        return () => {
+            disposed = true
+            if (typeof off === 'function') off()
+        }
     }, [])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -1410,6 +1466,39 @@ function AppInner() {
                         } finally {
                             setAutoBackupPrompt(null)
                         }
+                    }}
+                />
+            )}
+            {updatePrompt && (
+                <UpdateAvailableModal
+                    state={updatePrompt}
+                    onClose={() => setUpdatePrompt(null)}
+                    onDownload={async () => {
+                        try {
+                            const state = await window.api?.updates?.download?.()
+                            if (state && (state.status === 'downloading' || state.status === 'downloaded' || state.status === 'error')) {
+                                setUpdatePrompt(state as UpdateModalState)
+                            }
+                        } catch (e: any) {
+                            notify('error', `Update-Download fehlgeschlagen: ${String(e?.message || e)}`)
+                        }
+                    }}
+                    onInstall={async () => {
+                        try {
+                            const res = await window.api?.updates?.install?.()
+                            if (!res?.ok) {
+                                notify('info', res?.state?.message || 'Es ist kein installierbares Update vorhanden.')
+                            }
+                        } catch (e: any) {
+                            notify('error', `Update-Installation fehlgeschlagen: ${String(e?.message || e)}`)
+                        }
+                    }}
+                    onDisable={async () => {
+                        try {
+                            await window.api?.settings?.set?.({ key: 'updates.autoCheck', value: false })
+                            notify('info', 'Automatische Update-Hinweise wurden deaktiviert.')
+                        } catch { }
+                        setUpdatePrompt(null)
                     }}
                 />
             )}

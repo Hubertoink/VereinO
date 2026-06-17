@@ -3,7 +3,7 @@ import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 
 type UpdateState = {
-  status: 'idle' | 'checking' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
+  status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
   currentVersion: string
   availableVersion: string | null
   downloadedVersion: string | null
@@ -63,6 +63,7 @@ export function GeneralPane({
     downloadProgress: null,
     message: null,
   })
+  const [autoUpdateCheck, setAutoUpdateCheck] = React.useState(true)
 
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
 
@@ -77,6 +78,11 @@ export function GeneralPane({
     void window.api?.updates?.getState?.().then((state) => {
       if (!alive || !state) return
       setUpdateState(state)
+    }).catch(() => {})
+
+    void window.api?.settings?.get?.({ key: 'updates.autoCheck' }).then((res) => {
+      if (!alive) return
+      setAutoUpdateCheck(res?.value !== false)
     }).catch(() => {})
 
     const off = window.api?.updates?.onStateChanged?.((state) => {
@@ -100,6 +106,15 @@ export function GeneralPane({
     }
   }
 
+  const downloadUpdate = async () => {
+    try {
+      const state = await window.api?.updates?.download?.()
+      if (state) setUpdateState(state)
+    } catch (e) {
+      notify('error', `Update-Download fehlgeschlagen: ${String((e as any)?.message || e)}`)
+    }
+  }
+
   const installUpdate = async () => {
     try {
       const res = await window.api?.updates?.install?.()
@@ -108,6 +123,17 @@ export function GeneralPane({
       }
     } catch (e) {
       notify('error', `Update-Installation fehlgeschlagen: ${String((e as any)?.message || e)}`)
+    }
+  }
+
+  const toggleAutoUpdateCheck = async (enabled: boolean) => {
+    setAutoUpdateCheck(enabled)
+    try {
+      await window.api?.settings?.set?.({ key: 'updates.autoCheck', value: enabled })
+      notify('info', enabled ? 'Automatische Update-Hinweise aktiviert.' : 'Automatische Update-Hinweise deaktiviert.')
+    } catch (e) {
+      setAutoUpdateCheck(!enabled)
+      notify('error', `Update-Einstellung konnte nicht gespeichert werden: ${String((e as any)?.message || e)}`)
     }
   }
 
@@ -195,6 +221,18 @@ export function GeneralPane({
         <div className="settings-sub">
           Installierte Version: {appVersion || updateState.currentVersion || 'unbekannt'}
         </div>
+        <div className="settings-inline-toggle" style={{ marginTop: 10 }}>
+          <label htmlFor="toggle-auto-update-check">Wöchentlich beim Start nach Updates suchen</label>
+          <input
+            id="toggle-auto-update-check"
+            role="switch"
+            aria-checked={autoUpdateCheck}
+            className="toggle"
+            type="checkbox"
+            checked={autoUpdateCheck}
+            onChange={(e) => { void toggleAutoUpdateCheck(e.target.checked) }}
+          />
+        </div>
         {updateState.message && (
           <div className="helper" style={{ marginTop: 8 }}>
             {updateState.message}
@@ -209,6 +247,11 @@ export function GeneralPane({
           >
             {updateState.status === 'checking' ? 'Suche läuft…' : updateState.status === 'downloading' ? 'Download läuft…' : 'Nach Updates suchen'}
           </button>
+          {updateState.status === 'available' && (
+            <button className="btn primary" onClick={() => { void downloadUpdate() }}>
+              Download starten
+            </button>
+          )}
           {updateState.status === 'downloaded' && (
             <button className="btn primary" onClick={() => { void installUpdate() }}>
               Update installieren
