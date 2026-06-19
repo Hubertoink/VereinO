@@ -575,7 +575,7 @@ export function GeneralPane({
             />
           </div>
           <div className="helper" style={{ alignSelf: 'center' }}>
-            Standard: Storno statt Löschen.
+            Neuinstallationen nutzen standardmäßig Storno; Updates behalten Löschen als Ausnahme aktiv.
           </div>
         </div>
       </div>

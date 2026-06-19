@@ -70,6 +70,14 @@ function safeLocalStorageRemove(key: string) {
 }
 
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const allowVoucherDeletionWasUnsetRef = useRef<boolean>((() => {
+    try {
+      return localStorage.getItem('ui.allowVoucherDeletion') == null
+    } catch {
+      return false
+    }
+  })())
+
   const [navLayout, setNavLayout] = useState<NavLayout>(() => {
     const stored = localStorage.getItem('ui.navLayout')
     return stored === 'left' || stored === 'top' ? stored : 'left'
@@ -253,6 +261,34 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   })
 
   useEffect(() => {
+    if (!allowVoucherDeletionWasUnsetRef.current) return
+
+    let alive = true
+    ;(async () => {
+      try {
+        const setup = await (window as any).api?.settings?.get?.({ key: 'setup.completed' })
+        if (!alive) return
+
+        if (setup?.value === true) {
+          setAllowVoucherDeletion(true)
+          safeLocalStorageSet('ui.allowVoucherDeletion', 'true')
+        }
+      } catch {
+        // Keep the new-install default: Storno instead of permanent deletion.
+        return
+      }
+
+      if (alive) {
+        allowVoucherDeletionWasUnsetRef.current = false
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
     safeLocalStorageSet('ui.navLayout', navLayout)
   }, [navLayout])
 
@@ -292,6 +328,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [bookingsOpenDetached])
 
   useEffect(() => {
+    if (allowVoucherDeletionWasUnsetRef.current && !allowVoucherDeletion) return
     safeLocalStorageSet('ui.allowVoucherDeletion', String(allowVoucherDeletion))
   }, [allowVoucherDeletion])
 
