@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.4] - 2026-06-19
+
+### Hinzugefügt
+
+- Buchungen: Storno-Funktion für Korrekturbuchungen ergänzt, inklusive Statusanzeige für Storno- und stornierte Buchungen.
+- Exporte und Berichte: Storno-Status in Journal-, Jahresabschluss-, Kassier- und Fiskalberichten sichtbar gemacht.
+
+### Geändert
+
+- Buchungen: Neuinstallationen verwenden standardmäßig Storno statt endgültigem Löschen.
+- Buchungen: Updates behalten die Ausnahmeregel "Buchungen endgültig löschen" automatisch aktiv, solange die Einstellung vorher noch nicht gesetzt war.
+- Einstellungen: Hinweistext zum Löschmodus präzisiert, damit Neuinstallation und Update-Verhalten klar unterscheidbar sind.
+
+### Behoben
+
+- Buchungen: Storno-Buchungen werden vor erneutem Storno, Bearbeitung und endgültigem Löschen geschützt.
+- Buchungen: Referenzen zwischen Originalbuchung und Storno bleiben in Tabellen, Modalen und Exporten nachvollziehbar.
+
 ## [1.9.2] – 2026-06-17
 
 ### Hinzugefügt
