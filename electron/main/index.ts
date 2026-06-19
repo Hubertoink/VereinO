@@ -12,6 +12,83 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+const detachedQuickAddInitials = new Map<string, any>()
+const detachedQuickAddWindows = new Map<string, BrowserWindow>()
+
+function createWindowOpenHandler() {
+    return ({ url }: { url: string }) => {
+        shell.openExternal(url)
+        return { action: 'deny' as const }
+    }
+}
+
+async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: boolean; token: string }> {
+    const token = `quick-add-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const draftId = typeof initialState?.draftId === 'string' ? initialState.draftId : token
+    const existing = detachedQuickAddWindows.get(draftId)
+    if (existing && !existing.isDestroyed()) {
+        if (existing.isMinimized()) existing.restore()
+        existing.focus()
+        return { ok: true, token }
+    }
+    detachedQuickAddInitials.set(token, initialState || null)
+
+    const win = new BrowserWindow({
+        width: 1180,
+        height: 760,
+        minWidth: 860,
+        minHeight: 620,
+        show: false,
+        autoHideMenuBar: true,
+        frame: true,
+        title: 'VereinO - Buchung',
+        webPreferences: {
+            preload: path.join(__dirname, '../preload/index.cjs'),
+            contextIsolation: true,
+            sandbox: true,
+            nodeIntegration: false,
+            webSecurity: true,
+            devTools: isDev
+        }
+    })
+
+    win.on('ready-to-show', () => win.show())
+    detachedQuickAddWindows.set(draftId, win)
+    win.on('closed', () => {
+        detachedQuickAddInitials.delete(token)
+        detachedQuickAddWindows.delete(draftId)
+    })
+
+    if (isDev) {
+        const baseUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
+        const url = new URL(baseUrl)
+        url.searchParams.set('window', 'quick-add')
+        url.searchParams.set('token', token)
+        await win.loadURL(url.toString())
+    } else {
+        await win.loadFile(path.join(__dirname, '../../dist/index.html'), {
+            query: { window: 'quick-add', token }
+        })
+    }
+
+    win.webContents.setWindowOpenHandler(createWindowOpenHandler())
+    return { ok: true, token }
+}
+
+function focusDetachedQuickAddWindow(draftId: string) {
+    const win = detachedQuickAddWindows.get(draftId)
+    if (!win || win.isDestroyed()) return { ok: false }
+    if (win.isMinimized()) win.restore()
+    win.focus()
+    return { ok: true }
+}
+
+function closeDetachedQuickAddWindow(draftId: string) {
+    const win = detachedQuickAddWindows.get(draftId)
+    if (!win || win.isDestroyed()) return { ok: false }
+    win.close()
+    return { ok: true }
+}
 
 async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
@@ -101,10 +178,7 @@ async function createWindow(): Promise<BrowserWindow> {
         await win.loadFile(path.join(__dirname, '../../dist/index.html'))
     }
 
-    win.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url)
-        return { action: 'deny' }
-    })
+    win.webContents.setWindowOpenHandler(createWindowOpenHandler())
 
     return win
 }
@@ -169,7 +243,17 @@ app.whenReady().then(async () => {
         // Do NOT block startup. We'll inform the renderer via an event so it can present recovery options.
     }
     // Register IPC first so renderer can use db.location.* to recover
-    registerIpcHandlers()
+    registerIpcHandlers({
+        openDetachedQuickAdd: createDetachedQuickAddWindow,
+        focusDetachedQuickAdd: focusDetachedQuickAddWindow,
+        closeDetachedQuickAdd: closeDetachedQuickAddWindow,
+        getDetachedQuickAddInitial: (token: string) => detachedQuickAddInitials.get(token) ?? null,
+        notifyQuickAddSaved: (payload: any) => {
+            for (const browserWindow of BrowserWindow.getAllWindows()) {
+                try { browserWindow.webContents.send('quickAdd:saved', payload || {}) } catch { /* ignore */ }
+            }
+        }
+    })
     initUpdateManager()
     createMenu()
     const win = await createWindow()

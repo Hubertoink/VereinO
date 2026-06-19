@@ -24,7 +24,12 @@ type QuickAddDraft = {
     sequence: number
     qa: QA
     files: File[]
+    detached?: boolean
 }
+
+type QuickAddAfterSave = 'close' | 'new'
+type QuickAddSaveMode = QuickAddAfterSave | 'default'
+type OpenQuickAddOptions = { detached?: boolean; showModal?: boolean }
 
 function createDraftId() {
     return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -79,6 +84,14 @@ function trackBookingHabit(type: string, paymentMethod: string | undefined, mode
     } catch { }
 }
 
+function bookingGrossAmount(qa: QA) {
+    if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
+    if ((qa as any).mode === 'GROSS') return Number((qa as any).grossAmount || 0)
+    const net = Number(qa.netAmount || 0)
+    const vatRate = Number(qa.vatRate || 0)
+    return Math.round((net * (1 + vatRate / 100)) * 100) / 100
+}
+
 /**
  * useQuickAdd Hook
  * 
@@ -90,7 +103,8 @@ export function useQuickAdd(
     create: (p: any) => Promise<any>, 
     onOpenFilePicker?: () => void,
     notify?: (type: 'success' | 'error' | 'info', text: string) => void,
-    draftTabsEnabled: boolean = true
+    draftTabsEnabled: boolean = true,
+    afterSaveDefault: QuickAddAfterSave = 'close'
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
     const [drafts, setDrafts] = useState<QuickAddDraft[]>([])
@@ -112,6 +126,31 @@ export function useQuickAdd(
         }
     }, [today])
 
+    const makeNextDefaults = useCallback((previous: QA): QA => {
+        const mode = (previous as any).mode === 'NET' ? 'NET' : 'GROSS'
+        const next: QA = {
+            date: previous.date || today,
+            type: previous.type,
+            sphere: previous.sphere,
+            mode,
+            vatRate: mode === 'NET' ? Number(previous.vatRate || 0) : 0,
+            description: '',
+            tags: []
+        }
+
+        if (previous.type === 'TRANSFER') {
+            next.transferFrom = (previous as any).transferFrom || 'BAR'
+            next.transferTo = (previous as any).transferTo || 'BANK'
+            next.grossAmount = undefined
+        } else {
+            next.paymentMethod = previous.paymentMethod || getBookingHabits().paymentMethod
+            if (mode === 'NET') next.netAmount = undefined
+            else next.grossAmount = undefined
+        }
+
+        return next
+    }, [today])
+
     const activeDraft = useMemo(
         () => drafts.find((draft) => draft.id === activeDraftId) ?? null,
         [drafts, activeDraftId]
@@ -120,22 +159,28 @@ export function useQuickAdd(
     const qa = activeDraft?.qa ?? makeDefaults()
     const files = activeDraft?.files ?? []
 
-    const openQuickAdd = useCallback(() => {
+    const openQuickAdd = useCallback((initial?: { qa?: QA; files?: File[] }, options?: OpenQuickAddOptions) => {
+        const detached = !!options?.detached
+        const showModal = options?.showModal ?? !detached
         const draft: QuickAddDraft = {
             id: createDraftId(),
             sequence: nextSequenceRef.current++,
-            qa: makeDefaults(),
-            files: []
+            qa: initial?.qa ?? makeDefaults(),
+            files: initial?.files ?? [],
+            detached
         }
         setDrafts((prev) => draftTabsEnabled ? [...prev, draft] : [draft])
-        setActiveDraftId(draft.id)
-        setQuickAdd(true)
+        setActiveDraftId(showModal ? draft.id : null)
+        setQuickAdd(showModal)
+        return draft
     }, [draftTabsEnabled, makeDefaults])
 
     const reopenDraft = useCallback((draftId: string) => {
+        const draft = drafts.find((entry) => entry.id === draftId)
+        if (draft?.detached) return
         setActiveDraftId(draftId)
         setQuickAdd(true)
-    }, [])
+    }, [drafts])
 
     const parkQuickAdd = useCallback(() => {
         if (!draftTabsEnabled) {
@@ -153,6 +198,36 @@ export function useQuickAdd(
             setQuickAdd(false)
         }
     }, [drafts, activeDraftId])
+
+    const markDraftDetached = useCallback((draftId: string) => {
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === draftId ? { ...draft, detached: true } : draft
+        )))
+        if (activeDraftId === draftId) {
+            setActiveDraftId(null)
+            setQuickAdd(false)
+        }
+    }, [activeDraftId])
+
+    const markDraftDocked = useCallback((draftId: string) => {
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === draftId ? { ...draft, detached: false } : draft
+        )))
+    }, [])
+
+    const dockAndOpenDraft = useCallback((draftId: string) => {
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === draftId ? { ...draft, detached: false } : draft
+        )))
+        setActiveDraftId(draftId)
+        setQuickAdd(true)
+    }, [])
+
+    const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean }) => {
+        setDrafts((prev) => prev.map((draft) => (
+            draft.id === draftId ? { ...draft, ...patch } : draft
+        )))
+    }, [])
 
     const clearDrafts = useCallback(() => {
         setDrafts([])
@@ -186,8 +261,13 @@ export function useQuickAdd(
         setFiles([...files, ...arr])
     }
 
-    async function onQuickSave() {
+    async function onQuickSave(mode: QuickAddSaveMode = 'default') {
         if (!activeDraft) return
+
+        if (!Number.isFinite(bookingGrossAmount(activeDraft.qa)) || bookingGrossAmount(activeDraft.qa) <= 0) {
+            notify?.('error', 'Bitte gib einen Betrag größer als 0 € ein.')
+            return
+        }
 
         // Validate transfer direction
         if (activeDraft.qa.type === 'TRANSFER' && (!(activeDraft.qa as any).transferFrom || !(activeDraft.qa as any).transferTo)) {
@@ -276,10 +356,26 @@ export function useQuickAdd(
         if (res) {
             // Track user habits for smart defaults
             trackBookingHabit(activeDraft.qa.type, activeDraft.qa.paymentMethod, (activeDraft.qa as any).mode)
-            const remaining = drafts.filter((draft) => draft.id !== activeDraft.id)
-            setDrafts(remaining)
-            setActiveDraftId(remaining.at(-1)?.id ?? null)
-            setQuickAdd(false)
+            const saveMode: QuickAddAfterSave = mode === 'default' ? afterSaveDefault : mode
+            if (saveMode === 'new') {
+                const nextDraft: QuickAddDraft = {
+                    id: createDraftId(),
+                    sequence: nextSequenceRef.current++,
+                    qa: makeNextDefaults(activeDraft.qa),
+                    files: []
+                }
+                setDrafts((prev) => {
+                    const remaining = prev.filter((draft) => draft.id !== activeDraft.id)
+                    return draftTabsEnabled ? [...remaining, nextDraft] : [nextDraft]
+                })
+                setActiveDraftId(nextDraft.id)
+                setQuickAdd(true)
+            } else {
+                const remaining = drafts.filter((draft) => draft.id !== activeDraft.id)
+                setDrafts(remaining)
+                setActiveDraftId(remaining.at(-1)?.id ?? null)
+                setQuickAdd(false)
+            }
         }
     }
 
@@ -303,7 +399,32 @@ export function useQuickAdd(
 
             // Open Quick-Add robustly via Ctrl+Shift+N (no bare 'n')
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
-                openQuickAdd()
+                let openDetached = false
+                try { openDetached = localStorage.getItem('ui.bookingsOpenDetached') === 'true' } catch { }
+                if (openDetached) {
+                    void (async () => {
+                        const draft = draftTabsEnabled ? openQuickAdd(undefined, { detached: true, showModal: false }) : null
+                        try {
+                            const res = await window.api?.quickAdd?.openDetached?.({
+                                draftId: draft?.id,
+                                qa: draft?.qa,
+                                files: [],
+                                afterSaveDefault
+                            })
+                            if (!res?.ok) {
+                                notify?.('error', res?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+                                if (draft) dockAndOpenDraft(draft.id)
+                                else openQuickAdd()
+                            }
+                        } catch (err: any) {
+                            notify?.('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(err?.message || err))
+                            if (draft) dockAndOpenDraft(draft.id)
+                            else openQuickAdd()
+                        }
+                    })()
+                } else {
+                    openQuickAdd()
+                }
                 e.preventDefault()
                 return
             }
@@ -333,7 +454,7 @@ export function useQuickAdd(
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [quickAdd, onQuickSave, onOpenFilePicker, openQuickAdd, parkQuickAdd])
+    }, [afterSaveDefault, dockAndOpenDraft, draftTabsEnabled, notify, quickAdd, onQuickSave, onOpenFilePicker, openQuickAdd, parkQuickAdd])
 
     const openFilePicker = () => onOpenFilePicker?.()
 
@@ -352,6 +473,10 @@ export function useQuickAdd(
         activeDraftId,
         reopenDraft,
         closeDraft,
+        markDraftDetached,
+        markDraftDocked,
+        dockAndOpenDraft,
+        updateDraft,
         clearDrafts,
         hasOpenDrafts: draftTabsEnabled && drafts.length > 0
     }

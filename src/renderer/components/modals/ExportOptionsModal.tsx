@@ -8,6 +8,10 @@ interface PreviewRow {
   type: 'IN' | 'OUT' | 'TRANSFER'
   sphere: string
   description: string
+  originalId?: number | null
+  originalVoucherNo?: string | null
+  reversedById?: number | null
+  reversedByVoucherNo?: string | null
   paymentMethod: string
   netAmount: number
   vatRate: number
@@ -61,8 +65,8 @@ type FiscalBudgetOption = {
 export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport }: {
   open: boolean
   onClose: () => void
-  fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
-  setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
+  fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
+  setFields: (f: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>) => void
   orgName: string
   setOrgName: (v: string) => void
   amountMode: 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
@@ -91,6 +95,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     { key: 'type', label: 'Typ' },
     { key: 'sphere', label: 'Sphäre' },
     { key: 'description', label: 'Beschreibung' },
+    { key: 'status', label: 'Status' },
     { key: 'paymentMethod', label: 'Zahlweg' },
     { key: 'netAmount', label: 'Netto' },
     { key: 'vatAmount', label: 'MwSt' },
@@ -126,6 +131,10 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           newFields.push(mapping[key])
         }
       })
+      if (newFields.includes('description') && !newFields.includes('status')) {
+        const descriptionIndex = newFields.indexOf('description')
+        newFields.splice(descriptionIndex + 1, 0, 'status')
+      }
       if (newFields.length > 0) {
         setFields(newFields as any)
       }
@@ -297,6 +306,18 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
       return eurFmt.format(-Math.abs(amount))
     }
     return eurFmt.format(amount)
+  }
+
+  const voucherStatus = (row: Partial<PreviewRow>) => {
+    if (row.originalId) {
+      const ref = row.originalVoucherNo ? `#${row.originalVoucherNo}` : `#${row.originalId}`
+      return `Storno zu ${ref}`
+    }
+    if (row.reversedById) {
+      const ref = row.reversedByVoucherNo ? `#${row.reversedByVoucherNo}` : `#${row.reversedById}`
+      return `storniert durch ${ref}`
+    }
+    return ''
   }
 
   // Get field label
@@ -735,6 +756,14 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                                     {row.description || '—'}
                                   </span>
                                 )
+                                break
+                              case 'status':
+                                value = (() => {
+                                  const status = voucherStatus(row)
+                                  if (!status) return '—'
+                                  const isStorno = !!row.originalId
+                                  return <span className={`badge ${isStorno ? 'badge-storno' : 'badge-storniert'}`}>{status}</span>
+                                })()
                                 break
                               case 'paymentMethod':
                                 value = row.paymentMethod === 'CASH' ? '💵 Bar' : row.paymentMethod === 'BANK' ? '🏦 Bank' : '—'

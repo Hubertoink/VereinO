@@ -14,6 +14,7 @@ import { listMembers } from '../repositories/members'
 import { listCashChecks } from '../repositories/cashChecks'
 import { summarizeInvoices } from '../repositories/invoices'
 import { getSetting } from './settings'
+import { voucherStatusKind, voucherStatusText } from './voucherStatus'
 
 export interface TreasurerReportOptions {
   fiscalYear: number
@@ -39,6 +40,13 @@ function esc(s: any) {
 
 function euro(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0)
+}
+
+function voucherDescriptionHtml(row: any) {
+  const status = voucherStatusText(row)
+  const kind = voucherStatusKind(row)
+  const description = String(row?.description || '').trim() || '—'
+  return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
 }
 
 export async function generateTreasurerReportPDF(options: TreasurerReportOptions): Promise<{ filePath: string }> {
@@ -339,6 +347,31 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     tr.total-row {
       font-weight: 700;
       background: #f0f4f8;
+    }
+    tr.voucher-row-storno {
+      background: #fff5f5;
+    }
+    tr.voucher-row-storniert {
+      background: #f5f5f5;
+      color: #555;
+    }
+    .voucher-status {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      font-weight: 700;
+    }
+    .voucher-status-storno {
+      background: #ffebee;
+      color: #b71c1c;
+      border: 1px solid #ffcdd2;
+    }
+    .voucher-status-storniert {
+      background: #eeeeee;
+      color: #555;
+      border: 1px solid #d6d6d6;
     }
     .sphere-badge {
       display: inline-block;
@@ -718,12 +751,12 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     </thead>
     <tbody>
       ${voucherRows.map((r: any) => `
-        <tr>
+        <tr class="${voucherStatusKind(r) ? `voucher-row-${voucherStatusKind(r)}` : ''}">
           <td class="nowrap">${esc(r.date)}</td>
           <td class="nowrap">${esc(r.voucherNo)}</td>
           <td class="nowrap">${r.type === 'IN' ? '↓ E' : r.type === 'OUT' ? '↑ A' : '⇄ U'}</td>
           <td><span class="sphere-badge" style="background:${spheres.find(s=>s.key===r.sphere)?.bg||'#eee'};color:${spheres.find(s=>s.key===r.sphere)?.color||'#333'}">${esc(r.sphere || '—')}</span></td>
-          <td>${esc(r.description || '—')}</td>
+          <td>${voucherDescriptionHtml(r)}</td>
           <td class="nowrap">${r.paymentMethod === 'BAR' ? '💵 Bar' : r.paymentMethod === 'BANK' ? '🏦 Bank' : '—'}</td>
           <td class="number ${r.type === 'IN' ? 'positive' : 'negative'}">${euro(r.grossAmount)}</td>
           ${includeTags ? `<td>${Array.isArray(r.tags) && r.tags.length ? r.tags.map((t: string) => esc(t)).join(', ') : '—'}</td>` : ''}

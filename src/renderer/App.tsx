@@ -52,6 +52,25 @@ function bufferToBase64Safe(buf: ArrayBuffer) {
     return btoa(binary)
 }
 
+function base64ToFile(name: string, dataBase64: string, mime?: string) {
+    const binary = atob(dataBase64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    return new File([bytes], name, { type: mime || '' })
+}
+
+function friendlyVoucherError(e: any) {
+    const msg = String(e?.message || e || '')
+    if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
+    if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
+    if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
+    if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
+    if (/UNIQUE constraint failed.*voucher_budgets/i.test(msg)) return 'Fehler: Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Budget-Einträge.'
+    if (/UNIQUE constraint failed.*voucher_earmarks/i.test(msg)) return 'Fehler: Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Einträge.'
+    if (/UNIQUE constraint failed/i.test(msg)) return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
+    return 'Fehler: ' + msg
+}
+
 // Simple contrast helper for hex colors (returns black or white text)
 function contrastText(bg?: string | null) {
     if (!bg) return '#000'
@@ -132,6 +151,574 @@ type PageShortcutAction = {
     action: () => void
 }
 
+function voucherRowToBookingForm(row: any) {
+    return {
+        ...row,
+        id: Number(row?.id),
+        date: row?.date || new Date().toISOString().slice(0, 10),
+        type: row?.type || 'IN',
+        sphere: row?.sphere || 'IDEELL',
+        description: row?.description ?? '',
+        paymentMethod: row?.paymentMethod ?? undefined,
+        transferFrom: row?.transferFrom ?? undefined,
+        transferTo: row?.transferTo ?? undefined,
+        mode: row?.amountMode ?? row?.mode ?? ((Number(row?.netAmount ?? 0) > 0 && row?.amountMode !== 'GROSS') ? 'NET' : 'GROSS'),
+        netAmount: row?.netAmount ?? undefined,
+        grossAmount: row?.grossAmount ?? undefined,
+        vatRate: row?.vatRate ?? 0,
+        tags: Array.isArray(row?.tags) ? row.tags : [],
+        budgets: Array.isArray(row?.budgets) ? row.budgets : [],
+        earmarksAssigned: Array.isArray(row?.earmarksAssigned) ? row.earmarksAssigned : []
+    }
+}
+
+function bookingFormGrossAmount(row: any) {
+    if (row?.type === 'TRANSFER') return Number(row?.grossAmount || 0)
+    if ((row?.mode ?? 'GROSS') === 'GROSS') return Number(row?.grossAmount || 0)
+    const net = Number(row?.netAmount || 0)
+    const vatRate = Number(row?.vatRate || 0)
+    return Math.round((net * (1 + vatRate / 100)) * 100) / 100
+}
+
+function bookingEditTitle(row: any) {
+    const desc = String(row?.description || '').trim()
+    return desc ? `Buchung (${desc.length > 60 ? desc.slice(0, 60) + '...' : desc}) bearbeiten` : 'Buchung bearbeiten'
+}
+
+function voucherMutationBlockReason(row: any) {
+    if (!row) return ''
+    if (row.originalId) {
+        const ref = row.originalVoucherNo ? ` #${row.originalVoucherNo}` : ''
+        return `Diese Stornobuchung ist mit der Originalbuchung${ref} verknüpft und kann nicht bearbeitet oder erneut storniert werden.`
+    }
+    if (row.reversedById) {
+        const ref = row.reversedByVoucherNo ? ` #${row.reversedByVoucherNo}` : ''
+        return `Diese Buchung wurde bereits storniert${ref ? ` durch${ref}` : ''} und kann nicht mehr bearbeitet werden.`
+    }
+    return ''
+}
+
+function serializeBookingForm(row: any) {
+    if (!row) return ''
+    return JSON.stringify({
+        date: row.date || '',
+        type: row.type || null,
+        sphere: row.sphere || null,
+        description: (row.description || '').trim(),
+        paymentMethod: row.paymentMethod || null,
+        transferFrom: row.transferFrom || null,
+        transferTo: row.transferTo || null,
+        mode: row.mode || 'GROSS',
+        grossAmount: Number(row.grossAmount ?? 0),
+        netAmount: Number(row.netAmount ?? 0),
+        vatRate: Number(row.vatRate ?? 0),
+        tags: Array.isArray(row.tags) ? [...row.tags].sort() : [],
+        budgets: Array.isArray(row.budgets)
+            ? [...row.budgets].map((b: any) => ({ budgetId: Number(b.budgetId || 0), amount: Number(b.amount || 0) })).sort((a: any, b: any) => a.budgetId - b.budgetId || a.amount - b.amount)
+            : [],
+        earmarksAssigned: Array.isArray(row.earmarksAssigned)
+            ? [...row.earmarksAssigned].map((e: any) => ({ earmarkId: Number(e.earmarkId || 0), amount: Number(e.amount || 0) })).sort((a: any, b: any) => a.earmarkId - b.earmarkId || a.amount - b.amount)
+            : []
+    })
+}
+
+function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: string } {
+    if (!row?.id) return { error: 'Buchung konnte nicht gespeichert werden: ID fehlt.' }
+    const blockReason = voucherMutationBlockReason(row)
+    if (blockReason) return { error: blockReason }
+    if (row.type === 'TRANSFER' && (!row.transferFrom || !row.transferTo)) {
+        return { error: 'Bitte wähle eine Richtung für den Transfer aus.' }
+    }
+
+    const budgets = Array.isArray(row.budgets)
+        ? row.budgets
+            .filter((b: any) => b.budgetId && Number(b.amount) > 0)
+            .map((b: any) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+        : []
+    const earmarks = Array.isArray(row.earmarksAssigned)
+        ? row.earmarksAssigned
+            .filter((e: any) => e.earmarkId && Number(e.amount) > 0)
+            .map((e: any) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+        : []
+
+    const budgetIds = budgets.map((b: any) => b.budgetId)
+    if (new Set(budgetIds).size !== budgetIds.length) {
+        return { error: 'Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.' }
+    }
+    const earmarkIds = earmarks.map((e: any) => e.earmarkId)
+    if (new Set(earmarkIds).size !== earmarkIds.length) {
+        return { error: 'Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.' }
+    }
+
+    const grossAmount = bookingFormGrossAmount(row)
+    const totalBudgetAmount = budgets.reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0)
+    if (totalBudgetAmount > grossAmount * 1.001) {
+        return { error: `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).` }
+    }
+    const totalEarmarkAmount = earmarks.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+    if (totalEarmarkAmount > grossAmount * 1.001) {
+        return { error: `Die Summe der Zweckbindungs-Beträge (${totalEarmarkAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).` }
+    }
+
+    const payload: any = {
+        id: Number(row.id),
+        date: row.date,
+        description: row.description ?? null,
+        type: row.type,
+        sphere: row.sphere,
+        earmarkId: earmarks.length > 0 ? earmarks[0].earmarkId : null,
+        earmarkAmount: earmarks.length > 0 ? earmarks[0].amount : null,
+        budgetId: budgets.length > 0 ? budgets[0].budgetId : null,
+        budgetAmount: budgets.length > 0 ? budgets[0].amount : null,
+        budgets,
+        earmarks,
+        tags: Array.isArray(row.tags) ? row.tags : []
+    }
+
+    if (row.type === 'TRANSFER') {
+        payload.paymentMethod = null
+        payload.transferFrom = row.transferFrom ?? null
+        payload.transferTo = row.transferTo ?? null
+        payload.grossAmount = Number(row.grossAmount || 0)
+        payload.vatRate = 0
+        payload.amountMode = 'GROSS'
+    } else {
+        payload.paymentMethod = row.paymentMethod ?? null
+        payload.transferFrom = null
+        payload.transferTo = null
+        if ((row.mode ?? 'GROSS') === 'GROSS') {
+            payload.grossAmount = Number(row.grossAmount || 0)
+            payload.vatRate = 0
+            payload.amountMode = 'GROSS'
+        } else {
+            payload.netAmount = Number(row.netAmount || 0)
+            payload.vatRate = Number(row.vatRate || 0)
+            payload.amountMode = 'NET'
+        }
+    }
+
+    return { payload }
+}
+
+function DetachedQuickAddWindow() {
+    const { notify } = useToast()
+    const { quickAddAfterSave, allowVoucherDeletion } = useUIPreferences()
+    const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+    const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+    const fmtDate = useCallback((s?: string) => s || '', [])
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
+    const openedRef = useRef(false)
+    const detachedDraftIdRef = useRef<string>('')
+    const [loaded, setLoaded] = useState(false)
+    const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>>([])
+    const [budgets, setBudgets] = useState<Array<{ id: number; year: number; categoryName?: string | null; projectName?: string | null; name?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; isArchived?: number; enforceTimeRange?: number; earmarkId?: number | null }>>([])
+    const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
+    const [descSuggest, setDescSuggest] = useState<string[]>([])
+    const [windowModeKind, setWindowModeKind] = useState<'create' | 'edit'>('create')
+    const [editQa, setEditQa] = useState<any | null>(null)
+    const [editFiles, setEditFiles] = useState<File[]>([])
+    const [editExistingFiles, setEditExistingFiles] = useState<Array<{ id: number; fileName: string }>>([])
+    const [editExistingFilesLoading, setEditExistingFilesLoading] = useState(false)
+    const [editInitialSnapshot, setEditInitialSnapshot] = useState('')
+    const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
+    const [confirmDeleteEdit, setConfirmDeleteEdit] = useState(false)
+
+    const budgetsForEdit = useMemo(() => {
+        const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
+        return budgets.map((budget: any) => {
+            let label = ''
+            if (budget.name && String(budget.name).trim()) label = String(budget.name).trim()
+            else if (budget.categoryName && String(budget.categoryName).trim()) label = `${budget.year} - ${budget.categoryName}`
+            else if (budget.projectName && String(budget.projectName).trim()) label = `${budget.year} - ${budget.projectName}`
+            else if (budget.earmarkId) {
+                const earmark = byIdEarmark.get(budget.earmarkId)
+                if (earmark) label = `${budget.year} - ${earmark.code}`
+            }
+            if (!label) label = String(budget.year)
+            return {
+                id: budget.id,
+                label,
+                year: budget.year,
+                startDate: budget.startDate ?? null,
+                endDate: budget.endDate ?? null,
+                enforceTimeRange: budget.enforceTimeRange ?? 0,
+                isArchived: budget.isArchived ?? 0,
+                color: budget.color ?? null
+            }
+        })
+    }, [budgets, earmarks])
+
+    const {
+        quickAdd,
+        qa,
+        setQa,
+        onQuickSave,
+        files,
+        setFiles,
+        openFilePicker,
+        onDropFiles,
+        openQuickAdd
+    } = useQuickAdd(
+        today,
+        async (payload: any) => {
+            try {
+                const res = await window.api?.vouchers.create?.(payload)
+                if (res) {
+                    notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
+                    const warnings = (res as any).warnings as string[] | undefined
+                    if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
+                    await window.api?.quickAdd?.notifySaved?.({ ...res, draftId: detachedDraftIdRef.current })
+                }
+                return res
+            } catch (e: any) {
+                notify('error', friendlyVoucherError(e))
+                return null
+            }
+        },
+        () => fileInputRef.current?.click(),
+        notify,
+        false,
+        quickAddAfterSave
+    )
+
+    useEffect(() => {
+        let cancelled = false
+        async function loadLookups() {
+            try {
+                const [bindingsRes, budgetsRes, tagsRes] = await Promise.all([
+                    window.api?.bindings?.list?.({ activeOnly: true }),
+                    window.api?.budgets?.list?.({ includeArchived: true } as any),
+                    window.api?.tags?.list?.({ includeUsage: true })
+                ])
+                if (cancelled) return
+                setEarmarks((bindingsRes as any)?.rows || [])
+                setBudgets((budgetsRes as any)?.rows || [])
+                setTagDefs((tagsRes as any)?.rows || [])
+            } catch {
+                if (!cancelled) notify('error', 'Stammdaten für das Buchungsfenster konnten nicht geladen werden.')
+            }
+        }
+        loadLookups()
+        return () => { cancelled = true }
+    }, [notify])
+
+    useEffect(() => {
+        if (openedRef.current) return
+        let cancelled = false
+        async function openInitialDraft() {
+            const token = new URLSearchParams(window.location.search).get('token') || ''
+            let initial: any = null
+            try {
+                if (token) {
+                    const res = await window.api?.quickAdd?.detachedInitial?.({ token })
+                    initial = res?.initial || null
+                }
+            } catch { }
+            if (cancelled || openedRef.current) return
+            detachedDraftIdRef.current = String(initial?.draftId || token || '')
+            const initialFiles = Array.isArray(initial?.files)
+                ? initial.files.map((file: any) => base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime))
+                : []
+            openedRef.current = true
+            if (initial?.mode === 'edit') {
+                const form = voucherRowToBookingForm(initial?.qa || initial?.voucher || { id: initial?.voucherId })
+                setWindowModeKind('edit')
+                setEditQa(form)
+                setEditFiles(initialFiles)
+                setEditInitialSnapshot(serializeBookingForm(form))
+            } else {
+                setWindowModeKind('create')
+                openQuickAdd(initial?.qa ? { qa: initial.qa, files: initialFiles } : undefined)
+            }
+            setLoaded(true)
+        }
+        openInitialDraft()
+        return () => { cancelled = true }
+    }, [openQuickAdd])
+
+    useEffect(() => {
+        if (!quickAdd || descSuggest.length > 0) return
+        let cancelled = false
+        async function loadSuggestions() {
+            try {
+                const res = await window.api?.vouchers?.recent?.({ limit: 50 })
+                const uniq = new Set<string>()
+                for (const row of ((res as any)?.rows || [])) {
+                    const description = String(row.description || '').trim()
+                    if (description) uniq.add(description)
+                    if (uniq.size >= 50) break
+                }
+                if (!cancelled) setDescSuggest(Array.from(uniq))
+            } catch { }
+        }
+        loadSuggestions()
+        return () => { cancelled = true }
+    }, [quickAdd, descSuggest.length])
+
+    useEffect(() => {
+        if (windowModeKind === 'create' && openedRef.current && loaded && !quickAdd) {
+            window.api?.window?.close?.()
+        }
+    }, [loaded, quickAdd, windowModeKind])
+
+    useEffect(() => {
+        const draftId = detachedDraftIdRef.current
+        if (!loaded || !quickAdd || !draftId) return
+        const timeout = window.setTimeout(() => {
+            void window.api?.quickAdd?.syncDraft?.({ draftId, qa })
+        }, 200)
+        return () => window.clearTimeout(timeout)
+    }, [loaded, quickAdd, qa])
+
+    useEffect(() => {
+        const draftId = detachedDraftIdRef.current
+        if (!loaded || !quickAdd || !draftId) return
+        let cancelled = false
+        async function syncFiles() {
+            const encoded = await Promise.all(files.map(async (file) => ({
+                name: file.name,
+                dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+                mime: file.type || undefined
+            })))
+            if (!cancelled) void window.api?.quickAdd?.syncDraft?.({ draftId, files: encoded })
+        }
+        syncFiles()
+        return () => { cancelled = true }
+    }, [files, loaded, quickAdd])
+
+    const refreshEditAttachments = useCallback(async (voucherId: number) => {
+        setEditExistingFilesLoading(true)
+        try {
+            const res = await window.api?.attachments.list?.({ voucherId })
+            setEditExistingFiles((res as any)?.files || (res as any)?.rows || [])
+        } catch {
+            setEditExistingFiles([])
+        } finally {
+            setEditExistingFilesLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (windowModeKind !== 'edit' || !editQa?.id) return
+        void refreshEditAttachments(Number(editQa.id))
+    }, [editQa?.id, refreshEditAttachments, windowModeKind])
+
+    const saveDetachedEdit = useCallback(async () => {
+        if (!editQa?.id) return
+        const { payload, error } = buildVoucherUpdatePayloadFromForm(editQa)
+        if (error) {
+            notify('error', error)
+            return
+        }
+        try {
+            const res = await window.api?.vouchers.update?.(payload)
+            for (const file of editFiles) {
+                const dataBase64 = bufferToBase64Safe(await file.arrayBuffer())
+                await window.api?.attachments.add?.({ voucherId: Number(editQa.id), fileName: file.name, dataBase64, mimeType: file.type || undefined })
+            }
+            notify('success', 'Buchung gespeichert')
+            const warnings = (res as any)?.warnings as string[] | undefined
+            if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
+            await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'edit' })
+            window.api?.window?.close?.()
+        } catch (e: any) {
+            notify('error', friendlyVoucherError(e))
+        }
+    }, [editFiles, editQa, notify])
+
+    const requestCloseDetachedEdit = useCallback(() => {
+        if (editQa && (serializeBookingForm(editQa) !== editInitialSnapshot || editFiles.length > 0)) {
+            setConfirmDiscardEdit(true)
+            return
+        }
+        window.api?.window?.close?.()
+    }, [editFiles.length, editInitialSnapshot, editQa])
+
+    const deleteDetachedEdit = useCallback(async () => {
+        if (!editQa?.id) return
+        const blockReason = voucherMutationBlockReason(editQa)
+        if (blockReason) {
+            setConfirmDeleteEdit(false)
+            notify('info', blockReason)
+            return
+        }
+        try {
+            if (allowVoucherDeletion) {
+                await window.api?.vouchers.delete?.({ id: Number(editQa.id) })
+                notify('success', 'Buchung gelöscht')
+                await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'delete', deleted: true })
+            } else {
+                const res = await window.api?.vouchers.reverse?.({ originalId: Number(editQa.id), reason: 'Storno statt Löschen' })
+                notify('success', `Storno erstellt: #${res?.voucherNo || ''}`)
+                await window.api?.quickAdd?.notifySaved?.({ id: res?.id, originalId: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'reverse' })
+            }
+            window.api?.window?.close?.()
+        } catch (e: any) {
+            notify('error', e?.message || String(e))
+        }
+    }, [allowVoucherDeletion, editQa, notify])
+
+    useEffect(() => {
+        if (windowModeKind !== 'edit' || !editQa) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault()
+                void saveDetachedEdit()
+                return
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+                e.preventDefault()
+                const blockReason = voucherMutationBlockReason(editQa)
+                if (blockReason) {
+                    notify('info', blockReason)
+                    return
+                }
+                fileInputRef.current?.click()
+                return
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                requestCloseDetachedEdit()
+            }
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [editQa, notify, requestCloseDetachedEdit, saveDetachedEdit, windowModeKind])
+
+    if (!loaded || (windowModeKind === 'create' && !quickAdd) || (windowModeKind === 'edit' && !editQa)) {
+        return <div className="detached-quick-add-loading">Buchungsfenster wird vorbereitet...</div>
+    }
+
+    if (windowModeKind === 'edit' && editQa) {
+        const editMutationBlockReason = voucherMutationBlockReason(editQa)
+        return (
+            <>
+                <QuickAddModal
+                    qa={editQa}
+                    setQa={setEditQa}
+                    onSave={saveDetachedEdit}
+                    saveLabel="Speichern"
+                    showSaveMenu={false}
+                    footerLeft={(
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            {editMutationBlockReason ? (
+                                <div className="helper">{editMutationBlockReason}</div>
+                            ) : (
+                                <button type="button" className="btn danger" title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'} onClick={() => setConfirmDeleteEdit(true)}>
+                                    {allowVoucherDeletion ? 'Löschen' : 'Stornieren'}
+                                </button>
+                            )}
+                            <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
+                        </div>
+                    )}
+                    onClose={() => window.api?.window?.close?.()}
+                    onRequestClose={requestCloseDetachedEdit}
+                    confirmingClose={confirmDiscardEdit}
+                    onConfirmDiscard={() => window.api?.window?.close?.()}
+                    onCancelDiscard={() => setConfirmDiscardEdit(false)}
+                    files={editFiles}
+                    setFiles={setEditFiles}
+                    openFilePicker={() => {
+                        if (editMutationBlockReason) {
+                            notify('info', editMutationBlockReason)
+                            return
+                        }
+                        fileInputRef.current?.click()
+                    }}
+                    onDropFiles={(fileList) => {
+                        if (editMutationBlockReason) {
+                            notify('info', editMutationBlockReason)
+                            return
+                        }
+                        if (!fileList) return
+                        setEditFiles((prev) => [...prev, ...Array.from(fileList)])
+                    }}
+                    fileInputRef={fileInputRef}
+                    fmtDate={fmtDate}
+                    eurFmt={eurFmt}
+                    budgetsForEdit={budgetsForEdit}
+                    earmarks={earmarks}
+                    tagDefs={tagDefs}
+                    descSuggest={descSuggest}
+                    title={bookingEditTitle(editQa)}
+                    existingFiles={editExistingFiles}
+                    existingFilesLoading={editExistingFilesLoading}
+                    onOpenExistingFile={(fileId) => { void window.api?.attachments.open?.({ fileId }) }}
+                    onDownloadExistingFile={async (fileId) => {
+                        try {
+                            const res = await window.api?.attachments.saveAs?.({ fileId })
+                            if (res?.filePath) notify('success', 'Gespeichert: ' + res.filePath)
+                        } catch (e: any) {
+                            const msg = String(e?.message || e)
+                            if (!/Abbruch/i.test(msg)) notify('error', 'Speichern fehlgeschlagen: ' + msg)
+                        }
+                    }}
+                    onDeleteExistingFile={async (file) => {
+                        if (editMutationBlockReason) {
+                            notify('info', editMutationBlockReason)
+                            return
+                        }
+                        try {
+                            await window.api?.attachments.delete?.({ fileId: file.id })
+                            await refreshEditAttachments(Number(editQa.id))
+                            notify('success', 'Anhang gelöscht')
+                        } catch (e: any) {
+                            notify('error', e?.message || String(e))
+                        }
+                    }}
+                    windowMode
+                />
+                {confirmDeleteEdit && !editMutationBlockReason && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 10000 }}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h2 style={{ margin: 0 }}>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</h2>
+                                <button className="btn ghost" onClick={() => setConfirmDeleteEdit(false)} aria-label="Schließen">✕</button>
+                            </header>
+                            <p style={{ margin: 0 }}>
+                                {allowVoucherDeletion
+                                    ? 'Möchtest du diese Buchung wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'
+                                    : 'Möchtest du diese Buchung stornieren? Die Originalbuchung bleibt erhalten und es wird eine Gegenbuchung erstellt.'}
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                <button className="btn" onClick={() => setConfirmDeleteEdit(false)}>Abbrechen</button>
+                                <button className="btn danger" onClick={() => { void deleteDetachedEdit() }}>
+                                    {allowVoucherDeletion ? 'Ja, löschen' : 'Ja, stornieren'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </>
+        )
+    }
+
+    return (
+        <QuickAddModal
+            qa={qa}
+            setQa={setQa}
+            onSave={onQuickSave}
+            onSaveAndNew={() => onQuickSave('new')}
+            onSaveAndClose={() => onQuickSave('close')}
+            afterSaveDefault={quickAddAfterSave}
+            onClose={() => window.api?.window?.close?.()}
+            onRequestClose={() => window.api?.window?.close?.()}
+            files={files}
+            setFiles={setFiles}
+            openFilePicker={openFilePicker}
+            onDropFiles={onDropFiles}
+            fileInputRef={fileInputRef}
+            fmtDate={fmtDate}
+            eurFmt={eurFmt}
+            budgetsForEdit={budgetsForEdit}
+            earmarks={earmarks}
+            tagDefs={tagDefs}
+            descSuggest={descSuggest}
+            windowMode
+        />
+    )
+}
+
 function AppInner() {
     // Use toast context
     const { notify } = useToast()
@@ -158,10 +745,14 @@ function AppInner() {
         setCustomBackgroundImage,
         glassModals,
         setGlassModals,
-        showSubmissionBadge,
-        setShowSubmissionBadge,
         showBookingDraftTabs,
-        setShowBookingDraftTabs
+        setShowBookingDraftTabs,
+        bookingsOpenDetached,
+        setBookingsOpenDetached,
+        allowVoucherDeletion,
+        setAllowVoucherDeletion,
+        quickAddAfterSave,
+        setQuickAddAfterSave
     } = useUIPreferences()
 
     // ── Auto-switch: force side-nav when window is too narrow for top-nav ──
@@ -223,20 +814,23 @@ function AppInner() {
     const bumpDataVersion = () => setRefreshKey((k) => k + 1)
     const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
     const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
-    
+
+    useEffect(() => {
+        const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
+            const id = typeof payload?.id === 'number' ? payload.id : null
+            if (id != null && !payload?.deleted) {
+                setLastId(id)
+                setFlashId(id)
+                window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 3000)
+            }
+            bumpDataVersion()
+            window.dispatchEvent(new Event('data-changed'))
+        })
+        return () => { if (typeof off === 'function') off() }
+    }, [])
+
     // Map backend errors to friendlier messages (esp. earmark period issues)
-    const friendlyError = (e: any) => {
-        const msg = String(e?.message || e || '')
-        if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung.*liegt nach Ende/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
-        if (/Zweckbindung ist inaktiv/i.test(msg)) return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-        if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg)) return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
-        // SQLite UNIQUE constraint errors for budget/earmark duplicates
-        if (/UNIQUE constraint failed.*voucher_budgets/i.test(msg)) return 'Fehler: Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Budget-Einträge.'
-        if (/UNIQUE constraint failed.*voucher_earmarks/i.test(msg)) return 'Fehler: Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Einträge.'
-        if (/UNIQUE constraint failed/i.test(msg)) return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
-        return 'Fehler: ' + msg
-    }
+    const friendlyError = friendlyVoucherError
     // Dynamic available years from vouchers
     const [yearsAvail, setYearsAvail] = useState<number[]>([])
     useEffect(() => {
@@ -402,7 +996,7 @@ function AppInner() {
     const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
     const [showActivityReportEditor, setShowActivityReportEditor] = useState<boolean>(false)
     type AmountMode = 'POSITIVE_BOTH' | 'OUT_NEGATIVE'
-    const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
+    const [exportFields, setExportFields] = useState<Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>>(['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'])
     const [exportOrgName, setExportOrgName] = useState<string>('')
     const [exportAmountMode, setExportAmountMode] = useState<AmountMode>('OUT_NEGATIVE')
     const [exportSortDir, setExportSortDir] = useState<'ASC' | 'DESC'>('DESC')
@@ -532,6 +1126,10 @@ function AppInner() {
         activeDraftId,
         reopenDraft,
         closeDraft,
+        markDraftDetached,
+        markDraftDocked,
+        dockAndOpenDraft,
+        updateDraft,
         clearDrafts,
         hasOpenDrafts
     } = useQuickAdd(
@@ -557,7 +1155,53 @@ function AppInner() {
             notify('error', friendlyError(e))
             return null
         }
-    }, () => fileInputRef.current?.click(), notify, showBookingDraftTabs)
+    }, () => fileInputRef.current?.click(), notify, showBookingDraftTabs, quickAddAfterSave)
+
+    const detachQuickAdd = useCallback(async () => {
+        if (!activeDraftId) return
+        try {
+            const detachedFiles = await Promise.all(files.map(async (file) => ({
+                name: file.name,
+                dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+                mime: file.type || undefined
+            })))
+            const res = await window.api?.quickAdd?.openDetached?.({
+                draftId: activeDraftId,
+                qa,
+                files: detachedFiles,
+                afterSaveDefault: quickAddAfterSave
+            })
+            if (!res?.ok) {
+                notify('error', res?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+                return
+            }
+            markDraftDetached(activeDraftId)
+        } catch (e: any) {
+            notify('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(e?.message || e))
+        }
+    }, [activeDraftId, files, markDraftDetached, notify, qa, quickAddAfterSave])
+
+    useEffect(() => {
+        const off = window.api?.quickAdd?.onDetachedDraftSync?.((payload: any) => {
+            const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
+            if (!draftId) return
+            const patch: any = {}
+            if (payload.qa) patch.qa = payload.qa
+            if (Array.isArray(payload.files)) {
+                patch.files = payload.files.map((file: any) => base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime))
+            }
+            if (Object.keys(patch).length) updateDraft(draftId, patch)
+        })
+        return () => { if (typeof off === 'function') off() }
+    }, [updateDraft])
+
+    useEffect(() => {
+        const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
+            const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
+            if (draftId) closeDraft(draftId)
+        })
+        return () => { if (typeof off === 'function') off() }
+    }, [closeDraft])
 
     const [showOpenBookingTabsClosePrompt, setShowOpenBookingTabsClosePrompt] = useState(false)
 
@@ -589,11 +1233,52 @@ function AppInner() {
             return {
                 id: draft.id,
                 label: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · #${draft.sequence}`,
-                title: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`,
-                isActive: draft.id === activeDraftId
+                title: `${desc ? `${desc} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`}${draft.detached ? ' · abgedockt' : ''}`,
+                isActive: draft.id === activeDraftId,
+                isDetached: !!draft.detached
             }
         })
     }, [activeDraftId, bookingDrafts, fmtDate])
+
+    const openBookingDraftTab = useCallback((draftId: string) => {
+        const draft = bookingDrafts.find((entry) => entry.id === draftId)
+        if (draft?.detached) {
+            void (async () => {
+                const focusRes = await window.api?.quickAdd?.focusDetached?.({ draftId })
+                if (focusRes?.ok) return
+                const sourceDraft = bookingDrafts.find((entry) => entry.id === draftId)
+                if (!sourceDraft) return
+                try {
+                    const detachedFiles = await Promise.all(sourceDraft.files.map(async (file) => ({
+                        name: file.name,
+                        dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+                        mime: file.type || undefined
+                    })))
+                    const res = await window.api?.quickAdd?.openDetached?.({
+                        draftId,
+                        qa: sourceDraft.qa,
+                        files: detachedFiles,
+                        afterSaveDefault: quickAddAfterSave
+                    })
+                    if (!res?.ok) {
+                        markDraftDocked(draftId)
+                        reopenDraft(draftId)
+                    }
+                } catch {
+                    markDraftDocked(draftId)
+                    reopenDraft(draftId)
+                }
+            })()
+            return
+        }
+        reopenDraft(draftId)
+    }, [bookingDrafts, markDraftDocked, quickAddAfterSave, reopenDraft])
+
+    const closeBookingDraftTab = useCallback((draftId: string) => {
+        const draft = bookingDrafts.find((entry) => entry.id === draftId)
+        if (draft?.detached) void window.api?.quickAdd?.closeDetached?.({ draftId })
+        closeDraft(draftId)
+    }, [bookingDrafts, closeDraft])
 
     useEffect(() => {
         return window.api?.window?.onCloseRequested?.(() => {
@@ -615,13 +1300,40 @@ function AppInner() {
         setShowOpenBookingTabsClosePrompt(false)
     }, [])
 
+    const openBookingEntry = useCallback(() => {
+        if (!bookingsOpenDetached) {
+            openQuickAdd()
+            return
+        }
+        void (async () => {
+            const draft = showBookingDraftTabs ? openQuickAdd(undefined, { detached: true, showModal: false }) : null
+            try {
+                const res = await window.api?.quickAdd?.openDetached?.({
+                    draftId: draft?.id,
+                    qa: draft?.qa,
+                    files: [],
+                    afterSaveDefault: quickAddAfterSave
+                })
+                if (!res?.ok) {
+                    notify('error', res?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+                    if (draft) dockAndOpenDraft(draft.id)
+                    else openQuickAdd()
+                }
+            } catch (e: any) {
+                notify('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(e?.message || e))
+                if (draft) dockAndOpenDraft(draft.id)
+                else openQuickAdd()
+            }
+        })()
+    }, [bookingsOpenDetached, dockAndOpenDraft, notify, openQuickAdd, quickAddAfterSave, showBookingDraftTabs])
+
     const activePageShortcuts = useMemo<PageShortcutAction[]>(() => {
         const shortcuts = [...registeredPageShortcuts]
         if (activePage === 'Buchungen') {
-            shortcuts.unshift({ id: 'journal-quick-add', key: 'q', label: 'Buchung', action: openQuickAdd })
+            shortcuts.unshift({ id: 'journal-quick-add', key: 'q', label: 'Buchung', action: openBookingEntry })
         }
         return shortcuts
-    }, [activePage, openQuickAdd, registeredPageShortcuts])
+    }, [activePage, openBookingEntry, registeredPageShortcuts])
 
     const pageShortcutMap = useMemo(() => {
         return Object.fromEntries(activePageShortcuts.map((shortcut) => [shortcut.id, shortcut.key])) as Record<string, string>
@@ -1103,7 +1815,7 @@ function AppInner() {
                             navIconColorMode={navIconColorMode}
                             pendingSubmissionsCount={pendingSubmissionsCount}
                             openInvoicesCount={openInvoicesCount}
-                            showBadges={showSubmissionBadge}
+                            showBadges
                             showShortcuts={showNavShortcuts}
                             navShortcuts={navShortcuts}
                         />
@@ -1132,7 +1844,7 @@ function AppInner() {
                         collapsed={true}
                         pendingSubmissionsCount={pendingSubmissionsCount}
                         openInvoicesCount={openInvoicesCount}
-                        showBadges={showSubmissionBadge}
+                        showBadges
                         showShortcuts={showNavShortcuts}
                         navShortcuts={navShortcuts}
                     />
@@ -1258,8 +1970,10 @@ function AppInner() {
                             setPage={setPage}
                             showBookingDraftTabs={showBookingDraftTabs}
                             bookingDraftTabs={bookingDraftTabs}
-                            onOpenBookingDraft={reopenDraft}
-                            onCloseBookingDraft={closeDraft}
+                            onOpenBookingDraft={openBookingDraftTab}
+                            onCloseBookingDraft={closeBookingDraftTab}
+                            bookingsOpenDetached={bookingsOpenDetached}
+                            allowVoucherDeletion={allowVoucherDeletion}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -1294,10 +2008,14 @@ function AppInner() {
                             setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
-                            showSubmissionBadge={showSubmissionBadge}
-                            setShowSubmissionBadge={setShowSubmissionBadge}
                             showBookingDraftTabs={showBookingDraftTabs}
                             setShowBookingDraftTabs={setShowBookingDraftTabs}
+                            bookingsOpenDetached={bookingsOpenDetached}
+                            setBookingsOpenDetached={setBookingsOpenDetached}
+                            allowVoucherDeletion={allowVoucherDeletion}
+                            setAllowVoucherDeletion={setAllowVoucherDeletion}
+                            quickAddAfterSave={quickAddAfterSave}
+                            setQuickAddAfterSave={setQuickAddAfterSave}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             notify={notify}
@@ -1398,11 +2116,16 @@ function AppInner() {
 {/* Quick-Add Modal */}
             {quickAdd && (
                 <QuickAddModal
+                    key={activeDraftId ?? 'quick-add'}
                     qa={qa}
                     setQa={setQa}
                     onSave={onQuickSave}
+                    onSaveAndNew={() => onQuickSave('new')}
+                    onSaveAndClose={() => onQuickSave('close')}
+                    afterSaveDefault={quickAddAfterSave}
                     onClose={parkQuickAdd}
                     onRequestClose={parkQuickAdd}
+                    onDetach={detachQuickAdd}
                     files={files}
                     setFiles={setFiles}
                     openFilePicker={openFilePicker}
@@ -1438,7 +2161,7 @@ function AppInner() {
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
-                <button className="fab fab-buchung page-shortcut-target" onClick={openQuickAdd} title="+ Buchung">
+                <button className="fab fab-buchung page-shortcut-target" onClick={openBookingEntry} title="+ Buchung">
                     {showNavShortcuts && activePage === 'Buchungen' && pageShortcutMap['journal-quick-add'] && (
                         <span className="page-shortcut" aria-hidden="true">{pageShortcutMap['journal-quick-add'].toUpperCase()}</span>
                     )}
@@ -2382,10 +3105,11 @@ function IconArrow({ size = 14 }: { size?: number }) {
 
 // Wrapper with context providers
 export default function App() {
+    const isDetachedQuickAdd = new URLSearchParams(window.location.search).get('window') === 'quick-add'
     return (
         <UIPreferencesProvider>
             <ToastProvider>
-                <AppInner />
+                {isDetachedQuickAdd ? <DetachedQuickAddWindow /> : <AppInner />}
             </ToastProvider>
         </UIPreferencesProvider>
     )

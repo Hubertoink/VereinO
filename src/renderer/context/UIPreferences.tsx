@@ -7,6 +7,7 @@ type DateFormat = 'de' | 'iso'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
 type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
+type QuickAddAfterSave = 'close' | 'new'
 
 const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom']
 
@@ -33,10 +34,14 @@ interface UIPreferencesContextValue {
   setJournalRowStyle: (val: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (val: JournalRowDensity) => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (val: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (val: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (val: boolean) => void
+  allowVoucherDeletion: boolean
+  setAllowVoucherDeletion: (val: boolean) => void
+  quickAddAfterSave: QuickAddAfterSave
+  setQuickAddAfterSave: (val: QuickAddAfterSave) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
   customBackgroundImage: string | null
@@ -227,14 +232,24 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
-  const [showSubmissionBadge, setShowSubmissionBadge] = useState<boolean>(() => {
-    const stored = localStorage.getItem('ui.showSubmissionBadge')
-    return stored !== 'false' // default true
-  })
-
   const [showBookingDraftTabs, setShowBookingDraftTabs] = useState<boolean>(() => {
     const stored = localStorage.getItem('ui.showBookingDraftTabs')
     return stored === 'true' // default false
+  })
+
+  const [bookingsOpenDetached, setBookingsOpenDetached] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ui.bookingsOpenDetached')
+    return stored === 'true'
+  })
+
+  const [allowVoucherDeletion, setAllowVoucherDeletion] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ui.allowVoucherDeletion')
+    return stored === 'true'
+  })
+
+  const [quickAddAfterSave, setQuickAddAfterSave] = useState<QuickAddAfterSave>(() => {
+    const stored = localStorage.getItem('ui.quickAddAfterSave')
+    return stored === 'new' ? 'new' : 'close'
   })
 
   useEffect(() => {
@@ -269,12 +284,20 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [journalRowDensity])
 
   useEffect(() => {
-    safeLocalStorageSet('ui.showSubmissionBadge', String(showSubmissionBadge))
-  }, [showSubmissionBadge])
-
-  useEffect(() => {
     safeLocalStorageSet('ui.showBookingDraftTabs', String(showBookingDraftTabs))
   }, [showBookingDraftTabs])
+
+  useEffect(() => {
+    safeLocalStorageSet('ui.bookingsOpenDetached', String(bookingsOpenDetached))
+  }, [bookingsOpenDetached])
+
+  useEffect(() => {
+    safeLocalStorageSet('ui.allowVoucherDeletion', String(allowVoucherDeletion))
+  }, [allowVoucherDeletion])
+
+  useEffect(() => {
+    safeLocalStorageSet('ui.quickAddAfterSave', quickAddAfterSave)
+  }, [quickAddAfterSave])
 
   useEffect(() => {
     safeLocalStorageSet('ui.backgroundImage', backgroundImage)
@@ -313,10 +336,14 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setJournalRowStyle,
         journalRowDensity,
         setJournalRowDensity,
-        showSubmissionBadge,
-        setShowSubmissionBadge,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
+        bookingsOpenDetached,
+        setBookingsOpenDetached,
+        allowVoucherDeletion,
+        setAllowVoucherDeletion,
+        quickAddAfterSave,
+        setQuickAddAfterSave,
         backgroundImage,
         setBackgroundImage,
         customBackgroundImage,

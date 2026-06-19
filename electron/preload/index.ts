@@ -38,6 +38,29 @@ contextBridge.exposeInMainWorld('api', {
     workQueue: {
         summary: () => ipcRenderer.invoke('workQueue.summary')
     },
+    quickAdd: {
+        openDetached: (payload?: any) => ipcRenderer.invoke('quickAdd.openDetached', payload),
+        detachedInitial: (payload: { token: string }) => ipcRenderer.invoke('quickAdd.detachedInitial', payload),
+        focusDetached: (payload: { draftId: string }) => ipcRenderer.invoke('quickAdd.focusDetached', payload),
+        closeDetached: (payload: { draftId: string }) => ipcRenderer.invoke('quickAdd.closeDetached', payload),
+        syncDraft: (payload: any) => ipcRenderer.invoke('quickAdd.syncDraft', payload),
+        notifySaved: (payload?: any) => ipcRenderer.invoke('quickAdd.notifySaved', payload),
+        onDetachedDraftSync: (cb: (payload: any) => void) => {
+            const handler = (_: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:detachedDraftSync', handler)
+            return () => ipcRenderer.removeListener('quickAdd:detachedDraftSync', handler)
+        },
+        onDetachedClosed: (cb: (payload: any) => void) => {
+            const handler = (_: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:detachedClosed', handler)
+            return () => ipcRenderer.removeListener('quickAdd:detachedClosed', handler)
+        },
+        onSaved: (cb: (payload: any) => void) => {
+            const handler = (_: any, payload: any) => cb(payload)
+            ipcRenderer.on('quickAdd:saved', handler)
+            return () => ipcRenderer.removeListener('quickAdd:saved', handler)
+        }
+    },
     ping: () => 'pong',
     vouchers: {
         create: (payload: any) => cleanInvoke('vouchers.create', payload),

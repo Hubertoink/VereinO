@@ -5,12 +5,22 @@ import { useShortcutOverlay, type ShortcutOverlayAction } from '../../hooks/useS
 
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
+type ExistingAttachment = { id: number; fileName: string }
 
 interface QuickAddModalProps {
     qa: QA
     setQa: (qa: QA) => void
     onSave: () => void
+    onSaveAndNew?: () => void
+    onSaveAndClose?: () => void
+    afterSaveDefault?: 'close' | 'new'
+    saveLabel?: string
+    showSaveMenu?: boolean
+    footerHint?: string
+    footerLeft?: React.ReactNode
     onClose: () => void
+    onDetach?: () => void
+    windowMode?: boolean
     onRequestClose?: () => void
     confirmingClose?: boolean
     onConfirmDiscard?: () => void
@@ -27,6 +37,11 @@ interface QuickAddModalProps {
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
     title?: string
+    existingFiles?: ExistingAttachment[]
+    existingFilesLoading?: boolean
+    onOpenExistingFile?: (fileId: number) => void | Promise<void>
+    onDownloadExistingFile?: (fileId: number) => void | Promise<void>
+    onDeleteExistingFile?: (file: ExistingAttachment) => void | Promise<void>
 }
 
 function inRange(dateISO: string, startISO?: string | null, endISO?: string | null) {
@@ -62,7 +77,15 @@ export default function QuickAddModal({
     qa,
     setQa,
     onSave,
+    onSaveAndNew,
+    onSaveAndClose,
+    saveLabel,
+    showSaveMenu = true,
+    footerHint,
+    footerLeft,
     onClose,
+    onDetach,
+    windowMode,
     onRequestClose,
     confirmingClose,
     onConfirmDiscard,
@@ -78,12 +101,21 @@ export default function QuickAddModal({
     earmarks,
     tagDefs,
     descSuggest,
-    title
+    title,
+    existingFiles = [],
+    existingFilesLoading = false,
+    onOpenExistingFile,
+    onDownloadExistingFile,
+    onDeleteExistingFile
 }: QuickAddModalProps) {
     const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const amountInputRef = React.useRef<HTMLInputElement | null>(null)
     const descriptionInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
+    const modalRef = React.useRef<HTMLDivElement | null>(null)
+    const dragStartRef = React.useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null)
+    const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 })
+    const [saveMenuOpen, setSaveMenuOpen] = React.useState(false)
 
     const grossAmt = (() => {
         if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
@@ -135,12 +167,71 @@ export default function QuickAddModal({
     )
 
     const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
+    const hasInvalidAmount = !Number.isFinite(grossAmt) || grossAmt <= 0
+    const amountError = 'Bitte einen Betrag größer als 0 € eingeben.'
+    const saveBlocked = hasOutOfRange || hasInvalidAmount
+    const saveAndNew = onSaveAndNew ?? onSave
+    const saveAndClose = onSaveAndClose ?? onSave
+    const defaultSaveLabel = saveLabel || 'Speichern'
+    const canDrag = !windowMode
+    const hasAnyAttachment = files.length > 0 || existingFiles.length > 0
 
     const focusInput = React.useCallback((input: HTMLInputElement | null) => {
         if (!input) return
         input.focus()
         input.select()
     }, [])
+
+    React.useEffect(() => {
+        window.setTimeout(() => focusInput(amountInputRef.current), 0)
+    }, [focusInput])
+
+    const clampDragOffset = React.useCallback((x: number, y: number) => {
+        const modal = modalRef.current
+        if (!modal) return { x, y }
+        const rect = modal.getBoundingClientRect()
+        const margin = 12
+        const minX = margin - rect.left + dragOffset.x
+        const maxX = window.innerWidth - margin - rect.right + dragOffset.x
+        const minY = margin - rect.top + dragOffset.y
+        const maxY = window.innerHeight - margin - rect.bottom + dragOffset.y
+        return {
+            x: Math.min(maxX, Math.max(minX, x)),
+            y: Math.min(maxY, Math.max(minY, y))
+        }
+    }, [dragOffset.x, dragOffset.y])
+
+    const startDrag = React.useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (!canDrag) return
+        if (e.button !== 0) return
+        const target = e.target as HTMLElement | null
+        if (target?.closest('button, input, select, textarea, a')) return
+        dragStartRef.current = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            originX: dragOffset.x,
+            originY: dragOffset.y
+        }
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }, [canDrag, dragOffset.x, dragOffset.y])
+
+    const moveDrag = React.useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (!canDrag) return
+        const start = dragStartRef.current
+        if (!start || start.pointerId !== e.pointerId) return
+        const nextX = start.originX + e.clientX - start.startX
+        const nextY = start.originY + e.clientY - start.startY
+        setDragOffset(clampDragOffset(nextX, nextY))
+    }, [canDrag, clampDragOffset])
+
+    const endDrag = React.useCallback((e: React.PointerEvent<HTMLElement>) => {
+        if (!canDrag) return
+        const start = dragStartRef.current
+        if (!start || start.pointerId !== e.pointerId) return
+        dragStartRef.current = null
+        try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { }
+    }, [canDrag])
 
     const addBudgetAssignment = React.useCallback(() => {
         if (!hasAvailableBudgets) return
@@ -167,7 +258,7 @@ export default function QuickAddModal({
         { id: 'quick-add-amount-field', key: 'r', label: 'Betrag', action: () => focusInput(amountInputRef.current) },
         { id: 'quick-add-description-field', key: 'e', label: 'Beschreibung', action: () => focusInput(descriptionInputRef.current) },
         { id: 'quick-add-tags-field', key: 'g', label: 'Tags', action: () => focusInput(tagsInputRef.current) },
-        { id: 'quick-add-save', key: 's', label: 'Speichern', action: onSave, disabled: hasOutOfRange },
+        { id: 'quick-add-save', key: 's', label: 'Speichern', action: onSave, disabled: saveBlocked },
         { id: 'quick-add-file', key: 'd', label: 'Datei', action: openFilePicker },
         { id: 'quick-add-income', key: 'i', label: 'Einnahme', action: () => setQa({ ...qa, type: 'IN' }) },
         { id: 'quick-add-expense', key: 'a', label: 'Ausgabe', action: () => setQa({ ...qa, type: 'OUT' }) },
@@ -189,7 +280,7 @@ export default function QuickAddModal({
         { id: 'quick-add-budget', key: 'u', label: 'Budget', action: addBudgetAssignment, disabled: !hasAvailableBudgets },
         { id: 'quick-add-earmark', key: 'z', label: 'Zweckbindung', action: addEarmarkAssignment, disabled: !hasAvailableEarmarks },
         { id: 'quick-add-close', key: 'x', label: 'Schließen', action: closeModal }
-    ], [addBudgetAssignment, addEarmarkAssignment, closeModal, focusInput, hasAvailableBudgets, hasAvailableEarmarks, hasOutOfRange, onSave, openFilePicker, qa, setQa])
+    ], [addBudgetAssignment, addEarmarkAssignment, closeModal, focusInput, hasAvailableBudgets, hasAvailableEarmarks, onSave, openFilePicker, qa, saveBlocked, setQa])
 
     const { showShortcuts, shortcutMap } = useShortcutOverlay({
         actions: modalShortcuts,
@@ -230,16 +321,39 @@ export default function QuickAddModal({
     }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
     return (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-            <div className="modal booking-modal" onClick={(e) => e.stopPropagation()}>
-                <header className="modal-header-flex">
+        <div className={`modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`} role="dialog" aria-modal="true">
+            <div
+                ref={modalRef}
+                className={`modal booking-modal${windowMode ? ' detached-quick-add-modal' : ''}`}
+                onClick={(e) => e.stopPropagation()}
+                style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
+            >
+                <header
+                    className={`modal-header-flex${canDrag ? ' booking-modal-drag-handle' : ''}`}
+                    title={canDrag ? 'Zum Verschieben ziehen' : undefined}
+                    onPointerDown={startDrag}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                >
                     <h2>{title || '+ Buchung'}</h2>
-                    <button className="btn ghost modal-shortcut-target" onClick={closeModal} title="Schließen (ESC)">
-                        {shortcutBadge('quick-add-close')}
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
-                    </button>
+                    <div className="booking-modal-header-actions">
+                        {onDetach && (
+                            <button className="btn ghost" type="button" onClick={onDetach} title="In eigenes Fenster abdocken">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M15 3h6v6" />
+                                    <path d="M10 14 21 3" />
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                </svg>
+                            </button>
+                        )}
+                        <button className="btn ghost modal-shortcut-target" type="button" onClick={closeModal} title="Schließen (ESC)">
+                            {shortcutBadge('quick-add-close')}
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </header>
 
                 {/* Unsaved changes confirmation */}
@@ -263,7 +377,7 @@ export default function QuickAddModal({
                     </div>
                 )}
                 
-                <form onSubmit={(e) => { e.preventDefault(); if (!hasOutOfRange) onSave(); }}>
+                <form onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) onSave(); }}>
                     {/* Live Summary */}
                     <div className="card summary-card">
                         <div className="helper">Zusammenfassung</div>
@@ -362,14 +476,18 @@ export default function QuickAddModal({
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field field-full-width finance-amount-highlight">
-                                        <label className="field-label-shortcut">Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}</label>
+                                        <label className="field-label-shortcut">
+                                            Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}
+                                            {hasInvalidAmount && <span className="booking-field-error has-tooltip" data-tooltip={amountError} tabIndex={0}>!</span>}
+                                        </label>
                                         <span className="adorn-wrap">
-                                            <input ref={amountInputRef} className="input input-transfer" type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
+                                            <input ref={amountInputRef} className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                 onChange={(e) => {
                                                     const v = Number(e.target.value)
                                                     setQa({ ...qa, grossAmount: v })
                                                 }}
-                                                aria-label="Transfer-Betrag" />
+                                                aria-label="Transfer-Betrag"
+                                                aria-invalid={hasInvalidAmount} />
                                             <span className="adorn-suffix">€</span>
                                         </span>
                                         <div className="helper">Transfers sind umsatzsteuerneutral.</div>
@@ -377,7 +495,10 @@ export default function QuickAddModal({
                                 ) : (
                                     <>
                                         <div className="field finance-amount-highlight">
-                                            <label className="field-label-shortcut">{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}</label>
+                                            <label className="field-label-shortcut">
+                                                {(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span>{shortcutBadge('quick-add-amount-field')}
+                                                {hasInvalidAmount && <span className="booking-field-error has-tooltip" data-tooltip={amountError} tabIndex={0}>!</span>}
+                                            </label>
                                             <div className="flex-gap-8">
                                                 <select
                                                     className="input"
@@ -409,13 +530,14 @@ export default function QuickAddModal({
                                                     <option value="GROSS">Brutto</option>
                                                 </select>
                                                 <span className="adorn-wrap flex-1">
-                                                    <input ref={amountInputRef} className="input" type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
+                                                    <input ref={amountInputRef} className={`input ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount}
                                                         onChange={(e) => {
                                                             const v = Number(e.target.value)
                                                             if ((qa as any).mode === 'GROSS') setQa({ ...qa, grossAmount: v })
                                                             else setQa({ ...qa, netAmount: v })
                                                         }}
-                                                        aria-label={(qa as any).mode === 'GROSS' ? 'Brutto-Betrag' : 'Netto-Betrag'} />
+                                                        aria-label={(qa as any).mode === 'GROSS' ? 'Brutto-Betrag' : 'Netto-Betrag'}
+                                                        aria-invalid={hasInvalidAmount} />
                                                     <span className="adorn-suffix">€</span>
                                                 </span>
                                             </div>
@@ -450,7 +572,7 @@ export default function QuickAddModal({
                             {/* Budget Zuordnungen (mehrfach möglich) */}
                             <div className="row">
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div className="quick-add-assignment-title">
                                         Budget
                                         {hasAvailableBudgets ? (
                                             <button
@@ -466,7 +588,7 @@ export default function QuickAddModal({
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Kein Budget vorhanden</span>
                                         )}
-                                    </label>
+                                    </div>
                                     {(() => {
                                         const budgetIds = budgetsList.filter((b) => b.budgetId).map((b) => b.budgetId)
                                         const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
@@ -564,7 +686,7 @@ export default function QuickAddModal({
                             {/* Zweckbindung Zuordnungen (mehrfach möglich) */}
                             <div className="row">
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div className="quick-add-assignment-title">
                                         Zweckbindung
                                         {hasAvailableEarmarks ? (
                                             <button
@@ -580,7 +702,7 @@ export default function QuickAddModal({
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Keine Zweckbindung vorhanden</span>
                                         )}
-                                    </label>
+                                    </div>
                                     {(() => {
                                         const earmarkIds = earmarksList.filter((e) => e.earmarkId).map((e) => e.earmarkId)
                                         const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
@@ -694,7 +816,7 @@ export default function QuickAddModal({
                             <div className="attachment-header">
                                 <div className="attachment-title">
                                     <strong>Anhänge</strong>
-                                    {files.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
+                                    {hasAnyAttachment && <div className="helper">Dateien hierher ziehen</div>}
                                 </div>
                                 <div className="flex-gap-8">
                                     <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
@@ -707,12 +829,33 @@ export default function QuickAddModal({
                                     )}
                                 </div>
                             </div>
-                            {files.length > 0 ? (
+                            {existingFilesLoading ? (
+                                <div className="helper" style={{ marginTop: 8 }}>Lade ...</div>
+                            ) : hasAnyAttachment ? (
                                 <ul className="file-list">
+                                    {existingFiles.map((f) => (
+                                        <li key={`existing-${f.id}`} className="file-list-item">
+                                            <span className="file-name">{f.fileName}</span>
+                                            <div className="flex-gap-8">
+                                                {onOpenExistingFile && (
+                                                    <button type="button" className="btn" onClick={() => { void onOpenExistingFile(f.id) }}>Öffnen</button>
+                                                )}
+                                                {onDownloadExistingFile && (
+                                                    <button type="button" className="btn" onClick={() => { void onDownloadExistingFile(f.id) }}>Speichern</button>
+                                                )}
+                                                {onDeleteExistingFile && (
+                                                    <button type="button" className="btn danger" title="Löschen" onClick={() => { void onDeleteExistingFile(f) }}>Löschen</button>
+                                                )}
+                                            </div>
+                                        </li>
+                                    ))}
                                     {files.map((f, i) => (
-                                        <li key={i} className="file-list-item">
+                                        <li key={`new-${i}-${f.name}`} className="file-list-item">
                                             <span className="file-name">{f.name}</span>
-                                            <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                            <div className="flex-gap-8">
+                                                <span className="helper">neu</span>
+                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -736,11 +879,58 @@ export default function QuickAddModal({
                     </div>
                     
                     <div className="modal-footer-actions">
-                        <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Alt halten = Shortcuts · Esc = Abbrechen</div>
-                        <button type="submit" className="btn primary modal-shortcut-target" disabled={hasOutOfRange}>
-                            {shortcutBadge('quick-add-save')}
-                            Speichern
-                        </button>
+                        <div>
+                            {footerLeft}
+                            {!footerLeft && <div className="helper">{footerHint || 'Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Alt halten = Shortcuts · Esc = Abbrechen'}</div>}
+                        </div>
+                        <div className="booking-modal-save-actions" onBlur={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSaveMenuOpen(false)
+                        }}>
+                            {showSaveMenu ? (
+                                <div className="booking-split-save">
+                                    <button
+                                        type="submit"
+                                        className="btn primary modal-shortcut-target booking-split-save__main"
+                                        disabled={saveBlocked}
+                                    >
+                                        {shortcutBadge('quick-add-save')}
+                                        {defaultSaveLabel}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn primary booking-split-save__arrow"
+                                        disabled={saveBlocked}
+                                        aria-label="Weitere Speicheraktionen"
+                                        aria-haspopup="menu"
+                                        aria-expanded={saveMenuOpen}
+                                        onClick={() => setSaveMenuOpen((open) => !open)}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M7 10l5 5 5-5H7z" />
+                                        </svg>
+                                    </button>
+                                    {saveMenuOpen && (
+                                        <div className="booking-split-save__menu" role="menu">
+                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); saveAndClose() }}>
+                                                Speichern & schließen
+                                            </button>
+                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); saveAndNew() }}>
+                                                Speichern & neu
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <button
+                                    type="submit"
+                                    className="btn primary modal-shortcut-target"
+                                    disabled={saveBlocked}
+                                >
+                                    {shortcutBadge('quick-add-save')}
+                                    {defaultSaveLabel}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </form>
             </div>

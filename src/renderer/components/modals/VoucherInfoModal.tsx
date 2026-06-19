@@ -17,6 +17,10 @@ type VoucherInfo = {
   transferFrom?: 'BAR' | 'BANK' | null
   transferTo?: 'BAR' | 'BANK' | null
   grossAmount: number
+  originalId?: number | null
+  originalVoucherNo?: string | null
+  reversedById?: number | null
+  reversedByVoucherNo?: string | null
   earmarkId?: number | null
   earmarkCode?: string | null
   budgetId?: number | null
@@ -55,6 +59,15 @@ function contrastText(bg?: string | null) {
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [] }: VoucherInfoModalProps) {
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
+  const isReversalVoucher = !!voucher.originalId
+  const isReversedOriginal = !!voucher.reversedById
+  const originalRef = voucher.originalVoucherNo ? `#${voucher.originalVoucherNo}` : voucher.originalId ? `#${voucher.originalId}` : ''
+  const reversedByRef = voucher.reversedByVoucherNo ? `#${voucher.reversedByVoucherNo}` : voucher.reversedById ? `#${voucher.reversedById}` : ''
+  const statusLabel = isReversalVoucher
+    ? `Stornobuchung zu ${originalRef || 'Originalbuchung'}`
+    : isReversedOriginal
+      ? `Storniert durch ${reversedByRef || 'Stornobuchung'}`
+      : 'Aktiv'
   
   // Build budget assignments list
   const budgetAssignments: BudgetAssignment[] = voucher.budgets && voucher.budgets.length > 0
@@ -122,8 +135,10 @@ Budget: ${budgetDisplay}
 Zweckbindung: ${earmarkDisplay}
 Zahlweg: ${paymentLabel}
 Tags: ${tagsDisplay}`
+    const withStatus = `${text}
+Status: ${statusLabel}`
     
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(withStatus).then(() => {
       notify('success', 'Als Text kopiert', 2000)
     }).catch(() => {
       notify('error', 'Kopieren fehlgeschlagen', 2000)
@@ -132,8 +147,8 @@ Tags: ${tagsDisplay}`
 
   const copyForExcel = () => {
     // Tab-separated format (headers + data)
-    const headers = 'Datum\tBelegnummer\tBeschreibung\tBrutto\tArt\tSphäre\tBudget\tZweckbindung\tZahlweg\tTags'
-    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${sphereLabel}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}`
+    const headers = 'Datum\tBelegnummer\tBeschreibung\tBrutto\tArt\tSphäre\tBudget\tZweckbindung\tZahlweg\tTags\tStatus'
+    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${sphereLabel}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}\t${statusLabel}`
     const combined = `${headers}\n${data}`
     
     navigator.clipboard.writeText(combined).then(() => {
@@ -179,7 +194,7 @@ Tags: ${tagsDisplay}`
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>📋 Buchungsdetails</h2>
-            <div className="helper" style={{ marginTop: 4 }}>Beleg {voucher.voucherNo}</div>
+            <div className="helper" style={{ marginTop: 4 }}>Beleg {voucher.voucherNo}{statusLabel !== 'Aktiv' ? ` · ${statusLabel}` : ''}</div>
           </div>
           <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ fontSize: 20 }}>
             ✕
@@ -197,6 +212,12 @@ Tags: ${tagsDisplay}`
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Belegnummer:</span>
               <span>{voucher.voucherNo}</span>
             </div>
+            {statusLabel !== 'Aktiv' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Status:</span>
+                <span className={`badge ${isReversalVoucher ? 'badge-storno' : 'badge-storniert'}`}>{statusLabel}</span>
+              </div>
+            ) : null}
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'start' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Beschreibung:</span>
               <span style={{ wordBreak: 'break-word' }}>{voucher.description || '-'}</span>

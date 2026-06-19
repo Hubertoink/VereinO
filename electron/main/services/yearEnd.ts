@@ -6,6 +6,7 @@ import { getDb } from '../db/database'
 import { getSetting, setSetting } from './settings'
 import { summarizeVouchers, monthlyVouchers, listVouchersAdvanced, cashBalance as getCashBalance } from '../repositories/vouchers'
 import { writeAudit } from './audit'
+import { voucherStatusKind, voucherStatusText } from './voucherStatus'
 
 export async function preview(year: number) {
     const from = `${year}-01-01`
@@ -78,26 +79,35 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     // Journal sheet
     const rows = listVouchersAdvanced({ from, to, limit: 200000 })
     const ws2 = wb.addWorksheet('Journal')
-    const head = ['Datum', 'Nr.', 'Typ', 'Sphäre', 'Beschreibung', 'Zahlweg', 'Netto', 'MwSt', 'Brutto', 'Tags']
+    const head = ['Datum', 'Nr.', 'Typ', 'Sphäre', 'Beschreibung', 'Status', 'Zahlweg', 'Netto', 'MwSt', 'Brutto', 'Tags']
     ws2.addRow(head)
     const startRow = 2
     for (const r of rows) {
+        const status = voucherStatusText(r)
         const row = ws2.addRow([
             r.date,
             r.voucherNo,
             r.type,
             r.sphere,
             r.description ?? '',
+            status,
             r.paymentMethod ?? '',
             Number(r.netAmount?.toFixed?.(2) ?? r.netAmount),
             Number(r.vatAmount?.toFixed?.(2) ?? r.vatAmount),
             Number(r.grossAmount?.toFixed?.(2) ?? r.grossAmount),
             (r.tags || []).join(', ')
         ])
+        const kind = voucherStatusKind(r)
+        if (kind === 'storno') {
+            row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F1' } }
+        } else if (kind === 'storniert') {
+            row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } }
+            row.font = { color: { argb: 'FF555555' } }
+        }
         // Currency formatting for numeric columns (trailing €)
-        row.getCell(7).numFmt = CURRENCY_FMT
         row.getCell(8).numFmt = CURRENCY_FMT
         row.getCell(9).numFmt = CURRENCY_FMT
+        row.getCell(10).numFmt = CURRENCY_FMT
     }
     ws2.getRow(1).font = { bold: true }
     // Column widths and alignments
@@ -106,15 +116,17 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     ws2.getColumn(3).width = 10 // Typ
     ws2.getColumn(4).width = 10 // Sphäre
     ws2.getColumn(5).width = 40 // Beschreibung
-    ws2.getColumn(6).width = 12 // Zahlweg
-    ws2.getColumn(7).width = 14 // Netto
-    ws2.getColumn(8).width = 14 // MwSt
-    ws2.getColumn(9).width = 14 // Brutto
-    ws2.getColumn(10).width = 20 // Tags
+    ws2.getColumn(6).width = 28 // Status
+    ws2.getColumn(7).width = 12 // Zahlweg
+    ws2.getColumn(8).width = 14 // Netto
+    ws2.getColumn(9).width = 14 // MwSt
+    ws2.getColumn(10).width = 14 // Brutto
+    ws2.getColumn(11).width = 20 // Tags
     ws2.getColumn(5).alignment = { wrapText: true }
-    ws2.getColumn(7).alignment = { horizontal: 'right' }
+    ws2.getColumn(6).alignment = { wrapText: true }
     ws2.getColumn(8).alignment = { horizontal: 'right' }
     ws2.getColumn(9).alignment = { horizontal: 'right' }
+    ws2.getColumn(10).alignment = { horizontal: 'right' }
     // Freeze header row
     ;(ws2 as any).views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }]
     // Add a stable AutoFilter on the header

@@ -673,6 +673,52 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_submissions_budget ON submissions(budget_id);
     CREATE INDEX IF NOT EXISTS idx_submissions_earmark ON submissions(earmark_id);
     `
+  },
+  {
+    version: 31,
+    up: `
+    -- Reversal vouchers store positive amounts; the opposite flow is represented by IN/OUT.
+    UPDATE vouchers
+    SET net_amount = ABS(IFNULL(net_amount, 0)),
+        vat_amount = ABS(IFNULL(vat_amount, 0)),
+        gross_amount = ABS(IFNULL(gross_amount, 0)),
+        earmark_amount = CASE WHEN earmark_amount IS NULL THEN NULL ELSE ABS(earmark_amount) END,
+        budget_amount = CASE WHEN budget_amount IS NULL THEN NULL ELSE ABS(budget_amount) END
+    WHERE original_id IS NOT NULL;
+
+    UPDATE voucher_budgets
+    SET amount = ABS(IFNULL(amount, 0))
+    WHERE voucher_id IN (SELECT id FROM vouchers WHERE original_id IS NOT NULL);
+
+    UPDATE voucher_earmarks
+    SET amount = ABS(IFNULL(amount, 0))
+    WHERE voucher_id IN (SELECT id FROM vouchers WHERE original_id IS NOT NULL);
+
+    UPDATE vouchers
+    SET payment_method = (
+      SELECT original.payment_method
+      FROM vouchers original
+      WHERE original.id = vouchers.original_id
+    )
+    WHERE original_id IS NOT NULL
+      AND type IN ('IN', 'OUT')
+      AND payment_method IS NULL;
+
+    UPDATE vouchers
+    SET transfer_from = (
+          SELECT original.transfer_to
+          FROM vouchers original
+          WHERE original.id = vouchers.original_id
+        ),
+        transfer_to = (
+          SELECT original.transfer_from
+          FROM vouchers original
+          WHERE original.id = vouchers.original_id
+        )
+    WHERE original_id IS NOT NULL
+      AND type = 'TRANSFER'
+      AND (transfer_from IS NULL OR transfer_to IS NULL);
+    `
   }
 ]
 

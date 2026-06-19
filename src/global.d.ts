@@ -12,6 +12,17 @@ declare global {
                 onMaximizeChanged: (cb: (isMax: boolean) => void) => () => void
                 onCloseRequested: (cb: () => void) => () => void
             }
+            quickAdd?: {
+                openDetached: (payload?: any) => Promise<{ ok: boolean; token?: string; error?: string }>
+                detachedInitial: (payload: { token: string }) => Promise<{ initial: any }>
+                focusDetached: (payload: { draftId: string }) => Promise<{ ok: boolean }>
+                closeDetached: (payload: { draftId: string }) => Promise<{ ok: boolean }>
+                syncDraft: (payload: any) => Promise<{ ok: boolean }>
+                notifySaved: (payload?: any) => Promise<{ ok: boolean }>
+                onDetachedDraftSync: (cb: (payload: any) => void) => () => void
+                onDetachedClosed: (cb: (payload: any) => void) => () => void
+                onSaved: (cb: (payload: any) => void) => () => void
+            }
             ping: () => string
             vouchers: {
                 create: (payload: {
@@ -52,6 +63,10 @@ declare global {
                         vatRate: number
                         vatAmount: number
                         grossAmount: number
+                        originalId?: number | null
+                        originalVoucherNo?: string | null
+                        reversedById?: number | null
+                        reversedByVoucherNo?: string | null
                         fileCount?: number
                         earmarkId?: number | null
                         earmarkCode?: string | null
@@ -62,7 +77,7 @@ declare global {
                     }>
                     total: number
                 }>
-                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; fileCount?: number }> }>
+                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
                 update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
                 delete: (payload: { id: number }) => Promise<{ id: number }>
                 batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>

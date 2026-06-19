@@ -1627,11 +1627,40 @@ td {
     background: color-mix(in oklab, var(--warning) 22%, transparent) !important;
 }
 
+.journal-table tbody tr.journal-row-storno {
+    background: color-mix(in oklab, var(--danger) 10%, transparent) !important;
+}
+
+.journal-table tbody tr.journal-row-storno:hover {
+    background: color-mix(in oklab, var(--danger) 16%, transparent) !important;
+}
+
+.journal-table tbody tr.journal-row-storniert {
+    background: color-mix(in oklab, var(--text-dim) 10%, transparent) !important;
+}
+
+.journal-table tbody tr.journal-row-storniert:hover {
+    background: color-mix(in oklab, var(--text-dim) 14%, transparent) !important;
+}
+
 .badge-advance-placeholder,
 .badge-advance-placeholder-lock {
     background: color-mix(in oklab, var(--warning) 26%, transparent);
     color: var(--text);
     border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--border));
+}
+
+.badge-storno,
+.badge-storno-lock {
+    background: color-mix(in oklab, var(--danger) 28%, transparent);
+    color: var(--text);
+    border: 1px solid color-mix(in oklab, var(--danger) 48%, var(--border));
+}
+
+.badge-storniert {
+    background: color-mix(in oklab, var(--text-dim) 20%, transparent);
+    color: var(--text);
+    border: 1px solid color-mix(in oklab, var(--text-dim) 38%, var(--border));
 }
 
 tbody tr:hover,
@@ -2018,6 +2047,152 @@ svg text {
     flex-direction: column;
     -webkit-app-region: no-drag;
     animation: modalSlideUp 0.25s ease-out;
+}
+
+.booking-modal-drag-handle {
+    cursor: move;
+    touch-action: none;
+    user-select: none;
+}
+
+.booking-modal-drag-handle button,
+.booking-modal-drag-handle input,
+.booking-modal-drag-handle select,
+.booking-modal-drag-handle textarea,
+.booking-modal-drag-handle a {
+    cursor: auto;
+}
+
+.booking-modal-save-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.booking-modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.booking-field-error {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--danger) 18%, transparent);
+    color: var(--danger);
+    border: 1px solid color-mix(in oklab, var(--danger) 62%, transparent);
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: help;
+}
+
+.booking-field-error.has-tooltip::after {
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--danger) 45%, var(--border));
+}
+
+.quick-add-assignment-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.booking-split-save {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.booking-split-save .btn {
+    border-radius: 0;
+}
+
+.booking-split-save__main {
+    border-top-left-radius: 8px !important;
+    border-bottom-left-radius: 8px !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.booking-split-save__arrow {
+    width: 42px;
+    min-width: 42px;
+    padding-inline: 8px;
+    border-left: 1px solid color-mix(in oklab, var(--surface) 48%, transparent);
+    border-top-right-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+
+.booking-split-save__menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    min-width: 190px;
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--surface) 96%, #000 4%);
+    box-shadow: var(--shadow-lg);
+    z-index: 20;
+}
+
+.booking-split-save__menu button {
+    width: 100%;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.booking-split-save__menu button:hover,
+.booking-split-save__menu button:focus-visible {
+    outline: none;
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.detached-quick-add-overlay {
+    position: fixed;
+    inset: 0;
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 12px;
+    background: var(--bg);
+    overflow: hidden;
+}
+
+.detached-quick-add-modal {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    box-shadow: none;
+}
+
+.detached-quick-add-loading {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    color: var(--text);
+    background: var(--bg);
+    font-weight: 700;
 }
 
 /* Keep header/footer visible; scroll only inside form when really needed */
@@ -3707,7 +3882,9 @@ textarea:focus {
 }
 
 .has-tooltip:hover::after,
-.has-tooltip:hover::before {
+.has-tooltip:hover::before,
+.has-tooltip:focus-visible::after,
+.has-tooltip:focus-visible::before {
   opacity: 1;
   visibility: visible;
 }
@@ -7234,6 +7411,11 @@ html[data-glass-modals="true"] .flyout-arrow {
     color: var(--text);
 }
 
+.booking-draft-tab--detached {
+    border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
+    background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+}
+
 .booking-draft-tab__open {
     display: inline-flex;
     align-items: center;
@@ -7252,6 +7434,18 @@ html[data-glass-modals="true"] .flyout-arrow {
     white-space: nowrap;
     font-size: 13px;
     font-weight: 600;
+}
+
+.booking-draft-tab__badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0;
 }
 
 .booking-draft-tab__close {

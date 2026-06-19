@@ -47,6 +47,8 @@ export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'moun
 
 export type DateFmt = 'ISO' | 'PRETTY'
 
+export type QuickAddAfterSave = 'close' | 'new'
+
 export type ColKey = 
   | 'actions' 
   | 'date' 
@@ -135,10 +137,14 @@ export interface SettingsProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (v: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (v: boolean) => void
+  allowVoucherDeletion: boolean
+  setAllowVoucherDeletion: (v: boolean) => void
+  quickAddAfterSave: QuickAddAfterSave
+  setQuickAddAfterSave: (v: QuickAddAfterSave) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -181,10 +187,14 @@ export interface GeneralPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
-  showSubmissionBadge: boolean
-  setShowSubmissionBadge: (v: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
+  bookingsOpenDetached: boolean
+  setBookingsOpenDetached: (v: boolean) => void
+  allowVoucherDeletion: boolean
+  setAllowVoucherDeletion: (v: boolean) => void
+  quickAddAfterSave: QuickAddAfterSave
+  setQuickAddAfterSave: (v: QuickAddAfterSave) => void
 }
 
 export interface TablePaneProps {

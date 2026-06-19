@@ -40,10 +40,14 @@ export function GeneralPane({
   setDateFmt,
   notify,
   openSetupWizard,
-  showSubmissionBadge,
-  setShowSubmissionBadge,
   showBookingDraftTabs,
   setShowBookingDraftTabs,
+  bookingsOpenDetached,
+  setBookingsOpenDetached,
+  allowVoucherDeletion,
+  setAllowVoucherDeletion,
+  quickAddAfterSave,
+  setQuickAddAfterSave,
   backgroundImage,
   setBackgroundImage,
   customBackgroundImage,
@@ -507,18 +511,6 @@ export function GeneralPane({
             />
           </div>
           <div className="settings-inline-toggle">
-            <label htmlFor="toggle-submission-badge">Menü-Badges</label>
-            <input
-              id="toggle-submission-badge"
-              role="switch"
-              aria-checked={showSubmissionBadge}
-              className="toggle"
-              type="checkbox"
-              checked={showSubmissionBadge}
-              onChange={(e) => setShowSubmissionBadge(e.target.checked)}
-            />
-          </div>
-          <div className="settings-inline-toggle">
             <label htmlFor="toggle-booking-draft-tabs">Buchungsreiter</label>
             <input
               id="toggle-booking-draft-tabs"
@@ -529,6 +521,61 @@ export function GeneralPane({
               checked={showBookingDraftTabs}
               onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
             />
+          </div>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-bookings-open-detached">Eigenes Buchungsfenster</label>
+            <input
+              id="toggle-bookings-open-detached"
+              role="switch"
+              aria-checked={bookingsOpenDetached}
+              title="Neue und bearbeitete Buchungen direkt als eigenes Fenster öffnen."
+              className="toggle"
+              type="checkbox"
+              checked={bookingsOpenDetached}
+              onChange={(e) => setBookingsOpenDetached(e.target.checked)}
+            />
+          </div>
+        </div>
+
+        <div className="settings-row-2col" style={{ marginTop: 16 }}>
+          <div className="field">
+            <label>Nach Speichern im Buchungsmodal</label>
+            <div className="btn-group">
+              <button
+                type="button"
+                className={`btn-option ${quickAddAfterSave === 'close' ? 'active' : ''}`}
+                onClick={() => setQuickAddAfterSave('close')}
+              >
+                Schließen
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${quickAddAfterSave === 'new' ? 'active' : ''}`}
+                onClick={() => setQuickAddAfterSave('new')}
+              >
+                Neue Buchung
+              </button>
+            </div>
+          </div>
+          <div className="field" />
+        </div>
+
+        <div className="settings-row-2col" style={{ marginTop: 16 }}>
+          <div className="settings-inline-toggle">
+            <label htmlFor="toggle-voucher-delete-mode">Buchungen endgültig löschen</label>
+            <input
+              id="toggle-voucher-delete-mode"
+              role="switch"
+              aria-checked={allowVoucherDeletion}
+              title="Aus: Buchungen werden per Storno korrigiert. Ein: Buchungen können endgültig gelöscht werden."
+              className="toggle"
+              type="checkbox"
+              checked={allowVoucherDeletion}
+              onChange={(e) => setAllowVoucherDeletion(e.target.checked)}
+            />
+          </div>
+          <div className="helper" style={{ alignSelf: 'center' }}>
+            Standard: Storno statt Löschen.
           </div>
         </div>
       </div>

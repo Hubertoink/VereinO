@@ -231,6 +231,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
     return withTransaction((d: DB) => {
         const original = d.prepare('SELECT * FROM vouchers WHERE id=?').get(originalId) as any
         if (!original) throw new Error('Original voucher not found')
+        if (original.reversed_by_id) throw new Error('Diese Buchung wurde bereits storniert.')
+        if (original.original_id) throw new Error('Stornobuchungen können nicht erneut storniert werden.')
         // Reverse uses today's date; ensure open
         ensurePeriodOpen(new Date().toISOString().slice(0, 10), d)
 
@@ -239,32 +241,80 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         const seq = nextVoucherSequence(d, year, original.sphere)
         const todayISO = now.toISOString().slice(0, 10)
         const voucherNo = makeVoucherNo(year, todayISO, original.sphere, seq)
+        const reverseType = original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : 'TRANSFER'
+        const reverseDescription = `Storno zu ${original.voucher_no}${original.description ? ` - ${original.description}` : ''}`
+        const reverseNet = Math.abs(Number(original.net_amount || 0))
+        const reverseVat = Math.abs(Number(original.vat_amount || 0))
+        const reverseGross = Math.abs(Number(original.gross_amount || 0))
+        const reversePaymentMethod = original.type === 'TRANSFER' ? null : (original.payment_method ?? null)
+        const reverseTransferFrom = original.type === 'TRANSFER' ? (original.transfer_to ?? null) : null
+        const reverseTransferTo = original.type === 'TRANSFER' ? (original.transfer_from ?? null) : null
 
         const stmt = d.prepare(`
       INSERT INTO vouchers (
-        year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, description,
-                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, counterparty, created_by, original_id
-            ) VALUES (?, ?, ?, date('now'), ?, ?, ?, ?, ?, ?, 'Storno', ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
+        year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id,
+        earmark_id, earmark_amount, budget_id, budget_amount, description,
+        net_amount, vat_rate, vat_amount, gross_amount, amount_mode,
+        payment_method, transfer_from, transfer_to, counterparty, created_by, original_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
     `)
         const info = stmt.run(
             year,
             seq,
             voucherNo,
-            original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : 'TRANSFER',
+            todayISO,
+            reverseType,
             original.sphere,
             original.account_id,
             original.category_id,
             original.project_id,
             original.earmark_id,
-            -original.net_amount,
+            original.earmark_amount == null ? null : Math.abs(Number(original.earmark_amount)),
+            original.budget_id,
+            original.budget_amount == null ? null : Math.abs(Number(original.budget_amount)),
+            reverseDescription,
+            reverseNet,
             original.vat_rate,
-            -original.vat_amount,
-            -original.gross_amount,
+            reverseVat,
+            reverseGross,
             original.amount_mode ?? 'NET',
+            reversePaymentMethod,
+            reverseTransferFrom,
+            reverseTransferTo,
             userId ?? null,
             originalId
         )
         const id = Number(info.lastInsertRowid)
+
+        const originalBudgets = d.prepare('SELECT budget_id as budgetId, amount FROM voucher_budgets WHERE voucher_id = ?').all(originalId) as Array<{ budgetId: number; amount: number }>
+        if (originalBudgets.length) {
+            const stmtB = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
+            for (const a of originalBudgets) {
+                const amount = Math.abs(Number(a.amount || 0))
+                if (a.budgetId && amount > 0) stmtB.run(id, a.budgetId, amount)
+            }
+        }
+
+        const originalEarmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM voucher_earmarks WHERE voucher_id = ?').all(originalId) as Array<{ earmarkId: number; amount: number }>
+        if (originalEarmarks.length) {
+            const stmtE = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
+            for (const a of originalEarmarks) {
+                const amount = Math.abs(Number(a.amount || 0))
+                if (a.earmarkId && amount > 0) stmtE.run(id, a.earmarkId, amount)
+            }
+        }
+
+        const originalTags = getTagsForVoucher(originalId)
+        const reverseTagNames = [...originalTags, 'Storno']
+        const tagIds: number[] = []
+        for (const name of reverseTagNames) {
+            const tag = ensureTag(d, name)
+            if (tag?.id) tagIds.push(tag.id)
+        }
+        if (tagIds.length) {
+            const tagStmt = d.prepare('INSERT OR IGNORE INTO voucher_tags(voucher_id, tag_id) VALUES (?, ?)')
+            for (const tagId of tagIds) tagStmt.run(id, tagId)
+        }
 
         d.prepare('UPDATE vouchers SET reversed_by_id=? WHERE id=?').run(id, originalId)
 
@@ -279,6 +329,10 @@ export function listRecentVouchers(limit = 20) {
         .prepare(
             `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
                             v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
+                            v.original_id as originalId,
+                            (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
+                            v.reversed_by_id as reversedById,
+                            (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
                             (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                             v.earmark_id as earmarkId,
                             v.earmark_amount as earmarkAmount,
@@ -310,6 +364,10 @@ export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: nu
     const d = getDb()
     let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo, description,
                                         net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, amount_mode as amountMode,
+                                        original_id as originalId,
+                                        (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = vouchers.original_id) as originalVoucherNo,
+                                        reversed_by_id as reversedById,
+                                        (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = vouchers.reversed_by_id) as reversedByVoucherNo,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = vouchers.id) as fileCount
                          FROM vouchers`
     const params: any[] = []
@@ -344,6 +402,10 @@ export function listVouchersAdvanced(filters: {
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
     let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
+                                        v.original_id as originalId,
+                                        (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
+                                        v.reversed_by_id as reversedById,
+                                        (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
                                         (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
                                         v.earmark_id as earmarkId,
                                         v.earmark_amount as earmarkAmount,
@@ -478,6 +540,10 @@ export function listVouchersAdvancedPaged(filters: {
     const rows = d.prepare(
         `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
             v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
+                v.original_id as originalId,
+                (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
+                v.reversed_by_id as reversedById,
+                (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
                 EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
             EXISTS(SELECT 1 FROM member_advances ma WHERE ma.placeholder_voucher_id = v.id AND (ma.resolved_at IS NULL OR ma.resolved_at = '')) as isAdvancePlaceholder,
                 (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
@@ -527,6 +593,7 @@ export function batchAssignEarmark(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
+    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
     if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
@@ -586,6 +653,7 @@ export function batchAssignBudget(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
+    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
     if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
@@ -642,6 +710,7 @@ export function batchAssignTags(params: {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
+    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
     if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
@@ -961,10 +1030,13 @@ export function updateVoucher(input: {
                earmark_id as earmarkId, earmark_amount as earmarkAmount,
                budget_id as budgetId, budget_amount as budgetAmount,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-               description, amount_mode as amountMode
+               description, amount_mode as amountMode,
+               original_id as originalId, reversed_by_id as reversedById
         FROM vouchers WHERE id=?
     `).get(input.id) as any
     if (!current) throw new Error('Beleg nicht gefunden')
+    if (current.originalId) throw new Error('Stornobuchungen sind fest mit der Originalbuchung verknüpft und können nicht bearbeitet werden.')
+    if (current.reversedById) throw new Error('Diese Buchung wurde bereits storniert und kann nicht mehr bearbeitet werden.')
     // Capture tags before update for audit
     const beforeTags = getTagsForVoucher(input.id)
     const currentFull = { ...current, tags: beforeTags }
@@ -1134,8 +1206,10 @@ export function updateVoucher(input: {
 export function deleteVoucher(id: number, options?: { allowAdvancePlaceholder?: boolean }) {
     const d = getDb()
     // Snapshot before deletion for audit
-    const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount FROM vouchers WHERE id=?').get(id) as any
+    const snap = d.prepare('SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, description, net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount, original_id as originalId, reversed_by_id as reversedById FROM vouchers WHERE id=?').get(id) as any
     if (!snap) throw new Error('Beleg nicht gefunden')
+    if (snap.originalId) throw new Error('Stornobuchungen sind Teil der Storno-Kette und können nicht gelöscht werden.')
+    if (snap.reversedById) throw new Error('Diese Buchung wurde bereits storniert und kann nicht gelöscht werden.')
 
     if (!options?.allowAdvancePlaceholder) {
         const advancePlaceholderRef = getAdvancePlaceholderRef(d, id)

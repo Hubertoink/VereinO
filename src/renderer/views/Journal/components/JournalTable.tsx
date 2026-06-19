@@ -216,6 +216,10 @@ interface JournalTableProps {
         description?: string | null
         isAdvancePlaceholder?: boolean
         isCashCheck?: boolean
+        originalId?: number | null
+        originalVoucherNo?: string | null
+        reversedById?: number | null
+        reversedByVoucherNo?: string | null
         paymentMethod?: 'BAR' | 'BANK' | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
@@ -226,8 +230,10 @@ interface JournalTableProps {
         amountMode?: 'NET' | 'GROSS'
         fileCount?: number
         earmarkId?: number | null
+        earmarkAmount?: number | null
         earmarkCode?: string | null
         budgetId?: number | null
+        budgetAmount?: number | null
         budgetLabel?: string | null
         tags?: string[]
         // Multiple assignments
@@ -251,12 +257,20 @@ interface JournalTableProps {
         type?: 'IN' | 'OUT' | 'TRANSFER'
         sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
         earmarkId?: number | null
+        earmarkAmount?: number | null
         budgetId?: number | null
+        budgetAmount?: number | null
+        originalId?: number | null
+        originalVoucherNo?: string | null
+        reversedById?: number | null
+        reversedByVoucherNo?: string | null
         tags?: string[]
         netAmount?: number
         grossAmount?: number
         vatRate?: number
         amountMode?: 'NET' | 'GROSS'
+        budgets?: BudgetAssignment[]
+        earmarksAssigned?: EarmarkAssignment[]
     }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
     onToggleSort: (col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => void
@@ -509,6 +523,10 @@ export default function JournalTable({
         return String(d) <= String(lockedUntil)
     }
 
+    const stornierungLabel = (value?: string | number | null) => value ? `#${value}` : ''
+    const isReversalVoucher = (r: any) => !!r.originalId
+    const isReversedOriginal = (r: any) => !!r.reversedById
+
     // Column width configuration for fixed table layout (default values)
     const defaultColWidths: Record<string, number> = {
         actions: 50,
@@ -551,8 +569,12 @@ export default function JournalTable({
                     <span className="badge" title="Kassenprüfung-Buchung (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
                 ) : r.isAdvancePlaceholder ? (
                     <span className="badge badge-advance-placeholder-lock" title="Vorschuss-Platzhalter (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
+                ) : isReversalVoucher(r) ? (
+                    <span className="badge badge-storno-lock" title={`Stornobuchung zu ${stornierungLabel(r.originalVoucherNo || r.originalId)} – nicht bearbeitbar`} aria-label="Stornobuchung gesperrt">ST</span>
+                ) : isReversedOriginal(r) ? (
+                    <span className="badge badge-storno-lock" title={`Bereits storniert durch ${stornierungLabel(r.reversedByVoucherNo || r.reversedById)} – nicht bearbeitbar`} aria-label="Stornierte Buchung gesperrt">ST</span>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -567,6 +589,8 @@ export default function JournalTable({
             <td key={k}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
+                    {isReversalVoucher(r) ? <span className="badge badge-storno" title={`Gegenbuchung zu ${stornierungLabel(r.originalVoucherNo || r.originalId)}`}>Storno zu {stornierungLabel(r.originalVoucherNo || r.originalId)}</span> : null}
+                    {isReversedOriginal(r) ? <span className="badge badge-storniert" title={`Storniert durch ${stornierungLabel(r.reversedByVoucherNo || r.reversedById)}`}>storniert durch {stornierungLabel(r.reversedByVoucherNo || r.reversedById)}</span> : null}
                     {r.isAdvancePlaceholder ? <span className="badge badge-advance-placeholder">Vorschuss</span> : null}
                     {(r.tags || []).map((t: string) => {
                         const tagDef = tagDefFor(t)
@@ -797,7 +821,9 @@ export default function JournalTable({
                         key={r.id} 
                         className={[
                             highlightId === r.id ? 'row-flash' : '',
-                            r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : ''
+                            r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
+                            isReversalVoucher(r) ? 'journal-row-storno' : '',
+                            isReversedOriginal(r) ? 'journal-row-storniert' : ''
                         ].filter(Boolean).join(' ') || undefined}
                         onDoubleClick={() => onRowDoubleClick?.(r)}
                     >

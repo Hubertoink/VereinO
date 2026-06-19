@@ -12,6 +12,7 @@ import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { getSetting } from './settings'
 import { getActivityReport, validateActivityReport } from '../repositories/activityReports'
+import { voucherStatusKind, voucherStatusText } from './voucherStatus'
 
 export interface FiscalReportOptions {
   fiscalYear: number
@@ -181,6 +182,12 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
   const euro = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
   const nl2br = (s: any) => esc(s).replace(/\r?\n/g, '<br>')
+  const voucherDescriptionHtml = (row: any) => {
+    const status = voucherStatusText(row)
+    const kind = voucherStatusKind(row)
+    const description = String(row?.description || '').trim() || '—'
+    return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
+  }
   
   const totalInGross = summary.byType.find((t: any) => t.key === 'IN')?.gross || 0
   const totalOutGross = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross || 0)
@@ -315,6 +322,31 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     }
     tr.sphere-row:nth-child(even) {
       background: #fafafa;
+    }
+    tr.voucher-row-storno {
+      background: #fff5f5;
+    }
+    tr.voucher-row-storniert {
+      background: #f5f5f5;
+      color: #555;
+    }
+    .voucher-status {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      font-weight: 700;
+    }
+    .voucher-status-storno {
+      background: #ffebee;
+      color: #b71c1c;
+      border: 1px solid #ffcdd2;
+    }
+    .voucher-status-storniert {
+      background: #eeeeee;
+      color: #555;
+      border: 1px solid #d6d6d6;
     }
     .footer { 
       margin-top: 32px; 
@@ -535,12 +567,12 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     </thead>
     <tbody>
       ${voucherRows.map((r: any) => `
-        <tr>
+        <tr class="${voucherStatusKind(r) ? `voucher-row-${voucherStatusKind(r)}` : ''}">
           <td class="nowrap">${esc(r.date)}</td>
           <td class="nowrap">${esc(r.voucherNo)}</td>
           <td class="nowrap">${esc(r.type)}</td>
           <td><span class="sphere-badge sphere-${r.sphere}">${esc(r.sphere)}</span></td>
-          <td>${esc(r.description || '—')}</td>
+          <td>${voucherDescriptionHtml(r)}</td>
           <td class="number ${r.type === 'IN' ? 'positive' : 'negative'}">${euro(r.grossAmount)}</td>
         </tr>
       `).join('')}

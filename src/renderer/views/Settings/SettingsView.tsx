@@ -109,10 +109,14 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
-            showSubmissionBadge={props.showSubmissionBadge}
-            setShowSubmissionBadge={props.setShowSubmissionBadge}
             showBookingDraftTabs={props.showBookingDraftTabs}
             setShowBookingDraftTabs={props.setShowBookingDraftTabs}
+            bookingsOpenDetached={props.bookingsOpenDetached}
+            setBookingsOpenDetached={props.setBookingsOpenDetached}
+            allowVoucherDeletion={props.allowVoucherDeletion}
+            setAllowVoucherDeletion={props.setAllowVoucherDeletion}
+            quickAddAfterSave={props.quickAddAfterSave}
+            setQuickAddAfterSave={props.setQuickAddAfterSave}
           />
         )}
         

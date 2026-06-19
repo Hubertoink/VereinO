@@ -17,6 +17,7 @@ type VoucherRow = {
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
     isAdvancePlaceholder?: boolean
+    isCashCheck?: boolean
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
@@ -25,6 +26,10 @@ type VoucherRow = {
     vatAmount: number
     grossAmount: number
     amountMode?: 'NET' | 'GROSS'
+    originalId?: number | null
+    originalVoucherNo?: string | null
+    reversedById?: number | null
+    reversedByVoucherNo?: string | null
     hasFiles?: boolean
     earmarkId?: number | null
     earmarkCode?: string | null
@@ -124,9 +129,11 @@ interface JournalViewProps {
     page?: number
     setPage?: (v: number) => void
     showBookingDraftTabs?: boolean
-    bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean }>
+    bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean; isDetached?: boolean }>
     onOpenBookingDraft?: (draftId: string) => void
     onCloseBookingDraft?: (draftId: string) => void
+    bookingsOpenDetached?: boolean
+    allowVoucherDeletion?: boolean
 }
 
 export default function JournalView({
@@ -184,7 +191,9 @@ export default function JournalView({
     showBookingDraftTabs = false,
     bookingDraftTabs = [],
     onOpenBookingDraft,
-    onCloseBookingDraft
+    onCloseBookingDraft,
+    bookingsOpenDetached = false,
+    allowVoucherDeletion = false
 }: JournalViewProps) {
     // ==================== STATE ====================
     // Pagination & Sorting
@@ -406,6 +415,19 @@ export default function JournalView({
         return current !== editRowInitialSnapshot
     }, [editRow, editRowInitialSnapshot, serializeEditRow])
 
+    const voucherMutationBlockReason = useCallback((row: Partial<VoucherRow> | null | undefined) => {
+        if (!row) return ''
+        if (row.originalId) {
+            const ref = row.originalVoucherNo ? ` #${row.originalVoucherNo}` : ''
+            return `Diese Stornobuchung ist mit der Originalbuchung${ref} verknüpft und kann nicht bearbeitet oder erneut storniert werden.`
+        }
+        if (row.reversedById) {
+            const ref = row.reversedByVoucherNo ? ` #${row.reversedByVoucherNo}` : ''
+            return `Diese Buchung wurde bereits storniert${ref ? ` durch${ref}` : ''} und kann nicht mehr bearbeitet werden.`
+        }
+        return ''
+    }, [])
+
     const hasActiveFilters = useMemo(() => {
         return Boolean(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
     }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo])
@@ -502,6 +524,36 @@ export default function JournalView({
         }
         closeEditModalNow()
     }, [editRow, editHasUnsavedChanges, closeEditModalNow])
+
+    const openDetachedEdit = useCallback(async (
+        row: VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null },
+        closeInline = false
+    ) => {
+        const blockReason = voucherMutationBlockReason(row)
+        if (blockReason) {
+            notify('info', blockReason)
+            return false
+        }
+        const draftId = `edit-${row.id}`
+        try {
+            const res = await window.api?.quickAdd?.openDetached?.({
+                mode: 'edit',
+                draftId,
+                voucherId: row.id,
+                qa: row,
+                files: []
+            })
+            if (!res?.ok) {
+                notify('error', res?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
+                return false
+            }
+            if (closeInline) closeEditModalNow()
+            return true
+        } catch (e: any) {
+            notify('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(e?.message || e))
+            return false
+        }
+    }, [closeEditModalNow, notify, voucherMutationBlockReason])
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
@@ -940,7 +992,7 @@ export default function JournalView({
                             {bookingDraftTabs.map((draft) => (
                                 <div
                                     key={draft.id}
-                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}`}
+                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}
                                 >
                                     <button
                                         type="button"
@@ -949,6 +1001,7 @@ export default function JournalView({
                                         onClick={() => onOpenBookingDraft?.(draft.id)}
                                     >
                                         <span className="booking-draft-tab__label">{draft.label}</span>
+                                        {draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}
                                     </button>
                                     <button
                                         type="button"
@@ -1000,6 +1053,15 @@ export default function JournalView({
                                 grossAmount: (r as any).grossAmount ?? null,
                                 vatRate: (r as any).vatRate ?? 0
                             } as any
+                            const blockReason = voucherMutationBlockReason(nextEdit)
+                            if (blockReason) {
+                                notify('info', blockReason)
+                                return
+                            }
+                            if (bookingsOpenDetached) {
+                                void openDetachedEdit(nextEdit)
+                                return
+                            }
                             setEditRow(nextEdit)
                             setEditRowInitialSnapshot(serializeEditRow(nextEdit))
                             setConfirmDiscardEdit(false)
@@ -1050,11 +1112,20 @@ export default function JournalView({
                                         return label
                                     })()}
                                 </h2>
-                                <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                    </svg>
-                                </button>
+                                <div className="booking-modal-header-actions">
+                                    <button className="btn ghost" type="button" onClick={() => { void openDetachedEdit(editRow, true) }} title="In eigenes Fenster abdocken">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            <path d="M15 3h6v6" />
+                                            <path d="M10 14 21 3" />
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        </svg>
+                                    </button>
+                                    <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </header>
 
                             {confirmDiscardEdit && (
@@ -1080,6 +1151,11 @@ export default function JournalView({
                             <form onSubmit={async (e) => {
                                 e.preventDefault()
                                 try {
+                                    const blockReason = voucherMutationBlockReason(editRow)
+                                    if (blockReason) {
+                                        notify('info', blockReason)
+                                        return
+                                    }
                                     // Validate transfer direction
                                     if (editRow.type === 'TRANSFER' && (!editRow.transferFrom || !editRow.transferTo)) {
                                         notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
@@ -1673,11 +1749,22 @@ export default function JournalView({
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
                                     <div>
-                                        <button type="button" className="btn danger" title="Löschen" onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}>🗑 Löschen</button>
+                                        {voucherMutationBlockReason(editRow) ? (
+                                            <div className="helper">{voucherMutationBlockReason(editRow)}</div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="btn danger"
+                                                title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}
+                                                onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}
+                                            >
+                                                {allowVoucherDeletion ? '🗑 Löschen' : 'Stornieren'}
+                                            </button>
+                                        )}
                                     </div>
                                     <div style={{ display: 'flex', gap: 8 }}>
                                         <button type="button" className="btn" onClick={requestCloseEditModal}>Abbrechen</button>
-                                        <button type="submit" className="btn primary">Speichern (Ctrl+S)</button>
+                                        <button type="submit" className="btn primary" disabled={!!voucherMutationBlockReason(editRow)}>Speichern (Ctrl+S)</button>
                                     </div>
                                 </div>
                             </form>
@@ -1690,15 +1777,22 @@ export default function JournalView({
                     <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0 }}>
                         <div className="modal" onClick={(e) => e.stopPropagation()}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <h2 style={{ margin: 0 }}>Buchung löschen</h2>
+                                <h2 style={{ margin: 0 }}>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</h2>
                                 <button className="btn danger" onClick={() => setDeleteRow(null)}>Schließen</button>
                             </header>
-                            <p>Möchtest du die Buchung <strong>{deleteRow.voucherNo ? `#${deleteRow.voucherNo}` : ''}{deleteRow.description ? ` ${deleteRow.voucherNo ? '– ' : ''}${deleteRow.description}` : ''}</strong> wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
+                            <p>
+                                Möchtest du die Buchung <strong>{deleteRow.voucherNo ? `#${deleteRow.voucherNo}` : ''}{deleteRow.description ? ` ${deleteRow.voucherNo ? '– ' : ''}${deleteRow.description}` : ''}</strong>{' '}
+                                {allowVoucherDeletion
+                                    ? 'wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'
+                                    : 'stornieren? Die Originalbuchung bleibt erhalten und es wird eine Gegenbuchung erstellt.'}
+                            </p>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                                 <button className="btn" onClick={() => setDeleteRow(null)}>Abbrechen</button>
                                 <button className="btn danger" onClick={async () => {
                                     try {
-                                        await window.api?.vouchers.delete?.({ id: deleteRow.id })
+                                        const res = allowVoucherDeletion
+                                            ? await window.api?.vouchers.delete?.({ id: deleteRow.id })
+                                            : await window.api?.vouchers.reverse?.({ originalId: deleteRow.id, reason: 'Storno statt Löschen' })
                                         setDeleteRow(null)
                                         // Close edit modal if deletion was initiated from edit, or if the currently edited row matches the deleted one
                                         try {
@@ -1707,17 +1801,20 @@ export default function JournalView({
                                         } catch {}
                                         await loadRecent()
                                         bumpDataVersion()
-                                        notify('success', 'Buchung gelöscht')
+                                        if (!allowVoucherDeletion && (res as any)?.id) {
+                                            setFlashId((res as any).id)
+                                            window.setTimeout(() => setFlashId((cur) => (cur === (res as any).id ? null : cur)), 3000)
+                                        }
+                                        notify('success', allowVoucherDeletion ? 'Buchung gelöscht' : `Storno erstellt: #${(res as any)?.voucherNo || ''}`)
                                     } catch (e: any) {
                                         const raw = String(e?.message || e || '')
-                                        // If delete is blocked due to linked invoice, show an explanatory toast
-                                        if (/FOREIGN KEY|constraint|invoice|posted_voucher_id/i.test(raw)) {
+                                        if (allowVoucherDeletion && /FOREIGN KEY|constraint|invoice|posted_voucher_id/i.test(raw)) {
                                             notify('info', 'Diese Buchung ist mit einer Verbindlichkeit verknüpft und kann nicht gelöscht werden. Bitte zuerst die Verbindlichkeit löschen – danach ist die Buchung löschbar.')
                                         } else {
                                             notify('error', friendlyError(e))
                                         }
                                     }
-                                }}>Ja, löschen</button>
+                                }}>{allowVoucherDeletion ? 'Ja, löschen' : 'Ja, stornieren'}</button>
                             </div>
                         </div>
                     </div>

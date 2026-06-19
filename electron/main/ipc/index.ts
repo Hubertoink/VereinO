@@ -20,6 +20,7 @@ import { getSetting, setSetting } from '../services/settings'
 import { getTaxExemptionCertificate, saveTaxExemptionCertificate, deleteTaxExemptionCertificate, updateTaxExemptionValidity } from '../services/taxExemption'
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
+import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { applyMigrations, ensureAdvanceTables, ensureVoucherColumns } from '../db/migrations'
@@ -74,7 +75,15 @@ async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[])
     }
 }
 
-export function registerIpcHandlers() {
+type RegisterIpcHandlersOptions = {
+    openDetachedQuickAdd?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
+    focusDetachedQuickAdd?: (draftId: string) => { ok: boolean }
+    closeDetachedQuickAdd?: (draftId: string) => { ok: boolean }
+    getDetachedQuickAddInitial?: (token: string) => any
+    notifyQuickAddSaved?: (payload?: any) => void
+}
+
+export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 
     // App info
@@ -117,6 +126,32 @@ export function registerIpcHandlers() {
     ipcMain.handle('window.isMaximized', async () => {
         const win = getCurrentWindow()
         return { isMaximized: !!win?.isMaximized() }
+    })
+    ipcMain.handle('quickAdd.openDetached', async (_e, payload) => {
+        if (!options.openDetachedQuickAdd) return { ok: false, error: 'Abdocken ist nicht verfügbar.' }
+        return options.openDetachedQuickAdd(payload || null)
+    })
+    ipcMain.handle('quickAdd.detachedInitial', async (_e, payload: { token?: string }) => {
+        const token = String(payload?.token || '')
+        return { initial: token && options.getDetachedQuickAddInitial ? options.getDetachedQuickAddInitial(token) : null }
+    })
+    ipcMain.handle('quickAdd.focusDetached', async (_e, payload: { draftId?: string }) => {
+        const draftId = String(payload?.draftId || '')
+        return draftId && options.focusDetachedQuickAdd ? options.focusDetachedQuickAdd(draftId) : { ok: false }
+    })
+    ipcMain.handle('quickAdd.closeDetached', async (_e, payload: { draftId?: string }) => {
+        const draftId = String(payload?.draftId || '')
+        return draftId && options.closeDetachedQuickAdd ? options.closeDetachedQuickAdd(draftId) : { ok: false }
+    })
+    ipcMain.handle('quickAdd.notifySaved', async (_e, payload) => {
+        try { options.notifyQuickAddSaved?.(payload || {}) } catch { }
+        return { ok: true }
+    })
+    ipcMain.handle('quickAdd.syncDraft', async (_e, payload) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            try { win.webContents.send('quickAdd:detachedDraftSync', payload || {}) } catch { }
+        }
+        return { ok: true }
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
@@ -210,10 +245,10 @@ export function registerIpcHandlers() {
         const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
         try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
 
-        const defaultCols = ['date', 'voucherNo', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'] as const
+        const defaultCols = ['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'] as const
         const colsSel = (parsed.fields && parsed.fields.length ? parsed.fields : defaultCols) as string[]
         const headerMap: Record<string, string> = {
-            date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Sphäre', description: 'Beschreibung', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
+            date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Sphäre', description: 'Beschreibung', status: 'Status', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
         }
         const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
         const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
@@ -298,6 +333,12 @@ export function registerIpcHandlers() {
             // Helpers
             const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
             const euro = (n: number) => `${(n).toFixed(2)} €`
+            const voucherDescriptionHtml = (row: any) => {
+                const description = String(row?.description || '').trim() || '—'
+                const status = voucherStatusText(row)
+                const kind = voucherStatusKind(row)
+                return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
+            }
 
             const totalIn = (summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0)
             const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
@@ -338,6 +379,11 @@ export function registerIpcHandlers() {
     .table-box table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .table-box th, .table-box td { border-bottom: 1px solid #eee; padding: 4px 6px; text-align: left; vertical-align: top; }
     .table-box th.right, .table-box td.right { text-align: right; }
+    tr.voucher-row-storno { background: #fff5f5; }
+    tr.voucher-row-storniert { background: #f5f5f5; color: #555; }
+    .voucher-status { display:inline-block; margin-top:3px; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700; }
+    .voucher-status-storno { background:#ffebee; color:#b71c1c; border:1px solid #ffcdd2; }
+    .voucher-status-storniert { background:#eeeeee; color:#555; border:1px solid #d6d6d6; }
     .nowrap { white-space: nowrap; }
     .muted { color: #666; font-size: 12px; }
     @media print { .card { break-inside: avoid; } tr { break-inside: avoid; } }
@@ -572,12 +618,13 @@ export function registerIpcHandlers() {
             <tbody>
                 ${rows.map((r: any) => {
                     const g = (r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount
-                    return `<tr>
+                    const kind = voucherStatusKind(r)
+                    return `<tr class="${kind ? `voucher-row-${kind}` : ''}">
                         <td class="nowrap">${esc(r.date)}</td>
                         <td class="nowrap">${esc(r.voucherNo)}</td>
                         <td class="nowrap">${esc(r.type)}</td>
                         <td class="nowrap">${esc(r.sphere)}</td>
-                        <td>${esc(r.description ?? '')}</td>
+                        <td>${voucherDescriptionHtml(r)}</td>
                         <td class="nowrap">${esc(r.paymentMethod ?? '')}</td>
                         <td class="right nowrap">${euro(Number(g))}</td>
                     </tr>`
@@ -613,17 +660,25 @@ export function registerIpcHandlers() {
                     if (c === 'netAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2))
                     if (c === 'vatAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.vatAmount : r.vatAmount).toFixed(2))
                     if (c === 'description') return r.description ?? ''
+                    if (c === 'status') return voucherStatusText(r)
                     if (c === 'paymentMethod') return r.paymentMethod ?? ''
                     if (c === 'tags') return (r.tags || []).join(', ')
                     return (r as any)[c]
                 })
-                ws.addRow(values)
+                const row = ws.addRow(values)
+                const kind = voucherStatusKind(r)
+                if (kind === 'storno') {
+                    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F1' } }
+                } else if (kind === 'storniert') {
+                    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } }
+                    row.font = { color: { argb: 'FF555555' } }
+                }
             }
             // Simple formatting
             ws.getRow(1).font = { bold: true, size: 14 }
             ws.getRow(5).font = { bold: true }
             // Column widths
-            ws.columns = colsSel.map((c) => ({ width: c === 'description' ? 40 : 12 })) as any
+            ws.columns = colsSel.map((c) => ({ width: c === 'description' ? 40 : c === 'status' ? 28 : 12 })) as any
 
             // Currency formatting for Brutto (grossAmount) with colors
             const grossIdx = colsSel.indexOf('grossAmount') + 1
@@ -643,6 +698,7 @@ export function registerIpcHandlers() {
             for (const r of rows) {
                 const vals = colsSel.map((c) => {
                     if (c === 'description') return (r.description ?? '').replace(/\n|\r|;/g, ' ')
+                    if (c === 'status') return voucherStatusText(r)
                     if (c === 'paymentMethod') return r.paymentMethod ?? ''
                     if (c === 'tags') return (r.tags || []).join(', ')
                     if (c === 'grossAmount') return ((r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount).toFixed(2)
