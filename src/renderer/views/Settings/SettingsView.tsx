@@ -111,6 +111,8 @@ export function SettingsView(props: SettingsProps) {
             openSetupWizard={props.openSetupWizard}
             showBookingDraftTabs={props.showBookingDraftTabs}
             setShowBookingDraftTabs={props.setShowBookingDraftTabs}
+            showBookingEditTabs={props.showBookingEditTabs}
+            setShowBookingEditTabs={props.setShowBookingEditTabs}
             bookingsOpenDetached={props.bookingsOpenDetached}
             setBookingsOpenDetached={props.setBookingsOpenDetached}
             allowVoucherDeletion={props.allowVoucherDeletion}

@@ -1,6 +1,7 @@
 import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
+import HoverTooltip from '../../../components/common/HoverTooltip'
 
 type UpdateState = {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
@@ -42,6 +43,8 @@ export function GeneralPane({
   openSetupWizard,
   showBookingDraftTabs,
   setShowBookingDraftTabs,
+  showBookingEditTabs,
+  setShowBookingEditTabs,
   bookingsOpenDetached,
   setBookingsOpenDetached,
   allowVoucherDeletion,
@@ -438,145 +441,219 @@ export function GeneralPane({
         <div className="settings-title">
           <span aria-hidden="true">🧭</span> <strong>Navigation & Layout</strong>
         </div>
-        <div className="settings-sub">Passe die Darstellung deiner Menüs und Buchungstabelle an.</div>
-        
-        {/* Row 1: Layout options */}
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="field">
-            <label>Menü-Layout</label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn-option ${navLayout === 'left' ? 'active' : ''}`}
-                onClick={() => setNavLayout('left')}
-              >
-                Links (klassisch)
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${navLayout === 'top' ? 'active' : ''}`}
-                onClick={() => setNavLayout('top')}
-              >
-                Oben (icons)
-              </button>
+        <div className="settings-sub">Steuere, wie du dich durch die App bewegst und wie dicht Buchungen angezeigt werden.</div>
+
+        <div className="settings-layout-stack">
+          <section className="settings-layout-panel">
+            <div>
+              <div className="settings-layout-kicker">Navigation</div>
+              <h3>Menüführung</h3>
+              <p>Position und Farbigkeit der Hauptnavigation.</p>
             </div>
-          </div>
-          <div className="field">
-            <label>Zeilenhöhe</label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn-option ${journalRowDensity === 'normal' ? 'active' : ''}`}
-                onClick={() => setJournalRowDensity('normal')}
-              >
-                Normal
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${journalRowDensity === 'compact' ? 'active' : ''}`}
-                onClick={() => setJournalRowDensity('compact')}
-              >
-                Kompakt
-              </button>
+
+            <div className="settings-layout-grid">
+              <div className="settings-layout-control">
+                <div className="settings-layout-label-row">
+                  <label>Menü-Layout</label>
+                  <span>Bestimmt, ob die Hauptnavigation links oder oben sitzt.</span>
+                </div>
+                <div className="btn-group">
+                  <button
+                    type="button"
+                    className={`btn-option ${navLayout === 'left' ? 'active' : ''}`}
+                    onClick={() => setNavLayout('left')}
+                  >
+                    Links
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-option ${navLayout === 'top' ? 'active' : ''}`}
+                    onClick={() => setNavLayout('top')}
+                  >
+                    Oben
+                  </button>
+                </div>
+              </div>
+
+              <label className="settings-toggle-card" htmlFor="toggle-menu-icons">
+                <span className="settings-toggle-card__copy">
+                  <strong>Farbige Menüicons</strong>
+                  <span>Hebt Menüpunkte mit farbigen Symbolen hervor. Aus zeigt Icons neutral.</span>
+                </span>
+                <input
+                  id="toggle-menu-icons"
+                  role="switch"
+                  aria-checked={navIconColorMode === 'color'}
+                  className="toggle"
+                  type="checkbox"
+                  checked={navIconColorMode === 'color'}
+                  onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
+                />
+              </label>
             </div>
-          </div>
-        </div>
+          </section>
 
-        {/* Row 2: Row style */}
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="field">
-            <label htmlFor="select-row-style">Buchungen: Zeilenlayout</label>
-            <select id="select-row-style" className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
-              <option value="both">Linien + Zebra</option>
-              <option value="lines">Nur Linien</option>
-              <option value="zebra">Nur Zebra</option>
-              <option value="none">Ohne Linien/Zebra</option>
-            </select>
-          </div>
-          <div className="field" />
-        </div>
-
-        {/* Row 3: Toggles in a grid */}
-        <div className="settings-row-3col" style={{ marginTop: 16 }}>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-menu-icons">Farbige Menüicons</label>
-            <input
-              id="toggle-menu-icons"
-              role="switch"
-              aria-checked={navIconColorMode === 'color'}
-              className="toggle"
-              type="checkbox"
-              checked={navIconColorMode === 'color'}
-              onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
-            />
-          </div>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-booking-draft-tabs">Buchungsreiter</label>
-            <input
-              id="toggle-booking-draft-tabs"
-              role="switch"
-              aria-checked={showBookingDraftTabs}
-              className="toggle"
-              type="checkbox"
-              checked={showBookingDraftTabs}
-              onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
-            />
-          </div>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-bookings-open-detached">Eigenes Buchungsfenster</label>
-            <input
-              id="toggle-bookings-open-detached"
-              role="switch"
-              aria-checked={bookingsOpenDetached}
-              title="Neue und bearbeitete Buchungen direkt als eigenes Fenster öffnen."
-              className="toggle"
-              type="checkbox"
-              checked={bookingsOpenDetached}
-              onChange={(e) => setBookingsOpenDetached(e.target.checked)}
-            />
-          </div>
-        </div>
-
-        <div className="settings-row-2col" style={{ marginTop: 16 }}>
-          <div className="field">
-            <label>Nach Speichern im Buchungsmodal</label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn-option ${quickAddAfterSave === 'close' ? 'active' : ''}`}
-                onClick={() => setQuickAddAfterSave('close')}
-              >
-                Schließen
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${quickAddAfterSave === 'new' ? 'active' : ''}`}
-                onClick={() => setQuickAddAfterSave('new')}
-              >
-                Neue Buchung
-              </button>
+          <section className="settings-layout-panel">
+            <div>
+              <div className="settings-layout-kicker">Buchungstabelle</div>
+              <h3>Lesbarkeit</h3>
+              <p>Darstellung der Zeilen in der Buchungsübersicht.</p>
             </div>
-          </div>
-          <div className="field" />
-        </div>
 
-        <div className="settings-row-2col" style={{ marginTop: 16 }}>
-          <div className="settings-inline-toggle">
-            <label htmlFor="toggle-voucher-delete-mode">Buchungen endgültig löschen</label>
-            <input
-              id="toggle-voucher-delete-mode"
-              role="switch"
-              aria-checked={allowVoucherDeletion}
-              title="Aus: Buchungen werden per Storno korrigiert. Ein: Buchungen können endgültig gelöscht werden."
-              className="toggle"
-              type="checkbox"
-              checked={allowVoucherDeletion}
-              onChange={(e) => setAllowVoucherDeletion(e.target.checked)}
-            />
-          </div>
-          <div className="helper" style={{ alignSelf: 'center' }}>
-            Neuinstallationen nutzen standardmäßig Storno; Updates behalten Löschen als Ausnahme aktiv.
-          </div>
+            <div className="settings-layout-grid">
+              <div className="settings-layout-control">
+                <div className="settings-layout-label-row">
+                  <label>Zeilenhöhe</label>
+                  <span>Normal für mehr Luft, kompakt für mehr Buchungen auf einmal.</span>
+                </div>
+                <div className="btn-group">
+                  <button
+                    type="button"
+                    className={`btn-option ${journalRowDensity === 'normal' ? 'active' : ''}`}
+                    onClick={() => setJournalRowDensity('normal')}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-option ${journalRowDensity === 'compact' ? 'active' : ''}`}
+                    onClick={() => setJournalRowDensity('compact')}
+                  >
+                    Kompakt
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-layout-control">
+                <div className="settings-layout-label-row">
+                  <label htmlFor="select-row-style">Zeilenlayout</label>
+                  <span>Linien und Zebra-Muster trennen Buchungen optisch.</span>
+                </div>
+                <select id="select-row-style" className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
+                  <option value="both">Linien + Zebra</option>
+                  <option value="lines">Nur Linien</option>
+                  <option value="zebra">Nur Zebra</option>
+                  <option value="none">Ohne Linien/Zebra</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="settings-layout-panel">
+            <div>
+              <div className="settings-layout-kicker">Buchungsfenster</div>
+              <h3>Arbeitsweise</h3>
+              <p>Verhalten beim Erfassen, Speichern und Korrigieren von Buchungen.</p>
+            </div>
+
+            <div className="settings-layout-grid settings-layout-grid--wide">
+              <label className="settings-toggle-card" htmlFor="toggle-booking-draft-tabs">
+                <span className="settings-toggle-card__copy">
+                  <strong>Buchungsreiter</strong>
+                  <span>Zeigt mehrere offene Buchungsentwürfe als Reiter im Buchungsfenster.</span>
+                </span>
+                <input
+                  id="toggle-booking-draft-tabs"
+                  role="switch"
+                  aria-checked={showBookingDraftTabs}
+                  className="toggle"
+                  type="checkbox"
+                  checked={showBookingDraftTabs}
+                  onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
+                />
+              </label>
+
+              <label className="settings-toggle-card" htmlFor="toggle-booking-edit-tabs">
+                <span className="settings-toggle-card__copy">
+                  <strong>Bearbeitungen als Reiter</strong>
+                  <span>Hält mehrere geöffnete Buchungen beim Bearbeiten im Hauptfenster als eigene Reiter bereit.</span>
+                </span>
+                <input
+                  id="toggle-booking-edit-tabs"
+                  role="switch"
+                  aria-checked={showBookingEditTabs}
+                  className="toggle"
+                  type="checkbox"
+                  checked={showBookingEditTabs}
+                  onChange={(e) => setShowBookingEditTabs(e.target.checked)}
+                />
+              </label>
+
+              <label className="settings-toggle-card" htmlFor="toggle-bookings-open-detached">
+                <span className="settings-toggle-card__copy">
+                  <strong>Eigenes Buchungsfenster</strong>
+                  <span>Öffnet neue und bearbeitete Buchungen in einem separaten Fenster.</span>
+                </span>
+                <input
+                  id="toggle-bookings-open-detached"
+                  role="switch"
+                  aria-checked={bookingsOpenDetached}
+                  className="toggle"
+                  type="checkbox"
+                  checked={bookingsOpenDetached}
+                  onChange={(e) => setBookingsOpenDetached(e.target.checked)}
+                />
+              </label>
+
+              <div className="settings-layout-control">
+                <div className="settings-layout-label-row">
+                  <label>Nach Speichern</label>
+                  <span>Was nach dem Speichern einer Buchung passieren soll.</span>
+                </div>
+                <div className="btn-group">
+                  <button
+                    type="button"
+                    className={`btn-option ${quickAddAfterSave === 'close' ? 'active' : ''}`}
+                    onClick={() => setQuickAddAfterSave('close')}
+                  >
+                    Schließen
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-option ${quickAddAfterSave === 'new' ? 'active' : ''}`}
+                    onClick={() => setQuickAddAfterSave('new')}
+                  >
+                    Neue Buchung
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-toggle-card">
+                <span className="settings-toggle-card__copy">
+                  <span className="settings-toggle-card__title-row">
+                    <label htmlFor="toggle-voucher-delete-mode" className="settings-toggle-card__label">Buchungen endgültig löschen</label>
+                    <HoverTooltip<HTMLButtonElement>
+                      content="Storno ist der akzeptierte Buchungsstandard: Der Originalbeleg bleibt erhalten und eine Gegenbuchung korrigiert ihn nachvollziehbar."
+                      preferredPlacement="top"
+                    >
+                      {({ ref, props }) => (
+                        <button
+                          ref={ref}
+                          {...props}
+                          type="button"
+                          className="settings-info-icon"
+                          aria-label="Info zu Storno als Buchungsstandard"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          i
+                        </button>
+                      )}
+                    </HoverTooltip>
+                  </span>
+                  <span>Aus nutzt Storno. Ein erlaubt das dauerhafte Entfernen von Buchungen.</span>
+                </span>
+                <input
+                  id="toggle-voucher-delete-mode"
+                  role="switch"
+                  aria-checked={allowVoucherDeletion}
+                  className="toggle"
+                  type="checkbox"
+                  checked={allowVoucherDeletion}
+                  onChange={(e) => setAllowVoucherDeletion(e.target.checked)}
+                />
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 

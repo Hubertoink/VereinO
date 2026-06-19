@@ -139,6 +139,8 @@ export interface SettingsProps {
   setGlassModals: (v: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (v: boolean) => void
   bookingsOpenDetached: boolean
   setBookingsOpenDetached: (v: boolean) => void
   allowVoucherDeletion: boolean
@@ -189,6 +191,8 @@ export interface GeneralPaneProps {
   openSetupWizard?: () => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (v: boolean) => void
   bookingsOpenDetached: boolean
   setBookingsOpenDetached: (v: boolean) => void
   allowVoucherDeletion: boolean

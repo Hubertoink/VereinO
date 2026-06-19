@@ -36,6 +36,8 @@ interface UIPreferencesContextValue {
   setJournalRowDensity: (val: JournalRowDensity) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (val: boolean) => void
+  showBookingEditTabs: boolean
+  setShowBookingEditTabs: (val: boolean) => void
   bookingsOpenDetached: boolean
   setBookingsOpenDetached: (val: boolean) => void
   allowVoucherDeletion: boolean
@@ -245,6 +247,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'true' // default false
   })
 
+  const [showBookingEditTabs, setShowBookingEditTabs] = useState<boolean>(() => {
+    const stored = localStorage.getItem('ui.showBookingEditTabs')
+    return stored === 'true'
+  })
+
   const [bookingsOpenDetached, setBookingsOpenDetached] = useState<boolean>(() => {
     const stored = localStorage.getItem('ui.bookingsOpenDetached')
     return stored === 'true'
@@ -324,6 +331,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [showBookingDraftTabs])
 
   useEffect(() => {
+    safeLocalStorageSet('ui.showBookingEditTabs', String(showBookingEditTabs))
+  }, [showBookingEditTabs])
+
+  useEffect(() => {
     safeLocalStorageSet('ui.bookingsOpenDetached', String(bookingsOpenDetached))
   }, [bookingsOpenDetached])
 
@@ -375,6 +386,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setJournalRowDensity,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
+        showBookingEditTabs,
+        setShowBookingEditTabs,
         bookingsOpenDetached,
         setBookingsOpenDetached,
         allowVoucherDeletion,

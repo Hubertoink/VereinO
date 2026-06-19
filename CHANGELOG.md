@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.5] - 2026-06-19
+
+### Hinzugefügt
+
+- Buchungen: Option "Bearbeitungen als Reiter" ergänzt, damit mehrere geöffnete Buchungen im Hauptfenster parallel bearbeitet werden können.
+
+### Geändert
+
+- Einstellungen: Bereich "Navigation & Layout" klarer gruppiert und Toggle-Erklärungen direkt an den jeweiligen Optionen ergänzt.
+- Buchungen: Offene Buchungsentwürfe und Bearbeitungen teilen sich eine gemeinsame Reiterleiste mit getrennten Kennzeichnungen.
+
+### Behoben
+
+- Buchungen: Bearbeitungsreiter bleiben beim Schließen des Bearbeitungsmodals erhalten und fokussieren abgedockte Buchungen wieder korrekt.
+
 ## [1.9.4] - 2026-06-19
 
 ### Hinzugefügt

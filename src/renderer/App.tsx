@@ -747,6 +747,8 @@ function AppInner() {
         setGlassModals,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
+        showBookingEditTabs,
+        setShowBookingEditTabs,
         bookingsOpenDetached,
         setBookingsOpenDetached,
         allowVoucherDeletion,
@@ -1972,6 +1974,7 @@ function AppInner() {
                             bookingDraftTabs={bookingDraftTabs}
                             onOpenBookingDraft={openBookingDraftTab}
                             onCloseBookingDraft={closeBookingDraftTab}
+                            showBookingEditTabs={showBookingEditTabs}
                             bookingsOpenDetached={bookingsOpenDetached}
                             allowVoucherDeletion={allowVoucherDeletion}
                         />
@@ -2010,6 +2013,8 @@ function AppInner() {
                             setGlassModals={setGlassModals}
                             showBookingDraftTabs={showBookingDraftTabs}
                             setShowBookingDraftTabs={setShowBookingDraftTabs}
+                            showBookingEditTabs={showBookingEditTabs}
+                            setShowBookingEditTabs={setShowBookingEditTabs}
                             bookingsOpenDetached={bookingsOpenDetached}
                             setBookingsOpenDetached={setBookingsOpenDetached}
                             allowVoucherDeletion={allowVoucherDeletion}

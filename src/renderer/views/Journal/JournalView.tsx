@@ -44,6 +44,15 @@ type VoucherRow = {
     earmarksAssigned?: EarmarkAssignment[]
 }
 
+type EditVoucherRow = VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }
+
+type BookingEditTab = {
+    id: string
+    row: EditVoucherRow
+    initialSnapshot: string
+    detached?: boolean
+}
+
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 
 const DEFAULT_ORDER: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
@@ -132,6 +141,7 @@ interface JournalViewProps {
     bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean; isDetached?: boolean }>
     onOpenBookingDraft?: (draftId: string) => void
     onCloseBookingDraft?: (draftId: string) => void
+    showBookingEditTabs?: boolean
     bookingsOpenDetached?: boolean
     allowVoucherDeletion?: boolean
 }
@@ -192,6 +202,7 @@ export default function JournalView({
     bookingDraftTabs = [],
     onOpenBookingDraft,
     onCloseBookingDraft,
+    showBookingEditTabs = false,
     bookingsOpenDetached = false,
     allowVoucherDeletion = false
 }: JournalViewProps) {
@@ -367,7 +378,9 @@ export default function JournalView({
 
     // Modal states
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
-    const [editRow, setEditRow] = useState<(VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null>(null)
+    const [editRow, setEditRowState] = useState<EditVoucherRow | null>(null)
+    const [bookingEditTabs, setBookingEditTabs] = useState<BookingEditTab[]>([])
+    const [activeEditTabId, setActiveEditTabId] = useState<string | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
     const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -381,7 +394,7 @@ export default function JournalView({
     const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
     const [editRowInitialSnapshot, setEditRowInitialSnapshot] = useState<string | null>(null)
 
-    const serializeEditRow = useCallback((row: (VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }) | null) => {
+    const serializeEditRow = useCallback((row: EditVoucherRow | null) => {
         if (!row) return null
         return JSON.stringify({
             date: row.date || '',
@@ -408,6 +421,23 @@ export default function JournalView({
                 : []
         })
     }, [])
+
+    const setEditRow = useCallback((next: React.SetStateAction<EditVoucherRow | null>) => {
+        setEditRowState((prev) => {
+            const resolved = typeof next === 'function'
+                ? (next as (prev: EditVoucherRow | null) => EditVoucherRow | null)(prev)
+                : next
+
+            if (showBookingEditTabs && activeEditTabId) {
+                setBookingEditTabs((tabs) => {
+                    if (!resolved) return tabs.filter((tab) => tab.id !== activeEditTabId)
+                    return tabs.map((tab) => tab.id === activeEditTabId ? { ...tab, row: resolved } : tab)
+                })
+            }
+
+            return resolved
+        })
+    }, [activeEditTabId, showBookingEditTabs])
 
     const editHasUnsavedChanges = useMemo(() => {
         if (!editRow || !editRowInitialSnapshot) return false
@@ -511,11 +541,58 @@ export default function JournalView({
         return () => registerPageShortcuts([])
     }, [registerPageShortcuts])
 
+    const activateBookingEditTab = useCallback((tab: BookingEditTab) => {
+        setActiveEditTabId(tab.id)
+        setEditRowState(tab.row)
+        setEditRowInitialSnapshot(tab.initialSnapshot)
+        setConfirmDiscardEdit(false)
+    }, [])
+
+    const openEditRow = useCallback((row: EditVoucherRow) => {
+        const snapshot = serializeEditRow(row) || ''
+
+        if (!showBookingEditTabs) {
+            setActiveEditTabId(null)
+            setConfirmDiscardEdit(false)
+            setEditRowInitialSnapshot(snapshot)
+            setEditRowState(row)
+            return
+        }
+
+        const tabId = `edit-${row.id}`
+        const existing = bookingEditTabs.find((tab) => tab.id === tabId)
+        if (existing) {
+            if (existing.detached) {
+                setActiveEditTabId(existing.id)
+                setEditRowInitialSnapshot(existing.initialSnapshot)
+                setEditRowState(null)
+                setConfirmDiscardEdit(false)
+                void window.api?.quickAdd?.focusDetached?.({ draftId: existing.id })
+                return
+            }
+            activateBookingEditTab(existing)
+            return
+        }
+
+        const tab = { id: tabId, row, initialSnapshot: snapshot, detached: false }
+        setBookingEditTabs((tabs) => [...tabs, tab])
+        activateBookingEditTab(tab)
+    }, [activateBookingEditTab, bookingEditTabs, serializeEditRow, showBookingEditTabs])
+
     const closeEditModalNow = useCallback(() => {
         setConfirmDiscardEdit(false)
+
+        if (showBookingEditTabs && activeEditTabId) {
+            setActiveEditTabId(null)
+            setEditRowInitialSnapshot(null)
+            setEditRowState(null)
+            return
+        }
+
+        setActiveEditTabId(null)
         setEditRowInitialSnapshot(null)
-        setEditRow(null)
-    }, [])
+        setEditRowState(null)
+    }, [activeEditTabId, showBookingEditTabs])
 
     const requestCloseEditModal = useCallback(() => {
         if (editRow && editHasUnsavedChanges) {
@@ -525,8 +602,44 @@ export default function JournalView({
         closeEditModalNow()
     }, [editRow, editHasUnsavedChanges, closeEditModalNow])
 
+    const closeBookingEditTab = useCallback((tabId: string) => {
+        const target = bookingEditTabs.find((tab) => tab.id === tabId)
+        if (!target) return
+
+        if (target.detached) {
+            void window.api?.quickAdd?.closeDetached?.({ draftId: tabId })
+            const remaining = bookingEditTabs.filter((tab) => tab.id !== tabId)
+            setBookingEditTabs(remaining)
+            if (activeEditTabId === tabId) {
+                const nextTab = remaining.at(-1) ?? null
+                setActiveEditTabId(nextTab?.id ?? null)
+                setEditRowInitialSnapshot(nextTab?.initialSnapshot ?? null)
+                setEditRowState(nextTab?.detached ? null : (nextTab?.row ?? null))
+            }
+            setConfirmDiscardEdit(false)
+            return
+        }
+
+        const targetHasUnsavedChanges = serializeEditRow(target.row) !== target.initialSnapshot
+        if (targetHasUnsavedChanges) {
+            activateBookingEditTab(target)
+            setConfirmDiscardEdit(true)
+            return
+        }
+
+        const remaining = bookingEditTabs.filter((tab) => tab.id !== tabId)
+        setBookingEditTabs(remaining)
+
+        if (activeEditTabId === tabId) {
+            const nextTab = remaining.at(-1) ?? null
+            setActiveEditTabId(nextTab?.id ?? null)
+            setEditRowInitialSnapshot(nextTab?.initialSnapshot ?? null)
+            setEditRowState(nextTab?.row ?? null)
+        }
+    }, [activateBookingEditTab, activeEditTabId, bookingEditTabs, serializeEditRow])
+
     const openDetachedEdit = useCallback(async (
-        row: VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null },
+        row: EditVoucherRow,
         closeInline = false
     ) => {
         const blockReason = voucherMutationBlockReason(row)
@@ -535,6 +648,7 @@ export default function JournalView({
             return false
         }
         const draftId = `edit-${row.id}`
+        const snapshot = serializeEditRow(row) || ''
         try {
             const res = await window.api?.quickAdd?.openDetached?.({
                 mode: 'edit',
@@ -547,13 +661,50 @@ export default function JournalView({
                 notify('error', res?.error || 'Buchungsfenster konnte nicht geöffnet werden.')
                 return false
             }
-            if (closeInline) closeEditModalNow()
+            if (showBookingEditTabs) {
+                setBookingEditTabs((tabs) => {
+                    const nextTab: BookingEditTab = { id: draftId, row, initialSnapshot: snapshot, detached: true }
+                    const existingIndex = tabs.findIndex((tab) => tab.id === draftId)
+                    if (existingIndex >= 0) return tabs.map((tab) => tab.id === draftId ? nextTab : tab)
+                    return [...tabs, nextTab]
+                })
+                setActiveEditTabId(draftId)
+                setEditRowInitialSnapshot(snapshot)
+                setEditRowState(null)
+                setConfirmDiscardEdit(false)
+            } else if (closeInline) {
+                closeEditModalNow()
+            }
             return true
         } catch (e: any) {
             notify('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(e?.message || e))
             return false
         }
-    }, [closeEditModalNow, notify, voucherMutationBlockReason])
+    }, [closeEditModalNow, notify, serializeEditRow, showBookingEditTabs, voucherMutationBlockReason])
+
+    useEffect(() => {
+        const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
+            const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
+            if (!draftId.startsWith('edit-')) return
+
+            setBookingEditTabs((tabs) => {
+                const remaining = tabs.filter((tab) => tab.id !== draftId)
+                if (remaining.length === tabs.length) return tabs
+
+                setActiveEditTabId((current) => {
+                    if (current !== draftId) return current
+                    const nextTab = remaining.at(-1) ?? null
+                    setEditRowInitialSnapshot(nextTab?.initialSnapshot ?? null)
+                    setEditRowState(nextTab?.detached ? null : (nextTab?.row ?? null))
+                    setConfirmDiscardEdit(false)
+                    return nextTab?.id ?? null
+                })
+
+                return remaining
+            })
+        })
+        return () => { if (typeof off === 'function') off() }
+    }, [])
 
     // ==================== FILTER CHIPS ====================
     const chips = useMemo(() => {
@@ -688,6 +839,30 @@ export default function JournalView({
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [editRow, requestCloseEditModal])
+
+    const bookingTabs = useMemo(() => {
+        const draftTabs = showBookingDraftTabs
+            ? bookingDraftTabs.map((draft) => ({ ...draft, kind: 'draft' as const }))
+            : []
+
+        const editTabs = showBookingEditTabs
+            ? bookingEditTabs.map((tab) => {
+                const desc = (tab.row.description || '').trim()
+                const ref = tab.row.voucherNo ? `#${tab.row.voucherNo}` : `#${tab.row.id}`
+                const label = desc ? `${ref} ${desc}` : `${ref} bearbeiten`
+                return {
+                    id: tab.id,
+                    kind: 'edit' as const,
+                    label,
+                    title: `Bearbeitung: ${label}`,
+                    isActive: tab.id === activeEditTabId,
+                    isDetached: !!tab.detached
+                }
+            })
+            : []
+
+        return [...draftTabs, ...editTabs]
+    }, [activeEditTabId, bookingDraftTabs, bookingEditTabs, showBookingDraftTabs, showBookingEditTabs])
 
     // ==================== RENDER ====================
     return (
@@ -987,27 +1162,47 @@ export default function JournalView({
             {/* Main Table Card */}
             <div>
                 <div className="card">
-                    {showBookingDraftTabs && bookingDraftTabs.length > 0 && (
+                    {bookingTabs.length > 0 && (
                         <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
-                            {bookingDraftTabs.map((draft) => (
+                            {bookingTabs.map((draft) => (
                                 <div
                                     key={draft.id}
-                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}
+                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}${draft.kind === 'edit' ? ' booking-draft-tab--edit' : ''}`}
                                 >
                                     <button
                                         type="button"
                                         className="booking-draft-tab__open"
                                         title={draft.title}
-                                        onClick={() => onOpenBookingDraft?.(draft.id)}
+                                        onClick={() => {
+                                            if (draft.kind === 'edit') {
+                                                const tab = bookingEditTabs.find((entry) => entry.id === draft.id)
+                                                if (!tab) return
+                                                if (tab.detached) {
+                                                    setActiveEditTabId(tab.id)
+                                                    setEditRowInitialSnapshot(tab.initialSnapshot)
+                                                    setEditRowState(null)
+                                                    setConfirmDiscardEdit(false)
+                                                    void window.api?.quickAdd?.focusDetached?.({ draftId: draft.id })
+                                                    return
+                                                }
+                                                activateBookingEditTab(tab)
+                                            } else {
+                                                onOpenBookingDraft?.(draft.id)
+                                            }
+                                        }}
                                     >
                                         <span className="booking-draft-tab__label">{draft.label}</span>
+                                        {draft.kind === 'edit' && <span className="booking-draft-tab__badge">Bearbeitung</span>}
                                         {draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}
                                     </button>
                                     <button
                                         type="button"
                                         className="booking-draft-tab__close"
                                         aria-label={`${draft.label} schließen`}
-                                        onClick={() => onCloseBookingDraft?.(draft.id)}
+                                        onClick={() => {
+                                            if (draft.kind === 'edit') closeBookingEditTab(draft.id)
+                                            else onCloseBookingDraft?.(draft.id)
+                                        }}
                                     >
                                         ×
                                     </button>
@@ -1062,9 +1257,7 @@ export default function JournalView({
                                 void openDetachedEdit(nextEdit)
                                 return
                             }
-                            setEditRow(nextEdit)
-                            setEditRowInitialSnapshot(serializeEditRow(nextEdit))
-                            setConfirmDiscardEdit(false)
+                            openEditRow(nextEdit)
                         }}
                         onDelete={(r) => setDeleteRow(r)}
                         onToggleSort={(col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
@@ -1796,8 +1989,8 @@ export default function JournalView({
                                         setDeleteRow(null)
                                         // Close edit modal if deletion was initiated from edit, or if the currently edited row matches the deleted one
                                         try {
-                                            if (deleteRow.fromEdit) setEditRow(null)
-                                            else if (editRow && editRow.id === deleteRow.id) setEditRow(null)
+                                            if (deleteRow.fromEdit) closeEditModalNow()
+                                            else if (editRow && editRow.id === deleteRow.id) closeEditModalNow()
                                         } catch {}
                                         await loadRecent()
                                         bumpDataVersion()
