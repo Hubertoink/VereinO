@@ -33,7 +33,7 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
   const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
   return (
     <div className={`field field-full-width ${className || ''}`.trim()}>
-      {label && <label className={labelAccessory ? 'field-label-shortcut' : undefined}>{label}{labelAccessory}</label>}
+      {label && <label>{label}{labelAccessory}</label>}
       <div className="input tags-editor-input">
         {(value || []).map(t => {
           const bg = colorFor(t) || undefined

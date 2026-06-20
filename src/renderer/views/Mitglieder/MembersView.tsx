@@ -4,7 +4,6 @@ import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
-import { useShortcutOverlay, type ShortcutOverlayAction } from '../../hooks/useShortcutOverlay'
 
 type PageShortcutAction = {
     id: string
@@ -14,12 +13,10 @@ type PageShortcutAction = {
 }
 
 interface MembersViewProps {
-    showShortcuts?: boolean
-    pageShortcuts?: Record<string, string>
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
-export default function MembersView({ showShortcuts = false, pageShortcuts = {}, registerPageShortcuts }: MembersViewProps = {}) {
+export default function MembersView({ registerPageShortcuts }: MembersViewProps = {}) {
     const [q, setQ] = useState('')
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
     const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })
@@ -260,36 +257,6 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
         }
     }, [addrCity, addrStreet, addrZip, form])
 
-    const focusMemberInput = useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
-        if (!input) return
-        input.focus()
-        input.select()
-    }, [])
-
-    const memberModalShortcuts = useMemo<ShortcutOverlayAction[]>(() => [
-        { id: 'member-close', key: 'x', label: 'Schließen', action: () => setForm(null) },
-        { id: 'member-save', key: 's', label: 'Speichern', action: saveMemberForm },
-        { id: 'member-no', key: 'n', label: 'Nr.', action: () => focusMemberInput(memberNoInputRef.current) },
-        { id: 'member-name', key: 'm', label: 'Name', action: () => focusMemberInput(memberNameInputRef.current) },
-        { id: 'member-email', key: 'e', label: 'E-Mail', action: () => focusMemberInput(memberEmailInputRef.current) },
-        { id: 'member-join', key: 'i', label: 'Eintritt', action: () => focusMemberInput(memberJoinInputRef.current) },
-        { id: 'member-iban', key: 'b', label: 'IBAN', action: () => focusMemberInput(memberIbanInputRef.current) },
-        { id: 'member-notes', key: 'a', label: 'Anmerkungen', action: () => focusMemberInput(memberNotesInputRef.current) }
-    ], [focusMemberInput, saveMemberForm])
-
-    const { showShortcuts: showMemberShortcuts, shortcutMap: memberShortcutMap } = useShortcutOverlay({
-        actions: memberModalShortcuts,
-        enabled: !!form && missingRequired.length === 0 && !deleteConfirm,
-        capture: true,
-        stopPropagation: true
-    })
-
-    const memberShortcutBadge = useCallback((id: string) => {
-        const key = memberShortcutMap[id]
-        if (!showMemberShortcuts || !key) return null
-        return <span className="modal-shortcut" aria-hidden="true">{key.toUpperCase()}</span>
-    }, [memberShortcutMap, showMemberShortcuts])
-
     useEffect(() => {
         if (!registerPageShortcuts) return
         registerPageShortcuts([
@@ -495,10 +462,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                 <div className="members-header-right">
                     <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}>📄</button>
                     <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
-                    <button className="btn btn-accent page-shortcut-target" onClick={openCreateMember}>
-                        {showShortcuts && pageShortcuts['members-quick-add'] && (
-                            <span className="page-shortcut" aria-hidden="true">{pageShortcuts['members-quick-add'].toUpperCase()}</span>
-                        )}
+                    <button className="btn btn-accent" onClick={openCreateMember}>
                         + Neu
                     </button>
                 </div>
@@ -641,8 +605,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
-                                <button className="btn ghost modal-shortcut-target" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
-                                    {memberShortcutBadge('member-close')}
+                                <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                                     </svg>
@@ -657,16 +620,16 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                                 <div className="helper" style={{ marginBottom: 8 }}>Basis</div>
                                 <div className="row">
                                     <div className="field">
-                                        <label className="field-label-shortcut">Mitglieds-Nr. <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span>{memberShortcutBadge('member-no')}</label>
+                                        <label>Mitglieds-Nr. <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
                                         <input ref={memberNoInputRef} className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                                         {requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                     </div>
                                     <div className="field">
-                                        <label className="field-label-shortcut">Name <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span>{memberShortcutBadge('member-name')}</label>
+                                        <label>Name <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
                                         <input ref={memberNameInputRef} className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                                         {requiredTouched && (!form.draft.name || !form.draft.name.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                     </div>
-                                    <div className="field"><label className="field-label-shortcut">E-Mail{memberShortcutBadge('member-email')}</label><input ref={memberEmailInputRef} className="input" type="email" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
+                                    <div className="field"><label>E-Mail</label><input ref={memberEmailInputRef} className="input" type="email" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
                                     <div className="field"><label>Telefon</label><input className="input" type="tel" inputMode="numeric" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value.replace(/[^0-9\s\-\+]/g, '') || null } })} /></div>
                                     <div className="field" style={{ gridColumn: '1 / -1' }}>
                                         <label>Adresse</label>
@@ -685,7 +648,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                                     <div className="helper" style={{ marginBottom: 8 }}>Mitgliedschaft</div>
                                     <div className="row">
                                         <div className="field">
-                                            <label className="field-label-shortcut">Eintritt <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span>{memberShortcutBadge('member-join')}</label>
+                                            <label>Eintritt <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
                                             <input ref={memberJoinInputRef} className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                                             {requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                         </div>
@@ -715,7 +678,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                                     </div>
                                 </div>
                                 <div className="card" style={{ padding: 12, flex: 1 }}>
-                                    <div className="helper field-label-shortcut" style={{ marginBottom: 6 }}>Anmerkungen{memberShortcutBadge('member-notes')}</div>
+                                    <div className="helper" style={{ marginBottom: 6 }}>Anmerkungen</div>
                                     <textarea ref={memberNotesInputRef} className="input" rows={2} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
                                 </div>
                             </div>
@@ -730,7 +693,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                                 {(() => { const v = validateIBAN(form.draft.iban); return (
                                     <div className="field" style={{ gridColumn: 'span 2' }}>
-                                        <label className="field-label-shortcut" title="IBAN mit Prüfziffer">IBAN{memberShortcutBadge('member-iban')}</label>
+                                        <label title="IBAN mit Prüfziffer">IBAN</label>
                                         <input ref={memberIbanInputRef} className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
                                         {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
                                     </div>
@@ -771,7 +734,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                            <div className="helper">Ctrl+S = Speichern · Alt halten = Shortcuts · Esc = Abbrechen</div>
+                            <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 {form.mode === 'edit' && (
                                     <button className="btn danger modal-delete-btn" onClick={() => {
@@ -781,7 +744,7 @@ export default function MembersView({ showShortcuts = false, pageShortcuts = {},
                                     }}>🗑 Löschen</button>
                                 )}
                                 <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                                <button className="btn primary modal-shortcut-target" onClick={() => { void saveMemberForm() }}>{memberShortcutBadge('member-save')}Speichern</button>
+                                <button className="btn primary" onClick={() => { void saveMemberForm() }}>Speichern</button>
                             </div>
                         </div>
                     </div>

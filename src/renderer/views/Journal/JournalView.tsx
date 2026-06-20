@@ -81,8 +81,6 @@ type PageShortcutAction = {
 }
 
 interface JournalViewProps {
-    showShortcuts?: boolean
-    pageShortcuts?: Record<string, string>
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
     // Props die von App.tsx kommen
     flashId: number | null
@@ -149,8 +147,6 @@ interface JournalViewProps {
 export default function JournalView({
     flashId,
     setFlashId,
-    showShortcuts = false,
-    pageShortcuts = {},
     registerPageShortcuts,
     periodLock,
     refreshKey,
@@ -869,7 +865,7 @@ export default function JournalView({
         <>
             {/* Filter Toolbar */}
             <div className="journal-filter-toolbar">
-                <div className="journal-filter-toolbar__search-wrap page-shortcut-target">
+                <div className="journal-filter-toolbar__search-wrap">
                     <input
                         ref={searchInputRef}
                         className="input journal-filter-toolbar__search"
@@ -881,15 +877,12 @@ export default function JournalView({
                         }}
                         aria-label="Suche"
                     />
-                    {showShortcuts && pageShortcuts['journal-search'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-search'].toUpperCase()}</span>
-                    )}
                 </div>
 
                 <div className="filter-divider" />
 
                 {/* Filter-Cluster: Zeit- und Meta-Filter */}
-                <div ref={timeFilterRef} className="toolbar-icon page-shortcut-target">
+                <div ref={timeFilterRef} className="toolbar-icon">
                     <TimeFilterDropdown
                         yearsAvail={yearsAvail}
                         from={activeFrom}
@@ -901,12 +894,9 @@ export default function JournalView({
                             activeSetPage(1)
                         }}
                     />
-                    {showShortcuts && pageShortcuts['journal-time-filter'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-time-filter'].toUpperCase()}</span>
-                    )}
                 </div>
 
-                <div ref={metaFilterRef} className="toolbar-icon page-shortcut-target">
+                <div ref={metaFilterRef} className="toolbar-icon">
                     <MetaFilterDropdown
                         budgets={budgets}
                         earmarks={earmarks}
@@ -928,15 +918,12 @@ export default function JournalView({
                             activeSetPage(1)
                         }}
                     />
-                    {showShortcuts && pageShortcuts['journal-meta-filter'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-meta-filter'].toUpperCase()}</span>
-                    )}
                 </div>
 
                 <div className="filter-divider" />
 
                 {/* Anzeige-Cluster: Spaltenauswahl */}
-                <div ref={columnsFilterRef} className="toolbar-icon page-shortcut-target">
+                <div ref={columnsFilterRef} className="toolbar-icon">
                     <FilterDropdown
                         trigger={
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1074,15 +1061,12 @@ export default function JournalView({
                             })}
                         </div>
                     </FilterDropdown>
-                    {showShortcuts && pageShortcuts['journal-columns'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-columns'].toUpperCase()}</span>
-                    )}
                 </div>
 
                 <div className="filter-divider" />
 
                 {/* Aktionen-Cluster: Batch-Zuweisung */}
-                <div ref={batchAssignRef} className="toolbar-icon page-shortcut-target">
+                <div ref={batchAssignRef} className="toolbar-icon">
                     <BatchAssignDropdown
                     earmarks={earmarks}
                     tagDefs={tagDefs}
@@ -1107,9 +1091,6 @@ export default function JournalView({
                     }}
                     notify={notify}
                     />
-                    {showShortcuts && pageShortcuts['journal-batch-assign'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-batch-assign'].toUpperCase()}</span>
-                    )}
                 </div>
             </div>
 
@@ -1128,14 +1109,11 @@ export default function JournalView({
                     })}
                     {hasActiveFilters && (
                         <button
-                            className="btn ghost page-shortcut-target"
+                            className="btn ghost"
                             title="Alle Filter zurücksetzen"
                             onClick={resetAllFilters}
                             style={{ padding: '4px 8px', color: 'var(--accent)' }}
                         >
-                            {showShortcuts && pageShortcuts['journal-reset-filters'] && (
-                                <span className="page-shortcut" aria-hidden="true">{pageShortcuts['journal-reset-filters'].toUpperCase()}</span>
-                            )}
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
                                 <line x1="6" y1="6" x2="18" y2="18"></line>

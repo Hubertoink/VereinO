@@ -59,6 +59,15 @@ export function SettingsView(props: SettingsProps) {
     }
   }, [activeTile])
 
+  useEffect(() => {
+    const selectTile = (event: Event) => {
+      const tile = normalizeTileKey((event as CustomEvent<{ tile?: string }>).detail?.tile)
+      setActiveTile(tile)
+    }
+    window.addEventListener('settings:selectTile', selectTile)
+    return () => window.removeEventListener('settings:selectTile', selectTile)
+  }, [])
+
   // Reload logo when navigating away from org pane (in case it was updated)
   useEffect(() => {
     ;(window as any).api?.settings?.get?.({ key: 'org.logoDataUrl' })

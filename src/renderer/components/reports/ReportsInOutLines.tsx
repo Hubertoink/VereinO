@@ -13,7 +13,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     const el = containerRef.current
     if (!el) return
     const measure = () => {
-      const w = Math.max(el.getBoundingClientRect().width, el.parentElement?.clientWidth || 0)
+      const w = el.clientWidth
       if (w && Math.abs(w - containerW) > 1) setContainerW(w)
     }
     measure()
@@ -32,7 +32,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     const el = containerRef.current
     if (!el) return
     const measure = () => {
-      const w = Math.max(el.getBoundingClientRect().width, el.parentElement?.clientWidth || 0)
+      const w = el.clientWidth
       if (w && Math.abs(w - containerW) > 1) setContainerW(w)
     }
     requestAnimationFrame(() => {
@@ -116,7 +116,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div ref={containerRef} style={{ overflowX: 'auto', position: 'relative' }}>
+        <div ref={containerRef} style={{ overflowX: 'hidden', position: 'relative', width: '100%' }}>
           {(() => {
             const idx = (typeof hoverIdx === 'number' ? hoverIdx : null)
             if (idx == null) return null

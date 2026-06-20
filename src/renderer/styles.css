@@ -394,58 +394,162 @@ label.settings-toggle-card {
 .swatches { display: flex; gap: 8px; margin-top: 8px; }
 .swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); }
 
-/* Shortcut letter badge shown when Space is pressed */
-.nav-shortcut,
-.page-shortcut {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    min-width: 20px;
-    height: 20px;
+.nav-btn { position: relative; }
+
+/* Space leader / which-key command guide */
+.leader-shortcut-trigger {
+    position: fixed;
+    left: 72px;
+    bottom: 14px;
+    z-index: 850;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0 6px;
-    border-radius: 10px;
-    background: rgba(0,0,0,0.7);
-    color: #fff;
+    gap: 7px;
+    padding: 6px 9px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text-dim);
+    background: color-mix(in oklab, var(--surface) 88%, transparent);
+    box-shadow: 0 8px 26px color-mix(in oklab, #000 16%, transparent);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    font: inherit;
     font-size: 11px;
-    font-weight: 700;
-    pointer-events: none;
+    opacity: .72;
+    transition: opacity .15s ease, transform .15s ease;
 }
 
-.nav-btn { position: relative; }
-.page-shortcut-target { position: relative; }
-.modal-shortcut-target { position: relative; }
-.modal-shortcut {
-    min-width: 18px;
-    height: 18px;
-    display: inline-flex;
+.leader-shortcut-trigger:hover,
+.leader-shortcut-trigger:focus-visible {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.leader-shortcut-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: grid;
+    place-items: end center;
+    padding: 24px;
+}
+
+.leader-shortcut-backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: color-mix(in oklab, #000 26%, transparent);
+    backdrop-filter: blur(2px);
+    cursor: default;
+}
+
+.leader-shortcut-panel {
+    position: relative;
+    width: min(760px, calc(100vw - 32px));
+    max-height: min(560px, calc(100vh - 48px));
+    overflow: auto;
+    border: 1px solid color-mix(in oklab, var(--border) 82%, var(--accent));
+    border-radius: 16px;
+    padding: 18px;
+    background: color-mix(in oklab, var(--surface) 94%, transparent);
+    box-shadow: 0 24px 80px color-mix(in oklab, #000 34%, transparent);
+    backdrop-filter: blur(22px);
+    animation: leader-shortcut-in .12s ease-out;
+}
+
+@keyframes leader-shortcut-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.leader-shortcut-header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.leader-shortcut-eyebrow {
+    margin-bottom: 3px;
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.leader-shortcut-help {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 12px;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.leader-shortcut-invalid { color: var(--danger, #ef5350); }
+
+.leader-shortcut-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.leader-shortcut-command {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: center;
+    gap: 11px;
+    min-height: 58px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    color: var(--text);
+    background: color-mix(in oklab, var(--surface-alt, var(--surface)) 76%, transparent);
+    text-align: left;
+    cursor: pointer;
+}
+
+.leader-shortcut-command.has-icon { grid-template-columns: 34px 24px minmax(0, 1fr) auto; }
+.leader-shortcut-command-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-dim); }
+
+.leader-shortcut-command:hover,
+.leader-shortcut-command:focus-visible {
+    border-color: color-mix(in oklab, var(--accent) 62%, var(--border));
+    background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+    outline: none;
+}
+
+.leader-shortcut-command:disabled { opacity: .42; cursor: not-allowed; }
+
+.leader-shortcut-command kbd,
+.leader-shortcut-trigger kbd,
+.leader-shortcut-help kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 24px;
+    min-height: 23px;
     padding: 0 5px;
-    border-radius: 9px;
-    background: rgba(0,0,0,0.78);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
+    border: 1px solid color-mix(in oklab, var(--border) 72%, #fff);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--surface) 78%, #fff 4%);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11px;
     line-height: 1;
-    margin-left: 6px;
-    pointer-events: none;
-    vertical-align: middle;
 }
-.modal-shortcut-target .modal-shortcut {
-    margin-left: 0;
-    margin-right: 5px;
-}
-.field-label-shortcut {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-}
-.field-label-shortcut .modal-shortcut {
-    margin-left: 2px;
+
+.leader-shortcut-command-copy { display: grid; gap: 2px; }
+.leader-shortcut-command small { color: var(--text-dim); font-size: 11px; }
+.leader-shortcut-arrow { color: var(--text-dim); font-size: 22px; }
+
+@media (max-width: 640px) {
+    .leader-shortcut-layer { padding: 10px; }
+    .leader-shortcut-grid { grid-template-columns: 1fr; }
+    .leader-shortcut-header { align-items: start; flex-direction: column; }
+    .leader-shortcut-help { justify-content: flex-start; }
+    .leader-shortcut-trigger span { display: none; }
 }
 
 /* Storage pane specific */

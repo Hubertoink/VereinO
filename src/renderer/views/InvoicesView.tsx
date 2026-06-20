@@ -6,7 +6,6 @@ import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
 import ColumnSelectDropdown from '../components/dropdowns/ColumnSelectDropdown'
 import InvoiceFilterDropdown from '../components/dropdowns/InvoiceFilterDropdown'
-import { useShortcutOverlay, type ShortcutOverlayAction } from '../hooks/useShortcutOverlay'
 
 // Local contrast helper for readable badges
 function contrastText(bg?: string | null) {
@@ -29,12 +28,10 @@ type PageShortcutAction = {
 }
 
 interface InvoicesViewProps {
-  showShortcuts?: boolean
-  pageShortcuts?: Record<string, string>
   registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
-export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}, registerPageShortcuts }: InvoicesViewProps = {}) {
+export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
   const { notify } = useToast()
   // Filters and pagination
   const [q, setQ] = useState<string>('')
@@ -395,45 +392,10 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
     return () => registerPageShortcuts([])
   }, [openCreate, registerPageShortcuts])
 
-  const focusInvoiceInput = React.useCallback((input: HTMLInputElement | null) => {
-    if (!input) return
-    input.focus()
-    input.select()
-  }, [])
-
   const openInvoiceFilePicker = React.useCallback(() => {
     if (!form) return
     ;(form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()
   }, [form])
-
-  const invoiceModalShortcuts = useMemo<ShortcutOverlayAction[]>(() => [
-    { id: 'invoice-close', key: 'x', label: 'Schließen', action: () => setForm(null) },
-    { id: 'invoice-save', key: 's', label: 'Speichern', action: saveForm },
-    { id: 'invoice-file', key: 'd', label: 'Datei', action: openInvoiceFilePicker },
-    { id: 'invoice-date', key: 'm', label: 'Datum', action: () => focusInvoiceInput(invoiceDateInputRef.current) },
-    { id: 'invoice-party', key: 'p', label: 'Partei', action: () => focusInvoiceInput(invoicePartyInputRef.current) },
-    { id: 'invoice-no', key: 'n', label: 'Nummer', action: () => focusInvoiceInput(invoiceNoInputRef.current) },
-    { id: 'invoice-amount', key: 'r', label: 'Betrag', action: () => focusInvoiceInput(invoiceAmountInputRef.current) },
-    { id: 'invoice-description', key: 'e', label: 'Beschreibung', action: () => focusInvoiceInput(invoiceDescriptionInputRef.current) },
-    { id: 'invoice-tags', key: 'g', label: 'Tags', action: () => focusInvoiceInput(invoiceTagsInputRef.current) },
-    { id: 'invoice-income', key: 'i', label: 'IN', action: () => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } })) },
-    { id: 'invoice-expense', key: 'a', label: 'OUT', action: () => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } })) },
-    { id: 'invoice-cash', key: 'b', label: 'Bar', action: () => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } })) },
-    { id: 'invoice-bank', key: 'k', label: 'Bank', action: () => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } })) }
-  ], [focusInvoiceInput, openInvoiceFilePicker, saveForm])
-
-  const { showShortcuts: showInvoiceShortcuts, shortcutMap: invoiceShortcutMap } = useShortcutOverlay({
-    actions: invoiceModalShortcuts,
-    enabled: !!form && missingRequired.length === 0,
-    capture: true,
-    stopPropagation: true
-  })
-
-  const invoiceShortcutBadge = React.useCallback((id: string) => {
-    const key = invoiceShortcutMap[id]
-    if (!showInvoiceShortcuts || !key) return null
-    return <span className="modal-shortcut" aria-hidden="true">{key.toUpperCase()}</span>
-  }, [invoiceShortcutMap, showInvoiceShortcuts])
 
   useEffect(() => {
     if (!form) return
@@ -521,10 +483,7 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
           />
           {(() => { const hasFilters = !!(q.trim() || (status !== 'ALL') || sphere || budgetId || tag || dueFrom || dueTo); return hasFilters ? (<button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">✕</button>) : null })()}
           <div className="filter-divider" />
-          <button className="btn primary page-shortcut-target" onClick={() => openCreate()}>
-            {showShortcuts && pageShortcuts['invoices-quick-add'] && (
-              <span className="page-shortcut" aria-hidden="true">{pageShortcuts['invoices-quick-add'].toUpperCase()}</span>
-            )}
+          <button className="btn primary" onClick={() => openCreate()}>
             + Neu
           </button>
         </div>
@@ -771,7 +730,7 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                 const type = form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
                 return form.mode === 'create' ? `+ ${type}` : `${type} bearbeiten`
               })()}</h2>
-              <button className="btn ghost modal-shortcut-target" onClick={() => setForm(null)} aria-label="Schließen"> {invoiceShortcutBadge('invoice-close')}×</button>
+              <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen">×</button>
             </div>
 
             {formError && <div className="invoices-text-danger" style={{ padding: '0 16px' }}>{formError}</div>}
@@ -785,14 +744,14 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                   <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                   <div className="row">
                     <div className="field">
-                      <label className="field-label-shortcut">Datum <span className="req-asterisk">*</span>{invoiceShortcutBadge('invoice-date')}</label>
+                      <label>Datum <span className="req-asterisk">*</span></label>
                       <input ref={invoiceDateInputRef} className="input" type="date" value={form.draft.date} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, date: e.target.value } }))} style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined} />
                     </div>
                     <div className="field">
                       <label>Art</label>
                       <div className="btn-group" role="group">
-                        <button type="button" className={`btn modal-shortcut-target ${form.draft.voucherType === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } }))}>{invoiceShortcutBadge('invoice-income')}IN</button>
-                        <button type="button" className={`btn modal-shortcut-target ${form.draft.voucherType === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } }))}>{invoiceShortcutBadge('invoice-expense')}OUT</button>
+                        <button type="button" className={`btn ${form.draft.voucherType === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'IN' } }))}>IN</button>
+                        <button type="button" className={`btn ${form.draft.voucherType === 'OUT' ? 'btn-toggle-active btn-type-out' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, voucherType: 'OUT' } }))}>OUT</button>
                       </div>
                     </div>
                   </div>
@@ -809,8 +768,8 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                     <div className="field">
                       <label>Zahlweg</label>
                       <div className="btn-group" role="group">
-                        <button type="button" className={`btn modal-shortcut-target ${form.draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } }))}>{invoiceShortcutBadge('invoice-cash')}Bar</button>
-                        <button type="button" className={`btn modal-shortcut-target ${form.draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } }))}>{invoiceShortcutBadge('invoice-bank')}Bank</button>
+                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BAR' } }))}>Bar</button>
+                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`} onClick={() => setForm(f => f && ({ ...f, draft: { ...f.draft, paymentMethod: 'BANK' } }))}>Bank</button>
                       </div>
                     </div>
                   </div>
@@ -820,12 +779,11 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                 <div className="card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
                   <div className="field">
-                    <label className="field-label-shortcut">Beschreibung{invoiceShortcutBadge('invoice-description')}</label>
+                    <label>Beschreibung</label>
                     <input ref={invoiceDescriptionInputRef} className="input" list="desc-suggestions" value={form.draft.description || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, description: e.target.value } }))} placeholder="z. B. Mitgliedsbeitrag, Spende …" />
                   </div>
                   <TagsEditor
                     label="Tags"
-                    labelAccessory={invoiceShortcutBadge('invoice-tags')}
                     value={form.draft.tags}
                     onChange={tags => setForm(f => f && ({ ...f, draft: { ...f.draft, tags } }))}
                     tagDefs={tags}
@@ -840,12 +798,12 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                 <div className="card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
                   <div className="field">
-                    <label className="field-label-shortcut">Partei <span className="req-asterisk">*</span>{invoiceShortcutBadge('invoice-party')}</label>
+                    <label>Partei <span className="req-asterisk">*</span></label>
                     <input ref={invoicePartyInputRef} className="input" list="party-suggestions" value={form.draft.party} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, party: e.target.value } }))} placeholder="Name der Partei" style={requiredTouched && (!form.draft.party?.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                   </div>
                   <div className="row">
                     <div className="field">
-                      <label className="field-label-shortcut">{form.draft.voucherType === 'IN' ? 'Forderungs-Nr.' : 'Verbindl.-Nr.'} <span className="req-asterisk">*</span>{invoiceShortcutBadge('invoice-no')}</label>
+                      <label>{form.draft.voucherType === 'IN' ? 'Forderungs-Nr.' : 'Verbindl.-Nr.'} <span className="req-asterisk">*</span></label>
                       <input ref={invoiceNoInputRef} className="input" value={form.draft.invoiceNo || ''} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, invoiceNo: e.target.value } }))} placeholder="z. B. 2025-001" style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined} />
                     </div>
                     <div className="field">
@@ -855,7 +813,7 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                   </div>
                   <div className="row">
                     <div className="field">
-                      <label className="field-label-shortcut">Betrag <span className="req-asterisk">*</span>{invoiceShortcutBadge('invoice-amount')}</label>
+                      <label>Betrag <span className="req-asterisk">*</span></label>
                       <span className="adorn-wrap">
                         <input ref={invoiceAmountInputRef} className="input" inputMode="decimal" placeholder="z. B. 199,90" value={form.draft.grossAmount} onChange={e => setForm(f => f && ({ ...f, draft: { ...f.draft, grossAmount: e.target.value } }))} style={requiredTouched && (parseAmount(form.draft.grossAmount) == null || parseAmount(form.draft.grossAmount)! <= 0) ? { borderColor: 'var(--danger)' } : undefined} />
                         <span className="adorn-suffix">€</span>
@@ -942,7 +900,7 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                         } finally { if (editInvoiceFileInputRef.current) editInvoiceFileInputRef.current.value = '' }
                       }
                     }} />
-                    <button type="button" className="btn modal-shortcut-target" style={{ padding: '4px 10px', fontSize: 12 }} onClick={openInvoiceFilePicker}>{invoiceShortcutBadge('invoice-file')}+ Datei(en)</button>
+                    <button type="button" className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={openInvoiceFilePicker}>+ Datei(en)</button>
                   </div>
                   {(() => {
                     const filesList = form.mode === 'create' ? formFiles : editInvoiceFiles
@@ -981,12 +939,12 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
 
             {/* Footer */}
             <div className="invoices-modal-footer">
-              <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Alt halten = Shortcuts · Esc = Abbrechen</div>
+              <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {form.mode === 'edit' && form.draft.id && (
                   <button className="btn danger" onClick={() => { const inv = form.sourceRow; if (inv) setDeleteConfirm(inv) }}>🗑 Löschen</button>
                 )}
-                <button className="btn primary modal-shortcut-target" onClick={() => {
+                <button className="btn primary" onClick={() => {
                   setRequiredTouched(true)
                   const missing: string[] = []
                   if (!form!.draft.date) missing.push('Datum')
@@ -996,7 +954,7 @@ export default function InvoicesView({ showShortcuts = false, pageShortcuts = {}
                   if (a == null || a <= 0) missing.push('Betrag')
                   if (missing.length > 0) { setMissingRequired(missing); return }
                   saveForm()
-                }}>{invoiceShortcutBadge('invoice-save')}Speichern</button>
+                }}>Speichern</button>
               </div>
             </div>
             <datalist id="party-suggestions">{partySuggestions.map((p, i) => <option key={i} value={p} />)}</datalist>

@@ -38,6 +38,8 @@ import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
+import { getNavIcon } from './utils/navIcons'
+import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -116,32 +118,6 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
             ) : null}
         </div>
     )
-}
-
-// Build a simple shortcut map from nav item labels -> unique letters
-function buildNavShortcuts(): Record<string, string> {
-    const map: Record<string, string> = {}
-    const used = new Set<string>()
-    for (const item of navItems) {
-        const label = item.label || item.key
-        let assigned = ''
-        for (const ch of label) {
-            const c = ch.toLowerCase()
-            if (/[a-z0-9]/.test(c) && !used.has(c)) {
-                assigned = c
-                break
-            }
-        }
-        if (!assigned) {
-            // fallback to index-based digit
-            let i = 1
-            while (used.has(String(i))) i++
-            assigned = String(i)
-        }
-        used.add(assigned)
-        map[item.key] = assigned
-    }
-    return map
 }
 
 type PageShortcutAction = {
@@ -851,9 +827,6 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
-    // Nav shortcut overlay state
-    const [showNavShortcuts, setShowNavShortcuts] = useState(false)
-    const navShortcuts = useMemo(() => buildNavShortcuts(), [])
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     const registerPageShortcuts = useCallback((shortcuts: PageShortcutAction[]) => {
         setRegisteredPageShortcuts(shortcuts)
@@ -1329,6 +1302,11 @@ function AppInner() {
         })()
     }, [bookingsOpenDetached, dockAndOpenDraft, notify, openQuickAdd, quickAddAfterSave, showBookingDraftTabs])
 
+    // These values are displayed and changed by the global shortcut menu, so they
+    // must be initialized before shortcutCommands is created.
+    const [page, setPage] = useState<number>(() => { try { return Number(localStorage.getItem('journal.page') || '1') } catch { return 1 } })
+    const [journalLimit, setJournalLimit] = useState<number>(50)
+
     const activePageShortcuts = useMemo<PageShortcutAction[]>(() => {
         const shortcuts = [...registeredPageShortcuts]
         if (activePage === 'Buchungen') {
@@ -1337,94 +1315,152 @@ function AppInner() {
         return shortcuts
     }, [activePage, openBookingEntry, registeredPageShortcuts])
 
-    const pageShortcutMap = useMemo(() => {
-        return Object.fromEntries(activePageShortcuts.map((shortcut) => [shortcut.id, shortcut.key])) as Record<string, string>
-    }, [activePageShortcuts])
+    const navigateAndFocus = useCallback((page: NavKey, selector: string) => {
+        setActivePage(page)
+        window.setTimeout(() => {
+            const input = document.querySelector(selector) as HTMLInputElement | null
+            input?.focus()
+            input?.select()
+        }, 100)
+    }, [])
 
-    // Global key handling: Alt shows shortcut badges; Alt+letter triggers nav and current-page actions.
-    useEffect(() => {
-        function hideShortcuts() {
-            setShowNavShortcuts(false)
-        }
+    const openSettingsTile = useCallback((tile: string) => {
+        try { sessionStorage.setItem('settingsActiveTile', tile) } catch { /* ignore */ }
+        setActivePage('Einstellungen')
+        window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile } }))
+        }, 100)
+    }, [])
 
-        function hasOpenModal() {
-            return Boolean(document.querySelector('[role="dialog"][aria-modal="true"], .booking-modal'))
-        }
+    const shortcutCommands = useMemo<ShortcutCommand[]>(() => {
+        const pageActions = activePageShortcuts.map((shortcut) => ({
+            key: shortcut.key,
+            label: shortcut.label,
+            action: shortcut.action
+        }))
 
-        function isTextEntryTarget(target: EventTarget | null) {
-            const element = target instanceof HTMLElement ? target : document.activeElement instanceof HTMLElement ? document.activeElement : null
-            if (!element) return false
-            if (/input|textarea|select/.test(element.tagName.toLowerCase())) return true
-            if (element.isContentEditable) return true
-            return false
-        }
-
-        function runShortcut(key: string) {
-            const pressed = key.toLowerCase()
-            const pageShortcut = activePageShortcuts.find((shortcut) => shortcut.key.toLowerCase() === pressed)
-            if (pageShortcut) {
-                pageShortcut.action()
-                return true
+        return [
+            {
+                key: 'n',
+                label: 'Neue Buchung',
+                description: 'Öffnet einen neuen Buchungsentwurf',
+                action: openBookingEntry
+            },
+            {
+                key: 'g',
+                label: 'Gehe zu …',
+                description: 'Bereich in VereinO öffnen',
+                children: navItems.map((item) => ({
+                    key: ({
+                        Dashboard: 'd', Buchungen: 'b', Verbindlichkeiten: 'v', Mitglieder: 'm',
+                        Vorschuesse: 'o', Budgets: 'p', Zweckbindungen: 'z', Einreichungen: 'i',
+                        Belege: 'l', Reports: 'r', Einstellungen: 'e'
+                    } as Record<NavKey, string>)[item.key],
+                    label: item.label,
+                    icon: <span className={navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}>{getNavIcon(item.key)}</span>,
+                    action: () => setActivePage(item.key)
+                }))
+            },
+            {
+                key: 's',
+                label: 'Suche …',
+                description: 'Bereich öffnen und Suchfeld fokussieren',
+                children: [
+                    { key: 'b', label: 'Buchungen', action: () => navigateAndFocus('Buchungen', '.journal-filter-toolbar__search') },
+                    { key: 'v', label: 'Verbindlichkeiten', action: () => navigateAndFocus('Verbindlichkeiten', '.invoices-search') },
+                    { key: 'm', label: 'Mitglieder', action: () => navigateAndFocus('Mitglieder', '.members-search') },
+                    { key: 'o', label: 'Vorschüsse', action: () => navigateAndFocus('Vorschuesse', 'input[placeholder^="Suchen (Person"]') }
+                ]
+            },
+            ...(pageActions.length ? [{
+                key: 'a',
+                label: `Aktionen: ${navItems.find((item) => item.key === activePage)?.label ?? activePage} …`,
+                description: 'Funktionen des aktuellen Bereichs',
+                children: pageActions
+            }] : []),
+            {
+                key: 'e',
+                label: 'Einstellungen & Verwaltung …',
+                description: 'Häufige Verwaltungsbereiche direkt öffnen',
+                icon: <span className={navIconColorMode === 'color' ? 'icon-color-Einstellungen' : ''}>{getNavIcon('Einstellungen')}</span>,
+                children: [
+                    {
+                        key: 'n',
+                        label: 'Navigation & Layout …',
+                        description: 'Menü und Buchungstabelle direkt anpassen',
+                        icon: <span aria-hidden>🧭</span>,
+                        children: [
+                            {
+                                key: 'm', label: 'Menü-Layout …', description: `Aktuell: ${navLayout === 'left' ? 'Links' : 'Oben'}`, children: [
+                                    { key: 'l', label: 'Links (klassisch)', action: () => setNavLayout('left') },
+                                    { key: 'o', label: 'Oben (Icons)', action: () => setNavLayout('top') }
+                                ]
+                            },
+                            {
+                                key: 'h', label: 'Zeilenhöhe …', description: `Aktuell: ${journalRowDensity === 'compact' ? 'Kompakt' : 'Normal'}`, children: [
+                                    { key: 'n', label: 'Normal', action: () => setJournalRowDensity('normal') },
+                                    { key: 'k', label: 'Kompakt', action: () => setJournalRowDensity('compact') }
+                                ]
+                            },
+                            {
+                                key: 'z', label: 'Buchungen: Zeilenlayout …', description: `Aktuell: ${{ both: 'Linien + Zebra', lines: 'Nur Linien', zebra: 'Nur Zebra', none: 'Ohne Linien/Zebra' }[journalRowStyle]}`, children: [
+                                    { key: 'l', label: 'Linien + Zebra', action: () => setJournalRowStyle('both') },
+                                    { key: 'i', label: 'Nur Linien', action: () => setJournalRowStyle('lines') },
+                                    { key: 'z', label: 'Nur Zebra', action: () => setJournalRowStyle('zebra') },
+                                    { key: 'o', label: 'Ohne Linien/Zebra', action: () => setJournalRowStyle('none') }
+                                ]
+                            },
+                            { key: 'f', label: 'Farbige Menüicons umschalten', description: `Aktuell: ${navIconColorMode === 'color' ? 'Ein' : 'Aus'}`, action: () => setNavIconColorMode(navIconColorMode === 'color' ? 'mono' : 'color') },
+                            { key: 'b', label: 'Buchungsreiter umschalten', description: `Aktuell: ${showBookingDraftTabs ? 'Ein' : 'Aus'}`, action: () => setShowBookingDraftTabs(!showBookingDraftTabs) },
+                            { key: 'e', label: 'Eigenes Buchungsfenster umschalten', description: `Aktuell: ${bookingsOpenDetached ? 'Ein' : 'Aus'}`, action: () => setBookingsOpenDetached(!bookingsOpenDetached) },
+                            {
+                                key: 's', label: 'Nach dem Speichern …', description: `Aktuell: ${quickAddAfterSave === 'close' ? 'Schließen' : 'Neue Buchung'}`, children: [
+                                    { key: 's', label: 'Buchungsmodal schließen', action: () => setQuickAddAfterSave('close') },
+                                    { key: 'n', label: 'Neue Buchung öffnen', action: () => setQuickAddAfterSave('new') }
+                                ]
+                            },
+                            {
+                                key: 'd', label: 'Buchungen löschen …', description: `Aktuell: ${allowVoucherDeletion ? 'Endgültiges Löschen erlaubt' : 'Nur Storno'}`, children: [
+                                    { key: 's', label: 'Nur Storno erlauben', action: () => setAllowVoucherDeletion(false) },
+                                    { key: 'e', label: 'Endgültiges Löschen erlauben', action: () => setAllowVoucherDeletion(true) }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        key: 'a',
+                        label: 'Anzeige & Lesbarkeit …',
+                        description: 'Eintragszahl und Datumsformat direkt anpassen',
+                        icon: <span aria-hidden>🔎</span>,
+                        children: [
+                            {
+                                key: 'e', label: 'Buchungen: Anzahl der Einträge …', description: `Aktuell: ${journalLimit}`, children: [
+                                    { key: '2', label: '20 Einträge', action: () => { setJournalLimit(20); setPage(1) } },
+                                    { key: '5', label: '50 Einträge', action: () => { setJournalLimit(50); setPage(1) } },
+                                    { key: '0', label: '100 Einträge', action: () => { setJournalLimit(100); setPage(1) } }
+                                ]
+                            },
+                            {
+                                key: 'd', label: 'Datumsformat …', description: `Aktuell: ${dateFmt === 'ISO' ? '2025-01-15' : '15. Jan 2025'}`, children: [
+                                    { key: 'i', label: 'ISO · 2025-01-15', action: () => setDateFmt('ISO') },
+                                    { key: 'l', label: 'Lesbar · 15. Jan 2025', action: () => setDateFmt('PRETTY') }
+                                ]
+                            }
+                        ]
+                    },
+                    { key: 'd', label: 'Darstellung', action: () => openSettingsTile('general') },
+                    { key: 't', label: 'Tabelle', action: () => openSettingsTile('table') },
+                    { key: 's', label: 'Speicher & Backup', action: () => openSettingsTile('storage') },
+                    { key: 'i', label: 'Import', action: () => openSettingsTile('import') },
+                    { key: 'o', label: 'Organisation', action: () => openSettingsTile('org') },
+                    { key: 'p', label: 'Spenden', action: () => openSettingsTile('donations') },
+                    { key: 'g', label: 'Tags', action: () => openSettingsTile('tags') },
+                    { key: 'k', label: 'Kassenprüfung', action: () => openSettingsTile('cashCheck') },
+                    { key: 'j', label: 'Jahresabschluss', action: () => openSettingsTile('yearEnd') }
+                ]
             }
-
-            for (const k of Object.keys(navShortcuts)) {
-                if (navShortcuts[k].toLowerCase() === pressed) {
-                    setActivePage(k as NavKey)
-                    return true
-                }
-            }
-
-            return false
-        }
-
-        function onKeyDown(e: KeyboardEvent) {
-            if (hasOpenModal()) {
-                if (showNavShortcuts) hideShortcuts()
-                return
-            }
-
-            if (e.key === 'Alt') {
-                e.preventDefault()
-                if (!e.repeat) setShowNavShortcuts(true)
-                return
-            }
-
-            if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.length === 1) {
-                if (!runShortcut(e.key)) return
-                e.preventDefault()
-                hideShortcuts()
-                return
-            }
-
-            if (isTextEntryTarget(e.target)) return
-            if (!showNavShortcuts) return
-
-            if (e.key === 'Escape') {
-                e.preventDefault()
-                hideShortcuts()
-                return
-            }
-
-            if (runShortcut(e.key)) {
-                e.preventDefault()
-                hideShortcuts()
-            }
-        }
-
-        function onKeyUp(e: KeyboardEvent) {
-            if (e.key === 'Alt') {
-                e.preventDefault()
-                hideShortcuts()
-            }
-        }
-
-        window.addEventListener('keydown', onKeyDown)
-        window.addEventListener('keyup', onKeyUp)
-        return () => {
-            window.removeEventListener('keydown', onKeyDown)
-            window.removeEventListener('keyup', onKeyUp)
-        }
-    }, [activePageShortcuts, navShortcuts, showNavShortcuts])
+        ]
+    }, [activePage, activePageShortcuts, allowVoucherDeletion, bookingsOpenDetached, dateFmt, journalLimit, journalRowDensity, journalRowStyle, navIconColorMode, navLayout, navigateAndFocus, openBookingEntry, openSettingsTile, quickAddAfterSave, showBookingDraftTabs])
 
     async function createSampleVoucher() {
         try {
@@ -1493,7 +1529,6 @@ function AppInner() {
         }>
     >([])
     const [totalRows, setTotalRows] = useState<number>(0)
-    const [page, setPage] = useState<number>(() => { try { return Number(localStorage.getItem('journal.page') || '1') } catch { return 1 } })
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return (localStorage.getItem('journal.sort') as any) || 'DESC' } catch { return 'DESC' } })
     const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net'>(() => { try { return (localStorage.getItem('journal.sortBy') as any) || 'date' } catch { return 'date' } })
     // PaymentsAssignModal extracted to components/modals/PaymentsAssignModal.tsx
@@ -1628,9 +1663,6 @@ function AppInner() {
         try { localStorage.setItem('journalColsOrder', JSON.stringify(order)) } catch { }
         try { window.api?.settings?.set?.({ key: 'journal.order', value: JSON.stringify(order) }) } catch { }
     }, [order])
-
-    // Journal pagination limit
-    const [journalLimit, setJournalLimit] = useState<number>(50)
 
     // Load recent vouchers (journal/buchungen data loader)
     const loadRecent = useCallback(async () => {
@@ -1818,8 +1850,6 @@ function AppInner() {
                             pendingSubmissionsCount={pendingSubmissionsCount}
                             openInvoicesCount={openInvoicesCount}
                             showBadges
-                            showShortcuts={showNavShortcuts}
-                            navShortcuts={navShortcuts}
                         />
                     </div>
                 ) : null}
@@ -1847,8 +1877,6 @@ function AppInner() {
                         pendingSubmissionsCount={pendingSubmissionsCount}
                         openInvoicesCount={openInvoicesCount}
                         showBadges
-                        showShortcuts={showNavShortcuts}
-                        navShortcuts={navShortcuts}
                     />
                 </aside>
             )}
@@ -1923,8 +1951,6 @@ function AppInner() {
                         <JournalView
                             flashId={flashId}
                             setFlashId={setFlashId}
-                            showShortcuts={showNavShortcuts}
-                            pageShortcuts={pageShortcutMap}
                             registerPageShortcuts={registerPageShortcuts}
                             periodLock={periodLock}
                             refreshKey={refreshKey}
@@ -2087,8 +2113,6 @@ function AppInner() {
 
                     {activePage === 'Mitglieder' && (
                         <MembersView
-                            showShortcuts={showNavShortcuts}
-                            pageShortcuts={pageShortcutMap}
                             registerPageShortcuts={registerPageShortcuts}
                         />
                     )}
@@ -2099,8 +2123,6 @@ function AppInner() {
 
                     {activePage === 'Verbindlichkeiten' && (
                         <InvoicesView
-                            showShortcuts={showNavShortcuts}
-                            pageShortcuts={pageShortcutMap}
                             registerPageShortcuts={registerPageShortcuts}
                         />
                     )}
@@ -2117,6 +2139,8 @@ function AppInner() {
                         />
                     )}
             </main>
+
+            <LeaderShortcuts commands={shortcutCommands} />
 
 {/* Quick-Add Modal */}
             {quickAdd && (
@@ -2166,10 +2190,7 @@ function AppInner() {
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
             {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
-                <button className="fab fab-buchung page-shortcut-target" onClick={openBookingEntry} title="+ Buchung">
-                    {showNavShortcuts && activePage === 'Buchungen' && pageShortcutMap['journal-quick-add'] && (
-                        <span className="page-shortcut" aria-hidden="true">{pageShortcutMap['journal-quick-add'].toUpperCase()}</span>
-                    )}
+                <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>
                 </button>

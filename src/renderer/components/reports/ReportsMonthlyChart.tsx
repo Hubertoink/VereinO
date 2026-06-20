@@ -34,9 +34,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const el = containerRef.current
     if (!el) return
     const measure = () => {
-      const rectW = el.getBoundingClientRect().width
-      const parentW = el.parentElement?.clientWidth || 0
-      const w = Math.max(rectW, parentW, 0)
+      const w = el.clientWidth
       if (w && Math.abs(w - containerW) > 1) setContainerW(w)
     }
     measure()
@@ -55,9 +53,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const el = containerRef.current
     if (!el) return
     const measure = () => {
-      const rectW = el.getBoundingClientRect().width
-      const parentW = el.parentElement?.clientWidth || 0
-      const w = Math.max(rectW, parentW, 0)
+      const w = el.clientWidth
       if (w && Math.abs(w - containerW) > 1) setContainerW(w)
     }
     requestAnimationFrame(() => {
@@ -218,7 +214,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div ref={containerRef} style={{ overflowX: 'auto', position: 'relative' }}>
+        <div ref={containerRef} style={{ overflowX: 'hidden', position: 'relative', width: '100%' }}>
           {(() => {
             const focusIdx = (typeof hoverIdx === 'number' ? hoverIdx : null)
             const idx = focusIdx
