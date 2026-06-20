@@ -13,6 +13,8 @@
     "prebuild": "node scripts/ensure-electron-arch.cjs",
     "build": "electron-vite build",
     "prepackage": "npm run build",
+    "release:artifacts": "npm run package",
+    "release:publish": "node scripts/publish-release.cjs",
     "prepreview": "node scripts/ensure-electron-arch.cjs",
     "preview": "electron-vite preview",
     "lint": "eslint .",
