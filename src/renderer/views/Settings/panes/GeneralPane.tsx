@@ -57,6 +57,8 @@ export function GeneralPane({
   setCustomBackgroundImage,
   glassModals,
   setGlassModals,
+  backgroundContrast,
+  setBackgroundContrast,
 }: GeneralPaneProps) {
   // Date format examples
   const sample = '2025-01-15'
@@ -229,7 +231,7 @@ export function GeneralPane({
           Installierte Version: {appVersion || updateState.currentVersion || 'unbekannt'}
         </div>
         <div className="settings-inline-toggle" style={{ marginTop: 10 }}>
-          <label htmlFor="toggle-auto-update-check">Wöchentlich beim Start nach Updates suchen</label>
+          <label htmlFor="toggle-auto-update-check">Bei jedem Start nach Updates suchen</label>
           <input
             id="toggle-auto-update-check"
             role="switch"
@@ -431,6 +433,25 @@ export function GeneralPane({
               type="checkbox"
               checked={glassModals}
               onChange={(e) => setGlassModals(e.target.checked)}
+            />
+          </div>
+        </div>
+
+        <div className="field" style={{ marginTop: 12 }}>
+          <div className="glass-toggle-row">
+            <div className="glass-toggle-info">
+              <label htmlFor="toggle-background-contrast">Kontrastmodus für Bildhintergründe</label>
+              <span className="helper">Macht Karten und Buchungstabellen deckender und Texte besser lesbar.</span>
+            </div>
+            <input
+              id="toggle-background-contrast"
+              role="switch"
+              aria-checked={backgroundContrast}
+              className="toggle"
+              type="checkbox"
+              checked={backgroundContrast}
+              disabled={backgroundImage === 'none'}
+              onChange={(e) => setBackgroundContrast(e.target.checked)}
             />
           </div>
         </div>

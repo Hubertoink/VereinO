@@ -172,6 +172,49 @@ function UsageHover({
     )
 }
 
+function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, children }: {
+    linkedId: number
+    title: string
+    eurFmt: Intl.NumberFormat
+    fmtDate: (s?: string) => string
+    getVoucher: (id: number) => Promise<any>
+    onClick: () => void
+    children: React.ReactNode
+}) {
+    const [voucher, setVoucher] = useState<any>(null)
+    const [loading, setLoading] = useState(false)
+    const loadVoucher = useCallback(async () => {
+        if (voucher || loading) return
+        setLoading(true)
+        try { setVoucher(await getVoucher(linkedId)) } catch { setVoucher(null) } finally { setLoading(false) }
+    }, [getVoucher, linkedId, loading, voucher])
+    const tooltipRows = voucher ? [
+        { key: 'Beleg', value: `#${voucher.voucherNo || voucher.id}` },
+        { key: 'Datum', value: fmtDate(voucher.date) },
+        { key: 'Beschreibung', value: voucher.description || '—' },
+        { key: 'Betrag', value: eurFmt.format(Number(voucher.grossAmount || 0)), dotColor: voucher.type === 'IN' ? 'var(--success)' : 'var(--danger)' }
+    ] : []
+    return (
+        <HoverTooltip<HTMLButtonElement>
+            content={<TooltipList title={title} rows={tooltipRows} hint={loading ? 'Lädt…' : voucher ? 'Klick zeigt Original und Storno.' : 'Zum Laden hovern.'} />}
+            className="tooltip-modal journal-usage-tooltip"
+            preferredPlacement="top"
+        >
+            {({ ref, props }) => (
+                <button ref={ref} type="button" className="badge storno-link-badge"
+                    aria-describedby={props['aria-describedby']}
+                    onMouseEnter={(e) => { void loadVoucher(); props.onMouseEnter?.(e) }}
+                    onMouseLeave={props.onMouseLeave}
+                    onFocus={(e) => { void loadVoucher(); props.onFocus?.(e) }}
+                    onBlur={props.onBlur}
+                    onClick={(e) => { e.stopPropagation(); onClick() }}>
+                    {children}
+                </button>
+            )}
+        </HoverTooltip>
+    )
+}
+
 // Helper function for contrast text color
 function contrastText(bg?: string | null) {
     if (!bg) return '#000'
@@ -279,6 +322,8 @@ interface JournalTableProps {
     onTagClick?: (name: string) => void
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
+    onStornoPairClick?: (originalId: number, reversalId: number) => void
+    getVoucherById?: (id: number) => Promise<any>
     highlightId?: number | null
     lockedUntil?: string | null
     onRowDoubleClick?: (row: any) => void
@@ -301,6 +346,8 @@ export default function JournalTable({
     onTagClick,
     onEarmarkClick,
     onBudgetClick,
+    onStornoPairClick,
+    getVoucherById,
     highlightId,
     lockedUntil,
     onRowDoubleClick
@@ -589,8 +636,8 @@ export default function JournalTable({
             <td key={k}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
-                    {isReversalVoucher(r) ? <span className="badge badge-storno" title={`Gegenbuchung zu ${stornierungLabel(r.originalVoucherNo || r.originalId)}`}>Storno zu {stornierungLabel(r.originalVoucherNo || r.originalId)}</span> : null}
-                    {isReversedOriginal(r) ? <span className="badge badge-storniert" title={`Storniert durch ${stornierungLabel(r.reversedByVoucherNo || r.reversedById)}`}>storniert durch {stornierungLabel(r.reversedByVoucherNo || r.reversedById)}</span> : null}
+                    {isReversalVoucher(r) && getVoucherById ? <StornoHover linkedId={r.originalId} title="Originalbuchung" eurFmt={eurFmt} fmtDate={fmtDate} getVoucher={getVoucherById} onClick={() => onStornoPairClick?.(r.originalId, r.id)}><span className="badge-storno">Storno zu {stornierungLabel(r.originalVoucherNo || r.originalId)}</span></StornoHover> : null}
+                    {isReversedOriginal(r) && getVoucherById ? <StornoHover linkedId={r.reversedById} title="Stornobuchung" eurFmt={eurFmt} fmtDate={fmtDate} getVoucher={getVoucherById} onClick={() => onStornoPairClick?.(r.id, r.reversedById)}><span className="badge-storniert">storniert durch {stornierungLabel(r.reversedByVoucherNo || r.reversedById)}</span></StornoHover> : null}
                     {r.isAdvancePlaceholder ? <span className="badge badge-advance-placeholder">Vorschuss</span> : null}
                     {(r.tags || []).map((t: string) => {
                         const tagDef = tagDefFor(t)

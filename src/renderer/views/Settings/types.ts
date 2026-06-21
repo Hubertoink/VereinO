@@ -137,6 +137,8 @@ export interface SettingsProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  backgroundContrast: boolean
+  setBackgroundContrast: (v: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
@@ -182,6 +184,8 @@ export interface GeneralPaneProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  backgroundContrast: boolean
+  setBackgroundContrast: (v: boolean) => void
   dateFmt: DateFmt
   setDateFmt: (v: DateFmt) => void
   journalLimit: number

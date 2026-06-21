@@ -111,6 +111,8 @@ export function SettingsView(props: SettingsProps) {
             setCustomBackgroundImage={props.setCustomBackgroundImage}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
+            backgroundContrast={props.backgroundContrast}
+            setBackgroundContrast={props.setBackgroundContrast}
             dateFmt={props.dateFmt}
             setDateFmt={props.setDateFmt}
             journalLimit={props.journalLimit}

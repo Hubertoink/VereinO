@@ -489,11 +489,12 @@ export function listVouchersAdvancedPaged(filters: {
     to?: string
     earmarkId?: number
     budgetId?: number
+    voucherIds?: number[]
     q?: string
     tag?: string
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
@@ -503,6 +504,10 @@ export function listVouchersAdvancedPaged(filters: {
     if (to) { wh.push('v.date <= ?'); params.push(to) }
     if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
     if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
+    if (voucherIds?.length) {
+        wh.push(`v.id IN (${voucherIds.map(() => '?').join(', ')})`)
+        params.push(...voucherIds)
+    }
     {
         const nq = normalizeVoucherSearchQuery(q)
         if (nq) {

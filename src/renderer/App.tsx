@@ -721,6 +721,8 @@ function AppInner() {
         setCustomBackgroundImage,
         glassModals,
         setGlassModals,
+        backgroundContrast,
+        setBackgroundContrast,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
         showBookingEditTabs,
@@ -842,6 +844,7 @@ function AppInner() {
     const [updatePrompt, setUpdatePrompt] = useState<UpdateModalState | null>(null)
     const updatePromptRef = useRef<UpdateModalState | null>(null)
     const autoUpdateCheckInFlight = useRef(false)
+    const startupUpdateNoticeShown = useRef(false)
 
     useEffect(() => {
         updatePromptRef.current = updatePrompt
@@ -900,14 +903,35 @@ function AppInner() {
         return () => { disposed = true }
     }, [])
 
+    const showStartupUpdateNotice = useCallback((state: UpdateModalState) => {
+        if (startupUpdateNoticeShown.current) return
+        startupUpdateNoticeShown.current = true
+        const version = state.availableVersion || state.downloadedVersion
+        notify(
+            'info',
+            version ? `VereinO ${version} ist verfügbar.` : 'Ein Update für VereinO ist verfügbar.',
+            10000,
+            {
+                label: 'Einstellungen öffnen',
+                onClick: () => {
+                    setActivePage('Einstellungen')
+                    window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'general' } }))
+                    }, 0)
+                }
+            }
+        )
+    }, [notify])
+
     useEffect(() => {
         let disposed = false
-        const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
         const off = window.api?.updates?.onStateChanged?.((state) => {
             if (disposed || !state) return
             if (state.status === 'available' || state.status === 'downloaded') {
-                if (autoUpdateCheckInFlight.current || updatePromptRef.current) {
+                if (autoUpdateCheckInFlight.current) {
+                    showStartupUpdateNotice(state as UpdateModalState)
+                } else if (updatePromptRef.current) {
                     setUpdatePrompt(state as UpdateModalState)
                 }
                 return
@@ -925,15 +949,10 @@ function AppInner() {
                 const enabled = (await window.api?.settings?.get?.({ key: 'updates.autoCheck' }))?.value
                 if (enabled === false) return
 
-                const lastAutoCheck = Number((await window.api?.settings?.get?.({ key: 'updates.lastAutoCheck' }))?.value || 0)
-                const now = Date.now()
-                if (lastAutoCheck && now - lastAutoCheck < WEEK_MS) return
-
                 autoUpdateCheckInFlight.current = true
                 const state = await window.api?.updates?.check?.()
-                await window.api?.settings?.set?.({ key: 'updates.lastAutoCheck', value: now })
                 if (!disposed && (state?.status === 'available' || state?.status === 'downloaded')) {
-                    setUpdatePrompt(state as UpdateModalState)
+                    showStartupUpdateNotice(state as UpdateModalState)
                 }
             } catch {
                 // Automatic checks should stay quiet unless an update is actually found.
@@ -946,7 +965,7 @@ function AppInner() {
             disposed = true
             if (typeof off === 'function') off()
         }
-    }, [])
+    }, [showStartupUpdateNotice])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
     
@@ -1882,7 +1901,7 @@ function AppInner() {
             )}
 
             {/* Main content */}
-            <main className="app-main">
+            <main className={`app-main${activePage === 'Buchungen' ? ' app-main--journal' : ''}`}>
                     
                     {activePage === 'Reports' && (
                         <ReportsView
@@ -2037,6 +2056,8 @@ function AppInner() {
                             setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
+                            backgroundContrast={backgroundContrast}
+                            setBackgroundContrast={setBackgroundContrast}
                             showBookingDraftTabs={showBookingDraftTabs}
                             setShowBookingDraftTabs={setShowBookingDraftTabs}
                             showBookingEditTabs={showBookingEditTabs}

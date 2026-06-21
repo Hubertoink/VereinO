@@ -206,6 +206,8 @@ export default function JournalView({
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])
     const [totalRows, setTotalRows] = useState<number>(0)
+    const [stornoPairIds, setStornoPairIds] = useState<[number, number] | null>(null)
+    const voucherTooltipCache = useRef(new Map<number, VoucherRow>())
     const [page, setPage] = useState<number>(() => { 
         try { return Number(localStorage.getItem('journal.page') || '1') } 
         catch { return 1 } 
@@ -455,8 +457,8 @@ export default function JournalView({
     }, [])
 
     const hasActiveFilters = useMemo(() => {
-        return Boolean(activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
-    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo])
+        return Boolean(stornoPairIds || activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
+    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo, stornoPairIds])
 
     const resetAllFilters = useCallback(() => {
         activeSetFilterType(null)
@@ -468,6 +470,7 @@ export default function JournalView({
         activeSetFrom('')
         activeSetTo('')
         activeSetQ('')
+        setStornoPairIds(null)
         activeSetPage(1)
     }, [activeSetFilterBudgetId, activeSetFilterEarmark, activeSetFilterPM, activeSetFilterSphere, activeSetFilterTag, activeSetFilterType, activeSetFrom, activeSetPage, activeSetQ, activeSetTo])
 
@@ -678,6 +681,25 @@ export default function JournalView({
         }
     }, [closeEditModalNow, notify, serializeEditRow, showBookingEditTabs, voucherMutationBlockReason])
 
+    const openBookingEditTab = useCallback(async (tab: BookingEditTab) => {
+        if (!tab.detached) {
+            activateBookingEditTab(tab)
+            return
+        }
+
+        setActiveEditTabId(tab.id)
+        setEditRowInitialSnapshot(tab.initialSnapshot)
+        setEditRowState(null)
+        setConfirmDiscardEdit(false)
+
+        const focusResult = await window.api?.quickAdd?.focusDetached?.({ draftId: tab.id })
+        if (focusResult?.ok) return
+
+        // The user may have closed the detached window while its tab remains open.
+        // Recreate it from the tab state instead of leaving the tab unresponsive.
+        await openDetachedEdit(tab.row)
+    }, [activateBookingEditTab, openDetachedEdit])
+
     useEffect(() => {
         const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
             const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
@@ -727,8 +749,9 @@ export default function JournalView({
             list.push({ key: 'tag', label: `Tag: ${activeFilterTag}`, clear: () => activeSetFilterTag(null), color: tagDef?.color })
         }
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
+        if (stornoPairIds) list.push({ key: 'storno-pair', label: 'Original + Storno', clear: () => setStornoPairIds(null) })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ, stornoPairIds])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -746,6 +769,7 @@ export default function JournalView({
                 to: activeTo || undefined,
                 earmarkId: activeFilterEarmark || undefined,
                 budgetId: activeFilterBudgetId || undefined,
+                voucherIds: stornoPairIds || undefined,
                 q: activeQ.trim() || undefined,
                 tag: activeFilterTag || undefined
             })
@@ -757,7 +781,30 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, notify, refreshKey])
+    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, stornoPairIds, notify, refreshKey])
+
+    const getVoucherById = useCallback(async (id: number) => {
+        const cached = voucherTooltipCache.current.get(id)
+        if (cached) return cached
+        const res = await window.api?.vouchers?.list?.({ limit: 1, voucherIds: [id] })
+        const voucher = res?.rows?.[0]
+        if (voucher) voucherTooltipCache.current.set(id, voucher as VoucherRow)
+        return voucher || null
+    }, [])
+
+    const filterStornoPair = useCallback((originalId: number, reversalId: number) => {
+        activeSetFrom('')
+        activeSetTo('')
+        activeSetFilterSphere(null)
+        activeSetFilterType(null)
+        activeSetFilterPM(null)
+        activeSetFilterEarmark(null)
+        activeSetFilterBudgetId(null)
+        activeSetFilterTag(null)
+        activeSetQ('')
+        activeSetPage(1)
+        setStornoPairIds([originalId, reversalId])
+    }, [activeSetFrom, activeSetTo, activeSetFilterSphere, activeSetFilterType, activeSetFilterPM, activeSetFilterEarmark, activeSetFilterBudgetId, activeSetFilterTag, activeSetQ, activeSetPage])
 
     // Load on mount and filter changes
     useEffect(() => {
@@ -862,7 +909,7 @@ export default function JournalView({
 
     // ==================== RENDER ====================
     return (
-        <>
+        <div className="journal-view">
             {/* Filter Toolbar */}
             <div className="journal-filter-toolbar">
                 <div className="journal-filter-toolbar__search-wrap">
@@ -1138,8 +1185,8 @@ export default function JournalView({
             />
 
             {/* Main Table Card */}
-            <div>
-                <div className="card">
+            <div className="journal-table-section">
+                <div className="card journal-table-card">
                     {bookingTabs.length > 0 && (
                         <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
                             {bookingTabs.map((draft) => (
@@ -1155,15 +1202,7 @@ export default function JournalView({
                                             if (draft.kind === 'edit') {
                                                 const tab = bookingEditTabs.find((entry) => entry.id === draft.id)
                                                 if (!tab) return
-                                                if (tab.detached) {
-                                                    setActiveEditTabId(tab.id)
-                                                    setEditRowInitialSnapshot(tab.initialSnapshot)
-                                                    setEditRowState(null)
-                                                    setConfirmDiscardEdit(false)
-                                                    void window.api?.quickAdd?.focusDetached?.({ draftId: draft.id })
-                                                    return
-                                                }
-                                                activateBookingEditTab(tab)
+                                                void openBookingEditTab(tab)
                                             } else {
                                                 onOpenBookingDraft?.(draft.id)
                                             }
@@ -1218,6 +1257,8 @@ export default function JournalView({
                         tagDefs={tagDefs}
                         eurFmt={eurFmt}
                         fmtDate={(s?: string) => fmtDate(s || '')}
+                        getVoucherById={getVoucherById}
+                        onStornoPairClick={filterStornoPair}
                         onEdit={(r) => {
                             const nextEdit = {
                                 ...r,
@@ -2005,6 +2046,6 @@ export default function JournalView({
                     />
                 )}
             </div>
-        </>
+        </div>
     )
 }

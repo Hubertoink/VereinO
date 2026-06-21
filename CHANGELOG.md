@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.7] - 2026-06-21
+
+### Hinzugefügt
+
+- Darstellung: Optionaler Kontrastmodus für Bildhintergründe verbessert die Lesbarkeit von Karten, Tabellen und farbigen Buchungsbeträgen.
+- Buchungen: Hover-Details für Storno-Verknüpfungen sowie ein Klickfilter für Original- und Gegenbuchung ergänzt.
+- Updates: Beim Start wird nach verfügbaren Versionen gesucht und zehn Sekunden lang ein Hinweis mit direktem Sprung zu den Einstellungen angezeigt.
+
+### Geändert
+
+- Buchungen: Bei geringer Fensterhöhe scrollt nur noch der Tabellenbereich; Suche, Summenübersicht, Pagination und Tabellenkopf bleiben sichtbar.
+- Buchungsfenster: Position und Größe externer Buchungsfenster werden bildschirmübergreifend gespeichert.
+
+### Behoben
+
+- Buchungen: Bearbeitungsreiter öffnen ein manuell geschlossenes externes Buchungsfenster wieder zuverlässig.
+- Buchungen: Der globale Filter-Reset entfernt auch den Filter „Original + Storno“.
+- Buchungen: Storno-Badges verwenden die kompakte Größe der übrigen Tags und Kategorien.
+
 ## [1.9.5] - 2026-06-19
 
 ### Hinzugefügt

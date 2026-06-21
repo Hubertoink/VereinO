@@ -355,6 +355,7 @@ export const VouchersListInput = z
         to: z.string().optional(),
         earmarkId: z.number().optional(),
         budgetId: z.number().optional(),
+        voucherIds: z.array(z.number().int().positive()).min(1).max(2).optional(),
         q: z.string().optional()
         , tag: z.string().optional()
     })

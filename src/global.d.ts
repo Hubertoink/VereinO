@@ -48,7 +48,7 @@ declare global {
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; q?: string; tag?: string }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; voucherIds?: number[]; q?: string; tag?: string }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
@@ -339,9 +339,9 @@ declare global {
                 switch: (payload: { orgId: string }) => Promise<{ success: boolean; org: { id: string; name: string; dbRoot: string } }>
                 rename: (payload: { orgId: string; name: string }) => Promise<{ success: boolean }>
                 delete: (payload: { orgId: string; deleteData?: boolean }) => Promise<{ success: boolean }>
-                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
-                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => Promise<{ success: boolean }>
-                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
+                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean }>
+                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) => Promise<{ success: boolean }>
+                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean }>
                 onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => () => void
             }
             shell: {

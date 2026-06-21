@@ -802,6 +802,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 to: parsed.to,
                 earmarkId: parsed.earmarkId,
                 budgetId: (parsed as any).budgetId,
+                voucherIds: parsed.voucherIds,
                 q: parsed.q,
                 tag: (parsed as any).tag
             })
@@ -2117,13 +2118,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         return getOrganizationAppearance(payload.orgId)
     })
     
-    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
+    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
         return setOrganizationAppearance(payload.orgId, {
             colorTheme: payload.colorTheme,
             backgroundImage: payload.backgroundImage,
             customBackgroundImage: payload.customBackgroundImage,
-            glassModals: payload.glassModals
+            glassModals: payload.glassModals,
+            backgroundContrast: payload.backgroundContrast
         })
     })
     

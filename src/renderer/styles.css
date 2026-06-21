@@ -1922,6 +1922,26 @@ td {
     border: 1px solid color-mix(in oklab, var(--text-dim) 38%, var(--border));
 }
 
+.storno-link-badge {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.storno-link-badge > span {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0;
+}
+
 tbody tr:hover,
 tbody tr:nth-child(even):hover {
     background: color-mix(in oklab, var(--accent) 12%, transparent) !important;
@@ -5629,6 +5649,21 @@ html[data-glass-modals="true"] .settings-pane-card {
     background: color-mix(in oklab, var(--surface) 60%, transparent) !important;
 }
 
+/* Optional readability boost when a photo is visible behind the interface. */
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .card,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .settings-content,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .flyout-popover {
+    background: color-mix(in oklab, var(--surface) 94%, transparent) !important;
+}
+
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-in,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-out,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-transfer,
+html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .filter-totals-stat__value {
+    font-weight: 750;
+    text-shadow: 0 1px 2px var(--surface);
+}
+
 /* ========================================
    Info Icon Button
    ======================================== */
@@ -8527,6 +8562,48 @@ html[data-glass-modals="true"] .flyout-arrow {
 .journal-table-scroll-wrapper .resizable-table {
     min-width: 780px;
     width: max(100%, 780px);
+}
+
+/* Keep the journal controls visible and scroll only the booking rows. */
+.app-main--journal {
+    overflow: hidden;
+}
+
+.journal-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.journal-view > :not(.journal-table-section) {
+    flex-shrink: 0;
+}
+
+.journal-table-section {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.journal-table-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden !important;
+}
+
+.journal-table-card .journal-table-scroll-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.journal-table-card .journal-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
 }
 
 /* Card must not clip horizontal overflow so scroll wrapper works */
