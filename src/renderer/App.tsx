@@ -136,8 +136,14 @@ function voucherRowToBookingForm(row: any) {
         sphere: row?.sphere || 'IDEELL',
         description: row?.description ?? '',
         paymentMethod: row?.paymentMethod ?? undefined,
+        paymentAccountId: row?.paymentAccountId ?? null,
+        paymentAccountName: row?.paymentAccountName ?? null,
         transferFrom: row?.transferFrom ?? undefined,
         transferTo: row?.transferTo ?? undefined,
+        transferFromAccountId: row?.transferFromAccountId ?? null,
+        transferFromAccountName: row?.transferFromAccountName ?? null,
+        transferToAccountId: row?.transferToAccountId ?? null,
+        transferToAccountName: row?.transferToAccountName ?? null,
         mode: row?.amountMode ?? row?.mode ?? ((Number(row?.netAmount ?? 0) > 0 && row?.amountMode !== 'GROSS') ? 'NET' : 'GROSS'),
         netAmount: row?.netAmount ?? undefined,
         grossAmount: row?.grossAmount ?? undefined,
@@ -182,8 +188,11 @@ function serializeBookingForm(row: any) {
         sphere: row.sphere || null,
         description: (row.description || '').trim(),
         paymentMethod: row.paymentMethod || null,
+        paymentAccountId: row.paymentAccountId || null,
         transferFrom: row.transferFrom || null,
         transferTo: row.transferTo || null,
+        transferFromAccountId: row.transferFromAccountId || null,
+        transferToAccountId: row.transferToAccountId || null,
         mode: row.mode || 'GROSS',
         grossAmount: Number(row.grossAmount ?? 0),
         netAmount: Number(row.netAmount ?? 0),
@@ -202,8 +211,8 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
     if (!row?.id) return { error: 'Buchung konnte nicht gespeichert werden: ID fehlt.' }
     const blockReason = voucherMutationBlockReason(row)
     if (blockReason) return { error: blockReason }
-    if (row.type === 'TRANSFER' && (!row.transferFrom || !row.transferTo)) {
-        return { error: 'Bitte wähle eine Richtung für den Transfer aus.' }
+    if (row.type === 'TRANSFER' && (!row.transferFromAccountId || !row.transferToAccountId)) {
+        return { error: 'Bitte wähle Quell- und Zielkonto für den Transfer aus.' }
     }
 
     const budgets = Array.isArray(row.budgets)
@@ -253,15 +262,21 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
 
     if (row.type === 'TRANSFER') {
         payload.paymentMethod = null
+        payload.paymentAccountId = null
         payload.transferFrom = row.transferFrom ?? null
         payload.transferTo = row.transferTo ?? null
+        payload.transferFromAccountId = row.transferFromAccountId ?? null
+        payload.transferToAccountId = row.transferToAccountId ?? null
         payload.grossAmount = Number(row.grossAmount || 0)
         payload.vatRate = 0
         payload.amountMode = 'GROSS'
     } else {
         payload.paymentMethod = row.paymentMethod ?? null
+        payload.paymentAccountId = row.paymentAccountId ?? null
         payload.transferFrom = null
         payload.transferTo = null
+        payload.transferFromAccountId = null
+        payload.transferToAccountId = null
         if ((row.mode ?? 'GROSS') === 'GROSS') {
             payload.grossAmount = Number(row.grossAmount || 0)
             payload.vatRate = 0
@@ -288,6 +303,7 @@ function DetachedQuickAddWindow() {
     const [loaded, setLoaded] = useState(false)
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>>([])
     const [budgets, setBudgets] = useState<Array<{ id: number; year: number; categoryName?: string | null; projectName?: string | null; name?: string | null; startDate?: string | null; endDate?: string | null; color?: string | null; isArchived?: number; enforceTimeRange?: number; earmarkId?: number | null }>>([])
+    const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>>([])
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     const [descSuggest, setDescSuggest] = useState<string[]>([])
     const [windowModeKind, setWindowModeKind] = useState<'create' | 'edit'>('create')
@@ -297,6 +313,7 @@ function DetachedQuickAddWindow() {
     const [editExistingFilesLoading, setEditExistingFilesLoading] = useState(false)
     const [editInitialSnapshot, setEditInitialSnapshot] = useState('')
     const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
+    const [confirmDiscardCreate, setConfirmDiscardCreate] = useState(false)
     const [confirmDeleteEdit, setConfirmDeleteEdit] = useState(false)
 
     const budgetsForEdit = useMemo(() => {
@@ -361,14 +378,16 @@ function DetachedQuickAddWindow() {
         let cancelled = false
         async function loadLookups() {
             try {
-                const [bindingsRes, budgetsRes, tagsRes] = await Promise.all([
+                const [bindingsRes, budgetsRes, paymentAccountsRes, tagsRes] = await Promise.all([
                     window.api?.bindings?.list?.({ activeOnly: true }),
                     window.api?.budgets?.list?.({ includeArchived: true } as any),
+                    window.api?.paymentAccounts?.list?.(),
                     window.api?.tags?.list?.({ includeUsage: true })
                 ])
                 if (cancelled) return
                 setEarmarks((bindingsRes as any)?.rows || [])
                 setBudgets((budgetsRes as any)?.rows || [])
+                setPaymentAccounts((paymentAccountsRes as any)?.rows || [])
                 setTagDefs((tagsRes as any)?.rows || [])
             } catch {
                 if (!cancelled) notify('error', 'Stammdaten für das Buchungsfenster konnten nicht geladen werden.')
@@ -433,9 +452,28 @@ function DetachedQuickAddWindow() {
 
     useEffect(() => {
         if (windowModeKind === 'create' && openedRef.current && loaded && !quickAdd) {
-            window.api?.window?.close?.()
+            window.api?.window?.confirmClose?.()
         }
     }, [loaded, quickAdd, windowModeKind])
+
+    const isCreateDraftDirty = useCallback(() => {
+        if (!qa) return false
+        const draft = qa as any
+        const textFields = ['description', 'voucherNo', 'note', 'receiptNo']
+        if (textFields.some((key) => String(draft?.[key] ?? '').trim())) return true
+        if (Number(draft?.grossAmount || 0) > 0 || Number(draft?.netAmount || 0) > 0) return true
+        if (draft?.budgetId || draft?.earmarkId || draft?.tagIds?.length) return true
+        if (files.length > 0) return true
+        return false
+    }, [files.length, qa])
+
+    const requestCloseDetachedCreate = useCallback(() => {
+        if (isCreateDraftDirty()) {
+            setConfirmDiscardCreate(true)
+            return
+        }
+        window.api?.window?.confirmClose?.()
+    }, [isCreateDraftDirty])
 
     useEffect(() => {
         const draftId = detachedDraftIdRef.current
@@ -496,7 +534,7 @@ function DetachedQuickAddWindow() {
             const warnings = (res as any)?.warnings as string[] | undefined
             if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
             await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'edit' })
-            window.api?.window?.close?.()
+            window.api?.window?.confirmClose?.()
         } catch (e: any) {
             notify('error', friendlyVoucherError(e))
         }
@@ -507,8 +545,18 @@ function DetachedQuickAddWindow() {
             setConfirmDiscardEdit(true)
             return
         }
-        window.api?.window?.close?.()
+        window.api?.window?.confirmClose?.()
     }, [editFiles.length, editInitialSnapshot, editQa])
+
+    useEffect(() => {
+        return window.api?.window?.onCloseRequested?.(() => {
+            if (windowModeKind === 'edit') {
+                requestCloseDetachedEdit()
+                return
+            }
+            requestCloseDetachedCreate()
+        })
+    }, [requestCloseDetachedCreate, requestCloseDetachedEdit, windowModeKind])
 
     const deleteDetachedEdit = useCallback(async () => {
         if (!editQa?.id) return
@@ -528,7 +576,7 @@ function DetachedQuickAddWindow() {
                 notify('success', `Storno erstellt: #${res?.voucherNo || ''}`)
                 await window.api?.quickAdd?.notifySaved?.({ id: res?.id, originalId: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'reverse' })
             }
-            window.api?.window?.close?.()
+            window.api?.window?.confirmClose?.()
         } catch (e: any) {
             notify('error', e?.message || String(e))
         }
@@ -587,11 +635,11 @@ function DetachedQuickAddWindow() {
                             <div className="helper">Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen</div>
                         </div>
                     )}
-                    onClose={() => window.api?.window?.close?.()}
+                    onClose={requestCloseDetachedEdit}
                     onRequestClose={requestCloseDetachedEdit}
                     confirmingClose={confirmDiscardEdit}
-                    onConfirmDiscard={() => window.api?.window?.close?.()}
-                    onCancelDiscard={() => setConfirmDiscardEdit(false)}
+                    onConfirmDiscard={() => window.api?.window?.confirmClose?.()}
+                    onCancelDiscard={() => { setConfirmDiscardEdit(false); void window.api?.window?.cancelClose?.() }}
                     files={editFiles}
                     setFiles={setEditFiles}
                     openFilePicker={() => {
@@ -614,6 +662,7 @@ function DetachedQuickAddWindow() {
                     eurFmt={eurFmt}
                     budgetsForEdit={budgetsForEdit}
                     earmarks={earmarks}
+                    paymentAccounts={paymentAccounts}
                     tagDefs={tagDefs}
                     descSuggest={descSuggest}
                     title={bookingEditTitle(editQa)}
@@ -677,8 +726,8 @@ function DetachedQuickAddWindow() {
             onSaveAndNew={() => onQuickSave('new')}
             onSaveAndClose={() => onQuickSave('close')}
             afterSaveDefault={quickAddAfterSave}
-            onClose={() => window.api?.window?.close?.()}
-            onRequestClose={() => window.api?.window?.close?.()}
+            onClose={requestCloseDetachedCreate}
+            onRequestClose={requestCloseDetachedCreate}
             files={files}
             setFiles={setFiles}
             openFilePicker={openFilePicker}
@@ -688,9 +737,13 @@ function DetachedQuickAddWindow() {
             eurFmt={eurFmt}
             budgetsForEdit={budgetsForEdit}
             earmarks={earmarks}
+            paymentAccounts={paymentAccounts}
             tagDefs={tagDefs}
             descSuggest={descSuggest}
             windowMode
+            confirmingClose={confirmDiscardCreate}
+            onConfirmDiscard={() => window.api?.window?.confirmClose?.()}
+            onCancelDiscard={() => { setConfirmDiscardCreate(false); void window.api?.window?.cancelClose?.() }}
         />
     )
 }
@@ -721,8 +774,6 @@ function AppInner() {
         setCustomBackgroundImage,
         glassModals,
         setGlassModals,
-        backgroundContrast,
-        setBackgroundContrast,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
         showBookingEditTabs,
@@ -1557,6 +1608,7 @@ function AppInner() {
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
+    const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
@@ -1571,6 +1623,7 @@ function AppInner() {
     const [reportsFilterBudgetId, setReportsFilterBudgetId] = useState<number | null>(null)
     // Global Zweckbindungen (earmarks) for filters/tables
     const [earmarks, setEarmarks] = useState<Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>>([])
+    const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>>([])
     async function loadEarmarks() {
         try {
             const res = await window.api?.bindings?.list?.({ activeOnly: true })
@@ -1578,9 +1631,16 @@ function AppInner() {
             setEarmarks(rows)
         } catch { /* ignore */ }
     }
+    async function loadPaymentAccounts() {
+        try {
+            const res = await window.api?.paymentAccounts?.list?.()
+            setPaymentAccounts((res as any)?.rows || [])
+        } catch { /* ignore */ }
+    }
     useEffect(() => {
         loadEarmarks()
-        const onChanged = () => loadEarmarks()
+        loadPaymentAccounts()
+        const onChanged = () => { loadEarmarks(); loadPaymentAccounts() }
         window.addEventListener('data-changed', onChanged)
         return () => window.removeEventListener('data-changed', onChanged)
     }, [])
@@ -1591,7 +1651,10 @@ function AppInner() {
         if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
         if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
-        if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
+        if (filterPaymentAccountId != null) {
+            const account = paymentAccounts.find((item) => item.id === filterPaymentAccountId)
+            list.push({ key: 'payment-account', label: `Zahlweg: ${account?.name || `#${filterPaymentAccountId}`}`, clear: () => setFilterPaymentAccountId(null) })
+        } else if (filterPM) list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
         if (filterEarmark != null) {
             const em = earmarks.find(e => e.id === filterEarmark)
             list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + filterEarmark}` , clear: () => setFilterEarmark(null) })
@@ -1603,7 +1666,7 @@ function AppInner() {
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
     if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '?' : ''), clear: () => setQ('') })
         return list
-    }, [from, to, filterSphere, filterType, filterPM, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q])
+    }, [from, to, filterSphere, filterType, filterPM, filterPaymentAccountId, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, paymentAccounts])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
     const activeChips = chips
 
@@ -1693,6 +1756,7 @@ function AppInner() {
                 sort: sortDir,
                 sortBy,
                 paymentMethod: filterPM || undefined,
+                paymentAccountId: filterPaymentAccountId || undefined,
                 sphere: filterSphere || undefined,
                 type: filterType || undefined,
                 from: from || undefined,
@@ -1709,7 +1773,7 @@ function AppInner() {
         } catch (e: any) {
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
-    }, [journalLimit, page, sortDir, sortBy, filterPM, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag])
+    }, [journalLimit, page, sortDir, sortBy, filterPM, filterPaymentAccountId, filterSphere, filterType, from, to, filterEarmark, filterBudgetId, q, filterTag])
 
     // Load vouchers whenever filters or page change
     useEffect(() => {
@@ -1941,6 +2005,7 @@ function AppInner() {
                                 setFilterTag(null)
                                 setFilterType(null)
                                 setFilterPM(null)
+                                setFilterPaymentAccountId(null)
                                 setFilterSphere(null)
                                 setQ(voucherId ? `#${voucherId}` : '')
 
@@ -1982,6 +2047,7 @@ function AppInner() {
                             yearsAvail={yearsAvail}
                             budgets={budgets}
                             earmarks={earmarks}
+                            paymentAccounts={paymentAccounts}
                             tagDefs={tagDefs}
                             budgetsForEdit={budgetsForEdit}
                             budgetNames={budgetNames}
@@ -2000,6 +2066,7 @@ function AppInner() {
                             filterSphere={filterSphere}
                             filterType={filterType}
                             filterPM={filterPM}
+                            filterPaymentAccountId={filterPaymentAccountId}
                             filterEarmark={filterEarmark}
                             filterBudgetId={filterBudgetId}
                             filterTag={filterTag}
@@ -2009,6 +2076,7 @@ function AppInner() {
                             setFilterSphere={setFilterSphere}
                             setFilterType={setFilterType}
                             setFilterPM={setFilterPM}
+                            setFilterPaymentAccountId={setFilterPaymentAccountId}
                             setFilterEarmark={setFilterEarmark}
                             setFilterBudgetId={setFilterBudgetId}
                             setFilterTag={setFilterTag}
@@ -2056,8 +2124,6 @@ function AppInner() {
                             setCustomBackgroundImage={setCustomBackgroundImage}
                             glassModals={glassModals}
                             setGlassModals={setGlassModals}
-                            backgroundContrast={backgroundContrast}
-                            setBackgroundContrast={setBackgroundContrast}
                             showBookingDraftTabs={showBookingDraftTabs}
                             setShowBookingDraftTabs={setShowBookingDraftTabs}
                             showBookingEditTabs={showBookingEditTabs}
@@ -2070,6 +2136,8 @@ function AppInner() {
                             setQuickAddAfterSave={setQuickAddAfterSave}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
+                            paymentAccounts={paymentAccounts}
+                            setPaymentAccounts={setPaymentAccounts}
                             notify={notify}
                             bumpDataVersion={bumpDataVersion}
                             openTagsManager={() => setShowTagsManager(true)}
@@ -2093,6 +2161,7 @@ function AppInner() {
                                 setFilterTag(null)
                                 setFilterType(null)
                                 setFilterPM(null)
+                                setFilterPaymentAccountId(null)
                                 setFilterSphere(null)
                                 setQ('')
                                 setFrom('')
@@ -2117,6 +2186,7 @@ function AppInner() {
                                 setFilterTag(null)
                                 setFilterType(null)
                                 setFilterPM(null)
+                                setFilterPaymentAccountId(null)
                                 setFilterSphere(null)
                                 setQ('')
                                 setFrom('')
@@ -2185,6 +2255,7 @@ function AppInner() {
                     eurFmt={eurFmt}
                     budgetsForEdit={budgetsForEdit}
                     earmarks={earmarks}
+                    paymentAccounts={paymentAccounts}
                     tagDefs={tagDefs}
                     descSuggest={descSuggest}
                 />

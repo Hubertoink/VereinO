@@ -1,36 +1,56 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { PaymentMethod, Sphere, VoucherType } from './types'
+import { Sphere, VoucherType } from './types'
+
+type PaymentAccountSummaryRow = {
+  accountId: number | null
+  key: string
+  color?: string | null
+  gross: number
+}
+
+type AccountBarRow = {
+  key: string
+  label: string
+  color?: string | null
+  inGross: number
+  outGross: number
+}
 
 export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<Array<{ key: PaymentMethod; inGross: number; outGross: number }>>([])
+  const [data, setData] = useState<AccountBarRow[]>([])
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    // Query per payment method instead of per type, so TRANSFERs are correctly
-    // included: a TRANSFER BAR→BANK counts as OUT for BAR and IN for BANK.
-    const keys: Array<PaymentMethod> = ['BAR', 'BANK']
+    const requestedTypes: Array<'IN' | 'OUT'> = props.type === 'IN' ? ['IN'] : props.type === 'OUT' ? ['OUT'] : ['IN', 'OUT']
     Promise.all(
-      keys.map(pm =>
+      requestedTypes.map(type =>
         (window as any).api?.reports.summary?.({
           from: props.from, to: props.to, sphere: props.sphere,
-          type: props.type, paymentMethod: pm,
+          type,
           earmarkId: props.earmarkId, budgetId: props.budgetId
         })
       )
     ).then((results) => {
       if (cancelled) return
-      const mapped = keys.map((pm, i) => {
-        const res = results[i]
-        const byType = (res?.byType || []) as Array<{ key: string; gross: number }>
-        const inGross = byType.find(t => t.key === 'IN')?.gross || 0
-        const outGross = byType.find(t => t.key === 'OUT')?.gross || 0
-        return { key: pm, inGross, outGross }
+      const rows = new Map<string, AccountBarRow>()
+      const mergeRows = (items: PaymentAccountSummaryRow[], field: 'inGross' | 'outGross') => {
+        for (const item of items) {
+          const key = item.accountId == null ? `legacy:${item.key}` : `account:${item.accountId}`
+          const existing = rows.get(key) || { key, label: item.key, color: item.color, inGross: 0, outGross: 0 }
+          existing.label = item.key || existing.label
+          existing.color = item.color || existing.color
+          existing[field] += Number(item.gross || 0)
+          rows.set(key, existing)
+        }
+      }
+      results.forEach((result, index) => {
+        mergeRows(((result?.byPaymentAccount || []) as PaymentAccountSummaryRow[]), requestedTypes[index] === 'IN' ? 'inGross' : 'outGross')
       })
-      setData(mapped)
+      setData(Array.from(rows.values()).filter(row => row.inGross || row.outGross))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [props.from, props.to, props.sphere, props.type, props.earmarkId, props.budgetId, props.refreshKey])
@@ -78,10 +98,9 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
             const idx = hoverIdx
             if (idx == null || !data[idx]) return null
             const r = data[idx]
-            const label = r.key
             return (
               <div className="chart-tooltip">
-                <div className="chart-tooltip-header">{label}</div>
+                <div className="chart-tooltip-header">{r.label}</div>
                 <div className="chart-tooltip-row"><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(r.inGross)}</strong></div>
                 <div className="chart-tooltip-row"><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(r.outGross))}</strong></div>
               </div>
@@ -100,10 +119,9 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
               const inX = xFor(r.inGross)
               const outX = xFor(r.outGross)
               const yBar = y + 8
-              const label = r.key
               return (
                 <g key={(r.key ?? 'NULL') + i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
-                  <text x={margin.left - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle" fontSize="12">{label}</text>
+                  <text x={margin.left - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle" fontSize="12">{r.label}</text>
                   <rect x={margin.left} y={yBar} width={Math.max(0, inX - margin.left)} height={10} fill="#2e7d32" rx={3} />
                   <rect x={margin.left} y={yBar + 12} width={Math.max(0, outX - margin.left)} height={10} fill="#c62828" rx={3} />
                 </g>

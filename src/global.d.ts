@@ -9,6 +9,7 @@ declare global {
                 isMaximized: () => Promise<boolean>
                 close: () => Promise<{ ok: boolean }>
                 confirmClose: () => Promise<{ ok: boolean }>
+                cancelClose: () => Promise<{ ok: boolean }>
                 onMaximizeChanged: (cb: (isMax: boolean) => void) => () => void
                 onCloseRequested: (cb: () => void) => () => void
             }
@@ -34,8 +35,11 @@ declare global {
                     grossAmount?: number
                     vatRate: number
                     paymentMethod?: 'BAR' | 'BANK'
+                    paymentAccountId?: number | null
                     transferFrom?: 'BAR' | 'BANK'
                     transferTo?: 'BAR' | 'BANK'
+                    transferFromAccountId?: number | null
+                    transferToAccountId?: number | null
                     categoryId?: number
                     projectId?: number
                     earmarkId?: number
@@ -48,7 +52,7 @@ declare global {
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; voucherIds?: number[]; q?: string; tag?: string }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; paymentAccountId?: number | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; voucherIds?: number[]; q?: string; tag?: string }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
@@ -56,8 +60,20 @@ declare global {
                         type: 'IN' | 'OUT' | 'TRANSFER'
                         sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
                         paymentMethod?: 'BAR' | 'BANK' | null
+                        paymentAccountId?: number | null
+                        paymentAccountName?: string | null
+                        paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+                        paymentAccountColor?: string | null
                         transferFrom?: 'BAR' | 'BANK' | null
                         transferTo?: 'BAR' | 'BANK' | null
+                        transferFromAccountId?: number | null
+                        transferFromAccountName?: string | null
+                        transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+                        transferFromAccountColor?: string | null
+                        transferToAccountId?: number | null
+                        transferToAccountName?: string | null
+                        transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+                        transferToAccountColor?: string | null
                         description?: string | null
                         netAmount: number
                         vatRate: number
@@ -77,13 +93,18 @@ declare global {
                     }>
                     total: number
                 }>
-                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
-                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
+                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; paymentAccountName?: string | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
+                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; transferFromAccountId?: number | null; transferToAccountId?: number | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
                 delete: (payload: { id: number }) => Promise<{ id: number }>
                 batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
                 batchAssignBudget: (payload: { budgetId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
                 batchAssignTags: (payload: { tags: string[]; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string }) => Promise<{ updated: number }>
                 clearAll: () => Promise<{ deleted: number }>
+            }
+            paymentAccounts: {
+                list: (payload?: { activeOnly?: boolean }) => Promise<{ rows: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }> }>
+                upsert: (payload: { id?: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder?: number; isActive?: boolean }) => Promise<{ id: number }>
+                delete: (payload: { id: number }) => Promise<{ id: number }>
             }
             tags: {
                 list: (payload?: { q?: string; includeUsage?: boolean }) => Promise<{ rows: Array<{ id: number; name: string; color?: string | null; usage?: number }> }>
@@ -176,7 +197,7 @@ declare global {
                 exportTreasurer: (payload: any) => Promise<{ filePath: string }>
                 summary: (payload: any) => Promise<any>
                 monthly: (payload: any) => Promise<any>
-                cashBalance: (payload: any) => Promise<{ BAR: number; BANK: number }>
+                cashBalance: (payload: any) => Promise<{ BAR: number; BANK: number; accounts?: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; color?: string | null; balance: number; sortOrder: number; isActive: number }> }>
                 years: () => Promise<{ years: number[] }>
             }
             activityReports: {
@@ -339,9 +360,9 @@ declare global {
                 switch: (payload: { orgId: string }) => Promise<{ success: boolean; org: { id: string; name: string; dbRoot: string } }>
                 rename: (payload: { orgId: string; name: string }) => Promise<{ success: boolean }>
                 delete: (payload: { orgId: string; deleteData?: boolean }) => Promise<{ success: boolean }>
-                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean }>
-                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) => Promise<{ success: boolean }>
-                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean; backgroundContrast: boolean }>
+                getAppearance: (payload: { orgId: string }) => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
+                setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => Promise<{ success: boolean }>
+                activeAppearance: () => Promise<{ colorTheme: string | null; backgroundImage: string | null; customBackgroundImage: string | null; glassModals: boolean }>
                 onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => () => void
             }
             shell: {

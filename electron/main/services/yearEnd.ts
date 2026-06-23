@@ -25,7 +25,16 @@ export async function preview(year: number) {
         gross: round2(Number(inType.gross || 0) - Number(outType.gross || 0))
         // Note: net and vat remain as simple sums to preserve existing breakdown expectations
     }
-    return { year, from, to, totals: adjustedTotals, bySphere: summary.bySphere, byPaymentMethod: summary.byPaymentMethod, byType: summary.byType, cashBalance }
+    return { year, from, to, totals: adjustedTotals, bySphere: summary.bySphere, byPaymentMethod: summary.byPaymentMethod, byPaymentAccount: (summary as any).byPaymentAccount, byType: summary.byType, cashBalance }
+}
+
+function paymentAccountLabel(row: any) {
+    if (row?.type === 'TRANSFER') {
+        const from = row.transferFromAccountName || (row.transferFrom === 'BAR' ? 'Bar' : row.transferFrom === 'BANK' ? 'Bank' : '')
+        const to = row.transferToAccountName || (row.transferTo === 'BAR' ? 'Bar' : row.transferTo === 'BANK' ? 'Bank' : '')
+        return from && to ? `${from} -> ${to}` : 'Transfer'
+    }
+    return row?.paymentAccountName || (row?.paymentMethod === 'BAR' ? 'Bar' : row?.paymentMethod === 'BANK' ? 'Bank' : '')
 }
 
 export async function exportPackage(year: number): Promise<{ filePath: string }> {
@@ -76,6 +85,19 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
     ws1.getColumn(2).width = Math.max(ws1.getColumn(2).width || 0, 16)
     ws1.getColumn(3).width = Math.max(ws1.getColumn(3).width || 0, 16)
 
+    ws1.addRow([])
+    ws1.addRow(['Nach Zahlungskonto', '', ''])
+    ws1.getRow(ws1.rowCount).font = { bold: true }
+    ws1.addRow(['Konto', 'Brutto', 'Netto'])
+    const paymentAccountRows = Array.isArray((summary as any).byPaymentAccount) && (summary as any).byPaymentAccount.length
+        ? (summary as any).byPaymentAccount
+        : summary.byPaymentMethod.map((p: any) => ({ key: p.key === 'BAR' ? 'Bar' : p.key === 'BANK' ? 'Bank' : 'Ohne Konto', gross: p.gross, net: p.net }))
+    for (const account of paymentAccountRows) {
+        const r = ws1.addRow([account.key, account.gross, account.net])
+        r.getCell(2).numFmt = CURRENCY_FMT
+        r.getCell(3).numFmt = CURRENCY_FMT
+    }
+
     // Journal sheet
     const rows = listVouchersAdvanced({ from, to, limit: 200000 })
     const ws2 = wb.addWorksheet('Journal')
@@ -91,7 +113,7 @@ export async function exportPackage(year: number): Promise<{ filePath: string }>
             r.sphere,
             r.description ?? '',
             status,
-            r.paymentMethod ?? '',
+            paymentAccountLabel(r),
             Number(r.netAmount?.toFixed?.(2) ?? r.netAmount),
             Number(r.vatAmount?.toFixed?.(2) ?? r.vatAmount),
             Number(r.grossAmount?.toFixed?.(2) ?? r.grossAmount),

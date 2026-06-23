@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.9.8] - 2026-06-23
+
+### Hinzugefügt
+
+- Zahlwege: Eigene Zahlungswege wie Bankkonten, PayPal oder Karten lassen sich jetzt separat verwalten, einfärben und Buchungen direkt zuweisen.
+- Buchungsjournal: Hover-Übersichten für Zahlwege zeigen Einnahmen, Ausgaben, Saldo, Gesamtbetrag und Buchungsanzahl; ein Klick auf den Zahlweg aktiviert direkt den passenden Filter.
+
+### Geändert
+
+- Auswertungen und Exporte: Berichte, Dashboard-Zusammenfassungen sowie PDF/XLS-Ausgaben verwenden jetzt konsequent die tatsächlichen Zahlwege statt nur `Bar` und `Bank`.
+- Einstellungen: Der separate Kontrastmodus für Bildhintergründe entfällt, weil der Glaseffekt dieselbe Aufgabe ohne zusätzliche Option abdeckt.
+
+### Behoben
+
+- Datenbank: Neue Organisationen erhalten Zahlungsweg-Tabellen und zugehoerige Buchungsspalten jetzt auch bei frischen Datenbanken vollstaendig, ohne nachtraegliche Schemafehler.
+- Fensterverhalten: Abgedockte Buchungsfenster werden beim Schliessen des Hauptfensters sauber mit beendet.
+
 ## [1.9.7] - 2026-06-21
 
 ### Hinzugefügt

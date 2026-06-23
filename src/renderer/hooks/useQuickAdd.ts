@@ -9,9 +9,15 @@ type QA = {
     vatRate: number
     description: string
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
+    paymentAccountName?: string | null
     mode?: 'NET' | 'GROSS'
     transferFrom?: 'BAR' | 'BANK'
     transferTo?: 'BAR' | 'BANK'
+    transferFromAccountId?: number | null
+    transferFromAccountName?: string | null
+    transferToAccountId?: number | null
+    transferToAccountName?: string | null
     budgetId?: number | null
     earmarkId?: number | null
     budgets?: Array<{ budgetId: number; amount: number }>
@@ -141,9 +147,15 @@ export function useQuickAdd(
         if (previous.type === 'TRANSFER') {
             next.transferFrom = (previous as any).transferFrom || 'BAR'
             next.transferTo = (previous as any).transferTo || 'BANK'
+            next.transferFromAccountId = (previous as any).transferFromAccountId ?? null
+            next.transferFromAccountName = (previous as any).transferFromAccountName ?? null
+            next.transferToAccountId = (previous as any).transferToAccountId ?? null
+            next.transferToAccountName = (previous as any).transferToAccountName ?? null
             next.grossAmount = undefined
         } else {
             next.paymentMethod = previous.paymentMethod || getBookingHabits().paymentMethod
+            next.paymentAccountId = (previous as any).paymentAccountId ?? null
+            next.paymentAccountName = (previous as any).paymentAccountName ?? null
             if (mode === 'NET') next.netAmount = undefined
             else next.grossAmount = undefined
         }
@@ -270,8 +282,12 @@ export function useQuickAdd(
         }
 
         // Validate transfer direction
-        if (activeDraft.qa.type === 'TRANSFER' && (!(activeDraft.qa as any).transferFrom || !(activeDraft.qa as any).transferTo)) {
-            notify?.('error', 'Bitte wähle eine Richtung für den Transfer aus.')
+        if (activeDraft.qa.type === 'TRANSFER' && (!(activeDraft.qa as any).transferFromAccountId || !(activeDraft.qa as any).transferToAccountId)) {
+            notify?.('error', 'Bitte wähle Quell- und Zielkonto für den Transfer aus.')
+            return
+        }
+        if (activeDraft.qa.type !== 'TRANSFER' && !(activeDraft.qa as any).paymentAccountId) {
+            notify?.('error', 'Bitte wähle ein Konto für die Buchung aus.')
             return
         }
         
@@ -287,13 +303,19 @@ export function useQuickAdd(
             delete payload.paymentMethod
             payload.transferFrom = (activeDraft.qa as any).transferFrom
             payload.transferTo = (activeDraft.qa as any).transferTo
+            payload.paymentAccountId = null
+            payload.transferFromAccountId = (activeDraft.qa as any).transferFromAccountId ?? null
+            payload.transferToAccountId = (activeDraft.qa as any).transferToAccountId ?? null
             payload.vatRate = 0
             payload.grossAmount = (activeDraft.qa as any).grossAmount ?? 0
             delete payload.netAmount
         } else {
             payload.paymentMethod = activeDraft.qa.paymentMethod
+            payload.paymentAccountId = (activeDraft.qa as any).paymentAccountId ?? null
             payload.transferFrom = undefined
             payload.transferTo = undefined
+            payload.transferFromAccountId = null
+            payload.transferToAccountId = null
         }
         
         if (activeDraft.qa.mode === 'GROSS') {

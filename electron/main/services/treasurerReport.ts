@@ -49,6 +49,23 @@ function voucherDescriptionHtml(row: any) {
   return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
 }
 
+function paymentAccountLabel(row: any) {
+  if (row?.type === 'TRANSFER') {
+    const from = row.transferFromAccountName || (row.transferFrom === 'BAR' ? 'Bar' : row.transferFrom === 'BANK' ? 'Bank' : '')
+    const to = row.transferToAccountName || (row.transferTo === 'BAR' ? 'Bar' : row.transferTo === 'BANK' ? 'Bank' : '')
+    return from && to ? `${from} -> ${to}` : 'Transfer'
+  }
+  return row?.paymentAccountName || (row?.paymentMethod === 'BAR' ? 'Bar' : row?.paymentMethod === 'BANK' ? 'Bank' : '—')
+}
+
+function paymentAccountIcon(kind?: string | null) {
+  if (kind === 'CASH') return '💵'
+  if (kind === 'BANK') return '🏦'
+  if (kind === 'PAYPAL') return 'P'
+  if (kind === 'CARD') return '💳'
+  return '•'
+}
+
 export async function generateTreasurerReportPDF(options: TreasurerReportOptions): Promise<{ filePath: string }> {
   const {
     fiscalYear,
@@ -80,7 +97,13 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
 
   // 1. Cash balance as of the selected cut-off date
   const currentBalance = cashBalance({ to: cashBalanceAsOf })
-  const totalBalance = (currentBalance.BAR || 0) + (currentBalance.BANK || 0)
+  const currentAccountBalances = Array.isArray((currentBalance as any).accounts) && (currentBalance as any).accounts.length
+    ? (currentBalance as any).accounts
+    : [
+        { name: 'Bar', kind: 'CASH', balance: currentBalance.BAR || 0 },
+        { name: 'Bank', kind: 'BANK', balance: currentBalance.BANK || 0 }
+      ]
+  const totalBalance = currentAccountBalances.reduce((sum: number, account: any) => sum + Number(account.balance || 0), 0)
 
   // 2. Summary for fiscal year
   const summary = summarizeVouchers({ from, to } as any)
@@ -482,14 +505,12 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   <!-- 1. Kassenstand zum Stichtag -->
   <h2>${nextSection()}. Kassenstand zum ${fmtDate(cashBalanceAsOf)}</h2>
   <div class="kpi-grid">
-    <div class="kpi-box">
-      <div class="kpi-label">💵 Bargeld (Bar)</div>
-      <div class="kpi-value neutral">${esc(euro(currentBalance.BAR || 0))}</div>
+    ${currentAccountBalances.map((account: any) => `
+    <div class="kpi-box" style="border-left: 4px solid ${esc(account.color || '#999')};">
+      <div class="kpi-label">${paymentAccountIcon(account.kind)} ${esc(account.name || 'Konto')}</div>
+      <div class="kpi-value neutral">${esc(euro(account.balance || 0))}</div>
     </div>
-    <div class="kpi-box">
-      <div class="kpi-label">🏦 Bankkonto</div>
-      <div class="kpi-value neutral">${esc(euro(currentBalance.BANK || 0))}</div>
-    </div>
+    `).join('')}
     <div class="kpi-box" style="border-color: #1565c0; border-width: 2px;">
       <div class="kpi-label">Gesamt</div>
       <div class="kpi-value kpi-big ${totalBalance >= 0 ? 'positive' : 'negative'}">${esc(euro(totalBalance))}</div>
@@ -757,7 +778,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
           <td class="nowrap">${r.type === 'IN' ? '↓ E' : r.type === 'OUT' ? '↑ A' : '⇄ U'}</td>
           <td><span class="sphere-badge" style="background:${spheres.find(s=>s.key===r.sphere)?.bg||'#eee'};color:${spheres.find(s=>s.key===r.sphere)?.color||'#333'}">${esc(r.sphere || '—')}</span></td>
           <td>${voucherDescriptionHtml(r)}</td>
-          <td class="nowrap">${r.paymentMethod === 'BAR' ? '💵 Bar' : r.paymentMethod === 'BANK' ? '🏦 Bank' : '—'}</td>
+          <td class="nowrap">${esc(paymentAccountLabel(r))}</td>
           <td class="number ${r.type === 'IN' ? 'positive' : 'negative'}">${euro(r.grossAmount)}</td>
           ${includeTags ? `<td>${Array.isArray(r.tags) && r.tags.length ? r.tags.map((t: string) => esc(t)).join(', ') : '—'}</td>` : ''}
         </tr>

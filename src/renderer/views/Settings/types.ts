@@ -15,6 +15,7 @@ export type TileKey =
   | 'import'
   | 'org'
   | 'donations'
+  | 'paymentAccounts'
   | 'tags'
   | 'cashCheck'
   | 'yearEnd'
@@ -100,6 +101,16 @@ export interface TagDef {
   usage?: number
 }
 
+export interface PaymentAccount {
+  id: number
+  name: string
+  kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
+  iban?: string | null
+  color?: string | null
+  sortOrder: number
+  isActive: number
+}
+
 // ============================================================================
 // Settings Props (Main Component Interface)
 // ============================================================================
@@ -137,8 +148,6 @@ export interface SettingsProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
-  backgroundContrast: boolean
-  setBackgroundContrast: (v: boolean) => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
@@ -153,6 +162,8 @@ export interface SettingsProps {
   // Tags
   tagDefs: TagDef[]
   setTagDefs: React.Dispatch<React.SetStateAction<TagDef[]>>
+  paymentAccounts: PaymentAccount[]
+  setPaymentAccounts: React.Dispatch<React.SetStateAction<PaymentAccount[]>>
 
   // Callbacks
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
@@ -184,8 +195,6 @@ export interface GeneralPaneProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
-  backgroundContrast: boolean
-  setBackgroundContrast: (v: boolean) => void
   dateFmt: DateFmt
   setDateFmt: (v: DateFmt) => void
   journalLimit: number
@@ -228,6 +237,13 @@ export interface TagsPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openTagsManager?: () => void
+}
+
+export interface PaymentAccountsPaneProps {
+  paymentAccounts: PaymentAccount[]
+  setPaymentAccounts: React.Dispatch<React.SetStateAction<PaymentAccount[]>>
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
+  bumpDataVersion: () => void
 }
 
 export interface OrgPaneProps {

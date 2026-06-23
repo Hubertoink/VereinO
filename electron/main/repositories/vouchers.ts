@@ -6,6 +6,7 @@ import { ensurePeriodOpen, getSetting } from '../services/settings'
 import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
+import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 
 type DB = InstanceType<typeof Database>
 
@@ -32,6 +33,62 @@ function getAdvancePlaceholderRef(d: DB, voucherId: number) {
         `).get(voucherId) as any
 }
 
+function resolveVoucherPaymentFields(
+    d: DB,
+    input: {
+        type?: 'IN' | 'OUT' | 'TRANSFER'
+        paymentMethod?: 'BAR' | 'BANK' | null
+        transferFrom?: 'BAR' | 'BANK' | null
+        transferTo?: 'BAR' | 'BANK' | null
+        paymentAccountId?: number | null
+        transferFromAccountId?: number | null
+        transferToAccountId?: number | null
+    },
+    current?: {
+        type?: 'IN' | 'OUT' | 'TRANSFER'
+        paymentMethod?: 'BAR' | 'BANK' | null
+        transferFrom?: 'BAR' | 'BANK' | null
+        transferTo?: 'BAR' | 'BANK' | null
+        paymentAccountId?: number | null
+        transferFromAccountId?: number | null
+        transferToAccountId?: number | null
+    }
+) {
+    const nextType = input.type ?? current?.type ?? 'IN'
+
+    if (nextType === 'TRANSFER') {
+        const fromId = input.transferFromAccountId ?? current?.transferFromAccountId ?? (input.transferFrom ? getDefaultPaymentAccountIdForMethod(input.transferFrom, d) : null) ?? (current?.transferFrom ? getDefaultPaymentAccountIdForMethod(current.transferFrom, d) : null)
+        const toId = input.transferToAccountId ?? current?.transferToAccountId ?? (input.transferTo ? getDefaultPaymentAccountIdForMethod(input.transferTo, d) : null) ?? (current?.transferTo ? getDefaultPaymentAccountIdForMethod(current.transferTo, d) : null)
+        const fromAccount = fromId ? getPaymentAccountById(fromId, d) : undefined
+        const toAccount = toId ? getPaymentAccountById(toId, d) : undefined
+        return {
+            paymentAccountId: null,
+            paymentMethod: null,
+            transferFromAccountId: fromId ?? null,
+            transferFrom: paymentMethodForAccountKind(fromAccount?.kind) ?? input.transferFrom ?? current?.transferFrom ?? null,
+            transferToAccountId: toId ?? null,
+            transferTo: paymentMethodForAccountKind(toAccount?.kind) ?? input.transferTo ?? current?.transferTo ?? null,
+            paymentAccountName: null,
+            transferFromAccountName: fromAccount?.name ?? null,
+            transferToAccountName: toAccount?.name ?? null,
+        }
+    }
+
+    const paymentAccountId = input.paymentAccountId ?? current?.paymentAccountId ?? (input.paymentMethod ? getDefaultPaymentAccountIdForMethod(input.paymentMethod, d) : null) ?? (current?.paymentMethod ? getDefaultPaymentAccountIdForMethod(current.paymentMethod, d) : null)
+    const paymentAccount = paymentAccountId ? getPaymentAccountById(paymentAccountId, d) : undefined
+    return {
+        paymentAccountId: paymentAccountId ?? null,
+        paymentMethod: paymentMethodForAccountKind(paymentAccount?.kind) ?? input.paymentMethod ?? current?.paymentMethod ?? null,
+        transferFromAccountId: null,
+        transferFrom: null,
+        transferToAccountId: null,
+        transferTo: null,
+        paymentAccountName: paymentAccount?.name ?? null,
+        transferFromAccountName: null,
+        transferToAccountName: null,
+    }
+}
+
 export function createVoucher(input: {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER'
@@ -43,6 +100,9 @@ export function createVoucher(input: {
     paymentMethod?: 'BAR' | 'BANK'
     transferFrom?: 'BAR' | 'BANK'
     transferTo?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
+    transferFromAccountId?: number | null
+    transferToAccountId?: number | null
     categoryId?: number
     projectId?: number
     earmarkId?: number
@@ -132,11 +192,13 @@ export function createVoucher(input: {
             }
         }
 
+                const paymentFields = resolveVoucherPaymentFields(d, input)
+
         const stmt = d.prepare(`
       INSERT INTO vouchers (
-    year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
-                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, counterparty, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+        year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
+                                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, created_by
+                                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
         let id: number | null = null
@@ -166,9 +228,12 @@ export function createVoucher(input: {
                     vatAmount,
                     grossAmount,
                     typeof input.grossAmount === 'number' ? 'GROSS' : 'NET',
-                    input.paymentMethod ?? null,
-                    input.transferFrom ?? null,
-                    input.transferTo ?? null,
+                    paymentFields.paymentMethod,
+                    paymentFields.transferFrom,
+                    paymentFields.transferTo,
+                    paymentFields.paymentAccountId,
+                    paymentFields.transferFromAccountId,
+                    paymentFields.transferToAccountId,
                     input.createdBy ?? null
                 )
                 id = Number(info.lastInsertRowid)
@@ -362,7 +427,20 @@ export function listRecentVouchers(limit = 20) {
 
 export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: number; paymentMethod?: 'BAR' | 'BANK' }) {
     const d = getDb()
-    let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo, description,
+    let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+                                        payment_account_id as paymentAccountId,
+                                        transfer_from_account_id as transferFromAccountId,
+                                        transfer_to_account_id as transferToAccountId,
+                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountName,
+                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountKind,
+                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountColor,
+                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountName,
+                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountKind,
+                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountColor,
+                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountName,
+                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountKind,
+                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountColor,
+                                        description,
                                         net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, amount_mode as amountMode,
                                         original_id as originalId,
                                         (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = vouchers.original_id) as originalVoucherNo,
@@ -389,6 +467,7 @@ export function listVouchersAdvanced(filters: {
     // Extended sort keys
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
@@ -400,7 +479,20 @@ export function listVouchersAdvanced(filters: {
 }) {
     const d = getDb()
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
-    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo,
+                                        v.payment_account_id as paymentAccountId,
+                                        v.transfer_from_account_id as transferFromAccountId,
+                                        v.transfer_to_account_id as transferToAccountId,
+                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountName,
+                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountKind,
+                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountColor,
+                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountName,
+                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountKind,
+                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountColor,
+                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
+                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
+                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
+                                        v.description, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                                         v.original_id as originalId,
                                         (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -494,10 +586,11 @@ export function listVouchersAdvancedPaged(filters: {
     tag?: string
 }): { rows: any[]; total: number } {
     const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
+    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, paymentAccountId, sphere, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (paymentAccountId) { wh.push('(v.payment_account_id = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = ? OR v.transfer_to_account_id = ?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
@@ -543,7 +636,20 @@ export function listVouchersAdvancedPaged(filters: {
         }
     })()
     const rows = d.prepare(
-        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.counterparty,
+        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo,
+            v.payment_account_id as paymentAccountId,
+            v.transfer_from_account_id as transferFromAccountId,
+            v.transfer_to_account_id as transferToAccountId,
+            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountName,
+            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountKind,
+            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountColor,
+            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountName,
+            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountKind,
+            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountColor,
+            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
+            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
+            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
+            v.description, v.counterparty,
             v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                 v.original_id as originalId,
                 (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -774,6 +880,7 @@ export function batchAssignTags(params: {
 
 export function summarizeVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER'
     from?: string
@@ -784,15 +891,25 @@ export function summarizeVouchers(filters: {
     tag?: string
 }) {
     const d = getDb()
-    const { paymentMethod, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { paymentMethod, paymentAccountId, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const normalizedPaymentAccountId = paymentAccountId != null ? Number(paymentAccountId) : null
     const paramsBase: any[] = []
     const wh: string[] = []
     let joinSql = ''
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); paramsBase.push(paymentMethod, paymentMethod, paymentMethod) }
+    if (normalizedPaymentAccountId) { wh.push('(v.payment_account_id = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = ? OR v.transfer_to_account_id = ?)))'); paramsBase.push(normalizedPaymentAccountId, normalizedPaymentAccountId, normalizedPaymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
     // When both type and paymentMethod are active, include TRANSFERs that act as
     // the requested type for this payment method (e.g. transfer_to=pm → IN).
-    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
+    if (type && normalizedPaymentAccountId && (type === 'IN' || type === 'OUT')) {
+        if (type === 'IN') {
+            wh.push(`(v.type = 'IN' OR (v.type = 'TRANSFER' AND v.transfer_to_account_id = ?))`)
+            paramsBase.push(normalizedPaymentAccountId)
+        } else {
+            wh.push(`(v.type = 'OUT' OR (v.type = 'TRANSFER' AND v.transfer_from_account_id = ?))`)
+            paramsBase.push(normalizedPaymentAccountId)
+        }
+    } else if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
         if (type === 'IN') {
             wh.push(`(v.type = 'IN' OR (v.type = 'TRANSFER' AND v.transfer_to = ?))`)
             paramsBase.push(paymentMethod)
@@ -831,6 +948,8 @@ export function summarizeVouchers(filters: {
     // Amounts stay positive (same convention as regular IN/OUT vouchers in the DB).
     const pmAdjustedType = paymentMethod
         ? `CASE WHEN v.type = 'TRANSFER' AND v.transfer_from = '${paymentMethod}' THEN 'OUT' WHEN v.type = 'TRANSFER' AND v.transfer_to = '${paymentMethod}' THEN 'IN' ELSE v.type END`
+        : normalizedPaymentAccountId
+            ? `CASE WHEN v.type = 'TRANSFER' AND v.transfer_from_account_id = ${normalizedPaymentAccountId} THEN 'OUT' WHEN v.type = 'TRANSFER' AND v.transfer_to_account_id = ${normalizedPaymentAccountId} THEN 'IN' ELSE v.type END`
         : 'v.type'
 
     const totals = d.prepare(`
@@ -889,6 +1008,32 @@ export function summarizeVouchers(filters: {
         `).all(...paramsBase) as any[]
     }
 
+    const byPaymentAccount = d.prepare(`
+        WITH filtered AS (
+            SELECT v.payment_account_id, v.type, v.transfer_from_account_id, v.transfer_to_account_id,
+                   v.net_amount, v.vat_amount, v.gross_amount
+            FROM vouchers v${joinSql}${whereSql}
+        )
+        SELECT sub.account_id as accountId,
+               COALESCE(pa.name, 'Ohne Konto') as key,
+               pa.kind as kind,
+               pa.color as color,
+               IFNULL(SUM(sub.net_amount), 0) as net,
+               IFNULL(SUM(sub.vat_amount), 0) as vat,
+               IFNULL(SUM(sub.gross_amount), 0) as gross
+        FROM (
+            SELECT CASE WHEN type != 'TRANSFER' THEN payment_account_id ELSE transfer_from_account_id END as account_id,
+                   net_amount, vat_amount, gross_amount
+            FROM filtered
+            UNION ALL
+            SELECT transfer_to_account_id as account_id, net_amount, vat_amount, gross_amount
+            FROM filtered WHERE type = 'TRANSFER'
+        ) sub
+        LEFT JOIN payment_accounts pa ON pa.id = sub.account_id
+        GROUP BY sub.account_id, pa.name, pa.kind, pa.color, pa.sort_order
+        ORDER BY sub.account_id IS NULL, pa.sort_order, pa.name
+    `).all(...paramsBase) as any[]
+
     const byType = d.prepare(`
         SELECT ${pmAdjustedType} as key,
                IFNULL(SUM(v.net_amount), 0) as net,
@@ -899,7 +1044,7 @@ export function summarizeVouchers(filters: {
         ORDER BY ${pmAdjustedType}
     `).all(...paramsBase) as any[]
 
-    return { totals, bySphere, byPaymentMethod, byType }
+    return { totals, bySphere, byPaymentMethod, byPaymentAccount, byType }
 }
 
 export function monthlyVouchers(filters: {
@@ -1017,6 +1162,9 @@ export function updateVoucher(input: {
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
+    transferFromAccountId?: number | null
+    transferToAccountId?: number | null
     earmarkId?: number | null
     earmarkAmount?: number | null
     budgetId?: number | null
@@ -1034,6 +1182,9 @@ export function updateVoucher(input: {
                net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount,
                earmark_id as earmarkId, earmark_amount as earmarkAmount,
                budget_id as budgetId, budget_amount as budgetAmount,
+               payment_account_id as paymentAccountId,
+               transfer_from_account_id as transferFromAccountId,
+               transfer_to_account_id as transferToAccountId,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
                description, amount_mode as amountMode,
                original_id as originalId, reversed_by_id as reversedById
@@ -1060,6 +1211,7 @@ export function updateVoucher(input: {
     const newType = input.type ?? current.type
     const newEarmarkId = (input.earmarkId === undefined) ? current.earmarkId : input.earmarkId
     const newBudgetId = (input.budgetId === undefined) ? current.budgetId : input.budgetId
+    const paymentFields = resolveVoucherPaymentFields(d, input, current)
 
     // Additional check when date actually changes (ensures new date is open too)
     if (input.date != null) ensurePeriodOpen(newDate, d)
@@ -1112,11 +1264,14 @@ export function updateVoucher(input: {
     if (input.type != null) { fields.push('type = ?'); params.push(input.type) }
     if (input.sphere != null) { fields.push('sphere = ?'); params.push(input.sphere) }
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
-    if (input.paymentMethod !== undefined) { fields.push('payment_method = ?'); params.push(input.paymentMethod) }
+    if (input.paymentMethod !== undefined || input.paymentAccountId !== undefined || input.type === 'TRANSFER' || current.type === 'TRANSFER') { fields.push('payment_method = ?'); params.push(paymentFields.paymentMethod) }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
     if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
-    if (input.transferFrom !== undefined) { fields.push('transfer_from = ?'); params.push(input.transferFrom) }
-    if (input.transferTo !== undefined) { fields.push('transfer_to = ?'); params.push(input.transferTo) }
+    if (input.transferFrom !== undefined || input.transferFromAccountId !== undefined || input.type === 'TRANSFER' || current.type === 'TRANSFER') { fields.push('transfer_from = ?'); params.push(paymentFields.transferFrom) }
+    if (input.transferTo !== undefined || input.transferToAccountId !== undefined || input.type === 'TRANSFER' || current.type === 'TRANSFER') { fields.push('transfer_to = ?'); params.push(paymentFields.transferTo) }
+    if (input.paymentAccountId !== undefined || input.type !== undefined || current.type === 'TRANSFER') { fields.push('payment_account_id = ?'); params.push(paymentFields.paymentAccountId) }
+    if (input.transferFromAccountId !== undefined || input.type !== undefined || current.type === 'TRANSFER') { fields.push('transfer_from_account_id = ?'); params.push(paymentFields.transferFromAccountId) }
+    if (input.transferToAccountId !== undefined || input.type !== undefined || current.type === 'TRANSFER') { fields.push('transfer_to_account_id = ?'); params.push(paymentFields.transferToAccountId) }
     if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
     if (input.budgetAmount !== undefined) { fields.push('budget_amount = ?'); params.push(input.budgetAmount) }
     if (input.amountMode !== undefined) { fields.push('amount_mode = ?'); params.push(input.amountMode) }
@@ -1301,10 +1456,54 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
 
     const whereSql = ' WHERE ' + wh.join(' AND ')
     const rows = d.prepare(`
-        SELECT v.payment_method as pm, v.type as type, v.transfer_from as transferFrom, v.transfer_to as transferTo, IFNULL(SUM(${grossExpr}), 0) as gross
+        SELECT v.payment_method as pm,
+               v.type as type,
+               v.transfer_from as transferFrom,
+               v.transfer_to as transferTo,
+               COALESCE(v.payment_account_id,
+                   CASE v.payment_method
+                       WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+                       WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+                       ELSE NULL
+                   END
+               ) as paymentAccountId,
+               COALESCE(v.transfer_from_account_id,
+                   CASE v.transfer_from
+                       WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+                       WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+                       ELSE NULL
+                   END
+               ) as transferFromAccountId,
+               COALESCE(v.transfer_to_account_id,
+                   CASE v.transfer_to
+                       WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+                       WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+                       ELSE NULL
+                   END
+               ) as transferToAccountId,
+               IFNULL(SUM(${grossExpr}), 0) as gross
         FROM vouchers v${joinSql}${whereSql}
-        GROUP BY v.payment_method, v.type, v.transfer_from, v.transfer_to
+        GROUP BY v.payment_method, v.type, v.transfer_from, v.transfer_to, paymentAccountId, transferFromAccountId, transferToAccountId
     `).all(bind) as any[]
+    const accountRows = d.prepare(`
+        SELECT id, name, kind, color, sort_order as sortOrder, is_active as isActive
+        FROM payment_accounts
+        ORDER BY sort_order, name, id
+    `).all() as Array<{ id: number; name: string; kind: string; color?: string | null; sortOrder: number; isActive: number }>
+    const accountBalances = new Map<number, { id: number; name: string; kind: string; color?: string | null; balance: number; sortOrder: number; isActive: number }>()
+    for (const account of accountRows) {
+        accountBalances.set(account.id, { ...account, balance: 0 })
+    }
+    const addAccountBalance = (accountId: unknown, amount: number) => {
+        const id = Number(accountId)
+        if (!Number.isFinite(id)) return
+        const existing = accountBalances.get(id)
+        if (existing) {
+            existing.balance += amount
+            return
+        }
+        accountBalances.set(id, { id, name: `Konto #${id}`, kind: 'OTHER', color: null, balance: amount, sortOrder: 9999, isActive: 1 })
+    }
     let bar = 0, bank = 0
     for (const r of rows) {
         if (r.type === 'TRANSFER') {
@@ -1314,13 +1513,20 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
             if (r.transferFrom === 'BANK') bank -= amt
             if (r.transferTo === 'BAR') bar += amt
             if (r.transferTo === 'BANK') bank += amt
+            addAccountBalance(r.transferFromAccountId, -amt)
+            addAccountBalance(r.transferToAccountId, amt)
         } else {
             const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0
             if (r.pm === 'BAR') bar += sign * (r.gross || 0)
             if (r.pm === 'BANK') bank += sign * (r.gross || 0)
+            addAccountBalance(r.paymentAccountId, sign * (r.gross || 0))
         }
     }
-    return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100 }
+    const accounts = Array.from(accountBalances.values())
+        .map((account) => ({ ...account, balance: Math.round(account.balance * 100) / 100 }))
+        .filter((account) => account.isActive !== 0 || Math.abs(account.balance) > 0.0001)
+        .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name) || (a.id - b.id))
+    return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100, accounts }
 }
 
 // Distinct voucher years present in the database

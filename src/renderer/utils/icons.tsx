@@ -57,6 +57,21 @@ export const IconCash = ({ size = 14, color }: { size?: number; color?: string }
     </svg>
 )
 
+export const IconPayPal = ({ size = 14, color }: { size?: number; color?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path
+            d="M8.2 20.5h-3l3-17h7.1c3.3 0 5.3 1.8 4.8 4.7-.5 3.1-2.9 5-6.4 5H10l-1.8 7.3Z"
+            fill={color || '#0070BA'}
+            opacity="0.95"
+        />
+        <path
+            d="M10.4 22h-3l2.4-13.5h6.4c3 0 4.8 1.6 4.4 4.2-.5 2.8-2.7 4.5-5.9 4.5h-2.8L10.4 22Z"
+            fill={color || '#00A8EA'}
+            opacity="0.88"
+        />
+    </svg>
+)
+
 export const IconTransfer = ({ size = 14 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M3 5h10M10 2l3 3-3 3M13 11H3M6 14L3 11l3-3" strokeLinecap="round" strokeLinejoin="round" />

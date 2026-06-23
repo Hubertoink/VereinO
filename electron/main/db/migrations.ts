@@ -914,6 +914,111 @@ export function ensureSubmissionColumns(db: DB) {
   }
 }
 
+export function ensurePaymentAccountTables(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS payment_accounts (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        kind TEXT CHECK(kind IN ('CASH','BANK','PAYPAL','CARD','OTHER')) NOT NULL,
+        iban TEXT,
+        color TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_payment_accounts_kind ON payment_accounts(kind);
+      CREATE INDEX IF NOT EXISTS idx_payment_accounts_active ON payment_accounts(is_active, sort_order, name);
+    `)
+
+    const paymentAccountCount = db.prepare('SELECT COUNT(*) as count FROM payment_accounts').get() as { count?: number } | undefined
+    if (Number(paymentAccountCount?.count || 0) === 0) {
+      const defaults = [
+        { name: 'Bar', kind: 'CASH', sortOrder: 1 },
+        { name: 'Bank', kind: 'BANK', sortOrder: 2 },
+      ]
+      const insertDefault = db.prepare(`
+        INSERT OR IGNORE INTO payment_accounts(name, kind, sort_order, is_active)
+        VALUES (?, ?, ?, 1)
+      `)
+      for (const entry of defaults) {
+        insertDefault.run(entry.name, entry.kind, entry.sortOrder)
+      }
+    }
+
+    db.exec(`
+      UPDATE payment_accounts
+      SET name = 'Bar', sort_order = CASE WHEN sort_order <= 0 OR sort_order = 10 THEN 1 ELSE sort_order END
+      WHERE kind = 'CASH' AND name = 'Barkasse' AND NOT EXISTS (SELECT 1 FROM payment_accounts WHERE name = 'Bar');
+
+      UPDATE payment_accounts
+      SET name = 'Bank', sort_order = CASE WHEN sort_order <= 0 OR sort_order = 20 THEN 2 ELSE sort_order END
+      WHERE kind = 'BANK' AND name = 'Bankkonto' AND NOT EXISTS (SELECT 1 FROM payment_accounts WHERE name = 'Bank');
+    `)
+
+    const voucherCols = db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>
+    const voucherNames = new Set(voucherCols.map((col) => col.name))
+    if (!voucherNames.has('payment_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN payment_account_id INTEGER;')
+    if (!voucherNames.has('transfer_from_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN transfer_from_account_id INTEGER;')
+    if (!voucherNames.has('transfer_to_account_id')) db.exec('ALTER TABLE vouchers ADD COLUMN transfer_to_account_id INTEGER;')
+
+    const submissionCols = db.prepare('PRAGMA table_info(submissions)').all() as Array<{ name: string }>
+    const submissionNames = new Set(submissionCols.map((col) => col.name))
+    if (!submissionNames.has('payment_account_id')) db.exec('ALTER TABLE submissions ADD COLUMN payment_account_id INTEGER;')
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_vouchers_payment_account ON vouchers(payment_account_id);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_transfer_accounts ON vouchers(transfer_from_account_id, transfer_to_account_id);
+      CREATE INDEX IF NOT EXISTS idx_submissions_payment_account ON submissions(payment_account_id);
+    `)
+
+    db.exec(`
+      UPDATE vouchers
+      SET payment_account_id = (
+        CASE payment_method
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+          ELSE payment_account_id
+        END
+      )
+      WHERE payment_account_id IS NULL AND type <> 'TRANSFER';
+
+      UPDATE vouchers
+      SET transfer_from_account_id = (
+        CASE transfer_from
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+          ELSE transfer_from_account_id
+        END
+      )
+      WHERE transfer_from_account_id IS NULL AND type = 'TRANSFER';
+
+      UPDATE vouchers
+      SET transfer_to_account_id = (
+        CASE transfer_to
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+          ELSE transfer_to_account_id
+        END
+      )
+      WHERE transfer_to_account_id IS NULL AND type = 'TRANSFER';
+
+      UPDATE submissions
+      SET payment_account_id = (
+        CASE payment_method
+          WHEN 'BAR' THEN (SELECT id FROM payment_accounts WHERE kind = 'CASH' ORDER BY sort_order, id LIMIT 1)
+          WHEN 'BANK' THEN (SELECT id FROM payment_accounts WHERE kind = 'BANK' ORDER BY sort_order, id LIMIT 1)
+          ELSE payment_account_id
+        END
+      )
+      WHERE payment_account_id IS NULL;
+    `)
+  } catch {
+    return
+  }
+}
+
 export function ensureVoucherColumns(db: DB) {
   try {
     const voucherCols = db.prepare('PRAGMA table_info(vouchers)').all() as Array<{ name: string }>
@@ -937,10 +1042,21 @@ export function ensureVoucherColumns(db: DB) {
     if (!names.has('amount_mode')) {
       db.exec("ALTER TABLE vouchers ADD COLUMN amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'NET';")
     }
+    if (!names.has('payment_account_id')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN payment_account_id INTEGER;')
+    }
+    if (!names.has('transfer_from_account_id')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN transfer_from_account_id INTEGER;')
+    }
+    if (!names.has('transfer_to_account_id')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN transfer_to_account_id INTEGER;')
+    }
 
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_vouchers_budget ON vouchers(budget_id);
       CREATE INDEX IF NOT EXISTS idx_vouchers_transfer ON vouchers(transfer_from, transfer_to);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_payment_account ON vouchers(payment_account_id);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_transfer_accounts ON vouchers(transfer_from_account_id, transfer_to_account_id);
     `)
 
     db.exec(`
@@ -966,6 +1082,7 @@ export function getAppliedVersions(db: DB): Set<number> {
 
 export function applyMigrations(db: DB) {
   // Ensure critical junction tables exist even if migrations are partially applied.
+  ensurePaymentAccountTables(db)
   ensureVoucherColumns(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
@@ -1034,4 +1151,14 @@ export function applyMigrations(db: DB) {
       }
     }
   }
+
+  // A brand-new database does not have domain tables yet when the pre-flight
+  // healers above run. Run them again after migrations so additive columns and
+  // indexes that depend on base tables are created for fresh organizations too.
+  ensurePaymentAccountTables(db)
+  ensureVoucherColumns(db)
+  ensureVoucherJunctionTables(db)
+  ensureActivityReportsTable(db)
+  ensureAdvanceTables(db)
+  ensureSubmissionColumns(db)
 }

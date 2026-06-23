@@ -7,6 +7,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
     totals: { net: number; vat: number; gross: number }
     bySphere: Array<{ key: Sphere; net: number; vat: number; gross: number }>
     byPaymentMethod: Array<{ key: PaymentMethod | null; net: number; vat: number; gross: number }>
+    byPaymentAccount?: Array<{ accountId: number | null; key: string; kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null; color?: string | null; net: number; vat: number; gross: number }>
     byType: Array<{ key: VoucherType; net: number; vat: number; gross: number }>
   }>(null)
   const [monthsCount, setMonthsCount] = useState<number>(0)
@@ -107,12 +108,16 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                 <strong>Nach Zahlweg</strong>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r, i) => {
-                  const icons: Record<string, string> = { BANK: '🏦', BAR: '💵' }
+                {((data.byPaymentAccount && data.byPaymentAccount.length > 0)
+                  ? data.byPaymentAccount
+                  : data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r) => ({ accountId: null, key: r.key || 'Ohne Konto', kind: r.key === 'BAR' ? 'CASH' : 'BANK', color: null, gross: r.gross, net: r.net, vat: r.vat }))
+                ).map((r, i) => {
+                  const icons: Record<string, string> = { BANK: '🏦', CASH: '💵', PAYPAL: 'P', CARD: '💳', OTHER: '•' }
+                  const color = r.color || (r.kind === 'CASH' ? '#42a5f5' : r.kind === 'BANK' ? '#26a69a' : 'var(--accent)')
                   return (
-                    <div key={(r.key ?? 'NULL') + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)' }}>
+                    <div key={(r.accountId ?? r.key ?? 'NULL') + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, fontSize: 13 }}>
-                        <span>{icons[r.key ?? ''] || '📄'}</span>
+                        <span>{icons[r.kind ?? 'OTHER'] || '•'}</span>
                         {r.key}
                       </span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>

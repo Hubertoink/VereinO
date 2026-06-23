@@ -23,6 +23,7 @@ import { getWeeklyQuote } from '../services/quotes'
 import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
 import { previewFile, executeFile, generateImportTemplate, generateImportTestData } from '../services/imports'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
+import { PaymentAccountsListInput, PaymentAccountsListOutput, PaymentAccountUpsertInput, PaymentAccountUpsertOutput, PaymentAccountDeleteInput, PaymentAccountDeleteOutput } from './schemas'
 import { applyMigrations, ensureAdvanceTables, ensureVoucherColumns } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
@@ -34,6 +35,7 @@ import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreat
 import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGetInput, ActivityReportGetOutput, ActivityReportListInput, ActivityReportListOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
 import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
 import { checkForAppUpdates, downloadAppUpdate, getUpdateState, installAppUpdate } from '../updateManager'
+import { deletePaymentAccount, listPaymentAccounts, upsertPaymentAccount } from '../repositories/paymentAccounts'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -79,6 +81,9 @@ type RegisterIpcHandlersOptions = {
     openDetachedQuickAdd?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
     focusDetachedQuickAdd?: (draftId: string) => { ok: boolean }
     closeDetachedQuickAdd?: (draftId: string) => { ok: boolean }
+    hasDetachedQuickAdds?: () => boolean
+    requestCloseDetachedQuickAdds?: (mainWindow?: BrowserWindow | null, confirmed?: boolean) => { ok: boolean; count: number }
+    cancelPendingMainClose?: () => { ok: boolean }
     getDetachedQuickAddInitial?: (token: string) => any
     notifyQuickAddSaved?: (payload?: any) => void
 }
@@ -116,12 +121,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     ipcMain.handle('window.confirmClose', async () => {
         const win = getCurrentWindow()
         if (!win) return { ok: false }
+        if (!(win as any).__isDetachedQuickAddWindow && options.hasDetachedQuickAdds?.()) {
+            const requested = options.requestCloseDetachedQuickAdds?.(win, true)
+            if (requested?.count) return { ok: true, pendingDetached: requested.count }
+        }
         try {
             ;(win as any).__allowRendererClose?.()
         } catch {
         }
         win.close()
         return { ok: true }
+    })
+    ipcMain.handle('window.cancelClose', async () => {
+        return options.cancelPendingMainClose?.() ?? { ok: true }
     })
     ipcMain.handle('window.isMaximized', async () => {
         const win = getCurrentWindow()
@@ -169,6 +181,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const parsed = ReportsSummaryInput.parse(payload)
         const summary = summarizeVouchers({
             paymentMethod: parsed.paymentMethod as any,
+            paymentAccountId: parsed.paymentAccountId ?? undefined,
             sphere: parsed.sphere as any,
             type: parsed.type as any,
             from: parsed.from,
@@ -249,6 +262,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const colsSel = (parsed.fields && parsed.fields.length ? parsed.fields : defaultCols) as string[]
         const headerMap: Record<string, string> = {
             date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Sphäre', description: 'Beschreibung', status: 'Status', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
+        }
+        const paymentAccountLabel = (row: any) => {
+            if (row?.type === 'TRANSFER') {
+                const from = row.transferFromAccountName || (row.transferFrom === 'BAR' ? 'Bar' : row.transferFrom === 'BANK' ? 'Bank' : '')
+                const to = row.transferToAccountName || (row.transferTo === 'BAR' ? 'Bar' : row.transferTo === 'BANK' ? 'Bank' : '')
+                return from && to ? `${from} -> ${to}` : 'Transfer'
+            }
+            return row?.paymentAccountName || (row?.paymentMethod === 'BAR' ? 'Bar' : row?.paymentMethod === 'BANK' ? 'Bank' : '')
         }
         const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
         const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
@@ -339,6 +360,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 const kind = voucherStatusKind(row)
                 return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
             }
+            const paymentAccountRows = Array.isArray((summary as any).byPaymentAccount) && (summary as any).byPaymentAccount.length
+                ? (summary as any).byPaymentAccount
+                : (summary.byPaymentMethod as any[]).map(p => ({ key: p.key === 'BAR' ? 'Bar' : p.key === 'BANK' ? 'Bank' : 'Ohne Konto', color: null, gross: p.gross }))
 
             const totalIn = (summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0)
             const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
@@ -411,7 +435,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             <table class="small">
                 <thead><tr><th>Zahlweg</th><th class="right">Brutto</th></tr></thead>
                 <tbody>
-                    ${(summary.byPaymentMethod as any[]).map(p => `<tr><td>${p.key === null ? 'TRANSFER' : (p.key ?? 'TRANSFER')}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
+                    ${paymentAccountRows.map((p: any) => `<tr><td>${p.color ? `<span class="sw" style="background:${esc(p.color)}"></span> ` : ''}${esc(p.key ?? 'Ohne Konto')}</td><td class=right>${Number(p.gross).toFixed(2)} €</td></tr>`).join('')}
                 </tbody>
             </table>
         </div>
@@ -625,7 +649,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                         <td class="nowrap">${esc(r.type)}</td>
                         <td class="nowrap">${esc(r.sphere)}</td>
                         <td>${voucherDescriptionHtml(r)}</td>
-                        <td class="nowrap">${esc(r.paymentMethod ?? '')}</td>
+                        <td class="nowrap">${esc(paymentAccountLabel(r))}</td>
                         <td class="right nowrap">${euro(Number(g))}</td>
                     </tr>`
                 }).join('')}
@@ -661,7 +685,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                     if (c === 'vatAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.vatAmount : r.vatAmount).toFixed(2))
                     if (c === 'description') return r.description ?? ''
                     if (c === 'status') return voucherStatusText(r)
-                    if (c === 'paymentMethod') return r.paymentMethod ?? ''
+                    if (c === 'paymentMethod') return paymentAccountLabel(r)
                     if (c === 'tags') return (r.tags || []).join(', ')
                     return (r as any)[c]
                 })
@@ -699,7 +723,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 const vals = colsSel.map((c) => {
                     if (c === 'description') return (r.description ?? '').replace(/\n|\r|;/g, ' ')
                     if (c === 'status') return voucherStatusText(r)
-                    if (c === 'paymentMethod') return r.paymentMethod ?? ''
+                    if (c === 'paymentMethod') return paymentAccountLabel(r)
                     if (c === 'tags') return (r.tags || []).join(', ')
                     if (c === 'grossAmount') return ((r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount).toFixed(2)
                     if (c === 'netAmount') return ((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2)
@@ -796,6 +820,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 sort: (parsed.sort as any) || 'DESC',
                 sortBy: (parsed as any).sortBy,
                 paymentMethod: parsed.paymentMethod as any,
+                paymentAccountId: parsed.paymentAccountId ?? undefined,
                 sphere: parsed.sphere as any,
                 type: parsed.type as any,
                 from: parsed.from,
@@ -826,6 +851,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             setVoucherEarmarks(parsed.id, parsed.earmarks)
         }
         return VoucherUpdateOutput.parse(res)
+    })
+
+    ipcMain.handle('paymentAccounts.list', async (_e, payload) => {
+        const parsed = PaymentAccountsListInput.parse(payload)
+        return PaymentAccountsListOutput.parse({ rows: listPaymentAccounts(parsed ?? undefined) })
+    })
+    ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
+        const parsed = PaymentAccountUpsertInput.parse(payload)
+        return PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
+    })
+    ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
+        const parsed = PaymentAccountDeleteInput.parse(payload)
+        return PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
     })
 
     ipcMain.handle('vouchers.delete', async (_e, payload) => {
@@ -2118,14 +2156,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         return getOrganizationAppearance(payload.orgId)
     })
     
-    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) => {
+    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
         if (!payload?.orgId) throw new Error('orgId ist erforderlich')
         return setOrganizationAppearance(payload.orgId, {
             colorTheme: payload.colorTheme,
             backgroundImage: payload.backgroundImage,
             customBackgroundImage: payload.customBackgroundImage,
-            glassModals: payload.glassModals,
-            backgroundContrast: payload.backgroundContrast
+            glassModals: payload.glassModals
         })
     })
     

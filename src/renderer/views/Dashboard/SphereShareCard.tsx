@@ -80,7 +80,7 @@ function Donut({ data, colors, title }: { data: Array<{ key: string; value: numb
 
 export default function SphereShareCard({ from, to }: CommonFilters) {
   const [bySphere, setBySphere] = useState<Array<{ key: string; gross: number }>>([])
-  const [byPM, setByPM] = useState<Array<{ key: string; gross: number }>>([])
+  const [byAccount, setByAccount] = useState<Array<{ key: string; gross: number; color?: string | null }>>([])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   useEffect(() => {
@@ -90,8 +90,11 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
         const s = await (window as any).api?.reports?.summary?.({ from, to })
         if (!alive || !s) return
         setBySphere((s.bySphere || []).map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
-        setByPM((s.byPaymentMethod || []).filter((x: any) => x.key === 'BAR' || x.key === 'BANK').map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
-      } catch { if (alive) { setBySphere([]); setByPM([]) } }
+        const accountRows = Array.isArray(s.byPaymentAccount) && s.byPaymentAccount.length
+          ? s.byPaymentAccount
+          : (s.byPaymentMethod || []).filter((x: any) => x.key === 'BAR' || x.key === 'BANK')
+        setByAccount(accountRows.map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0), color: x.color || null })))
+      } catch { if (alive) { setBySphere([]); setByAccount([]) } }
     }
     load()
     const onChanged = () => load()
@@ -105,10 +108,10 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
     VERMOEGEN: '#9575cd',
     WGB: '#ffb74d',
   }
-  const pmColors: Record<string, string> = { BAR: '#42a5f5', BANK: '#26a69a' }
+  const accountColors: Record<string, string> = Object.fromEntries(byAccount.map((account, index) => [account.key, account.color || ['#42a5f5', '#26a69a', '#ab47bc', '#ffb74d', '#66bb6a'][index % 5]]))
 
   const sphereData = bySphere.filter(x => (x.gross || 0) !== 0)
-  const pmData = byPM.filter(x => (x.gross || 0) !== 0)
+  const accountData = byAccount.filter(x => (x.gross || 0) !== 0)
 
   return (
     <section className="card" style={{ padding: 12 }}>
@@ -118,7 +121,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'center' }}>
         <Donut title="Sphären" data={sphereData.map(s => ({ key: s.key, value: Math.abs(s.gross) }))} colors={sphereColors} />
-        <Donut title="Bar vs Bank" data={pmData.map(p => ({ key: String(p.key), value: Math.abs(p.gross) }))} colors={pmColors} />
+        <Donut title="Zahlungskonten" data={accountData.map(p => ({ key: String(p.key), value: Math.abs(p.gross) }))} colors={accountColors} />
         <div>
           <div className="helper">Legende</div>
           <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>

@@ -15,6 +15,8 @@ const isDev = !app.isPackaged
 const detachedQuickAddInitials = new Map<string, any>()
 const detachedQuickAddWindows = new Map<string, BrowserWindow>()
 const DETACHED_QUICK_ADD_BOUNDS_SETTING = 'ui.detachedQuickAddBounds'
+let pendingMainCloseWindow: BrowserWindow | null = null
+let pendingMainCloseConfirmed = false
 
 type WindowBounds = { x: number; y: number; width: number; height: number }
 
@@ -67,7 +69,7 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
         minHeight: 620,
         show: false,
         autoHideMenuBar: true,
-        frame: true,
+        frame: false,
         title: 'VereinO - Buchung',
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
@@ -79,15 +81,43 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
         }
     })
 
+    let allowClose = false
+    ;(win as any).__isDetachedQuickAddWindow = true
+
     win.on('ready-to-show', () => win.show())
     detachedQuickAddWindows.set(draftId, win)
-    win.on('close', () => {
+    win.on('close', (event) => {
+        if (!allowClose && !win.webContents.isDestroyed()) {
+            event.preventDefault()
+            try { win.webContents.send('window:close-requested') } catch {
+                allowClose = true
+                win.close()
+            }
+            return
+        }
         try { setSetting(DETACHED_QUICK_ADD_BOUNDS_SETTING, win.getNormalBounds()) } catch { }
     })
     win.on('closed', () => {
         detachedQuickAddInitials.delete(token)
         detachedQuickAddWindows.delete(draftId)
+        for (const browserWindow of BrowserWindow.getAllWindows()) {
+            try { browserWindow.webContents.send('quickAdd:detachedClosed', { draftId }) } catch { /* ignore */ }
+        }
+        if (pendingMainCloseWindow && !pendingMainCloseWindow.isDestroyed() && detachedQuickAddWindows.size === 0) {
+            const mainWindow = pendingMainCloseWindow
+            const confirmed = pendingMainCloseConfirmed
+            pendingMainCloseWindow = null
+            pendingMainCloseConfirmed = false
+            if (confirmed) {
+                try { ;(mainWindow as any).__allowRendererClose?.() } catch { }
+            }
+            mainWindow.close()
+        }
     })
+
+    ;(win as any).__allowRendererClose = () => {
+        allowClose = true
+    }
 
     if (isDev) {
         const baseUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
@@ -120,6 +150,30 @@ function closeDetachedQuickAddWindow(draftId: string) {
     return { ok: true }
 }
 
+function requestCloseDetachedQuickAddWindows(mainWindow?: BrowserWindow | null, confirmed = false) {
+    const windows = Array.from(detachedQuickAddWindows.values()).filter((win) => !win.isDestroyed())
+    if (!windows.length) return { ok: true, count: 0 }
+    pendingMainCloseWindow = mainWindow && !detachedQuickAddWindowsHas(mainWindow) ? mainWindow : null
+    pendingMainCloseConfirmed = confirmed
+    for (const win of windows) {
+        try { win.close() } catch { /* ignore */ }
+    }
+    return { ok: true, count: windows.length }
+}
+
+function cancelPendingMainClose() {
+    pendingMainCloseWindow = null
+    pendingMainCloseConfirmed = false
+    return { ok: true }
+}
+
+function detachedQuickAddWindowsHas(win: BrowserWindow) {
+    for (const detached of detachedQuickAddWindows.values()) {
+        if (detached === win) return true
+    }
+    return false
+}
+
 async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
@@ -148,6 +202,10 @@ async function createWindow(): Promise<BrowserWindow> {
     win.on('close', (event) => {
         if (allowClose || win.webContents.isDestroyed()) return
         event.preventDefault()
+        if (detachedQuickAddWindows.size > 0) {
+            requestCloseDetachedQuickAddWindows(win)
+            return
+        }
         try {
             win.webContents.send('window:close-requested')
         } catch {
@@ -277,6 +335,9 @@ app.whenReady().then(async () => {
         openDetachedQuickAdd: createDetachedQuickAddWindow,
         focusDetachedQuickAdd: focusDetachedQuickAddWindow,
         closeDetachedQuickAdd: closeDetachedQuickAddWindow,
+        hasDetachedQuickAdds: () => detachedQuickAddWindows.size > 0,
+        requestCloseDetachedQuickAdds: requestCloseDetachedQuickAddWindows,
+        cancelPendingMainClose,
         getDetachedQuickAddInitial: (token: string) => detachedQuickAddInitials.get(token) ?? null,
         notifyQuickAddSaved: (payload: any) => {
             for (const browserWindow of BrowserWindow.getAllWindows()) {

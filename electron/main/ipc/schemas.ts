@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
+export const PaymentAccountKind = z.enum(['CASH', 'BANK', 'PAYPAL', 'CARD', 'OTHER'])
 export const VoucherAmountMode = z.enum(['NET', 'GROSS'])
 
 // Multiple assignment shapes (shared by create + update)
@@ -26,9 +27,12 @@ export const VoucherCreateInput = z
         grossAmount: z.number().optional(),
         vatRate: z.number(),
         paymentMethod: PaymentMethod.optional(),
+        paymentAccountId: z.number().nullable().optional(),
         // Transfer direction (only when type === 'TRANSFER')
         transferFrom: PaymentMethod.optional(),
         transferTo: PaymentMethod.optional(),
+        transferFromAccountId: z.number().nullable().optional(),
+        transferToAccountId: z.number().nullable().optional(),
         categoryId: z.number().optional(),
         projectId: z.number().optional(),
         earmarkId: z.number().optional(),
@@ -188,8 +192,13 @@ export const YearEndPreviewOutput = z.object({
     totals: z.object({ net: z.number(), vat: z.number(), gross: z.number(), inGross: z.number(), outGross: z.number() }),
     bySphere: z.array(z.object({ key: Sphere, net: z.number(), vat: z.number(), gross: z.number() })),
     byPaymentMethod: z.array(z.object({ key: PaymentMethod.nullable(), net: z.number(), vat: z.number(), gross: z.number() })),
+    byPaymentAccount: z.array(z.object({ accountId: z.number().nullable(), key: z.string(), kind: PaymentAccountKind.nullable(), color: z.string().nullable(), net: z.number(), vat: z.number(), gross: z.number() })).optional(),
     byType: z.array(z.object({ key: VoucherType, net: z.number(), vat: z.number(), gross: z.number() })),
-    cashBalance: z.object({ BAR: z.number(), BANK: z.number() })
+    cashBalance: z.object({
+        BAR: z.number(),
+        BANK: z.number(),
+        accounts: z.array(z.object({ id: z.number(), name: z.string(), kind: PaymentAccountKind, color: z.string().nullable().optional(), balance: z.number(), sortOrder: z.number(), isActive: z.number() })).optional()
+    })
 })
 export type TYearEndPreviewInput = z.infer<typeof YearEndPreviewInput>
 export type TYearEndPreviewOutput = z.infer<typeof YearEndPreviewOutput>
@@ -279,6 +288,7 @@ export const ReportsSummaryInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
     type: VoucherType.optional(),
     earmarkId: z.number().optional(),
@@ -295,6 +305,7 @@ export const ReportsSummaryOutput = z.object({
     }),
     bySphere: z.array(z.object({ key: Sphere, net: z.number(), vat: z.number(), gross: z.number() })),
     byPaymentMethod: z.array(z.object({ key: PaymentMethod.nullable(), net: z.number(), vat: z.number(), gross: z.number() })),
+    byPaymentAccount: z.array(z.object({ accountId: z.number().nullable(), key: z.string(), kind: PaymentAccountKind.nullable(), color: z.string().nullable(), net: z.number(), vat: z.number(), gross: z.number() })).optional(),
     byType: z.array(z.object({ key: VoucherType, net: z.number(), vat: z.number(), gross: z.number() }))
 })
 
@@ -335,7 +346,8 @@ export const ReportsCashBalanceInput = z.object({
 })
 export const ReportsCashBalanceOutput = z.object({
     BAR: z.number(),
-    BANK: z.number()
+    BANK: z.number(),
+    accounts: z.array(z.object({ id: z.number(), name: z.string(), kind: PaymentAccountKind, color: z.string().nullable().optional(), balance: z.number(), sortOrder: z.number(), isActive: z.number() })).optional()
 })
 export type TReportsCashBalanceInput = z.infer<typeof ReportsCashBalanceInput>
 export type TReportsCashBalanceOutput = z.infer<typeof ReportsCashBalanceOutput>
@@ -349,6 +361,7 @@ export const VouchersListInput = z
         // New sortable columns for Buchungen
         sortBy: z.enum(['date', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere']).optional(),
         paymentMethod: PaymentMethod.optional(),
+        paymentAccountId: z.number().nullable().optional(),
         sphere: Sphere.optional(),
         type: VoucherType.optional(),
         from: z.string().optional(),
@@ -373,6 +386,18 @@ export const VouchersListOutput = z.object({
             paymentMethod: PaymentMethod.nullable().optional(),
             transferFrom: PaymentMethod.nullable().optional(),
             transferTo: PaymentMethod.nullable().optional(),
+            paymentAccountId: z.number().nullable().optional(),
+            paymentAccountName: z.string().nullable().optional(),
+            paymentAccountKind: PaymentAccountKind.nullable().optional(),
+            paymentAccountColor: z.string().nullable().optional(),
+            transferFromAccountId: z.number().nullable().optional(),
+            transferFromAccountName: z.string().nullable().optional(),
+            transferFromAccountKind: PaymentAccountKind.nullable().optional(),
+            transferFromAccountColor: z.string().nullable().optional(),
+            transferToAccountId: z.number().nullable().optional(),
+            transferToAccountName: z.string().nullable().optional(),
+            transferToAccountKind: PaymentAccountKind.nullable().optional(),
+            transferToAccountColor: z.string().nullable().optional(),
             description: z.string().nullable().optional(),
             netAmount: z.number(),
             vatRate: z.number(),
@@ -607,6 +632,9 @@ export const VoucherUpdateInput = z.object({
     paymentMethod: PaymentMethod.nullable().optional(),
     transferFrom: PaymentMethod.nullable().optional(),
     transferTo: PaymentMethod.nullable().optional(),
+    paymentAccountId: z.number().nullable().optional(),
+    transferFromAccountId: z.number().nullable().optional(),
+    transferToAccountId: z.number().nullable().optional(),
     earmarkId: z.number().nullable().optional(),
     earmarkAmount: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
@@ -629,6 +657,30 @@ export type TVoucherUpdateInput = z.infer<typeof VoucherUpdateInput>
 export type TVoucherUpdateOutput = z.infer<typeof VoucherUpdateOutput>
 export type TVoucherDeleteInput = z.infer<typeof VoucherDeleteInput>
 export type TVoucherDeleteOutput = z.infer<typeof VoucherDeleteOutput>
+
+export const PaymentAccountShape = z.object({
+    id: z.number(),
+    name: z.string(),
+    kind: PaymentAccountKind,
+    iban: z.string().nullable().optional(),
+    color: z.string().nullable().optional(),
+    sortOrder: z.number(),
+    isActive: z.number()
+})
+export const PaymentAccountsListInput = z.object({ activeOnly: z.boolean().optional() }).optional()
+export const PaymentAccountsListOutput = z.object({ rows: z.array(PaymentAccountShape) })
+export const PaymentAccountUpsertInput = z.object({
+    id: z.number().optional(),
+    name: z.string(),
+    kind: PaymentAccountKind,
+    iban: z.string().nullable().optional(),
+    color: z.string().nullable().optional(),
+    sortOrder: z.number().optional(),
+    isActive: z.boolean().optional()
+})
+export const PaymentAccountUpsertOutput = z.object({ id: z.number() })
+export const PaymentAccountDeleteInput = z.object({ id: z.number() })
+export const PaymentAccountDeleteOutput = z.object({ id: z.number() })
 
 // Batch assign earmark to vouchers
 export const VouchersBatchAssignEarmarkInput = z.object({

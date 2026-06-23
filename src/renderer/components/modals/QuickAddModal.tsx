@@ -1,10 +1,12 @@
 import React from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA } from '../../hooks/useQuickAdd'
+import WindowControls from '../layout/WindowControls'
 
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
 type ExistingAttachment = { id: number; fileName: string }
+type PaymentAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }
 
 interface QuickAddModalProps {
     qa: QA
@@ -33,6 +35,7 @@ interface QuickAddModalProps {
     eurFmt: Intl.NumberFormat
     budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isArchived?: number; color?: string | null }>
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number }>
+    paymentAccounts?: PaymentAccount[]
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     descSuggest: string[]
     title?: string
@@ -64,6 +67,17 @@ function fmtRange(start?: string | null, end?: string | null) {
     if (start) return `ab ${start}`
     if (end) return `bis ${end}`
     return ''
+}
+
+function paymentMethodLabel(method?: 'BAR' | 'BANK' | null) {
+    if (method === 'BAR') return 'Bar'
+    if (method === 'BANK') return 'Bank'
+    return '—'
+}
+
+function accountMethod(kind?: PaymentAccount['kind'] | null): 'BAR' | 'BANK' | null {
+    if (!kind) return null
+    return kind === 'CASH' ? 'BAR' : 'BANK'
 }
 
 /**
@@ -98,6 +112,7 @@ export default function QuickAddModal({
     eurFmt,
     budgetsForEdit,
     earmarks,
+    paymentAccounts = [],
     tagDefs,
     descSuggest,
     title,
@@ -131,6 +146,33 @@ export default function QuickAddModal({
         [budgetsForEdit]
     )
     const hasAvailableBudgets = availableBudgets.length > 0
+    const activePaymentAccounts = React.useMemo(
+        () => (paymentAccounts || []).filter((account) => account.isActive !== 0),
+        [paymentAccounts]
+    )
+    const paymentAccountsById = React.useMemo(
+        () => new Map(activePaymentAccounts.map((account) => [account.id, account])),
+        [activePaymentAccounts]
+    )
+    const defaultCashAccount = React.useMemo(
+        () => activePaymentAccounts.find((account) => account.kind === 'CASH') ?? activePaymentAccounts[0] ?? null,
+        [activePaymentAccounts]
+    )
+    const defaultBankAccount = React.useMemo(
+        () => activePaymentAccounts.find((account) => account.kind === 'BANK')
+            ?? activePaymentAccounts.find((account) => account.id !== defaultCashAccount?.id)
+            ?? activePaymentAccounts[0]
+            ?? null,
+        [activePaymentAccounts, defaultCashAccount]
+    )
+    const financeAccountColor = React.useMemo(() => {
+        if (qa.type === 'TRANSFER') {
+            const fromColor = paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color
+            const toColor = paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.color
+            return fromColor || toColor || undefined
+        }
+        return paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.color || undefined
+    }, [paymentAccountsById, qa])
     const activeEarmarks = React.useMemo(() => {
         return (earmarks || []).filter((em: any) => {
             // In DB/IPC: archived Zweckbindungen are represented as isActive = 0
@@ -284,11 +326,11 @@ export default function QuickAddModal({
                 ref={modalRef}
                 className={`modal booking-modal${windowMode ? ' detached-quick-add-modal' : ''}`}
                 onClick={(e) => e.stopPropagation()}
-                style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
+                style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
                 <header
-                    className={`modal-header-flex${canDrag ? ' booking-modal-drag-handle' : ''}`}
-                    title={canDrag ? 'Zum Verschieben ziehen' : undefined}
+                    className={`modal-header-flex${canDrag ? ' booking-modal-drag-handle' : ''}${windowMode ? ' detached-booking-titlebar' : ''}`}
+                    title={canDrag || windowMode ? 'Zum Verschieben ziehen' : undefined}
                     onPointerDown={startDrag}
                     onPointerMove={moveDrag}
                     onPointerUp={endDrag}
@@ -305,11 +347,15 @@ export default function QuickAddModal({
                                 </svg>
                             </button>
                         )}
-                        <button className="btn ghost" type="button" onClick={closeModal} title="Schließen (ESC)">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                            </svg>
-                        </button>
+                        {windowMode ? (
+                            <WindowControls onClose={closeModal} />
+                        ) : (
+                            <button className="btn ghost" type="button" onClick={closeModal} title="Schließen (ESC)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </header>
 
@@ -342,7 +388,9 @@ export default function QuickAddModal({
                             {(() => {
                                 const date = fmtDate(qa.date)
                                 const type = qa.type
-                                const pm = qa.type === 'TRANSFER' ? (((qa as any).transferFrom || '—') + ' → ' + ((qa as any).transferTo || '—')) : ((qa as any).paymentMethod || '—')
+                                const pm = qa.type === 'TRANSFER'
+                                    ? `${(qa as any).transferFromAccountName || paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.name || paymentMethodLabel((qa as any).transferFrom)} → ${(qa as any).transferToAccountName || paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.name || paymentMethodLabel((qa as any).transferTo)}`
+                                    : ((qa as any).paymentAccountName || paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.name || paymentMethodLabel((qa as any).paymentMethod))
                                 const amount = (() => {
                                     if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
                                     if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
@@ -374,9 +422,20 @@ export default function QuickAddModal({
                                                 className={`btn ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
                                                 onClick={() => {
                                                     const newQa = { ...qa, type: t }
-                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFrom || !(newQa as any).transferTo)) {
-                                                        (newQa as any).transferFrom = 'BAR';
-                                                        (newQa as any).transferTo = 'BANK'
+                                                    if (t === 'TRANSFER' && (!(newQa as any).transferFromAccountId || !(newQa as any).transferToAccountId)) {
+                                                        (newQa as any).transferFromAccountId = defaultCashAccount?.id ?? null
+                                                        ;(newQa as any).transferFromAccountName = defaultCashAccount?.name ?? null
+                                                        ;(newQa as any).transferFrom = accountMethod(defaultCashAccount?.kind) ?? 'BAR'
+                                                        ;(newQa as any).transferToAccountId = defaultBankAccount?.id ?? null
+                                                        ;(newQa as any).transferToAccountName = defaultBankAccount?.name ?? null
+                                                        ;(newQa as any).transferTo = accountMethod(defaultBankAccount?.kind) ?? 'BANK'
+                                                        ;(newQa as any).paymentAccountId = null
+                                                        ;(newQa as any).paymentAccountName = null
+                                                    } else if (t !== 'TRANSFER' && !(newQa as any).paymentAccountId) {
+                                                        const fallback = defaultCashAccount ?? defaultBankAccount
+                                                        ;(newQa as any).paymentAccountId = fallback?.id ?? null
+                                                        ;(newQa as any).paymentAccountName = fallback?.name ?? null
+                                                        ;(newQa as any).paymentMethod = accountMethod(fallback?.kind) ?? (newQa as any).paymentMethod
                                                     }
                                                     setQa(newQa)
                                                 }}>
@@ -395,38 +454,89 @@ export default function QuickAddModal({
                                     </select>
                                 </div>
                                 {qa.type === 'TRANSFER' ? (
-                                    <div className="field">
-                                        <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                        <select value={`${(qa as any).transferFrom ?? ''}->${(qa as any).transferTo ?? ''}`}
-                                            onChange={(e) => {
-                                                const v = e.target.value
-                                                if (v === 'BAR->BANK') setQa({ ...(qa as any), transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: undefined } as any)
-                                                else if (v === 'BANK->BAR') setQa({ ...(qa as any), transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: undefined } as any)
-                                            }}
-                                            aria-label="Transfer-Richtung">
-                                            <option value="BAR->BANK">BAR → BANK</option>
-                                            <option value="BANK->BAR">BANK → BAR</option>
-                                        </select>
+                                    <div className="field field-full-width">
+                                        <label>Kontotransfer <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                        <div className="flex gap-8">
+                                            <select
+                                                className="input"
+                                                value={String((qa as any).transferFromAccountId ?? '')}
+                                                required
+                                                style={{ color: paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color || undefined }}
+                                                onChange={(e) => {
+                                                    const nextId = e.target.value ? Number(e.target.value) : null
+                                                    const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                    setQa({
+                                                        ...(qa as any),
+                                                        transferFromAccountId: nextId,
+                                                        transferFromAccountName: nextAccount?.name ?? null,
+                                                        transferFrom: accountMethod(nextAccount?.kind) ?? undefined,
+                                                        paymentMethod: undefined,
+                                                    } as any)
+                                                }}
+                                                aria-label="Transfer von Konto"
+                                            >
+                                                <option value="">Von Konto wählen</option>
+                                                {activePaymentAccounts.map((account) => (
+                                                    <option key={`from-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                className="input"
+                                                value={String((qa as any).transferToAccountId ?? '')}
+                                                required
+                                                style={{ color: paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.color || undefined }}
+                                                onChange={(e) => {
+                                                    const nextId = e.target.value ? Number(e.target.value) : null
+                                                    const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                    setQa({
+                                                        ...(qa as any),
+                                                        transferToAccountId: nextId,
+                                                        transferToAccountName: nextAccount?.name ?? null,
+                                                        transferTo: accountMethod(nextAccount?.kind) ?? undefined,
+                                                        paymentMethod: undefined,
+                                                    } as any)
+                                                }}
+                                                aria-label="Transfer nach Konto"
+                                            >
+                                                <option value="">Nach Konto wählen</option>
+                                                {activePaymentAccounts.map((account) => (
+                                                    <option key={`to-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="field">
-                                        <label>Zahlweg</label>
-                                        <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                            {(['BAR','BANK'] as const).map(pm => (
-                                                <button key={pm} type="button" 
-                                                    className={`btn ${(qa as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`}
-                                                    onClick={() => setQa({ ...qa, paymentMethod: pm })}>
-                                                    {pm === 'BAR' ? 'Bar' : 'Bank'}
-                                                </button>
+                                        <label>Konto</label>
+                                        <select
+                                            className="input"
+                                            value={String((qa as any).paymentAccountId ?? '')}
+                                            required
+                                            style={{ color: paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.color || undefined }}
+                                            onChange={(e) => {
+                                                const nextId = e.target.value ? Number(e.target.value) : null
+                                                const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                setQa({
+                                                    ...(qa as any),
+                                                    paymentAccountId: nextId,
+                                                    paymentAccountName: nextAccount?.name ?? null,
+                                                    paymentMethod: accountMethod(nextAccount?.kind) ?? undefined,
+                                                } as any)
+                                            }}
+                                            aria-label="Buchungskonto wählen"
+                                        >
+                                            <option value="">Konto wählen</option>
+                                            {activePaymentAccounts.map((account) => (
+                                                <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
                                             ))}
-                                        </div>
+                                        </select>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* Block B – Finanzdetails */}
-                        <div className="card form-card card-finance">
+                        <div className="card form-card card-finance" style={{ '--booking-account-color': financeAccountColor || 'var(--accent)' } as React.CSSProperties}>
                             <div className="helper helper-mb">Finanzen</div>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (

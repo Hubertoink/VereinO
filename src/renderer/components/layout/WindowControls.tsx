@@ -1,6 +1,10 @@
 import React from 'react'
 
-export default function WindowControls() {
+type WindowControlsProps = {
+    onClose?: () => void
+}
+
+export default function WindowControls({ onClose }: WindowControlsProps) {
     return (
         <div className="window-controls" style={{ WebkitAppRegion: 'no-drag' } as any}>
             <button
@@ -27,7 +31,7 @@ export default function WindowControls() {
                 className="btn danger window-controls__btn"
                 title="Schließen"
                 aria-label="Schließen"
-                onClick={() => window.api?.window?.close?.()}
+                onClick={() => onClose ? onClose() : window.api?.window?.close?.()}
             >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" />

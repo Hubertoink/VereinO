@@ -6,9 +6,11 @@ export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 export interface MetaFilterDropdownProps {
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
   earmarks: Array<{ id: number; code: string; name?: string | null }>
+  paymentAccounts?: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; color?: string | null; isActive: number }>
   tagDefs: Array<{ id: number; name: string; usage?: number }>
   filterType: 'IN' | 'OUT' | 'TRANSFER' | null
   filterPM: 'BAR' | 'BANK' | null
+  paymentAccountId?: number | null
   filterTag: string | null
   sphere: Sphere
   earmarkId: number | null
@@ -17,6 +19,7 @@ export interface MetaFilterDropdownProps {
   onApply: (v: {
     filterType: 'IN' | 'OUT' | 'TRANSFER' | null
     filterPM: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
     filterTag: string | null
     sphere: Sphere
     earmarkId: number | null
@@ -27,9 +30,11 @@ export interface MetaFilterDropdownProps {
 export default function MetaFilterDropdown({
   budgets,
   earmarks,
+  paymentAccounts = [],
   tagDefs,
   filterType,
   filterPM,
+  paymentAccountId = null,
   filterTag,
   sphere,
   earmarkId,
@@ -40,6 +45,7 @@ export default function MetaFilterDropdown({
   const closeRef = useRef<(() => void) | null>(null)
   const [type, setType] = useState<MetaFilterDropdownProps['filterType']>(filterType)
   const [pm, setPm] = useState<MetaFilterDropdownProps['filterPM']>(filterPM)
+  const [accountId, setAccountId] = useState<number | null>(paymentAccountId)
   const [tag, setTag] = useState<string | null>(filterTag)
   const [s, setS] = useState<Sphere>(sphere)
   const [e, setE] = useState<number | null>(earmarkId)
@@ -48,17 +54,19 @@ export default function MetaFilterDropdown({
   useEffect(() => {
     setType(filterType)
     setPm(filterPM)
+    setAccountId(paymentAccountId)
     setTag(filterTag)
     setS(sphere)
     setE(earmarkId)
     setB(budgetId)
-  }, [filterType, filterPM, filterTag, sphere, earmarkId, budgetId])
+  }, [filterType, filterPM, paymentAccountId, filterTag, sphere, earmarkId, budgetId])
 
-  const hasFilters = type != null || pm != null || tag != null || s != null || e != null || b != null
+  const hasFilters = type != null || pm != null || accountId != null || tag != null || s != null || e != null || b != null
 
   const showTags = tagDefs.length > 0
   const showEarmarks = earmarks.length > 0
   const showBudgets = budgets.length > 0
+  const activePaymentAccounts = paymentAccounts.filter((account) => account.isActive !== 0)
 
   const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
     (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
@@ -74,15 +82,16 @@ export default function MetaFilterDropdown({
   const handleReset = () => {
     setType(null)
     setPm(null)
+    setAccountId(null)
     setTag(null)
     setS(null)
     setE(null)
     setB(null)
-    onApply({ filterType: null, filterPM: null, filterTag: null, sphere: null, earmarkId: null, budgetId: null })
+    onApply({ filterType: null, filterPM: null, paymentAccountId: null, filterTag: null, sphere: null, earmarkId: null, budgetId: null })
   }
 
   const handleApply = () => {
-    onApply({ filterType: type, filterPM: pm, filterTag: tag, sphere: s, earmarkId: e, budgetId: b })
+    onApply({ filterType: type, filterPM: accountId == null ? pm : null, paymentAccountId: accountId, filterTag: tag, sphere: s, earmarkId: e, budgetId: b })
     closeRef.current?.()
   }
 
@@ -116,10 +125,19 @@ export default function MetaFilterDropdown({
 
         <div className="filter-dropdown__field">
           <label className="filter-dropdown__label">Zahlweg</label>
-          <select className="input" value={pm ?? ''} onChange={(ev) => setPm((ev.target.value as any) || null)}>
+          <select className="input" value={accountId != null ? String(accountId) : (pm ?? '')} onChange={(ev) => {
+            const value = ev.target.value
+            if (!value) { setAccountId(null); setPm(null); return }
+            if (value === 'BAR' || value === 'BANK') { setAccountId(null); setPm(value); return }
+            setAccountId(Number(value)); setPm(null)
+          }}>
             <option value="">Alle</option>
-            <option value="BAR">Bar</option>
-            <option value="BANK">Bank</option>
+            {activePaymentAccounts.length > 0 ? activePaymentAccounts.map((account) => (
+              <option key={account.id} value={account.id}>{account.name}</option>
+            )) : (<>
+              <option value="BAR">Bar</option>
+              <option value="BANK">Bank</option>
+            </>)}
           </select>
         </div>
 

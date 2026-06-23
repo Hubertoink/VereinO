@@ -30,6 +30,7 @@ const settingsIconColors: Record<TileKey, string> = {
   import: '#F50057',      // Pink/Red - Import
   org: '#26A69A',         // Teal - Organization
   donations: '#FF7043',   // Orange - Donations
+  paymentAccounts: '#1976D2',
   tags: '#FFD600',        // Yellow - Tags
   cashCheck: '#00C853',   // Reuse Year End green
   yearEnd: '#00C853',     // Green - Year End
@@ -103,6 +104,14 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M12 8v8" />
         </svg>
       )
+    case 'paymentAccounts':
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 10h18" />
+          <circle cx="8" cy="14" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      )
     case 'tags':
       // Tag icon
       return (
@@ -172,6 +181,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'import', label: 'Import', shortLabel: 'Import' },
     { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
     { key: 'donations', label: 'Spenden', shortLabel: 'Spenden' },
+    { key: 'paymentAccounts', label: 'Konten', shortLabel: 'Konten' },
     { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
     { key: 'cashCheck', label: 'Kassenprüfung', shortLabel: 'Kassenpr.' },
     { key: 'yearEnd', label: 'Jahresabschluss', shortLabel: 'Jahresab.' },

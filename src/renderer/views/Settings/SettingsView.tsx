@@ -7,6 +7,7 @@ import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { DonationsPane } from './panes/DonationsPane'
+import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
 import { TagsPane } from './panes/TagsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
@@ -19,6 +20,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'import',
   'org',
   'donations',
+  'paymentAccounts',
   'tags',
   'cashCheck',
   'yearEnd',
@@ -111,8 +113,6 @@ export function SettingsView(props: SettingsProps) {
             setCustomBackgroundImage={props.setCustomBackgroundImage}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
-            backgroundContrast={props.backgroundContrast}
-            setBackgroundContrast={props.setBackgroundContrast}
             dateFmt={props.dateFmt}
             setDateFmt={props.setDateFmt}
             journalLimit={props.journalLimit}
@@ -159,6 +159,15 @@ export function SettingsView(props: SettingsProps) {
   {activeTile === 'org' && <OrgPane notify={props.notify} />}
 
       {activeTile === 'donations' && <DonationsPane notify={props.notify} />}
+
+      {activeTile === 'paymentAccounts' && (
+        <PaymentAccountsPane
+          paymentAccounts={props.paymentAccounts}
+          setPaymentAccounts={props.setPaymentAccounts}
+          notify={props.notify}
+          bumpDataVersion={props.bumpDataVersion}
+        />
+      )}
         
         {activeTile === 'tags' && (
           <TagsPane

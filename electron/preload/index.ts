@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
         isMaximized: () => ipcRenderer.invoke('window.isMaximized').then(r => !!r?.isMaximized),
         close: () => ipcRenderer.invoke('window.close'),
         confirmClose: () => ipcRenderer.invoke('window.confirmClose'),
+        cancelClose: () => ipcRenderer.invoke('window.cancelClose'),
         onMaximizeChanged: (cb: (isMax: boolean) => void) => {
             const handler = (_: any, v: boolean) => cb(!!v)
             ipcRenderer.on('window:maximized', handler)
@@ -73,6 +74,11 @@ contextBridge.exposeInMainWorld('api', {
         batchAssignBudget: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignBudget', payload),
         batchAssignTags: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignTags', payload),
         clearAll: () => ipcRenderer.invoke('vouchers.clearAll', { confirm: true })
+    },
+    paymentAccounts: {
+        list: (payload?: any) => ipcRenderer.invoke('paymentAccounts.list', payload),
+        upsert: (payload: any) => ipcRenderer.invoke('paymentAccounts.upsert', payload),
+        delete: (payload: any) => ipcRenderer.invoke('paymentAccounts.delete', payload)
     },
     tags: {
         list: (payload?: any) => ipcRenderer.invoke('tags.list', payload),
@@ -281,7 +287,7 @@ contextBridge.exposeInMainWorld('api', {
         rename: (payload: { orgId: string; name: string }) => ipcRenderer.invoke('organizations.rename', payload),
         delete: (payload: { orgId: string; deleteData?: boolean }) => ipcRenderer.invoke('organizations.delete', payload),
         getAppearance: (payload: { orgId: string }) => ipcRenderer.invoke('organizations.getAppearance', payload),
-        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) =>
+        setAppearance: (payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) =>
             ipcRenderer.invoke('organizations.setAppearance', payload),
         activeAppearance: () => ipcRenderer.invoke('organizations.activeAppearance'),
         onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => {

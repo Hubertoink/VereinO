@@ -19,8 +19,20 @@ type VoucherRow = {
     isAdvancePlaceholder?: boolean
     isCashCheck?: boolean
     paymentMethod?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
+    paymentAccountName?: string | null
+    paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+    paymentAccountColor?: string | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
+    transferFromAccountId?: number | null
+    transferFromAccountName?: string | null
+    transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+    transferFromAccountColor?: string | null
+    transferToAccountId?: number | null
+    transferToAccountName?: string | null
+    transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+    transferToAccountColor?: string | null
     netAmount: number
     vatRate: number
     vatAmount: number
@@ -98,6 +110,7 @@ interface JournalViewProps {
     budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; color?: string | null }>
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
+    paymentAccounts: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
     budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isArchived?: number; color?: string | null }>
     budgetNames: Map<number, string>
@@ -120,6 +133,7 @@ interface JournalViewProps {
     filterSphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
     filterType?: 'IN' | 'OUT' | 'TRANSFER' | null
     filterPM?: 'BAR' | 'BANK' | null
+    filterPaymentAccountId?: number | null
     filterEarmark?: number | null
     filterBudgetId?: number | null
     filterTag?: string | null
@@ -129,6 +143,7 @@ interface JournalViewProps {
     setFilterSphere?: (v: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null) => void
     setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
     setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
+    setFilterPaymentAccountId?: (v: number | null) => void
     setFilterEarmark?: (v: number | null) => void
     setFilterBudgetId?: (v: number | null) => void
     setFilterTag?: (v: string | null) => void
@@ -159,6 +174,7 @@ export default function JournalView({
     yearsAvail,
     budgets,
     earmarks,
+    paymentAccounts,
     tagDefs,
     budgetsForEdit,
     budgetNames,
@@ -179,6 +195,7 @@ export default function JournalView({
     filterSphere: filterSphereProp,
     filterType: filterTypeProp,
     filterPM: filterPMProp,
+    filterPaymentAccountId: filterPaymentAccountIdProp,
     filterEarmark: filterEarmarkProp,
     filterBudgetId: filterBudgetIdProp,
     filterTag: filterTagProp,
@@ -188,6 +205,7 @@ export default function JournalView({
     setFilterSphere: setFilterSphereProp,
     setFilterType: setFilterTypeProp,
     setFilterPM: setFilterPMProp,
+    setFilterPaymentAccountId: setFilterPaymentAccountIdProp,
     setFilterEarmark: setFilterEarmarkProp,
     setFilterBudgetId: setFilterBudgetIdProp,
     setFilterTag: setFilterTagProp,
@@ -202,6 +220,32 @@ export default function JournalView({
     bookingsOpenDetached = false,
     allowVoucherDeletion = false
 }: JournalViewProps) {
+    const paymentMethodLabel = useCallback((method?: 'BAR' | 'BANK' | null) => {
+        if (method === 'BAR') return 'Bar'
+        if (method === 'BANK') return 'Bank'
+        return '—'
+    }, [])
+
+    const paymentAccountsById = useMemo(
+        () => new Map((paymentAccounts || []).map((account) => [account.id, account])),
+        [paymentAccounts]
+    )
+    const activePaymentAccounts = useMemo(
+        () => (paymentAccounts || []).filter((account) => account.isActive !== 0),
+        [paymentAccounts]
+    )
+    const defaultCashAccount = useMemo(
+        () => activePaymentAccounts.find((account) => account.kind === 'CASH') ?? activePaymentAccounts[0] ?? null,
+        [activePaymentAccounts]
+    )
+    const defaultBankAccount = useMemo(
+        () => activePaymentAccounts.find((account) => account.kind === 'BANK')
+            ?? activePaymentAccounts.find((account) => account.id !== defaultCashAccount?.id)
+            ?? activePaymentAccounts[0]
+            ?? null,
+        [activePaymentAccounts, defaultCashAccount]
+    )
+
     // ==================== STATE ====================
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])
@@ -230,6 +274,7 @@ export default function JournalView({
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
+    const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
@@ -241,6 +286,7 @@ export default function JournalView({
     const activeFilterSphere = filterSphereProp !== undefined ? filterSphereProp : filterSphere
     const activeFilterType = filterTypeProp !== undefined ? filterTypeProp : filterType
     const activeFilterPM = filterPMProp !== undefined ? filterPMProp : filterPM
+    const activeFilterPaymentAccountId = filterPaymentAccountIdProp !== undefined ? filterPaymentAccountIdProp : filterPaymentAccountId
     const activeFilterEarmark = filterEarmarkProp !== undefined ? filterEarmarkProp : filterEarmark
     const activeFilterBudgetId = filterBudgetIdProp !== undefined ? filterBudgetIdProp : filterBudgetId
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
@@ -253,6 +299,7 @@ export default function JournalView({
     const activeSetFilterSphere = setFilterSphereProp || setFilterSphere
     const activeSetFilterType = setFilterTypeProp || setFilterType
     const activeSetFilterPM = setFilterPMProp || setFilterPM
+    const activeSetFilterPaymentAccountId = setFilterPaymentAccountIdProp || setFilterPaymentAccountId
     const activeSetFilterEarmark = setFilterEarmarkProp || setFilterEarmark
     const activeSetFilterBudgetId = setFilterBudgetIdProp || setFilterBudgetId
     const activeSetFilterTag = setFilterTagProp || setFilterTag
@@ -400,8 +447,11 @@ export default function JournalView({
             sphere: row.sphere || null,
             description: (row.description || '').trim(),
             paymentMethod: row.paymentMethod || null,
+            paymentAccountId: row.paymentAccountId || null,
             transferFrom: row.transferFrom || null,
             transferTo: row.transferTo || null,
+            transferFromAccountId: row.transferFromAccountId || null,
+            transferToAccountId: row.transferToAccountId || null,
             mode: (row as any).mode || 'GROSS',
             grossAmount: Number((row as any).grossAmount ?? 0),
             netAmount: Number((row as any).netAmount ?? 0),
@@ -457,12 +507,13 @@ export default function JournalView({
     }, [])
 
     const hasActiveFilters = useMemo(() => {
-        return Boolean(stornoPairIds || activeFilterType || activeFilterPM || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
-    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo, stornoPairIds])
+        return Boolean(stornoPairIds || activeFilterType || activeFilterPM || activeFilterPaymentAccountId || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
+    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo, stornoPairIds])
 
     const resetAllFilters = useCallback(() => {
         activeSetFilterType(null)
         activeSetFilterPM(null)
+        activeSetFilterPaymentAccountId(null)
         activeSetFilterTag(null)
         activeSetFilterSphere(null)
         activeSetFilterEarmark(null)
@@ -472,7 +523,7 @@ export default function JournalView({
         activeSetQ('')
         setStornoPairIds(null)
         activeSetPage(1)
-    }, [activeSetFilterBudgetId, activeSetFilterEarmark, activeSetFilterPM, activeSetFilterSphere, activeSetFilterTag, activeSetFilterType, activeSetFrom, activeSetPage, activeSetQ, activeSetTo])
+    }, [activeSetFilterBudgetId, activeSetFilterEarmark, activeSetFilterPM, activeSetFilterPaymentAccountId, activeSetFilterSphere, activeSetFilterTag, activeSetFilterType, activeSetFrom, activeSetPage, activeSetQ, activeSetTo])
 
     const clickShortcutTrigger = useCallback((container: HTMLDivElement | null) => {
         const button = container?.querySelector('button') as HTMLButtonElement | null
@@ -730,7 +781,10 @@ export default function JournalView({
         if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
         if (activeFilterSphere) list.push({ key: 'sphere', label: `Sphäre: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
-        if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
+        if (activeFilterPaymentAccountId != null) {
+            const account = paymentAccountsById.get(Number(activeFilterPaymentAccountId))
+            list.push({ key: 'payment-account', label: `Zahlweg: ${account?.name || `#${activeFilterPaymentAccountId}`}`, clear: () => activeSetFilterPaymentAccountId(null), color: account?.color })
+        } else if (activeFilterPM) list.push({ key: 'pm', label: `Zahlweg: ${activeFilterPM}`, clear: () => activeSetFilterPM(null) })
         if (activeFilterEarmark != null) {
             const em = earmarks.find(e => e.id === activeFilterEarmark)
             list.push({ key: 'earmark', label: `Zweckbindung: ${em ? em.code : '#' + activeFilterEarmark}`, clear: () => activeSetFilterEarmark(null), color: em?.color })
@@ -751,7 +805,7 @@ export default function JournalView({
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         if (stornoPairIds) list.push({ key: 'storno-pair', label: 'Original + Storno', clear: () => setStornoPairIds(null) })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ, stornoPairIds])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterPaymentAccountId, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ, stornoPairIds, paymentAccountsById, activeSetFilterPaymentAccountId])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -763,6 +817,7 @@ export default function JournalView({
                 sort: sortDir,
                 sortBy,
                 paymentMethod: activeFilterPM || undefined,
+                paymentAccountId: activeFilterPaymentAccountId || undefined,
                 sphere: activeFilterSphere || undefined,
                 type: activeFilterType || undefined,
                 from: activeFrom || undefined,
@@ -781,7 +836,7 @@ export default function JournalView({
             notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, stornoPairIds, notify, refreshKey])
+    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, stornoPairIds, notify, refreshKey])
 
     const getVoucherById = useCallback(async (id: number) => {
         const cached = voucherTooltipCache.current.get(id)
@@ -947,17 +1002,20 @@ export default function JournalView({
                     <MetaFilterDropdown
                         budgets={budgets}
                         earmarks={earmarks}
+                        paymentAccounts={paymentAccounts}
                         tagDefs={tagDefs}
                         filterType={activeFilterType}
                         filterPM={activeFilterPM}
+                        paymentAccountId={activeFilterPaymentAccountId}
                         filterTag={activeFilterTag}
                         sphere={activeFilterSphere}
                         earmarkId={activeFilterEarmark}
                         budgetId={activeFilterBudgetId}
                         tooltip="Filter nach Art, Sphäre, Tags …"
-                        onApply={({ filterType, filterPM, filterTag, sphere, earmarkId, budgetId }) => {
+                        onApply={({ filterType, filterPM, paymentAccountId, filterTag, sphere, earmarkId, budgetId }) => {
                             activeSetFilterType(filterType)
                             activeSetFilterPM(filterPM)
+                            activeSetFilterPaymentAccountId(paymentAccountId ?? null)
                             activeSetFilterTag(filterTag)
                             activeSetFilterSphere(sphere)
                             activeSetFilterEarmark(earmarkId)
@@ -1308,6 +1366,15 @@ export default function JournalView({
                             activeSetPage(1)
                             await loadRecent()
                         }}
+                        onPaymentAccountClick={async (id) => {
+                            const normalizedId = Number(id)
+                            if (!Number.isFinite(normalizedId) || normalizedId <= 0) return
+                            activeSetFilterPM(null)
+                            activeSetFilterPaymentAccountId(normalizedId)
+                            setActivePage('Buchungen')
+                            activeSetPage(1)
+                            await loadRecent()
+                        }}
                         onRowDoubleClick={(row) => setInfoVoucher(row)}
                     />
                 </div>
@@ -1369,8 +1436,12 @@ export default function JournalView({
                                         return
                                     }
                                     // Validate transfer direction
-                                    if (editRow.type === 'TRANSFER' && (!editRow.transferFrom || !editRow.transferTo)) {
-                                        notify('error', 'Bitte wähle eine Richtung für den Transfer aus.')
+                                    if (editRow.type === 'TRANSFER' && (!editRow.transferFromAccountId || !editRow.transferToAccountId)) {
+                                        notify('error', 'Bitte wähle Quell- und Zielkonto für den Transfer aus.')
+                                        return
+                                    }
+                                    if (editRow.type !== 'TRANSFER' && !editRow.paymentAccountId) {
+                                        notify('error', 'Bitte wähle ein Konto für die Buchung aus.')
                                         return
                                     }
                                     // Build budgets array from the new multi-assignment UI
@@ -1426,12 +1497,18 @@ export default function JournalView({
                                     }
                                     if (editRow.type === 'TRANSFER') {
                                         delete payload.paymentMethod
+                                        payload.paymentAccountId = null
                                         payload.transferFrom = editRow.transferFrom ?? null
                                         payload.transferTo = editRow.transferTo ?? null
+                                        payload.transferFromAccountId = editRow.transferFromAccountId ?? null
+                                        payload.transferToAccountId = editRow.transferToAccountId ?? null
                                     } else {
                                         payload.paymentMethod = editRow.paymentMethod ?? null
+                                        payload.paymentAccountId = editRow.paymentAccountId ?? null
                                         payload.transferFrom = null
                                         payload.transferTo = null
+                                        payload.transferFromAccountId = null
+                                        payload.transferToAccountId = null
                                     }
                                     if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
                                         payload.grossAmount = Number((editRow as any).grossAmount)
@@ -1459,7 +1536,9 @@ export default function JournalView({
                                         {(() => {
                                             const date = fmtDate(editRow.date)
                                             const type = editRow.type
-                                            const pm = editRow.type === 'TRANSFER' ? (((editRow as any).transferFrom || '—') + ' → ' + ((editRow as any).transferTo || '—')) : ((editRow as any).paymentMethod || '—')
+                                            const pm = editRow.type === 'TRANSFER'
+                                                ? `${editRow.transferFromAccountName || paymentAccountsById.get(Number(editRow.transferFromAccountId || 0))?.name || paymentMethodLabel(editRow.transferFrom)} → ${editRow.transferToAccountName || paymentAccountsById.get(Number(editRow.transferToAccountId || 0))?.name || paymentMethodLabel(editRow.transferTo)}`
+                                                : (editRow.paymentAccountName || paymentAccountsById.get(Number(editRow.paymentAccountId || 0))?.name || paymentMethodLabel(editRow.paymentMethod))
                                             const amount = (() => {
                                                 if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
                                                 if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
@@ -1489,9 +1568,20 @@ export default function JournalView({
                                                     {(['IN','OUT','TRANSFER'] as const).map(t => (
                                                         <button key={t} type="button" className={`btn ${editRow.type === t ? 'btn-toggle-active' : ''} ${t==='IN' ? 'btn-type-in' : t==='OUT' ? 'btn-type-out' : ''}`} onClick={() => {
                                                             const newRow = { ...editRow, type: t }
-                                                            if (t === 'TRANSFER' && (!newRow.transferFrom || !newRow.transferTo)) {
-                                                                newRow.transferFrom = 'BAR'
-                                                                newRow.transferTo = 'BANK'
+                                                            if (t === 'TRANSFER' && (!newRow.transferFromAccountId || !newRow.transferToAccountId)) {
+                                                                newRow.transferFromAccountId = defaultCashAccount?.id ?? null
+                                                                newRow.transferFromAccountName = defaultCashAccount?.name ?? null
+                                                                newRow.transferFrom = defaultCashAccount?.kind === 'CASH' ? 'BAR' : 'BANK'
+                                                                newRow.transferToAccountId = defaultBankAccount?.id ?? null
+                                                                newRow.transferToAccountName = defaultBankAccount?.name ?? null
+                                                                newRow.transferTo = defaultBankAccount?.kind === 'CASH' ? 'BAR' : 'BANK'
+                                                                newRow.paymentAccountId = null
+                                                                newRow.paymentAccountName = null
+                                                            } else if (t !== 'TRANSFER' && !newRow.paymentAccountId) {
+                                                                const fallback = defaultCashAccount ?? defaultBankAccount
+                                                                newRow.paymentAccountId = fallback?.id ?? null
+                                                                newRow.paymentAccountName = fallback?.name ?? null
+                                                                newRow.paymentMethod = fallback?.kind === 'CASH' ? 'BAR' : 'BANK'
                                                             }
                                                             setEditRow(newRow)
                                                         }}>{t}</button>
@@ -1509,26 +1599,41 @@ export default function JournalView({
                                                 </select>
                                             </div>
                                             {editRow.type === 'TRANSFER' ? (
-                                                <div className="field">
-                                                    <label>Richtung <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                    <select value={`${editRow.transferFrom ?? ''}->${editRow.transferTo ?? ''}`}
-                                                        onChange={(e) => {
-                                                            const v = e.target.value
-                                                            if (v === 'BAR->BANK') setEditRow({ ...editRow, transferFrom: 'BAR', transferTo: 'BANK', paymentMethod: null })
-                                                            else if (v === 'BANK->BAR') setEditRow({ ...editRow, transferFrom: 'BANK', transferTo: 'BAR', paymentMethod: null })
-                                                        }}>
-                                                        <option value="BAR->BANK">BAR → BANK</option>
-                                                        <option value="BANK->BAR">BANK → BAR</option>
-                                                    </select>
+                                                <div className="field" style={{ gridColumn: 'span 2' }}>
+                                                    <label>Kontotransfer <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                                    <div className="flex gap-8">
+                                                        <select className="input" value={String(editRow.transferFromAccountId ?? '')} required style={{ color: paymentAccountsById.get(Number(editRow.transferFromAccountId || 0))?.color || undefined }}
+                                                            onChange={(e) => {
+                                                                const nextId = e.target.value ? Number(e.target.value) : null
+                                                                const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                                setEditRow({ ...editRow, transferFromAccountId: nextId, transferFromAccountName: nextAccount?.name ?? null, transferFromAccountKind: nextAccount?.kind ?? null, transferFromAccountColor: nextAccount?.color ?? null, transferFrom: nextAccount?.kind === 'CASH' ? 'BAR' : nextAccount ? 'BANK' : null, paymentMethod: null })
+                                                            }}>
+                                                            <option value="">Von Konto wählen</option>
+                                                            {activePaymentAccounts.map((account) => <option key={`edit-from-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
+                                                        </select>
+                                                        <select className="input" value={String(editRow.transferToAccountId ?? '')} required style={{ color: paymentAccountsById.get(Number(editRow.transferToAccountId || 0))?.color || undefined }}
+                                                            onChange={(e) => {
+                                                                const nextId = e.target.value ? Number(e.target.value) : null
+                                                                const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                                setEditRow({ ...editRow, transferToAccountId: nextId, transferToAccountName: nextAccount?.name ?? null, transferToAccountKind: nextAccount?.kind ?? null, transferToAccountColor: nextAccount?.color ?? null, transferTo: nextAccount?.kind === 'CASH' ? 'BAR' : nextAccount ? 'BANK' : null, paymentMethod: null })
+                                                            }}>
+                                                            <option value="">Nach Konto wählen</option>
+                                                            {activePaymentAccounts.map((account) => <option key={`edit-to-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className="field">
-                                                    <label>Zahlweg</label>
-                                                    <div className="btn-group" role="group" aria-label="Zahlweg wählen">
-                                                        {(['BAR','BANK'] as const).map(pm => (
-                                                            <button key={pm} type="button" className={`btn ${(editRow as any).paymentMethod === pm ? 'btn-toggle-active' : ''}`} onClick={() => setEditRow({ ...editRow, paymentMethod: pm })}>{pm === 'BAR' ? 'Bar' : 'Bank'}</button>
-                                                        ))}
-                                                    </div>
+                                                    <label>Konto</label>
+                                                    <select className="input" value={String(editRow.paymentAccountId ?? '')} required style={{ color: paymentAccountsById.get(Number(editRow.paymentAccountId || 0))?.color || undefined }}
+                                                        onChange={(e) => {
+                                                            const nextId = e.target.value ? Number(e.target.value) : null
+                                                            const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                            setEditRow({ ...editRow, paymentAccountId: nextId, paymentAccountName: nextAccount?.name ?? null, paymentAccountKind: nextAccount?.kind ?? null, paymentAccountColor: nextAccount?.color ?? null, paymentMethod: nextAccount?.kind === 'CASH' ? 'BAR' : nextAccount ? 'BANK' : null })
+                                                        }}>
+                                                        <option value="">Konto wählen</option>
+                                                        {activePaymentAccounts.map((account) => <option key={`edit-account-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
+                                                    </select>
                                                 </div>
                                             )}
                                         </div>

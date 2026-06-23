@@ -50,8 +50,6 @@ interface UIPreferencesContextValue {
   setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean
   setGlassModals: (val: boolean) => void
-  backgroundContrast: boolean
-  setBackgroundContrast: (val: boolean) => void
 }
 
 const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(null)
@@ -71,6 +69,11 @@ function safeLocalStorageRemove(key: string) {
   } catch (e) {
     console.warn(`localStorage.removeItem failed for ${key}:`, e)
   }
+}
+
+function clearLegacyBackgroundContrastPreference() {
+  safeLocalStorageRemove('ui.backgroundContrast')
+  document.documentElement.removeAttribute('data-background-contrast')
 }
 
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -96,7 +99,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
   const [customBackgroundImage, setCustomBackgroundImageState] = useState<string | null>(null)
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
-  const [backgroundContrast, setBackgroundContrastState] = useState<boolean>(false)
   
   // Track current org ID for appearance persistence
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null)
@@ -129,11 +131,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         safeLocalStorageSet('ui.glassModals', String(appearance.glassModals))
         document.documentElement.setAttribute('data-glass-modals', String(appearance.glassModals))
       }
-      if (typeof appearance?.backgroundContrast === 'boolean') {
-        setBackgroundContrastState(appearance.backgroundContrast)
-        safeLocalStorageSet('ui.backgroundContrast', String(appearance.backgroundContrast))
-        document.documentElement.setAttribute('data-background-contrast', String(appearance.backgroundContrast))
-      }
+      clearLegacyBackgroundContrastPreference()
     }
 
     async function loadOrgAppearance() {
@@ -170,9 +168,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         const storedGlass = localStorage.getItem('ui.glassModals')
         setGlassModalsState(storedGlass === 'true')
         document.documentElement.setAttribute('data-glass-modals', storedGlass === 'true' ? 'true' : 'false')
-        const storedContrast = localStorage.getItem('ui.backgroundContrast')
-        setBackgroundContrastState(storedContrast === 'true')
-        document.documentElement.setAttribute('data-background-contrast', storedContrast === 'true' ? 'true' : 'false')
+        clearLegacyBackgroundContrastPreference()
         appearanceInitializedRef.current = true
       } catch (e) {
         console.warn('Failed to load org appearance:', e)
@@ -204,7 +200,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
   
   // Helper to save appearance to organization
-  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean; backgroundContrast?: boolean }) => {
+  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
@@ -231,11 +227,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const setGlassModals = (val: boolean) => {
     setGlassModalsState(val)
     saveAppearanceToOrg({ glassModals: val })
-  }
-
-  const setBackgroundContrast = (val: boolean) => {
-    setBackgroundContrastState(val)
-    saveAppearanceToOrg({ backgroundContrast: val })
   }
 
   const [navIconColorMode, setNavIconColorMode] = useState<NavIconColorMode>(() => {
@@ -383,11 +374,6 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     document.documentElement.setAttribute('data-glass-modals', String(glassModals))
   }, [glassModals])
 
-  useEffect(() => {
-    safeLocalStorageSet('ui.backgroundContrast', String(backgroundContrast))
-    document.documentElement.setAttribute('data-background-contrast', String(backgroundContrast))
-  }, [backgroundContrast])
-
   return (
     <UIPreferencesContext.Provider
       value={{
@@ -420,9 +406,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         customBackgroundImage,
         setCustomBackgroundImage,
         glassModals,
-        setGlassModals,
-        backgroundContrast,
-        setBackgroundContrast
+        setGlassModals
       }}
     >
       {children}

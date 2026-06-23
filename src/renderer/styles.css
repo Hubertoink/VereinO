@@ -1805,6 +1805,35 @@ button.badge:hover { filter: brightness(1.03); }
     margin: 0 1px;
 }
 
+.badge.pm-account-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 118px;
+    padding: 2px 7px;
+    border-width: 1px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.15;
+    opacity: 0.92;
+}
+
+.pm-account-badge__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge.pm-account-badge svg {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
+}
+
 /* TransferDisplay helper (used in summaries etc.) */
 .pm-transfer-display {
     display: inline-flex;
@@ -2348,12 +2377,31 @@ svg text {
     justify-content: flex-end;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .booking-modal-header-actions {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
+}
+
+.booking-modal-header-actions .window-controls {
+    margin-left: 2px;
+}
+
+.detached-booking-titlebar {
+    -webkit-app-region: drag;
+}
+
+.detached-booking-titlebar button,
+.detached-booking-titlebar input,
+.detached-booking-titlebar select,
+.detached-booking-titlebar textarea,
+.detached-booking-titlebar a,
+.detached-booking-titlebar .window-controls {
+    -webkit-app-region: no-drag;
 }
 
 .booking-field-error {
@@ -2453,7 +2501,7 @@ svg text {
     inset: 0;
     align-items: stretch;
     justify-content: stretch;
-    padding: 12px;
+    padding: 0;
     background: var(--bg);
     overflow: hidden;
 }
@@ -2463,6 +2511,19 @@ svg text {
     max-height: none;
     height: 100%;
     box-shadow: none;
+    border: 0;
+    border-radius: 0;
+    -webkit-app-region: drag;
+}
+
+.detached-quick-add-modal > form,
+.detached-quick-add-modal button,
+.detached-quick-add-modal input,
+.detached-quick-add-modal select,
+.detached-quick-add-modal textarea,
+.detached-quick-add-modal a,
+.detached-quick-add-modal [role="button"] {
+    -webkit-app-region: no-drag;
 }
 
 .detached-quick-add-loading {
@@ -2478,7 +2539,8 @@ svg text {
 .booking-modal > form {
     flex: 1;
     min-height: 0;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Wider Members modal similar to booking */
@@ -4902,7 +4964,7 @@ label .req-asterisk {
 
         /* Finanzen card emphasis */
         .booking-modal .card-finance {
-            border-left: 3px solid var(--accent);
+            border-left: 3px solid var(--booking-account-color, var(--accent));
         }
 
         /* Give Beschreibung & Tags more space than Anhänge in the C+D grid */
@@ -5020,6 +5082,104 @@ label .req-asterisk {
             gap: 8px;
             margin-top: 12px;
             align-items: center;
+        }
+
+        .booking-modal .modal-footer-actions {
+            margin: 14px -18px -18px;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+            background: color-mix(in oklab, var(--surface) 94%, #000 6%);
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        .settings-pane-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .settings-pane-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 16px;
+        }
+
+        .payment-accounts-pane {
+            display: grid;
+            gap: 16px;
+        }
+
+        .payment-account-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 10px;
+        }
+
+        .payment-account-card {
+            display: grid;
+            gap: 10px;
+            padding: 12px 14px;
+            border-left: 4px solid var(--account-color);
+        }
+
+        .payment-account-card__main {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .payment-account-card__name {
+            font-weight: 700;
+        }
+
+        .payment-account-card__badges,
+        .payment-account-card__actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .payment-account-card__actions {
+            justify-content: flex-end;
+        }
+
+        .payment-account-modal {
+            max-width: 760px;
+            display: grid;
+            gap: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .payment-account-modal__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .payment-account-modal__header h2 {
+            margin: 0;
+        }
+
+        .payment-account-modal__body {
+            padding: 16px 18px;
+        }
+
+        .payment-account-modal__footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+            background: color-mix(in oklab, var(--surface) 94%, #000 6%);
         }
 
             .text-overflow-ellipsis {
@@ -5647,21 +5807,6 @@ html[data-glass-modals="true"] .settings-content {
 /* Slightly more translucent for nested cards in glass mode */
 html[data-glass-modals="true"] .settings-pane-card {
     background: color-mix(in oklab, var(--surface) 60%, transparent) !important;
-}
-
-/* Optional readability boost when a photo is visible behind the interface. */
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .card,
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .settings-content,
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .flyout-popover {
-    background: color-mix(in oklab, var(--surface) 94%, transparent) !important;
-}
-
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-in,
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-out,
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) td.gross-transfer,
-html[data-background-contrast="true"][data-background-image]:not([data-background-image="none"]) .filter-totals-stat__value {
-    font-weight: 750;
-    text-shadow: 0 1px 2px var(--surface);
 }
 
 /* ========================================

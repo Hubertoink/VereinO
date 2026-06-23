@@ -1,9 +1,10 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { ICONS, IconBank, IconCash, IconArrow, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
+import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
+type PaymentUsage = { inflow: number; spent: number; balance: number; count?: number }
 
 function TooltipList({
     title,
@@ -46,7 +47,7 @@ function UsageHover({
     hint,
     children
 }: {
-    kind: 'budget' | 'earmark' | 'tag'
+    kind: 'budget' | 'earmark' | 'tag' | 'payment'
     id?: number
     title: string
     accent?: string | null
@@ -121,6 +122,16 @@ function UsageHover({
             }
             return result
         }
+        if (kind === 'payment') {
+            const u = data as PaymentUsage
+            const result = [
+                { key: 'Einnahmen', value: eurFmt.format(Number(u.inflow || 0)), dotColor: 'var(--success)' },
+                { key: 'Ausgaben', value: eurFmt.format(Number(u.spent || 0)), dotColor: 'var(--danger)' },
+                { key: 'Saldo', value: eurFmt.format(Number(u.balance || 0)), dotColor: accent || 'var(--accent)' }
+            ]
+            if (u.count != null) result.push({ key: 'Buchungen', value: String(u.count || 0), dotColor: 'var(--text-dim)' })
+            return result
+        }
         // kind === 'tag'
         const u = data as { inflow: number; spent: number; balance: number; count: number }
         return [
@@ -170,6 +181,14 @@ function UsageHover({
             )}
         </HoverTooltip>
     )
+}
+
+function paymentKindLabel(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null, method?: 'BAR' | 'BANK' | null) {
+    if (kind === 'CASH' || method === 'BAR') return 'Bar'
+    if (kind === 'PAYPAL') return 'PayPal'
+    if (kind === 'CARD') return 'Karte'
+    if (kind === 'OTHER') return 'Sonstiges'
+    return 'Bank'
 }
 
 function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, children }: {
@@ -245,6 +264,18 @@ function saveColumnWidths(widths: Record<string, number>) {
     } catch { /* ignore */ }
 }
 
+function paymentMethodLabel(method?: 'BAR' | 'BANK' | null) {
+    if (method === 'BAR') return 'Bar'
+    if (method === 'BANK') return 'Bank'
+    return '—'
+}
+
+function paymentAccountIcon(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null, method?: 'BAR' | 'BANK' | null, size = 12) {
+    if (kind === 'PAYPAL') return <IconPayPal size={size} />
+    if (kind === 'CASH' || method === 'BAR') return <IconCash size={size} />
+    return <IconBank size={size} />
+}
+
 // Types for multiple budget/earmark assignments
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
 type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
@@ -264,8 +295,20 @@ interface JournalTableProps {
         reversedById?: number | null
         reversedByVoucherNo?: string | null
         paymentMethod?: 'BAR' | 'BANK' | null
+        paymentAccountId?: number | null
+        paymentAccountName?: string | null
+        paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        paymentAccountColor?: string | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
+        transferFromAccountId?: number | null
+        transferFromAccountName?: string | null
+        transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        transferFromAccountColor?: string | null
+        transferToAccountId?: number | null
+        transferToAccountName?: string | null
+        transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        transferToAccountColor?: string | null
         netAmount: number
         vatRate: number
         vatAmount: number
@@ -295,8 +338,20 @@ interface JournalTableProps {
         date: string
         description: string | null
         paymentMethod: 'BAR' | 'BANK' | null
+        paymentAccountId?: number | null
+        paymentAccountName?: string | null
+        paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        paymentAccountColor?: string | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
+        transferFromAccountId?: number | null
+        transferFromAccountName?: string | null
+        transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        transferFromAccountColor?: string | null
+        transferToAccountId?: number | null
+        transferToAccountName?: string | null
+        transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+        transferToAccountColor?: string | null
         type?: 'IN' | 'OUT' | 'TRANSFER'
         sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
         earmarkId?: number | null
@@ -322,6 +377,7 @@ interface JournalTableProps {
     onTagClick?: (name: string) => void
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
+    onPaymentAccountClick?: (id: number) => void
     onStornoPairClick?: (originalId: number, reversalId: number) => void
     getVoucherById?: (id: number) => Promise<any>
     highlightId?: number | null
@@ -346,6 +402,7 @@ export default function JournalTable({
     onTagClick,
     onEarmarkClick,
     onBudgetClick,
+    onPaymentAccountClick,
     onStornoPairClick,
     getVoucherById,
     highlightId,
@@ -400,6 +457,8 @@ export default function JournalTable({
 
     const tagUsageCache = useRef(new Map<number, any>())
     const tagUsageInFlight = useRef(new Map<number, Promise<any>>())
+    const paymentUsageCache = useRef(new Map<number, PaymentUsage>())
+    const paymentUsageInFlight = useRef(new Map<number, Promise<PaymentUsage>>())
 
     const getTagUsage = useCallback(async (tagId: number) => {
         const cached = tagUsageCache.current.get(tagId)
@@ -422,6 +481,33 @@ export default function JournalTable({
             return await p
         } finally {
             tagUsageInFlight.current.delete(tagId)
+        }
+    }, [])
+
+    const getPaymentUsage = useCallback(async (paymentAccountId: number) => {
+        const cached = paymentUsageCache.current.get(paymentAccountId)
+        if (cached) return cached
+        const inflight = paymentUsageInFlight.current.get(paymentAccountId)
+        if (inflight) return inflight
+        const p = (async () => {
+            const api = (window as any)?.api
+            if (!api?.reports?.summary) throw new Error('Zahlweg-Auswertung ist lokal nicht verfügbar.')
+            const [inSummary, outSummary, allRows] = await Promise.all([
+                api.reports.summary({ paymentAccountId, type: 'IN' }),
+                api.reports.summary({ paymentAccountId, type: 'OUT' }),
+                api.vouchers?.list?.({ paymentAccountId, limit: 1 })
+            ])
+            const inflow = Number(inSummary?.totals?.gross || 0)
+            const spent = Number(outSummary?.totals?.gross || 0)
+            const usage = { inflow, spent, balance: inflow - spent, count: Number(allRows?.total || 0) }
+            paymentUsageCache.current.set(paymentAccountId, usage)
+            return usage
+        })()
+        paymentUsageInFlight.current.set(paymentAccountId, p)
+        try {
+            return await p
+        } finally {
+            paymentUsageInFlight.current.delete(paymentAccountId)
         }
     }, [])
     
@@ -621,7 +707,7 @@ export default function JournalTable({
                 ) : isReversedOriginal(r) ? (
                     <span className="badge badge-storno-lock" title={`Bereits storniert durch ${stornierungLabel(r.reversedByVoucherNo || r.reversedById)} – nicht bearbeitbar`} aria-label="Stornierte Buchung gesperrt">ST</span>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, paymentAccountName: r.paymentAccountName ?? null, paymentAccountKind: r.paymentAccountKind ?? null, paymentAccountColor: r.paymentAccountColor ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferFromAccountName: r.transferFromAccountName ?? null, transferFromAccountKind: r.transferFromAccountKind ?? null, transferFromAccountColor: r.transferFromAccountColor ?? null, transferToAccountId: r.transferToAccountId ?? null, transferToAccountName: r.transferToAccountName ?? null, transferToAccountKind: r.transferToAccountKind ?? null, transferToAccountColor: r.transferToAccountColor ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -740,24 +826,49 @@ export default function JournalTable({
                     (() => {
                         const from = r.transferFrom
                         const to = r.transferTo
-                        const title = from && to ? `${from === 'BAR' ? 'Bar' : 'Bank'} → ${to === 'BAR' ? 'Bar' : 'Bank'}` : 'Transfer'
+                        const fromLabel = r.transferFromAccountName || paymentMethodLabel(from)
+                        const toLabel = r.transferToAccountName || paymentMethodLabel(to)
+                        const title = `${fromLabel} → ${toLabel}`
+                            const rows = [
+                            { key: 'Von', value: fromLabel, dotColor: r.transferFromAccountColor || 'var(--border)' },
+                            { key: 'Nach', value: toLabel, dotColor: r.transferToAccountColor || 'var(--border)' },
+                            { key: 'Betrag', value: eurFmt.format(Math.abs(Number(r.grossAmount || 0))), dotColor: 'var(--accent)' }
+                        ]
+                            const clickAccountId = Number(r.transferFromAccountId || r.transferToAccountId || 0)
                         return (
-                            <span className={`badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} title={title} aria-label={title}>
-                                <span className="pm-icon">
-                                    {from === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
-                                </span>
-                                <span className="transfer-arrow">→</span>
-                                <span className="pm-icon">
-                                    {to === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
-                                </span>
-                            </span>
+                            <UsageHover kind="payment" title="Kontotransfer" rows={rows} eurFmt={eurFmt} getUsage={clickAccountId ? getPaymentUsage : undefined} id={clickAccountId || undefined}>
+                                <button type="button" className={`badge pm-account-badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} aria-label={title} style={{ borderColor: r.transferFromAccountColor || r.transferToAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); if (clickAccountId) onPaymentAccountClick?.(clickAccountId) }}>
+                                    <span className="pm-icon">
+                                        {paymentAccountIcon(r.transferFromAccountKind, from)}
+                                    </span>
+                                    <span className="transfer-arrow">→</span>
+                                    <span className="pm-icon">
+                                        {paymentAccountIcon(r.transferToAccountKind, to)}
+                                    </span>
+                                    <span className="pm-account-badge__label">{fromLabel} → {toLabel}</span>
+                                </button>
+                            </UsageHover>
                         )
                     })()
                 ) : (
                     r.paymentMethod ? (
-                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'} aria-label={`Zahlweg: ${r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'}`}>
-                            {r.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
-                        </span>
+                        (() => {
+                            const label = r.paymentAccountName || paymentMethodLabel(r.paymentMethod)
+                            const rows = [
+                                { key: 'Konto', value: label, dotColor: r.paymentAccountColor || 'var(--border)' },
+                                { key: 'Typ', value: paymentKindLabel(r.paymentAccountKind, r.paymentMethod), dotColor: r.paymentAccountColor || 'var(--accent)' },
+                                { key: 'Betrag', value: eurFmt.format(Math.abs(Number(r.grossAmount || 0))), dotColor: r.type === 'IN' ? 'var(--success)' : 'var(--danger)' }
+                            ]
+                            const accountId = Number(r.paymentAccountId || 0)
+                            return (
+                                <UsageHover kind="payment" title="Zahlungskonto" rows={rows} eurFmt={eurFmt} getUsage={accountId ? getPaymentUsage : undefined} id={accountId || undefined}>
+                                    <button type="button" className={`badge pm-account-badge pm-${(r.paymentMethod || '').toLowerCase()}`} aria-label={`Zahlweg: ${label}`} style={{ borderColor: r.paymentAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); if (accountId) onPaymentAccountClick?.(accountId) }}>
+                                        {paymentAccountIcon(r.paymentAccountKind, r.paymentMethod)}
+                                        <span className="pm-account-badge__label">{label}</span>
+                                    </button>
+                                </UsageHover>
+                            )
+                        })()
                     ) : ''
                 )}
             </td>
