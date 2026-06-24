@@ -2271,6 +2271,7 @@ function AppInner() {
                             earmarks={earmarks}
                             budgetsForEdit={budgetsForEdit}
                             tagDefs={tagDefs}
+                            paymentAccounts={paymentAccounts}
                         />
                     )}
             </main>

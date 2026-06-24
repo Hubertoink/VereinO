@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ICONS } from '../../utils/icons'
 import TagsEditor from '../../components/TagsEditor'
+import { getInitialPaymentAccount, getPaymentMethodFromAccountKind } from './paymentAccountUtils'
 
 // Unicode icons for buttons
 const ICON_IMPORT = '📥'
@@ -16,6 +17,8 @@ interface Submission {
     type: 'IN' | 'OUT'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
     paymentMethod?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
+    paymentAccountName?: string | null
     description?: string | null
     grossAmount: number
     categoryHint?: string | null
@@ -47,6 +50,8 @@ interface VoucherDraft {
     grossAmount: number
     vatRate: number
     paymentMethod: 'BAR' | 'BANK'
+    paymentAccountId: number | null
+    paymentAccountName: string | null
     earmarkId: number | null
     budgetId: number | null
     tags: string[]
@@ -64,6 +69,7 @@ interface SubmissionsViewProps {
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     budgetsForEdit: Array<{ id: number; label: string }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    paymentAccounts?: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>
 }
 
 // Review modal for kassier to approve/reject with edit capability
@@ -74,7 +80,8 @@ function ReviewModal({
     onReject,
     earmarks,
     budgetsForEdit,
-    tagDefs
+    tagDefs,
+    paymentAccounts = []
 }: {
     submission: Submission
     onClose: () => void
@@ -83,12 +90,15 @@ function ReviewModal({
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     budgetsForEdit: Array<{ id: number; label: string }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
+    paymentAccounts?: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>
 }) {
     const [notes, setNotes] = useState('')
     const [loading, setLoading] = useState(false)
     const [editMode, setEditMode] = useState(false)
     const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; mimeType?: string | null; dataBase64?: string } | null>(null)
     const [loadingPreview, setLoadingPreview] = useState(false)
+    const paymentAccountsById = useMemo(() => new Map((paymentAccounts || []).map((account) => [account.id, account])), [paymentAccounts])
+    const activePaymentAccounts = useMemo(() => (paymentAccounts || []).filter((account) => account.isActive !== 0), [paymentAccounts])
     
     // Attachments management - track existing attachments and new ones
     const [existingAttachments, setExistingAttachments] = useState(submission.attachments || [])
@@ -98,19 +108,25 @@ function ReviewModal({
     const earmarkExists = useMemo(() => !!submission.earmarkId && earmarks.some((em) => em.id === submission.earmarkId), [earmarks, submission.earmarkId])
     
     // Editable voucher draft - convert from cents to euros for display
-    const [draft, setDraft] = useState<VoucherDraft>(() => ({
-        date: submission.date,
-        type: submission.type,
-        sphere: submission.sphere || 'IDEELL',
-        description: submission.description || '',
-        grossAmount: submission.grossAmount, // stored in cents
-        vatRate: 0,
-        paymentMethod: submission.paymentMethod || 'BANK',
-        earmarkId: submission.earmarkId && earmarks.some((em) => em.id === submission.earmarkId) ? submission.earmarkId : null,
-        budgetId: submission.budgetId && budgetsForEdit.some((b) => b.id === submission.budgetId) ? submission.budgetId : null,
-        tags: submission.tags || [],
-        counterparty: submission.counterparty || ''
-    }))
+    const [draft, setDraft] = useState<VoucherDraft>(() => {
+        const initialAccount = getInitialPaymentAccount(activePaymentAccounts, submission.paymentMethod || null)
+        const initialAccountId = submission.paymentAccountId ?? initialAccount?.id ?? null
+        return {
+            date: submission.date,
+            type: submission.type,
+            sphere: submission.sphere || 'IDEELL',
+            description: submission.description || '',
+            grossAmount: submission.grossAmount, // stored in cents
+            vatRate: 0,
+            paymentMethod: submission.paymentMethod || getPaymentMethodFromAccountKind(initialAccount?.kind) || 'BANK',
+            paymentAccountId: initialAccountId,
+            paymentAccountName: submission.paymentAccountName || paymentAccountsById.get(initialAccountId)?.name || initialAccount?.name || null,
+            earmarkId: submission.earmarkId && earmarks.some((em) => em.id === submission.earmarkId) ? submission.earmarkId : null,
+            budgetId: submission.budgetId && budgetsForEdit.some((b) => b.id === submission.budgetId) ? submission.budgetId : null,
+            tags: submission.tags || [],
+            counterparty: submission.counterparty || ''
+        }
+    })
 
     // Euro input state (for display, stored separately from cents)
     const [grossAmountEuro, setGrossAmountEuro] = useState(() => 
@@ -166,7 +182,7 @@ function ReviewModal({
                     <div className="card mb-16" style={{ padding: 12, background: 'var(--surface-alt)' }}>
                         <div className="helper mb-4" style={{ fontSize: 11 }}>Eingereichte Daten</div>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>
-                            {submission.date} · {submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {submission.paymentMethod || 'BANK'} ·{' '}
+                            {submission.date} · {submission.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {draft.paymentAccountName || (draft.paymentMethod === 'BAR' ? 'Bar' : draft.paymentMethod === 'BANK' ? 'Bank' : submission.paymentMethod || 'BANK')} ·{' '}
                             <span style={{ color: submission.type === 'IN' ? 'var(--success)' : 'var(--danger)' }}>
                                 {submission.type === 'OUT' && '-'}€ {(submission.grossAmount / 100).toFixed(2)}
                             </span>
@@ -274,23 +290,28 @@ function ReviewModal({
                                                 </select>
                                             </div>
                                             <div className="field">
-                                                <label>Zahlweg</label>
-                                                <div className="btn-group">
-                                                    <button
-                                                        type="button"
-                                                        className={`btn ${draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`}
-                                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BAR' })}
-                                                    >
-                                                        Bar
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`btn ${draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`}
-                                                        onClick={() => setDraft({ ...draft, paymentMethod: 'BANK' })}
-                                                    >
-                                                        Bank
-                                                    </button>
-                                                </div>
+                                                <label>Konto</label>
+                                                <select
+                                                    className="input"
+                                                    value={draft.paymentAccountId ?? ''}
+                                                    onChange={(e) => {
+                                                        const nextId = e.target.value ? Number(e.target.value) : null
+                                                        const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
+                                                        setDraft({
+                                                            ...draft,
+                                                            paymentAccountId: nextId,
+                                                            paymentAccountName: nextAccount?.name ?? null,
+                                                            paymentMethod: getPaymentMethodFromAccountKind(nextAccount?.kind) || draft.paymentMethod || 'BANK'
+                                                        })
+                                                    }}
+                                                >
+                                                    <option value="">Konto wählen</option>
+                                                    {activePaymentAccounts.map((account) => (
+                                                        <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>
+                                                            {account.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
@@ -624,7 +645,7 @@ function StatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' }
     return <span className={className}>{label}</span>
 }
 
-export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDate, earmarks, budgetsForEdit, tagDefs }: SubmissionsViewProps) {
+export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDate, earmarks, budgetsForEdit, tagDefs, paymentAccounts }: SubmissionsViewProps) {
     const [submissions, setSubmissions] = useState<Submission[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -734,6 +755,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                 grossAmount: draft.grossAmount / 100, // Convert from cents to euros
                 vatRate: draft.vatRate,
                 paymentMethod: draft.paymentMethod,
+                paymentAccountId: draft.paymentAccountId ?? null,
                 earmarkId: draft.earmarkId || undefined,
                 budgetId: draft.budgetId || undefined,
                 tags: draft.tags.length > 0 ? draft.tags : undefined
@@ -861,6 +883,8 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
         const rejected = submissions.filter(s => s.status === 'rejected').length
         return { pending, approved, rejected, total: submissions.length }
     }, [submissions])
+
+    const paymentAccountOptions = useMemo(() => (paymentAccounts || []).filter((account) => account.isActive !== 0), [paymentAccounts])
 
     return (
         <div className="page-content">
