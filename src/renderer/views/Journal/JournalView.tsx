@@ -159,6 +159,7 @@ interface JournalViewProps {
     showBookingEditTabs?: boolean
     bookingsOpenDetached?: boolean
     allowVoucherDeletion?: boolean
+    onOpenVoucherAttachments?: (voucher: { voucherId: number; voucherNo: string; date: string; description: string }) => void
 }
 
 export default function JournalView({
@@ -220,7 +221,8 @@ export default function JournalView({
     onCloseBookingDraft,
     showBookingEditTabs = false,
     bookingsOpenDetached = false,
-    allowVoucherDeletion = false
+    allowVoucherDeletion = false,
+    onOpenVoucherAttachments
 }: JournalViewProps) {
     const paymentMethodLabel = useCallback((method?: 'BAR' | 'BANK' | null) => {
         if (method === 'BAR') return 'Bar'
@@ -2159,6 +2161,15 @@ export default function JournalView({
                         allowVoucherDeletion={allowVoucherDeletion}
                         onReverse={() => {
                             setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })
+                            setInfoVoucher(null)
+                        }}
+                        onOpenAttachments={() => {
+                            onOpenVoucherAttachments?.({
+                                voucherId: infoVoucher.id,
+                                voucherNo: infoVoucher.voucherNo,
+                                date: infoVoucher.date,
+                                description: infoVoucher.description || '',
+                            })
                             setInfoVoucher(null)
                         }}
                     />

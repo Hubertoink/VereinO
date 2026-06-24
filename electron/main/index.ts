@@ -178,7 +178,9 @@ async function createWindow(): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
-        minWidth: 580,
+        // Fits comfortably into a 50/50 snap on a 1920 px wide display while
+        // preventing layouts that are too narrow to remain useful.
+        minWidth: 900,
         minHeight: 640,
         show: false,
         autoHideMenuBar: true,

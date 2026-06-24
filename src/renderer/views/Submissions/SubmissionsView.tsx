@@ -1007,8 +1007,9 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                 </div>
             ) : (
                 /* Table */
-                <div className="card">
-                    <table className="table">
+                <div className="card submissions-table-card">
+                    <div className="submissions-table-scroll" role="region" aria-label="Einreichungen" tabIndex={0}>
+                    <table className="table submissions-table">
                         <thead>
                             <tr>
                                 <th style={{ textAlign: 'left' }}>Status</th>
@@ -1067,6 +1068,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 

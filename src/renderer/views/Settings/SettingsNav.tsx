@@ -34,6 +34,7 @@ const settingsIconColors: Record<TileKey, string> = {
   tags: '#FFD600',        // Yellow - Tags
   cashCheck: '#00C853',   // Reuse Year End green
   yearEnd: '#00C853',     // Green - Year End
+  updates: '#00B8D4',     // Cyan - Updates
   tutorial: '#FF7043',    // Orange - Tutorial
   about: '#9C27B0',       // Purple - About
 }
@@ -146,6 +147,14 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M16 18h.01" />
         </svg>
       )
+    case 'updates':
+      return (
+        <svg {...iconProps}>
+          <path d="M12 3v12" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M5 21h14" />
+        </svg>
+      )
     case 'tutorial':
       // Graduation cap / Learning icon
       return (
@@ -185,6 +194,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
     { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
     { key: 'cashCheck', label: 'Kassenprüfung', shortLabel: 'Kassenpr.' },
     { key: 'yearEnd', label: 'Jahresabschluss', shortLabel: 'Jahresab.' },
+    { key: 'updates', label: 'Updates', shortLabel: 'Updates' },
   ]
 
   return (

@@ -19,6 +19,7 @@ export type TileKey =
   | 'tags'
   | 'cashCheck'
   | 'yearEnd'
+  | 'updates'
   | 'tutorial' 
   | 'about'
 

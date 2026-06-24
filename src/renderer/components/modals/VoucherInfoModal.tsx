@@ -31,6 +31,8 @@ type VoucherInfo = {
   budgetLabel?: string | null
   budgetColor?: string | null
   tags?: string[]
+  hasFiles?: boolean
+  fileCount?: number
   // Multiple assignments
   budgets?: BudgetAssignment[]
   earmarksAssigned?: EarmarkAssignment[]
@@ -47,6 +49,7 @@ interface VoucherInfoModalProps {
   tagDefs?: Array<{ id: number; name: string; color?: string | null }>
   allowVoucherDeletion?: boolean
   onReverse?: () => void
+  onOpenAttachments?: () => void
 }
 
 // Helper for contrast text color
@@ -62,7 +65,7 @@ function contrastText(bg?: string | null) {
   return luminance > 0.6 ? '#000' : '#fff'
 }
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments }: VoucherInfoModalProps) {
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   const isReversalVoucher = !!voucher.originalId
@@ -231,6 +234,14 @@ Status: ${statusLabel}`
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'start' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Beschreibung:</span>
               <span style={{ wordBreak: 'break-word' }}>{voucher.description || '-'}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Anhang:</span>
+              {voucher.hasFiles || (voucher.fileCount || 0) > 0 ? (
+                <button className="btn" style={{ justifySelf: 'start' }} onClick={onOpenAttachments} disabled={!onOpenAttachments}>
+                  📎 {voucher.fileCount || 1} {(voucher.fileCount || 1) === 1 ? 'Beleg' : 'Belege'} anzeigen
+                </button>
+              ) : <span>Kein Anhang</span>}
             </div>
           </div>
 

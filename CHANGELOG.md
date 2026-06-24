@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.0.7] - 2026-06-24
+
+### Hinzugefügt
+
+- Einstellungen: Updates sind jetzt über einen eigenen Reiter erreichbar.
+- Buchungsdetails: Vorhandene Anhänge werden angezeigt und öffnen per Klick direkt den zugehörigen Beleg.
+
+### Geändert
+
+- Fensterlayout: Die Mindestbreite wurde erhöht und die Kopfzeile, Fenstersteuerung sowie Einstellungsreiter für 50/50-Fenstersnap optimiert.
+
+### Behoben
+
+- Buchungen und Einreichungen: Tabellen bleiben bei minimaler Fensterbreite vollständig über horizontale Scrollleisten bedienbar.
+
 ## [1.9.8] - 2026-06-23
 
 ### Hinzugefügt

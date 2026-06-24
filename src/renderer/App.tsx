@@ -915,6 +915,7 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    const [receiptTarget, setReceiptTarget] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     const registerPageShortcuts = useCallback((shortcuts: PageShortcutAction[]) => {
         setRegisteredPageShortcuts(shortcuts)
@@ -1002,7 +1003,7 @@ function AppInner() {
                 onClick: () => {
                     setActivePage('Einstellungen')
                     window.setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'general' } }))
+                        window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'updates' } }))
                     }, 0)
                 }
             }
@@ -1580,7 +1581,8 @@ function AppInner() {
                     { key: 'p', label: 'Spenden', action: () => openSettingsTile('donations') },
                     { key: 'g', label: 'Tags', action: () => openSettingsTile('tags') },
                     { key: 'k', label: 'Kassenprüfung', action: () => openSettingsTile('cashCheck') },
-                    { key: 'j', label: 'Jahresabschluss', action: () => openSettingsTile('yearEnd') }
+                    { key: 'j', label: 'Jahresabschluss', action: () => openSettingsTile('yearEnd') },
+                    { key: 'u', label: 'Updates', action: () => openSettingsTile('updates') }
                 ]
             }
         ]
@@ -2144,6 +2146,10 @@ function AppInner() {
                             showBookingEditTabs={showBookingEditTabs}
                             bookingsOpenDetached={bookingsOpenDetached}
                             allowVoucherDeletion={allowVoucherDeletion}
+                            onOpenVoucherAttachments={(voucher) => {
+                                setReceiptTarget(voucher)
+                                setActivePage('Belege')
+                            }}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -2201,7 +2207,7 @@ function AppInner() {
                     )}
 
                     {activePage === 'Belege' && (
-                        <ReceiptsView />
+                        <ReceiptsView openVoucher={receiptTarget} onVoucherOpened={() => setReceiptTarget(null)} />
                     )}
 
                     {activePage === 'Zweckbindungen' && (

@@ -11,6 +11,7 @@ import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
 import { TagsPane } from './panes/TagsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
+import { UpdatesPane } from './panes/UpdatesPane'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
@@ -24,6 +25,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'tags',
   'cashCheck',
   'yearEnd',
+  'updates',
   'tutorial',
   'about',
 ] as const
@@ -192,6 +194,8 @@ export function SettingsView(props: SettingsProps) {
             bumpDataVersion={props.bumpDataVersion}
           />
         )}
+
+        {activeTile === 'updates' && <UpdatesPane notify={props.notify} />}
       </div>
 
       {/* Developer Badge - edge anchored handle; panel retracts on mouse leave */}

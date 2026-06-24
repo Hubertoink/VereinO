@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
 
-export default function ReceiptsView() {
+type ReceiptTarget = { voucherId: number; voucherNo: string; date: string; description: string }
+
+export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVoucher?: ReceiptTarget | null; onVoucherOpened?: () => void }) {
     const [rows, setRows] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string | null; fileCount?: number }>>([])
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(20)
@@ -24,6 +26,12 @@ export default function ReceiptsView() {
     }
 
     useEffect(() => { load() }, [page, limit])
+
+    useEffect(() => {
+        if (!openVoucher) return
+        setAttachmentsModal(openVoucher)
+        onVoucherOpened?.()
+    }, [openVoucher, onVoucherOpened])
 
     // AttachmentsModal handles listing, preview and download
 
