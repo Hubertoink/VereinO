@@ -14,8 +14,12 @@ type VoucherInfo = {
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   description?: string | null
   paymentMethod?: 'BAR' | 'BANK' | null
+  paymentAccountName?: string | null
+  paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
   transferFrom?: 'BAR' | 'BANK' | null
   transferTo?: 'BAR' | 'BANK' | null
+  transferFromAccountName?: string | null
+  transferToAccountName?: string | null
   grossAmount: number
   originalId?: number | null
   originalVoucherNo?: string | null
@@ -41,6 +45,8 @@ interface VoucherInfoModalProps {
   earmarks?: Array<{ id: number; code: string; name: string; color?: string | null }>
   budgets?: Array<{ id: number; label: string; color?: string | null }>
   tagDefs?: Array<{ id: number; name: string; color?: string | null }>
+  allowVoucherDeletion?: boolean
+  onReverse?: () => void
 }
 
 // Helper for contrast text color
@@ -56,7 +62,7 @@ function contrastText(bg?: string | null) {
   return luminance > 0.6 ? '#000' : '#fff'
 }
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [] }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse }: VoucherInfoModalProps) {
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   const isReversalVoucher = !!voucher.originalId
@@ -98,9 +104,13 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   // Payment label for copy functions
   let paymentLabel = ''
   if (voucher.type === 'TRANSFER') {
-    paymentLabel = `${voucher.transferFrom === 'BAR' ? 'Bar' : 'Bank'} → ${voucher.transferTo === 'BAR' ? 'Bar' : 'Bank'}`
+    const fromLabel = voucher.transferFromAccountName?.trim() || (voucher.transferFrom === 'BAR' ? 'Bar' : voucher.transferFrom === 'BANK' ? 'Bank' : 'Konto')
+    const toLabel = voucher.transferToAccountName?.trim() || (voucher.transferTo === 'BAR' ? 'Bar' : voucher.transferTo === 'BANK' ? 'Bank' : 'Konto')
+    paymentLabel = `${fromLabel} → ${toLabel}`
   } else {
-    paymentLabel = voucher.paymentMethod === 'BAR' ? 'Bar' : voucher.paymentMethod === 'BANK' ? 'Bank' : '-'
+    const methodLabel = voucher.paymentMethod === 'BAR' ? 'Bar' : voucher.paymentMethod === 'BANK' ? 'Bank' : null
+    const accountLabel = voucher.paymentAccountName?.trim()
+    paymentLabel = methodLabel && accountLabel ? `${methodLabel} · ${accountLabel}` : methodLabel || accountLabel || '-'
   }
   
   const budgetDisplay = budgetAssignments.length > 0 
@@ -247,7 +257,7 @@ Status: ${statusLabel}`
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zahlweg:</span>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {voucher.type === 'TRANSFER' ? (
                   <span className={`badge pm-transfer pm-transfer-${(voucher.transferFrom || '').toLowerCase()}-${(voucher.transferTo || '').toLowerCase()}`}>
                     <span className="pm-icon">{voucher.transferFrom === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
@@ -261,6 +271,7 @@ Status: ${statusLabel}`
                 ) : (
                   <span>-</span>
                 )}
+                <span>{paymentLabel}</span>
               </div>
             </div>
           </div>
@@ -353,7 +364,7 @@ Status: ${statusLabel}`
           </div>
         </div>
 
-        {/* Footer mit Kopier-Buttons */}
+        {/* Footer mit Aktionen */}
         <div
           style={{
             display: 'flex',
@@ -364,6 +375,11 @@ Status: ${statusLabel}`
             flexWrap: 'wrap'
           }}
         >
+          {!allowVoucherDeletion && !isReversalVoucher && !isReversedOriginal && onReverse ? (
+            <button className="btn danger" onClick={() => { onReverse(); }} style={{ flex: 1, minWidth: 160 }}>
+              ↺ Stornieren
+            </button>
+          ) : null}
           <button className="btn primary" onClick={copyAsText} style={{ flex: 1, minWidth: 160 }}>
             📋 Als Text kopieren
           </button>

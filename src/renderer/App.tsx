@@ -40,6 +40,8 @@ import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
+import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
+import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -293,7 +295,7 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
 
 function DetachedQuickAddWindow() {
     const { notify } = useToast()
-    const { quickAddAfterSave, allowVoucherDeletion } = useUIPreferences()
+    const { quickAddAfterSave, allowVoucherDeletion, showBookingDraftTabs, showBookingEditTabs } = useUIPreferences()
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     const fmtDate = useCallback((s?: string) => s || '', [])
@@ -468,12 +470,32 @@ function DetachedQuickAddWindow() {
     }, [files.length, qa])
 
     const requestCloseDetachedCreate = useCallback(() => {
-        if (isCreateDraftDirty()) {
+        if (shouldPromptDiscardForDraftClose({
+            showBookingDraftTabs,
+            hasUnsavedChanges: isCreateDraftDirty()
+        })) {
             setConfirmDiscardCreate(true)
             return
         }
+        if (showBookingDraftTabs && detachedDraftIdRef.current) {
+            const draftId = detachedDraftIdRef.current
+            void (async () => {
+                try {
+                    const encodedFiles = await Promise.all(files.map(async (file) => ({
+                        name: file.name,
+                        dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+                        mime: file.type || undefined
+                    })))
+                    await window.api?.quickAdd?.syncDraft?.({ draftId, qa, files: encodedFiles, detached: false })
+                } catch {
+                    // Closing the detached window should still succeed even if the last sync fails.
+                }
+                await window.api?.window?.confirmClose?.()
+            })()
+            return
+        }
         window.api?.window?.confirmClose?.()
-    }, [isCreateDraftDirty])
+    }, [files, isCreateDraftDirty, qa, showBookingDraftTabs])
 
     useEffect(() => {
         const draftId = detachedDraftIdRef.current
@@ -541,12 +563,15 @@ function DetachedQuickAddWindow() {
     }, [editFiles, editQa, notify])
 
     const requestCloseDetachedEdit = useCallback(() => {
-        if (editQa && (serializeBookingForm(editQa) !== editInitialSnapshot || editFiles.length > 0)) {
+        if (shouldPromptDiscardForEdit({
+            showBookingEditTabs,
+            hasUnsavedChanges: Boolean(editQa && (serializeBookingForm(editQa) !== editInitialSnapshot || editFiles.length > 0))
+        })) {
             setConfirmDiscardEdit(true)
             return
         }
         window.api?.window?.confirmClose?.()
-    }, [editFiles.length, editInitialSnapshot, editQa])
+    }, [editFiles.length, editInitialSnapshot, editQa, showBookingEditTabs])
 
     useEffect(() => {
         return window.api?.window?.onCloseRequested?.(() => {
@@ -1235,10 +1260,22 @@ function AppInner() {
             if (Array.isArray(payload.files)) {
                 patch.files = payload.files.map((file: any) => base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime))
             }
+            if (typeof payload?.detached === 'boolean') {
+                patch.detached = payload.detached
+            }
             if (Object.keys(patch).length) updateDraft(draftId, patch)
         })
         return () => { if (typeof off === 'function') off() }
     }, [updateDraft])
+
+    useEffect(() => {
+        const off = window.api?.quickAdd?.onDetachedClosed?.((payload: any) => {
+            const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
+            if (!draftId) return
+            markDraftDocked(draftId)
+        })
+        return () => { if (typeof off === 'function') off() }
+    }, [markDraftDocked])
 
     useEffect(() => {
         const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
@@ -1287,10 +1324,15 @@ function AppInner() {
 
     const openBookingDraftTab = useCallback((draftId: string) => {
         const draft = bookingDrafts.find((entry) => entry.id === draftId)
-        if (draft?.detached) {
+        if (!draft) return
+
+        if (draft.detached || bookingsOpenDetached) {
             void (async () => {
                 const focusRes = await window.api?.quickAdd?.focusDetached?.({ draftId })
-                if (focusRes?.ok) return
+                if (focusRes?.ok) {
+                    markDraftDetached(draftId)
+                    return
+                }
                 const sourceDraft = bookingDrafts.find((entry) => entry.id === draftId)
                 if (!sourceDraft) return
                 try {
@@ -1308,7 +1350,9 @@ function AppInner() {
                     if (!res?.ok) {
                         markDraftDocked(draftId)
                         reopenDraft(draftId)
+                        return
                     }
+                    markDraftDetached(draftId)
                 } catch {
                     markDraftDocked(draftId)
                     reopenDraft(draftId)
@@ -1317,7 +1361,7 @@ function AppInner() {
             return
         }
         reopenDraft(draftId)
-    }, [bookingDrafts, markDraftDocked, quickAddAfterSave, reopenDraft])
+    }, [bookingDrafts, bookingsOpenDetached, markDraftDetached, markDraftDocked, quickAddAfterSave, reopenDraft])
 
     const closeBookingDraftTab = useCallback((draftId: string) => {
         const draft = bookingDrafts.find((entry) => entry.id === draftId)

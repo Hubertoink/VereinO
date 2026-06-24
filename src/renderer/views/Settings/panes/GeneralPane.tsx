@@ -563,18 +563,19 @@ export function GeneralPane({
                 />
               </label>
 
-              <label className="settings-toggle-card" htmlFor="toggle-booking-edit-tabs">
+              <label className={`settings-toggle-card ${!allowVoucherDeletion ? 'is-disabled' : ''}`} htmlFor="toggle-booking-edit-tabs">
                 <span className="settings-toggle-card__copy">
                   <strong>Bearbeitungen als Reiter</strong>
-                  <span>Hält mehrere geöffnete Buchungen beim Bearbeiten im Hauptfenster als eigene Reiter bereit.</span>
+                  <span>{allowVoucherDeletion ? 'Hält mehrere geöffnete Buchungen beim Bearbeiten im Hauptfenster als eigene Reiter bereit.' : 'Nur verfügbar, wenn Buchungen endgültig löschen aktiviert ist.'}</span>
                 </span>
                 <input
                   id="toggle-booking-edit-tabs"
                   role="switch"
-                  aria-checked={showBookingEditTabs}
+                  aria-checked={allowVoucherDeletion && showBookingEditTabs}
                   className="toggle"
                   type="checkbox"
-                  checked={showBookingEditTabs}
+                  checked={allowVoucherDeletion && showBookingEditTabs}
+                  disabled={!allowVoucherDeletion}
                   onChange={(e) => setShowBookingEditTabs(e.target.checked)}
                 />
               </label>

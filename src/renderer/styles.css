@@ -7845,9 +7845,20 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .booking-draft-tab--active {
-    border-color: color-mix(in oklab, var(--accent) 65%, var(--border));
-    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
-    color: var(--text);
+    border-color: var(--accent);
+    background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 82%, var(--surface)) 0%, color-mix(in oklab, var(--accent) 58%, var(--surface)) 100%);
+    color: #fff;
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 60%, transparent) inset;
+}
+
+.booking-draft-tab--active .booking-draft-tab__label,
+.booking-draft-tab--active .booking-draft-tab__close {
+    color: #fff;
+}
+
+.booking-draft-tab--active .booking-draft-tab__badge {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
 }
 
 .booking-draft-tab--detached {

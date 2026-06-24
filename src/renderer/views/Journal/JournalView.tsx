@@ -4,6 +4,8 @@ import JournalTable from './components/JournalTable'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
 import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
+import { getEffectiveJournalCols, getEffectiveJournalOrder } from './utils/journalColumnVisibility'
+import { shouldPromptDiscardForEdit } from './utils/journalEditDiscardPrompt'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
@@ -333,7 +335,7 @@ export default function JournalView({
 
     const presetStandard = useCallback(() => {
         const nextCols: Record<ColKey, boolean> = {
-            actions: true,
+            actions: allowVoucherDeletion,
             date: true,
             voucherNo: false,
             type: true,
@@ -362,13 +364,13 @@ export default function JournalView({
             'net',
             'vat'
         ]
-        setCols(nextCols)
-        setOrder(nextOrder)
-    }, [setCols, setOrder])
+        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
+        setOrder(getEffectiveJournalOrder(nextOrder, allowVoucherDeletion))
+    }, [allowVoucherDeletion, setCols, setOrder])
 
     const presetMinimal = useCallback(() => {
         const nextCols: Record<ColKey, boolean> = {
-            actions: true,
+            actions: allowVoucherDeletion,
             date: true,
             voucherNo: false,
             type: false,
@@ -382,28 +384,16 @@ export default function JournalView({
             vat: false,
             gross: true
         }
-        const nextOrder: ColKey[] = [
-            'actions',
-            'date',
-            'description',
-            'gross',
-            'voucherNo',
-            'type',
-            'sphere',
-            'earmark',
-            'budget',
-            'paymentMethod',
-            'attachments',
-            'net',
-            'vat'
-        ]
-        setCols(nextCols)
-        setOrder(nextOrder)
-    }, [setCols, setOrder])
+        const nextOrder: ColKey[] = allowVoucherDeletion
+            ? ['actions', 'date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
+            : ['date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
+        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
+        setOrder(getEffectiveJournalOrder(nextOrder, allowVoucherDeletion))
+    }, [allowVoucherDeletion, setCols, setOrder])
 
     const presetDetails = useCallback(() => {
         const nextCols: Record<ColKey, boolean> = {
-            actions: true,
+            actions: allowVoucherDeletion,
             date: true,
             voucherNo: true,
             type: true,
@@ -417,9 +407,9 @@ export default function JournalView({
             vat: true,
             gross: true
         }
-        setCols(nextCols)
-        setOrder(DEFAULT_ORDER)
-    }, [setCols, setOrder])
+        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
+        setOrder(getEffectiveJournalOrder(allowVoucherDeletion ? DEFAULT_ORDER : DEFAULT_ORDER.filter((k) => k !== 'actions'), allowVoucherDeletion))
+    }, [allowVoucherDeletion, setCols, setOrder])
 
     // Modal states
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
@@ -438,6 +428,10 @@ export default function JournalView({
     const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | { id: number; fileName: string; voucherId: number }>(null)
     const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
     const [editRowInitialSnapshot, setEditRowInitialSnapshot] = useState<string | null>(null)
+
+    const journalCols = useMemo(() => getEffectiveJournalCols(cols, allowVoucherDeletion), [allowVoucherDeletion, cols])
+
+    const journalOrder = useMemo(() => getEffectiveJournalOrder(order, allowVoucherDeletion), [allowVoucherDeletion, order])
 
     const serializeEditRow = useCallback((row: EditVoucherRow | null) => {
         if (!row) return null
@@ -645,12 +639,16 @@ export default function JournalView({
     }, [activeEditTabId, showBookingEditTabs])
 
     const requestCloseEditModal = useCallback(() => {
-        if (editRow && editHasUnsavedChanges) {
+        if (showBookingEditTabs && activeEditTabId) {
+            closeEditModalNow()
+            return
+        }
+        if (shouldPromptDiscardForEdit({ showBookingEditTabs, hasUnsavedChanges: Boolean(editRow && editHasUnsavedChanges) })) {
             setConfirmDiscardEdit(true)
             return
         }
         closeEditModalNow()
-    }, [editRow, editHasUnsavedChanges, closeEditModalNow])
+    }, [activeEditTabId, closeEditModalNow, editHasUnsavedChanges, editRow, showBookingEditTabs])
 
     const closeBookingEditTab = useCallback((tabId: string) => {
         const target = bookingEditTabs.find((tab) => tab.id === tabId)
@@ -1052,7 +1050,7 @@ export default function JournalView({
                             </div>
                         </div>
 
-                        {!cols['actions'] && (
+                        {!journalCols.actions && allowVoucherDeletion && (
                             <div className="helper" style={{ color: 'var(--danger)', marginTop: 8 }}>
                                 Ohne „Aktionen" kannst du Zeilen nicht bearbeiten oder löschen.
                             </div>
@@ -1087,13 +1085,13 @@ export default function JournalView({
                                 setDropTarget(null)
                             }}
                         >
-                            {order.map((k, idx) => {
-                                const fromIdx = order.indexOf(draggedCol!)
+                            {journalOrder.map((k, idx) => {
+                                const fromIdx = journalOrder.indexOf(draggedCol as ColKey)
                                 // Indikator vor diesem Element anzeigen?
                                 const showIndicatorBefore = dropTarget === idx && draggedCol && fromIdx !== idx && fromIdx !== idx - 1
                                 // Indikator nach dem letzten Element?
-                                const isLast = idx === order.length - 1
-                                const showIndicatorAfter = isLast && dropTarget === order.length && draggedCol && fromIdx !== order.length - 1
+                                const isLast = idx === journalOrder.length - 1
+                                const showIndicatorAfter = isLast && dropTarget === journalOrder.length && draggedCol && fromIdx !== journalOrder.length - 1
 
                                 return (
                                     <React.Fragment key={k}>
@@ -1151,13 +1149,13 @@ export default function JournalView({
                                             <label className="filter-dropdown__col-label">
                                                 <input
                                                     type="checkbox"
-                                                    checked={!!cols[k]}
+                                                    checked={!!journalCols[k as ColKey]}
                                                     onChange={(e) => {
                                                         e.stopPropagation()
-                                                        setCols({ ...cols, [k]: e.target.checked })
+                                                        setCols({ ...journalCols, [k]: e.target.checked } as Record<ColKey, boolean>)
                                                     }}
                                                 />
-                                                <span>{LABEL_FOR_COL[k] || k}</span>
+                                                <span>{LABEL_FOR_COL[k as ColKey] || k}</span>
                                             </label>
                                         </div>
                                         {showIndicatorAfter && <div className="filter-dropdown__drop-indicator" />}
@@ -1297,6 +1295,7 @@ export default function JournalView({
                                 <span>Seite:</span>
                                 <span className="pagination-bar__stat-value">{activePage} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
                             </div>
+                            <div className="helper" style={{ marginLeft: 8 }}>Doppelklick für Details - Stornieren in Details</div>
                         </div>
                         <div className="pagination-bar__controls">
                             <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
@@ -1308,8 +1307,8 @@ export default function JournalView({
 
                     <JournalTable
                         rows={rows}
-                        order={order}
-                        cols={cols}
+                        order={journalOrder}
+                        cols={journalCols}
                         onReorder={(o: any) => setOrder(o as any)}
                         earmarks={earmarks}
                         tagDefs={tagDefs}
@@ -2148,6 +2147,11 @@ export default function JournalView({
                         earmarks={earmarks}
                         budgets={budgetsForEdit}
                         tagDefs={tagDefs}
+                        allowVoucherDeletion={allowVoucherDeletion}
+                        onReverse={() => {
+                            setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })
+                            setInfoVoucher(null)
+                        }}
                     />
                 )}
             </div>

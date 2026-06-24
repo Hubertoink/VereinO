@@ -342,6 +342,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [showBookingEditTabs])
 
   useEffect(() => {
+    if (allowVoucherDeletion || !showBookingEditTabs) return
+    setShowBookingEditTabs(false)
+  }, [allowVoucherDeletion, showBookingEditTabs])
+
+  useEffect(() => {
     safeLocalStorageSet('ui.bookingsOpenDetached', String(bookingsOpenDetached))
   }, [bookingsOpenDetached])
 
