@@ -34,6 +34,8 @@ const sphereHelp = document.getElementById('sphere-help')
 const paymentMethodInput = document.getElementById('paymentMethod')
 const paymentMethodButtons = document.getElementById('payment-method-buttons')
 const paymentMethodHelp = document.getElementById('payment-method-help')
+const paymentAccountGroup = document.getElementById('payment-account-group')
+const paymentAccountSelect = document.getElementById('payment-account')
 const amountInput = document.getElementById('amount')
 const descriptionInput = document.getElementById('description')
 const counterpartyInput = document.getElementById('counterparty')
@@ -116,6 +118,17 @@ function setupEventListeners() {
         showSphereHelp()
     })
 
+    paymentAccountSelect.addEventListener('change', () => {
+        const selectedAccount = findPaymentAccount(paymentAccountSelect.value)
+        if (selectedAccount) {
+            paymentMethodInput.value = selectedAccount.paymentMethod === 'BAR' ? 'BAR' : 'BANK'
+            renderPaymentMethodControls()
+            paymentMethodHelp.textContent = `Zahlkonto: ${selectedAccount.label}`
+            return
+        }
+        renderPaymentMethodControls()
+    })
+
     // Category catalog import
     catalogButton.addEventListener('click', () => catalogInput.click())
     catalogInput.addEventListener('change', handleCatalogSelect)
@@ -151,7 +164,17 @@ function handleFormSubmit(e) {
     const selectedBudget = findCatalogItem('budgets', budgetInput.value)
     const selectedEarmark = findCatalogItem('earmarks', earmarkInput.value)
     const selectedTags = getSelectedTags()
-    const selectedPaymentMethod = findPaymentMethod(paymentMethodInput.value)
+    const selectedPaymentAccount = findPaymentAccount(paymentAccountSelect.value)
+    const selectedPaymentMethod = selectedPaymentAccount
+        ? {
+            id: selectedPaymentAccount.paymentMethod === 'BAR' ? 'BAR' : 'BANK',
+            label: selectedPaymentAccount.label,
+            icon: selectedPaymentAccount.icon,
+            paymentMethod: selectedPaymentAccount.paymentMethod || 'BANK',
+            accountId: selectedPaymentAccount.accountId ?? selectedPaymentAccount.id,
+            kind: selectedPaymentAccount.kind || null
+        }
+        : findPaymentMethod(paymentMethodInput.value)
     const selectedPaymentMethodValue = selectedPaymentMethod?.paymentMethod || 'BAR'
     
     // Create submission object
@@ -228,6 +251,7 @@ function resetForm() {
 
     // Reset payment method to default
     paymentMethodInput.value = defaultPaymentMethods[0].id
+    paymentAccountSelect.value = ''
     renderPaymentMethodControls()
 }
 
@@ -522,25 +546,55 @@ function normalizeCatalog(data) {
     const budgets = Array.isArray(categories.budgets) ? categories.budgets : []
     const earmarks = Array.isArray(categories.earmarks || categories.purposeBindings) ? (categories.earmarks || categories.purposeBindings) : []
     const tags = Array.isArray(categories.tags) ? categories.tags : []
-    const paymentMethods = Array.isArray(data?.paymentMethods) ? data.paymentMethods : Array.isArray(data?.paymentMethodOptions) ? data.paymentMethodOptions : []
-    const paymentAccounts = Array.isArray(data?.paymentAccounts) ? data.paymentAccounts : []
+    const paymentMethodCandidates = Array.isArray(data?.paymentMethods) ? data.paymentMethods : Array.isArray(data?.paymentMethodOptions) ? data.paymentMethodOptions : []
+    const paymentAccountCandidates = Array.isArray(data?.paymentAccounts) ? data.paymentAccounts : []
 
-    const normalizedPaymentMethods = [...paymentMethods, ...paymentAccounts]
-        .map((item) => {
-            if (typeof item === 'string') {
-                const value = String(item || '').trim()
-                return value ? { id: value, label: value, icon: null, paymentMethod: value === 'BAR' ? 'BAR' : value === 'BANK' ? 'BANK' : 'BANK' } : null
-            }
-            const id = String(item?.id || item?.value || item?.key || '').trim()
-            if (!id) return null
-            const label = String(item?.label || item?.name || item?.title || item?.value || id).trim()
-            const icon = String(item?.icon || item?.symbol || '').trim() || null
-            const kind = String(item?.kind || '').trim().toUpperCase()
-            const paymentMethod = String(item?.paymentMethod || (kind === 'CASH' ? 'BAR' : kind === 'BANK' ? 'BANK' : item?.value === 'BAR' ? 'BAR' : item?.value === 'BANK' ? 'BANK' : 'BANK')).trim()
-            const accountId = item?.accountId != null ? Number(item.accountId) : (item?.id && String(item.id).startsWith('account:') ? Number(String(item.id).split(':').pop()) : null)
-            return { id, label, icon, paymentMethod, accountId, kind }
-        })
+    const looksLikePaymentAccount = (item) => {
+        if (!item || typeof item === 'string') return false
+        return item?.accountId != null
+            || item?.paymentAccountId != null
+            || item?.kind
+            || String(item?.id || '').startsWith('account:')
+            || String(item?.value || '').startsWith('account:')
+    }
+
+    const normalizePaymentMethod = (item) => {
+        if (typeof item === 'string') {
+            const value = String(item || '').trim()
+            return value ? { id: value, label: value, icon: null, paymentMethod: value === 'BAR' ? 'BAR' : value === 'BANK' ? 'BANK' : 'BANK' } : null
+        }
+        const id = String(item?.id || item?.value || item?.key || '').trim()
+        if (!id) return null
+        const label = String(item?.label || item?.name || item?.title || item?.value || id).trim()
+        const icon = String(item?.icon || item?.symbol || '').trim() || null
+        const paymentMethod = String(item?.paymentMethod || (item?.value === 'BAR' ? 'BAR' : item?.value === 'BANK' ? 'BANK' : 'BANK')).trim()
+        return { id, label, icon, paymentMethod }
+    }
+
+    const normalizePaymentAccount = (item) => {
+        if (typeof item === 'string') {
+            const value = String(item || '').trim()
+            return value ? { id: value, label: value, icon: null, paymentMethod: value === 'BAR' ? 'BAR' : 'BANK', accountId: null, kind: null } : null
+        }
+        const id = String(item?.id || item?.value || item?.key || '').trim()
+        if (!id) return null
+        const label = String(item?.label || item?.name || item?.title || item?.value || id).trim()
+        const icon = String(item?.icon || item?.symbol || '').trim() || null
+        const kind = String(item?.kind || '').trim().toUpperCase()
+        const paymentMethod = String(item?.paymentMethod || (kind === 'CASH' ? 'BAR' : kind === 'BANK' ? 'BANK' : 'BANK')).trim()
+        const accountId = item?.accountId != null ? Number(item.accountId) : (item?.id && String(item.id).startsWith('account:') ? Number(String(item.id).split(':').pop()) : null)
+        return { id, label, icon, paymentMethod, accountId, kind }
+    }
+
+    const normalizedPaymentMethods = paymentMethodCandidates
+        .filter((item) => !looksLikePaymentAccount(item))
+        .map(normalizePaymentMethod)
         .filter(Boolean)
+
+    const normalizedPaymentAccounts = [
+        ...paymentAccountCandidates.map(normalizePaymentAccount).filter(Boolean),
+        ...paymentMethodCandidates.filter(looksLikePaymentAccount).map(normalizePaymentAccount).filter(Boolean)
+    ]
 
     return {
         type: 'vereino-submission-catalog',
@@ -548,6 +602,7 @@ function normalizeCatalog(data) {
         exportedAt: data?.exportedAt || null,
         organization: data?.organization || null,
         paymentMethods: normalizedPaymentMethods,
+        paymentAccounts: normalizedPaymentAccounts,
         categories: {
             budgets: budgets.map(item => ({
                 ...item,
@@ -590,10 +645,20 @@ function getPaymentMethods() {
         : defaultPaymentMethods
 }
 
+function getPaymentAccounts() {
+    return Array.isArray(categoryCatalog?.paymentAccounts) ? categoryCatalog.paymentAccounts : []
+}
+
 function findPaymentMethod(methodId) {
     const value = String(methodId || '').trim()
     if (!value) return defaultPaymentMethods[0] || null
     return getPaymentMethods().find((method) => method.id === value) || null
+}
+
+function findPaymentAccount(accountId) {
+    const value = String(accountId || '').trim()
+    if (!value) return null
+    return getPaymentAccounts().find((account) => String(account.id) === value) || null
 }
 
 function renderPaymentMethodControls() {
@@ -631,8 +696,21 @@ function renderPaymentMethodControls() {
     }
 }
 
+function renderPaymentAccountControls() {
+    const accounts = getPaymentAccounts()
+    paymentAccountGroup.hidden = accounts.length === 0
+    paymentAccountSelect.innerHTML = '<option value="">Kein spezielles Konto</option>' + accounts.map((account) => `
+        <option value="${escapeHtml(String(account.id))}">${escapeHtml(account.label)}</option>
+    `).join('')
+
+    if (paymentAccountSelect.value && !accounts.some((account) => String(account.id) === paymentAccountSelect.value)) {
+        paymentAccountSelect.value = ''
+    }
+}
+
 function renderCatalogControls() {
     renderPaymentMethodControls()
+    renderPaymentAccountControls()
 
     const budgets = categoryCatalog?.categories?.budgets || []
     const earmarks = categoryCatalog?.categories?.earmarks || []

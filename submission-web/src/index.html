@@ -67,6 +67,14 @@
                     <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Beim Import einer Kategorien-Datei können zusätzliche Zahlungswege bzw. Konten zur Auswahl stehen.</div>
                 </div>
 
+                <div class="form-group" id="payment-account-group" hidden>
+                    <label for="payment-account">Zahlkonto</label>
+                    <select id="payment-account">
+                        <option value="">Kein spezielles Konto</option>
+                    </select>
+                    <div class="helper">Optional: Aus dem Export übernommenes Zahlkonto auswählen.</div>
+                </div>
+
                 <div class="form-group">
                     <label for="amount">Betrag (€) *</label>
                     <input type="number" id="amount" step="0.01" min="0.01" placeholder="0,00" required inputmode="decimal">

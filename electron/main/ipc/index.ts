@@ -1838,17 +1838,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         }
         const paymentMethodOptions = [
             { id: 'BAR', label: 'Bar', icon: '💵', paymentMethod: 'BAR' },
-            { id: 'BANK', label: 'Bank', icon: '🏦', paymentMethod: 'BANK' },
-            ...paymentAccounts.map((account: any) => ({
-                id: `account:${account.id}`,
-                label: account.name,
-                icon: iconForPaymentAccountKind(account.kind),
-                paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
-                accountId: account.id,
-                kind: account.kind,
-                color: account.color ?? null,
-                iban: account.iban ?? null
-            }))
+            { id: 'BANK', label: 'Bank', icon: '🏦', paymentMethod: 'BANK' }
         ]
 
         const exportData = {
