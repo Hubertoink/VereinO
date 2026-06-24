@@ -1826,9 +1826,29 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             return `Budget ${budget.year}`
         }
 
+        const paymentAccounts = listPaymentAccounts({ activeOnly: true })
+        const iconForPaymentAccountKind = (kind?: string | null) => {
+            switch (kind) {
+                case 'CASH': return '💵'
+                case 'BANK': return '🏦'
+                case 'PAYPAL': return '💳'
+                case 'CARD': return '💳'
+                default: return '💳'
+            }
+        }
         const paymentMethodOptions = [
-            { id: 'BAR', label: 'Bar', icon: '💵' },
-            { id: 'BANK', label: 'Bank', icon: '🏦' }
+            { id: 'BAR', label: 'Bar', icon: '💵', paymentMethod: 'BAR' },
+            { id: 'BANK', label: 'Bank', icon: '🏦', paymentMethod: 'BANK' },
+            ...paymentAccounts.map((account: any) => ({
+                id: `account:${account.id}`,
+                label: account.name,
+                icon: iconForPaymentAccountKind(account.kind),
+                paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+                accountId: account.id,
+                kind: account.kind,
+                color: account.color ?? null,
+                iban: account.iban ?? null
+            }))
         ]
 
         const exportData = {
@@ -1840,6 +1860,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 name: activeOrg.name
             } : null,
             paymentMethods: paymentMethodOptions,
+            paymentAccounts: paymentAccounts.map((account: any) => ({
+                id: account.id,
+                name: account.name,
+                label: account.name,
+                icon: iconForPaymentAccountKind(account.kind),
+                paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+                kind: account.kind,
+                color: account.color ?? null,
+                iban: account.iban ?? null
+            })),
             categories: {
                 budgets: budgets.map((budget: any) => ({
                     id: budget.id,

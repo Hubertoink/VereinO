@@ -37,6 +37,16 @@
                     <input type="hidden" id="type" value="OUT">
                 </div>
 
+                <div class="form-group form-group--full catalog-panel">
+                    <label>VereinO-Kategorien</label>
+                    <div class="catalog-import">
+                        <input type="file" id="catalog-input" accept=".json,.vereino-catalog.json,application/json" hidden>
+                        <button type="button" class="btn-secondary" id="catalog-button">📤 Kategorien importieren</button>
+                        <button type="button" class="btn-secondary btn-compact" id="catalog-clear" hidden>×</button>
+                    </div>
+                    <div class="catalog-status" id="catalog-status">Optional: Kategorien-Datei vom Kassier importieren.</div>
+                </div>
+
                 <div class="form-group">
                     <label for="sphere">
                         Sphäre
@@ -54,7 +64,7 @@
                     <label>Zahlweg *</label>
                     <div class="btn-group" id="payment-method-buttons"></div>
                     <input type="hidden" id="paymentMethod" value="BAR">
-                    <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Beim Import einer Kategorien-Datei können zusätzliche Zahlungswege zur Auswahl stehen.</div>
+                    <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Beim Import einer Kategorien-Datei können zusätzliche Zahlungswege bzw. Konten zur Auswahl stehen.</div>
                 </div>
 
                 <div class="form-group">
@@ -75,16 +85,6 @@
                 <div class="form-group">
                     <label for="category">Kategorie-Hinweis</label>
                     <input type="text" id="category" placeholder="z.B. Vereinsfest, Material, etc.">
-                </div>
-
-                <div class="form-group form-group--full catalog-panel">
-                    <label>VereinO-Kategorien</label>
-                    <div class="catalog-import">
-                        <input type="file" id="catalog-input" accept=".json,.vereino-catalog.json,application/json" hidden>
-                        <button type="button" class="btn-secondary" id="catalog-button">📤 Kategorien importieren</button>
-                        <button type="button" class="btn-secondary btn-compact" id="catalog-clear" hidden>×</button>
-                    </div>
-                    <div class="catalog-status" id="catalog-status">Optional: Kategorien-Datei vom Kassier importieren.</div>
                 </div>
 
                 <div class="form-group" id="budget-group" hidden>

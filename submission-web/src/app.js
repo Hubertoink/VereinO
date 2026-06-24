@@ -152,6 +152,7 @@ function handleFormSubmit(e) {
     const selectedEarmark = findCatalogItem('earmarks', earmarkInput.value)
     const selectedTags = getSelectedTags()
     const selectedPaymentMethod = findPaymentMethod(paymentMethodInput.value)
+    const selectedPaymentMethodValue = selectedPaymentMethod?.paymentMethod || 'BAR'
     
     // Create submission object
     const submission = {
@@ -159,9 +160,11 @@ function handleFormSubmit(e) {
         date: dateInput.value,
         type: typeInput.value,
         sphere: sphereInput.value,
-        paymentMethod: paymentMethodInput.value,
+        paymentMethod: selectedPaymentMethodValue,
         paymentMethodLabel: selectedPaymentMethod?.label || null,
         paymentMethodIcon: selectedPaymentMethod?.icon || null,
+        paymentAccountId: selectedPaymentMethod?.accountId ?? null,
+        paymentAccountKind: selectedPaymentMethod?.kind || null,
         grossAmount: Math.round(parseFloat(amountInput.value) * 100), // Convert to cents
         description: descriptionInput.value.trim(),
         counterparty: counterpartyInput.value.trim() || null,
@@ -444,6 +447,8 @@ function handleDownload() {
             tags: sub.tags || [],
             paymentMethodLabel: sub.paymentMethodLabel || null,
             paymentMethodIcon: sub.paymentMethodIcon || null,
+            paymentAccountId: sub.paymentAccountId || null,
+            paymentAccountKind: sub.paymentAccountKind || null,
             submittedBy: sub.submittedBy,
             submittedAt: sub.submittedAt,
             attachment: sub.attachment
@@ -518,18 +523,22 @@ function normalizeCatalog(data) {
     const earmarks = Array.isArray(categories.earmarks || categories.purposeBindings) ? (categories.earmarks || categories.purposeBindings) : []
     const tags = Array.isArray(categories.tags) ? categories.tags : []
     const paymentMethods = Array.isArray(data?.paymentMethods) ? data.paymentMethods : Array.isArray(data?.paymentMethodOptions) ? data.paymentMethodOptions : []
+    const paymentAccounts = Array.isArray(data?.paymentAccounts) ? data.paymentAccounts : []
 
-    const normalizedPaymentMethods = paymentMethods
+    const normalizedPaymentMethods = [...paymentMethods, ...paymentAccounts]
         .map((item) => {
             if (typeof item === 'string') {
                 const value = String(item || '').trim()
-                return value ? { id: value, label: value, icon: null } : null
+                return value ? { id: value, label: value, icon: null, paymentMethod: value === 'BAR' ? 'BAR' : value === 'BANK' ? 'BANK' : 'BANK' } : null
             }
             const id = String(item?.id || item?.value || item?.key || '').trim()
             if (!id) return null
             const label = String(item?.label || item?.name || item?.title || item?.value || id).trim()
             const icon = String(item?.icon || item?.symbol || '').trim() || null
-            return { id, label, icon }
+            const kind = String(item?.kind || '').trim().toUpperCase()
+            const paymentMethod = String(item?.paymentMethod || (kind === 'CASH' ? 'BAR' : kind === 'BANK' ? 'BANK' : item?.value === 'BAR' ? 'BAR' : item?.value === 'BANK' ? 'BANK' : 'BANK')).trim()
+            const accountId = item?.accountId != null ? Number(item.accountId) : (item?.id && String(item.id).startsWith('account:') ? Number(String(item.id).split(':').pop()) : null)
+            return { id, label, icon, paymentMethod, accountId, kind }
         })
         .filter(Boolean)
 
