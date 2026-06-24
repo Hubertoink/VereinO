@@ -1826,14 +1826,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             return `Budget ${budget.year}`
         }
 
+        const paymentMethodOptions = [
+            { id: 'BAR', label: 'Bar', icon: '💵' },
+            { id: 'BANK', label: 'Bank', icon: '🏦' }
+        ]
+
         const exportData = {
             type: 'vereino-submission-catalog',
-            version: '1.0',
+            version: '1.1',
             exportedAt: new Date().toISOString(),
             organization: activeOrg ? {
                 id: activeOrg.id,
                 name: activeOrg.name
             } : null,
+            paymentMethods: paymentMethodOptions,
             categories: {
                 budgets: budgets.map((budget: any) => ({
                     id: budget.id,

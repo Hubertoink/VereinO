@@ -52,11 +52,9 @@
 
                 <div class="form-group">
                     <label>Zahlweg *</label>
-                    <div class="btn-group">
-                        <button type="button" class="btn-toggle btn-toggle-pay active" data-pay="BAR">💵 Bar</button>
-                        <button type="button" class="btn-toggle btn-toggle-pay" data-pay="BANK">🏦 Bank</button>
-                    </div>
+                    <div class="btn-group" id="payment-method-buttons"></div>
                     <input type="hidden" id="paymentMethod" value="BAR">
+                    <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Beim Import einer Kategorien-Datei können zusätzliche Zahlungswege zur Auswahl stehen.</div>
                 </div>
 
                 <div class="form-group">

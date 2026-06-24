@@ -8,6 +8,11 @@ let submissions = []
 let currentImage = null
 let categoryCatalog = null
 
+const defaultPaymentMethods = [
+    { id: 'BAR', label: 'Bar', icon: '💵' },
+    { id: 'BANK', label: 'Bank', icon: '🏦' }
+]
+
 // ===== DOM Elements =====
 const form = document.getElementById('submission-form')
 const mainView = document.getElementById('main-view')
@@ -27,6 +32,8 @@ const typeInput = document.getElementById('type')
 const sphereInput = document.getElementById('sphere')
 const sphereHelp = document.getElementById('sphere-help')
 const paymentMethodInput = document.getElementById('paymentMethod')
+const paymentMethodButtons = document.getElementById('payment-method-buttons')
+const paymentMethodHelp = document.getElementById('payment-method-help')
 const amountInput = document.getElementById('amount')
 const descriptionInput = document.getElementById('description')
 const counterpartyInput = document.getElementById('counterparty')
@@ -58,10 +65,16 @@ const typeButtons = document.querySelectorAll('.btn-toggle[data-type]')
 function init() {
     // Set today's date as default
     dateInput.value = new Date().toISOString().split('T')[0]
-    
+
     // Load saved data
     loadFromStorage()
-    loadCatalogFromStorage()
+    try {
+        localStorage.removeItem('vereino-category-catalog')
+    } catch (e) {
+        console.error('Failed to clear persisted catalog', e)
+    }
+    categoryCatalog = null
+    renderCatalogControls()
     
     // Load saved submitter name
     const savedName = localStorage.getItem('vereino-submitter')
@@ -86,16 +99,6 @@ function setupEventListeners() {
             typeButtons.forEach(b => b.classList.remove('active'))
             btn.classList.add('active')
             typeInput.value = btn.dataset.type
-        })
-    })
-    
-    // Payment method toggle
-    const payButtons = document.querySelectorAll('.btn-toggle-pay[data-pay]')
-    payButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            payButtons.forEach(b => b.classList.remove('active'))
-            btn.classList.add('active')
-            paymentMethodInput.value = btn.dataset.pay
         })
     })
     
@@ -148,6 +151,7 @@ function handleFormSubmit(e) {
     const selectedBudget = findCatalogItem('budgets', budgetInput.value)
     const selectedEarmark = findCatalogItem('earmarks', earmarkInput.value)
     const selectedTags = getSelectedTags()
+    const selectedPaymentMethod = findPaymentMethod(paymentMethodInput.value)
     
     // Create submission object
     const submission = {
@@ -156,6 +160,8 @@ function handleFormSubmit(e) {
         type: typeInput.value,
         sphere: sphereInput.value,
         paymentMethod: paymentMethodInput.value,
+        paymentMethodLabel: selectedPaymentMethod?.label || null,
+        paymentMethodIcon: selectedPaymentMethod?.icon || null,
         grossAmount: Math.round(parseFloat(amountInput.value) * 100), // Convert to cents
         description: descriptionInput.value.trim(),
         counterparty: counterpartyInput.value.trim() || null,
@@ -216,6 +222,10 @@ function resetForm() {
     typeButtons.forEach(b => b.classList.remove('active'))
     document.querySelector('.btn-toggle[data-type="OUT"]').classList.add('active')
     typeInput.value = 'OUT'
+
+    // Reset payment method to default
+    paymentMethodInput.value = defaultPaymentMethods[0].id
+    renderPaymentMethodControls()
 }
 
 // ===== Image/File Handling =====
@@ -350,7 +360,7 @@ function renderSubmissionsList() {
             </div>
             <div class="submission-description">${escapeHtml(sub.description)}</div>
             <div class="submission-meta">
-                ${sub.paymentMethod === 'BAR' ? '💵' : '🏦'} ${sub.sphere === 'W' ? 'Wirtschaftlich' : 'Ideell'}
+                ${sub.paymentMethodIcon || (sub.paymentMethod === 'BAR' ? '💵' : sub.paymentMethod === 'BANK' ? '🏦' : '💳')} ${escapeHtml(sub.paymentMethodLabel || (sub.paymentMethod === 'BAR' ? 'Bar' : sub.paymentMethod === 'BANK' ? 'Bank' : 'Sonstiger Zahlungsweg'))} · ${sub.sphere === 'W' ? 'Wirtschaftlich' : 'Ideell'}
                 ${sub.counterparty ? ` · ${escapeHtml(sub.counterparty)}` : ''}
                 ${sub.categoryHint ? ` · ${escapeHtml(sub.categoryHint)}` : ''}
                 ${sub.budgetLabel ? ` · Budget: ${escapeHtml(sub.budgetLabel)}` : ''}
@@ -412,7 +422,8 @@ function handleDownload() {
         exportedAt: new Date().toISOString(),
         sourceCatalog: categoryCatalog ? {
             organization: categoryCatalog.organization || null,
-            exportedAt: categoryCatalog.exportedAt || null
+            exportedAt: categoryCatalog.exportedAt || null,
+            paymentMethods: categoryCatalog.paymentMethods || []
         } : null,
         submissions: submissions.map(sub => ({
             externalId: sub.id,
@@ -431,6 +442,8 @@ function handleDownload() {
             earmarkLabel: sub.earmarkLabel ?? null,
             earmark: sub.earmark ?? null,
             tags: sub.tags || [],
+            paymentMethodLabel: sub.paymentMethodLabel || null,
+            paymentMethodIcon: sub.paymentMethodIcon || null,
             submittedBy: sub.submittedBy,
             submittedAt: sub.submittedAt,
             attachment: sub.attachment
@@ -487,7 +500,6 @@ function handleCatalogSelect(e) {
         try {
             const parsed = JSON.parse(event.target.result)
             categoryCatalog = normalizeCatalog(parsed)
-            saveCatalogToStorage()
             renderCatalogControls()
             showToast('Kategorien importiert', 'success')
         } catch (err) {
@@ -505,12 +517,28 @@ function normalizeCatalog(data) {
     const budgets = Array.isArray(categories.budgets) ? categories.budgets : []
     const earmarks = Array.isArray(categories.earmarks || categories.purposeBindings) ? (categories.earmarks || categories.purposeBindings) : []
     const tags = Array.isArray(categories.tags) ? categories.tags : []
+    const paymentMethods = Array.isArray(data?.paymentMethods) ? data.paymentMethods : Array.isArray(data?.paymentMethodOptions) ? data.paymentMethodOptions : []
+
+    const normalizedPaymentMethods = paymentMethods
+        .map((item) => {
+            if (typeof item === 'string') {
+                const value = String(item || '').trim()
+                return value ? { id: value, label: value, icon: null } : null
+            }
+            const id = String(item?.id || item?.value || item?.key || '').trim()
+            if (!id) return null
+            const label = String(item?.label || item?.name || item?.title || item?.value || id).trim()
+            const icon = String(item?.icon || item?.symbol || '').trim() || null
+            return { id, label, icon }
+        })
+        .filter(Boolean)
 
     return {
         type: 'vereino-submission-catalog',
         version: data?.version || '1.0',
         exportedAt: data?.exportedAt || null,
         organization: data?.organization || null,
+        paymentMethods: normalizedPaymentMethods,
         categories: {
             budgets: budgets.map(item => ({
                 ...item,
@@ -539,35 +567,64 @@ function normalizeColor(color) {
     return /^#[0-9a-f]{3,8}$/i.test(value) ? value : null
 }
 
-function saveCatalogToStorage() {
-    try {
-        localStorage.setItem('vereino-category-catalog', JSON.stringify(categoryCatalog))
-    } catch (e) {
-        console.error('Failed to save catalog', e)
-    }
-}
-
-function loadCatalogFromStorage() {
-    try {
-        const saved = localStorage.getItem('vereino-category-catalog')
-        if (saved) categoryCatalog = normalizeCatalog(JSON.parse(saved))
-    } catch (e) {
-        console.error('Failed to load catalog', e)
-        categoryCatalog = null
-    }
-    renderCatalogControls()
-}
-
 function clearCatalog() {
     categoryCatalog = null
-    localStorage.removeItem('vereino-category-catalog')
     budgetInput.value = ''
     earmarkInput.value = ''
     renderCatalogControls()
     showToast('Kategorien entfernt', 'success')
 }
 
+function getPaymentMethods() {
+    return Array.isArray(categoryCatalog?.paymentMethods) && categoryCatalog.paymentMethods.length > 0
+        ? categoryCatalog.paymentMethods
+        : defaultPaymentMethods
+}
+
+function findPaymentMethod(methodId) {
+    const value = String(methodId || '').trim()
+    if (!value) return defaultPaymentMethods[0] || null
+    return getPaymentMethods().find((method) => method.id === value) || null
+}
+
+function renderPaymentMethodControls() {
+    const methods = getPaymentMethods()
+    paymentMethodButtons.innerHTML = methods.map((method) => `
+        <button type="button" class="btn-toggle btn-toggle-pay${paymentMethodInput.value === method.id ? ' active' : ''}" data-pay="${escapeHtml(method.id)}" data-label="${escapeHtml(method.label)}">
+            ${method.icon ? escapeHtml(method.icon) + ' ' : ''}${escapeHtml(method.label)}
+        </button>
+    `).join('')
+
+    const buttons = paymentMethodButtons.querySelectorAll('.btn-toggle-pay[data-pay]')
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            buttons.forEach((b) => b.classList.remove('active'))
+            btn.classList.add('active')
+            paymentMethodInput.value = btn.dataset.pay
+            const selectedMethod = findPaymentMethod(btn.dataset.pay)
+            paymentMethodHelp.textContent = selectedMethod
+                ? `Ausgewählt: ${selectedMethod.label}`
+                : 'Zahlweg ausgewählt'
+        })
+    })
+
+    const selectedMethod = findPaymentMethod(paymentMethodInput.value)
+    if (selectedMethod) {
+        paymentMethodInput.value = selectedMethod.id
+        const activeButton = paymentMethodButtons.querySelector(`.btn-toggle-pay[data-pay="${selectedMethod.id}"]`)
+        if (activeButton) {
+            buttons.forEach((b) => b.classList.remove('active'))
+            activeButton.classList.add('active')
+        }
+        paymentMethodHelp.textContent = categoryCatalog
+            ? `Zahlweg aus der Kategorien-Datei: ${selectedMethod.label}`
+            : `Standard: ${selectedMethod.label}`
+    }
+}
+
 function renderCatalogControls() {
+    renderPaymentMethodControls()
+
     const budgets = categoryCatalog?.categories?.budgets || []
     const earmarks = categoryCatalog?.categories?.earmarks || []
     const tags = categoryCatalog?.categories?.tags || []
