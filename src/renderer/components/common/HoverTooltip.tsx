@@ -18,6 +18,7 @@ export interface HoverTooltipProps<TElement extends HTMLElement = HTMLElement> {
   preferredPlacement?: TooltipPlacement
   gap?: number
   margin?: number
+  delayMs?: number
 }
 
 export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>({
@@ -26,14 +27,53 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
   className,
   preferredPlacement = 'bottom',
   gap = 8,
-  margin = 8
+  margin = 8,
+  delayMs = 0
 }: HoverTooltipProps<TElement>) {
   const tooltipId = useId()
   const [open, setOpen] = useState(false)
   const [anchorEl, setAnchorEl] = useState<TElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const openTimeoutRef = useRef<number | null>(null)
+  const closeTimeoutRef = useRef<number | null>(null)
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({ left: 0, top: 0 })
   const [placement, setPlacement] = useState<TooltipPlacement>(preferredPlacement)
+
+  useEffect(() => {
+    return () => {
+      if (openTimeoutRef.current != null) {
+        window.clearTimeout(openTimeoutRef.current)
+      }
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const clearPendingTimers = useCallback(() => {
+    if (openTimeoutRef.current != null) {
+      window.clearTimeout(openTimeoutRef.current)
+      openTimeoutRef.current = null
+    }
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleOpen = useCallback(() => {
+    clearPendingTimers()
+    if (delayMs > 0) {
+      openTimeoutRef.current = window.setTimeout(() => setOpen(true), delayMs)
+      return
+    }
+    setOpen(true)
+  }, [clearPendingTimers, delayMs])
+
+  const handleClose = useCallback(() => {
+    clearPendingTimers()
+    setOpen(false)
+  }, [clearPendingTimers])
 
   const updateTooltipPosition = useCallback(() => {
     if (!content || !open) return
@@ -100,10 +140,10 @@ export default function HoverTooltip<TElement extends HTMLElement = HTMLElement>
     ref: setAnchorEl,
     props: {
       'aria-describedby': open ? tooltipId : undefined,
-      onMouseEnter: () => setOpen(true),
-      onMouseLeave: () => setOpen(false),
-      onFocus: () => setOpen(true),
-      onBlur: () => setOpen(false)
+      onMouseEnter: handleOpen,
+      onMouseLeave: handleClose,
+      onFocus: handleOpen,
+      onBlur: handleClose
     }
   }
 

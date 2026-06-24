@@ -478,78 +478,81 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         <div style={{ fontSize: '0.9em', opacity: 0.7 }}>Vorstandsfunktionen können bei der Mitgliedschaft zugewiesen werden.</div>
                     </div>
                 ) : (
-                    <table cellPadding={6} className="members-board-table">
-                        <thead>
-                            <tr>
-                                <th align="left">Funktion</th>
-                                <th align="left">Name</th>
-                                <th align="left">E-Mail</th>
-                                <th align="left">Telefon</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {boardRows.map((r: any) => (
-                                <tr key={`board-${r.id}`}>
-                                    <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge members-badge-role" style={{ '--role-color': def.color } as React.CSSProperties}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
-                                    <td>{r.name}</td>
-                                    <td>{r.email || '—'}</td>
-                                    <td>{r.phone || '—'}</td>
+                    <div className="members-board-table-scroll-wrapper">
+                        <table cellPadding={6} className="members-board-table">
+                            <thead>
+                                <tr>
+                                    <th align="left">Funktion</th>
+                                    <th align="left">Name</th>
+                                    <th align="left">E-Mail</th>
+                                    <th align="left">Telefon</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {boardRows.map((r: any) => (
+                                    <tr key={`board-${r.id}`}>
+                                        <td>{(() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge members-badge-role" style={{ '--role-color': def.color } as React.CSSProperties}>{def.label}</span>) : (r.boardRole || '—') })()}</td>
+                                        <td>{r.name}</td>
+                                        <td>{r.email || '—'}</td>
+                                        <td>{r.phone || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
-            <table cellPadding={6} className="members-table">
-                <thead>
-                    <tr>
-                        {colPrefs.showMemberNo && (
-                            <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                                Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
-                            </th>
-                        )}
-                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
-                        </th>
-                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
-                        </th>
-                        <th align="left">Telefon</th>
-                        {colPrefs.showAddress && (<th align="left">Adresse</th>)}
-                        {colPrefs.showIBAN && (<th align="left">IBAN</th>)}
-                        {colPrefs.showContribution && (<th align="right">Beitrag</th>)}
-                        <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
-                            Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
-                        </th>
-                        {colPrefs.showNotes && (<th align="left">Anmerkungen</th>)}
-                        <th align="center">Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map(r => (
-                        <tr key={r.id}>
-                            {colPrefs.showMemberNo && (<td>{r.memberNo || '—'}</td>)}
-                            <td>
-                                <span>{r.name}</span>
-                                {r.boardRole && (() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ marginLeft: 8, background: def.color, color: '#fff' }}>{def.label}</span>) : null })()}
-                                {((r as any).contribution_amount != null && (r as any).contribution_amount > 0 && !!(r as any).contribution_interval) ? (
-                                    <MemberStatusButton memberId={r.id} name={r.name} memberNo={r.memberNo || undefined} />
-                                ) : null}
-                            </td>
-                            <td>{r.email || '—'}</td>
-                            <td>{r.phone || '—'}</td>
-                            {colPrefs.showAddress && (<td>{r.address || '—'}</td>)}
-                            {colPrefs.showIBAN && (<td>{r.iban || '—'}</td>)}
-                            {colPrefs.showContribution && (<td align="right">{r.contribution_amount != null ? eurFmt.format(r.contribution_amount) : '—'}</td>)}
-                            <td>{(() => { const s = String(r.status || '').toUpperCase(); const c = (s === 'ACTIVE') ? '#00C853' : (s === 'LEFT') ? 'var(--danger)' : '#FFD600'; return (
-                                <span title={s} aria-label={`Status: ${s}`} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c }} />
-                            ) })()}</td>
-                            {colPrefs.showNotes && (
-                                <td title={r.notes || undefined} style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {r.notes ? (r.notes.length > 120 ? (r.notes.slice(0, 120) + '…') : r.notes) : '—'}
-                                </td>
+            <div className="members-table-scroll-wrapper">
+                <table cellPadding={6} className="members-table">
+                    <thead>
+                        <tr>
+                            {colPrefs.showMemberNo && (
+                                <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                                    Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                                </th>
                             )}
-                            <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                            <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('name'); setSort(s => (sortBy === 'name' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                                Name <span aria-hidden="true" style={{ color: sortBy === 'name' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'name' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            </th>
+                            <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('email'); setSort(s => (sortBy === 'email' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                                E-Mail <span aria-hidden="true" style={{ color: sortBy === 'email' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'email' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            </th>
+                            <th align="left">Telefon</th>
+                            {colPrefs.showAddress && (<th align="left">Adresse</th>)}
+                            {colPrefs.showIBAN && (<th align="left">IBAN</th>)}
+                            {colPrefs.showContribution && (<th align="right">Beitrag</th>)}
+                            <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('status'); setSort(s => (sortBy === 'status' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
+                                Status <span aria-hidden="true" style={{ color: sortBy === 'status' ? 'var(--warning)' : 'var(--text-dim)' }}>{sortBy === 'status' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
+                            </th>
+                            {colPrefs.showNotes && (<th align="left">Anmerkungen</th>)}
+                            <th align="center">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(r => (
+                            <tr key={r.id}>
+                                {colPrefs.showMemberNo && (<td>{r.memberNo || '—'}</td>)}
+                                <td>
+                                    <span>{r.name}</span>
+                                    {r.boardRole && (() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ marginLeft: 8, background: def.color, color: '#fff' }}>{def.label}</span>) : null })()}
+                                    {((r as any).contribution_amount != null && (r as any).contribution_amount > 0 && !!(r as any).contribution_interval) ? (
+                                        <MemberStatusButton memberId={r.id} name={r.name} memberNo={r.memberNo || undefined} />
+                                    ) : null}
+                                </td>
+                                <td>{r.email || '—'}</td>
+                                <td>{r.phone || '—'}</td>
+                                {colPrefs.showAddress && (<td>{r.address || '—'}</td>)}
+                                {colPrefs.showIBAN && (<td>{r.iban || '—'}</td>)}
+                                {colPrefs.showContribution && (<td align="right">{r.contribution_amount != null ? eurFmt.format(r.contribution_amount) : '—'}</td>)}
+                                <td>{(() => { const s = String(r.status || '').toUpperCase(); const c = (s === 'ACTIVE') ? '#00C853' : (s === 'LEFT') ? 'var(--danger)' : '#FFD600'; return (
+                                    <span title={s} aria-label={`Status: ${s}`} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c }} />
+                                ) })()}</td>
+                                {colPrefs.showNotes && (
+                                    <td title={r.notes || undefined} style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {r.notes ? (r.notes.length > 120 ? (r.notes.slice(0, 120) + '…') : r.notes) : '—'}
+                                    </td>
+                                )}
+                                <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                 <button className="btn btn-edit" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
                                     id: r.id,
                                     memberNo: r.memberNo ?? null,
@@ -578,6 +581,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     )})()}
                 </tbody>
             </table>
+            </div>
             <div className="pagination-bar" style={{ marginTop: 12, marginBottom: 0 }}>
                 <div className="pagination-bar__info">
                     <div className="pagination-bar__stat">

@@ -1374,15 +1374,23 @@ export default function JournalView({
                             activeSetPage(1)
                             await loadRecent()
                         }}
+                        onTransferClick={async () => {
+                            activeSetFilterType('TRANSFER')
+                            activeSetFilterPM(null)
+                            activeSetFilterPaymentAccountId(null)
+                            setActivePage('Buchungen')
+                            activeSetPage(1)
+                            await loadRecent()
+                        }}
                         onRowDoubleClick={(row) => setInfoVoucher(row)}
                     />
                 </div>
 
                 {/* Edit Modal */}
                 {editRow && (
-                    <div className="modal-overlay">
-                        <div className="modal booking-modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div className="modal-overlay journal-edit-modal-overlay">
+                        <div className="modal booking-modal journal-edit-modal" onClick={(e) => e.stopPropagation()}>
+                            <header className="journal-edit-modal__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <h2 style={{ margin: 0 }}>
                                     {(() => {
                                         const desc = (editRow.description || '').trim()
@@ -1426,7 +1434,7 @@ export default function JournalView({
                                 </div>
                             )}
 
-                            <form onSubmit={async (e) => {
+                            <form className="journal-edit-modal__form" onSubmit={async (e) => {
                                 e.preventDefault()
                                 try {
                                     const blockReason = voucherMutationBlockReason(editRow)
@@ -1529,7 +1537,7 @@ export default function JournalView({
                                 }
                             }}>
                                 {/* Live Summary */}
-                                <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+                                <div className="card journal-edit-modal__summary" style={{ padding: 10, marginBottom: 8 }}>
                                     <div className="helper">Zusammenfassung</div>
                                     <div style={{ fontWeight: 600 }}>
                                         {(() => {
@@ -1552,7 +1560,7 @@ export default function JournalView({
                                 </div>
 
                                 {/* Blocks A+B in a side-by-side grid on wide screens */}
-                                <div className="block-grid" style={{ marginBottom: 8 }}>
+                                <div className="block-grid journal-edit-modal__block-grid" style={{ marginBottom: 8 }}>
                                     {/* Block A – Basisinfos */}
                                     <div className="card" style={{ padding: 12 }}>
                                         <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
@@ -1902,7 +1910,7 @@ export default function JournalView({
                                 </div>
 
                                 {/* Block C+D – Beschreibung & Tags + Anhänge */}
-                                <div className="block-grid block-grid-meta" style={{ marginBottom: 8 }}>
+                                <div className="block-grid block-grid-meta journal-edit-modal__block-grid" style={{ marginBottom: 8 }}>
                                     {/* Block C – Beschreibung & Tags */}
                                     <div className="card" style={{ padding: 12 }}>
                                         <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
@@ -2001,6 +2009,7 @@ export default function JournalView({
                                                 </ul>
                                             ) : (
                                                 <div 
+                                                    className="journal-edit-modal__empty-attachments"
                                                     style={{ 
                                                         marginTop: 8, 
                                                         padding: 20, 
@@ -2063,7 +2072,7 @@ export default function JournalView({
                                     </div>
                                 )}
 
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                                <div className="journal-edit-modal__footer" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12, alignItems: 'center' }}>
                                     <div>
                                         {voucherMutationBlockReason(editRow) ? (
                                             <div className="helper">{voucherMutationBlockReason(editRow)}</div>

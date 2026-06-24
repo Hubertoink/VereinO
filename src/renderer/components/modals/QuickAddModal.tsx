@@ -321,10 +321,10 @@ export default function QuickAddModal({
     }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
     return (
-        <div className={`modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`} role="dialog" aria-modal="true">
+        <div className={`modal-overlay quick-add-modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`} role="dialog" aria-modal="true">
             <div
                 ref={modalRef}
-                className={`modal booking-modal${windowMode ? ' detached-quick-add-modal' : ''}`}
+                className={`modal booking-modal quick-add-modal${windowMode ? ' detached-quick-add-modal' : ''}`}
                 onClick={(e) => e.stopPropagation()}
                 style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
@@ -339,7 +339,7 @@ export default function QuickAddModal({
                     <h2>{title || '+ Buchung'}</h2>
                     <div className="booking-modal-header-actions">
                         {onDetach && (
-                            <button className="btn ghost" type="button" onClick={onDetach} title="In eigenes Fenster abdocken">
+                            <button className="btn ghost booking-modal-icon-btn" type="button" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M15 3h6v6" />
                                     <path d="M10 14 21 3" />
@@ -352,8 +352,8 @@ export default function QuickAddModal({
                                 <WindowControls onClose={closeModal} />
                             </div>
                         ) : (
-                            <button className="btn ghost" type="button" onClick={closeModal} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} title="Schließen (ESC)">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" onClick={closeModal} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} title="Schließen (ESC)" aria-label="Schließen">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                                 </svg>
                             </button>
@@ -382,7 +382,10 @@ export default function QuickAddModal({
                     </div>
                 )}
                 
-                <form onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) onSave(); }}>
+                <form
+                    className="quick-add-form"
+                    onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) onSave(); }}
+                >
                     {/* Live Summary */}
                     <div className="card summary-card">
                         <div className="helper">Zusammenfassung</div>
@@ -923,18 +926,8 @@ export default function QuickAddModal({
                                     ))}
                                 </ul>
                             ) : (
-                                <div 
-                                    style={{ 
-                                        marginTop: 6, 
-                                        padding: 12, 
-                                        border: '2px dashed var(--border)', 
-                                        borderRadius: 8, 
-                                        textAlign: 'center',
-                                        cursor: 'pointer'
-                                    }}
-                                    onClick={openFilePicker}
-                                >
-                                    <div style={{ fontSize: 20, marginBottom: 4 }}>📎</div>
+                                <div className="quick-add-dropzone" onClick={openFilePicker}>
+                                    <div className="quick-add-dropzone__icon">📎</div>
                                     <div className="helper">Dateien hierher ziehen oder klicken</div>
                                 </div>
                             )}

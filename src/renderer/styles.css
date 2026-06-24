@@ -1805,6 +1805,26 @@ button.badge:hover { filter: brightness(1.03); }
     margin: 0 1px;
 }
 
+.journal-description-cell {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.journal-description-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.journal-description-tooltip {
+    max-width: min(420px, 80vw);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .badge.pm-account-badge {
     display: inline-flex;
     align-items: center;
@@ -2357,6 +2377,204 @@ svg text {
     animation: modalSlideUp 0.25s ease-out;
 }
 
+.quick-add-form {
+    display: grid;
+    gap: 4px;
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
+    min-height: 0;
+}
+
+.quick-add-form::-webkit-scrollbar {
+    width: 8px;
+}
+
+.quick-add-form::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text-dim) 30%, transparent);
+    border-radius: 999px;
+}
+
+.quick-add-modal-overlay {
+    align-items: center;
+    padding: 4px 12px 6px;
+    overflow: hidden;
+}
+
+.quick-add-modal {
+    max-height: min(90vh, calc(100dvh - 12px));
+    height: min(90vh, calc(100dvh - 12px));
+    min-height: 0;
+    margin: auto;
+    box-sizing: border-box;
+    padding: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.quick-add-modal::-webkit-scrollbar {
+    display: none;
+}
+
+.quick-add-modal > form.quick-add-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 100%;
+    padding-right: 2px;
+    padding-bottom: 2px;
+    scrollbar-gutter: stable;
+}
+
+.quick-add-modal .summary-card {
+    margin-bottom: 0;
+    padding: 7px;
+}
+
+.quick-add-modal .card,
+.quick-add-modal .attachment-card {
+    padding: 7px;
+}
+
+.quick-add-modal .block-grid {
+    gap: 6px;
+}
+
+.quick-add-modal .block-grid-mb {
+    margin-bottom: 0;
+}
+
+.quick-add-modal .booking-section {
+    padding: 8px;
+    gap: 6px;
+}
+
+.quick-add-modal .row,
+.quick-add-modal .booking-meta-grid {
+    gap: 6px;
+}
+
+.quick-add-modal .field {
+    gap: 3px;
+}
+
+.quick-add-modal .modal-footer-actions {
+    margin-top: 4px;
+}
+
+.quick-add-modal .modal-footer-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 4px 0 0;
+    padding: 4px 0 0;
+    border-top: 1px solid var(--border);
+    background: color-mix(in oklab, var(--surface) 94%, transparent);
+    border-radius: 0;
+}
+
+.quick-add-modal .helper-mb {
+    margin-bottom: 4px;
+}
+
+.quick-add-modal .attachment-header {
+    gap: 6px;
+}
+
+.quick-add-dropzone {
+    margin-top: 6px;
+    padding: 12px;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.quick-add-dropzone__icon {
+    margin-bottom: 4px;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.quick-add-modal .input,
+.quick-add-modal select,
+.quick-add-modal textarea {
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.journal-edit-modal-overlay {
+    align-items: stretch;
+    padding: 2px 12px 4px;
+    overflow: hidden;
+}
+
+.journal-edit-modal {
+    max-height: calc(100vh - 6px);
+    max-height: calc(100dvh - 6px);
+    min-height: 0;
+    height: calc(100vh - 6px);
+    height: calc(100dvh - 6px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    overflow: hidden;
+    margin: auto;
+}
+
+.journal-edit-modal > header {
+    flex-shrink: 0;
+}
+
+.journal-edit-modal > form {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.journal-edit-modal__header {
+    margin-bottom: 2px !important;
+}
+
+.journal-edit-modal__form {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+}
+
+.journal-edit-modal__summary {
+    padding: 8px !important;
+    margin-bottom: 0 !important;
+}
+
+.journal-edit-modal__block-grid {
+    margin-bottom: 0 !important;
+}
+
+.journal-edit-modal__form .card {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+}
+
+.journal-edit-modal__form .helper {
+    line-height: 1.2;
+}
+
+.journal-edit-modal__empty-attachments {
+    padding: 14px !important;
+    margin-top: 6px !important;
+}
+
+.journal-edit-modal__footer {
+    margin-top: 6px !important;
+}
+
 .booking-modal-drag-handle {
     cursor: move;
     touch-action: none;
@@ -2385,6 +2603,50 @@ svg text {
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+}
+
+.booking-modal-icon-btn,
+.booking-modal-header-actions .window-controls__btn {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.booking-modal-icon-btn:hover,
+.booking-modal-icon-btn:focus-visible,
+.booking-modal-header-actions .window-controls__btn:hover,
+.booking-modal-header-actions .window-controls__btn:focus-visible {
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 24%, transparent);
+    transform: translateY(-1px);
+}
+
+.booking-modal-close-btn {
+    background: color-mix(in oklab, var(--danger) 78%, transparent);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 45%, transparent);
+}
+
+.booking-modal-close-btn:hover,
+.booking-modal-close-btn:focus-visible {
+    background: color-mix(in oklab, var(--danger) 86%, white 12%);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 55%, transparent), 0 2px 8px color-mix(in oklab, var(--danger) 24%, transparent);
+    transform: translateY(-1px);
+}
+
+.booking-modal-close-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.booking-modal-icon-btn:active,
+.booking-modal-header-actions .window-controls__btn:active {
+    transform: translateY(0) scale(0.98);
 }
 
 .booking-modal-header-actions .window-controls {
@@ -2506,14 +2768,54 @@ svg text {
     overflow: hidden;
 }
 
+html.detached-quick-add-document,
+body.detached-quick-add-body,
+body.detached-quick-add-body #root {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+}
+
 .detached-quick-add-modal {
     width: 100%;
     max-height: none;
-    height: 100%;
+    height: 100dvh;
+    padding: 6px 8px 0;
     box-shadow: none;
     border: 0;
     border-radius: 0;
     -webkit-app-region: drag;
+}
+
+.detached-quick-add-modal > form.quick-add-form {
+    gap: 3px;
+    padding-right: 0;
+    padding-bottom: 0;
+    scrollbar-gutter: auto;
+}
+
+.detached-quick-add-modal .block-grid {
+    align-items: start;
+}
+
+.detached-quick-add-modal .card,
+.detached-quick-add-modal .attachment-card {
+    min-height: 0;
+}
+
+.detached-quick-add-modal .quick-add-dropzone {
+    margin-top: 5px;
+    padding: 8px;
+}
+
+.detached-quick-add-modal .quick-add-dropzone__icon {
+    margin-bottom: 2px;
+    font-size: 16px;
+}
+
+.detached-quick-add-modal .modal-footer-actions {
+    margin-top: 2px;
+    padding-top: 3px;
 }
 
 .detached-quick-add-modal > form,
@@ -2536,7 +2838,7 @@ svg text {
 }
 
 /* Keep header/footer visible; scroll only inside form when really needed */
-.booking-modal > form {
+.booking-modal:not(.quick-add-modal) > form {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -4056,6 +4358,7 @@ textarea:focus {
 .app-root-grid {
     display: grid;
     grid-template-rows: 56px 1fr;
+    min-width: 980px;
     height: 100vh;
     overflow: hidden;
 }
@@ -5085,8 +5388,8 @@ label .req-asterisk {
         }
 
         .booking-modal .modal-footer-actions {
-            margin: 14px -18px -18px;
-            padding: 14px 18px;
+            margin: 10px -16px -16px;
+            padding: 10px 16px;
             border-top: 1px solid var(--border);
             background: color-mix(in oklab, var(--surface) 94%, #000 6%);
             border-bottom-left-radius: 12px;
@@ -5530,6 +5833,42 @@ label .req-asterisk {
 .members-board-table {
     margin-top: 4px;
     width: 100%;
+}
+
+.members-board-table-scroll-wrapper,
+.members-table-scroll-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: auto;
+    scrollbar-color: color-mix(in oklab, var(--text-dim) 55%, transparent) color-mix(in oklab, var(--surface) 85%, var(--border));
+    padding-bottom: 6px;
+}
+
+.members-board-table-scroll-wrapper::-webkit-scrollbar,
+.members-table-scroll-wrapper::-webkit-scrollbar {
+    height: 10px;
+}
+
+.members-board-table-scroll-wrapper::-webkit-scrollbar-track,
+.members-table-scroll-wrapper::-webkit-scrollbar-track {
+    background: color-mix(in oklab, var(--surface) 85%, var(--border));
+    border-radius: 999px;
+}
+
+.members-board-table-scroll-wrapper::-webkit-scrollbar-thumb,
+.members-table-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text-dim) 55%, transparent);
+    border-radius: 999px;
+    border: 2px solid color-mix(in oklab, var(--surface) 85%, var(--border));
+}
+
+.members-board-table-scroll-wrapper .members-board-table,
+.members-table-scroll-wrapper .members-table {
+    min-width: 920px;
+    width: max(100%, 920px);
 }
 
 .members-table {
@@ -8694,30 +9033,41 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 /* ── Journal table horizontal scroll wrapper ── */
 .journal-table-scroll-wrapper {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    /* subtle scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklab, var(--text-dim) 30%, transparent) transparent;
+    scrollbar-width: auto;
+    scrollbar-color: color-mix(in oklab, var(--text-dim) 55%, transparent) color-mix(in oklab, var(--surface) 85%, var(--border));
+    padding-bottom: 6px;
 }
 
 .journal-table-scroll-wrapper::-webkit-scrollbar {
-    height: 6px;
+    height: 10px;
 }
 .journal-table-scroll-wrapper::-webkit-scrollbar-track {
-    background: transparent;
+    background: color-mix(in oklab, var(--surface) 85%, var(--border));
+    border-radius: 999px;
 }
 .journal-table-scroll-wrapper::-webkit-scrollbar-thumb {
-    background: color-mix(in oklab, var(--text-dim) 30%, transparent);
-    border-radius: 3px;
+    background: color-mix(in oklab, var(--text-dim) 55%, transparent);
+    border-radius: 999px;
+    border: 2px solid color-mix(in oklab, var(--surface) 85%, var(--border));
+}
+.journal-table-scroll-wrapper:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text) 70%, var(--accent));
 }
 
 /* Inside the scroll wrapper, table must be able to exceed container width */
 .journal-table-scroll-wrapper .journal-table,
 .journal-table-scroll-wrapper .resizable-table {
+    display: table;
     min-width: 780px;
     width: max(100%, 780px);
+    table-layout: fixed;
 }
 
 /* Keep the journal controls visible and scroll only the booking rows. */
@@ -8730,6 +9080,7 @@ html[data-glass-modals="true"] .flyout-arrow {
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    min-width: 0;
 }
 
 .journal-view > :not(.journal-table-section) {
@@ -8739,6 +9090,7 @@ html[data-glass-modals="true"] .flyout-arrow {
 .journal-table-section {
     flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
 }
 
 .journal-table-card {
@@ -8746,12 +9098,14 @@ html[data-glass-modals="true"] .flyout-arrow {
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    min-width: 0;
     overflow: hidden !important;
 }
 
 .journal-table-card .journal-table-scroll-wrapper {
     flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
     overflow: auto;
 }
 

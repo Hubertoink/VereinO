@@ -1,6 +1,7 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
+import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
@@ -378,6 +379,7 @@ interface JournalTableProps {
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
     onPaymentAccountClick?: (id: number) => void
+    onTransferClick?: () => void
     onStornoPairClick?: (originalId: number, reversalId: number) => void
     getVoucherById?: (id: number) => Promise<any>
     highlightId?: number | null
@@ -403,6 +405,7 @@ export default function JournalTable({
     onEarmarkClick,
     onBudgetClick,
     onPaymentAccountClick,
+    onTransferClick,
     onStornoPairClick,
     getVoucherById,
     highlightId,
@@ -720,8 +723,32 @@ export default function JournalTable({
             <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (
             <td key={k}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
+                <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {(() => {
+                        const fullText = r.description?.trim() || ''
+                        const shortenedText = truncateJournalDescription(fullText, 32)
+                        const hasOverflow = fullText.length > 32
+                        if (!fullText) {
+                            return <span className="journal-description-text" />
+                        }
+                        if (!hasOverflow) {
+                            return <span className="journal-description-text">{shortenedText}</span>
+                        }
+                        return (
+                            <HoverTooltip<HTMLSpanElement>
+                                content={<div className="journal-description-tooltip">{fullText}</div>}
+                                className="tooltip-modal"
+                                preferredPlacement="top"
+                                delayMs={1000}
+                            >
+                                {({ ref, props }) => (
+                                    <span ref={ref} className="journal-description-text" {...props}>
+                                        {shortenedText}
+                                    </span>
+                                )}
+                            </HoverTooltip>
+                        )
+                    })()}
                     {isReversalVoucher(r) && getVoucherById ? <StornoHover linkedId={r.originalId} title="Originalbuchung" eurFmt={eurFmt} fmtDate={fmtDate} getVoucher={getVoucherById} onClick={() => onStornoPairClick?.(r.originalId, r.id)}><span className="badge-storno">Storno zu {stornierungLabel(r.originalVoucherNo || r.originalId)}</span></StornoHover> : null}
                     {isReversedOriginal(r) && getVoucherById ? <StornoHover linkedId={r.reversedById} title="Stornobuchung" eurFmt={eurFmt} fmtDate={fmtDate} getVoucher={getVoucherById} onClick={() => onStornoPairClick?.(r.id, r.reversedById)}><span className="badge-storniert">storniert durch {stornierungLabel(r.reversedByVoucherNo || r.reversedById)}</span></StornoHover> : null}
                     {r.isAdvancePlaceholder ? <span className="badge badge-advance-placeholder">Vorschuss</span> : null}
@@ -828,16 +855,15 @@ export default function JournalTable({
                         const to = r.transferTo
                         const fromLabel = r.transferFromAccountName || paymentMethodLabel(from)
                         const toLabel = r.transferToAccountName || paymentMethodLabel(to)
-                        const title = `${fromLabel} → ${toLabel}`
-                            const rows = [
+                        const title = getTransferTooltipTitle(fromLabel, toLabel)
+                        const rows = [
                             { key: 'Von', value: fromLabel, dotColor: r.transferFromAccountColor || 'var(--border)' },
                             { key: 'Nach', value: toLabel, dotColor: r.transferToAccountColor || 'var(--border)' },
                             { key: 'Betrag', value: eurFmt.format(Math.abs(Number(r.grossAmount || 0))), dotColor: 'var(--accent)' }
                         ]
-                            const clickAccountId = Number(r.transferFromAccountId || r.transferToAccountId || 0)
                         return (
-                            <UsageHover kind="payment" title="Kontotransfer" rows={rows} eurFmt={eurFmt} getUsage={clickAccountId ? getPaymentUsage : undefined} id={clickAccountId || undefined}>
-                                <button type="button" className={`badge pm-account-badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} aria-label={title} style={{ borderColor: r.transferFromAccountColor || r.transferToAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); if (clickAccountId) onPaymentAccountClick?.(clickAccountId) }}>
+                            <UsageHover kind="payment" title={title} rows={rows} eurFmt={eurFmt}>
+                                <button type="button" className={`badge pm-account-badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} aria-label={title} style={{ borderColor: r.transferFromAccountColor || r.transferToAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); onTransferClick?.() }}>
                                     <span className="pm-icon">
                                         {paymentAccountIcon(r.transferFromAccountKind, from)}
                                     </span>

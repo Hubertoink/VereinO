@@ -318,6 +318,16 @@ function DetachedQuickAddWindow() {
     const [confirmDiscardCreate, setConfirmDiscardCreate] = useState(false)
     const [confirmDeleteEdit, setConfirmDeleteEdit] = useState(false)
 
+    useEffect(() => {
+        document.documentElement.classList.add('detached-quick-add-document')
+        document.body.classList.add('detached-quick-add-body')
+
+        return () => {
+            document.documentElement.classList.remove('detached-quick-add-document')
+            document.body.classList.remove('detached-quick-add-body')
+        }
+    }, [])
+
     const budgetsForEdit = useMemo(() => {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         return budgets.map((budget: any) => {
