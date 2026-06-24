@@ -1080,6 +1080,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                     earmarks={earmarks}
                     budgetsForEdit={budgetsForEdit}
                     tagDefs={tagDefs}
+                    paymentAccounts={paymentAccounts}
                 />
             )}
 
