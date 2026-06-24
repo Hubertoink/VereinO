@@ -34,6 +34,7 @@ const sphereHelp = document.getElementById('sphere-help')
 const paymentMethodInput = document.getElementById('paymentMethod')
 const paymentMethodButtons = document.getElementById('payment-method-buttons')
 const paymentMethodHelp = document.getElementById('payment-method-help')
+const paymentMethodNote = document.getElementById('payment-method-note')
 const paymentAccountGroup = document.getElementById('payment-account-group')
 const paymentAccountSelect = document.getElementById('payment-account')
 const amountInput = document.getElementById('amount')
@@ -123,7 +124,7 @@ function setupEventListeners() {
         if (selectedAccount) {
             paymentMethodInput.value = selectedAccount.paymentMethod === 'BAR' ? 'BAR' : 'BANK'
             renderPaymentMethodControls()
-            paymentMethodHelp.textContent = `Zahlkonto: ${selectedAccount.label}`
+            paymentMethodHelp.textContent = `Konto: ${selectedAccount.label}`
             return
         }
         renderPaymentMethodControls()
@@ -678,7 +679,8 @@ function renderPaymentMethodControls() {
             const selectedMethod = findPaymentMethod(btn.dataset.pay)
             paymentMethodHelp.textContent = selectedMethod
                 ? `Ausgewählt: ${selectedMethod.label}`
-                : 'Zahlweg ausgewählt'
+                : 'Bitte einen Zahlungsweg auswählen.'
+            paymentMethodNote.hidden = true
         })
     })
 
@@ -691,8 +693,12 @@ function renderPaymentMethodControls() {
             activeButton.classList.add('active')
         }
         paymentMethodHelp.textContent = categoryCatalog
-            ? `Zahlweg aus der Kategorien-Datei: ${selectedMethod.label}`
+            ? `Zahlungsweg aus der Kategorien-Datei: ${selectedMethod.label}`
             : `Standard: ${selectedMethod.label}`
+        paymentMethodNote.hidden = Boolean(categoryCatalog)
+        paymentMethodNote.textContent = categoryCatalog
+            ? ''
+            : 'Hinweis: Ohne Kategorien-Datei stehen nur die Standard-Zahlungswege Bar und Bank zur Verfügung. Bitte den Kassier um eine Kategorien-Datei, wenn weitere Konten oder Zahlungswege verwendet werden sollen.'
     }
 }
 
@@ -715,11 +721,13 @@ function renderCatalogControls() {
     const budgets = categoryCatalog?.categories?.budgets || []
     const earmarks = categoryCatalog?.categories?.earmarks || []
     const tags = categoryCatalog?.categories?.tags || []
+    const paymentMethods = categoryCatalog?.paymentMethods || []
+    const paymentAccounts = categoryCatalog?.paymentAccounts || []
     const orgName = categoryCatalog?.organization?.name
 
     catalogStatus.textContent = categoryCatalog
-        ? `${orgName ? `${orgName}: ` : ''}${budgets.length} Budget(s), ${earmarks.length} Zweckbindung(en), ${tags.length} Tag(s)`
-        : 'Optional: Kategorien-Datei vom Kassier importieren.'
+        ? `${orgName ? `${orgName}: ` : ''}${budgets.length} Budget(s), ${earmarks.length} Zweckbindung(en), ${tags.length} Tag(s), ${paymentMethods.length} Zahlungsweg(e), ${paymentAccounts.length} Konto(s)`
+        : 'Optional: Kategorien-Datei vom Kassier importieren, damit Zahlungswege und Konten übernommen werden.'
     catalogClear.hidden = !categoryCatalog
 
     budgetGroup.hidden = budgets.length === 0

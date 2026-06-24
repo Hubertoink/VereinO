@@ -61,18 +61,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Zahlweg *</label>
+                    <label>Zahlungsart *</label>
                     <div class="btn-group" id="payment-method-buttons"></div>
                     <input type="hidden" id="paymentMethod" value="BAR">
-                    <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Beim Import einer Kategorien-Datei können zusätzliche Zahlungswege bzw. Konten zur Auswahl stehen.</div>
+                    <div class="helper" id="payment-method-help">Standard: Bar oder Bank. Bei einer Kategorien-Datei können zusätzliche Zahlungswege und Konten zur Auswahl stehen.</div>
+                    <div class="helper helper--note" id="payment-method-note" hidden></div>
                 </div>
 
                 <div class="form-group" id="payment-account-group" hidden>
-                    <label for="payment-account">Zahlkonto</label>
+                    <label for="payment-account">Konto</label>
                     <select id="payment-account">
                         <option value="">Kein spezielles Konto</option>
                     </select>
-                    <div class="helper">Optional: Aus dem Export übernommenes Zahlkonto auswählen.</div>
+                    <div class="helper">Optional: Aus dem Export übernommenes Konto auswählen.</div>
                 </div>
 
                 <div class="form-group">

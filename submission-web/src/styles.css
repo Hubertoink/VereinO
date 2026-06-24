@@ -354,6 +354,16 @@ body {
     color: var(--text-muted);
 }
 
+.helper--note {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-sm);
+    background: var(--surface-alt);
+    color: var(--text-muted);
+}
+
 .tag-options {
     display: flex;
     flex-wrap: wrap;
