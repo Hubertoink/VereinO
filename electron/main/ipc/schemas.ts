@@ -1069,6 +1069,78 @@ export const ImportExecuteOutput = z.object({
     errorFilePath: z.string().optional()
 })
 
+const ImportRuleSchema = z.object({
+    id: z.string().optional(),
+    enabled: z.boolean().optional(),
+    sourceField: z.enum(['description', 'paymentAccount', 'tags', 'note']),
+    contains: z.string(),
+    targetField: z.enum(['tags', 'type', 'paymentMethod', 'paymentAccount', 'budget', 'earmarkCode', 'sphere']),
+    value: z.string()
+})
+
+const ImportDraftIssueSchema = z.object({
+    level: z.enum(['error', 'warning', 'info']),
+    code: z.string(),
+    message: z.string()
+})
+
+const ImportDraftRowSchema = z.object({
+    id: z.string(),
+    sourceRow: z.number(),
+    status: z.enum(['ok', 'warning', 'error', 'duplicate', 'ignored']),
+    duplicateAction: z.enum(['skip', 'import', 'merge']).optional(),
+    duplicateIds: z.array(z.number()).optional(),
+    issues: z.array(ImportDraftIssueSchema),
+    original: z.record(z.any()),
+    values: z.record(z.any())
+})
+
+const ImportMissingSchema = z.object({
+    tags: z.array(z.string()).optional(),
+    budgets: z.array(z.string()).optional(),
+    earmarks: z.array(z.string()).optional(),
+    paymentAccounts: z.array(z.string()).optional()
+})
+
+export const ImportAnalyzeInput = z.object({
+    fileBase64: z.string(),
+    mapping: z.record(z.string().nullable()),
+    rules: z.array(ImportRuleSchema).optional()
+})
+
+export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
+    rows: z.array(ImportDraftRowSchema),
+    summary: z.object({
+        total: z.number(),
+        ok: z.number(),
+        warnings: z.number(),
+        errors: z.number(),
+        duplicates: z.number(),
+        ignored: z.number()
+    }),
+    missing: z.object({
+        tags: z.array(z.string()),
+        budgets: z.array(z.string()),
+        earmarks: z.array(z.string()),
+        paymentAccounts: z.array(z.string())
+    }),
+    lookup: z.object({
+        paymentAccounts: z.array(z.object({ id: z.number(), label: z.string() })),
+        budgets: z.array(z.object({ id: z.number(), label: z.string() })),
+        earmarks: z.array(z.object({ id: z.number(), label: z.string() })),
+        tags: z.array(z.string())
+    })
+})
+
+export const ImportCommitDraftInput = z.object({ rows: z.array(ImportDraftRowSchema) })
+export const ImportCreateMissingInput = ImportMissingSchema
+export const ImportCreateMissingOutput = z.object({
+    tags: z.number(),
+    budgets: z.number(),
+    earmarks: z.number(),
+    paymentAccounts: z.number()
+})
+
 // Imports template (download)
 export const ImportTemplateInput = z.object({}).optional()
 export const ImportTemplateOutput = z.object({ filePath: z.string() })

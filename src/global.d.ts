@@ -328,6 +328,18 @@ declare global {
             imports: {
                 preview: (payload: { fileBase64: string }) => Promise<{ headers: string[]; sample: Array<Record<string, any>>; suggestedMapping: Record<string, string | null>; headerRowIndex: number }>
                 execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; newTags?: string[]; errorFilePath?: string }>
+                analyze: (payload: { fileBase64: string; mapping: Record<string, string | null>; rules?: Array<{ id?: string; enabled?: boolean; sourceField: 'description' | 'paymentAccount' | 'tags' | 'note'; contains: string; targetField: 'tags' | 'type' | 'paymentMethod' | 'paymentAccount' | 'budget' | 'earmarkCode' | 'sphere'; value: string }> }) => Promise<{
+                    headers: string[]
+                    sample: Array<Record<string, any>>
+                    suggestedMapping: Record<string, string | null>
+                    headerRowIndex: number
+                    rows: Array<{ id: string; sourceRow: number; status: 'ok' | 'warning' | 'error' | 'duplicate' | 'ignored'; duplicateAction?: 'skip' | 'import' | 'merge'; duplicateIds?: number[]; issues: Array<{ level: 'error' | 'warning' | 'info'; code: string; message: string }>; original: Record<string, any>; values: Record<string, any> }>
+                    summary: { total: number; ok: number; warnings: number; errors: number; duplicates: number; ignored: number }
+                    missing: { tags: string[]; budgets: string[]; earmarks: string[]; paymentAccounts: string[] }
+                    lookup: { paymentAccounts: Array<{ id: number; label: string }>; budgets: Array<{ id: number; label: string }>; earmarks: Array<{ id: number; label: string }>; tags: string[] }
+                }>
+                commitDraft: (payload: { rows: Array<{ id: string; sourceRow: number; status: 'ok' | 'warning' | 'error' | 'duplicate' | 'ignored'; duplicateAction?: 'skip' | 'import' | 'merge'; duplicateIds?: number[]; issues: Array<{ level: 'error' | 'warning' | 'info'; code: string; message: string }>; original: Record<string, any>; values: Record<string, any> }> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; newTags?: string[]; errorFilePath?: string }>
+                createMissing: (payload: { tags?: string[]; budgets?: string[]; earmarks?: string[]; paymentAccounts?: string[] }) => Promise<{ tags: number; budgets: number; earmarks: number; paymentAccounts: number }>
                 template: () => Promise<{ filePath: string }>
                 testdata: () => Promise<{ filePath: string }>
                 editableExport: () => Promise<{ filePath: string }>

@@ -259,6 +259,9 @@ contextBridge.exposeInMainWorld('api', {
     imports: {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),
+        analyze: (payload: any) => ipcRenderer.invoke('imports.analyze', payload),
+        commitDraft: (payload: any) => ipcRenderer.invoke('imports.commitDraft', payload),
+        createMissing: (payload: any) => ipcRenderer.invoke('imports.createMissing', payload),
         template: () => ipcRenderer.invoke('imports.template'),
         testdata: () => ipcRenderer.invoke('imports.testdata'),
         editableExport: () => ipcRenderer.invoke('imports.editableExport')

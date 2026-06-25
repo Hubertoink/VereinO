@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.1.5] - 2026-06-25
+
+### Hinzugefügt
+
+- Import: Neuer Assistent mit Vorabvalidierung, Entwurfsansicht, Problemfilter und bearbeitbarer Importtabelle.
+- Import: Regeln für Textmuster, Batch-Zuweisungen und Duplikat-Entscheidungen im Entwurf ergänzt.
+
+### Geändert
+
+- Import: Konten, Budgets und Zweckbindungen werden in der Entwurfstabelle jetzt als echte Dropdown-Auswahl aus VereinO angeboten.
+
+### Behoben
+
+- Import: Wenn neue IPC-Funktionen nach einem Update noch nicht im laufenden Fenster verfügbar sind, zeigt VereinO jetzt eine klare Neustart-Meldung statt still zu scheitern.
+
 ## [2.1.4] - 2026-06-25
 
 ### Hinzugefügt

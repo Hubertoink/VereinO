@@ -2,7 +2,10 @@ import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { createVoucher } from '../repositories/vouchers'
 import { updateVoucher } from '../repositories/vouchers'
-import { getPaymentAccountById, paymentMethodForAccountKind } from '../repositories/paymentAccounts'
+import { getPaymentAccountById, paymentMethodForAccountKind, upsertPaymentAccount } from '../repositories/paymentAccounts'
+import { upsertBudget } from '../repositories/budgets'
+import { upsertBinding } from '../repositories/bindings'
+import { ensureTag } from '../repositories/tags'
 import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
@@ -23,6 +26,58 @@ export type ImportExecuteResult = {
     rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
     newTags?: string[]
 }
+
+export type ImportRule = {
+    id?: string
+    enabled?: boolean
+    sourceField: 'description' | 'paymentAccount' | 'tags' | 'note'
+    contains: string
+    targetField: 'tags' | 'type' | 'paymentMethod' | 'paymentAccount' | 'budget' | 'earmarkCode' | 'sphere'
+    value: string
+}
+
+export type ImportDraftIssue = {
+    level: 'error' | 'warning' | 'info'
+    code: string
+    message: string
+}
+
+export type ImportDraftRow = {
+    id: string
+    sourceRow: number
+    status: 'ok' | 'warning' | 'error' | 'duplicate' | 'ignored'
+    duplicateAction?: 'skip' | 'import' | 'merge'
+    duplicateIds?: number[]
+    issues: ImportDraftIssue[]
+    original: Record<string, any>
+    values: Record<string, any>
+}
+
+export type ImportAnalyzeResult = ImportPreview & {
+    rows: ImportDraftRow[]
+    summary: {
+        total: number
+        ok: number
+        warnings: number
+        errors: number
+        duplicates: number
+        ignored: number
+    }
+    missing: {
+        tags: string[]
+        budgets: string[]
+        earmarks: string[]
+        paymentAccounts: string[]
+    }
+    lookup: {
+        paymentAccounts: LookupOption[]
+        budgets: LookupOption[]
+        earmarks: LookupOption[]
+        tags: string[]
+    }
+}
+
+export type ImportDraftCommitResult = ImportExecuteResult & { errorFilePath?: string }
 
 const FIELD_KEYS = [
     'voucherId',
@@ -481,6 +536,475 @@ function parseDate(v: any): string | undefined {
         return new Date(ms).toISOString().slice(0, 10)
     }
     return undefined
+}
+
+function getImportLookups(d = getDb()) {
+    const paymentAccounts = buildPaymentAccountOptions(d)
+    const paymentAccountAliases = (d.prepare(`SELECT id, name FROM payment_accounts`).all() as Array<{ id: number; name: string }>)
+        .map((row) => row.name)
+    const budgets = buildBudgetOptions(d)
+    const budgetAliases = (d.prepare(`
+        SELECT id, year, sphere, name, category_name as categoryName, project_name as projectName
+        FROM budgets
+    `).all() as Array<{ id: number; year: number; sphere: string; name?: string | null; categoryName?: string | null; projectName?: string | null }>)
+        .map((row) => row.name || row.categoryName || row.projectName || `${row.year} ${row.sphere} ${row.id}`)
+    const earmarks = buildEarmarkOptions(d)
+    const earmarkAliases = (d.prepare(`SELECT id, code, name FROM earmarks`).all() as Array<{ id: number; code: string; name: string }>)
+        .map((row) => `${row.code} ${row.name}`)
+    const tags = buildTagOptions(d)
+    return {
+        paymentAccounts,
+        paymentAccountAliases,
+        budgets,
+        budgetAliases,
+        earmarks,
+        earmarkAliases,
+        tags
+    }
+}
+
+function uniqueSorted(values: Iterable<string>) {
+    return Array.from(new Set(Array.from(values).map((v) => String(v || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, 'de'))
+}
+
+function getRowValue(
+    ws: ExcelJS.Worksheet,
+    idxByHeader: Record<string, number>,
+    mapping: Record<FieldKey, string | null>,
+    rowNumber: number,
+    key: FieldKey
+) {
+    const h = mapping[key]
+    if (!h) return undefined
+    const col = idxByHeader[h]
+    return col ? normalizeCellValue(ws.getRow(rowNumber).getCell(col).value) : undefined
+}
+
+function looksLikeSummaryRow(rawDate: any, description: any) {
+    const txt = [rawDate, description].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
+    return /ergebnis|summe|saldo/.test(txt)
+}
+
+function applyImportRules(values: Record<string, any>, rules?: ImportRule[]) {
+    for (const rule of rules || []) {
+        if (rule.enabled === false) continue
+        const needle = String(rule.contains || '').trim().toLowerCase()
+        if (!needle) continue
+        const hay = String(values[rule.sourceField] ?? '').toLowerCase()
+        if (!hay.includes(needle)) continue
+        if (rule.targetField === 'tags') {
+            const current = parseTagsValue(values.tags)
+            const additions = parseTagsValue(rule.value)
+            values.tags = uniqueSorted([...current, ...additions]).join('; ')
+        } else {
+            values[rule.targetField] = rule.value
+        }
+    }
+}
+
+function issue(level: ImportDraftIssue['level'], code: string, message: string): ImportDraftIssue {
+    return { level, code, message }
+}
+
+function statusFromIssues(issues: ImportDraftIssue[], duplicateIds: number[]): ImportDraftRow['status'] {
+    if (issues.some((i) => i.level === 'error')) return 'error'
+    if (duplicateIds.length > 0) return 'duplicate'
+    if (issues.some((i) => i.level === 'warning')) return 'warning'
+    return 'ok'
+}
+
+function detectDuplicateIds(d: ReturnType<typeof getDb>, values: Record<string, any>) {
+    const date = parseDate(values.date)
+    const gross = parseNumber(values.grossAmount)
+    const desc = String(values.description || '').trim().slice(0, 80)
+    if (!date || gross == null || !desc) return []
+    const rows = d.prepare(`
+        SELECT id
+        FROM vouchers
+        WHERE date = ?
+          AND ROUND(gross_amount, 2) = ROUND(?, 2)
+          AND COALESCE(description, '') LIKE ?
+        ORDER BY id DESC
+        LIMIT 5
+    `).all(date, Math.abs(gross), desc + '%') as Array<{ id: number }>
+    return rows.map((row) => Number(row.id)).filter(Boolean)
+}
+
+function normalizeDraftValues(
+    values: Record<string, any>,
+    lookups: ReturnType<typeof getImportLookups>,
+    d: ReturnType<typeof getDb>
+) {
+    const issues: ImportDraftIssue[] = []
+    const date = parseDate(values.date)
+    if (!date) issues.push(issue('error', 'date', 'Datum fehlt oder ist unklar.'))
+    values.date = date || String(values.date ?? '')
+
+    const type = parseEnum(values.type, ['IN', 'OUT', 'TRANSFER', 'INTERNAL'] as const)
+    const sphere = parseEnum(values.sphere, ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
+    values.type = type || ''
+    values.sphere = sphere
+
+    const paymentMethod = parseEnum(values.paymentMethod, ['BAR', 'BANK'] as const)
+    const paymentAccountId = findLookupId(values.paymentAccount, lookups.paymentAccounts, lookups.paymentAccountAliases)
+    const paymentAccount = paymentAccountId != null ? getPaymentAccountById(paymentAccountId, d) : undefined
+    values.paymentAccountId = paymentAccountId ?? null
+    values.paymentMethod = paymentMethodForAccountKind(paymentAccount?.kind) ?? paymentMethod ?? values.paymentMethod ?? ''
+    if (values.paymentAccount && paymentAccountId == null) {
+        issues.push(issue('warning', 'paymentAccount', `Konto nicht gefunden: ${values.paymentAccount}`))
+    }
+
+    const budgetId = findLookupId(values.budget, lookups.budgets, lookups.budgetAliases)
+    values.budgetId = budgetId ?? null
+    if (values.budget && budgetId == null) issues.push(issue('warning', 'budget', `Budget nicht gefunden: ${values.budget}`))
+
+    const earmarkId = findLookupId(values.earmarkCode, lookups.earmarks, lookups.earmarkAliases)
+    values.earmarkId = earmarkId ?? null
+    if (values.earmarkCode && earmarkId == null) issues.push(issue('warning', 'earmark', `Zweckbindung nicht gefunden: ${values.earmarkCode}`))
+
+    const grossAmount = parseNumber(values.grossAmount)
+    const netAmount = parseNumber(values.netAmount)
+    values.grossAmount = grossAmount ?? ''
+    values.netAmount = netAmount ?? ''
+    values.vatRate = parseNumber(values.vatRate) ?? 0
+    values.budgetAmount = parseNumber(values.budgetAmount) ?? ''
+    values.earmarkAmount = parseNumber(values.earmarkAmount) ?? ''
+
+    if (grossAmount == null && netAmount == null) issues.push(issue('error', 'amount', 'Kein Betrag erkannt.'))
+    if (!type && grossAmount != null) values.type = grossAmount < 0 ? 'OUT' : 'IN'
+    if (!values.type) issues.push(issue('warning', 'type', 'Art fehlt; VereinO nimmt IN an.'))
+
+    const knownTags = new Set(lookups.tags.map((tag) => tag.trim().toLowerCase()))
+    const tags = parseTagsValue(values.tags)
+    values.tags = tags.join('; ')
+    const missingTags = tags.filter((tag) => !knownTags.has(tag.trim().toLowerCase()))
+    if (missingTags.length > 0) issues.push(issue('info', 'tags', `Neue Tags: ${missingTags.join(', ')}`))
+
+    const duplicateIds = detectDuplicateIds(d, { ...values, grossAmount: grossAmount ?? netAmount })
+    if (duplicateIds.length > 0) issues.push(issue('warning', 'duplicate', `Mögliches Duplikat: Buchung #${duplicateIds[0]}`))
+
+    return { issues, duplicateIds }
+}
+
+function buildDraftRow(
+    id: string,
+    sourceRow: number,
+    original: Record<string, any>,
+    values: Record<string, any>,
+    lookups: ReturnType<typeof getImportLookups>,
+    rules: ImportRule[] | undefined,
+    d: ReturnType<typeof getDb>
+): ImportDraftRow {
+    applyImportRules(values, rules)
+    const { issues, duplicateIds } = normalizeDraftValues(values, lookups, d)
+    return {
+        id,
+        sourceRow,
+        status: statusFromIssues(issues, duplicateIds),
+        duplicateAction: duplicateIds.length ? 'skip' : 'import',
+        duplicateIds,
+        issues,
+        original,
+        values
+    }
+}
+
+async function analyzeCamtFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    rules?: ImportRule[]
+): Promise<ImportAnalyzeResult> {
+    const xml = NodeBuffer.from(base64, 'base64').toString('utf8')
+    const entries = parseCamtXml(xml)
+    const preview = await previewCamt(base64)
+    const d = getDb()
+    const lookups = getImportLookups(d)
+    const rows = entries.map((entry, index) => {
+        const original = {
+            'Datum': entry.date,
+            'Text': [entry.purpose, entry.name].filter(Boolean).join(' · '),
+            'Bank +': entry.creditDebit === 'CR' ? Math.abs(entry.amount) : '',
+            'Bank -': entry.creditDebit === 'DB' ? Math.abs(entry.amount) : '',
+            'Währung': entry.currency || 'EUR',
+            'Gegenpartei': entry.name || '',
+            'IBAN': entry.iban || '',
+            'EndToEndId': entry.endToEndId || '',
+            'Ref': entry.entryRef || ''
+        }
+        const valueFor = (key: FieldKey) => {
+            const mapped = mapping[key]
+            return mapped ? (original as any)[mapped] : undefined
+        }
+        const values: Record<string, any> = {
+            voucherId: '',
+            voucherNo: valueFor('voucherNo') ?? '',
+            date: valueFor('date') ?? entry.date,
+            type: entry.creditDebit === 'CR' ? 'IN' : 'OUT',
+            sphere: valueFor('sphere') ?? mapping.defaultSphere ?? 'IDEELL',
+            description: valueFor('description') ?? original.Text,
+            note: valueFor('note') ?? '',
+            paymentMethod: valueFor('paymentMethod') ?? 'BANK',
+            paymentAccount: valueFor('paymentAccount') ?? '',
+            grossAmount: Math.abs(entry.amount),
+            netAmount: valueFor('netAmount') ?? '',
+            vatRate: valueFor('vatRate') ?? 0,
+            budget: valueFor('budget') ?? '',
+            budgetAmount: valueFor('budgetAmount') ?? '',
+            earmarkCode: valueFor('earmarkCode') ?? '',
+            earmarkAmount: valueFor('earmarkAmount') ?? '',
+            tags: valueFor('tags') ?? ''
+        }
+        return buildDraftRow(`${index + 2}:camt`, index + 2, original, values, lookups, rules, d)
+    })
+    const missing = {
+        tags: uniqueSorted(rows.flatMap((row) => parseTagsValue(row.values.tags)).filter((tag) => !lookups.tags.map((t) => t.toLowerCase()).includes(tag.toLowerCase()))),
+        budgets: uniqueSorted(rows.filter((row) => row.values.budget && !row.values.budgetId).map((row) => String(row.values.budget))),
+        earmarks: uniqueSorted(rows.filter((row) => row.values.earmarkCode && !row.values.earmarkId).map((row) => String(row.values.earmarkCode))),
+        paymentAccounts: uniqueSorted(rows.filter((row) => row.values.paymentAccount && !row.values.paymentAccountId).map((row) => String(row.values.paymentAccount)))
+    }
+    const summary = {
+        total: rows.length,
+        ok: rows.filter((row) => row.status === 'ok').length,
+        warnings: rows.filter((row) => row.status === 'warning').length,
+        errors: rows.filter((row) => row.status === 'error').length,
+        duplicates: rows.filter((row) => row.status === 'duplicate').length,
+        ignored: rows.filter((row) => row.status === 'ignored').length
+    }
+    return {
+        ...preview,
+        rows,
+        summary,
+        missing,
+        lookup: {
+            paymentAccounts: lookups.paymentAccounts,
+            budgets: lookups.budgets,
+            earmarks: lookups.earmarks,
+            tags: lookups.tags
+        }
+    }
+}
+
+export async function analyzeFile(
+    base64: string,
+    mapping: Record<FieldKey, string | null>,
+    rules?: ImportRule[]
+): Promise<ImportAnalyzeResult> {
+    if (detectFileType(base64) === 'CAMT') return analyzeCamtFile(base64, mapping, rules)
+    const wb = new ExcelJS.Workbook()
+    const buf = NodeBuffer.from(base64, 'base64')
+    await (wb as any).xlsx.load(buf as any)
+    const pick = pickWorksheet(wb)
+    if (!pick) throw new Error('Keine Tabelle gefunden')
+    const { ws, headerRowIdx, headers, idxByHeader } = pick
+    const d = getDb()
+    const lookups = getImportLookups(d)
+    const suggestedMapping = suggestMapping(headers)
+    const rows: ImportDraftRow[] = []
+
+    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+        const original: Record<string, any> = {}
+        headers.forEach((h, i) => {
+            const col = idxByHeader[h] || (i + 1)
+            original[h || `col${i + 1}`] = normalizeCellValue(ws.getRow(r).getCell(col).value)
+        })
+        const get = (key: FieldKey) => getRowValue(ws, idxByHeader, mapping, r, key)
+        const rawDate = get('date')
+        const description = get('description')
+        if (looksLikeSummaryRow(rawDate, description)) {
+            rows.push({
+                id: `${r}:ignored`,
+                sourceRow: r,
+                status: 'ignored',
+                duplicateAction: 'skip',
+                duplicateIds: [],
+                issues: [issue('info', 'summary', 'Summen-/Saldozeile wird übersprungen.')],
+                original,
+                values: { date: rawDate ?? '', description: description ?? '' }
+            })
+            continue
+        }
+
+        const baseValues: Record<string, any> = {
+            voucherId: get('voucherId') ?? '',
+            voucherNo: get('voucherNo') ?? '',
+            date: rawDate ?? '',
+            type: get('type') ?? '',
+            sphere: get('sphere') ?? mapping.defaultSphere ?? 'IDEELL',
+            description: description ?? '',
+            note: get('note') ?? '',
+            paymentMethod: get('paymentMethod') ?? '',
+            paymentAccount: get('paymentAccount') ?? '',
+            netAmount: get('netAmount') ?? '',
+            vatRate: get('vatRate') ?? 0,
+            grossAmount: get('grossAmount') ?? '',
+            budget: get('budget') ?? '',
+            budgetAmount: get('budgetAmount') ?? '',
+            earmarkCode: get('earmarkCode') ?? '',
+            earmarkAmount: get('earmarkAmount') ?? '',
+            tags: get('tags') ?? ''
+        }
+
+        const ops: Array<{ suffix: string; type: 'IN' | 'OUT'; paymentMethod?: 'BAR' | 'BANK'; amount: number }> = []
+        const bankIn = parseNumber(get('bankIn'))
+        const bankOut = parseNumber(get('bankOut'))
+        const cashIn = parseNumber(get('cashIn'))
+        const cashOut = parseNumber(get('cashOut'))
+        const inGross = parseNumber(get('inGross'))
+        const outGross = parseNumber(get('outGross'))
+        if (bankIn != null && bankIn !== 0) ops.push({ suffix: 'bankIn', type: 'IN', paymentMethod: 'BANK', amount: Math.abs(bankIn) })
+        if (bankOut != null && bankOut !== 0) ops.push({ suffix: 'bankOut', type: 'OUT', paymentMethod: 'BANK', amount: Math.abs(bankOut) })
+        if (cashIn != null && cashIn !== 0) ops.push({ suffix: 'cashIn', type: 'IN', paymentMethod: 'BAR', amount: Math.abs(cashIn) })
+        if (cashOut != null && cashOut !== 0) ops.push({ suffix: 'cashOut', type: 'OUT', paymentMethod: 'BAR', amount: Math.abs(cashOut) })
+        if (inGross != null && inGross !== 0) ops.push({ suffix: 'inGross', type: 'IN', amount: Math.abs(inGross) })
+        if (outGross != null && outGross !== 0) ops.push({ suffix: 'outGross', type: 'OUT', amount: Math.abs(outGross) })
+
+        if (ops.length > 0) {
+            for (const op of ops) {
+                rows.push(buildDraftRow(`${r}:${op.suffix}`, r, original, {
+                    ...baseValues,
+                    type: op.type,
+                    paymentMethod: op.paymentMethod ?? baseValues.paymentMethod,
+                    grossAmount: op.amount
+                }, lookups, rules, d))
+            }
+        } else {
+            rows.push(buildDraftRow(`${r}:main`, r, original, baseValues, lookups, rules, d))
+        }
+    }
+
+    const missing = {
+        tags: uniqueSorted(rows.flatMap((row) => parseTagsValue(row.values.tags)).filter((tag) => !lookups.tags.map((t) => t.toLowerCase()).includes(tag.toLowerCase()))),
+        budgets: uniqueSorted(rows.filter((row) => row.values.budget && !row.values.budgetId).map((row) => String(row.values.budget))),
+        earmarks: uniqueSorted(rows.filter((row) => row.values.earmarkCode && !row.values.earmarkId).map((row) => String(row.values.earmarkCode))),
+        paymentAccounts: uniqueSorted(rows.filter((row) => row.values.paymentAccount && !row.values.paymentAccountId).map((row) => String(row.values.paymentAccount)))
+    }
+    const summary = {
+        total: rows.length,
+        ok: rows.filter((row) => row.status === 'ok').length,
+        warnings: rows.filter((row) => row.status === 'warning').length,
+        errors: rows.filter((row) => row.status === 'error').length,
+        duplicates: rows.filter((row) => row.status === 'duplicate').length,
+        ignored: rows.filter((row) => row.status === 'ignored').length
+    }
+    const sample = rows.slice(0, 50).map((row) => row.original)
+    return {
+        headers,
+        sample,
+        suggestedMapping,
+        headerRowIndex: headerRowIdx,
+        rows,
+        summary,
+        missing,
+        lookup: {
+            paymentAccounts: lookups.paymentAccounts,
+            budgets: lookups.budgets,
+            earmarks: lookups.earmarks,
+            tags: lookups.tags
+        }
+    }
+}
+
+function draftPayload(row: ImportDraftRow, d = getDb()) {
+    const values = row.values || {}
+    const date = parseDate(values.date)
+    if (!date) throw new Error('Datum fehlt/ungültig')
+    const type = parseEnum(values.type, ['IN', 'OUT', 'TRANSFER', 'INTERNAL'] as const, 'IN') || 'IN'
+    const sphere = parseEnum(values.sphere, ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const, 'IDEELL') || 'IDEELL'
+    const paymentMethod = parseEnum(values.paymentMethod, ['BAR', 'BANK'] as const)
+    const paymentAccountId = values.paymentAccountId != null
+        ? Number(values.paymentAccountId)
+        : findLookupId(values.paymentAccount, buildPaymentAccountOptions(d), (d.prepare(`SELECT id, name FROM payment_accounts`).all() as any[]).map((r) => r.name))
+    const paymentAccount = paymentAccountId ? getPaymentAccountById(paymentAccountId, d) : undefined
+    const resolvedPaymentMethod = paymentMethodForAccountKind(paymentAccount?.kind) ?? paymentMethod ?? undefined
+    const grossAmount = parseNumber(values.grossAmount)
+    const netAmount = parseNumber(values.netAmount)
+    if (grossAmount == null && netAmount == null) throw new Error('Kein Betrag (Netto/Brutto)')
+    const payload: any = {
+        date,
+        type,
+        sphere,
+        description: values.description != null ? String(values.description) : undefined,
+        note: values.note != null ? String(values.note) : undefined,
+        paymentMethod: resolvedPaymentMethod,
+        paymentAccountId: paymentAccountId || undefined,
+        vatRate: parseNumber(values.vatRate) ?? 0,
+        tags: parseTagsValue(values.tags)
+    }
+    if (grossAmount != null) payload.grossAmount = Math.abs(grossAmount)
+    else payload.netAmount = Math.abs(netAmount!)
+    const budgetId = values.budgetId != null && values.budgetId !== '' ? Number(values.budgetId) : findLookupId(values.budget, buildBudgetOptions(d))
+    if (budgetId) payload.budgetId = budgetId
+    const budgetAmount = parseNumber(values.budgetAmount)
+    if (budgetAmount != null) payload.budgetAmount = budgetAmount
+    const earmarkId = values.earmarkId != null && values.earmarkId !== '' ? Number(values.earmarkId) : findLookupId(values.earmarkCode, buildEarmarkOptions(d))
+    if (earmarkId) payload.earmarkId = earmarkId
+    const earmarkAmount = parseNumber(values.earmarkAmount)
+    if (earmarkAmount != null) payload.earmarkAmount = earmarkAmount
+    return payload
+}
+
+export async function commitImportDraft(rows: ImportDraftRow[]): Promise<ImportDraftCommitResult> {
+    const d = getDb()
+    let imported = 0
+    let skipped = 0
+    const errors: Array<{ row: number; message: string }> = []
+    const rowStatuses: Array<{ row: number; ok: boolean; message?: string }> = []
+    const knownTags = loadTagNameSet(d)
+    const newTags = new Set<string>()
+    for (const row of rows) {
+        try {
+            if (row.status === 'ignored' || row.duplicateAction === 'skip') {
+                skipped++
+                rowStatuses.push({ row: row.sourceRow, ok: true, message: row.status === 'ignored' ? 'Übersprungen' : 'Duplikat übersprungen' })
+                continue
+            }
+            if (row.status === 'error') throw new Error(row.issues.find((i) => i.level === 'error')?.message || 'Zeile enthält Fehler')
+            const payload = draftPayload(row, d)
+            const mergeId = row.duplicateAction === 'merge' ? row.duplicateIds?.[0] : undefined
+            if (mergeId) await Promise.resolve(updateVoucher({ id: mergeId, ...payload }))
+            else await Promise.resolve(createVoucher(payload))
+            rememberNewTags(payload.tags || [], knownTags, newTags)
+            imported++
+            rowStatuses.push({ row: row.sourceRow, ok: true })
+        } catch (e: any) {
+            skipped++
+            const message = e?.message || String(e)
+            errors.push({ row: row.sourceRow, message })
+            rowStatuses.push({ row: row.sourceRow, ok: false, message })
+        }
+    }
+    return { imported, skipped, errors, rowStatuses, newTags: Array.from(newTags).sort((a, b) => a.localeCompare(b, 'de')) }
+}
+
+export function createMissingImportMasterData(input: Partial<ImportAnalyzeResult['missing']>) {
+    const d = getDb()
+    const created = { tags: 0, budgets: 0, earmarks: 0, paymentAccounts: 0 }
+    for (const tag of input.tags || []) {
+        if (ensureTag(d as any, tag)?.created) created.tags++
+    }
+    const year = new Date().getFullYear()
+    for (const budget of input.budgets || []) {
+        const name = String(budget || '').trim()
+        if (!name) continue
+        upsertBudget({ year, sphere: 'IDEELL', amountPlanned: 0, name })
+        created.budgets++
+    }
+    for (const earmark of input.earmarks || []) {
+        const raw = String(earmark || '').trim()
+        if (!raw) continue
+        const code = raw.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || `IMPORT-${created.earmarks + 1}`
+        upsertBinding({ code, name: raw, isActive: true })
+        created.earmarks++
+    }
+    for (const account of input.paymentAccounts || []) {
+        const name = String(account || '').trim()
+        if (!name) continue
+        const kind = /(bar|cash|kasse)/i.test(name) ? 'CASH' : 'BANK'
+        upsertPaymentAccount({ name, kind, isActive: true })
+        created.paymentAccounts++
+    }
+    return created
 }
 
 export async function executeXlsx(base64: string, mapping: Record<FieldKey, string | null>): Promise<ImportExecuteResult & { errorFilePath?: string }> {

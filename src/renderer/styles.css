@@ -4299,6 +4299,103 @@ textarea:focus {
     color: var(--text);
 }
 
+.import-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.import-step {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    padding: 5px 10px;
+    background: color-mix(in oklab, var(--surface) 78%, transparent);
+}
+
+.import-step.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: color-mix(in oklab, var(--accent) 16%, var(--surface));
+}
+
+.import-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.import-summary-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 2px;
+    background: color-mix(in oklab, var(--surface) 82%, transparent);
+}
+
+.import-summary-card strong {
+    font-size: 20px;
+}
+
+.import-summary-card.ok { border-color: color-mix(in oklab, var(--success) 55%, var(--border)); }
+.import-summary-card.warn { border-color: color-mix(in oklab, #f59e0b 65%, var(--border)); }
+.import-summary-card.error { border-color: color-mix(in oklab, var(--danger) 65%, var(--border)); }
+.import-summary-card.dup { border-color: color-mix(in oklab, var(--accent) 65%, var(--border)); }
+
+.import-draft-table {
+    border-collapse: collapse;
+    min-width: 1500px;
+    width: 100%;
+    font-size: 12px;
+}
+
+.import-draft-table th,
+.import-draft-table td {
+    border-bottom: 1px solid var(--table-row-sep, var(--border));
+    padding: 4px 6px;
+    vertical-align: middle;
+}
+
+.import-draft-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: color-mix(in oklab, var(--surface) 92%, var(--bg));
+}
+
+.import-draft-table input,
+.import-draft-table select {
+    width: 100%;
+    min-width: 90px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px 6px;
+    color: var(--text);
+    background: color-mix(in oklab, var(--surface) 88%, transparent);
+}
+
+.import-row-ok {
+    background: color-mix(in oklab, var(--success) 7%, transparent);
+}
+
+.import-row-warning {
+    background: color-mix(in oklab, #f59e0b 12%, transparent);
+}
+
+.import-row-error {
+    background: color-mix(in oklab, var(--danger) 13%, transparent);
+}
+
+.import-row-duplicate {
+    background: color-mix(in oklab, var(--accent) 13%, transparent);
+}
+
+.import-row-ignored {
+    opacity: 0.72;
+    background: color-mix(in oklab, var(--muted) 12%, transparent);
+}
+
 /* Mapping field - label above select */
 .mapping-field {
     display: flex;
