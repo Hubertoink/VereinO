@@ -6,7 +6,7 @@ export interface BatchEarmarkModalProps {
   earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
   tagDefs: Array<{ id: number; name: string; color?: string | null }>
   budgets: Array<{ id: number; label: string }>
-  currentFilters: { paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; earmarkId?: number; budgetId?: number; tag?: string }
+  currentFilters: { paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; from?: string; to?: string; q?: string; earmarkId?: number; budgetId?: number; tag?: string }
   onApplied: (updated: number) => void
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }

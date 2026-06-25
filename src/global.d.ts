@@ -28,7 +28,7 @@ declare global {
             vouchers: {
                 create: (payload: {
                     date: string
-                    type: 'IN' | 'OUT' | 'TRANSFER'
+                    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
                     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
                     description?: string
                     netAmount?: number
@@ -53,12 +53,12 @@ declare global {
                     tags?: string[]
                 }) => Promise<{ id: number; voucherNo: string; grossAmount: number; warnings?: string[] }>
                 reverse: (payload: any) => Promise<{ id: number; voucherNo: string }>
-                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; paymentAccountId?: number | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; earmarkId?: number; budgetId?: number; voucherIds?: number[]; q?: string; tag?: string }) => Promise<{
+                list: (payload?: { limit?: number; offset?: number; sort?: 'ASC' | 'DESC'; sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'; paymentMethod?: 'BAR' | 'BANK'; paymentAccountId?: number | null; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; from?: string; to?: string; earmarkId?: number; budgetId?: number; voucherIds?: number[]; q?: string; tag?: string }) => Promise<{
                     rows: Array<{
                         id: number
                         voucherNo: string
                         date: string
-                        type: 'IN' | 'OUT' | 'TRANSFER'
+                        type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
                         sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
                         paymentMethod?: 'BAR' | 'BANK' | null
                         paymentAccountId?: number | null
@@ -95,13 +95,13 @@ declare global {
                     }>
                     total: number
                 }>
-                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; paymentAccountName?: string | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
-                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; note?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; transferFromAccountId?: number | null; transferToAccountId?: number | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
+                recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; paymentAccountName?: string | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
+                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; note?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; transferFromAccountId?: number | null; transferToAccountId?: number | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
                 updateMeta: (payload: { id: number; note?: string | null; earmarkId?: number | null; earmarkAmount?: number | null; budgetId?: number | null; budgetAmount?: number | null; budgets?: { budgetId: number; amount: number }[]; earmarks?: { earmarkId: number; amount: number }[]; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
                 delete: (payload: { id: number }) => Promise<{ id: number }>
-                batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
-                batchAssignBudget: (payload: { budgetId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
-                batchAssignTags: (payload: { tags: string[]; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string }) => Promise<{ updated: number }>
+                batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
+                batchAssignBudget: (payload: { budgetId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
+                batchAssignTags: (payload: { tags: string[]; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; from?: string; to?: string; q?: string }) => Promise<{ updated: number }>
                 clearAll: () => Promise<{ deleted: number }>
             }
             paymentAccounts: {
@@ -118,7 +118,7 @@ declare global {
                 recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; userId?: number | null; entity: string; entityId: number; action: string; createdAt: string; diff?: any | null }> }>
             }
             yearEnd?: {
-                preview?: (payload: { year: number }) => Promise<{ year: number; from: string; to: string; totals: { net: number; vat: number; gross: number }; bySphere: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; net: number; vat: number; gross: number }>; byPaymentMethod: Array<{ key: 'BAR' | 'BANK' | null; net: number; vat: number; gross: number }>; byType: Array<{ key: 'IN' | 'OUT' | 'TRANSFER'; net: number; vat: number; gross: number }>; cashBalance: { BAR: number; BANK: number } }>
+                preview?: (payload: { year: number }) => Promise<{ year: number; from: string; to: string; totals: { net: number; vat: number; gross: number }; bySphere: Array<{ key: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; net: number; vat: number; gross: number }>; byPaymentMethod: Array<{ key: 'BAR' | 'BANK' | null; net: number; vat: number; gross: number }>; byType: Array<{ key: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; net: number; vat: number; gross: number }>; cashBalance: { BAR: number; BANK: number } }>
                 export?: (payload: { year: number }) => Promise<{ filePath: string }>
                 close?: (payload: { year: number }) => Promise<{ ok: boolean; closedUntil: string }>
                 reopen?: (payload: { year: number }) => Promise<{ ok: boolean; closedUntil: string | null }>

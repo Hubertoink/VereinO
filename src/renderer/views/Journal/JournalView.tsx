@@ -15,7 +15,7 @@ type VoucherRow = {
     id: number
     voucherNo: string
     date: string
-    type: 'IN' | 'OUT' | 'TRANSFER'
+    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
     note?: string | null
@@ -135,7 +135,7 @@ interface JournalViewProps {
     from?: string
     to?: string
     filterSphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
-    filterType?: 'IN' | 'OUT' | 'TRANSFER' | null
+    filterType?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null
     filterPM?: 'BAR' | 'BANK' | null
     filterPaymentAccountId?: number | null
     filterEarmark?: number | null
@@ -145,7 +145,7 @@ interface JournalViewProps {
     setFrom?: (v: string) => void
     setTo?: (v: string) => void
     setFilterSphere?: (v: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null) => void
-    setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | null) => void
+    setFilterType?: (v: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null) => void
     setFilterPM?: (v: 'BAR' | 'BANK' | null) => void
     setFilterPaymentAccountId?: (v: number | null) => void
     setFilterEarmark?: (v: number | null) => void
@@ -278,7 +278,7 @@ export default function JournalView({
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
-    const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
+    const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
@@ -1482,17 +1482,17 @@ export default function JournalView({
                                         notify('error', 'Bitte wähle Quell- und Zielkonto für den Transfer aus.')
                                         return
                                     }
-                                    if (editRow.type !== 'TRANSFER' && !editRow.paymentAccountId) {
+                                    if (editRow.type !== 'TRANSFER' && editRow.type !== 'INTERNAL' && !editRow.paymentAccountId) {
                                         notify('error', 'Bitte wähle ein Konto für die Buchung aus.')
                                         return
                                     }
                                     // Build budgets array from the new multi-assignment UI
                                     const budgets = ((editRow as any).budgets || [])
-                                        .filter((b: BudgetAssignment) => b.budgetId && b.amount > 0)
+                                        .filter((b: BudgetAssignment) => b.budgetId && (editRow.type === 'INTERNAL' ? b.amount !== 0 : b.amount > 0))
                                         .map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount }))
                                     // Build earmarks array from the new multi-assignment UI
                                     const earmarksArr = ((editRow as any).earmarksAssigned || [])
-                                        .filter((e: EarmarkAssignment) => e.earmarkId && e.amount > 0)
+                                        .filter((e: EarmarkAssignment) => e.earmarkId && (editRow.type === 'INTERNAL' ? e.amount !== 0 : e.amount > 0))
                                         .map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount }))
                                     
                                     // Validate: No duplicate budgets
@@ -1510,13 +1510,30 @@ export default function JournalView({
                                     // Validate: Total budget amount should not exceed gross amount
                                     const totalBudgetAmount = budgets.reduce((sum: number, b: { amount: number }) => sum + b.amount, 0)
                                     const grossAmount = Number((editRow as any).grossAmount) || 0
-                                    if (totalBudgetAmount > grossAmount * 1.001) { // small tolerance for rounding
+                                    const hasBalancedInternalBudgets = budgets.length > 0 && (
+                                        budgets.some((b: { budgetId: number; amount: number }) => b.budgetId && Number(b.amount) < 0)
+                                        && budgets.some((b: { budgetId: number; amount: number }) => b.budgetId && Number(b.amount) > 0)
+                                        && Math.abs(totalBudgetAmount) <= 0.001
+                                    )
+                                    const totalEarmarkAmount = earmarksArr.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
+                                    const hasBalancedInternalEarmarks = earmarksArr.length > 0 && (
+                                        earmarksArr.some((e: { earmarkId: number; amount: number }) => e.earmarkId && Number(e.amount) < 0)
+                                        && earmarksArr.some((e: { earmarkId: number; amount: number }) => e.earmarkId && Number(e.amount) > 0)
+                                        && Math.abs(totalEarmarkAmount) <= 0.001
+                                    )
+                                    const hasValidInternalAssignments = (hasBalancedInternalBudgets || hasBalancedInternalEarmarks)
+                                        && (budgets.length === 0 || hasBalancedInternalBudgets)
+                                        && (earmarksArr.length === 0 || hasBalancedInternalEarmarks)
+                                    if (editRow.type === 'INTERNAL' && !hasValidInternalAssignments) {
+                                        notify('error', 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+                                        return
+                                    }
+                                    if (editRow.type !== 'INTERNAL' && totalBudgetAmount > grossAmount * 1.001) { // small tolerance for rounding
                                         notify('error', `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`)
                                         return
                                     }
                                     // Validate: Total earmark amount should not exceed gross amount
-                                    const totalEarmarkAmount = earmarksArr.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
-                                    if (totalEarmarkAmount > grossAmount * 1.001) {
+                                    if (editRow.type !== 'INTERNAL' && totalEarmarkAmount > grossAmount * 1.001) {
                                         notify('error', `Die Summe der Zweckbindungs-Beträge (${totalEarmarkAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`)
                                         return
                                     }
@@ -1545,6 +1562,13 @@ export default function JournalView({
                                         payload.transferTo = editRow.transferTo ?? null
                                         payload.transferFromAccountId = editRow.transferFromAccountId ?? null
                                         payload.transferToAccountId = editRow.transferToAccountId ?? null
+                                    } else if (editRow.type === 'INTERNAL') {
+                                        delete payload.paymentMethod
+                                        payload.paymentAccountId = null
+                                        payload.transferFrom = null
+                                        payload.transferTo = null
+                                        payload.transferFromAccountId = null
+                                        payload.transferToAccountId = null
                                     } else {
                                         payload.paymentMethod = editRow.paymentMethod ?? null
                                         payload.paymentAccountId = editRow.paymentAccountId ?? null
@@ -1581,15 +1605,17 @@ export default function JournalView({
                                             const type = editRow.type
                                             const pm = editRow.type === 'TRANSFER'
                                                 ? `${editRow.transferFromAccountName || paymentAccountsById.get(Number(editRow.transferFromAccountId || 0))?.name || paymentMethodLabel(editRow.transferFrom)} → ${editRow.transferToAccountName || paymentAccountsById.get(Number(editRow.transferToAccountId || 0))?.name || paymentMethodLabel(editRow.transferTo)}`
-                                                : (editRow.paymentAccountName || paymentAccountsById.get(Number(editRow.paymentAccountId || 0))?.name || paymentMethodLabel(editRow.paymentMethod))
+                                                : editRow.type === 'INTERNAL'
+                                                    ? 'intern'
+                                                    : (editRow.paymentAccountName || paymentAccountsById.get(Number(editRow.paymentAccountId || 0))?.name || paymentMethodLabel(editRow.paymentMethod))
                                             const amount = (() => {
-                                                if (editRow.type === 'TRANSFER') return eurFmt.format(Number((editRow as any).grossAmount || 0))
+                                                if (editRow.type === 'TRANSFER' || editRow.type === 'INTERNAL') return eurFmt.format(Number((editRow as any).grossAmount || 0))
                                                 if ((editRow as any).mode === 'GROSS') return eurFmt.format(Number((editRow as any).grossAmount || 0))
                                                 const n = Number((editRow as any).netAmount || 0); const v = Number((editRow as any).vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
                                                 return eurFmt.format(g)
                                             })()
                                             const sphere = editRow.sphere
-                                            const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
+                                            const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : type === 'INTERNAL' ? 'var(--muted)' : 'inherit'
                                             return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
                                         })()}
                                     </div>
@@ -1607,8 +1633,8 @@ export default function JournalView({
                                             </div>
                                             <div className="field">
                                                 <label>Art</label>
-                                                <div className="btn-group" role="group" aria-label="Art wählen">
-                                                    {(['IN','OUT','TRANSFER'] as const).map(t => (
+                                                <div className="btn-group booking-type-group" role="group" aria-label="Art wählen">
+                                                    {(['IN','OUT','TRANSFER','INTERNAL'] as const).map(t => (
                                                         <button key={t} type="button" className={`btn ${editRow.type === t ? 'btn-toggle-active' : ''} ${t==='IN' ? 'btn-type-in' : t==='OUT' ? 'btn-type-out' : ''}`} onClick={() => {
                                                             const newRow = { ...editRow, type: t }
                                                             if (t === 'TRANSFER' && (!newRow.transferFromAccountId || !newRow.transferToAccountId)) {
@@ -1620,6 +1646,14 @@ export default function JournalView({
                                                                 newRow.transferTo = defaultBankAccount?.kind === 'CASH' ? 'BAR' : 'BANK'
                                                                 newRow.paymentAccountId = null
                                                                 newRow.paymentAccountName = null
+                                                            } else if (t === 'INTERNAL') {
+                                                                newRow.paymentAccountId = null
+                                                                newRow.paymentAccountName = null
+                                                                newRow.paymentMethod = null
+                                                                newRow.transferFromAccountId = null
+                                                                newRow.transferToAccountId = null
+                                                                newRow.vatRate = 0
+                                                                ;(newRow as any).mode = 'GROSS'
                                                             } else if (t !== 'TRANSFER' && !newRow.paymentAccountId) {
                                                                 const fallback = defaultCashAccount ?? defaultBankAccount
                                                                 newRow.paymentAccountId = fallback?.id ?? null
@@ -1627,7 +1661,7 @@ export default function JournalView({
                                                                 newRow.paymentMethod = fallback?.kind === 'CASH' ? 'BAR' : 'BANK'
                                                             }
                                                             setEditRow(newRow)
-                                                        }}>{t}</button>
+                                                        }}>{t === 'IN' ? 'IN' : t === 'OUT' ? 'OUT' : t === 'TRANSFER' ? 'TRAN' : 'INT'}</button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1664,6 +1698,11 @@ export default function JournalView({
                                                             {activePaymentAccounts.map((account) => <option key={`edit-to-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
                                                         </select>
                                                     </div>
+                                                </div>
+                                            ) : editRow.type === 'INTERNAL' ? (
+                                                <div className="field">
+                                                    <label>Konto</label>
+                                                    <div className="badge pm-internal" style={{ alignSelf: 'start' }}>intern</div>
                                                 </div>
                                             ) : (
                                                 <div className="field">
@@ -1762,7 +1801,8 @@ export default function JournalView({
                                                         style={{ padding: '2px 6px', fontSize: '0.85rem' }}
                                                         onClick={() => {
                                                             const currentBudgets = (editRow as any).budgets || []
-                                                            setEditRow({ ...editRow, budgets: [...currentBudgets, { budgetId: 0, amount: (editRow as any).grossAmount || 0 }] } as any)
+                                                            const amount = editRow.type === 'INTERNAL' && currentBudgets.length === 0 ? -((editRow as any).grossAmount || 0) : ((editRow as any).grossAmount || 0)
+                                                            setEditRow({ ...editRow, budgets: [...currentBudgets, { budgetId: 0, amount }] } as any)
                                                         }}
                                                         title="Weiteres Budget hinzufügen"
                                                     >+</button>
@@ -1773,7 +1813,11 @@ export default function JournalView({
                                                     const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
                                                     const totalBudgetAmount = budgetsList.reduce((sum: number, b: BudgetAssignment) => sum + (b.amount || 0), 0)
                                                     const grossAmt = Number((editRow as any).grossAmount) || 0
-                                                    const exceedsTotal = totalBudgetAmount > grossAmt * 1.001
+                                                    const exceedsTotal = editRow.type !== 'INTERNAL' && totalBudgetAmount > grossAmt * 1.001
+                                                    const hasBalancedInternalBudgets = budgetsList.length > 0
+                                                        && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) < 0)
+                                                        && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) > 0)
+                                                        && Math.abs(totalBudgetAmount) <= 0.001
                                                     return budgetsList.length > 0 ? (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {budgetsList.map((ba: BudgetAssignment, idx: number) => {
@@ -1815,7 +1859,7 @@ export default function JournalView({
                                                                                 className="input"
                                                                                 type="number"
                                                                                 step="0.01"
-                                                                                min="0"
+                                                                                min={editRow.type === 'INTERNAL' ? undefined : '0'}
                                                                                 value={ba.amount ?? ''}
                                                                                 onChange={(e) => {
                                                                                     const newBudgets = [...budgetsList]
@@ -1845,6 +1889,9 @@ export default function JournalView({
                                                             {exceedsTotal && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                             )}
+                                                            {editRow.type === 'INTERNAL' && budgetsList.length > 0 && !hasBalancedInternalBudgets && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>Budget: Quelle negativ, Ziel positiv, Summe 0.</div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
@@ -1863,7 +1910,8 @@ export default function JournalView({
                                                         style={{ padding: '2px 6px', fontSize: '0.85rem' }}
                                                         onClick={() => {
                                                             const currentEarmarks = (editRow as any).earmarksAssigned || []
-                                                            setEditRow({ ...editRow, earmarksAssigned: [...currentEarmarks, { earmarkId: 0, amount: (editRow as any).grossAmount || 0 }] } as any)
+                                                            const amount = editRow.type === 'INTERNAL' && currentEarmarks.length === 0 ? -((editRow as any).grossAmount || 0) : ((editRow as any).grossAmount || 0)
+                                                            setEditRow({ ...editRow, earmarksAssigned: [...currentEarmarks, { earmarkId: 0, amount }] } as any)
                                                         }}
                                                         title="Weitere Zweckbindung hinzufügen"
                                                     >+</button>
@@ -1874,7 +1922,11 @@ export default function JournalView({
                                                     const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
                                                     const totalEarmarkAmount = earmarksList.reduce((sum: number, e: EarmarkAssignment) => sum + (e.amount || 0), 0)
                                                     const grossAmt = Number((editRow as any).grossAmount) || 0
-                                                    const exceedsTotal = totalEarmarkAmount > grossAmt * 1.001
+                                                    const exceedsTotal = editRow.type !== 'INTERNAL' && totalEarmarkAmount > grossAmt * 1.001
+                                                    const hasBalancedInternalEarmarks = earmarksList.length > 0
+                                                        && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) < 0)
+                                                        && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) > 0)
+                                                        && Math.abs(totalEarmarkAmount) <= 0.001
                                                     return earmarksList.length > 0 ? (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {earmarksList.map((ea: EarmarkAssignment, idx: number) => {
@@ -1905,7 +1957,7 @@ export default function JournalView({
                                                                                 className="input"
                                                                                 type="number"
                                                                                 step="0.01"
-                                                                                min="0"
+                                                                                min={editRow.type === 'INTERNAL' ? undefined : '0'}
                                                                                 value={ea.amount ?? ''}
                                                                                 onChange={(e) => {
                                                                                     const newEarmarks = [...earmarksList]
@@ -1934,6 +1986,9 @@ export default function JournalView({
                                                             )}
                                                             {exceedsTotal && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                            )}
+                                                            {editRow.type === 'INTERNAL' && earmarksList.length > 0 && !hasBalancedInternalEarmarks && (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>Zweckbindung: Quelle negativ, Ziel positiv, Summe 0.</div>
                                                             )}
                                                         </div>
                                                     ) : (

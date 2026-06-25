@@ -1696,7 +1696,8 @@ button.badge:hover { filter: brightness(1.03); }
 
 .badge.in,
 .badge.out,
-.badge.transfer {
+.badge.transfer,
+.badge.internal {
     padding: 1px 5px;
     font-size: 10px;
     font-weight: 700;
@@ -1716,6 +1717,12 @@ button.badge:hover { filter: brightness(1.03); }
 .badge.transfer {
     background: color-mix(in oklab, var(--accent) 25%, transparent);
     color: var(--badge-text);
+}
+
+.badge.internal {
+    background: color-mix(in oklab, #64748b 22%, transparent);
+    color: var(--badge-text);
+    border: 1px dashed color-mix(in oklab, #64748b 55%, transparent);
 }
 
 .badge.sphere-ideell {
@@ -1764,6 +1771,20 @@ button.badge:hover { filter: brightness(1.03); }
     border-radius: 6px;
     padding: 3px 6px;
     line-height: 1;
+}
+
+.badge.pm-internal,
+.pm-internal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in oklab, #64748b 14%, transparent);
+    border: 1.5px dashed color-mix(in oklab, #64748b 45%, transparent);
+    border-radius: 6px;
+    padding: 3px 7px;
+    line-height: 1;
+    color: var(--text);
+    font-weight: 700;
 }
 
 /* Transfer badge – combined flow indicator */
@@ -5768,6 +5789,26 @@ label .req-asterisk {
                 /* Hover affordance for inactive toggle buttons */
                 .btn-group .btn:not(.btn-toggle-active):hover {
                     background: color-mix(in oklab, var(--accent) 18%, transparent);
+                }
+
+                .booking-type-group {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 6px;
+                    width: 100%;
+                    max-width: 360px;
+                }
+
+                .booking-type-group .btn {
+                    min-width: 0;
+                    width: 100%;
+                    height: 38px;
+                    padding: 0 8px;
+                    justify-content: center;
+                    font-size: 0.9rem;
+                    font-weight: 800;
+                    letter-spacing: 0;
+                    white-space: nowrap;
                 }
 
         /* File list styles */

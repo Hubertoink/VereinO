@@ -8,7 +8,7 @@ export interface BatchAssignDropdownProps {
   currentFilters: {
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     q?: string

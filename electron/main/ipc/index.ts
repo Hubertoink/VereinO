@@ -752,6 +752,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             includeActivityReport: parsed.includeActivityReport ?? false,
             includeInactiveBindings: parsed.includeInactiveBindings ?? false,
             includeArchivedBudgets: parsed.includeArchivedBudgets ?? false,
+            includeInternalVouchers: parsed.includeInternalVouchers ?? false,
             bindingIds: parsed.bindingIds,
             budgetIds: parsed.budgetIds,
             orgName: parsed.orgName
@@ -802,6 +803,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             includeTagSummary: parsed.includeTagSummary ?? false,
             includeVoucherList: parsed.includeVoucherList ?? false,
             includeTags: parsed.includeTags ?? false,
+            includeInternalVouchers: parsed.includeInternalVouchers ?? false,
             voucherListFrom: parsed.voucherListFrom,
             voucherListTo: parsed.voucherListTo,
             voucherListSort: parsed.voucherListSort ?? 'ASC'

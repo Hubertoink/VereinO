@@ -1,7 +1,7 @@
-import type Database from 'better-sqlite3'
+import Database = require('better-sqlite3')
 type DB = InstanceType<typeof Database>
 
-type Mig = { version: number; up: string }
+type Mig = { version: number; up: string | ((db: DB) => void) }
 
 export const MIGRATIONS: Mig[] = [
   {
@@ -75,7 +75,7 @@ export const MIGRATIONS: Mig[] = [
       seq_no INTEGER NOT NULL,
       voucher_no TEXT NOT NULL UNIQUE,
       date TEXT NOT NULL,
-      type TEXT CHECK(type IN ('IN','OUT','TRANSFER')) NOT NULL,
+      type TEXT CHECK(type IN ('IN','OUT','TRANSFER','INTERNAL')) NOT NULL,
       sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL,
       account_id INTEGER,
       category_id INTEGER,
@@ -720,6 +720,12 @@ export const MIGRATIONS: Mig[] = [
       AND type = 'TRANSFER'
       AND (transfer_from IS NULL OR transfer_to IS NULL);
     `
+  },
+  {
+    version: 32,
+    up: (db: DB) => {
+      ensureInternalVoucherType(db)
+    }
   }
 ]
 
@@ -1076,6 +1082,44 @@ export function ensureVoucherColumns(db: DB) {
   }
 }
 
+export function expandVoucherTypeConstraint(sql: string): string {
+  return sql.replace(
+    /CHECK\s*\(\s*type\s+IN\s*\(\s*'IN'\s*,\s*'OUT'\s*(?:,\s*'TRANSFER')?\s*\)\s*\)/i,
+    "CHECK(type IN ('IN','OUT','TRANSFER','INTERNAL'))"
+  )
+}
+
+export function ensureInternalVoucherType(db: DB) {
+  try {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='vouchers'").get() as { sql?: string } | undefined
+    const sql = row?.sql || ''
+    if (!sql || sql.includes("'INTERNAL'")) return
+
+    const nextSql = expandVoucherTypeConstraint(sql)
+    if (nextSql === sql) return
+
+    const indexes = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='vouchers' AND sql IS NOT NULL").all() as Array<{ sql: string }>
+
+    db.exec('PRAGMA foreign_keys = OFF;')
+    db.exec('BEGIN;')
+    db.exec('ALTER TABLE vouchers RENAME TO vouchers_old;')
+    db.exec(nextSql)
+    db.exec('INSERT INTO vouchers SELECT * FROM vouchers_old;')
+    db.exec('DROP TABLE vouchers_old;')
+
+    for (const index of indexes) {
+      db.exec(index.sql)
+    }
+
+    db.exec('COMMIT;')
+    db.exec('PRAGMA foreign_keys = ON;')
+  } catch (error) {
+    try { db.exec('ROLLBACK;') } catch { /* ignore */ }
+    try { db.exec('PRAGMA foreign_keys = ON;') } catch { /* ignore */ }
+    console.warn('[ensureInternalVoucherType] Failed to rebuild vouchers schema:', error)
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -1088,6 +1132,7 @@ export function applyMigrations(db: DB) {
   // Ensure critical junction tables exist even if migrations are partially applied.
   ensurePaymentAccountTables(db)
   ensureVoucherColumns(db)
+  ensureInternalVoucherType(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)
@@ -1139,7 +1184,11 @@ export function applyMigrations(db: DB) {
     
     try {
       const exec = db.transaction(() => {
-        db.exec(mig.up)
+        if (typeof mig.up === 'function') {
+          mig.up(db)
+        } else {
+          db.exec(mig.up)
+        }
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       })
       exec()
@@ -1161,6 +1210,7 @@ export function applyMigrations(db: DB) {
   // indexes that depend on base tables are created for fresh organizations too.
   ensurePaymentAccountTables(db)
   ensureVoucherColumns(db)
+  ensureInternalVoucherType(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)

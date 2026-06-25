@@ -132,7 +132,7 @@ export default function QuickAddModal({
     const [saveMenuOpen, setSaveMenuOpen] = React.useState(false)
 
     const grossAmt = (() => {
-        if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
+        if (qa.type === 'TRANSFER' || qa.type === 'INTERNAL') return Number((qa as any).grossAmount || 0)
         if ((qa as any).mode === 'GROSS') return Number((qa as any).grossAmount || 0)
         const n = Number(qa.netAmount || 0)
         const v = Number(qa.vatRate || 0)
@@ -210,7 +210,25 @@ export default function QuickAddModal({
     const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
     const hasInvalidAmount = !Number.isFinite(grossAmt) || grossAmt <= 0
     const amountError = 'Bitte einen Betrag größer als 0 € eingeben.'
-    const saveBlocked = hasOutOfRange || hasInvalidAmount
+    const internalBudgets = budgetsList.filter((b) => b.budgetId && Number(b.amount) !== 0)
+    const internalEarmarks = earmarksList.filter((e) => e.earmarkId && Number(e.amount) !== 0)
+    const internalBudgetSum = internalBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
+    const internalEarmarkSum = internalEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+    const hasBalancedInternalBudgets = internalBudgets.length > 0
+        && internalBudgets.some((b) => Number(b.amount) < 0)
+        && internalBudgets.some((b) => Number(b.amount) > 0)
+        && Math.abs(internalBudgetSum) <= 0.001
+    const hasBalancedInternalEarmarks = internalEarmarks.length > 0
+        && internalEarmarks.some((e) => Number(e.amount) < 0)
+        && internalEarmarks.some((e) => Number(e.amount) > 0)
+        && Math.abs(internalEarmarkSum) <= 0.001
+    const hasValidInternalAssignments = qa.type !== 'INTERNAL'
+        || (
+            (hasBalancedInternalBudgets || hasBalancedInternalEarmarks)
+            && (internalBudgets.length === 0 || hasBalancedInternalBudgets)
+            && (internalEarmarks.length === 0 || hasBalancedInternalEarmarks)
+        )
+    const saveBlocked = hasOutOfRange || hasInvalidAmount || !hasValidInternalAssignments
     const saveAndNew = onSaveAndNew ?? onSave
     const saveAndClose = onSaveAndClose ?? onSave
     const defaultSaveLabel = saveLabel || 'Speichern'
@@ -277,13 +295,15 @@ export default function QuickAddModal({
     const addBudgetAssignment = React.useCallback(() => {
         if (!hasAvailableBudgets) return
         const current = ((qa as any).budgets || []) as BudgetAssignment[]
-        setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount: grossAmt }] } as any)
+        const amount = qa.type === 'INTERNAL' && current.length === 0 ? -grossAmt : grossAmt
+        setQa({ ...(qa as any), budgets: [...current, { budgetId: 0, amount }] } as any)
     }, [grossAmt, hasAvailableBudgets, qa, setQa])
 
     const addEarmarkAssignment = React.useCallback(() => {
         if (!hasAvailableEarmarks) return
         const current = ((qa as any).earmarksAssigned || []) as EarmarkAssignment[]
-        setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount: grossAmt }] } as any)
+        const amount = qa.type === 'INTERNAL' && current.length === 0 ? -grossAmt : grossAmt
+        setQa({ ...(qa as any), earmarksAssigned: [...current, { earmarkId: 0, amount }] } as any)
     }, [grossAmt, hasAvailableEarmarks, qa, setQa])
 
     const closeModal = React.useCallback(() => {
@@ -421,8 +441,8 @@ export default function QuickAddModal({
                                 </div>
                                 <div className="field">
                                     <label>Art</label>
-                                    <div className="btn-group" role="group" aria-label="Art wählen">
-                                        {(['IN','OUT','TRANSFER'] as const).map(t => (
+                                    <div className="btn-group booking-type-group" role="group" aria-label="Art wählen">
+                                        {(['IN','OUT','TRANSFER','INTERNAL'] as const).map(t => (
                                             <button key={t} type="button" 
                                                 className={`btn ${qa.type === t ? 'btn-toggle-active' : ''} ${t === 'IN' ? 'btn-type-in' : t === 'OUT' ? 'btn-type-out' : ''}`}
                                                 onClick={() => {
@@ -436,6 +456,14 @@ export default function QuickAddModal({
                                                         ;(newQa as any).transferTo = accountMethod(defaultBankAccount?.kind) ?? 'BANK'
                                                         ;(newQa as any).paymentAccountId = null
                                                         ;(newQa as any).paymentAccountName = null
+                                                    } else if (t === 'INTERNAL') {
+                                                        ;(newQa as any).paymentAccountId = null
+                                                        ;(newQa as any).paymentAccountName = null
+                                                        ;(newQa as any).paymentMethod = undefined
+                                                        ;(newQa as any).transferFromAccountId = null
+                                                        ;(newQa as any).transferToAccountId = null
+                                                        ;(newQa as any).vatRate = 0
+                                                        ;(newQa as any).mode = 'GROSS'
                                                     } else if (t !== 'TRANSFER' && !(newQa as any).paymentAccountId) {
                                                         const fallback = defaultCashAccount ?? defaultBankAccount
                                                         ;(newQa as any).paymentAccountId = fallback?.id ?? null
@@ -444,7 +472,7 @@ export default function QuickAddModal({
                                                     }
                                                     setQa(newQa)
                                                 }}>
-                                                {t === 'IN' ? '+ IN' : t === 'OUT' ? '− OUT' : '⇄ TRANSFER'}
+                                                {t === 'IN' ? 'IN' : t === 'OUT' ? 'OUT' : t === 'TRANSFER' ? 'TRAN' : 'INT'}
                                             </button>
                                         ))}
                                     </div>
@@ -509,6 +537,11 @@ export default function QuickAddModal({
                                                 ))}
                                             </select>
                                         </div>
+                                    </div>
+                                ) : qa.type === 'INTERNAL' ? (
+                                    <div className="field">
+                                        <label>Zahlweg</label>
+                                        <div className="badge pm-account-badge pm-internal">intern</div>
                                     </div>
                                 ) : (
                                     <div className="field">
@@ -662,7 +695,7 @@ export default function QuickAddModal({
                                         const budgetIds = budgetsList.filter((b) => b.budgetId).map((b) => b.budgetId)
                                         const hasDuplicateBudgets = new Set(budgetIds).size !== budgetIds.length
                                         const totalBudgetAmount = budgetsList.reduce((sum, b) => sum + (b.amount || 0), 0)
-                                        const exceedsTotal = totalBudgetAmount > grossAmt * 1.001
+                                        const exceedsTotal = qa.type !== 'INTERNAL' && totalBudgetAmount > grossAmt * 1.001
                                         return budgetsList.length > 0 ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                 {budgetsList.map((ba, idx) => {
@@ -709,7 +742,7 @@ export default function QuickAddModal({
                                                                     className="input"
                                                                     type="number"
                                                                     step="0.01"
-                                                                    min="0"
+                                                                    min={qa.type === 'INTERNAL' ? undefined : '0'}
                                                                     value={ba.amount ?? ''}
                                                                     onChange={(e) => {
                                                                         const next = [...budgetsList]
@@ -738,6 +771,9 @@ export default function QuickAddModal({
                                                 )}
                                                 {exceedsTotal && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                                {qa.type === 'INTERNAL' && budgetsList.length > 0 && !hasBalancedInternalBudgets && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>Budget: Quelle negativ, Ziel positiv, Summe 0.</div>
                                                 )}
                                                 {invalidBudgetIds.size > 0 && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens ein Budget ist für dieses Datum nicht gültig</div>
@@ -775,7 +811,7 @@ export default function QuickAddModal({
                                         const earmarkIds = earmarksList.filter((e) => e.earmarkId).map((e) => e.earmarkId)
                                         const hasDuplicateEarmarks = new Set(earmarkIds).size !== earmarkIds.length
                                         const totalEarmarkAmount = earmarksList.reduce((sum, e) => sum + (e.amount || 0), 0)
-                                        const exceedsTotal = totalEarmarkAmount > grossAmt * 1.001
+                                        const exceedsTotal = qa.type !== 'INTERNAL' && totalEarmarkAmount > grossAmt * 1.001
                                         return earmarksList.length > 0 ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                 {earmarksList.map((ea, idx) => {
@@ -806,7 +842,7 @@ export default function QuickAddModal({
                                                                     className="input"
                                                                     type="number"
                                                                     step="0.01"
-                                                                    min="0"
+                                                                    min={qa.type === 'INTERNAL' ? undefined : '0'}
                                                                     value={ea.amount ?? ''}
                                                                     onChange={(e) => {
                                                                         const next = [...earmarksList]
@@ -835,6 +871,9 @@ export default function QuickAddModal({
                                                 )}
                                                 {exceedsTotal && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                )}
+                                                {qa.type === 'INTERNAL' && earmarksList.length > 0 && !hasBalancedInternalEarmarks && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>Zweckbindung: Quelle negativ, Ziel positiv, Summe 0.</div>
                                                 )}
                                                 {invalidEarmarkIds.size > 0 && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens eine Zweckbindung ist für dieses Datum nicht gültig</div>

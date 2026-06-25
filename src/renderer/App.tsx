@@ -1191,7 +1191,8 @@ function AppInner() {
     const [includeBindings, setIncludeBindings] = useState<boolean>(false)
     const [includeVoucherList, setIncludeVoucherList] = useState<boolean>(false)
     const [includeBudgets, setIncludeBudgets] = useState<boolean>(false)
-    const [includeActivityReport, setIncludeActivityReport] = useState<boolean>(true)
+    const [includeActivityReport, setIncludeActivityReport] = useState<boolean>(false)
+    const [includeInternalVouchers, setIncludeInternalVouchers] = useState<boolean>(false)
 
     type FiscalExportOptions = {
         includeBindings?: boolean
@@ -1200,6 +1201,7 @@ function AppInner() {
         includeActivityReport?: boolean
         includeInactiveBindings?: boolean
         includeArchivedBudgets?: boolean
+        includeInternalVouchers?: boolean
         selectedBindingIds?: number[]
         selectedBudgetIds?: number[]
     }
@@ -1213,6 +1215,7 @@ function AppInner() {
         includeTagSummary?: boolean
         includeVoucherList?: boolean
         includeTags?: boolean
+        includeInternalVouchers?: boolean
         voucherListFrom?: string
         voucherListTo?: string
         voucherListSort?: 'ASC' | 'DESC'
@@ -1767,7 +1770,7 @@ function AppInner() {
             id: number
             voucherNo: string
             date: string
-            type: 'IN' | 'OUT' | 'TRANSFER'
+            type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
             sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
             description?: string | null
             paymentMethod?: 'BAR' | 'BANK' | null
@@ -1794,7 +1797,7 @@ function AppInner() {
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
-    const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
+    const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
     const [filterEarmark, setFilterEarmark] = useState<number | null>(null)
@@ -1805,7 +1808,7 @@ function AppInner() {
     const [reportsFrom, setReportsFrom] = useState<string>('')
     const [reportsTo, setReportsTo] = useState<string>('')
     const [reportsFilterSphere, setReportsFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
-    const [reportsFilterType, setReportsFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | null>(null)
+    const [reportsFilterType, setReportsFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null>(null)
     const [reportsFilterPM, setReportsFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [reportsFilterEarmark, setReportsFilterEarmark] = useState<number | null>(null)
     const [reportsFilterBudgetId, setReportsFilterBudgetId] = useState<number | null>(null)
@@ -1976,7 +1979,7 @@ function AppInner() {
         id: number
         voucherNo: string
         date: string
-        type: 'IN' | 'OUT' | 'TRANSFER'
+        type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
         sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
         description?: string | null
         paymentMethod?: 'BAR' | 'BANK' | null
@@ -2619,6 +2622,8 @@ function AppInner() {
                     setIncludeBudgets={setIncludeBudgets}
                     includeActivityReport={includeActivityReport}
                     setIncludeActivityReport={setIncludeActivityReport}
+                    includeInternalVouchers={includeInternalVouchers}
+                    setIncludeInternalVouchers={setIncludeInternalVouchers}
                     onExport={async (fmt, reportOpts) => {
                         try {
                             if (fmt === 'PDF_FISCAL') {
@@ -2632,6 +2637,7 @@ function AppInner() {
                                     includeActivityReport: fiscalOpts.includeActivityReport ?? includeActivityReport,
                                     includeInactiveBindings: fiscalOpts.includeInactiveBindings ?? false,
                                     includeArchivedBudgets: fiscalOpts.includeArchivedBudgets ?? false,
+                                    includeInternalVouchers: fiscalOpts.includeInternalVouchers ?? includeInternalVouchers,
                                     bindingIds: fiscalOpts.selectedBindingIds,
                                     budgetIds: fiscalOpts.selectedBudgetIds,
                                     orgName: exportOrgName || undefined
@@ -2655,6 +2661,7 @@ function AppInner() {
                                     includeTagSummary: treasurerOpts?.includeTagSummary,
                                     includeVoucherList: treasurerOpts?.includeVoucherList,
                                     includeTags: treasurerOpts?.includeTags,
+                                    includeInternalVouchers: treasurerOpts?.includeInternalVouchers ?? includeInternalVouchers,
                                     voucherListFrom: treasurerOpts?.voucherListFrom,
                                     voucherListTo: treasurerOpts?.voucherListTo,
                                     voucherListSort: treasurerOpts?.voucherListSort
@@ -3180,7 +3187,7 @@ const FilterTotals = FilterTotalsComponent
 
 // JournalTable with in-place header drag-and-drop reordering
 function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt, fmtDate, onEdit, onDelete, onToggleSort, sortDir, sortBy, onTagClick, onEarmarkClick, onBudgetClick, highlightId, lockedUntil }: {
-    rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; fileCount?: number; earmarkId?: number | null; earmarkCode?: string | null; budgetId?: number | null; budgetLabel?: string | null; tags?: string[] }>
+    rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; fileCount?: number; earmarkId?: number | null; earmarkCode?: string | null; budgetId?: number | null; budgetLabel?: string | null; tags?: string[] }>
     order: string[]
     cols: Record<string, boolean>
     onReorder: (o: string[]) => void
@@ -3188,7 +3195,7 @@ function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt,
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
     eurFmt: Intl.NumberFormat
     fmtDate: (s?: string) => string
-    onEdit: (r: { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[]; netAmount?: number; grossAmount?: number; vatRate?: number }) => void
+    onEdit: (r: { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[]; netAmount?: number; grossAmount?: number; vatRate?: number }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
     onToggleSort: (col: 'date' | 'net' | 'gross') => void
     sortDir: 'ASC' | 'DESC'

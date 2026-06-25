@@ -7,7 +7,7 @@ interface FilterTotalsProps {
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     earmarkId?: number
     budgetId?: number | null
     q?: string

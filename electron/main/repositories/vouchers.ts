@@ -36,7 +36,7 @@ function getAdvancePlaceholderRef(d: DB, voucherId: number) {
 function resolveVoucherPaymentFields(
     d: DB,
     input: {
-        type?: 'IN' | 'OUT' | 'TRANSFER'
+        type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
         paymentMethod?: 'BAR' | 'BANK' | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
@@ -45,7 +45,7 @@ function resolveVoucherPaymentFields(
         transferToAccountId?: number | null
     },
     current?: {
-        type?: 'IN' | 'OUT' | 'TRANSFER'
+        type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
         paymentMethod?: 'BAR' | 'BANK' | null
         transferFrom?: 'BAR' | 'BANK' | null
         transferTo?: 'BAR' | 'BANK' | null
@@ -74,6 +74,20 @@ function resolveVoucherPaymentFields(
         }
     }
 
+    if (nextType === 'INTERNAL') {
+        return {
+            paymentAccountId: null,
+            paymentMethod: null,
+            transferFromAccountId: null,
+            transferFrom: null,
+            transferToAccountId: null,
+            transferTo: null,
+            paymentAccountName: null,
+            transferFromAccountName: null,
+            transferToAccountName: null,
+        }
+    }
+
     const paymentAccountId = input.paymentAccountId ?? current?.paymentAccountId ?? (input.paymentMethod ? getDefaultPaymentAccountIdForMethod(input.paymentMethod, d) : null) ?? (current?.paymentMethod ? getDefaultPaymentAccountIdForMethod(current.paymentMethod, d) : null)
     const paymentAccount = paymentAccountId ? getPaymentAccountById(paymentAccountId, d) : undefined
     return {
@@ -91,7 +105,7 @@ function resolveVoucherPaymentFields(
 
 export function createVoucher(input: {
     date: string
-    type: 'IN' | 'OUT' | 'TRANSFER'
+    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string
     note?: string | null
@@ -193,7 +207,30 @@ export function createVoucher(input: {
             }
         }
 
-                const paymentFields = resolveVoucherPaymentFields(d, input)
+        if (input.type === 'INTERNAL') {
+            const normalizedBudgets = budgetAssignments
+                .filter((b) => b?.budgetId && Number(b.amount) !== 0)
+                .map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+            const normalizedEarmarks = earmarkAssignments
+                .filter((e) => e?.earmarkId && Number(e.amount) !== 0)
+                .map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+            const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
+            const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+            const hasBalancedBudgets = normalizedBudgets.length > 0
+                && normalizedBudgets.some((b) => Number(b.amount) < 0)
+                && normalizedBudgets.some((b) => Number(b.amount) > 0)
+                && Math.abs(budgetTotal) <= 0.001
+            const hasBalancedEarmarks = normalizedEarmarks.length > 0
+                && normalizedEarmarks.some((e) => Number(e.amount) < 0)
+                && normalizedEarmarks.some((e) => Number(e.amount) > 0)
+                && Math.abs(earmarkTotal) <= 0.001
+            const hasValidInternalAssignments = (hasBalancedBudgets || hasBalancedEarmarks)
+                && (normalizedBudgets.length === 0 || hasBalancedBudgets)
+                && (normalizedEarmarks.length === 0 || hasBalancedEarmarks)
+            if (!hasValidInternalAssignments) throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        }
+
+        const paymentFields = resolveVoucherPaymentFields(d, input)
 
         const stmt = d.prepare(`
       INSERT INTO vouchers (
@@ -206,7 +243,7 @@ export function createVoucher(input: {
         let lastVoucherNo: string = ''
         // Retry a few times in case of rare UNIQUE collisions on voucher_no/seq
         for (let attempt = 0; attempt < 5; attempt++) {
-            const seq = nextVoucherSequence(d, year, input.sphere)
+            const seq = nextVoucherSequence(d, year, input.sphere, input.date)
             const voucherNo = makeVoucherNo(year, input.date, input.sphere, seq)
             lastVoucherNo = voucherNo
             try {
@@ -243,7 +280,7 @@ export function createVoucher(input: {
             } catch (e: any) {
                 const msg = String(e?.message || '')
                 const code = String((e as any)?.code || '')
-                const isUnique = code.includes('SQLITE_CONSTRAINT') || /UNIQUE constraint failed/i.test(msg)
+                const isUnique = code === 'SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE constraint failed/i.test(msg)
                 if (!isUnique) throw e
                 // otherwise, retry (generate next sequence)
                 if (attempt === 4) throw new Error('Konnte Belegnummer nicht vergeben (UNIQUE). Bitte erneut versuchen.')
@@ -256,14 +293,14 @@ export function createVoucher(input: {
             d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(id)
             const stmtB = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
             for (const a of budgetAssignments) {
-                if (a.budgetId && a.amount > 0) stmtB.run(id, a.budgetId, a.amount)
+                if (a.budgetId && (input.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) stmtB.run(id, a.budgetId, a.amount)
             }
         }
         if (earmarkAssignments.length) {
             d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(id)
             const stmtE = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
             for (const a of earmarkAssignments) {
-                if (a.earmarkId && a.amount > 0) stmtE.run(id, a.earmarkId, a.amount)
+                if (a.earmarkId && (input.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) stmtE.run(id, a.earmarkId, a.amount)
             }
         }
 
@@ -305,7 +342,7 @@ export function reverseVoucher(originalId: number, userId: number | null) {
 
         const now = new Date()
         const year = now.getFullYear()
-        const seq = nextVoucherSequence(d, year, original.sphere)
+        const seq = nextVoucherSequence(d, year, original.sphere, todayISO)
         const todayISO = now.toISOString().slice(0, 10)
         const voucherNo = makeVoucherNo(year, todayISO, original.sphere, seq)
         const reverseType = original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : 'TRANSFER'
@@ -472,7 +509,7 @@ export function listVouchersAdvanced(filters: {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     earmarkId?: number
@@ -579,7 +616,7 @@ export function listVouchersAdvancedPaged(filters: {
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     earmarkId?: number
@@ -698,7 +735,7 @@ export function batchAssignEarmark(params: {
     earmarkId: number
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     q?: string
@@ -758,7 +795,7 @@ export function batchAssignBudget(params: {
     budgetId: number
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     q?: string
@@ -816,7 +853,7 @@ export function batchAssignTags(params: {
     tags: string[]
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     q?: string
@@ -885,16 +922,17 @@ export function summarizeVouchers(filters: {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     earmarkId?: number
     budgetId?: number
     q?: string
     tag?: string
+    includeInternalVouchers?: boolean
 }) {
     const d = getDb()
-    const { paymentMethod, paymentAccountId, sphere, type, from, to, earmarkId, budgetId, q, tag } = filters
+    const { paymentMethod, paymentAccountId, sphere, type, from, to, earmarkId, budgetId, q, tag, includeInternalVouchers = false } = filters
     const normalizedPaymentAccountId = paymentAccountId != null ? Number(paymentAccountId) : null
     const paramsBase: any[] = []
     const wh: string[] = []
@@ -921,6 +959,9 @@ export function summarizeVouchers(filters: {
             paramsBase.push(paymentMethod)
         }
     } else if (type) { wh.push('v.type = ?'); paramsBase.push(type) }
+    if (!type && !includeInternalVouchers) {
+        wh.push("v.type <> 'INTERNAL'")
+    }
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
@@ -1055,7 +1096,7 @@ export function monthlyVouchers(filters: {
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     earmarkId?: number
     budgetId?: number
 }) {
@@ -1108,7 +1149,7 @@ export function dailyVouchers(filters: {
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     earmarkId?: number
     budgetId?: number
 }) {
@@ -1159,7 +1200,7 @@ export function dailyVouchers(filters: {
 export function updateVoucher(input: {
     id: number
     date?: string
-    type?: 'IN' | 'OUT' | 'TRANSFER'
+    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
     note?: string | null
@@ -1173,6 +1214,8 @@ export function updateVoucher(input: {
     earmarkAmount?: number | null
     budgetId?: number | null
     budgetAmount?: number | null
+    budgets?: Array<{ budgetId: number; amount: number }>
+    earmarks?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
     netAmount?: number
     vatRate?: number
@@ -1286,7 +1329,7 @@ export function updateVoucher(input: {
     const sphereChanged = input.sphere != null && input.sphere !== current.sphere
     const yearChanged = Number(targetYear) !== Number(current.year)
     if (sphereChanged || yearChanged) {
-        const seq = nextVoucherSequence(d as any, targetYear, targetSphere)
+        const seq = nextVoucherSequence(d as any, targetYear, targetSphere, newDate)
         const newNo = makeVoucherNo(targetYear, newDate, targetSphere, seq)
         fields.push('year = ?')
         params.push(targetYear)
@@ -1349,9 +1392,37 @@ export function updateVoucher(input: {
         params.push(gross)
         setAmounts = true
     }
-    if (!fields.length && !input.tags && !setAmounts) return { id: input.id, warnings }
-    params.push(input.id)
-    d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
+    const normalizedBudgets = input.budgets !== undefined
+        ? input.budgets.filter((b) => b?.budgetId && (newType === 'INTERNAL' ? Number(b.amount) !== 0 : Number(b.amount) > 0)).map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+        : undefined
+    const normalizedEarmarks = input.earmarks !== undefined
+        ? input.earmarks.filter((e) => e?.earmarkId && (newType === 'INTERNAL' ? Number(e.amount) !== 0 : Number(e.amount) > 0)).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+        : undefined
+    if (newType === 'INTERNAL' && normalizedBudgets !== undefined && normalizedBudgets.length > 0) {
+        const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
+        const hasSource = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) < 0)
+        const hasTarget = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) > 0)
+        if (!hasSource || !hasTarget || Math.abs(budgetTotal) > 0.001) throw new Error('Interne Buchungen brauchen Budget-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+    }
+    if (newType === 'INTERNAL' && normalizedEarmarks !== undefined && normalizedEarmarks.length > 0) {
+        const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+        const hasSource = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) < 0)
+        const hasTarget = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) > 0)
+        if (!hasSource || !hasTarget || Math.abs(earmarkTotal) > 0.001) throw new Error('Interne Buchungen brauchen Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+    }
+    if (newType === 'INTERNAL') {
+        const hasAnyInternalAssignments = (normalizedBudgets?.length ?? 0) > 0 || (normalizedEarmarks?.length ?? 0) > 0
+        if ((normalizedBudgets !== undefined || normalizedEarmarks !== undefined) && !hasAnyInternalAssignments) {
+            throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        }
+    }
+    if (!fields.length && !input.tags && normalizedBudgets === undefined && normalizedEarmarks === undefined && !setAmounts) return { id: input.id, warnings }
+    if (fields.length) {
+        params.push(input.id)
+        d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
+    }
+    if (normalizedBudgets !== undefined) setVoucherBudgets(input.id, normalizedBudgets)
+    if (normalizedEarmarks !== undefined) setVoucherEarmarks(input.id, normalizedEarmarks)
     // Apply tag changes before snapshotting 'after' so audit contains new tags state
     if (input.tags) setVoucherTags(input.id, input.tags)
     try {
@@ -1407,15 +1478,21 @@ export function updateVoucherMeta(input: {
         params.push(input.note)
     }
 
+    const isInternal = current.type === 'INTERNAL'
     const normalizedBudgets = input.budgets !== undefined
-        ? input.budgets.filter((b) => b?.budgetId && Number(b.amount) > 0).map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+        ? input.budgets.filter((b) => b?.budgetId && (isInternal ? Number(b.amount) !== 0 : Number(b.amount) > 0)).map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
         : undefined
     const normalizedEarmarks = input.earmarks !== undefined
-        ? input.earmarks.filter((e) => e?.earmarkId && Number(e.amount) > 0).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+        ? input.earmarks.filter((e) => e?.earmarkId && (isInternal ? Number(e.amount) !== 0 : Number(e.amount) > 0)).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
         : undefined
 
     if (normalizedBudgets !== undefined) {
         const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
+        if (isInternal && normalizedBudgets.length > 0) {
+            const hasSource = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) < 0)
+            const hasTarget = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) > 0)
+            if (!hasSource || !hasTarget || Math.abs(budgetTotal) > 0.001) throw new Error('Interne Buchungen brauchen Budget-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        }
         if (budgetTotal > grossLimit + 0.001) throw new Error('Budget-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         fields.push('budget_id = ?', 'budget_amount = ?')
         params.push(normalizedBudgets[0]?.budgetId ?? null, normalizedBudgets[0]?.amount ?? null)
@@ -1426,12 +1503,24 @@ export function updateVoucherMeta(input: {
 
     if (normalizedEarmarks !== undefined) {
         const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+        if (isInternal && normalizedEarmarks.length > 0) {
+            const hasSource = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) < 0)
+            const hasTarget = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) > 0)
+            if (!hasSource || !hasTarget || Math.abs(earmarkTotal) > 0.001) throw new Error('Interne Buchungen brauchen Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        }
         if (earmarkTotal > grossLimit + 0.001) throw new Error('Zweckbindungs-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         fields.push('earmark_id = ?', 'earmark_amount = ?')
         params.push(normalizedEarmarks[0]?.earmarkId ?? null, normalizedEarmarks[0]?.amount ?? null)
     } else {
         if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
         if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
+    }
+
+    if (isInternal) {
+        const hasAnyInternalAssignments = (normalizedBudgets?.length ?? 0) > 0 || (normalizedEarmarks?.length ?? 0) > 0
+        if ((normalizedBudgets !== undefined || normalizedEarmarks !== undefined) && !hasAnyInternalAssignments) {
+            throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        }
     }
 
     if (fields.length) {
@@ -1717,7 +1806,7 @@ export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[
 /** Set budget assignments for a voucher (replaces existing) */
 export function setVoucherBudgets(voucherId: number, assignments: Array<{ budgetId: number; amount: number }>) {
     const d = getDb()
-    const voucher = d.prepare('SELECT date FROM vouchers WHERE id=?').get(voucherId) as any
+    const voucher = d.prepare('SELECT date, type FROM vouchers WHERE id=?').get(voucherId) as any
     if (!voucher?.date) throw new Error('Beleg nicht gefunden')
 
     // Validate time range for each budget assignment
@@ -1736,7 +1825,7 @@ export function setVoucherBudgets(voucherId: number, assignments: Array<{ budget
     d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(voucherId)
     const stmt = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
     for (const a of assignments) {
-        if (a.budgetId && a.amount > 0) {
+        if (a.budgetId && (voucher.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) {
             stmt.run(voucherId, a.budgetId, a.amount)
         }
     }
@@ -1752,7 +1841,7 @@ export function setVoucherBudgets(voucherId: number, assignments: Array<{ budget
 /** Set earmark assignments for a voucher (replaces existing) */
 export function setVoucherEarmarks(voucherId: number, assignments: Array<{ earmarkId: number; amount: number }>) {
     const d = getDb()
-    const voucher = d.prepare('SELECT date FROM vouchers WHERE id=?').get(voucherId) as any
+    const voucher = d.prepare('SELECT date, type FROM vouchers WHERE id=?').get(voucherId) as any
     if (!voucher?.date) throw new Error('Beleg nicht gefunden')
 
     // Validate time range and activity for each earmark assignment
@@ -1770,7 +1859,7 @@ export function setVoucherEarmarks(voucherId: number, assignments: Array<{ earma
     d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(voucherId)
     const stmt = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
     for (const a of assignments) {
-        if (a.earmarkId && a.amount > 0) {
+        if (a.earmarkId && (voucher.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) {
             stmt.run(voucherId, a.earmarkId, a.amount)
         }
     }

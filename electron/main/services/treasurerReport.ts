@@ -29,6 +29,7 @@ export interface TreasurerReportOptions {
   includeTagSummary?: boolean
   includeVoucherList?: boolean
   includeTags?: boolean
+  includeInternalVouchers?: boolean
   voucherListFrom?: string
   voucherListTo?: string
   voucherListSort?: 'ASC' | 'DESC'
@@ -79,6 +80,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     includeTagSummary = false,
     includeVoucherList = false,
     includeTags = false,
+    includeInternalVouchers = false,
     voucherListFrom,
     voucherListTo,
     voucherListSort = 'ASC'
@@ -106,7 +108,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   const totalBalance = currentAccountBalances.reduce((sum: number, account: any) => sum + Number(account.balance || 0), 0)
 
   // 2. Summary for fiscal year
-  const summary = summarizeVouchers({ from, to } as any)
+  const summary = summarizeVouchers({ from, to, includeInternalVouchers } as any)
   const totalInGross = Number(summary.byType.find((t: any) => t.key === 'IN')?.gross || 0)
   const totalOutGross = Math.abs(Number(summary.byType.find((t: any) => t.key === 'OUT')?.gross || 0))
   const saldo = totalInGross - totalOutGross
@@ -119,7 +121,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     { key: 'WGB', name: 'Wirtschaftl. Geschäftsbetrieb', color: '#7b1fa2', bg: '#f3e5f5' }
   ]
   const sphereData = spheres.map(s => {
-    const data = summarizeVouchers({ from, to, sphere: s.key as any } as any)
+    const data = summarizeVouchers({ from, to, sphere: s.key as any, includeInternalVouchers } as any)
     const inData = data.byType.find((t: any) => t.key === 'IN') || { gross: 0 }
     const outData = data.byType.find((t: any) => t.key === 'OUT') || { gross: 0 }
     return {
@@ -251,6 +253,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
       const allVouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC' })
       const tagMap = new Map<string, { inGross: number; outGross: number }>()
       for (const v of allVouchers) {
+        if (!includeInternalVouchers && v.type === 'INTERNAL') continue
         const tags = Array.isArray(v.tags) && v.tags.length > 0 ? v.tags : ['Ohne Tag']
         for (const tag of tags) {
           const entry = tagMap.get(tag) || { inGross: 0, outGross: 0 }
@@ -281,7 +284,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     const vlFrom = voucherListFrom || from
     const vlTo = voucherListTo || to
     const vouchers = listVouchersAdvanced({ from: vlFrom, to: vlTo, limit: 100000, sort: voucherListSort || 'ASC' })
-    voucherRows = Array.isArray(vouchers) ? vouchers : []
+    voucherRows = Array.isArray(vouchers) ? vouchers.filter((row: any) => includeInternalVouchers || row.type !== 'INTERNAL') : []
   }
 
   // Determine the formatted date range

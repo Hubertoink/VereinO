@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type QA = {
     date: string
-    type: 'IN' | 'OUT' | 'TRANSFER'
+    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     grossAmount?: number
     netAmount?: number
@@ -92,7 +92,7 @@ function trackBookingHabit(type: string, paymentMethod: string | undefined, mode
 }
 
 function bookingGrossAmount(qa: QA) {
-    if (qa.type === 'TRANSFER') return Number((qa as any).grossAmount || 0)
+    if (qa.type === 'TRANSFER' || qa.type === 'INTERNAL') return Number((qa as any).grossAmount || 0)
     if ((qa as any).mode === 'GROSS') return Number((qa as any).grossAmount || 0)
     const net = Number(qa.netAmount || 0)
     const vatRate = Number(qa.vatRate || 0)
@@ -155,7 +155,7 @@ export function useQuickAdd(
             next.transferToAccountId = (previous as any).transferToAccountId ?? null
             next.transferToAccountName = (previous as any).transferToAccountName ?? null
             next.grossAmount = undefined
-        } else {
+        } else if (previous.type !== 'INTERNAL') {
             next.paymentMethod = previous.paymentMethod || getBookingHabits().paymentMethod
             next.paymentAccountId = (previous as any).paymentAccountId ?? null
             next.paymentAccountName = (previous as any).paymentAccountName ?? null
@@ -289,11 +289,34 @@ export function useQuickAdd(
             notify?.('error', 'Bitte wähle Quell- und Zielkonto für den Transfer aus.')
             return
         }
-        if (activeDraft.qa.type !== 'TRANSFER' && !(activeDraft.qa as any).paymentAccountId) {
+        if (activeDraft.qa.type !== 'TRANSFER' && activeDraft.qa.type !== 'INTERNAL' && !(activeDraft.qa as any).paymentAccountId) {
             notify?.('error', 'Bitte wähle ein Konto für die Buchung aus.')
             return
         }
-        
+        if (activeDraft.qa.type === 'INTERNAL') {
+            const internalBudgets = (Array.isArray((activeDraft.qa as any).budgets) ? (activeDraft.qa as any).budgets : [])
+                .filter((b: any) => b.budgetId && Number(b.amount) !== 0)
+            const internalEarmarks = (Array.isArray((activeDraft.qa as any).earmarksAssigned) ? (activeDraft.qa as any).earmarksAssigned : [])
+                .filter((e: any) => e.earmarkId && Number(e.amount) !== 0)
+            const budgetSum = internalBudgets.reduce((acc: number, b: any) => acc + Number(b.amount || 0), 0)
+            const earmarkSum = internalEarmarks.reduce((acc: number, e: any) => acc + Number(e.amount || 0), 0)
+            const hasBalancedBudgetTransfer = internalBudgets.length > 0
+                && internalBudgets.some((b: any) => Number(b.amount) < 0)
+                && internalBudgets.some((b: any) => Number(b.amount) > 0)
+                && Math.abs(budgetSum) <= 0.001
+            const hasBalancedEarmarkTransfer = internalEarmarks.length > 0
+                && internalEarmarks.some((e: any) => Number(e.amount) < 0)
+                && internalEarmarks.some((e: any) => Number(e.amount) > 0)
+                && Math.abs(earmarkSum) <= 0.001
+            const hasValidInternalAssignments = (hasBalancedBudgetTransfer || hasBalancedEarmarkTransfer)
+                && (internalBudgets.length === 0 || hasBalancedBudgetTransfer)
+                && (internalEarmarks.length === 0 || hasBalancedEarmarkTransfer)
+            if (!hasValidInternalAssignments) {
+                notify?.('error', 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+                return
+            }
+        }
+
         const payload: any = {
             date: activeDraft.qa.date,
             type: activeDraft.qa.type,
@@ -312,6 +335,16 @@ export function useQuickAdd(
             payload.transferToAccountId = (activeDraft.qa as any).transferToAccountId ?? null
             payload.vatRate = 0
             payload.grossAmount = (activeDraft.qa as any).grossAmount ?? 0
+            delete payload.netAmount
+        } else if (activeDraft.qa.type === 'INTERNAL') {
+            delete payload.paymentMethod
+            payload.paymentAccountId = null
+            payload.transferFrom = undefined
+            payload.transferTo = undefined
+            payload.transferFromAccountId = null
+            payload.transferToAccountId = null
+            payload.vatRate = 0
+            payload.grossAmount = Math.abs(bookingGrossAmount(activeDraft.qa))
             delete payload.netAmount
         } else {
             payload.paymentMethod = activeDraft.qa.paymentMethod
@@ -338,12 +371,12 @@ export function useQuickAdd(
         // New: multiple assignments (optional)
         const budgets = Array.isArray((activeDraft.qa as any).budgets)
             ? ((activeDraft.qa as any).budgets as Array<{ budgetId: number; amount: number }>).
-                filter((b) => b.budgetId && b.amount > 0).
+                filter((b) => b.budgetId && (activeDraft.qa.type === 'INTERNAL' ? b.amount !== 0 : b.amount > 0)).
                 map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
             : []
         const earmarks = Array.isArray((activeDraft.qa as any).earmarksAssigned)
             ? ((activeDraft.qa as any).earmarksAssigned as Array<{ earmarkId: number; amount: number }>).
-                filter((e) => e.earmarkId && e.amount > 0).
+                filter((e) => e.earmarkId && (activeDraft.qa.type === 'INTERNAL' ? e.amount !== 0 : e.amount > 0)).
                 map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
             : []
 

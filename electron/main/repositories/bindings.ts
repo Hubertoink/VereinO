@@ -71,6 +71,8 @@ export function bindingUsage(earmarkId: number, params?: { from?: string; to?: s
     for (const r of rows) {
         if (r.type === 'IN') allocated += r.gross || 0
         if (r.type === 'OUT') released += r.gross || 0
+        if (r.type === 'INTERNAL' && Number(r.gross || 0) > 0) allocated += Number(r.gross || 0)
+        if (r.type === 'INTERNAL' && Number(r.gross || 0) < 0) released += Math.abs(Number(r.gross || 0))
     }
     const metaRow = d.prepare(`SELECT budget, start_date as startDate, end_date as endDate FROM earmarks WHERE id=?`).get(earmarkId) as any
     const budget = Number(metaRow?.budget ?? 0) || 0

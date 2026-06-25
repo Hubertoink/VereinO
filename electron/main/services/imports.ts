@@ -372,7 +372,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 if (/ergebnis|summe|saldo/.test(txt)) { skipped++; track(r, false, 'Summen-/Saldozeile übersprungen'); continue }
                 throw new Error('Datum fehlt/ungültig')
             }
-            const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER'] as const)
+            const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER', 'INTERNAL'] as const)
             const sphere = parseEnum(get('sphere'), ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || parseEnum(mapping['defaultSphere'] || 'IDEELL', ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
             const description = get('description') != null ? String(get('description')) : undefined
             const tags = parseTagsValue(get('tags'))
@@ -403,7 +403,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
 
             // Infer type from sign if not provided
             const signSource = grossAmount ?? netAmount
-            let t: 'IN' | 'OUT' | 'TRANSFER' = (type as any) || 'IN'
+            let t: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' = (type as any) || 'IN'
             if (!type && signSource != null) {
                 if (signSource < 0) t = 'OUT'
                 else if (signSource > 0) t = 'IN'

@@ -8,7 +8,7 @@ export interface MetaFilterDropdownProps {
   earmarks: Array<{ id: number; code: string; name?: string | null }>
   paymentAccounts?: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; color?: string | null; isActive: number }>
   tagDefs: Array<{ id: number; name: string; usage?: number }>
-  filterType: 'IN' | 'OUT' | 'TRANSFER' | null
+  filterType: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null
   filterPM: 'BAR' | 'BANK' | null
   paymentAccountId?: number | null
   filterTag: string | null
@@ -17,7 +17,7 @@ export interface MetaFilterDropdownProps {
   budgetId: number | null
   tooltip?: string
   onApply: (v: {
-    filterType: 'IN' | 'OUT' | 'TRANSFER' | null
+    filterType: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null
     filterPM: 'BAR' | 'BANK' | null
     paymentAccountId?: number | null
     filterTag: string | null
@@ -120,6 +120,7 @@ export default function MetaFilterDropdown({
             <option value="IN">IN</option>
             <option value="OUT">OUT</option>
             <option value="TRANSFER">TRANSFER</option>
+            <option value="INTERNAL">INTERNAL</option>
           </select>
         </div>
 

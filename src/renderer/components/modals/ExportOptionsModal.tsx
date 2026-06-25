@@ -5,7 +5,7 @@ interface PreviewRow {
   id: number
   date: string
   voucherNo: number
-  type: 'IN' | 'OUT' | 'TRANSFER'
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
   sphere: string
   description: string
   originalId?: number | null
@@ -62,7 +62,7 @@ type FiscalBudgetOption = {
   isArchived?: number | null
 }
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport, includeInternalVouchers, setIncludeInternalVouchers }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -88,6 +88,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setIncludeBudgets?: (v: boolean) => void
   includeActivityReport?: boolean
   setIncludeActivityReport?: (v: boolean) => void
+  includeInternalVouchers?: boolean
+  setIncludeInternalVouchers?: (v: boolean) => void
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -538,6 +540,15 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   />
                   Gespeicherten Tätigkeitsbericht einbeziehen
                 </label>
+                <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeInternalVouchers ?? false}
+                    onChange={(e) => setIncludeInternalVouchers?.(e.target.checked)}
+                    style={{ marginRight: 6 }}
+                  />
+                  Interne Buchungen einbeziehen
+                </label>
                 {fiscalListsLoading && (
                   <div className="helper" style={{ fontSize: 11, opacity: 0.85 }}>
                     Lade verfügbare Budgets und Zweckbindungen...
@@ -821,6 +832,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 includeActivityReport,
                 includeInactiveBindings,
                 includeArchivedBudgets,
+                includeInternalVouchers,
                 selectedBindingIds: includeBindings && limitBindingsSelection ? selectedBindingIds : undefined,
                 selectedBudgetIds: includeBudgets && limitBudgetsSelection ? selectedBudgetIds : undefined
               })}
@@ -840,6 +852,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 includeTagSummary: trIncludeTagSummary,
                 includeVoucherList: trIncludeVoucherList,
                 includeTags: trIncludeVoucherList ? trIncludeTags : false,
+                includeInternalVouchers,
                 voucherListFrom: trIncludeVoucherList ? (trVoucherListFrom || `${fiscalYear || currentYear}-01-01`) : undefined,
                 voucherListTo: trIncludeVoucherList ? (trVoucherListTo || `${fiscalYear || currentYear}-12-31`) : undefined,
                 voucherListSort: trVoucherListSort

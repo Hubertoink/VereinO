@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER'])
+export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER', 'INTERNAL'])
 export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
 export const PaymentMethod = z.enum(['BAR', 'BANK'])
 export const PaymentAccountKind = z.enum(['CASH', 'BANK', 'PAYPAL', 'CARD', 'OTHER'])
@@ -111,6 +111,7 @@ export const FiscalReportInput = z.object({
     includeActivityReport: z.boolean().optional(),
     includeInactiveBindings: z.boolean().optional(),
     includeArchivedBudgets: z.boolean().optional(),
+    includeInternalVouchers: z.boolean().optional(),
     bindingIds: z.array(z.number()).optional(),
     budgetIds: z.array(z.number()).optional(),
     orgName: z.string().optional()
@@ -165,6 +166,7 @@ export const TreasurerReportInput = z.object({
     includeTagSummary: z.boolean().optional(),
     includeVoucherList: z.boolean().optional(),
     includeTags: z.boolean().optional(),
+    includeInternalVouchers: z.boolean().optional(),
     voucherListFrom: z.string().optional(),
     voucherListTo: z.string().optional(),
     voucherListSort: z.enum(['ASC', 'DESC']).optional()

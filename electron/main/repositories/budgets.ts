@@ -112,8 +112,8 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
     // Der from/to Parameter wird nur für Dashboard-Zeitfilter verwendet
     const row = d.prepare(`
         SELECT
-          IFNULL(SUM(CASE WHEN v.type='OUT' THEN vb.amount ELSE 0 END), 0) as spent,
-          IFNULL(SUM(CASE WHEN v.type='IN' THEN vb.amount ELSE 0 END), 0) as inflow,
+          IFNULL(SUM(CASE WHEN v.type='OUT' THEN vb.amount WHEN v.type='INTERNAL' AND vb.amount < 0 THEN ABS(vb.amount) ELSE 0 END), 0) as spent,
+          IFNULL(SUM(CASE WHEN v.type='IN' THEN vb.amount WHEN v.type='INTERNAL' AND vb.amount > 0 THEN vb.amount ELSE 0 END), 0) as inflow,
           COUNT(1) as count,
           MAX(v.date) as lastDate
         FROM voucher_budgets vb

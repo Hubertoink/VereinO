@@ -6,7 +6,7 @@ type Voucher = {
   description: string
   grossAmount: number
   earmarkAmount?: number | null
-  type: 'IN' | 'OUT' | 'TRANSFER'
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
 }
 
 type Earmark = {

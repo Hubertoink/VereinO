@@ -11,7 +11,7 @@ type VoucherInfo = {
   id: number
   voucherNo: string
   date: string
-  type: 'IN' | 'OUT' | 'TRANSFER'
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   description?: string | null
   note?: string | null
@@ -91,7 +91,7 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
 )
 
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false }: VoucherInfoModalProps) {
-  const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'
+  const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : voucher.type === 'INTERNAL' ? 'Interne Umbuchung' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   const isReversalVoucher = !!voucher.originalId
   const isReversedOriginal = !!voucher.reversedById
@@ -135,6 +135,8 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     const fromLabel = voucher.transferFromAccountName?.trim() || (voucher.transferFrom === 'BAR' ? 'Bar' : voucher.transferFrom === 'BANK' ? 'Bank' : 'Konto')
     const toLabel = voucher.transferToAccountName?.trim() || (voucher.transferTo === 'BAR' ? 'Bar' : voucher.transferTo === 'BANK' ? 'Bank' : 'Konto')
     paymentLabel = `${fromLabel} → ${toLabel}`
+  } else if (voucher.type === 'INTERNAL') {
+    paymentLabel = 'intern'
   } else {
     const methodLabel = voucher.paymentMethod === 'BAR' ? 'Bar' : voucher.paymentMethod === 'BANK' ? 'Bank' : null
     const accountLabel = voucher.paymentAccountName?.trim()
@@ -468,6 +470,8 @@ Status: ${statusLabel}`
                     <span className="transfer-arrow">→</span>
                     <span className="pm-icon">{voucher.transferTo === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
                   </span>
+                ) : voucher.type === 'INTERNAL' ? (
+                  <span className="badge pm-internal">intern</span>
                 ) : voucher.paymentMethod ? (
                   <span className={`badge pm-${voucher.paymentMethod.toLowerCase()}`}>
                     {voucher.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}

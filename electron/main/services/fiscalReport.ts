@@ -25,6 +25,7 @@ export interface FiscalReportOptions {
   includeActivityReport?: boolean
   includeInactiveBindings?: boolean
   includeArchivedBudgets?: boolean
+  includeInternalVouchers?: boolean
   bindingIds?: number[]
   budgetIds?: number[]
 }
@@ -55,6 +56,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     includeActivityReport = false,
     includeInactiveBindings = false,
     includeArchivedBudgets = false,
+    includeInternalVouchers = false,
     bindingIds,
     budgetIds
   } = options
@@ -79,7 +81,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   }
 
   // 2. Get overall summary for the fiscal year (used to compute movement)
-  const summary = summarizeVouchers({ from, to } as any)
+  const summary = summarizeVouchers({ from, to, includeInternalVouchers } as any)
 
   // 4. Get data by sphere
   const spheres = [
@@ -90,7 +92,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   ]
 
   const sphereData: SphereData[] = spheres.map(s => {
-    const data = summarizeVouchers({ from, to, sphere: s.key as any } as any)
+    const data = summarizeVouchers({ from, to, sphere: s.key as any, includeInternalVouchers } as any)
     const inData = data.byType.find((t: any) => t.key === 'IN') || { gross: 0, net: 0, vat: 0 }
     const outData = data.byType.find((t: any) => t.key === 'OUT') || { gross: 0, net: 0, vat: 0 }
     
@@ -175,7 +177,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   let voucherRows: any[] = []
   if (includeVoucherList) {
     const vouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC' })
-    voucherRows = Array.isArray(vouchers) ? vouchers : []
+    voucherRows = Array.isArray(vouchers) ? vouchers.filter((row: any) => includeInternalVouchers || row.type !== 'INTERNAL') : []
   }
 
   // Helper functions

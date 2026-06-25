@@ -6,7 +6,7 @@ type Voucher = {
   description: string
   grossAmount: number
   budgetAmount?: number | null
-  type: 'IN' | 'OUT' | 'TRANSFER' 
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
 }
 type Budget = {
   id: number

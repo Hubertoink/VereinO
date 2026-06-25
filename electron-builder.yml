@@ -25,3 +25,4 @@ publish:
   owner: Hubertoink
   repo: VereinO
   releaseType: release
+  channel: latest
