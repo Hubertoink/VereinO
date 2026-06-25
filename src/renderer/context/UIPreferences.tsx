@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { isValidTheme, type ColorTheme } from './uiTheme'
 
 type NavLayout = 'top' | 'left'
-type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm'
 type NavIconColorMode = 'color' | 'mono'
 type DateFormat = 'de' | 'iso'
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
@@ -12,12 +12,6 @@ type QuickAddAfterSave = 'close' | 'new'
 const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom']
 
 // Glassmorphism: transparent modals with blur
-
-const VALID_THEMES: ColorTheme[] = ['default', 'fiery-ocean', 'peachy-delight', 'pastel-dreamland', 'ocean-breeze', 'earthy-tones', 'monochrome-harmony', 'vintage-charm']
-
-function isValidTheme(theme: string | null | undefined): theme is ColorTheme {
-  return !!theme && VALID_THEMES.includes(theme as ColorTheme)
-}
 
 interface UIPreferencesContextValue {
   navLayout: NavLayout
@@ -76,6 +70,15 @@ function clearLegacyBackgroundContrastPreference() {
   document.documentElement.removeAttribute('data-background-contrast')
 }
 
+function applyColorThemeToDocument(theme: string | null | undefined) {
+  const normalizedTheme = isValidTheme(theme) ? theme : 'default'
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-color-theme', normalizedTheme)
+  }
+  safeLocalStorageSet('ui.colorTheme', normalizedTheme)
+  return normalizedTheme
+}
+
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const allowVoucherDeletionWasUnsetRef = useRef<boolean>((() => {
     try {
@@ -95,7 +98,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'true'
   })
 
-  const [colorTheme, setColorThemeState] = useState<ColorTheme>('default')
+  const [colorTheme, setColorThemeState] = useState<ColorTheme>(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('ui.colorTheme') : null
+    return isValidTheme(stored) ? stored : 'default'
+  })
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
   const [customBackgroundImage, setCustomBackgroundImageState] = useState<string | null>(null)
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
@@ -104,6 +110,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null)
   const appearanceInitializedRef = useRef(false)
   
+  useLayoutEffect(() => {
+    const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('ui.colorTheme') : null
+    applyColorThemeToDocument(storedTheme)
+  }, [])
+
   // Load appearance settings from organization on mount
   useEffect(() => {
     const applyAppearance = (appearance: any) => {
