@@ -228,7 +228,8 @@ export default function QuickAddModal({
             && (internalBudgets.length === 0 || hasBalancedInternalBudgets)
             && (internalEarmarks.length === 0 || hasBalancedInternalEarmarks)
         )
-    const saveBlocked = hasOutOfRange || hasInvalidAmount || !hasValidInternalAssignments
+    const internalAssignmentBlocked = qa.type === 'INTERNAL' && !hasValidInternalAssignments
+    const saveBlocked = hasOutOfRange || hasInvalidAmount
     const saveAndNew = onSaveAndNew ?? onSave
     const saveAndClose = onSaveAndClose ?? onSave
     const defaultSaveLabel = saveLabel || 'Speichern'

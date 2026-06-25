@@ -567,7 +567,10 @@ export function listVouchersAdvanced(filters: {
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
     if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
+    if (budgetId != null) {
+        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
+        params.push(budgetId, budgetId)
+    }
     {
         const nq = normalizeVoucherSearchQuery(q)
         if (nq) {
@@ -636,7 +639,10 @@ export function listVouchersAdvancedPaged(filters: {
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
     if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId) { wh.push('v.budget_id = ?'); params.push(budgetId) }
+    if (budgetId != null) {
+        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
+        params.push(budgetId, budgetId)
+    }
     if (voucherIds?.length) {
         wh.push(`v.id IN (${voucherIds.map(() => '?').join(', ')})`)
         params.push(...voucherIds)
@@ -962,10 +968,13 @@ export function summarizeVouchers(filters: {
     if (!type && !includeInternalVouchers) {
         wh.push("v.type <> 'INTERNAL'")
     }
+    if (budgetId != null) {
+        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
+        paramsBase.push(budgetId, budgetId)
+    }
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
-    if (budgetId != null) { wh.push('v.budget_id = ?'); paramsBase.push(budgetId) }
     {
         const nq = normalizeVoucherSearchQuery(q)
         if (nq) {

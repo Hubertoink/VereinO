@@ -2115,7 +2115,7 @@ function AppInner() {
                     window.api?.window?.toggleMaximize?.()
                 }}
             >
-                <div className="app-header__left no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
+                <div className="app-header__left">
                     <TopHeaderOrg notify={notify} />
                 </div>
                 {isTopNav ? <div className="app-header__drag-spacer" aria-hidden="true" /> : null}

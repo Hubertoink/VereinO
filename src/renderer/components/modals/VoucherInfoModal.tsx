@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../TagsEditor'
 import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
-import { isMetaAmountValid } from './voucherMetaValidation'
+import { getInternalAssignmentValidationState, isMetaAmountValid } from './voucherMetaValidation'
 
 // Types for multiple budget/earmark assignments
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
@@ -163,6 +163,11 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   const totalEarmarkAmount = metaEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
   const budgetExceedsGross = totalBudgetAmount > grossLimit + 0.001
   const earmarkExceedsGross = totalEarmarkAmount > grossLimit + 0.001
+  const internalAssignmentValidation = getInternalAssignmentValidationState({
+    budgets: metaBudgets,
+    earmarks: metaEarmarks,
+    isInternal: voucher.type === 'INTERNAL',
+  })
 
   useEffect(() => {
     setMetaNote(voucher.note || '')
@@ -189,6 +194,11 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
 
   const validateMeta = () => {
     const isInternal = voucher.type === 'INTERNAL'
+    const internalAssignmentValidation = getInternalAssignmentValidationState({
+      budgets: metaBudgets,
+      earmarks: metaEarmarks,
+      isInternal,
+    })
     const incompleteBudget = metaBudgets.find((b) => !b.budgetId || !isMetaAmountValid(Number(b.amount), isInternal))
     if (incompleteBudget) return isInternal
       ? 'Bitte wähle für jede Budget-Zeile ein Budget aus und gib einen von 0 verschiedenen Betrag ein.'
@@ -201,6 +211,9 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     if (duplicateBudget) return 'Ein Budget kann hier nur einmal zugeordnet werden.'
     const duplicateEarmark = new Set(metaEarmarks.map((e) => e.earmarkId).filter(Boolean)).size !== metaEarmarks.filter((e) => e.earmarkId).length
     if (duplicateEarmark) return 'Eine Zweckbindung kann hier nur einmal zugeordnet werden.'
+    if (isInternal && !internalAssignmentValidation.hasValidAssignments) {
+      return internalAssignmentValidation.budgetHint || internalAssignmentValidation.earmarkHint || 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.'
+    }
     if (budgetExceedsGross) return `Die Budget-Zuordnungen (${eurFmt.format(totalBudgetAmount)}) dürfen den Bruttobetrag (${eurFmt.format(grossLimit)}) nicht übersteigen.`
     if (earmarkExceedsGross) return `Die Zweckbindungs-Zuordnungen (${eurFmt.format(totalEarmarkAmount)}) dürfen den Bruttobetrag (${eurFmt.format(grossLimit)}) nicht übersteigen.`
     return ''
@@ -549,6 +562,9 @@ Status: ${statusLabel}`
                     </div>
                   ))}
                   <button className="btn" type="button" style={{ justifySelf: 'start' }} onClick={() => setMetaBudgets([...metaBudgets, { budgetId: 0, amount: Math.abs(Number(voucher.grossAmount || 0)) }])}>+ Budget</button>
+                  {voucher.type === 'INTERNAL' && internalAssignmentValidation.budgetHint ? (
+                    <div className="helper" style={{ color: 'var(--danger)' }}>{internalAssignmentValidation.budgetHint}</div>
+                  ) : null}
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -617,6 +633,9 @@ Status: ${statusLabel}`
                     </div>
                   ))}
                   <button className="btn" type="button" style={{ justifySelf: 'start' }} onClick={() => setMetaEarmarks([...metaEarmarks, { earmarkId: 0, amount: Math.abs(Number(voucher.grossAmount || 0)) }])}>+ Zweckbindung</button>
+                  {voucher.type === 'INTERNAL' && internalAssignmentValidation.earmarkHint ? (
+                    <div className="helper" style={{ color: 'var(--danger)' }}>{internalAssignmentValidation.earmarkHint}</div>
+                  ) : null}
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

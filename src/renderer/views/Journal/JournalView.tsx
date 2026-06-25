@@ -6,6 +6,7 @@ import TagsEditor from '../../components/TagsEditor'
 import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 import { getEffectiveJournalCols, getEffectiveJournalOrder } from './utils/journalColumnVisibility'
 import { shouldPromptDiscardForEdit } from './utils/journalEditDiscardPrompt'
+import { getInternalAssignmentValidationState } from '../../components/modals/voucherMetaValidation'
 
 // Type für Voucher-Zeilen
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
@@ -1486,14 +1487,21 @@ export default function JournalView({
                                         notify('error', 'Bitte wähle ein Konto für die Buchung aus.')
                                         return
                                     }
+                                    const budgetsListForValidation = ((editRow as any).budgets || [])
                                     // Build budgets array from the new multi-assignment UI
-                                    const budgets = ((editRow as any).budgets || [])
+                                    const budgets = budgetsListForValidation
                                         .filter((b: BudgetAssignment) => b.budgetId && (editRow.type === 'INTERNAL' ? b.amount !== 0 : b.amount > 0))
                                         .map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount }))
+                                    const earmarksListForValidation = ((editRow as any).earmarksAssigned || [])
                                     // Build earmarks array from the new multi-assignment UI
-                                    const earmarksArr = ((editRow as any).earmarksAssigned || [])
+                                    const earmarksArr = earmarksListForValidation
                                         .filter((e: EarmarkAssignment) => e.earmarkId && (editRow.type === 'INTERNAL' ? e.amount !== 0 : e.amount > 0))
                                         .map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount }))
+                                    const internalAssignmentValidation = getInternalAssignmentValidationState({
+                                        budgets: budgetsListForValidation.map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount })),
+                                        earmarks: earmarksListForValidation.map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount })),
+                                        isInternal: editRow.type === 'INTERNAL',
+                                    })
                                     
                                     // Validate: No duplicate budgets
                                     const budgetIds = budgets.map((b: { budgetId: number }) => b.budgetId)
@@ -1510,24 +1518,11 @@ export default function JournalView({
                                     // Validate: Total budget amount should not exceed gross amount
                                     const totalBudgetAmount = budgets.reduce((sum: number, b: { amount: number }) => sum + b.amount, 0)
                                     const grossAmount = Number((editRow as any).grossAmount) || 0
-                                    const hasBalancedInternalBudgets = budgets.length > 0 && (
-                                        budgets.some((b: { budgetId: number; amount: number }) => b.budgetId && Number(b.amount) < 0)
-                                        && budgets.some((b: { budgetId: number; amount: number }) => b.budgetId && Number(b.amount) > 0)
-                                        && Math.abs(totalBudgetAmount) <= 0.001
-                                    )
-                                    const totalEarmarkAmount = earmarksArr.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
-                                    const hasBalancedInternalEarmarks = earmarksArr.length > 0 && (
-                                        earmarksArr.some((e: { earmarkId: number; amount: number }) => e.earmarkId && Number(e.amount) < 0)
-                                        && earmarksArr.some((e: { earmarkId: number; amount: number }) => e.earmarkId && Number(e.amount) > 0)
-                                        && Math.abs(totalEarmarkAmount) <= 0.001
-                                    )
-                                    const hasValidInternalAssignments = (hasBalancedInternalBudgets || hasBalancedInternalEarmarks)
-                                        && (budgets.length === 0 || hasBalancedInternalBudgets)
-                                        && (earmarksArr.length === 0 || hasBalancedInternalEarmarks)
-                                    if (editRow.type === 'INTERNAL' && !hasValidInternalAssignments) {
-                                        notify('error', 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+                                    if (editRow.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments) {
+                                        notify('error', internalAssignmentValidation.budgetHint || internalAssignmentValidation.earmarkHint || 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
                                         return
                                     }
+                                    const totalEarmarkAmount = earmarksArr.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0)
                                     if (editRow.type !== 'INTERNAL' && totalBudgetAmount > grossAmount * 1.001) { // small tolerance for rounding
                                         notify('error', `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`)
                                         return
@@ -1814,16 +1809,22 @@ export default function JournalView({
                                                     const totalBudgetAmount = budgetsList.reduce((sum: number, b: BudgetAssignment) => sum + (b.amount || 0), 0)
                                                     const grossAmt = Number((editRow as any).grossAmount) || 0
                                                     const exceedsTotal = editRow.type !== 'INTERNAL' && totalBudgetAmount > grossAmt * 1.001
+                                                    const internalBudgetValidation = getInternalAssignmentValidationState({
+                                                        budgets: budgetsList.map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount })),
+                                                        earmarks: [],
+                                                        isInternal: editRow.type === 'INTERNAL',
+                                                    })
                                                     const hasBalancedInternalBudgets = budgetsList.length > 0
                                                         && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) < 0)
                                                         && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) > 0)
                                                         && Math.abs(totalBudgetAmount) <= 0.001
-                                                    return budgetsList.length > 0 ? (
+                                                    return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                            {budgetsList.map((ba: BudgetAssignment, idx: number) => {
-                                                                const isDuplicate = budgetIds.filter((id: number) => id === ba.budgetId).length > 1
-                                                                return (
-                                                                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            {budgetsList.length > 0 ? (
+                                                                budgetsList.map((ba: BudgetAssignment, idx: number) => {
+                                                                    const isDuplicate = budgetIds.filter((id: number) => id === ba.budgetId).length > 1
+                                                                    return (
+                                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                                                         <select
                                                                             style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
                                                                             value={ba.budgetId || ''}
@@ -1881,20 +1882,22 @@ export default function JournalView({
                                                                             title="Entfernen"
                                                                         >✕</button>
                                                                     </div>
-                                                                )
-                                                            })}
+                                                                    )
+                                                                })
+                                                            ) : null}
                                                             {hasDuplicateBudgets && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Ein Budget kann nur einmal zugeordnet werden</div>
                                                             )}
                                                             {exceedsTotal && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                             )}
-                                                            {editRow.type === 'INTERNAL' && budgetsList.length > 0 && !hasBalancedInternalBudgets && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>Budget: Quelle negativ, Ziel positiv, Summe 0.</div>
-                                                            )}
+                                                            {editRow.type === 'INTERNAL' && internalBudgetValidation.budgetHint ? (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>{internalBudgetValidation.budgetHint}</div>
+                                                            ) : null}
+                                                            {!budgetsList.length && editRow.type === 'INTERNAL' ? (
+                                                                <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
+                                                            ) : null}
                                                         </div>
-                                                    ) : (
-                                                        <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Kein Budget zugeordnet. Klicke + zum Hinzufügen.</div>
                                                     )
                                                 })()}
                                             </div>
@@ -1923,16 +1926,22 @@ export default function JournalView({
                                                     const totalEarmarkAmount = earmarksList.reduce((sum: number, e: EarmarkAssignment) => sum + (e.amount || 0), 0)
                                                     const grossAmt = Number((editRow as any).grossAmount) || 0
                                                     const exceedsTotal = editRow.type !== 'INTERNAL' && totalEarmarkAmount > grossAmt * 1.001
+                                                    const internalEarmarkValidation = getInternalAssignmentValidationState({
+                                                        budgets: [],
+                                                        earmarks: earmarksList.map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount })),
+                                                        isInternal: editRow.type === 'INTERNAL',
+                                                    })
                                                     const hasBalancedInternalEarmarks = earmarksList.length > 0
                                                         && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) < 0)
                                                         && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) > 0)
                                                         && Math.abs(totalEarmarkAmount) <= 0.001
-                                                    return earmarksList.length > 0 ? (
+                                                    return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                            {earmarksList.map((ea: EarmarkAssignment, idx: number) => {
-                                                                const isDuplicate = earmarkIds.filter((id: number) => id === ea.earmarkId).length > 1
-                                                                return (
-                                                                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            {earmarksList.length > 0 ? (
+                                                                earmarksList.map((ea: EarmarkAssignment, idx: number) => {
+                                                                    const isDuplicate = earmarkIds.filter((id: number) => id === ea.earmarkId).length > 1
+                                                                    return (
+                                                                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                                                         <select
                                                                             style={{ flex: 1, borderColor: isDuplicate ? 'var(--danger)' : undefined }}
                                                                             value={ea.earmarkId || ''}
@@ -1979,20 +1988,22 @@ export default function JournalView({
                                                                             title="Entfernen"
                                                                         >✕</button>
                                                                     </div>
-                                                                )
-                                                            })}
+                                                                    )
+                                                                })
+                                                            ) : null}
                                                             {hasDuplicateEarmarks && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Eine Zweckbindung kann nur einmal zugeordnet werden</div>
                                                             )}
                                                             {exceedsTotal && (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                             )}
-                                                            {editRow.type === 'INTERNAL' && earmarksList.length > 0 && !hasBalancedInternalEarmarks && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>Zweckbindung: Quelle negativ, Ziel positiv, Summe 0.</div>
-                                                            )}
+                                                            {editRow.type === 'INTERNAL' && internalEarmarkValidation.earmarkHint ? (
+                                                                <div className="helper" style={{ color: 'var(--danger)' }}>{internalEarmarkValidation.earmarkHint}</div>
+                                                            ) : null}
+                                                            {!earmarksList.length && editRow.type === 'INTERNAL' ? (
+                                                                <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
+                                                            ) : null}
                                                         </div>
-                                                    ) : (
-                                                        <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.</div>
                                                     )
                                                 })()}
                                             </div>
