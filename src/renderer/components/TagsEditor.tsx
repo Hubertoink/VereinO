@@ -17,12 +17,10 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
   const [input, setInput] = useState('')
   const suggestions = useMemo(() => {
     const q = input.trim().toLowerCase()
-    const chosen = new Set((value || []).map(v => v.toLowerCase()))
     return (tagDefs || [])
-      .filter(t => !chosen.has((t.name || '').toLowerCase()))
       .filter(t => !q || t.name.toLowerCase().includes(q))
       .slice(0, 32)
-  }, [input, tagDefs, value])
+  }, [input, tagDefs])
   function addTag(name: string) {
     const n = (name || '').trim()
     if (!n) return
@@ -63,15 +61,17 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
           {suggestions.map(s => {
             const bg = s.color || undefined
             const fg = contrastText(bg)
+            const selected = (value || []).some(v => v.toLowerCase() === (s.name || '').toLowerCase())
             return (
               <button
                 key={s.id}
                 type="button"
-                className={`btn tag-suggestion-btn${bg ? ' tag-has-color' : ''}`}
+                className={`btn tag-suggestion-btn${bg ? ' tag-has-color' : ''}${selected ? ' tag-suggestion-btn--selected' : ''}`}
                 style={bg ? ({ '--tag-bg': bg, '--tag-fg': fg } as React.CSSProperties) : undefined}
-                onClick={() => addTag(s.name)}
-                aria-label={`Tag ${s.name} hinzufügen`}
-              >{s.name}</button>
+                onClick={() => selected ? removeTag(s.name) : addTag(s.name)}
+                aria-pressed={selected}
+                aria-label={selected ? `Tag ${s.name} entfernen` : `Tag ${s.name} hinzufügen`}
+              >{selected ? '✓ ' : ''}{s.name}</button>
             )
           })}
         </div>

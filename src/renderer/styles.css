@@ -1819,6 +1819,20 @@ button.badge:hover { filter: brightness(1.03); }
     white-space: nowrap;
 }
 
+.journal-note-cell {
+    max-width: 0;
+    overflow: hidden;
+}
+
+.journal-note-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .journal-description-tooltip {
     max-width: min(420px, 80vw);
     white-space: pre-wrap;
@@ -2433,8 +2447,25 @@ svg text {
 }
 
 .quick-add-modal .summary-card {
-    margin-bottom: 0;
-    padding: 7px;
+    margin-bottom: 8px;
+    padding: 9px 10px;
+    box-sizing: border-box;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    overflow: hidden;
+    flex: 0 0 56px;
+}
+
+.quick-add-modal .summary-text-bold {
+    line-height: 1.35;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .quick-add-modal .card,
@@ -2447,7 +2478,7 @@ svg text {
 }
 
 .quick-add-modal .block-grid-mb {
-    margin-bottom: 0;
+    margin-bottom: 6px;
 }
 
 .quick-add-modal .booking-section {
@@ -2507,6 +2538,313 @@ svg text {
 .quick-add-modal textarea {
     padding: 6px 8px;
     border-radius: 8px;
+}
+
+.booking-note-field {
+    margin-bottom: 10px;
+}
+
+.booking-note-textarea {
+    min-height: 82px;
+    height: 82px;
+    max-height: 82px;
+    resize: none;
+}
+
+.tag-suggestion-btn--selected {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 55%, transparent);
+    opacity: 0.95;
+}
+
+.voucher-info-modal-overlay--window {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.voucher-info-modal--window {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    -webkit-app-region: no-drag;
+}
+
+.voucher-info-modal__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+    position: relative;
+    z-index: 1;
+}
+
+.voucher-info-modal button,
+.voucher-info-modal input,
+.voucher-info-modal select,
+.voucher-info-modal textarea,
+.voucher-info-modal a,
+.voucher-info-modal [role="button"],
+.voucher-info-modal__content {
+    -webkit-app-region: no-drag;
+}
+
+.voucher-info-modal .btn,
+.voucher-info-modal button,
+.voucher-info-modal [role="button"] {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.voucher-info-modal .voucher-info-attachment-actions,
+.voucher-info-modal .voucher-info-row__value {
+    pointer-events: auto;
+}
+
+.voucher-info-card {
+    flex: 0 0 auto;
+    min-height: auto;
+}
+
+.voucher-info-card--meta-editing {
+    align-content: start;
+    grid-auto-rows: max-content;
+}
+
+.voucher-info-note-row--editing {
+    min-height: 96px;
+}
+
+.voucher-info-attachment-row {
+    margin-top: 4px;
+}
+
+.voucher-info-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+}
+
+.voucher-info-primary-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.35fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.voucher-info-primary-grid__left,
+.voucher-info-primary-grid__right {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.voucher-info-row__label {
+    color: var(--text-dim);
+    font-weight: 500;
+    padding-top: 2px;
+}
+
+.voucher-info-row__value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.voucher-info-row__value--stack {
+    display: grid;
+    gap: 8px;
+}
+
+.voucher-info-attachment-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+.voucher-info-attachment-btn {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.voucher-info-attachment-btn--add {
+    width: auto;
+    justify-self: start;
+    justify-content: center;
+    gap: 6px;
+    padding-inline: 10px;
+    border-color: transparent;
+    color: var(--text);
+    background: color-mix(in oklab, var(--surface) 86%, var(--muted));
+    transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.voucher-info-attachment-btn--add:hover,
+.voucher-info-attachment-btn--add:focus-visible {
+    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.voucher-info-attachment-btn__plus {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.voucher-info-note-row--editing .voucher-info-row__value {
+    min-height: 82px;
+}
+
+.voucher-info-note-row .booking-note-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+}
+
+.voucher-info-attachment-row .voucher-info-row__value--stack {
+    min-height: 58px;
+    align-content: start;
+}
+
+.voucher-info-attachment-row .voucher-info-attachment-actions {
+    min-height: 38px;
+    align-content: start;
+}
+
+.voucher-info-tags-editor {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.voucher-info-tags-editor .field {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.voucher-info-tags-editor .tags-editor-input {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.voucher-info-tags-editor .tags-suggestions {
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 112px;
+}
+
+.voucher-info-tags-editor .tag-suggestion-btn {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.voucher-info-edit-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 11px;
+    color: var(--accent);
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+.voucher-info-edit-btn:hover,
+.voucher-info-edit-btn:focus-visible {
+    color: color-mix(in oklab, var(--accent) 80%, #fff);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.voucher-info-edit-btn--active {
+    color: var(--danger);
+    background: transparent;
+}
+
+.voucher-info-edit-btn--active:hover,
+.voucher-info-edit-btn--active:focus-visible {
+    color: color-mix(in oklab, var(--danger) 80%, #fff);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.voucher-info-save-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 11px;
+    color: var(--success);
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+.voucher-info-save-btn:hover,
+.voucher-info-save-btn:focus-visible {
+    color: color-mix(in oklab, var(--success) 80%, #fff);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.voucher-info-save-btn:disabled {
+    opacity: 0.45;
+    transform: none;
+}
+
+@media (max-width: 860px) {
+    .voucher-info-primary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .voucher-info-attachment-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+.voucher-info-meta-error,
+.voucher-info-meta-notice {
+    padding: 10px 12px;
+    border-radius: 8px;
+    line-height: 1.35;
+}
+
+.voucher-info-meta-error {
+    border: 1px solid color-mix(in oklab, var(--danger) 75%, var(--border));
+    background: color-mix(in oklab, var(--danger) 16%, transparent);
+    color: color-mix(in oklab, var(--danger) 86%, #fff);
+    font-weight: 650;
+}
+
+.voucher-info-meta-notice {
+    border: 1px solid color-mix(in oklab, var(--warning) 55%, var(--border));
+    background: color-mix(in oklab, var(--warning) 12%, transparent);
+    color: var(--text);
 }
 
 .journal-edit-modal-overlay {
@@ -2607,23 +2945,23 @@ svg text {
 
 .booking-modal-icon-btn,
 .booking-modal-header-actions .window-controls__btn {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
-    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+    border-radius: 10px;
+    transition: color 140ms ease, transform 140ms ease;
 }
 
 .booking-modal-icon-btn:hover,
 .booking-modal-icon-btn:focus-visible,
 .booking-modal-header-actions .window-controls__btn:hover,
 .booking-modal-header-actions .window-controls__btn:focus-visible {
-    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    background: transparent;
     color: var(--accent);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 24%, transparent);
-    transform: translateY(-1px);
+    box-shadow: none;
+    transform: none;
 }
 
 .booking-modal-close-btn {
@@ -2655,6 +2993,9 @@ svg text {
 
 .detached-booking-titlebar {
     -webkit-app-region: drag;
+    cursor: move;
+    user-select: none;
+    margin: 0;
 }
 
 .detached-booking-titlebar button,
@@ -2664,6 +3005,37 @@ svg text {
 .detached-booking-titlebar a,
 .detached-booking-titlebar .window-controls {
     -webkit-app-region: no-drag;
+}
+
+.voucher-info-modal .booking-modal-header-actions {
+    gap: 8px;
+}
+
+.voucher-info-modal .booking-modal-icon-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 10px;
+}
+
+.voucher-info-modal .voucher-info-save-btn,
+.voucher-info-modal .voucher-info-edit-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+}
+
+.voucher-info-modal .voucher-info-save-btn svg,
+.voucher-info-modal .voucher-info-edit-btn svg {
+    width: 19px;
+    height: 19px;
+}
+
+.voucher-info-modal .booking-modal-close-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    font-size: 18px !important;
 }
 
 .booking-field-error {
@@ -3666,7 +4038,7 @@ tbody tr.row-flash {
     bottom: 16px;
     display: grid;
     gap: 8px;
-    z-index: 9999;
+    z-index: 15000;
 }
 
 .toast {
@@ -4391,17 +4763,39 @@ textarea:focus {
     background: color-mix(in oklab, var(--surface) 50%, transparent);
     -webkit-app-region: drag;
 }
-.app-header-top { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 92px; }
+.app-header-top { grid-template-columns: auto minmax(28px, 1fr) auto minmax(28px, 1fr) 92px; }
 .app-header-left { grid-template-columns: minmax(0, 1fr) 92px; }
 .app-header > * { min-width: 0; }
 .no-drag { pointer-events: auto; }
+.app-header__left,
+.app-header__nav,
+.app-header__controls {
+    min-width: 0;
+}
+.app-header__left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.app-header__nav {
+    display: inline-flex;
+}
+.app-header__controls {
+    display: inline-flex;
+    gap: 4px;
+    justify-self: end;
+}
+.app-header__drag-spacer {
+    min-width: 24px;
+    min-height: 100%;
+}
 .header-left-group { display: inline-flex; align-items: center; gap: 6px; }
 .top-nav { display: inline-flex; align-items: center; gap: 6px; justify-self: center; }
 
 @media (max-width: 1050px) {
     .app-header-top {
         gap: 6px;
-        grid-template-columns: minmax(116px, 1fr) auto minmax(0, .25fr) 84px;
+        grid-template-columns: auto minmax(16px, 1fr) auto minmax(16px, 0.4fr) 84px;
     }
     .top-nav { gap: 2px; }
     .top-nav .divider-v { margin-inline: 2px; }
@@ -8402,7 +8796,7 @@ html[data-glass-modals="true"] .flyout-arrow {
    Attachments Modal (Belege)
    ========================== */
 .attachments-modal-overlay {
-    z-index: 1100;
+    z-index: 14000;
 }
 
 .attachments-modal {

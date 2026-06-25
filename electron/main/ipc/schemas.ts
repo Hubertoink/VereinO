@@ -22,6 +22,7 @@ export const VoucherCreateInput = z
         type: VoucherType,
         sphere: Sphere,
         description: z.string().optional(),
+        note: z.string().nullable().optional(),
         // allow either net or gross entry
         netAmount: z.number().optional(),
         grossAmount: z.number().optional(),
@@ -399,6 +400,7 @@ export const VouchersListOutput = z.object({
             transferToAccountKind: PaymentAccountKind.nullable().optional(),
             transferToAccountColor: z.string().nullable().optional(),
             description: z.string().nullable().optional(),
+            note: z.string().nullable().optional(),
             netAmount: z.number(),
             vatRate: z.number(),
             vatAmount: z.number(),
@@ -629,6 +631,7 @@ export const VoucherUpdateInput = z.object({
     type: VoucherType.optional(),
     sphere: Sphere.optional(),
     description: z.string().nullable().optional(),
+    note: z.string().nullable().optional(),
     paymentMethod: PaymentMethod.nullable().optional(),
     transferFrom: PaymentMethod.nullable().optional(),
     transferTo: PaymentMethod.nullable().optional(),
@@ -650,6 +653,17 @@ export const VoucherUpdateInput = z.object({
     tags: z.array(z.string()).optional()
 })
 export const VoucherUpdateOutput = z.object({ id: z.number(), warnings: z.array(z.string()).optional() })
+export const VoucherMetaUpdateInput = z.object({
+    id: z.number(),
+    note: z.string().nullable().optional(),
+    earmarkId: z.number().nullable().optional(),
+    earmarkAmount: z.number().nullable().optional(),
+    budgetId: z.number().nullable().optional(),
+    budgetAmount: z.number().nullable().optional(),
+    budgets: z.array(z.object({ budgetId: z.number(), amount: z.number() })).optional(),
+    earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number() })).optional(),
+    tags: z.array(z.string()).optional()
+})
 export const VoucherDeleteInput = z.object({ id: z.number() })
 export const VoucherDeleteOutput = z.object({ id: z.number() })
 

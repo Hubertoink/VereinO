@@ -30,6 +30,7 @@ export function TablePane({
       type: true,
       sphere: true,
       description: true,
+      note: true,
       earmark: true,
       budget: true,
       paymentMethod: true,
@@ -65,6 +66,7 @@ export function TablePane({
       type: false,
       sphere: false,
       description: true,
+      note: false,
       earmark: false,
       budget: false,
       paymentMethod: false,
@@ -182,7 +184,7 @@ export function TablePane({
               <tr>
                 {order.filter(k => cols[k]).map(k => (
                   <td key={k} style={{ paddingTop: 6, color: 'var(--text-dim)' }}>
-                    {k === 'actions' ? '⚙️' : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? '📎' : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
+                    {k === 'actions' ? '⚙️' : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'note' ? 'Kommentar' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? '📎' : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
                   </td>
                 ))}
               </tr>

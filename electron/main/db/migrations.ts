@@ -82,6 +82,7 @@ export const MIGRATIONS: Mig[] = [
       project_id INTEGER,
       earmark_id INTEGER,
       description TEXT,
+      note TEXT,
       net_amount NUMERIC NOT NULL DEFAULT 0,
       vat_rate NUMERIC NOT NULL DEFAULT 0,
       vat_amount NUMERIC NOT NULL DEFAULT 0,
@@ -1050,6 +1051,9 @@ export function ensureVoucherColumns(db: DB) {
     }
     if (!names.has('transfer_to_account_id')) {
       db.exec('ALTER TABLE vouchers ADD COLUMN transfer_to_account_id INTEGER;')
+    }
+    if (!names.has('note')) {
+      db.exec('ALTER TABLE vouchers ADD COLUMN note TEXT;')
     }
 
     db.exec(`

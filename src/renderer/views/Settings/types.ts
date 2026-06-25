@@ -36,6 +36,8 @@ export type ColorTheme =
   | 'earthy-tones' 
   | 'monochrome-harmony' 
   | 'vintage-charm'
+  | 'soft-blush'
+  | 'professional-light'
 
 // ============================================================================
 // Journal/Table Configuration Types
@@ -58,6 +60,7 @@ export type ColKey =
   | 'type' 
   | 'sphere' 
   | 'description' 
+  | 'note' 
   | 'earmark' 
   | 'budget' 
   | 'paymentMethod' 

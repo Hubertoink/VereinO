@@ -8,6 +8,7 @@ type QA = {
     netAmount?: number
     vatRate: number
     description: string
+    note?: string | null
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     paymentAccountName?: string | null
@@ -128,6 +129,7 @@ export function useQuickAdd(
             netAmount: habits.mode === 'NET' ? 100 : undefined,
             vatRate: 0,
             description: '',
+            note: '',
             paymentMethod: habits.paymentMethod
         }
     }, [today])
@@ -141,6 +143,7 @@ export function useQuickAdd(
             mode,
             vatRate: mode === 'NET' ? Number(previous.vatRate || 0) : 0,
             description: '',
+            note: '',
             tags: []
         }
 
@@ -296,6 +299,7 @@ export function useQuickAdd(
             type: activeDraft.qa.type,
             sphere: activeDraft.qa.sphere,
             description: activeDraft.qa.description || undefined,
+            note: activeDraft.qa.note?.trim() ? activeDraft.qa.note.trim() : null,
             vatRate: activeDraft.qa.vatRate
         }
         

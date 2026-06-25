@@ -94,6 +94,7 @@ export function createVoucher(input: {
     type: 'IN' | 'OUT' | 'TRANSFER'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string
+    note?: string | null
     netAmount?: number
     grossAmount?: number
     vatRate: number
@@ -196,9 +197,9 @@ export function createVoucher(input: {
 
         const stmt = d.prepare(`
       INSERT INTO vouchers (
-        year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description,
+        year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description, note,
                                 net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, created_by
-                                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     `)
 
         let id: number | null = null
@@ -223,6 +224,7 @@ export function createVoucher(input: {
                     (budgetAssignments[0]?.budgetId ?? input.budgetId) ?? null,
                     (budgetAssignments[0]?.amount ?? input.budgetAmount) ?? null,
                     input.description ?? null,
+                    input.note ?? null,
                     netAmount,
                     input.vatRate,
                     vatAmount,
@@ -318,10 +320,10 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         const stmt = d.prepare(`
       INSERT INTO vouchers (
         year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id,
-        earmark_id, earmark_amount, budget_id, budget_amount, description,
+        earmark_id, earmark_amount, budget_id, budget_amount, description, note,
         net_amount, vat_rate, vat_amount, gross_amount, amount_mode,
         payment_method, transfer_from, transfer_to, counterparty, created_by, original_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
     `)
         const info = stmt.run(
             year,
@@ -338,6 +340,7 @@ export function reverseVoucher(originalId: number, userId: number | null) {
             original.budget_id,
             original.budget_amount == null ? null : Math.abs(Number(original.budget_amount)),
             reverseDescription,
+            null,
             reverseNet,
             original.vat_rate,
             reverseVat,
@@ -392,7 +395,7 @@ export function listRecentVouchers(limit = 20) {
     const d = getDb()
     const rows = (d
         .prepare(
-            `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.net_amount as netAmount,
+            `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere, v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo, v.description, v.note, v.net_amount as netAmount,
                             v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                             v.original_id as originalId,
                             (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -440,7 +443,7 @@ export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: nu
                                         (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountName,
                                         (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountKind,
                                         (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountColor,
-                                        description,
+                                        description, note,
                                         net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, amount_mode as amountMode,
                                         original_id as originalId,
                                         (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = vouchers.original_id) as originalVoucherNo,
@@ -492,7 +495,7 @@ export function listVouchersAdvanced(filters: {
                                         (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
                                         (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
                                         (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-                                        v.description, v.counterparty,
+                                        v.description, v.note, v.counterparty,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                                         v.original_id as originalId,
                                         (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -649,7 +652,7 @@ export function listVouchersAdvancedPaged(filters: {
             (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
             (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
             (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-            v.description, v.counterparty,
+            v.description, v.note, v.counterparty,
             v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                 v.original_id as originalId,
                 (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -1159,6 +1162,7 @@ export function updateVoucher(input: {
     type?: 'IN' | 'OUT' | 'TRANSFER'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
+    note?: string | null
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
@@ -1186,7 +1190,7 @@ export function updateVoucher(input: {
                transfer_from_account_id as transferFromAccountId,
                transfer_to_account_id as transferToAccountId,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-               description, amount_mode as amountMode,
+               description, note, amount_mode as amountMode,
                original_id as originalId, reversed_by_id as reversedById
         FROM vouchers WHERE id=?
     `).get(input.id) as any
@@ -1264,6 +1268,7 @@ export function updateVoucher(input: {
     if (input.type != null) { fields.push('type = ?'); params.push(input.type) }
     if (input.sphere != null) { fields.push('sphere = ?'); params.push(input.sphere) }
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
+    if (input.note !== undefined) { fields.push('note = ?'); params.push(input.note) }
     if (input.paymentMethod !== undefined || input.paymentAccountId !== undefined || input.type === 'TRANSFER' || current.type === 'TRANSFER') { fields.push('payment_method = ?'); params.push(paymentFields.paymentMethod) }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
     if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
@@ -1351,7 +1356,7 @@ export function updateVoucher(input: {
     if (input.tags) setVoucherTags(input.id, input.tags)
     try {
         const after = d.prepare(`
-            SELECT id, date, type, sphere, description, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+            SELECT id, date, type, sphere, description, note, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
                    earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
                      net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount, amount_mode as amountMode
             FROM vouchers WHERE id=?
@@ -1361,6 +1366,99 @@ export function updateVoucher(input: {
         writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
     } catch { /* ignore audit failures */ }
     return { id: input.id, warnings }
+}
+
+export function updateVoucherMeta(input: {
+    id: number
+    note?: string | null
+    budgetId?: number | null
+    budgetAmount?: number | null
+    earmarkId?: number | null
+    earmarkAmount?: number | null
+    budgets?: Array<{ budgetId: number; amount: number }>
+    earmarks?: Array<{ earmarkId: number; amount: number }>
+    tags?: string[]
+}) {
+    const d = getDb()
+    const current = d.prepare(`
+        SELECT id, voucher_no as voucherNo, date, type, sphere, note, gross_amount as grossAmount,
+               earmark_id as earmarkId, earmark_amount as earmarkAmount,
+               budget_id as budgetId, budget_amount as budgetAmount,
+               original_id as originalId, reversed_by_id as reversedById
+        FROM vouchers WHERE id=?
+    `).get(input.id) as any
+    if (!current) throw new Error('Beleg nicht gefunden')
+    if (current.originalId) throw new Error('Stornobuchungen können nachträglich nicht geändert werden.')
+    if (current.reversedById) throw new Error('Stornierte Buchungen können nachträglich nicht geändert werden.')
+    const grossLimit = Math.abs(Number(current.grossAmount || 0))
+
+    const beforeFull = {
+        ...current,
+        tags: getTagsForVoucher(input.id),
+        budgets: getVoucherBudgets(input.id),
+        earmarks: getVoucherEarmarks(input.id),
+    }
+
+    const fields: string[] = []
+    const params: any[] = []
+
+    if (input.note !== undefined) {
+        fields.push('note = ?')
+        params.push(input.note)
+    }
+
+    const normalizedBudgets = input.budgets !== undefined
+        ? input.budgets.filter((b) => b?.budgetId && Number(b.amount) > 0).map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
+        : undefined
+    const normalizedEarmarks = input.earmarks !== undefined
+        ? input.earmarks.filter((e) => e?.earmarkId && Number(e.amount) > 0).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
+        : undefined
+
+    if (normalizedBudgets !== undefined) {
+        const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
+        if (budgetTotal > grossLimit + 0.001) throw new Error('Budget-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
+        fields.push('budget_id = ?', 'budget_amount = ?')
+        params.push(normalizedBudgets[0]?.budgetId ?? null, normalizedBudgets[0]?.amount ?? null)
+    } else {
+        if (input.budgetId !== undefined) { fields.push('budget_id = ?'); params.push(input.budgetId) }
+        if (input.budgetAmount !== undefined) { fields.push('budget_amount = ?'); params.push(input.budgetAmount) }
+    }
+
+    if (normalizedEarmarks !== undefined) {
+        const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
+        if (earmarkTotal > grossLimit + 0.001) throw new Error('Zweckbindungs-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
+        fields.push('earmark_id = ?', 'earmark_amount = ?')
+        params.push(normalizedEarmarks[0]?.earmarkId ?? null, normalizedEarmarks[0]?.amount ?? null)
+    } else {
+        if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
+        if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
+    }
+
+    if (fields.length) {
+        params.push(input.id)
+        d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
+    }
+    if (normalizedBudgets !== undefined) setVoucherBudgets(input.id, normalizedBudgets)
+    if (normalizedEarmarks !== undefined) setVoucherEarmarks(input.id, normalizedEarmarks)
+    if (input.tags !== undefined) setVoucherTags(input.id, input.tags)
+
+    try {
+        const after = d.prepare(`
+            SELECT id, voucher_no as voucherNo, date, type, sphere, note,
+                   earmark_id as earmarkId, earmark_amount as earmarkAmount,
+                   budget_id as budgetId, budget_amount as budgetAmount
+            FROM vouchers WHERE id=?
+        `).get(input.id) as any
+        const afterFull = {
+            ...after,
+            tags: getTagsForVoucher(input.id),
+            budgets: getVoucherBudgets(input.id),
+            earmarks: getVoucherEarmarks(input.id),
+        }
+        writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE_META', { before: beforeFull, after: afterFull, changes: input })
+    } catch { /* ignore audit failures */ }
+
+    return { id: input.id }
 }
 
 export function deleteVoucher(id: number, options?: { allowAdvancePlaceholder?: boolean }) {

@@ -880,6 +880,16 @@ export default function QuickAddModal({
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
                         >
+                            <div className="field field-full-width booking-note-field">
+                                <label>Kommentar</label>
+                                <textarea
+                                    className="input booking-note-textarea"
+                                    rows={3}
+                                    value={(qa as any).note || ''}
+                                    onChange={(e) => setQa({ ...(qa as any), note: e.target.value } as any)}
+                                    placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..."
+                                />
+                            </div>
                             <div className="attachment-header">
                                 <div className="attachment-title">
                                     <strong>Anhänge</strong>

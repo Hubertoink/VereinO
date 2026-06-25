@@ -9,6 +9,7 @@ import MembersView from './views/Mitglieder/MembersView'
 import ReceiptsView from './views/ReceiptsView'
 import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
+import { getDefaultJournalCols, getDefaultJournalOrder } from './views/Journal/utils/journalColumnVisibility'
 import SubmissionsView from './views/Submissions/SubmissionsView'
 import AdvancesView from './views/Advances/AdvancesView'
 import { createPortal } from 'react-dom'
@@ -23,6 +24,7 @@ import AttachmentsModal from './components/modals/AttachmentsModal'
 import PaymentsAssignModal from './components/modals/PaymentsAssignModal'
 import BatchEarmarkModal from './components/modals/BatchEarmarkModal'
 import QuickAddModal from './components/modals/QuickAddModal'
+import VoucherInfoModal from './components/modals/VoucherInfoModal'
 import DbMigrateModal from './DbMigrateModal'
 import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
@@ -308,8 +310,11 @@ function DetachedQuickAddWindow() {
     const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>>([])
     const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     const [descSuggest, setDescSuggest] = useState<string[]>([])
-    const [windowModeKind, setWindowModeKind] = useState<'create' | 'edit'>('create')
+    const [windowModeKind, setWindowModeKind] = useState<'create' | 'edit' | 'details'>('create')
     const [editQa, setEditQa] = useState<any | null>(null)
+    const [detailVoucher, setDetailVoucher] = useState<any | null>(null)
+    const [detailAttachmentsVoucher, setDetailAttachmentsVoucher] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
+    const [confirmDetailReverse, setConfirmDetailReverse] = useState(false)
     const [editFiles, setEditFiles] = useState<File[]>([])
     const [editExistingFiles, setEditExistingFiles] = useState<Array<{ id: number; fileName: string }>>([])
     const [editExistingFilesLoading, setEditExistingFilesLoading] = useState(false)
@@ -427,7 +432,20 @@ function DetachedQuickAddWindow() {
                 ? initial.files.map((file: any) => base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime))
                 : []
             openedRef.current = true
-            if (initial?.mode === 'edit') {
+            if (initial?.mode === 'details') {
+                setWindowModeKind('details')
+                const initialVoucher = initial?.voucher || initial?.qa || null
+                if (initialVoucher?.id) {
+                    setDetailVoucher(initialVoucher)
+                } else if (initial?.voucherId) {
+                    try {
+                        const res = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [Number(initial.voucherId)] })
+                        setDetailVoucher((res as any)?.rows?.[0] || null)
+                    } catch {
+                        setDetailVoucher(null)
+                    }
+                }
+            } else if (initial?.mode === 'edit') {
                 const form = voucherRowToBookingForm(initial?.qa || initial?.voucher || { id: initial?.voucherId })
                 setWindowModeKind('edit')
                 setEditQa(form)
@@ -585,6 +603,10 @@ function DetachedQuickAddWindow() {
 
     useEffect(() => {
         return window.api?.window?.onCloseRequested?.(() => {
+            if (windowModeKind === 'details') {
+                window.api?.window?.confirmClose?.()
+                return
+            }
             if (windowModeKind === 'edit') {
                 requestCloseDetachedEdit()
                 return
@@ -617,6 +639,22 @@ function DetachedQuickAddWindow() {
         }
     }, [allowVoucherDeletion, editQa, notify])
 
+    const reverseDetachedDetails = useCallback(async () => {
+        if (!detailVoucher?.id) return
+        try {
+            const res = await window.api?.vouchers.reverse?.({ originalId: Number(detailVoucher.id), reason: 'Storno statt Löschen' })
+            setConfirmDetailReverse(false)
+            notify('success', `Storno erstellt: #${res?.voucherNo || ''}`)
+            const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [Number(detailVoucher.id)] })
+            const next = (refreshed as any)?.rows?.[0]
+            if (next) setDetailVoucher(next)
+            window.dispatchEvent(new Event('data-changed'))
+            await window.api?.quickAdd?.notifySaved?.({ id: res?.id, originalId: Number(detailVoucher.id), draftId: detachedDraftIdRef.current, mode: 'reverse' })
+        } catch (e: any) {
+            notify('error', e?.message || String(e))
+        }
+    }, [detailVoucher, notify])
+
     useEffect(() => {
         if (windowModeKind !== 'edit' || !editQa) return
         const onKeyDown = (e: KeyboardEvent) => {
@@ -644,8 +682,75 @@ function DetachedQuickAddWindow() {
         return () => window.removeEventListener('keydown', onKeyDown)
     }, [editQa, notify, requestCloseDetachedEdit, saveDetachedEdit, windowModeKind])
 
-    if (!loaded || (windowModeKind === 'create' && !quickAdd) || (windowModeKind === 'edit' && !editQa)) {
+    if (!loaded || (windowModeKind === 'create' && !quickAdd) || (windowModeKind === 'edit' && !editQa) || (windowModeKind === 'details' && !detailVoucher)) {
         return <div className="detached-quick-add-loading">Buchungsfenster wird vorbereitet...</div>
+    }
+
+    if (windowModeKind === 'details' && detailVoucher) {
+        return (
+            <>
+                <VoucherInfoModal
+                    voucher={detailVoucher}
+                    onClose={() => window.api?.window?.confirmClose?.()}
+                    eurFmt={eurFmt}
+                    fmtDate={fmtDate}
+                    notify={notify}
+                    earmarks={earmarks}
+                    budgets={budgetsForEdit}
+                    tagDefs={tagDefs}
+                    allowVoucherDeletion={allowVoucherDeletion}
+                    windowMode
+                    onOpenAttachments={() => {
+                        setDetailAttachmentsVoucher({
+                            voucherId: detailVoucher.id,
+                            voucherNo: detailVoucher.voucherNo,
+                            date: detailVoucher.date,
+                            description: detailVoucher.description || ''
+                        })
+                    }}
+                    onSaveMeta={async (payload) => {
+                        const res = await window.api?.vouchers.updateMeta?.({
+                            id: detailVoucher.id,
+                            note: payload.note,
+                            budgets: payload.budgets,
+                            earmarks: payload.earmarks,
+                            tags: payload.tags
+                        })
+                        if (!res) throw new Error('Buchungsdetails konnten nicht gespeichert werden.')
+                        const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [detailVoucher.id] })
+                        const next = (refreshed as any)?.rows?.[0]
+                        if (next) setDetailVoucher(next)
+                        window.dispatchEvent(new Event('data-changed'))
+                        await window.api?.quickAdd?.notifySaved?.({ id: detailVoucher.id, draftId: detachedDraftIdRef.current, mode: 'details' })
+                    }}
+                    onReverse={() => setConfirmDetailReverse(true)}
+                />
+                {confirmDetailReverse && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setConfirmDetailReverse(false)} style={{ zIndex: 16000, alignItems: 'center', paddingTop: 0 }}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(460px, 92vw)' }}>
+                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <h2 style={{ margin: 0 }}>Buchung stornieren</h2>
+                                <button className="btn danger" onClick={() => setConfirmDetailReverse(false)}>Schließen</button>
+                            </header>
+                            <p>
+                                Möchtest du die Buchung <strong>#{detailVoucher.voucherNo}{detailVoucher.description ? ` - ${detailVoucher.description}` : ''}</strong> stornieren?
+                                Die Originalbuchung bleibt erhalten und es wird eine Gegenbuchung erstellt.
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                                <button className="btn" onClick={() => setConfirmDetailReverse(false)}>Abbrechen</button>
+                                <button className="btn danger" onClick={() => { void reverseDetachedDetails() }}>Ja, stornieren</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {detailAttachmentsVoucher && (
+                    <AttachmentsModal
+                        voucher={detailAttachmentsVoucher}
+                        onClose={() => setDetailAttachmentsVoucher(null)}
+                    />
+                )}
+            </>
+        )
     }
 
     if (windowModeKind === 'edit' && editQa) {
@@ -1153,16 +1258,43 @@ function AppInner() {
         function onVoucherJump(ev: any) {
             try {
                 const detail = ev?.detail || {}
-                // Switch to Buchungen view first
-                setActivePage('Buchungen')
-                // Apply search query or voucherId filter
-                if (typeof detail.q === 'string' && detail.q.trim()) {
-                    setQ(detail.q)
-                    setPage(1)
-                } else if (detail.voucherId) {
-                    setQ('#' + String(detail.voucherId))
-                    setPage(1)
+                const voucherId = detail.voucherId ? Number(detail.voucherId) : null
+                const voucherNo = typeof detail.voucherNo === 'string' ? detail.voucherNo.trim() : ''
+                const voucherDate = typeof detail.date === 'string' ? detail.date : ''
+
+                setFilterSphere(null)
+                setFilterType(null)
+                setFilterPM(null)
+                setFilterPaymentAccountId(null)
+                setFilterEarmark(null)
+                setFilterBudgetId(null)
+                setFilterTag(null)
+
+                if (voucherDate) {
+                    setFrom(voucherDate)
+                    setTo(voucherDate)
+                } else {
+                    setFrom('')
+                    setTo('')
                 }
+
+                if (voucherNo) {
+                    setQ(voucherNo)
+                } else if (typeof detail.q === 'string' && detail.q.trim()) {
+                    setQ(detail.q.trim())
+                } else if (voucherId) {
+                    setQ(String(voucherId))
+                } else {
+                    setQ('')
+                }
+
+                if (voucherId) {
+                    setFlashId(voucherId)
+                    window.setTimeout(() => setFlashId((cur) => (cur === voucherId ? null : cur)), 5000)
+                }
+
+                setActivePage('Buchungen')
+                setPage(1)
             } catch { /* ignore */ }
         }
         window.addEventListener('apply-voucher-jump' as any, onVoucherJump as any)
@@ -1742,9 +1874,9 @@ function AppInner() {
     }, [])
 
     // Journal table UI: column visibility and order (Buchungen view)
-    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
-    const defaultCols: Record<ColKey, boolean> = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
-    const defaultOrder: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+    type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+    const defaultCols: Record<ColKey, boolean> = getDefaultJournalCols() as Record<ColKey, boolean>
+    const defaultOrder: ColKey[] = getDefaultJournalOrder() as ColKey[]
     // Human-readable labels for columns (used in Einstellungen > Tabelle)
     const labelForCol = (k: string): string => {
         switch (k) {
@@ -1754,6 +1886,7 @@ function AppInner() {
             case 'type': return 'Art'
             case 'sphere': return 'Sphäre'
             case 'description': return 'Beschreibung'
+            case 'note': return 'Kommentar'
             case 'earmark': return 'Zweckbindung'
             case 'budget': return 'Budget'
             case 'paymentMethod': return 'Zahlweg'
@@ -1767,13 +1900,15 @@ function AppInner() {
     const [cols, setCols] = useState<Record<ColKey, boolean>>(() => {
         try {
             const s = localStorage.getItem('journalCols')
-            return s ? JSON.parse(s) : defaultCols
+            const parsed = s ? JSON.parse(s) : null
+            return parsed && typeof parsed === 'object' ? { ...defaultCols, ...parsed } : defaultCols
         } catch { return defaultCols }
     })
     const [order, setOrder] = useState<ColKey[]>(() => {
         try {
             const s = localStorage.getItem('journalColsOrder')
-            return s ? JSON.parse(s) : defaultOrder
+            const parsed = s ? JSON.parse(s) : null
+            return Array.isArray(parsed) ? parsed : defaultOrder
         } catch { return defaultOrder }
     })
     // Try to hydrate from persisted settings (server) once on mount if present
@@ -1783,7 +1918,7 @@ function AppInner() {
                 const c = await window.api?.settings?.get?.({ key: 'journal.cols' })
                 if (c?.value) {
                     const parsed = JSON.parse(String(c.value))
-                    if (parsed && typeof parsed === 'object') setCols(parsed)
+                    if (parsed && typeof parsed === 'object') setCols({ ...defaultCols, ...parsed })
                 }
                 const o = await window.api?.settings?.get?.({ key: 'journal.order' })
                 if (o?.value) {
@@ -1977,11 +2112,12 @@ function AppInner() {
                     window.api?.window?.toggleMaximize?.()
                 }}
             >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as any}>
+                <div className="app-header__left no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
                     <TopHeaderOrg notify={notify} />
                 </div>
+                {isTopNav ? <div className="app-header__drag-spacer" aria-hidden="true" /> : null}
                 {isTopNav ? (
-                    <div style={{ display: 'inline-flex', WebkitAppRegion: 'no-drag' } as any}>
+                    <div className="app-header__nav no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
                         <TopNav
                             activePage={activePage}
                             onNavigate={setActivePage}
@@ -1992,9 +2128,9 @@ function AppInner() {
                         />
                     </div>
                 ) : null}
-                {isTopNav && <div />}
+                {isTopNav && <div className="app-header__drag-spacer" aria-hidden="true" />}
                 {/* Window controls */}
-                <div style={{ display: 'inline-flex', gap: 4, justifySelf: 'end', WebkitAppRegion: 'no-drag' } as any}>
+                <div className="app-header__controls no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
                     <button className="btn ghost icon-btn" title="Minimieren" aria-label="Minimieren" onClick={() => window.api?.window?.minimize?.()}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="11" width="14" height="2" rx="1"/></svg>
                     </button>

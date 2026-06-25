@@ -18,6 +18,7 @@ type VoucherRow = {
     type: 'IN' | 'OUT' | 'TRANSFER'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
+    note?: string | null
     isAdvancePlaceholder?: boolean
     isCashCheck?: boolean
     paymentMethod?: 'BAR' | 'BANK' | null
@@ -67,9 +68,9 @@ type BookingEditTab = {
     detached?: boolean
 }
 
-type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 
-const DEFAULT_ORDER: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+const DEFAULT_ORDER: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
 
 const LABEL_FOR_COL: Record<ColKey, string> = {
     actions: 'Aktionen',
@@ -78,6 +79,7 @@ const LABEL_FOR_COL: Record<ColKey, string> = {
     type: 'Art',
     sphere: 'Sphäre',
     description: 'Beschreibung',
+    note: 'Kommentar',
     earmark: 'Zweckbindung',
     budget: 'Budget',
     paymentMethod: 'Zahlweg',
@@ -343,6 +345,7 @@ export default function JournalView({
             type: true,
             sphere: true,
             description: true,
+            note: true,
             earmark: true,
             budget: true,
             paymentMethod: true,
@@ -357,6 +360,7 @@ export default function JournalView({
             'type',
             'sphere',
             'description',
+            'note',
             'earmark',
             'budget',
             'paymentMethod',
@@ -378,6 +382,7 @@ export default function JournalView({
             type: false,
             sphere: false,
             description: true,
+            note: false,
             earmark: false,
             budget: false,
             paymentMethod: false,
@@ -387,8 +392,8 @@ export default function JournalView({
             gross: true
         }
         const nextOrder: ColKey[] = allowVoucherDeletion
-            ? ['actions', 'date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
-            : ['date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
+            ? ['actions', 'date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
+            : ['date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
         setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
         setOrder(getEffectiveJournalOrder(nextOrder, allowVoucherDeletion))
     }, [allowVoucherDeletion, setCols, setOrder])
@@ -401,6 +406,7 @@ export default function JournalView({
             type: true,
             sphere: true,
             description: true,
+            note: true,
             earmark: true,
             budget: true,
             paymentMethod: true,
@@ -442,6 +448,7 @@ export default function JournalView({
             type: row.type || null,
             sphere: row.sphere || null,
             description: (row.description || '').trim(),
+            note: (row.note || '').trim(),
             paymentMethod: row.paymentMethod || null,
             paymentAccountId: row.paymentAccountId || null,
             transferFrom: row.transferFrom || null,
@@ -732,6 +739,27 @@ export default function JournalView({
         }
     }, [closeEditModalNow, notify, serializeEditRow, showBookingEditTabs, voucherMutationBlockReason])
 
+    const openVoucherDetails = useCallback(async (row: VoucherRow) => {
+        if (!bookingsOpenDetached) {
+            setInfoVoucher(row)
+            return
+        }
+        try {
+            const res = await window.api?.quickAdd?.openDetached?.({
+                mode: 'details',
+                draftId: `details-${row.id}-${Date.now()}`,
+                voucherId: row.id,
+                voucher: row
+            })
+            if (!res?.ok) {
+                notify('error', res?.error || 'Buchungsdetails konnten nicht im Fenster geöffnet werden.')
+                return
+            }
+        } catch (e: any) {
+            notify('error', 'Buchungsdetails konnten nicht geöffnet werden: ' + String(e?.message || e))
+        }
+    }, [bookingsOpenDetached, notify])
+
     const openBookingEditTab = useCallback(async (tab: BookingEditTab) => {
         if (!tab.detached) {
             activateBookingEditTab(tab)
@@ -754,6 +782,11 @@ export default function JournalView({
     useEffect(() => {
         const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
             const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
+            if (payload?.mode === 'details' || draftId.startsWith('details-')) {
+                void loadRecent()
+                window.dispatchEvent(new Event('data-changed'))
+                return
+            }
             if (!draftId.startsWith('edit-')) return
 
             setBookingEditTabs((tabs) => {
@@ -1384,7 +1417,7 @@ export default function JournalView({
                             activeSetPage(1)
                             await loadRecent()
                         }}
-                        onRowDoubleClick={(row) => setInfoVoucher(row)}
+                        onRowDoubleClick={(row) => { void openVoucherDetails(row) }}
                     />
                 </div>
 
@@ -1491,7 +1524,8 @@ export default function JournalView({
                                     const payload: any = { 
                                         id: editRow.id, 
                                         date: editRow.date, 
-                                        description: editRow.description ?? null, 
+                                        description: editRow.description ?? null,
+                                        note: editRow.note?.trim() ? editRow.note.trim() : null,
                                         type: editRow.type, 
                                         sphere: editRow.sphere, 
                                         // Legacy fields (kept for backwards compatibility, first item from arrays)
@@ -1952,6 +1986,16 @@ export default function JournalView({
                                             }
                                         }}
                                     >
+                                        <div className="field booking-note-field" style={{ marginBottom: 10 }}>
+                                            <label>Kommentar</label>
+                                            <textarea
+                                                className="input booking-note-textarea"
+                                                rows={3}
+                                                value={editRow.note ?? ''}
+                                                onChange={(e) => setEditRow({ ...editRow, note: e.target.value })}
+                                                placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..."
+                                            />
+                                        </div>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                                                 <strong>Anhänge</strong>
@@ -2101,7 +2145,7 @@ export default function JournalView({
 
                 {/* Delete Modal */}
                 {deleteRow && (
-                    <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0 }}>
+                    <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0, zIndex: 16000 }}>
                         <div className="modal" onClick={(e) => e.stopPropagation()}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <h2 style={{ margin: 0 }}>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</h2>
@@ -2127,6 +2171,16 @@ export default function JournalView({
                                             else if (editRow && editRow.id === deleteRow.id) closeEditModalNow()
                                         } catch {}
                                         await loadRecent()
+                                        if (infoVoucher && infoVoucher.id === deleteRow.id) {
+                                            try {
+                                                const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [deleteRow.id] })
+                                                const next = refreshed?.rows?.[0] as VoucherRow | undefined
+                                                if (next) {
+                                                    setInfoVoucher(next)
+                                                    voucherTooltipCache.current.set(next.id, next)
+                                                }
+                                            } catch { /* keep current details if refresh fails */ }
+                                        }
                                         bumpDataVersion()
                                         if (!allowVoucherDeletion && (res as any)?.id) {
                                             setFlashId((res as any).id)
@@ -2159,9 +2213,48 @@ export default function JournalView({
                         budgets={budgetsForEdit}
                         tagDefs={tagDefs}
                         allowVoucherDeletion={allowVoucherDeletion}
+                        windowMode={bookingsOpenDetached}
+                        onSaveMeta={async (payload) => {
+                            const res = await window.api?.vouchers.updateMeta?.({
+                                id: infoVoucher.id,
+                                note: payload.note,
+                                budgets: payload.budgets,
+                                earmarks: payload.earmarks,
+                                tags: payload.tags
+                            })
+                            if (!res) throw new Error('Buchungsdetails konnten nicht gespeichert werden.')
+                            const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [infoVoucher.id] })
+                            const next = refreshed?.rows?.[0] as VoucherRow | undefined
+                            if (next) {
+                                setInfoVoucher(next)
+                                voucherTooltipCache.current.set(next.id, next)
+                            } else {
+                                setInfoVoucher((cur) => cur ? {
+                                    ...cur,
+                                    note: payload.note,
+                                    tags: payload.tags,
+                                    budgets: payload.budgets.map((b) => ({
+                                        budgetId: b.budgetId,
+                                        amount: b.amount,
+                                        label: budgetsForEdit.find((budget) => budget.id === b.budgetId)?.label
+                                    })),
+                                    earmarksAssigned: payload.earmarks.map((e) => {
+                                        const found = earmarks.find((em) => em.id === e.earmarkId)
+                                        return {
+                                            earmarkId: e.earmarkId,
+                                            amount: e.amount,
+                                            code: found?.code,
+                                            name: found?.name,
+                                            color: found?.color
+                                        }
+                                    })
+                                } : cur)
+                            }
+                            await loadRecent()
+                            window.dispatchEvent(new Event('data-changed'))
+                        }}
                         onReverse={() => {
                             setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })
-                            setInfoVoucher(null)
                         }}
                         onOpenAttachments={() => {
                             onOpenVoucherAttachments?.({

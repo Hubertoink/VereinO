@@ -28,12 +28,29 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
     useEffect(() => { load() }, [page, limit])
 
     useEffect(() => {
+        const onChanged = () => { void load() }
+        window.addEventListener('data-changed', onChanged)
+        return () => window.removeEventListener('data-changed', onChanged)
+    }, [page, limit])
+
+    useEffect(() => {
         if (!openVoucher) return
         setAttachmentsModal(openVoucher)
         onVoucherOpened?.()
     }, [openVoucher, onVoucherOpened])
 
     // AttachmentsModal handles listing, preview and download
+
+    function jumpToVoucher(row: { id: number; voucherNo: string; date: string }) {
+        const ev = new CustomEvent('apply-voucher-jump', {
+            detail: {
+                voucherId: row.id,
+                voucherNo: row.voucherNo,
+                date: row.date,
+            }
+        })
+        window.dispatchEvent(ev)
+    }
 
     return (
         <div className="card" style={{ padding: 12 }}>
@@ -56,7 +73,17 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                         {rows.map(r => (
                             <tr key={r.id}>
                                 <td>{r.date}</td>
-                                <td>{r.voucherNo}</td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        className="btn ghost"
+                                        onClick={() => jumpToVoucher(r)}
+                                        title="Zur Buchung im Journal"
+                                        style={{ padding: 0, border: 0, background: 'transparent', color: 'var(--primary)', fontWeight: 600 }}
+                                    >
+                                        {r.voucherNo}
+                                    </button>
+                                </td>
                                 <td>{r.description}</td>
                                 <td align="center">
                                     <button

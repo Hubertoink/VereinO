@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('api', {
         list: (payload?: any) => ipcRenderer.invoke('vouchers.list', payload),
         recent: (payload?: any) => ipcRenderer.invoke('vouchers.recent', payload),
         update: (payload: any) => cleanInvoke('vouchers.update', payload),
+        updateMeta: (payload: any) => cleanInvoke('vouchers.updateMeta', payload),
         delete: (payload: any) => ipcRenderer.invoke('vouchers.delete', payload),
         batchAssignEarmark: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignEarmark', payload),
         batchAssignBudget: (payload: any) => ipcRenderer.invoke('vouchers.batchAssignBudget', payload),

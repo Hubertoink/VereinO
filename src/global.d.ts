@@ -35,6 +35,7 @@ declare global {
                     grossAmount?: number
                     vatRate: number
                     paymentMethod?: 'BAR' | 'BANK'
+                    note?: string | null
                     paymentAccountId?: number | null
                     transferFrom?: 'BAR' | 'BANK'
                     transferTo?: 'BAR' | 'BANK'
@@ -75,6 +76,7 @@ declare global {
                         transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
                         transferToAccountColor?: string | null
                         description?: string | null
+                        note?: string | null
                         netAmount: number
                         vatRate: number
                         vatAmount: number
@@ -94,7 +96,8 @@ declare global {
                     total: number
                 }>
                 recent: (payload?: { limit?: number }) => Promise<{ rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; paymentAccountName?: string | null; description?: string | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; originalId?: number | null; originalVoucherNo?: string | null; reversedById?: number | null; reversedByVoucherNo?: string | null; fileCount?: number }> }>
-                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; transferFromAccountId?: number | null; transferToAccountId?: number | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
+                update: (payload: { id: number; date?: string; type?: 'IN' | 'OUT' | 'TRANSFER'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; note?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; paymentAccountId?: number | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; transferFromAccountId?: number | null; transferToAccountId?: number | null; earmarkId?: number | null; budgetId?: number | null; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
+                updateMeta: (payload: { id: number; note?: string | null; earmarkId?: number | null; earmarkAmount?: number | null; budgetId?: number | null; budgetAmount?: number | null; budgets?: { budgetId: number; amount: number }[]; earmarks?: { earmarkId: number; amount: number }[]; tags?: string[] }) => Promise<{ id: number; warnings?: string[] }>
                 delete: (payload: { id: number }) => Promise<{ id: number }>
                 batchAssignEarmark: (payload: { earmarkId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>
                 batchAssignBudget: (payload: { budgetId: number; paymentMethod?: 'BAR' | 'BANK'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER'; from?: string; to?: string; q?: string; onlyWithout?: boolean }) => Promise<{ updated: number }>

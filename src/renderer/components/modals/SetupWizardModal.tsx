@@ -8,7 +8,7 @@ type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamla
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
 type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
-type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
+type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
 // Toggle button component for binary options
@@ -69,9 +69,9 @@ export default function SetupWizardModal({
     const [cashier, setCashier] = useState<string>('')
     const [tablePreset, setTablePreset] = useState<TablePreset>('standard')
     const [colsVisible, setColsVisible] = useState<Record<ColKey, boolean>>({
-        actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true
+        actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true
     })
-    const [colsOrder, setColsOrder] = useState<ColKey[]>(['actions', 'date', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat'])
+    const [colsOrder, setColsOrder] = useState<ColKey[]>(['actions', 'date', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat'])
     const mandatoryCols: ColKey[] = ['actions','date','description','gross']
 
     // Note: We no longer override existing settings on wizard open.
@@ -159,14 +159,14 @@ export default function SetupWizardModal({
         let cols: Record<ColKey, boolean>
         let order: ColKey[]
         if (preset === 'standard') {
-            cols = { actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true }
-            order = ['actions', 'date', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat']
+            cols = { actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true }
+            order = ['actions', 'date', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat']
         } else if (preset === 'minimal') {
-            cols = { actions: true, date: true, voucherNo: false, type: false, sphere: false, description: true, earmark: false, budget: false, paymentMethod: false, attachments: false, net: false, vat: false, gross: true }
-            order = ['actions', 'date', 'description', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
+            cols = { actions: true, date: true, voucherNo: false, type: false, sphere: false, description: true, note: false, earmark: false, budget: false, paymentMethod: false, attachments: false, net: false, vat: false, gross: true }
+            order = ['actions', 'date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
         } else { // details
-            cols = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
-            order = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
+            cols = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
+            order = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
         }
         setColsVisible(cols)
         setColsOrder(order)

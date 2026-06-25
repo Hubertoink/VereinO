@@ -246,6 +246,7 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
             const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
+            try { window.dispatchEvent(new Event('data-changed')) } catch { }
         } catch (e: any) {
             alert('Upload fehlgeschlagen: ' + (e?.message || String(e)))
         } finally {
@@ -276,6 +277,7 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
             setPdfMeta(null)
             pdfDocRef.current = null
             setConfirmDelete(null)
+            try { window.dispatchEvent(new Event('data-changed')) } catch { }
         } catch (e: any) {
             alert('Löschen fehlgeschlagen: ' + (e?.message || String(e)))
         }
