@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../TagsEditor'
 import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
+import { isMetaAmountValid } from './voucherMetaValidation'
 
 // Types for multiple budget/earmark assignments
 type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
@@ -187,10 +188,15 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   }
 
   const validateMeta = () => {
-    const incompleteBudget = metaBudgets.find((b) => !b.budgetId || Number(b.amount) <= 0)
-    if (incompleteBudget) return 'Bitte wähle für jede Budget-Zeile ein Budget aus und gib einen Betrag größer 0 ein.'
-    const incompleteEarmark = metaEarmarks.find((e) => !e.earmarkId || Number(e.amount) <= 0)
-    if (incompleteEarmark) return 'Bitte wähle für jede Zweckbindungs-Zeile eine Zweckbindung aus und gib einen Betrag größer 0 ein.'
+    const isInternal = voucher.type === 'INTERNAL'
+    const incompleteBudget = metaBudgets.find((b) => !b.budgetId || !isMetaAmountValid(Number(b.amount), isInternal))
+    if (incompleteBudget) return isInternal
+      ? 'Bitte wähle für jede Budget-Zeile ein Budget aus und gib einen von 0 verschiedenen Betrag ein.'
+      : 'Bitte wähle für jede Budget-Zeile ein Budget aus und gib einen Betrag größer 0 ein.'
+    const incompleteEarmark = metaEarmarks.find((e) => !e.earmarkId || !isMetaAmountValid(Number(e.amount), isInternal))
+    if (incompleteEarmark) return isInternal
+      ? 'Bitte wähle für jede Zweckbindungs-Zeile eine Zweckbindung aus und gib einen von 0 verschiedenen Betrag ein.'
+      : 'Bitte wähle für jede Zweckbindungs-Zeile eine Zweckbindung aus und gib einen Betrag größer 0 ein.'
     const duplicateBudget = new Set(metaBudgets.map((b) => b.budgetId).filter(Boolean)).size !== metaBudgets.filter((b) => b.budgetId).length
     if (duplicateBudget) return 'Ein Budget kann hier nur einmal zugeordnet werden.'
     const duplicateEarmark = new Set(metaEarmarks.map((e) => e.earmarkId).filter(Boolean)).size !== metaEarmarks.filter((e) => e.earmarkId).length
@@ -207,11 +213,12 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
       setMetaError(validationMessage)
       return
     }
+    const isInternal = voucher.type === 'INTERNAL'
     const cleanBudgets = metaBudgets
-      .filter((b) => b.budgetId && Number(b.amount) > 0)
+      .filter((b) => b.budgetId && isMetaAmountValid(Number(b.amount), isInternal))
       .map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
     const cleanEarmarks = metaEarmarks
-      .filter((e) => e.earmarkId && Number(e.amount) > 0)
+      .filter((e) => e.earmarkId && isMetaAmountValid(Number(e.amount), isInternal))
       .map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
 
     setSavingMeta(true)
@@ -530,7 +537,7 @@ Status: ${statusLabel}`
                         min="0"
                         step="0.01"
                         value={item.amount || ''}
-                        style={Number(item.amount) <= 0 || budgetExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
+                        style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || budgetExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
                         onChange={(e) => {
                           const next = [...metaBudgets]
                           next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
@@ -598,7 +605,7 @@ Status: ${statusLabel}`
                         min="0"
                         step="0.01"
                         value={item.amount || ''}
-                        style={Number(item.amount) <= 0 || earmarkExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
+                        style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || earmarkExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
                         onChange={(e) => {
                           const next = [...metaEarmarks]
                           next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
