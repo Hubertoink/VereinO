@@ -1120,6 +1120,54 @@ export function ensureInternalVoucherType(db: DB) {
   }
 }
 
+function quoteIdentifier(name: string): string {
+  return `"${String(name).replace(/"/g, '""')}"`
+}
+
+function rebuildTableWithSql(db: DB, tableName: string, createSql: string) {
+  const tempName = `__repair_${tableName}`
+  const indexes = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name = ? AND sql IS NOT NULL").all(tableName) as Array<{ sql: string }>
+  const triggers = db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name = ? AND sql IS NOT NULL").all(tableName) as Array<{ sql: string }>
+  const columns = db.prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`).all() as Array<{ name: string }>
+  const columnList = columns.map((column) => quoteIdentifier(column.name)).join(', ')
+
+  db.exec(`ALTER TABLE ${quoteIdentifier(tableName)} RENAME TO ${quoteIdentifier(tempName)};`)
+  db.exec(createSql)
+  if (columnList) {
+    db.exec(`INSERT INTO ${quoteIdentifier(tableName)} (${columnList}) SELECT ${columnList} FROM ${quoteIdentifier(tempName)};`)
+  }
+  db.exec(`DROP TABLE ${quoteIdentifier(tempName)};`)
+
+  for (const index of indexes) db.exec(index.sql)
+  for (const trigger of triggers) db.exec(trigger.sql)
+}
+
+export function ensureVoucherForeignKeyTargets(db: DB) {
+  try {
+    const rows = db.prepare(`
+      SELECT name, sql
+      FROM sqlite_master
+      WHERE type='table'
+        AND name NOT LIKE 'sqlite_%'
+        AND sql LIKE '%vouchers_old%'
+    `).all() as Array<{ name: string; sql: string }>
+    if (!rows.length) return
+
+    db.exec('PRAGMA foreign_keys = OFF;')
+    db.exec('BEGIN;')
+    for (const row of rows) {
+      const fixedSql = String(row.sql).replace(/vouchers_old/g, 'vouchers')
+      rebuildTableWithSql(db, row.name, fixedSql)
+    }
+    db.exec('COMMIT;')
+    db.exec('PRAGMA foreign_keys = ON;')
+  } catch (error) {
+    try { db.exec('ROLLBACK;') } catch { /* ignore */ }
+    try { db.exec('PRAGMA foreign_keys = ON;') } catch { /* ignore */ }
+    console.warn('[ensureVoucherForeignKeyTargets] Failed to repair voucher foreign keys:', error)
+  }
+}
+
 export function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
@@ -1133,6 +1181,7 @@ export function applyMigrations(db: DB) {
   ensurePaymentAccountTables(db)
   ensureVoucherColumns(db)
   ensureInternalVoucherType(db)
+  ensureVoucherForeignKeyTargets(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)
@@ -1211,6 +1260,7 @@ export function applyMigrations(db: DB) {
   ensurePaymentAccountTables(db)
   ensureVoucherColumns(db)
   ensureInternalVoucherType(db)
+  ensureVoucherForeignKeyTargets(db)
   ensureVoucherJunctionTables(db)
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)

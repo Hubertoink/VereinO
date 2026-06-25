@@ -330,6 +330,7 @@ declare global {
                 execute: (payload: { fileBase64: string; mapping: Record<string, string | null> }) => Promise<{ imported: number; skipped: number; errors: Array<{ row: number; message: string }>; rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>; newTags?: string[]; errorFilePath?: string }>
                 template: () => Promise<{ filePath: string }>
                 testdata: () => Promise<{ filePath: string }>
+                editableExport: () => Promise<{ filePath: string }>
             }
             db: {
                 export: () => Promise<{ filePath: string }>

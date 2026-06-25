@@ -146,6 +146,7 @@ export function SettingsView(props: SettingsProps) {
             journalLimit={props.journalLimit}
             setJournalLimit={props.setJournalLimit}
             labelForCol={props.labelForCol}
+            allowVoucherDeletion={props.allowVoucherDeletion}
           />
         )}
         

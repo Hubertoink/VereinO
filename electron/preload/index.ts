@@ -260,7 +260,8 @@ contextBridge.exposeInMainWorld('api', {
         preview: (payload: any) => ipcRenderer.invoke('imports.preview', payload),
         execute: (payload: any) => ipcRenderer.invoke('imports.execute', payload),
         template: () => ipcRenderer.invoke('imports.template'),
-        testdata: () => ipcRenderer.invoke('imports.testdata')
+        testdata: () => ipcRenderer.invoke('imports.testdata'),
+        editableExport: () => ipcRenderer.invoke('imports.editableExport')
     },
     shell: {
         showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell.showItemInFolder', { fullPath }),

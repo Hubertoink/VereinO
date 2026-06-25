@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.1.4] - 2026-06-25
+
+### Hinzugefügt
+
+- Import: Buchungsvorlagen enthalten jetzt vorhandene Zahlwege, Budgets, Zweckbindungen und Tags als auswählbare Listen.
+- Import: Buchungen können als bearbeitbare Excel-Datei exportiert und mit Buchungs-ID/Belegnummer wieder aktualisiert werden.
+
+### Behoben
+
+- Import: Zahlungswege aus Vorlagen und Testdateien werden beim Import korrekt übernommen.
+- Import: Datenbanken mit alten Fremdschlüsselreferenzen auf `vouchers_old` werden vor dem Import repariert.
+- Darstellung: Der Schließen-Button in Buchungsdetails bleibt in hellen Themes kontrastreich.
+- Tabelle: Die Spalte `Art` wird bei aktivem Storno-Modus nicht mehr als konfigurierbare Journalspalte angeboten.
+
 ## [2.0.7] - 2026-06-24
 
 ### Hinzugefügt

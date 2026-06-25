@@ -12,17 +12,24 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   const [sample, setSample] = useState<Array<Record<string, any>>>([])
   const [headerRowIndex, setHeaderRowIndex] = useState<number | null>(null)
   const [mapping, setMapping] = useState<Record<string, string | null>>({
+    voucherId: null,
+    voucherNo: null,
     date: null,
     type: null,
     sphere: null,
     description: null,
+    note: null,
     paymentMethod: null,
+    paymentAccount: null,
     netAmount: null,
     vatRate: null,
     grossAmount: null,
     inGross: null,
     outGross: null,
     earmarkCode: null,
+    earmarkAmount: null,
+    budget: null,
+    budgetAmount: null,
     tags: null,
     bankIn: null,
     bankOut: null,
@@ -122,17 +129,24 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   const fieldKeys: Array<{ key: string; label: string; required?: boolean; enumValues?: string[] }> = [
+    { key: 'voucherId', label: 'Buchungs-ID' },
+    { key: 'voucherNo', label: 'Belegnummer' },
     { key: 'date', label: 'Datum', required: true },
     { key: 'type', label: 'Art (IN/OUT/TRANSFER)' },
     { key: 'sphere', label: 'Sphäre (IDEELL/ZWECK/VERMOEGEN/WGB)', required: true },
     { key: 'description', label: 'Beschreibung' },
+    { key: 'note', label: 'Kommentar / Notiz' },
     { key: 'paymentMethod', label: 'Zahlweg (BAR/BANK)' },
+    { key: 'paymentAccount', label: 'Konto / Zahlkonto' },
     { key: 'netAmount', label: 'Netto' },
     { key: 'vatRate', label: 'Umsatzsteuersatz in Prozent' },
     { key: 'grossAmount', label: 'Brutto' },
     { key: 'inGross', label: 'Einnahmen (Brutto)' },
     { key: 'outGross', label: 'Ausgaben (Brutto)' },
     { key: 'earmarkCode', label: 'Zweckbindung-Code' },
+    { key: 'earmarkAmount', label: 'Zweckbindungs-Betrag' },
+    { key: 'budget', label: 'Budget' },
+    { key: 'budgetAmount', label: 'Budget-Betrag' },
     { key: 'tags', label: 'Tags (; oder , getrennt)' },
     { key: 'bankIn', label: 'Bankkonto + (Einnahmen)' },
     { key: 'bankOut', label: 'Bankkonto - (Ausgaben)' },
@@ -265,6 +279,29 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
           >
             Testdatei erzeugen
           </button>
+          <button
+            className="btn"
+            onClick={async () => {
+              try {
+                const res = await window.api?.imports.editableExport?.()
+                if (res?.filePath) {
+                  setError('')
+                  setResult(null)
+                  notify?.('success', `Buchungsliste gespeichert: ${res.filePath}`, 5000, {
+                    label: 'Ordner öffnen',
+                    onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                  })
+                }
+              } catch (e: any) {
+                const msg = e?.message || String(e)
+                if (msg && /abbruch/i.test(msg)) return
+                setError('Buchungsliste konnte nicht erstellt werden: ' + msg)
+                notify?.('error', 'Buchungsliste konnte nicht erstellt werden: ' + msg)
+              }
+            }}
+          >
+            Buchungen exportieren
+          </button>
           {/* Import-Button wandert nach unten, erscheint erst nach geladener Vorschau */}
         </div>
       </div>
@@ -280,19 +317,26 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <li>Beste Lesbarkeit: Kopfzeile in Zeile 1, Daten ab Zeile 2 (erkannte Kopfzeile: Zeile {headerRowIndex || 1}).</li>
               <li>Keine zusammengeführten Zellen oder Leerzeilen im Kopfbereich.</li>
               <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden automatisch ignoriert.</li>
-              <li>Mindestens Datum und ein Betrag (Brutto oder Netto+USt). Optional: Art (IN/OUT/TRANSFER), Sphäre, Zweckbindung, Zahlweg.</li>
-              <li>Tipp: Nutze "Vorlage herunterladen" bzw. "Testdatei erzeugen" als Referenz.</li>
+              <li>Mindestens Datum und ein Betrag (Brutto oder Netto+USt). Optional: Konto, Budget, Zweckbindung, Tags und Kommentar.</li>
+              <li>Mit Buchungs-ID oder Belegnummer werden bestehende Buchungen aktualisiert statt neu angelegt.</li>
+              <li>Tipp: Nutze "Vorlage herunterladen" für neue Daten oder "Buchungen exportieren" für eine bearbeitbare Liste bestehender Buchungen.</li>
             </ul>
           </div>
           <div className="helper">Ordne die Felder den Spaltenüberschriften deiner Datei zu.</div>
           <div className="members-mapping-grid" style={{ marginTop: 8 }}>
             <div className="mapping-section">
               <div className="section-title">📋 Basisdaten</div>
+              <Field keyName="voucherId" tooltip="Bestehende Buchung per ID wiederfinden" />
+              <Field keyName="voucherNo" tooltip="Bestehende Buchung per Belegnummer wiederfinden" />
               <Field keyName="date" tooltip="Datum der Buchung" />
               <Field keyName="description" tooltip="Beschreibung / Verwendungszweck" />
+              <Field keyName="note" tooltip="Kommentar / interne Notiz" />
               <Field keyName="type" tooltip="Art: IN, OUT, TRANSFER" />
               <Field keyName="sphere" tooltip="Sphäre aus der Datei" />
-              <Field keyName="earmarkCode" tooltip="Zweckbindung als Code" />
+              <Field keyName="earmarkCode" tooltip="Zweckbindung per Auswahl, ID oder Code" />
+              <Field keyName="earmarkAmount" tooltip="Optionaler Teilbetrag für die Zweckbindung" />
+              <Field keyName="budget" tooltip="Budget per Auswahl oder ID" />
+              <Field keyName="budgetAmount" tooltip="Optionaler Teilbetrag für das Budget" />
               <Field keyName="tags" tooltip="Tags mit Semikolon oder Komma trennen" />
             </div>
             <div className="mapping-section">
@@ -306,6 +350,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
             <div className="mapping-section">
               <div className="section-title">💳 Zahlung</div>
               <Field keyName="paymentMethod" tooltip="Zahlweg: BAR oder BANK" />
+              <Field keyName="paymentAccount" tooltip="Konkretes Zahlkonto aus VereinO" />
             </div>
             <div className="mapping-section">
               <div className="section-title">🏪 Konten</div>
@@ -339,6 +384,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 erzeugt.
               </li>
               <li>"Standard-Sphäre" wird verwendet, wenn keine Sphäre-Spalte vorhanden ist.</li>
+              <li>Für Updates vorhandener Buchungen empfiehlt sich die exportierte Buchungsliste mit Buchungs-ID und Belegnummer.</li>
               <li>Tags können per Semikolon oder Komma getrennt werden; fehlende Tags werden automatisch angelegt.</li>
               <li>
                 Summenzeilen wie "Ergebnis/Summe/Saldo" werden automatisch übersprungen.

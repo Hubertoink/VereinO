@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { createVoucher } from '../repositories/vouchers'
+import { updateVoucher } from '../repositories/vouchers'
+import { getPaymentAccountById, paymentMethodForAccountKind } from '../repositories/paymentAccounts'
 import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
@@ -22,7 +24,32 @@ export type ImportExecuteResult = {
     newTags?: string[]
 }
 
-const FIELD_KEYS = ['date', 'type', 'sphere', 'description', 'paymentMethod', 'netAmount', 'vatRate', 'grossAmount', 'inGross', 'outGross', 'earmarkCode', 'tags', 'bankIn', 'bankOut', 'cashIn', 'cashOut', 'defaultSphere'] as const
+const FIELD_KEYS = [
+    'voucherId',
+    'voucherNo',
+    'date',
+    'type',
+    'sphere',
+    'description',
+    'note',
+    'paymentMethod',
+    'paymentAccount',
+    'netAmount',
+    'vatRate',
+    'grossAmount',
+    'inGross',
+    'outGross',
+    'earmarkCode',
+    'earmarkAmount',
+    'budget',
+    'budgetAmount',
+    'tags',
+    'bankIn',
+    'bankOut',
+    'cashIn',
+    'cashOut',
+    'defaultSphere'
+] as const
 export type FieldKey = typeof FIELD_KEYS[number]
 
 function normalizeHeader(h: string) {
@@ -32,22 +59,30 @@ function normalizeHeader(h: string) {
 
 function suggestMapping(headers: string[]): Record<string, string | null> {
     const map: Record<string, string | null> = {
-        date: null, type: null, sphere: null, description: null, paymentMethod: null, netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null,
+        voucherId: null, voucherNo: null, date: null, type: null, sphere: null, description: null, note: null, paymentMethod: null, paymentAccount: null,
+        netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null, earmarkAmount: null, budget: null, budgetAmount: null,
         tags: null, bankIn: null, bankOut: null, cashIn: null, cashOut: null, defaultSphere: 'IDEELL'
     }
     for (const h of headers) {
         const n = normalizeHeader(h)
-        if (!map.date && /(datum|date)/.test(n)) map.date = h
+        if (!map.voucherId && /(buchungs-?id|beleg-?id|voucher.?id|\bid\b)/.test(n)) map.voucherId = h
+        else if (!map.voucherNo && /(beleg.?nr|belegnummer|voucher.?no|buchungsnummer|\bnr\b)/.test(n)) map.voucherNo = h
+        else if (!map.date && /(datum|date)/.test(n)) map.date = h
         else if (!map.type && /(art|type|in|out|transfer)/.test(n)) map.type = h
         else if (!map.sphere && /(sph|sphäre|sphere)/.test(n)) map.sphere = h
         else if (!map.description && /(beschreibung|text|zweck|desc|bezeichnung)/.test(n)) map.description = h
-        else if (!map.paymentMethod && /(zahlweg|payment|bar|bank|konto)/.test(n)) map.paymentMethod = h
+        else if (!map.note && /(kommentar|notiz|notizen|hinweis|note)/.test(n)) map.note = h
+        else if (!map.paymentMethod && /(zahlweg|payment.?method|payment method|zahlart)/.test(n)) map.paymentMethod = h
+        else if (!map.paymentAccount && /(konto|zahlkonto|payment.?account)/.test(n)) map.paymentAccount = h
         else if (!map.netAmount && /(netto|net)/.test(n)) map.netAmount = h
         else if (!map.vatRate && /(ust|mwst|vat)/.test(n)) map.vatRate = h
         else if (!map.inGross && /(ein|einnahm|eingang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.inGross = h
         else if (!map.outGross && /(ausgab|ausgang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.outGross = h
         else if (!map.grossAmount && /(brutto|gross|betrag|amount)/.test(n)) map.grossAmount = h
         else if (!map.earmarkCode && /(zweckbindung|earmark|code)/.test(n)) map.earmarkCode = h
+        else if (!map.earmarkAmount && /(zweckbindung.*betrag|earmark.*amount)/.test(n)) map.earmarkAmount = h
+        else if (!map.budget && /(budget)/.test(n)) map.budget = h
+        else if (!map.budgetAmount && /(budget.*betrag|budget.*amount)/.test(n)) map.budgetAmount = h
         else if (!map.tags && /(tag|tags|schlagwort)/.test(n)) map.tags = h
         else if (!map.bankIn && /bank|konto/.test(n) && (/\+/.test(n) || /(ein|eingang|einnahm)/.test(n))) map.bankIn = h
         else if (!map.bankOut && /bank|konto/.test(n) && (/-/.test(n) || /(ausgab|ausgang)/.test(n))) map.bankOut = h
@@ -83,6 +118,120 @@ function rememberNewTags(tags: string[], knownTags: Set<string>, newTags: Set<st
         knownTags.add(key)
         newTags.add(tag.trim())
     }
+}
+
+type LookupOption = { id: number; label: string }
+
+function buildPaymentAccountOptions(d = getDb()): LookupOption[] {
+    const rows = d.prepare(`
+        SELECT id, name, kind
+        FROM payment_accounts
+        WHERE is_active = 1
+        ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
+    `).all() as Array<{ id: number; name: string; kind: string }>
+    return rows.map((row) => ({
+        id: row.id,
+        label: `#${row.id} | ${row.name} [${row.kind}]`
+    }))
+}
+
+function buildBudgetOptions(d = getDb()): LookupOption[] {
+    const rows = d.prepare(`
+        SELECT id, year, sphere, name, category_name as categoryName, project_name as projectName, is_archived as isArchived
+        FROM budgets
+        ORDER BY is_archived ASC, year DESC, sphere ASC, COALESCE(name, category_name, project_name, '') COLLATE NOCASE ASC, id ASC
+    `).all() as Array<{ id: number; year: number; sphere: string; name?: string | null; categoryName?: string | null; projectName?: string | null; isArchived?: number }>
+    return rows.map((row) => {
+        const base = row.name || row.categoryName || row.projectName || `Budget ${row.id}`
+        const archived = row.isArchived ? ' [archiviert]' : ''
+        return { id: row.id, label: `#${row.id} | ${row.year} · ${row.sphere} · ${base}${archived}` }
+    })
+}
+
+function buildEarmarkOptions(d = getDb()): LookupOption[] {
+    const rows = d.prepare(`
+        SELECT id, code, name, is_active as isActive
+        FROM earmarks
+        ORDER BY code COLLATE NOCASE ASC, name COLLATE NOCASE ASC, id ASC
+    `).all() as Array<{ id: number; code: string; name: string; isActive?: number }>
+    return rows.map((row) => ({
+        id: row.id,
+        label: `#${row.id} | ${row.code} · ${row.name}${row.isActive === 0 ? ' [inaktiv]' : ''}`
+    }))
+}
+
+function buildTagOptions(d = getDb()): string[] {
+    const rows = d.prepare(`SELECT name FROM tags ORDER BY name COLLATE NOCASE ASC`).all() as Array<{ name: string }>
+    return rows.map((row) => row.name).filter(Boolean)
+}
+
+function extractIdFromLookup(value: any): number | undefined {
+    if (value == null || value === '') return undefined
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+    const text = String(value).trim()
+    const match = /^#?\s*(\d+)\b/.exec(text)
+    return match ? Number(match[1]) : undefined
+}
+
+function normalizeLookupKey(value: any): string {
+    return String(value ?? '').trim().toLowerCase()
+}
+
+function findLookupId(
+    value: any,
+    options: LookupOption[],
+    aliases: string[] = []
+): number | undefined {
+    const directId = extractIdFromLookup(value)
+    if (directId != null) return directId
+    const key = normalizeLookupKey(value)
+    if (!key) return undefined
+    const byLabel = options.find((option) => normalizeLookupKey(option.label) === key)
+    if (byLabel) return byLabel.id
+    if (aliases.length > 0) {
+        const byAlias = options.find((option, index) => normalizeLookupKey(aliases[index]) === key)
+        if (byAlias) return byAlias.id
+    }
+    return undefined
+}
+
+function ensureLookupSheet(wb: ExcelJS.Workbook, name = 'Listen') {
+    const existing = wb.getWorksheet(name)
+    if (existing) return existing
+    const ws = wb.addWorksheet(name)
+    ws.state = 'hidden'
+    return ws
+}
+
+function populateLookupSheet(wb: ExcelJS.Workbook, ws: ExcelJS.Worksheet) {
+    const paymentAccounts = buildPaymentAccountOptions()
+    const budgets = buildBudgetOptions()
+    const earmarks = buildEarmarkOptions()
+    const tags = buildTagOptions()
+    const paymentAccountLabels = paymentAccounts.length ? paymentAccounts.map((option) => option.label) : ['']
+    const budgetLabels = budgets.length ? budgets.map((option) => option.label) : ['']
+    const earmarkLabels = earmarks.length ? earmarks.map((option) => option.label) : ['']
+    const tagLabels = tags.length ? tags : ['']
+
+    ws.getCell('A1').value = 'Konten'
+    paymentAccountLabels.forEach((label, index) => { ws.getCell(index + 2, 1).value = label })
+    ws.getCell('B1').value = 'Budgets'
+    budgetLabels.forEach((label, index) => { ws.getCell(index + 2, 2).value = label })
+    ws.getCell('C1').value = 'Zweckbindungen'
+    earmarkLabels.forEach((label, index) => { ws.getCell(index + 2, 3).value = label })
+    ws.getCell('D1').value = 'Tags'
+    tagLabels.forEach((tag, index) => { ws.getCell(index + 2, 4).value = tag })
+    ws.columns = [{ width: 36 }, { width: 44 }, { width: 40 }, { width: 24 }]
+
+    const definedNames = (wb as any).definedNames
+    definedNames.add(`'${ws.name}'!$A$2:$A$${paymentAccountLabels.length + 1}`, 'PaymentAccounts')
+    definedNames.add(`'${ws.name}'!$B$2:$B$${budgetLabels.length + 1}`, 'Budgets')
+    definedNames.add(`'${ws.name}'!$C$2:$C$${earmarkLabels.length + 1}`, 'Earmarks')
+    definedNames.add(`'${ws.name}'!$D$2:$D$${tagLabels.length + 1}`, 'TagsList')
+}
+
+function addListValidation(ws: ExcelJS.Worksheet, range: string, formula: string) {
+    ; (ws as any).dataValidations?.add(range, { type: 'list', allowBlank: true, formulae: [formula] })
 }
 
 export async function previewXlsx(base64: string): Promise<ImportPreview> {
@@ -347,6 +496,18 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
     const earmarkIdByCode = new Map<string, number>()
     const knownTags = loadTagNameSet(d)
     const newTags = new Set<string>()
+    const paymentAccountOptions = buildPaymentAccountOptions(d)
+    const paymentAccountAliases = (d.prepare(`SELECT id, name FROM payment_accounts`).all() as Array<{ id: number; name: string }>)
+        .map((row) => row.name)
+    const budgetOptions = buildBudgetOptions(d)
+    const budgetAliases = (d.prepare(`
+        SELECT id, year, sphere, name, category_name as categoryName, project_name as projectName
+        FROM budgets
+    `).all() as Array<{ id: number; year: number; sphere: string; name?: string | null; categoryName?: string | null; projectName?: string | null }>)
+        .map((row) => row.name || row.categoryName || row.projectName || `${row.year} ${row.sphere} ${row.id}`)
+    const earmarkOptions = buildEarmarkOptions(d)
+    const earmarkAliases = (d.prepare(`SELECT id, code, name FROM earmarks`).all() as Array<{ id: number; code: string; name: string }>)
+        .map((row) => `${row.code} ${row.name}`)
 
     let imported = 0, skipped = 0
     const errors: Array<{ row: number; message: string }> = []
@@ -367,6 +528,8 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             }
             const rawDate = get('date')
             const date = parseDate(rawDate)
+            const voucherId = parseNumber(get('voucherId'))
+            const voucherNo = get('voucherNo') != null ? String(get('voucherNo')).trim() : ''
             if (!date) {
                 const txt = [rawDate, get('description')].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
                 if (/ergebnis|summe|saldo/.test(txt)) { skipped++; track(r, false, 'Summen-/Saldozeile übersprungen'); continue }
@@ -375,13 +538,19 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             const type = parseEnum(get('type'), ['IN', 'OUT', 'TRANSFER', 'INTERNAL'] as const)
             const sphere = parseEnum(get('sphere'), ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || parseEnum(mapping['defaultSphere'] || 'IDEELL', ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
             const description = get('description') != null ? String(get('description')) : undefined
+            const note = get('note') != null ? String(get('note')) : undefined
             const tags = parseTagsValue(get('tags'))
             const paymentMethod = parseEnum(get('paymentMethod'), ['BAR', 'BANK'] as const)
+            const paymentAccountId = findLookupId(get('paymentAccount'), paymentAccountOptions, paymentAccountAliases)
+            const paymentAccount = paymentAccountId != null ? getPaymentAccountById(paymentAccountId, d) : undefined
+            const resolvedPaymentMethod = paymentMethodForAccountKind(paymentAccount?.kind) ?? paymentMethod ?? undefined
             let netAmount = parseNumber(get('netAmount'))
             let vatRate = parseNumber(get('vatRate')) ?? 19
             let grossAmount = parseNumber(get('grossAmount'))
             const inGross = parseNumber(get('inGross'))
             const outGross = parseNumber(get('outGross'))
+            const budgetAmount = parseNumber(get('budgetAmount'))
+            const earmarkAmount = parseNumber(get('earmarkAmount'))
 
             // Special columns: bank/cash in/out
             const bankIn = parseNumber(get('bankIn'))
@@ -396,7 +565,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             if (cashOut != null && cashOut !== 0) ops.push({ pm: 'BAR', t: 'OUT', amount: Math.abs(cashOut) })
             // If user supplied separate in/out columns (single paymentMethod), translate into ops
             if ((inGross != null && inGross !== 0) || (outGross != null && outGross !== 0)) {
-                const pm = paymentMethod || 'BANK'
+                const pm = resolvedPaymentMethod || 'BANK'
                 if (inGross != null && inGross !== 0) ops.push({ pm: pm as any, t: 'IN', amount: Math.abs(inGross) })
                 if (outGross != null && outGross !== 0) ops.push({ pm: pm as any, t: 'OUT', amount: Math.abs(outGross) })
             }
@@ -417,19 +586,40 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             const earmarkCodeVal = get('earmarkCode')
             if (earmarkCodeVal != null && String(earmarkCodeVal).trim()) {
                 const code = String(earmarkCodeVal).trim()
-                if (earmarkIdByCode.has(code)) earmarkId = earmarkIdByCode.get(code)
-                else {
+                const foundByLookup = findLookupId(code, earmarkOptions, earmarkAliases)
+                if (foundByLookup != null) {
+                    earmarkId = foundByLookup
+                } else if (earmarkIdByCode.has(code)) {
+                    earmarkId = earmarkIdByCode.get(code)
+                } else {
                     const row = d.prepare('SELECT id FROM earmarks WHERE code = ?').get(code) as any
                     if (row?.id) { earmarkIdByCode.set(code, row.id); earmarkId = row.id }
                     else throw new Error(`Zweckbindung nicht gefunden: ${code}`)
                 }
             }
+            const budgetId = findLookupId(get('budget'), budgetOptions, budgetAliases)
+
+            const existing = (() => {
+                if (voucherId != null && Number.isFinite(voucherId) && voucherId > 0) {
+                    const row = d.prepare('SELECT id FROM vouchers WHERE id = ?').get(Number(voucherId)) as any
+                    if (row?.id) return row
+                }
+                if (voucherNo) {
+                    const row = d.prepare('SELECT id FROM vouchers WHERE voucher_no = ?').get(voucherNo) as any
+                    if (row?.id) return row
+                }
+                return null
+            })()
 
             if (ops.length > 0) {
+                if (existing?.id) throw new Error('Bestehende Buchungen mit Split-Spalten können nicht per Sammelzeile aktualisiert werden. Bitte Brutto/Netto verwenden.')
                 // From bank/cash columns; create one voucher per non-zero op
                 for (const op of ops) {
-                    const payload: any = { date, type: op.t, sphere, description, paymentMethod: op.pm, vatRate: 0, grossAmount: op.amount }
+                    const payload: any = { date, type: op.t, sphere, description, note, paymentMethod: op.pm, paymentAccountId, vatRate: 0, grossAmount: op.amount }
                     if (earmarkId != null) payload.earmarkId = earmarkId
+                    if (earmarkAmount != null) payload.earmarkAmount = earmarkAmount
+                    if (budgetId != null) payload.budgetId = budgetId
+                    if (budgetAmount != null) payload.budgetAmount = budgetAmount
                     if (tags.length) payload.tags = tags
                     await Promise.resolve(createVoucher(payload))
                     rememberNewTags(tags, knownTags, newTags)
@@ -437,16 +627,35 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
                 }
                 track(r, true)
             } else {
-                // Build payload: prefer gross if present
-                const payload: any = { date, type: t, sphere, description, paymentMethod, vatRate }
-                if (grossAmount != null) payload.grossAmount = grossAmount
-                else if (netAmount != null) payload.netAmount = netAmount
-                else { skipped++; track(r, false, 'Kein Betrag (Netto/Brutto)'); continue }
-                if (earmarkId != null) payload.earmarkId = earmarkId
-                if (tags.length) payload.tags = tags
-                await Promise.resolve(createVoucher(payload))
-                rememberNewTags(tags, knownTags, newTags)
-                imported++
+                if (existing?.id) {
+                    const payload: any = { id: existing.id, date, type: t, sphere, description, note, vatRate }
+                    if (paymentAccountId !== undefined) payload.paymentAccountId = paymentAccountId
+                    if (resolvedPaymentMethod !== undefined) payload.paymentMethod = resolvedPaymentMethod
+                    if (grossAmount != null) payload.grossAmount = Math.abs(grossAmount)
+                    else if (netAmount != null) payload.netAmount = Math.abs(netAmount)
+                    if (earmarkId !== undefined) payload.earmarkId = earmarkId ?? null
+                    if (earmarkAmount !== undefined) payload.earmarkAmount = earmarkAmount ?? null
+                    if (budgetId !== undefined) payload.budgetId = budgetId ?? null
+                    if (budgetAmount !== undefined) payload.budgetAmount = budgetAmount ?? null
+                    payload.tags = tags
+                    await Promise.resolve(updateVoucher(payload))
+                    rememberNewTags(tags, knownTags, newTags)
+                    imported++
+                } else {
+                    // Build payload: prefer gross if present
+                    const payload: any = { date, type: t, sphere, description, note, paymentMethod: resolvedPaymentMethod, paymentAccountId, vatRate }
+                    if (grossAmount != null) payload.grossAmount = grossAmount
+                    else if (netAmount != null) payload.netAmount = netAmount
+                    else { skipped++; track(r, false, 'Kein Betrag (Netto/Brutto)'); continue }
+                    if (earmarkId != null) payload.earmarkId = earmarkId
+                    if (earmarkAmount != null) payload.earmarkAmount = earmarkAmount
+                    if (budgetId != null) payload.budgetId = budgetId
+                    if (budgetAmount != null) payload.budgetAmount = budgetAmount
+                    if (tags.length) payload.tags = tags
+                    await Promise.resolve(createVoucher(payload))
+                    rememberNewTags(tags, knownTags, newTags)
+                    imported++
+                }
                 track(r, true)
             }
         } catch (e: any) {
@@ -583,19 +792,22 @@ function normalizeCellValue(v: any): any {
 export async function generateImportTemplate(destPath?: string): Promise<{ filePath: string }> {
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Import')
+    const lookupSheet = ensureLookupSheet(wb)
+    populateLookupSheet(wb, lookupSheet)
     // Intro text
-    ws.addRow(['Verein Finanzplaner – Importvorlage'])
+    ws.addRow(['VereinO – Dynamische Importvorlage'])
     ws.addRow(['Hinweise:'])
-    ws.addRow(['1) Trage die Buchungen in die Tabelle ab Zeile 4 ein. 2) Summen-/Saldozeilen überspringt der Import automatisch. 3) Sphäre bitte aus der Liste wählen.'])
+    ws.addRow(['1) Lege zuerst Konten, Budgets, Zweckbindungen und Tags in VereinO an. 2) Nutze dann diese Vorlage mit den aktuellen Listen. 3) Mehrfach-Tags mit ; trennen.'])
     ws.getRow(1).font = { bold: true, size: 14 }
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
-    // Define table aligned with app logic
-    // Removed 'Anmerkungen' column – not used by the app
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Tags']
+    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
+        { width: 12 }, { width: 34 }, { width: 24 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
     ]
+    const firstAccount = buildPaymentAccountOptions()[0]?.label || ''
+    const firstBudget = buildBudgetOptions()[0]?.label || ''
+    const firstEarmark = buildEarmarkOptions()[0]?.label || ''
     ws.addTable({
         name: 'Buchungen',
         ref: 'A4',
@@ -603,15 +815,16 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         totalsRow: false,
         columns: columns.map((c) => ({ name: c })),
         rows: [
-            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'Mitglieder; Beitrag']
+            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', '', 'IN', 'IDEELL', firstAccount, 50, '', '', 0, firstBudget, 50, firstEarmark, 50, 'Mitglieder; Beitrag']
         ]
     })
     // Freeze header + intro
     ws.views = [{ state: 'frozen', ySplit: 4 }]
-        // Data validations: C=Art, D=Zahlweg, H=Sphäre
-        ; (ws as any).dataValidations?.add('C5:C10000', { type: 'list', allowBlank: true, formulae: ['"IN,OUT,TRANSFER"'] })
-        ; (ws as any).dataValidations?.add('D5:D10000', { type: 'list', allowBlank: true, formulae: ['"BAR,BANK"'] })
-        ; (ws as any).dataValidations?.add('H5:H10000', { type: 'list', allowBlank: true, formulae: ['"IDEELL,ZWECK,VERMOEGEN,WGB"'] })
+    addListValidation(ws, 'D5:D10000', '"IN,OUT,TRANSFER,INTERNAL"')
+    addListValidation(ws, 'E5:E10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    addListValidation(ws, 'F5:F10000', '=PaymentAccounts')
+    addListValidation(ws, 'K5:K10000', '=Budgets')
+    addListValidation(ws, 'M5:M10000', '=Earmarks')
 
     // Power Query guidance
     const tips = wb.addWorksheet('PowerQuery_Hinweis')
@@ -633,14 +846,17 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         '    {"Datum","Datum"},',
         '    {"Text","Beschreibung"},',
         '    {"Typ","Art (IN/OUT/TRANSFER)"},',
-        '    {"Zahlweg","Zahlweg (BAR/BANK)"},',
+        '    {"Konto","Konto"},',
         '    {"Einnahmen","Einnahmen (Brutto)"},',
         '    {"Ausgaben","Ausgaben (Brutto)"},',
+        '    {"Netto","Netto"},',
         '    {"USt%","USt %"},',
         '    {"Sphaere","Sphäre"},',
+        '    {"Budget","Budget"},',
+        '    {"Zweckbindung","Zweckbindung"},',
         '    {"Tags","Tags"}',
         '  }),',
-        '  Typen = Table.TransformColumnTypes(Umbenannt, {{"Datum", type date}, {"Einnahmen (Brutto)", type number}, {"Ausgaben (Brutto)", type number}, {"USt %", type number}})',
+        '  Typen = Table.TransformColumnTypes(Umbenannt, {{"Datum", type date}, {"Einnahmen (Brutto)", type number}, {"Ausgaben (Brutto)", type number}, {"Netto", type number}, {"USt %", type number}})',
         'in',
         '  Typen'
     ].join('\n')
@@ -670,6 +886,8 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
 export async function generateImportTestData(destPath?: string): Promise<{ filePath: string }> {
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Import')
+    const lookupSheet = ensureLookupSheet(wb)
+    populateLookupSheet(wb, lookupSheet)
     // Intro rows similar to template
     ws.addRow(['Verein Finanzplaner – Testdaten'])
     ws.addRow(['Diese Datei enthält Beispielbuchungen für den Import.'])
@@ -678,30 +896,38 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
 
-    const columns = ['Datum', 'Beschreibung', 'Art (IN/OUT/TRANSFER)', 'Zahlweg (BAR/BANK)', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'USt %', 'Sphäre', 'Zweckbindung-Code', 'Tags']
+    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
     ws.columns = [
-        { width: 12 }, { width: 40 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 14 }, { width: 18 }, { width: 28 }
+        { width: 12 }, { width: 34 }, { width: 22 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
     ]
 
     const today = new Date()
     const y = today.getFullYear()
     const m = String(today.getMonth() + 1).padStart(2, '0')
 
+    const account = buildPaymentAccountOptions()[0]?.label || ''
+    const budget = buildBudgetOptions()[0]?.label || ''
+    const earmark = buildEarmarkOptions()[0]?.label || ''
     const rows: any[] = [
-        [`${y}-${m}-01`, 'Mitgliedsbeitrag', 'IN', 'BANK', 50, '', 0, 'IDEELL', '', 'Mitglieder; Beitrag'],
-        [`${y}-${m}-02`, 'Bürobedarf', 'OUT', 'BANK', '', 23.5, 19, 'IDEELL', '', 'Verwaltung, Material'],
-        [`${y}-${m}-03`, 'Spende bar', 'IN', 'BAR', 20, '', 0, 'IDEELL', '', 'Spende'],
-        [`${y}-${m}-04`, 'Reparatur', 'OUT', 'BAR', '', 45, 7, 'ZWECK', '', 'Instandhaltung'],
-        [`${y}-${m}-05`, 'Kuchenverkauf', 'IN', 'BANK', 120, '', 7, 'IDEELL', '', 'Veranstaltung; Verkauf'],
-        [`${y}-${m}-06`, 'Miete Saal', 'OUT', 'BANK', '', 300, 0, 'IDEELL', '', 'Miete'],
-        [`${y}-${m}-07`, 'Erstattung Material', 'IN', 'BANK', 35.5, '', 0, 'ZWECK', '', 'Material'],
-        [`${y}-${m}-08`, 'Fahrtkosten', 'OUT', 'BAR', '', 17.8, 0, 'ZWECK', '', 'Fahrtkosten'],
-        [`${y}-${m}-09`, 'Flohmarkt', 'IN', 'BAR', 88.9, '', 0, 'IDEELL', '', 'Veranstaltung'],
-        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '', '']
+        [`${y}-${m}-01`, 'Mitgliedsbeitrag', '', 'IN', 'IDEELL', account, 50, '', '', 0, budget, 50, earmark, 50, 'Mitglieder; Beitrag'],
+        [`${y}-${m}-02`, 'Bürobedarf', 'Ordner und Papier', 'OUT', 'IDEELL', account, '', 23.5, '', 19, budget, 23.5, '', '', 'Verwaltung, Material'],
+        [`${y}-${m}-03`, 'Spende', '', 'IN', 'IDEELL', account, 20, '', '', 0, '', '', earmark, 20, 'Spende'],
+        [`${y}-${m}-04`, 'Reparatur', '', 'OUT', 'ZWECK', account, '', 45, '', 7, budget, 45, earmark, 45, 'Instandhaltung'],
+        [`${y}-${m}-05`, 'Kuchenverkauf', 'Sommerfest', 'IN', 'IDEELL', account, 120, '', '', 7, budget, 120, '', '', 'Veranstaltung; Verkauf'],
+        [`${y}-${m}-06`, 'Miete Saal', '', 'OUT', 'IDEELL', account, '', 300, '', 0, budget, 300, '', '', 'Miete'],
+        [`${y}-${m}-07`, 'Erstattung Material', '', 'IN', 'ZWECK', account, 35.5, '', '', 0, budget, 35.5, '', '', 'Material'],
+        [`${y}-${m}-08`, 'Fahrtkosten', '', 'OUT', 'ZWECK', account, '', 17.8, '', 0, '', '', earmark, 17.8, 'Fahrtkosten'],
+        [`${y}-${m}-09`, 'Flohmarkt', '', 'IN', 'IDEELL', account, 88.9, '', '', 0, budget, 88.9, '', '', 'Veranstaltung'],
+        [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '', '', '', '', '', '', '']
     ]
 
     ws.addTable({ name: 'Buchungen', ref: 'A4', headerRow: true, totalsRow: false, columns: columns.map(n => ({ name: n })), rows })
     ws.views = [{ state: 'frozen', ySplit: 4 }]
+    addListValidation(ws, 'D5:D10000', '"IN,OUT,TRANSFER,INTERNAL"')
+    addListValidation(ws, 'E5:E10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    addListValidation(ws, 'F5:F10000', '=PaymentAccounts')
+    addListValidation(ws, 'K5:K10000', '=Budgets')
+    addListValidation(ws, 'M5:M10000', '=Earmarks')
 
     const fs = await import('node:fs')
     const path = await import('node:path')
@@ -716,4 +942,116 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     }
     await wb.xlsx.writeFile(filePath!)
     return { filePath: filePath! }
+}
+
+export async function exportEditableVouchersWorkbook(destPath?: string): Promise<{ filePath: string }> {
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Buchungen')
+    const lookupSheet = ensureLookupSheet(wb)
+    populateLookupSheet(wb, lookupSheet)
+    ws.addRow(['VereinO – Bearbeitbare Buchungsliste'])
+    ws.addRow(['Ändere Werte direkt in dieser Tabelle und importiere sie anschließend wieder über den Buchungsimport.'])
+    ws.addRow(['Wichtig: Buchungs-ID und Belegnummer nicht verändern. Mehrfach-Tags mit ; trennen.'])
+    ws.addRow([])
+    ws.getRow(1).font = { bold: true, size: 14 }
+    ws.getRow(2).font = { bold: true }
+
+    const columns = ['Buchungs-ID', 'Belegnummer', 'Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Brutto', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
+    ws.columns = [
+        { width: 12 }, { width: 16 }, { width: 12 }, { width: 34 }, { width: 24 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 14 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
+    ]
+    const rows = dprepareVoucherExportRows()
+    ws.addTable({
+        name: 'BearbeitbareBuchungen',
+        ref: 'A4',
+        headerRow: true,
+        totalsRow: false,
+        columns: columns.map((name) => ({ name })),
+        rows
+    })
+    ws.views = [{ state: 'frozen', ySplit: 4 }]
+    addListValidation(ws, 'F5:F10000', '"IN,OUT,TRANSFER,INTERNAL"')
+    addListValidation(ws, 'G5:G10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    addListValidation(ws, 'H5:H10000', '=PaymentAccounts')
+    addListValidation(ws, 'L5:L10000', '=Budgets')
+    addListValidation(ws, 'N5:N10000', '=Earmarks')
+
+    let filePath = destPath
+    if (!filePath) {
+        const result = await dialog.showSaveDialog({
+            title: 'Bearbeitbare Buchungsliste speichern',
+            defaultPath: path.join(app.getPath('downloads'), 'Buchungen-Bearbeiten.xlsx'),
+            filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+        })
+        if (result.canceled || !result.filePath) throw new Error('Abbruch durch Benutzer')
+        filePath = result.filePath
+    }
+    await wb.xlsx.writeFile(filePath!)
+    return { filePath: filePath! }
+}
+
+function dprepareVoucherExportRows(): any[][] {
+    const d = getDb()
+    const rows = d.prepare(`
+        SELECT
+            v.id,
+            v.voucher_no as voucherNo,
+            v.date,
+            v.description,
+            v.note,
+            v.type,
+            v.sphere,
+            v.payment_account_id as paymentAccountId,
+            pa.name as paymentAccountName,
+            pa.kind as paymentAccountKind,
+            v.gross_amount as grossAmount,
+            v.net_amount as netAmount,
+            v.vat_rate as vatRate,
+            v.budget_id as budgetId,
+            v.budget_amount as budgetAmount,
+            v.earmark_id as earmarkId,
+            v.earmark_amount as earmarkAmount,
+            e.code as earmarkCode,
+            e.name as earmarkName,
+            b.year as budgetYear,
+            b.sphere as budgetSphere,
+            b.name as budgetName,
+            b.category_name as budgetCategoryName,
+            b.project_name as budgetProjectName,
+            (
+                SELECT GROUP_CONCAT(t.name, '; ')
+                FROM voucher_tags vt
+                JOIN tags t ON t.id = vt.tag_id
+                WHERE vt.voucher_id = v.id
+            ) as tags
+        FROM vouchers v
+        LEFT JOIN payment_accounts pa ON pa.id = v.payment_account_id
+        LEFT JOIN budgets b ON b.id = v.budget_id
+        LEFT JOIN earmarks e ON e.id = v.earmark_id
+        ORDER BY v.date DESC, v.id DESC
+    `).all() as any[]
+    return rows.map((row) => {
+        const accountLabel = row.paymentAccountId ? `#${row.paymentAccountId} | ${row.paymentAccountName || 'Konto'} [${row.paymentAccountKind || 'BANK'}]` : ''
+        const budgetBase = row.budgetName || row.budgetCategoryName || row.budgetProjectName || (row.budgetId ? `Budget ${row.budgetId}` : '')
+        const budgetLabel = row.budgetId ? `#${row.budgetId} | ${row.budgetYear} · ${row.budgetSphere} · ${budgetBase}` : ''
+        const earmarkLabel = row.earmarkId ? `#${row.earmarkId} | ${row.earmarkCode || ''} · ${row.earmarkName || ''}`.trim() : ''
+        return [
+            row.id,
+            row.voucherNo,
+            row.date,
+            row.description || '',
+            row.note || '',
+            row.type,
+            row.sphere,
+            accountLabel,
+            row.grossAmount,
+            row.netAmount,
+            row.vatRate,
+            budgetLabel,
+            row.budgetAmount ?? '',
+            earmarkLabel,
+            row.earmarkAmount ?? '',
+            row.tags || ''
+        ]
+    })
 }

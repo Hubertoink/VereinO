@@ -228,6 +228,7 @@ export interface TablePaneProps {
   journalLimit: number
   setJournalLimit: (n: number) => void
   labelForCol: (k: string) => string
+  allowVoucherDeletion: boolean
 }
 
 export interface StoragePaneProps {

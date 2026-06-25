@@ -20,14 +20,19 @@ export function TablePane({
   journalLimit,
   setJournalLimit,
   labelForCol,
+  allowVoucherDeletion,
 }: TablePaneProps) {
+  const hiddenKeys = new Set<ColKey>(allowVoucherDeletion ? [] : ['type'])
+  const visibleConfigKeys = (Object.keys(defaultCols) as ColKey[]).filter((key) => !hiddenKeys.has(key))
+  const effectiveOrder = order.filter((key) => !hiddenKeys.has(key))
+
   // Preset configurations
   const presetStandard = () => {
     const standardCols: Record<string, boolean> = {
       actions: true,
       date: true,
       voucherNo: false,
-      type: true,
+      type: allowVoucherDeletion,
       sphere: true,
       description: true,
       note: true,
@@ -42,7 +47,6 @@ export function TablePane({
     const standardOrder: ColKey[] = [
       'actions',
       'date',
-      'type',
       'sphere',
       'description',
       'earmark',
@@ -54,6 +58,7 @@ export function TablePane({
       'net',
       'vat',
     ]
+    if (allowVoucherDeletion) standardOrder.splice(2, 0, 'type')
     setCols(standardCols as any)
     setOrder(standardOrder)
   }
@@ -81,7 +86,6 @@ export function TablePane({
       'description',
       'gross',
       'voucherNo',
-      'type',
       'sphere',
       'earmark',
       'budget',
@@ -90,17 +94,17 @@ export function TablePane({
       'net',
       'vat',
     ]
+    if (allowVoucherDeletion) minimalOrder.splice(5, 0, 'type')
     setCols(minimalCols as any)
     setOrder(minimalOrder)
   }
 
   const presetDetails = () => {
-    const detailsCols = { ...defaultCols }
+    const detailsCols = { ...defaultCols, type: allowVoucherDeletion ? defaultCols.type : false }
     const detailsOrder: ColKey[] = [
       'actions',
       'date',
       'voucherNo',
-      'type',
       'sphere',
       'description',
       'earmark',
@@ -111,13 +115,14 @@ export function TablePane({
       'vat',
       'gross',
     ]
+    if (allowVoucherDeletion) detailsOrder.splice(3, 0, 'type')
     setCols(detailsCols)
     setOrder(detailsOrder)
   }
 
   const resetAll = () => {
-    setCols(defaultCols)
-    setOrder(defaultOrder)
+    setCols({ ...defaultCols, type: allowVoucherDeletion ? defaultCols.type : false })
+    setOrder(defaultOrder.filter((key) => !hiddenKeys.has(key)))
     setJournalLimit(20)
   }
 
@@ -132,7 +137,7 @@ export function TablePane({
 
       {/* Column Visibility Checkboxes */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {Object.keys(defaultCols).map((k) => (
+        {visibleConfigKeys.map((k) => (
           <label
             key={k}
             title={k === 'actions' ? 'Empfohlen aktiviert' : ''}
@@ -159,7 +164,7 @@ export function TablePane({
       <div>
         <div className="helper">Reihenfolge:</div>
         <DnDOrder
-          order={order as string[]}
+          order={effectiveOrder as string[]}
           cols={cols as Record<string, boolean>}
           onChange={(o) => setOrder(o as ColKey[])}
           labelFor={labelForCol}
@@ -173,7 +178,7 @@ export function TablePane({
           <table cellPadding={6} style={{ width: '100%', fontSize: 13 }}>
             <thead>
               <tr>
-                {order.filter(k => cols[k]).map(k => (
+                {effectiveOrder.filter(k => cols[k]).map(k => (
                   <th key={k} align="left" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>
                     {labelForCol(k)}
                   </th>
@@ -182,7 +187,7 @@ export function TablePane({
             </thead>
             <tbody>
               <tr>
-                {order.filter(k => cols[k]).map(k => (
+                {effectiveOrder.filter(k => cols[k]).map(k => (
                   <td key={k} style={{ paddingTop: 6, color: 'var(--text-dim)' }}>
                     {k === 'actions' ? '⚙️' : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'note' ? 'Kommentar' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? '📎' : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
                   </td>

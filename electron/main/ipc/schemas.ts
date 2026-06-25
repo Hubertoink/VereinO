@@ -1082,6 +1082,11 @@ export const ImportTestDataOutput = z.object({ filePath: z.string() })
 export type TImportTestDataInput = z.infer<typeof ImportTestDataInput>
 export type TImportTestDataOutput = z.infer<typeof ImportTestDataOutput>
 
+export const ImportEditableExportInput = z.object({}).optional()
+export const ImportEditableExportOutput = z.object({ filePath: z.string() })
+export type TImportEditableExportInput = z.infer<typeof ImportEditableExportInput>
+export type TImportEditableExportOutput = z.infer<typeof ImportEditableExportOutput>
+
 // Attachments (files linked to vouchers)
 export const AttachmentsListInput = z.object({ voucherId: z.number() })
 export const AttachmentsListOutput = z.object({ files: z.array(z.object({ id: z.number(), fileName: z.string(), mimeType: z.string().nullable().optional(), size: z.number().nullable().optional(), createdAt: z.string().optional() })) })
