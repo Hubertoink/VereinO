@@ -113,6 +113,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                 <AttachmentsModal
                     voucher={attachmentsModal}
                     onClose={() => setAttachmentsModal(null)}
+                    onChanged={() => { void load() }}
                 />
             )}
         </div>

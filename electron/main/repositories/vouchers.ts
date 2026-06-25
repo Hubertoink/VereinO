@@ -341,9 +341,9 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         ensurePeriodOpen(new Date().toISOString().slice(0, 10), d)
 
         const now = new Date()
+        const todayISO = now.toISOString().slice(0, 10)
         const year = now.getFullYear()
         const seq = nextVoucherSequence(d, year, original.sphere, todayISO)
-        const todayISO = now.toISOString().slice(0, 10)
         const voucherNo = makeVoucherNo(year, todayISO, original.sphere, seq)
         const reverseType = original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : 'TRANSFER'
         const reverseDescription = `Storno zu ${original.voucher_no}${original.description ? ` - ${original.description}` : ''}`

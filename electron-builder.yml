@@ -26,3 +26,4 @@ publish:
   repo: VereinO
   releaseType: release
   channel: latest
+  vPrefixedTagName: true

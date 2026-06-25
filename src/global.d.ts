@@ -3,6 +3,10 @@ export { }
 declare global {
     interface Window {
         api?: {
+            app?: {
+                notifyDataChanged: () => void
+                onDataChanged: (cb: () => void) => () => void
+            }
             window?: {
                 minimize: () => Promise<{ ok: boolean }>
                 toggleMaximize: () => Promise<{ ok: boolean; isMaximized?: boolean }>

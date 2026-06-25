@@ -900,6 +900,14 @@ export default function JournalView({
         loadRecent()
     }, [loadRecent])
 
+    useEffect(() => {
+        const onChanged = () => {
+            void loadRecent()
+        }
+        window.addEventListener('data-changed', onChanged)
+        return () => window.removeEventListener('data-changed', onChanged)
+    }, [loadRecent])
+
     // Hydrate column prefs from server
     useEffect(() => {
         (async () => {

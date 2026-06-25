@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { notifyDataChanged } from '../../utils/refresh'
 
 // Vite will copy the worker file and return a URL string
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -75,7 +76,15 @@ const IconImage = () => (
     </svg>
 )
 
-export default function AttachmentsModal({ voucher, onClose }: { voucher: { voucherId: number; voucherNo: string; date: string; description: string }; onClose: () => void }) {
+export default function AttachmentsModal({
+    voucher,
+    onClose,
+    onChanged,
+}: {
+    voucher: { voucherId: number; voucherNo: string; date: string; description: string }
+    onClose: () => void
+    onChanged?: () => void
+}) {
     const [files, setFiles] = useState<Array<{ id: number; fileName: string; mimeType?: string | null }>>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string>('')
@@ -246,7 +255,8 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
             const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
-            try { window.dispatchEvent(new Event('data-changed')) } catch { }
+            try { onChanged?.() } catch { }
+            try { notifyDataChanged((window as any).api) } catch { }
         } catch (e: any) {
             alert('Upload fehlgeschlagen: ' + (e?.message || String(e)))
         } finally {
@@ -277,7 +287,8 @@ export default function AttachmentsModal({ voucher, onClose }: { voucher: { vouc
             setPdfMeta(null)
             pdfDocRef.current = null
             setConfirmDelete(null)
-            try { window.dispatchEvent(new Event('data-changed')) } catch { }
+            try { onChanged?.() } catch { }
+            try { notifyDataChanged((window as any).api) } catch { }
         } catch (e: any) {
             alert('Löschen fehlgeschlagen: ' + (e?.message || String(e)))
         }

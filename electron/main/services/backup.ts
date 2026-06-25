@@ -7,6 +7,45 @@ import { applyMigrations } from '../db/migrations'
 
 export type BackupEntry = { filePath: string; size: number; mtime: number }
 
+function snapshotDirForBackupFile(filePath: string) {
+    return filePath.replace(/\.sqlite$/i, '.files')
+}
+
+function copyDirRecursive(src: string, dest: string) {
+    if (!fs.existsSync(src)) return
+    fs.mkdirSync(dest, { recursive: true })
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        const srcPath = path.join(src, entry.name)
+        const destPath = path.join(dest, entry.name)
+        if (entry.isDirectory()) copyDirRecursive(srcPath, destPath)
+        else if (entry.isFile()) fs.copyFileSync(srcPath, destPath)
+    }
+}
+
+function clearDirContents(dir: string) {
+    if (!fs.existsSync(dir)) return
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        fs.rmSync(full, { recursive: true, force: true })
+    }
+}
+
+function relinkFilePaths(d: any, filesDir: string) {
+    for (const table of ['voucher_files', 'invoice_files']) {
+        let rows: Array<{ id: number; filePath: string }> = []
+        try {
+            rows = d.prepare(`SELECT id, file_path as filePath FROM ${table}`).all() as Array<{ id: number; filePath: string }>
+        } catch {
+            rows = []
+        }
+        for (const row of rows) {
+            const baseName = path.basename(String(row.filePath || ''))
+            if (!baseName) continue
+            d.prepare(`UPDATE ${table} SET file_path = ? WHERE id = ?`).run(path.join(filesDir, baseName), row.id)
+        }
+    }
+}
+
 export function getBackupDir(): string {
     // Allow user-defined backup directory via settings key 'backup.dir'
     const cfg = getSetting<string>('backup.dir')
@@ -74,6 +113,9 @@ export function setBackupDirWithMigration(dir: string | null | undefined): { ok:
                     try {
                         if (!fs.existsSync(dest)) {
                             fs.copyFileSync(src, dest)
+                            const srcSnapshot = snapshotDirForBackupFile(src)
+                            const destSnapshot = snapshotDirForBackupFile(dest)
+                            if (fs.existsSync(srcSnapshot) && !fs.existsSync(destSnapshot)) copyDirRecursive(srcSnapshot, destSnapshot)
                             moved += 1
                         }
                     } catch { /* skip individual errors */ }
@@ -102,6 +144,7 @@ export async function makeBackup(reason?: string): Promise<{ filePath: string }>
     const stamp = timestamp()
     const tag = reason ? `_${reason.replace(/[^a-zA-Z0-9_-]+/g, '_')}` : ''
     const out = path.join(dir, `database_${stamp}${tag}.sqlite`)
+    const snapshotDir = snapshotDirForBackupFile(out)
     // Use better-sqlite3 online backup for a consistent copy while DB is open
     const d: any = getDb()
     try {
@@ -112,9 +155,13 @@ export async function makeBackup(reason?: string): Promise<{ filePath: string }>
             const { dbPath } = getCurrentDbInfo()
             fs.copyFileSync(dbPath, out)
         }
+        const { filesDir } = getCurrentDbInfo()
+        if (fs.existsSync(snapshotDir)) fs.rmSync(snapshotDir, { recursive: true, force: true })
+        copyDirRecursive(filesDir, snapshotDir)
     } catch (e) {
         // If backup failed, ensure file does not remain as a partial
         try { if (fs.existsSync(out)) fs.unlinkSync(out) } catch { /* ignore */ }
+        try { if (fs.existsSync(snapshotDir)) fs.rmSync(snapshotDir, { recursive: true, force: true }) } catch { /* ignore */ }
         throw e
     }
     try { await rotateBackups() } catch { /* ignore rotation errors */ }
@@ -146,6 +193,10 @@ export async function rotateBackups(keep: number = 5): Promise<void> {
     const toDelete = backups.slice(keep)
     for (const b of toDelete) {
         try { fs.unlinkSync(b.filePath) } catch { /* ignore */ }
+        try {
+            const snapshotDir = snapshotDirForBackupFile(b.filePath)
+            if (fs.existsSync(snapshotDir)) fs.rmSync(snapshotDir, { recursive: true, force: true })
+        } catch { /* ignore */ }
     }
 }
 
@@ -210,16 +261,23 @@ export function inspectBackupDetailed(filePath: string): { ok: boolean; counts?:
 
 export function restoreBackup(filePath: string): { ok: boolean; error?: string } {
     try {
-        const { dbPath } = getCurrentDbInfo()
+        const { dbPath, filesDir } = getCurrentDbInfo()
+        const snapshotDir = snapshotDirForBackupFile(filePath)
         // Pre-backup current DB
         try { /* best-effort */ } finally { }
         // Close current DB
         try { closeDb() } catch { }
         // Copy selected backup over current
         fs.copyFileSync(filePath, dbPath)
+        fs.mkdirSync(filesDir, { recursive: true })
+        if (fs.existsSync(snapshotDir)) {
+            clearDirContents(filesDir)
+            copyDirRecursive(snapshotDir, filesDir)
+        }
         // Reopen + migrations
         const d = getDb()
         try { applyMigrations(d as any) } catch { /* ignore */ }
+        try { relinkFilePaths(d, filesDir) } catch { /* ignore */ }
         d.pragma('foreign_keys = ON')
         return { ok: true }
     } catch (e: any) { return { ok: false, error: e?.message || String(e) } }

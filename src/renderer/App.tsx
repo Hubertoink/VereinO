@@ -44,6 +44,7 @@ import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
+import { notifyDataChanged } from './utils/refresh'
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -322,6 +323,19 @@ function DetachedQuickAddWindow() {
     const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
     const [confirmDiscardCreate, setConfirmDiscardCreate] = useState(false)
     const [confirmDeleteEdit, setConfirmDeleteEdit] = useState(false)
+
+    const refreshDetailVoucher = useCallback(async () => {
+        if (!detailVoucher?.id) return
+        try {
+            const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [detailVoucher.id] })
+            const next = (refreshed as any)?.rows?.[0]
+            if (next) {
+                setDetailVoucher(next)
+            }
+        } catch {
+            // Ignore and keep current details open
+        }
+    }, [detailVoucher?.id])
 
     useEffect(() => {
         document.documentElement.classList.add('detached-quick-add-document')
@@ -747,6 +761,11 @@ function DetachedQuickAddWindow() {
                     <AttachmentsModal
                         voucher={detailAttachmentsVoucher}
                         onClose={() => setDetailAttachmentsVoucher(null)}
+                        onChanged={async () => {
+                            await refreshDetailVoucher()
+                            bumpDataVersion()
+                            notifyDataChanged((window as any).api)
+                        }}
                     />
                 )}
             </>
@@ -982,9 +1001,15 @@ function AppInner() {
     
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
-    const bumpDataVersion = () => setRefreshKey((k) => k + 1)
+    const bumpDataVersion = useCallback(() => setRefreshKey((k) => k + 1), [])
     const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
     const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
+
+    useEffect(() => {
+        const onDataChanged = () => bumpDataVersion()
+        window.addEventListener('data-changed', onDataChanged)
+        return () => window.removeEventListener('data-changed', onDataChanged)
+    }, [bumpDataVersion])
 
     useEffect(() => {
         const off = window.api?.quickAdd?.onSaved?.((payload: any) => {

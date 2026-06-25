@@ -165,6 +165,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         }
         return { ok: true }
     })
+    ipcMain.on('app.notifyDataChanged', async () => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            try { win.webContents.send('app:data-changed') } catch { }
+        }
+    })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)
         const res = createVoucher(parsed)

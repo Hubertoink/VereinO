@@ -1,5 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+const notifyLocalDataChanged = () => {
+    try {
+        window.dispatchEvent(new Event('data-changed'))
+    } catch {
+        // ignore
+    }
+}
+
+ipcRenderer.on('app:data-changed', () => {
+    notifyLocalDataChanged()
+})
+
 // Helper to clean up error messages from IPC
 function cleanInvoke(channel: string, ...args: any[]): Promise<any> {
     return ipcRenderer.invoke(channel, ...args).catch((error) => {
@@ -243,7 +255,13 @@ contextBridge.exposeInMainWorld('api', {
         restore: (filePath: string) => ipcRenderer.invoke('backup.restore', { filePath })
     },
     app: {
-        version: () => ipcRenderer.invoke('app.version')
+        version: () => ipcRenderer.invoke('app.version'),
+        notifyDataChanged: () => ipcRenderer.send('app.notifyDataChanged'),
+        onDataChanged: (cb: () => void) => {
+            const handler = () => cb()
+            ipcRenderer.on('app:data-changed', handler)
+            return () => ipcRenderer.removeListener('app:data-changed', handler)
+        }
     },
     updates: {
         getState: () => ipcRenderer.invoke('updates.getState'),
