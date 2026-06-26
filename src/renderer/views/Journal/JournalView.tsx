@@ -1509,6 +1509,7 @@ export default function JournalView({
                                         budgets: budgetsListForValidation.map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount })),
                                         earmarks: earmarksListForValidation.map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount })),
                                         isInternal: editRow.type === 'INTERNAL',
+                                        grossAmount: Number((editRow as any).grossAmount) || 0,
                                     })
                                     
                                     // Validate: No duplicate budgets
@@ -1821,6 +1822,7 @@ export default function JournalView({
                                                         budgets: budgetsList.map((b: BudgetAssignment) => ({ budgetId: b.budgetId, amount: b.amount })),
                                                         earmarks: [],
                                                         isInternal: editRow.type === 'INTERNAL',
+                                                        grossAmount: grossAmt,
                                                     })
                                                     const hasBalancedInternalBudgets = budgetsList.length > 0
                                                         && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) < 0)
@@ -1938,6 +1940,7 @@ export default function JournalView({
                                                         budgets: [],
                                                         earmarks: earmarksList.map((e: EarmarkAssignment) => ({ earmarkId: e.earmarkId, amount: e.amount })),
                                                         isInternal: editRow.type === 'INTERNAL',
+                                                        grossAmount: grossAmt,
                                                     })
                                                     const hasBalancedInternalEarmarks = earmarksList.length > 0
                                                         && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) < 0)

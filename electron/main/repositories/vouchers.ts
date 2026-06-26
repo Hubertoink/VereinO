@@ -14,6 +14,29 @@ function round2(n: number) {
     return Math.round(n * 100) / 100
 }
 
+function validateInternalTransferAssignments(
+    budgets: Array<{ budgetId?: number; amount: number }>,
+    earmarks: Array<{ earmarkId?: number; amount: number }>,
+    grossAmount: number
+) {
+    const limit = Math.abs(Number(grossAmount || 0))
+    const entries = [...budgets, ...earmarks]
+    if (!entries.length) {
+        throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+    }
+    const sourceTotal = entries.reduce((sum, entry) => Number(entry.amount) < 0 ? sum + Math.abs(Number(entry.amount)) : sum, 0)
+    const targetTotal = entries.reduce((sum, entry) => Number(entry.amount) > 0 ? sum + Number(entry.amount) : sum, 0)
+    const total = entries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+    const hasSource = entries.some((entry) => Number(entry.amount) < 0)
+    const hasTarget = entries.some((entry) => Number(entry.amount) > 0)
+    if (!hasSource || !hasTarget || Math.abs(total) > 0.001) {
+        throw new Error('Interne Buchungen brauchen insgesamt Quelle negativ, Ziel positiv und Summe 0.')
+    }
+    if (limit > 0 && (Math.abs(sourceTotal - limit) > 0.001 || Math.abs(targetTotal - limit) > 0.001)) {
+        throw new Error('Interne Buchungen brauchen Quelle und Ziel jeweils genau in Höhe des Bruttobetrags.')
+    }
+}
+
 function normalizeVoucherSearchQuery(raw?: string): { text: string; id: number | null } | null {
     if (!raw) return null
     const trimmed = String(raw).trim()
@@ -214,20 +237,7 @@ export function createVoucher(input: {
             const normalizedEarmarks = earmarkAssignments
                 .filter((e) => e?.earmarkId && Number(e.amount) !== 0)
                 .map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
-            const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-            const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
-            const hasBalancedBudgets = normalizedBudgets.length > 0
-                && normalizedBudgets.some((b) => Number(b.amount) < 0)
-                && normalizedBudgets.some((b) => Number(b.amount) > 0)
-                && Math.abs(budgetTotal) <= 0.001
-            const hasBalancedEarmarks = normalizedEarmarks.length > 0
-                && normalizedEarmarks.some((e) => Number(e.amount) < 0)
-                && normalizedEarmarks.some((e) => Number(e.amount) > 0)
-                && Math.abs(earmarkTotal) <= 0.001
-            const hasValidInternalAssignments = (hasBalancedBudgets || hasBalancedEarmarks)
-                && (normalizedBudgets.length === 0 || hasBalancedBudgets)
-                && (normalizedEarmarks.length === 0 || hasBalancedEarmarks)
-            if (!hasValidInternalAssignments) throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+            validateInternalTransferAssignments(normalizedBudgets, normalizedEarmarks, grossAmount)
         }
 
         const paymentFields = resolveVoucherPaymentFields(d, input)
@@ -1350,10 +1360,12 @@ export function updateVoucher(input: {
     }
 
     // Amount updates (optional)
+    let effectiveGrossAmount = Number(current.grossAmount || 0)
     let setAmounts = false
     if (input.grossAmount != null) {
         fields.push('gross_amount = ?')
         params.push(input.grossAmount)
+        effectiveGrossAmount = Number(input.grossAmount)
         if (input.amountMode === undefined) {
             fields.push('amount_mode = ?')
             params.push('GROSS')
@@ -1386,6 +1398,7 @@ export function updateVoucher(input: {
         const gross = Math.round(((Number(input.netAmount) + vat) * 100)) / 100
         fields.push('gross_amount = ?')
         params.push(gross)
+        effectiveGrossAmount = gross
         setAmounts = true
     } else if (input.vatRate != null) {
         // Update vatRate with recompute from existing net if available
@@ -1399,6 +1412,7 @@ export function updateVoucher(input: {
         const gross = Math.round(((curNet + vat) * 100)) / 100
         fields.push('gross_amount = ?')
         params.push(gross)
+        effectiveGrossAmount = gross
         setAmounts = true
     }
     const normalizedBudgets = input.budgets !== undefined
@@ -1407,23 +1421,12 @@ export function updateVoucher(input: {
     const normalizedEarmarks = input.earmarks !== undefined
         ? input.earmarks.filter((e) => e?.earmarkId && (newType === 'INTERNAL' ? Number(e.amount) !== 0 : Number(e.amount) > 0)).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
         : undefined
-    if (newType === 'INTERNAL' && normalizedBudgets !== undefined && normalizedBudgets.length > 0) {
-        const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-        const hasSource = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) < 0)
-        const hasTarget = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) > 0)
-        if (!hasSource || !hasTarget || Math.abs(budgetTotal) > 0.001) throw new Error('Interne Buchungen brauchen Budget-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
-    }
-    if (newType === 'INTERNAL' && normalizedEarmarks !== undefined && normalizedEarmarks.length > 0) {
-        const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
-        const hasSource = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) < 0)
-        const hasTarget = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) > 0)
-        if (!hasSource || !hasTarget || Math.abs(earmarkTotal) > 0.001) throw new Error('Interne Buchungen brauchen Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
-    }
-    if (newType === 'INTERNAL') {
-        const hasAnyInternalAssignments = (normalizedBudgets?.length ?? 0) > 0 || (normalizedEarmarks?.length ?? 0) > 0
-        if ((normalizedBudgets !== undefined || normalizedEarmarks !== undefined) && !hasAnyInternalAssignments) {
-            throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
-        }
+    if (newType === 'INTERNAL' && (normalizedBudgets !== undefined || normalizedEarmarks !== undefined || setAmounts || input.type === 'INTERNAL')) {
+        validateInternalTransferAssignments(
+            normalizedBudgets ?? getVoucherBudgets(input.id),
+            normalizedEarmarks ?? getVoucherEarmarks(input.id),
+            effectiveGrossAmount
+        )
     }
     if (!fields.length && !input.tags && normalizedBudgets === undefined && normalizedEarmarks === undefined && !setAmounts) return { id: input.id, warnings }
     if (fields.length) {
@@ -1495,14 +1498,19 @@ export function updateVoucherMeta(input: {
         ? input.earmarks.filter((e) => e?.earmarkId && (isInternal ? Number(e.amount) !== 0 : Number(e.amount) > 0)).map((e) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
         : undefined
 
+    if (isInternal && (normalizedBudgets !== undefined || normalizedEarmarks !== undefined)) {
+        validateInternalTransferAssignments(
+            normalizedBudgets ?? getVoucherBudgets(input.id),
+            normalizedEarmarks ?? getVoucherEarmarks(input.id),
+            grossLimit
+        )
+    }
+
     if (normalizedBudgets !== undefined) {
         const budgetTotal = normalizedBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-        if (isInternal && normalizedBudgets.length > 0) {
-            const hasSource = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) < 0)
-            const hasTarget = normalizedBudgets.some((b) => b.budgetId && Number(b.amount) > 0)
-            if (!hasSource || !hasTarget || Math.abs(budgetTotal) > 0.001) throw new Error('Interne Buchungen brauchen Budget-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        if (!isInternal && budgetTotal > grossLimit + 0.001) {
+            throw new Error('Budget-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         }
-        if (budgetTotal > grossLimit + 0.001) throw new Error('Budget-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         fields.push('budget_id = ?', 'budget_amount = ?')
         params.push(normalizedBudgets[0]?.budgetId ?? null, normalizedBudgets[0]?.amount ?? null)
     } else {
@@ -1512,24 +1520,14 @@ export function updateVoucherMeta(input: {
 
     if (normalizedEarmarks !== undefined) {
         const earmarkTotal = normalizedEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
-        if (isInternal && normalizedEarmarks.length > 0) {
-            const hasSource = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) < 0)
-            const hasTarget = normalizedEarmarks.some((e) => e.earmarkId && Number(e.amount) > 0)
-            if (!hasSource || !hasTarget || Math.abs(earmarkTotal) > 0.001) throw new Error('Interne Buchungen brauchen Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+        if (!isInternal && earmarkTotal > grossLimit + 0.001) {
+            throw new Error('Zweckbindungs-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         }
-        if (earmarkTotal > grossLimit + 0.001) throw new Error('Zweckbindungs-Zuordnungen dürfen den Bruttobetrag nicht übersteigen.')
         fields.push('earmark_id = ?', 'earmark_amount = ?')
         params.push(normalizedEarmarks[0]?.earmarkId ?? null, normalizedEarmarks[0]?.amount ?? null)
     } else {
         if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
         if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }
-    }
-
-    if (isInternal) {
-        const hasAnyInternalAssignments = (normalizedBudgets?.length ?? 0) > 0 || (normalizedEarmarks?.length ?? 0) > 0
-        if ((normalizedBudgets !== undefined || normalizedEarmarks !== undefined) && !hasAnyInternalAssignments) {
-            throw new Error('Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
-        }
     }
 
     if (fields.length) {

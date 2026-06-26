@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getInternalAssignmentValidationState } from '../components/modals/voucherMetaValidation'
 
 type QA = {
     date: string
@@ -298,21 +299,14 @@ export function useQuickAdd(
                 .filter((b: any) => b.budgetId && Number(b.amount) !== 0)
             const internalEarmarks = (Array.isArray((activeDraft.qa as any).earmarksAssigned) ? (activeDraft.qa as any).earmarksAssigned : [])
                 .filter((e: any) => e.earmarkId && Number(e.amount) !== 0)
-            const budgetSum = internalBudgets.reduce((acc: number, b: any) => acc + Number(b.amount || 0), 0)
-            const earmarkSum = internalEarmarks.reduce((acc: number, e: any) => acc + Number(e.amount || 0), 0)
-            const hasBalancedBudgetTransfer = internalBudgets.length > 0
-                && internalBudgets.some((b: any) => Number(b.amount) < 0)
-                && internalBudgets.some((b: any) => Number(b.amount) > 0)
-                && Math.abs(budgetSum) <= 0.001
-            const hasBalancedEarmarkTransfer = internalEarmarks.length > 0
-                && internalEarmarks.some((e: any) => Number(e.amount) < 0)
-                && internalEarmarks.some((e: any) => Number(e.amount) > 0)
-                && Math.abs(earmarkSum) <= 0.001
-            const hasValidInternalAssignments = (hasBalancedBudgetTransfer || hasBalancedEarmarkTransfer)
-                && (internalBudgets.length === 0 || hasBalancedBudgetTransfer)
-                && (internalEarmarks.length === 0 || hasBalancedEarmarkTransfer)
-            if (!hasValidInternalAssignments) {
-                notify?.('error', 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
+            const internalAssignmentValidation = getInternalAssignmentValidationState({
+                budgets: internalBudgets,
+                earmarks: internalEarmarks,
+                isInternal: true,
+                grossAmount: bookingGrossAmount(activeDraft.qa),
+            })
+            if (!internalAssignmentValidation.hasValidAssignments) {
+                notify?.('error', internalAssignmentValidation.budgetHint || internalAssignmentValidation.earmarkHint || 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.')
                 return
             }
         }

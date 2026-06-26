@@ -2,6 +2,7 @@ import React from 'react'
 import TagsEditor from '../TagsEditor'
 import type { QA } from '../../hooks/useQuickAdd'
 import WindowControls from '../layout/WindowControls'
+import { getInternalAssignmentValidationState } from './voucherMetaValidation'
 
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
@@ -210,25 +211,13 @@ export default function QuickAddModal({
     const hasOutOfRange = invalidBudgetIds.size > 0 || invalidEarmarkIds.size > 0
     const hasInvalidAmount = !Number.isFinite(grossAmt) || grossAmt <= 0
     const amountError = 'Bitte einen Betrag größer als 0 € eingeben.'
-    const internalBudgets = budgetsList.filter((b) => b.budgetId && Number(b.amount) !== 0)
-    const internalEarmarks = earmarksList.filter((e) => e.earmarkId && Number(e.amount) !== 0)
-    const internalBudgetSum = internalBudgets.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-    const internalEarmarkSum = internalEarmarks.reduce((sum, e) => sum + Number(e.amount || 0), 0)
-    const hasBalancedInternalBudgets = internalBudgets.length > 0
-        && internalBudgets.some((b) => Number(b.amount) < 0)
-        && internalBudgets.some((b) => Number(b.amount) > 0)
-        && Math.abs(internalBudgetSum) <= 0.001
-    const hasBalancedInternalEarmarks = internalEarmarks.length > 0
-        && internalEarmarks.some((e) => Number(e.amount) < 0)
-        && internalEarmarks.some((e) => Number(e.amount) > 0)
-        && Math.abs(internalEarmarkSum) <= 0.001
-    const hasValidInternalAssignments = qa.type !== 'INTERNAL'
-        || (
-            (hasBalancedInternalBudgets || hasBalancedInternalEarmarks)
-            && (internalBudgets.length === 0 || hasBalancedInternalBudgets)
-            && (internalEarmarks.length === 0 || hasBalancedInternalEarmarks)
-        )
-    const internalAssignmentBlocked = qa.type === 'INTERNAL' && !hasValidInternalAssignments
+    const internalAssignmentValidation = getInternalAssignmentValidationState({
+        budgets: budgetsList,
+        earmarks: earmarksList,
+        isInternal: qa.type === 'INTERNAL',
+        grossAmount: grossAmt,
+    })
+    const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
     const saveBlocked = hasOutOfRange || hasInvalidAmount
     const saveAndNew = onSaveAndNew ?? onSave
     const saveAndClose = onSaveAndClose ?? onSave
@@ -773,8 +762,8 @@ export default function QuickAddModal({
                                                 {exceedsTotal && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                 )}
-                                                {qa.type === 'INTERNAL' && budgetsList.length > 0 && !hasBalancedInternalBudgets && (
-                                                    <div className="helper" style={{ color: 'var(--danger)' }}>Budget: Quelle negativ, Ziel positiv, Summe 0.</div>
+                                                {qa.type === 'INTERNAL' && budgetsList.length > 0 && internalAssignmentValidation.budgetHint && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>{internalAssignmentValidation.budgetHint}</div>
                                                 )}
                                                 {invalidBudgetIds.size > 0 && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens ein Budget ist für dieses Datum nicht gültig</div>
@@ -873,8 +862,8 @@ export default function QuickAddModal({
                                                 {exceedsTotal && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                 )}
-                                                {qa.type === 'INTERNAL' && earmarksList.length > 0 && !hasBalancedInternalEarmarks && (
-                                                    <div className="helper" style={{ color: 'var(--danger)' }}>Zweckbindung: Quelle negativ, Ziel positiv, Summe 0.</div>
+                                                {qa.type === 'INTERNAL' && earmarksList.length > 0 && internalAssignmentValidation.earmarkHint && (
+                                                    <div className="helper" style={{ color: 'var(--danger)' }}>{internalAssignmentValidation.earmarkHint}</div>
                                                 )}
                                                 {invalidEarmarkIds.size > 0 && (
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens eine Zweckbindung ist für dieses Datum nicht gültig</div>

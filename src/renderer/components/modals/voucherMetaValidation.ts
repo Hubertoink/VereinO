@@ -12,10 +12,12 @@ export function getInternalAssignmentValidationState({
   budgets,
   earmarks,
   isInternal,
+  grossAmount,
 }: {
   budgets: Array<{ budgetId?: number | null; amount?: number | null }>;
   earmarks: Array<{ earmarkId?: number | null; amount?: number | null }>;
   isInternal: boolean;
+  grossAmount?: number | null;
 }): { hasValidAssignments: boolean; budgetHint: string; earmarkHint: string } {
   if (!isInternal) {
     return { hasValidAssignments: true, budgetHint: '', earmarkHint: '' }
@@ -23,33 +25,36 @@ export function getInternalAssignmentValidationState({
 
   const budgetEntries = budgets.filter((b) => b.budgetId)
   const earmarkEntries = earmarks.filter((e) => e.earmarkId)
+  const allEntries = [...budgetEntries, ...earmarkEntries]
+  const grossLimit = Number(grossAmount || 0)
+  const hasGrossLimit = Number.isFinite(grossLimit) && grossLimit > 0
 
-  const hasBalancedBudgets = budgetEntries.length > 0
-    && budgetEntries.some((b) => Number(b.amount || 0) < 0)
-    && budgetEntries.some((b) => Number(b.amount || 0) > 0)
-    && Math.abs(budgetEntries.reduce((sum, b) => sum + Number(b.amount || 0), 0)) <= 0.001
+  const sourceTotal = allEntries.reduce((sum, entry) => {
+    const amount = Number(entry.amount || 0)
+    return amount < 0 ? sum + Math.abs(amount) : sum
+  }, 0)
+  const targetTotal = allEntries.reduce((sum, entry) => {
+    const amount = Number(entry.amount || 0)
+    return amount > 0 ? sum + amount : sum
+  }, 0)
+  const total = allEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+  const hasSource = allEntries.some((entry) => Number(entry.amount || 0) < 0)
+  const hasTarget = allEntries.some((entry) => Number(entry.amount || 0) > 0)
+  const matchesGross = !hasGrossLimit
+    || (Math.abs(sourceTotal - grossLimit) <= 0.001 && Math.abs(targetTotal - grossLimit) <= 0.001)
+  const hasValidAssignments = allEntries.length > 0
+    && hasSource
+    && hasTarget
+    && Math.abs(total) <= 0.001
+    && matchesGross
 
-  const hasBalancedEarmarks = earmarkEntries.length > 0
-    && earmarkEntries.some((e) => Number(e.amount || 0) < 0)
-    && earmarkEntries.some((e) => Number(e.amount || 0) > 0)
-    && Math.abs(earmarkEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0)) <= 0.001
-
-  const hasAnyAssignments = budgetEntries.length > 0 || earmarkEntries.length > 0
-  const hasValidAssignments = (hasBalancedBudgets || hasBalancedEarmarks)
-    && (budgetEntries.length === 0 || hasBalancedBudgets)
-    && (earmarkEntries.length === 0 || hasBalancedEarmarks)
-
-  const budgetHint = budgetEntries.length === 0 && !hasAnyAssignments
-    ? 'Budget: Bitte mindestens eine Budget-Zeile mit Quelle negativ, Ziel positiv und Summe 0 ergänzen.'
-    : budgetEntries.length > 0 && !hasBalancedBudgets
-      ? 'Budget: Quelle negativ, Ziel positiv, Summe 0.'
-      : ''
-
-  const earmarkHint = earmarkEntries.length === 0 && !hasAnyAssignments
-    ? 'Zweckbindung: Bitte mindestens eine Zweckbindungs-Zeile mit Quelle negativ, Ziel positiv und Summe 0 ergänzen.'
-    : earmarkEntries.length > 0 && !hasBalancedEarmarks
-      ? 'Zweckbindung: Quelle negativ, Ziel positiv, Summe 0.'
-      : ''
+  const hint = allEntries.length === 0
+    ? 'Interne Buchungen brauchen Budget- oder Zweckbindungs-Zeilen mit Quelle negativ, Ziel positiv und Summe 0.'
+    : Math.abs(total) <= 0.001 && hasSource && hasTarget && !matchesGross
+      ? 'Interne Buchungen brauchen Quelle und Ziel jeweils genau in Hoehe des Bruttobetrags.'
+      : 'Interne Buchungen brauchen insgesamt Quelle negativ, Ziel positiv und Summe 0.'
+  const budgetHint = !hasValidAssignments && (budgetEntries.length > 0 || allEntries.length === 0) ? hint : ''
+  const earmarkHint = !hasValidAssignments && earmarkEntries.length > 0 ? hint : ''
 
   return {
     hasValidAssignments,

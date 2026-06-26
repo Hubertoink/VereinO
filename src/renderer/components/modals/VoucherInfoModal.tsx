@@ -167,6 +167,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     budgets: metaBudgets,
     earmarks: metaEarmarks,
     isInternal: voucher.type === 'INTERNAL',
+    grossAmount: grossLimit,
   })
 
   useEffect(() => {
@@ -198,6 +199,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
       budgets: metaBudgets,
       earmarks: metaEarmarks,
       isInternal,
+      grossAmount: grossLimit,
     })
     const incompleteBudget = metaBudgets.find((b) => !b.budgetId || !isMetaAmountValid(Number(b.amount), isInternal))
     if (incompleteBudget) return isInternal

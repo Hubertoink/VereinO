@@ -19,7 +19,8 @@ describe('getInternalAssignmentValidationState', () => {
 
     expect(state.hasValidAssignments).toBe(false)
     expect(state.budgetHint).toContain('Budget')
-    expect(state.earmarkHint).toContain('Zweckbindung')
+    expect(state.budgetHint).toContain('Zweckbindung')
+    expect(state.earmarkHint).toBe('')
   })
 
   it('accepts a balanced internal assignment set', () => {
@@ -27,6 +28,47 @@ describe('getInternalAssignmentValidationState', () => {
       budgets: [{ budgetId: 1, amount: -10 }, { budgetId: 2, amount: 10 }],
       earmarks: [],
       isInternal: true,
+    })
+
+    expect(state.hasValidAssignments).toBe(true)
+    expect(state.budgetHint).toBe('')
+    expect(state.earmarkHint).toBe('')
+  })
+
+  it('rejects balanced internal assignments that do not match the gross amount', () => {
+    const state = getInternalAssignmentValidationState({
+      budgets: [{ budgetId: 1, amount: -1000 }, { budgetId: 2, amount: 1000 }],
+      earmarks: [],
+      isInternal: true,
+      grossAmount: 500,
+    })
+
+    expect(state.hasValidAssignments).toBe(false)
+    expect(state.budgetHint).toContain('Bruttobetrag')
+  })
+
+  it('accepts split internal target assignments that match the gross amount', () => {
+    const state = getInternalAssignmentValidationState({
+      budgets: [
+        { budgetId: 1, amount: -500 },
+        { budgetId: 2, amount: 250 },
+        { budgetId: 3, amount: 250 },
+      ],
+      earmarks: [],
+      isInternal: true,
+      grossAmount: 500,
+    })
+
+    expect(state.hasValidAssignments).toBe(true)
+    expect(state.budgetHint).toBe('')
+  })
+
+  it('accepts internal transfers between budgets and earmarks', () => {
+    const state = getInternalAssignmentValidationState({
+      budgets: [{ budgetId: 1, amount: -500 }],
+      earmarks: [{ earmarkId: 1, amount: 500 }],
+      isInternal: true,
+      grossAmount: 500,
     })
 
     expect(state.hasValidAssignments).toBe(true)
