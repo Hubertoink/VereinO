@@ -14,14 +14,14 @@ export const ICONS = {
     ARROW_BOTH: '↕',
     ELLIPSIS: '…',
     BULLET: '·',  // Middle dot für Trennung
-    
+
     // Bearbeitung & Aktionen
     EDIT: '✎',
     DELETE: '🗑',
     ADD: '+',
     SAVE: '💾',
     CANCEL: '✖',
-    
+
     // Status
     CHECK: '✓',
     CROSS: '✗',
@@ -117,13 +117,6 @@ export const IconAttachment = ({ size = 16, color }: { size?: number; color?: st
 )
 
 // Helper-Funktion für Platzhalter-Text
-export function emptyValue(value: any): string {
-    if (value === null || value === undefined || value === '') {
-        return ICONS.EMPTY
-    }
-    return String(value)
-}
-
 // Helper für Zahlweg-Icons (React)
 export function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     if (method === 'BANK') return <IconBank size={size} />
@@ -143,8 +136,3 @@ export function TransferDisplay({ from, to, size = 14 }: { from: 'BAR' | 'BANK' 
 }
 
 // Helper für Transfer-Anzeige als String (für Zusammenfassung)
-export function transferDisplayString(from: 'BAR' | 'BANK' | null | undefined, to: 'BAR' | 'BANK' | null | undefined): string {
-    const fromStr = from || ICONS.EMPTY
-    const toStr = to || ICONS.EMPTY
-    return `${fromStr} ${ICONS.ARROW_RIGHT} ${toStr}`
-}

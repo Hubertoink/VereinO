@@ -30,7 +30,8 @@ function normalizeDraft(input: Partial<DonationReceiptDraft>): DonationReceiptDr
     waiverReimbursement: input.waiverReimbursement == null ? true : Boolean(input.waiverReimbursement),
     directUse: input.directUse == null ? true : Boolean(input.directUse),
     forwardedToOtherEntity: Boolean(input.forwardedToOtherEntity),
-    forwardedRecipient: String(input.forwardedRecipient || '')
+    forwardedRecipient: String(input.forwardedRecipient || ''),
+    signerName: String(input.signerName || '')
   }
 }
 

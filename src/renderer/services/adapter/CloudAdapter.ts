@@ -1,78 +1,88 @@
-import type { IDataAdapter } from './IDataAdapter'
+import type {
+  AttachmentAddResult,
+  EncodedAttachment,
+  IDataAdapter
+} from './IDataAdapter'
+
+export type CloudUser = {
+  id: number
+  email: string
+  organizationId: number
+  organizationName: string
+}
+
+export type CloudAuthResult = {
+  token: string
+  user: CloudUser
+}
+
+function apiErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return 'Request failed'
+  if ('message' in payload && typeof payload.message === 'string') return payload.message
+  if ('error' in payload && typeof payload.error === 'string') return payload.error
+  return 'Request failed'
+}
+
+function encodedAttachmentBlob(file: EncodedAttachment): Blob {
+  const binary = atob(file.dataBase64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return new Blob([bytes], { type: file.mimeType || file.mime || 'application/octet-stream' })
+}
 
 /**
- * Cloud Adapter - REST API Calls zum Backend
- * Verwendet fetch() für HTTP-Requests
+ * REST adapter for the cloud backend.
+ *
+ * JSON decoding is the explicit trust boundary. The backend still needs to
+ * converge on the local voucher domain before all methods are feature-complete.
  */
 export class CloudAdapter implements IDataAdapter {
-  private apiUrl: string
+  private readonly apiUrl: string
   private token: string | null = null
 
   constructor(apiUrl: string, token?: string) {
-    this.apiUrl = apiUrl.replace(/\/$/, '') // Remove trailing slash
+    this.apiUrl = apiUrl.replace(/\/$/, '')
     this.token = token || null
   }
 
-  /**
-   * Set authentication token
-   */
-  setToken(token: string) {
+  setToken(token: string): void {
     this.token = token
-    // Store in localStorage for persistence
     localStorage.setItem('cloud_token', token)
   }
 
-  /**
-   * Get current token
-   */
   getToken(): string | null {
     return this.token || localStorage.getItem('cloud_token')
   }
 
-  /**
-   * Clear authentication
-   */
-  clearAuth() {
+  clearAuth(): void {
     this.token = null
     localStorage.removeItem('cloud_token')
   }
 
-  /**
-   * Generic fetch with auth
-   */
-  private async fetch(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private async request<Result>(endpoint: string, options: RequestInit = {}): Promise<Result> {
     const token = this.getToken()
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...((options.headers as Record<string, string>) || {})
-    }
+    const headers = new Headers(options.headers)
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+    if (token) headers.set('Authorization', `Bearer ${token}`)
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-
-    const response = await fetch(`${this.apiUrl}${endpoint}`, {
-      ...options,
-      headers
-    })
-
+    const response = await fetch(`${this.apiUrl}${endpoint}`, { ...options, headers })
     if (!response.ok) {
-      if (response.status === 401) {
-        this.clearAuth()
-        throw new Error('Unauthorized - please login again')
-      }
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-      throw new Error(error.message || error.error || 'Request failed')
+      if (response.status === 401) this.clearAuth()
+      const payload: unknown = await response.json().catch(() => null)
+      throw new Error(
+        response.status === 401
+          ? 'Unauthorized - please login again'
+          : apiErrorMessage(payload)
+      )
     }
 
-    return await response.json()
+    return await response.json() as Result
   }
 
-  /**
-   * Login
-   */
-  async login(email: string, password: string): Promise<{ token: string; user: any }> {
-    const result = await this.fetch('/api/auth/login', {
+  async login(email: string, password: string): Promise<CloudAuthResult> {
+    const result = await this.request<CloudAuthResult>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     })
@@ -80,11 +90,12 @@ export class CloudAdapter implements IDataAdapter {
     return result
   }
 
-  /**
-   * Register
-   */
-  async register(email: string, password: string, organizationName: string): Promise<{ token: string; user: any }> {
-    const result = await this.fetch('/api/auth/register', {
+  async register(
+    email: string,
+    password: string,
+    organizationName: string
+  ): Promise<CloudAuthResult> {
+    const result = await this.request<CloudAuthResult>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, organizationName })
     })
@@ -92,154 +103,128 @@ export class CloudAdapter implements IDataAdapter {
     return result
   }
 
-  vouchers = {
-    list: async (params: { year?: number; page?: number; limit?: number }) => {
+  vouchers: IDataAdapter['vouchers'] = {
+    list: async (params) => {
       const query = new URLSearchParams()
       if (params.year) query.set('year', String(params.year))
       if (params.page) query.set('page', String(params.page))
       if (params.limit) query.set('limit', String(params.limit))
-      return await this.fetch(`/api/vouchers?${query}`)
+      return this.request(`/api/vouchers?${query}`)
     },
-    recent: async (params: { limit: number }) => {
-      return await this.fetch(`/api/vouchers?limit=${params.limit}`)
-    },
-    create: async (params: any) => {
-      return await this.fetch('/api/vouchers', {
-        method: 'POST',
-        body: JSON.stringify(params)
-      })
-    },
-    update: async (params: any) => {
-      return await this.fetch(`/api/vouchers/${params.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(params)
-      })
-    },
-    delete: async (params: { id: number }) => {
-      return await this.fetch(`/api/vouchers/${params.id}`, {
-        method: 'DELETE'
-      })
-    },
-    reverse: async (params: { originalId: number; reason: string }) => {
-      // Backend needs reverse endpoint implementation
-      return await this.fetch(`/api/vouchers/${params.originalId}/reverse`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: params.reason })
-      })
-    }
+    recent: (params) => this.request(`/api/vouchers?limit=${params.limit}`),
+    create: (params) => this.request('/api/vouchers', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    }),
+    update: (params) => this.request(`/api/vouchers/${params.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params)
+    }),
+    delete: (params) => this.request(`/api/vouchers/${params.id}`, {
+      method: 'DELETE'
+    }),
+    reverse: (params) => this.request(`/api/vouchers/${params.originalId}/reverse`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: params.reason })
+    })
   }
 
-  members = {
-    list: async (params: { search?: string; active?: boolean }) => {
+  members: IDataAdapter['members'] = {
+    list: async (params) => {
       const query = new URLSearchParams()
       if (params.search) query.set('search', params.search)
       if (params.active !== undefined) query.set('active', String(params.active))
-      return await this.fetch(`/api/members?${query}`)
+      return this.request(`/api/members?${query}`)
     },
-    get: async (params: { id: number }) => {
-      return await this.fetch(`/api/members/${params.id}`)
-    },
-    create: async (params: any) => {
-      return await this.fetch('/api/members', {
-        method: 'POST',
-        body: JSON.stringify(params)
-      })
-    },
-    update: async (params: any) => {
-      return await this.fetch(`/api/members/${params.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(params)
-      })
-    },
-    delete: async (params: { id: number }) => {
-      return await this.fetch(`/api/members/${params.id}`, {
-        method: 'DELETE'
-      })
-    },
+    get: (params) => this.request(`/api/members/${params.id}`),
+    create: (params) => this.request('/api/members', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    }),
+    update: (params) => this.request(`/api/members/${params.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params)
+    }),
+    delete: (params) => this.request(`/api/members/${params.id}`, {
+      method: 'DELETE'
+    }),
     payments: {
-      list: async (params: { memberId: number }) => {
-        return await this.fetch(`/api/members/${params.memberId}/payments`)
-      },
-      create: async (params: any) => {
-        return await this.fetch(`/api/members/${params.memberId}/payments`, {
-          method: 'POST',
-          body: JSON.stringify(params)
-        })
-      }
-    }
-  }
-
-  attachments = {
-    list: async (params: { voucherId: number }) => {
-      return await this.fetch(`/api/vouchers/${params.voucherId}/attachments`)
-    },
-    add: async (params: { voucherId: number; files: any[] }) => {
-      // File upload requires FormData
-      const formData = new FormData()
-      params.files.forEach((file) => {
-        formData.append('files', file)
-      })
-      
-      const token = this.getToken()
-      const response = await fetch(`${this.apiUrl}/api/vouchers/${params.voucherId}/attachments`, {
+      list: (params) => this.request(`/api/members/${params.memberId}/payments`),
+      create: (params) => this.request(`/api/members/${params.memberId}/payments`, {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData
+        body: JSON.stringify(params)
       })
-      
-      if (!response.ok) throw new Error('Upload failed')
-      return await response.json()
-    },
-    delete: async (params: { id: number }) => {
-      return await this.fetch(`/api/attachments/${params.id}`, {
-        method: 'DELETE'
-      })
-    },
-    download: async (params: { id: number }) => {
-      const token = this.getToken()
-      const response = await fetch(`${this.apiUrl}/api/attachments/${params.id}/download`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      if (!response.ok) throw new Error('Download failed')
-      return await response.blob()
     }
   }
 
-  // Note: bindings, budgets, tags, settings, reports, yearEnd, backup, db
-  // need backend implementation. For now, throw "not implemented" errors
-  bindings = {
+  attachments: IDataAdapter['attachments'] = {
+    list: (params) => this.request(`/api/vouchers/${params.voucherId}/attachments`),
+    add: async (params) => {
+      const formData = new FormData()
+      for (const file of params.files) {
+        if (file instanceof File) {
+          formData.append('files', file, file.name)
+        } else {
+          formData.append('files', encodedAttachmentBlob(file), file.name)
+        }
+      }
+
+      const headers = new Headers()
+      const token = this.getToken()
+      if (token) headers.set('Authorization', `Bearer ${token}`)
+      const response = await fetch(
+        `${this.apiUrl}/api/vouchers/${params.voucherId}/attachments`,
+        { method: 'POST', headers, body: formData }
+      )
+      if (!response.ok) throw new Error('Upload failed')
+      return await response.json() as AttachmentAddResult
+    },
+    delete: (params) => this.request(`/api/attachments/${params.id}`, {
+      method: 'DELETE'
+    }),
+    download: async (params) => {
+      const headers = new Headers()
+      const token = this.getToken()
+      if (token) headers.set('Authorization', `Bearer ${token}`)
+      const response = await fetch(`${this.apiUrl}/api/attachments/${params.id}/download`, { headers })
+      if (!response.ok) throw new Error('Download failed')
+      return response.blob()
+    }
+  }
+
+  bindings: IDataAdapter['bindings'] = {
     list: async () => { throw new Error('Bindings not yet implemented in cloud mode') },
     create: async () => { throw new Error('Bindings not yet implemented in cloud mode') },
     update: async () => { throw new Error('Bindings not yet implemented in cloud mode') },
     delete: async () => { throw new Error('Bindings not yet implemented in cloud mode') }
   }
 
-  budgets = {
+  budgets: IDataAdapter['budgets'] = {
     list: async () => { throw new Error('Budgets not yet implemented in cloud mode') },
     create: async () => { throw new Error('Budgets not yet implemented in cloud mode') },
     update: async () => { throw new Error('Budgets not yet implemented in cloud mode') },
     delete: async () => { throw new Error('Budgets not yet implemented in cloud mode') }
   }
 
-  tags = {
+  tags: IDataAdapter['tags'] = {
     list: async () => { throw new Error('Tags not yet implemented in cloud mode') },
     create: async () => { throw new Error('Tags not yet implemented in cloud mode') },
     update: async () => { throw new Error('Tags not yet implemented in cloud mode') },
     delete: async () => { throw new Error('Tags not yet implemented in cloud mode') }
   }
 
-  settings = {
+  settings: IDataAdapter['settings'] = {
     get: async () => { throw new Error('Settings not yet implemented in cloud mode') },
     set: async () => { throw new Error('Settings not yet implemented in cloud mode') },
     delete: async () => { throw new Error('Settings not yet implemented in cloud mode') }
   }
 
-  reports = {
+  reports: IDataAdapter['reports'] = {
     years: async () => { throw new Error('Reports not yet implemented in cloud mode') },
     summary: async () => { throw new Error('Reports not yet implemented in cloud mode') }
   }
 
-  yearEnd = {
+  yearEnd: IDataAdapter['yearEnd'] = {
     status: async () => { throw new Error('Year end not yet implemented in cloud mode') },
     preview: async () => { throw new Error('Year end not yet implemented in cloud mode') },
     export: async () => { throw new Error('Year end not yet implemented in cloud mode') },
@@ -247,14 +232,14 @@ export class CloudAdapter implements IDataAdapter {
     reopen: async () => { throw new Error('Year end not yet implemented in cloud mode') }
   }
 
-  backup = {
-    create: async () => { throw new Error('Backup not available in cloud mode (handled by server)') },
+  backup: IDataAdapter['backup'] = {
+    create: async () => { throw new Error('Backup not available in cloud mode') },
     restore: async () => { throw new Error('Restore not available in cloud mode') },
     inspect: async () => { throw new Error('Inspect not available in cloud mode') },
     inspectCurrent: async () => { throw new Error('Inspect not available in cloud mode') }
   }
 
-  db = {
+  db: IDataAdapter['db'] = {
     smartRestore: {
       preview: async () => { throw new Error('Smart restore not available in cloud mode') },
       apply: async () => { throw new Error('Smart restore not available in cloud mode') }

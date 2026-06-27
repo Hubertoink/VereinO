@@ -7,6 +7,27 @@ import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
 import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
+import {
+    getVoucherBudgets,
+    getVoucherEarmarks,
+    setVoucherBudgets,
+    setVoucherEarmarks
+} from './voucherAssignments'
+
+export {
+    addVoucherBudget,
+    addVoucherEarmark,
+    getVoucherBudgetTotal,
+    getVoucherBudgets,
+    getVoucherEarmarkTotal,
+    getVoucherEarmarks,
+    removeVoucherBudget,
+    removeVoucherEarmark,
+    setVoucherBudgets,
+    setVoucherEarmarks,
+    type VoucherBudgetAssignment,
+    type VoucherEarmarkAssignment
+} from './voucherAssignments'
 
 type DB = InstanceType<typeof Database>
 
@@ -628,6 +649,7 @@ export function listVouchersAdvancedPaged(filters: {
     // Extended sort keys
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
@@ -789,7 +811,7 @@ export function batchAssignEarmark(params: {
 
     const res = d.prepare(`UPDATE vouchers SET earmark_id = ?${whereSql}`).run(params.earmarkId, ...args)
     const updated = Number(res.changes || 0)
-    
+
     // Log batch assignment to audit
     if (updated > 0) {
         const earmarkInfo = d.prepare('SELECT code, name FROM earmarks WHERE id=?').get(params.earmarkId) as any
@@ -802,7 +824,7 @@ export function batchAssignEarmark(params: {
             { earmarkId: params.earmarkId, earmarkCode: earmarkInfo?.code, earmarkName: earmarkInfo?.name, count: updated, filters: params }
         )
     }
-    
+
     return { updated }
 }
 
@@ -847,7 +869,7 @@ export function batchAssignBudget(params: {
     if (!b) throw new Error('Budget nicht gefunden')
     const res = d.prepare(`UPDATE vouchers SET budget_id = ?${whereSql}`).run(params.budgetId, ...args)
     const updated = Number(res.changes || 0)
-    
+
     // Log batch assignment to audit
     if (updated > 0) {
         const budgetInfo = d.prepare('SELECT name, year FROM budgets WHERE id=?').get(params.budgetId) as any
@@ -860,7 +882,7 @@ export function batchAssignBudget(params: {
             { budgetId: params.budgetId, budgetName: budgetInfo?.name, budgetYear: budgetInfo?.year, count: updated, filters: params }
         )
     }
-    
+
     return { updated }
 }
 
@@ -918,7 +940,7 @@ export function batchAssignTags(params: {
     }
     // updated = number of vouchers touched (approximate: unique vids with at least one insert)
     const updated = ids.length
-    
+
     // Log batch assignment to audit
     if (updated > 0) {
         writeAudit(
@@ -930,7 +952,7 @@ export function batchAssignTags(params: {
             { tags: params.tags, count: updated, filters: params }
         )
     }
-    
+
     return { updated }
 }
 
@@ -1287,7 +1309,7 @@ export function updateVoucher(input: {
         const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, budget, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(newEarmarkId) as any
         if (!em) throw new Error('Zweckbindung nicht gefunden')
         if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-        
+
         // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
         if (em.enforceTimeRange) {
             if (em.startDate && newDate < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
@@ -1316,7 +1338,7 @@ export function updateVoucher(input: {
     if (newBudgetId != null) {
         const budget = d.prepare('SELECT id, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(newBudgetId) as any
         if (!budget) throw new Error('Budget nicht gefunden')
-        
+
         // Zeitraum-Prüfung nur wenn enforceTimeRange aktiv ist
         if (budget.enforceTimeRange) {
             if (budget.startDate && newDate < budget.startDate) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${budget.startDate})`)
@@ -1767,160 +1789,4 @@ export function deleteVoucherFile(fileId: number) {
     d.prepare('DELETE FROM voucher_files WHERE id=?').run(fileId)
     try { if (row?.filePath && fs.existsSync(row.filePath)) fs.unlinkSync(row.filePath) } catch { /* ignore */ }
     return { id: fileId }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Junction table functions for multiple budgets/earmarks per voucher
-// ─────────────────────────────────────────────────────────────────────────────
-
-export type VoucherBudgetAssignment = { id: number; budgetId: number; amount: number; label?: string; color?: string | null }
-export type VoucherEarmarkAssignment = { id: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
-
-/** Get all budget assignments for a voucher */
-export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
-    const d = getDb()
-    const rows = d.prepare(`
-        SELECT vb.id, vb.budget_id as budgetId, vb.amount,
-               CASE
-                   WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
-                   WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
-                   WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
-                   ELSE printf('%04d-%s', b.year, b.sphere)
-               END as label,
-               b.color
-        FROM voucher_budgets vb
-        JOIN budgets b ON b.id = vb.budget_id
-        WHERE vb.voucher_id = ?
-        ORDER BY vb.id
-    `).all(voucherId) as VoucherBudgetAssignment[]
-    return rows
-}
-
-/** Get all earmark assignments for a voucher */
-export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[] {
-    const d = getDb()
-    const rows = d.prepare(`
-        SELECT ve.id, ve.earmark_id as earmarkId, ve.amount,
-               e.code, e.name, e.color
-        FROM voucher_earmarks ve
-        JOIN earmarks e ON e.id = ve.earmark_id
-        WHERE ve.voucher_id = ?
-        ORDER BY ve.id
-    `).all(voucherId) as VoucherEarmarkAssignment[]
-    return rows
-}
-
-/** Set budget assignments for a voucher (replaces existing) */
-export function setVoucherBudgets(voucherId: number, assignments: Array<{ budgetId: number; amount: number }>) {
-    const d = getDb()
-    const voucher = d.prepare('SELECT date, type FROM vouchers WHERE id=?').get(voucherId) as any
-    if (!voucher?.date) throw new Error('Beleg nicht gefunden')
-
-    // Validate time range for each budget assignment
-    for (const a of assignments) {
-        if (!a?.budgetId) continue
-        const budget = d.prepare('SELECT id, year, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM budgets WHERE id=?').get(a.budgetId) as any
-        if (!budget) throw new Error('Budget nicht gefunden')
-        if (budget.enforceTimeRange) {
-            const effStart = budget.startDate ?? (budget.year ? `${budget.year}-01-01` : null)
-            const effEnd = budget.endDate ?? (budget.year ? `${budget.year}-12-31` : null)
-            if (effStart && voucher.date < effStart) throw new Error(`Buchungsdatum liegt vor Beginn des Budgets (${effStart})`)
-            if (effEnd && voucher.date > effEnd) throw new Error(`Buchungsdatum liegt nach Ende des Budgets (${effEnd})`)
-        }
-    }
-
-    d.prepare('DELETE FROM voucher_budgets WHERE voucher_id = ?').run(voucherId)
-    const stmt = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
-    for (const a of assignments) {
-        if (a.budgetId && (voucher.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) {
-            stmt.run(voucherId, a.budgetId, a.amount)
-        }
-    }
-    // Sync legacy columns for backwards compatibility (use first assignment)
-    if (assignments.length > 0 && assignments[0].budgetId) {
-        d.prepare('UPDATE vouchers SET budget_id = ?, budget_amount = ? WHERE id = ?')
-            .run(assignments[0].budgetId, assignments[0].amount, voucherId)
-    } else {
-        d.prepare('UPDATE vouchers SET budget_id = NULL, budget_amount = NULL WHERE id = ?').run(voucherId)
-    }
-}
-
-/** Set earmark assignments for a voucher (replaces existing) */
-export function setVoucherEarmarks(voucherId: number, assignments: Array<{ earmarkId: number; amount: number }>) {
-    const d = getDb()
-    const voucher = d.prepare('SELECT date, type FROM vouchers WHERE id=?').get(voucherId) as any
-    if (!voucher?.date) throw new Error('Beleg nicht gefunden')
-
-    // Validate time range and activity for each earmark assignment
-    for (const a of assignments) {
-        if (!a?.earmarkId) continue
-        const em = d.prepare('SELECT id, is_active as isActive, start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange FROM earmarks WHERE id=?').get(a.earmarkId) as any
-        if (!em) throw new Error('Zweckbindung nicht gefunden')
-        if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-        if (em.enforceTimeRange) {
-            if (em.startDate && voucher.date < em.startDate) throw new Error(`Buchungsdatum liegt vor Beginn der Zweckbindung (${em.startDate})`)
-            if (em.endDate && voucher.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
-        }
-    }
-
-    d.prepare('DELETE FROM voucher_earmarks WHERE voucher_id = ?').run(voucherId)
-    const stmt = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
-    for (const a of assignments) {
-        if (a.earmarkId && (voucher.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) {
-            stmt.run(voucherId, a.earmarkId, a.amount)
-        }
-    }
-    // Sync legacy columns for backwards compatibility (use first assignment)
-    if (assignments.length > 0 && assignments[0].earmarkId) {
-        d.prepare('UPDATE vouchers SET earmark_id = ?, earmark_amount = ? WHERE id = ?')
-            .run(assignments[0].earmarkId, assignments[0].amount, voucherId)
-    } else {
-        d.prepare('UPDATE vouchers SET earmark_id = NULL, earmark_amount = NULL WHERE id = ?').run(voucherId)
-    }
-}
-
-/** Add a single budget assignment to a voucher */
-export function addVoucherBudget(voucherId: number, budgetId: number, amount: number): { id: number } {
-    const d = getDb()
-    const info = d.prepare('INSERT OR REPLACE INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
-        .run(voucherId, budgetId, amount)
-    return { id: Number(info.lastInsertRowid) }
-}
-
-/** Add a single earmark assignment to a voucher */
-export function addVoucherEarmark(voucherId: number, earmarkId: number, amount: number): { id: number } {
-    const d = getDb()
-    const info = d.prepare('INSERT OR REPLACE INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
-        .run(voucherId, earmarkId, amount)
-    return { id: Number(info.lastInsertRowid) }
-}
-
-/** Remove a budget assignment by id */
-export function removeVoucherBudget(assignmentId: number) {
-    const d = getDb()
-    d.prepare('DELETE FROM voucher_budgets WHERE id = ?').run(assignmentId)
-    return { id: assignmentId }
-}
-
-/** Remove an earmark assignment by id */
-export function removeVoucherEarmark(assignmentId: number) {
-    const d = getDb()
-    d.prepare('DELETE FROM voucher_earmarks WHERE id = ?').run(assignmentId)
-    return { id: assignmentId }
-}
-
-/** Get total budget allocation for a voucher */
-export function getVoucherBudgetTotal(voucherId: number): number {
-    const d = getDb()
-    const row = d.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM voucher_budgets WHERE voucher_id = ?')
-        .get(voucherId) as { total: number }
-    return row.total
-}
-
-/** Get total earmark allocation for a voucher */
-export function getVoucherEarmarkTotal(voucherId: number): number {
-    const d = getDb()
-    const row = d.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM voucher_earmarks WHERE voucher_id = ?')
-        .get(voucherId) as { total: number }
-    return row.total
 }

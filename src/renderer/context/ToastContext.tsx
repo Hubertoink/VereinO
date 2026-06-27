@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
-
-type ToastType = 'info' | 'success' | 'warn' | 'error'
+import React, { useState, useCallback, useRef } from 'react'
+import { ToastContext, type ToastType } from './ToastContextCore'
 
 interface Toast {
   id: number
@@ -9,12 +8,6 @@ interface Toast {
   action?: { label: string; onClick: () => void }
   closing?: boolean
 }
-
-interface ToastContextValue {
-  notify: (type: ToastType, text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null)
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -55,10 +48,4 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       </div>
     </ToastContext.Provider>
   )
-}
-
-export const useToast = () => {
-  const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
 }

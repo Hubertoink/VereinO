@@ -6,7 +6,6 @@ import { app } from 'electron'
 const require = createRequire(import.meta.url)
 let BetterSqlite3: any
 try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     BetterSqlite3 = require('better-sqlite3')
 } catch (e) {
     BetterSqlite3 = null
@@ -36,7 +35,7 @@ type DB = any
 let db: DB | undefined
 
 // Simple app-level JSON config (outside DB) to remember custom DB location
-type AppConfig = { 
+type AppConfig = {
     dbRoot?: string
     lastRunVersion?: string
     activeOrgId?: string
@@ -191,7 +190,7 @@ export function listOrganizations(): Array<{ id: string; name: string; dbRoot: s
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
-    
+
     // If no orgs defined, create a virtual entry for the current DB
     if (orgs.length === 0) {
         const currentRoot = getConfiguredRoot()
@@ -203,7 +202,7 @@ export function listOrganizations(): Array<{ id: string; name: string; dbRoot: s
             isActive: true
         }]
     }
-    
+
     return orgs.map(o => ({ ...o, isActive: o.id === activeId }))
 }
 
@@ -214,12 +213,12 @@ export function getActiveOrganization(): { id: string; name: string; dbRoot: str
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId || 'default'
-    
+
     if (orgs.length === 0) {
         const currentRoot = getConfiguredRoot()
         return { id: 'default', name: 'Standard', dbRoot: currentRoot, createdAt: new Date().toISOString() }
     }
-    
+
     return orgs.find(o => o.id === activeId) || orgs[0] || null
 }
 
@@ -231,10 +230,10 @@ export function createOrganization(name: string): { id: string; name: string; db
     if (!name || typeof name !== 'string' || !name.trim()) {
         throw new Error('Organisationsname ist erforderlich')
     }
-    
+
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
-    
+
     // Migrate existing DB to first org if this is the first creation
     if (orgs.length === 0 && cfg.dbRoot !== undefined) {
         // There's already a DB in use - create a "default" entry for it
@@ -257,28 +256,28 @@ export function createOrganization(name: string): { id: string; name: string; db
         }
         orgs.push(defaultOrg)
     }
-    
+
     const id = generateOrgId()
     const orgsFolder = path.join(app.getPath('userData'), 'organizations')
     if (!fs.existsSync(orgsFolder)) fs.mkdirSync(orgsFolder, { recursive: true })
-    
+
     const orgRoot = path.join(orgsFolder, id)
     fs.mkdirSync(orgRoot, { recursive: true })
-    
+
     // Create files subfolder
     const filesDir = path.join(orgRoot, 'files')
     fs.mkdirSync(filesDir, { recursive: true })
-    
+
     const newOrg = {
         id,
         name: name.trim(),
         dbRoot: orgRoot,
         createdAt: new Date().toISOString()
     }
-    
+
     orgs.push(newOrg)
     writeAppConfig({ ...cfg, organizations: orgs })
-    
+
     return newOrg
 }
 
@@ -289,7 +288,7 @@ export function createOrganization(name: string): { id: string; name: string; db
 export function switchOrganization(orgId: string): { success: boolean; org: { id: string; name: string; dbRoot: string } } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
-    
+
     // Handle default org case
     if (orgId === 'default' && orgs.length === 0) {
         closeDb()
@@ -297,16 +296,16 @@ export function switchOrganization(orgId: string): { success: boolean; org: { id
         writeAppConfig({ ...cfg, activeOrgId: 'default', dbRoot: defaultRoot })
         return { success: true, org: { id: 'default', name: 'Standard', dbRoot: defaultRoot } }
     }
-    
+
     const org = orgs.find(o => o.id === orgId)
     if (!org) throw new Error('Organisation nicht gefunden')
-    
+
     // Close current DB
     closeDb()
-    
+
     // Update config
     writeAppConfig({ ...cfg, activeOrgId: orgId, dbRoot: org.dbRoot })
-    
+
     return { success: true, org }
 }
 
@@ -315,10 +314,10 @@ export function switchOrganization(orgId: string): { success: boolean; org: { id
  */
 export function renameOrganization(orgId: string, newName: string): { success: boolean } {
     if (!newName || !newName.trim()) throw new Error('Name ist erforderlich')
-    
+
     const cfg = readAppConfig()
     let orgs = cfg.organizations || []
-    
+
     // Handle default org when no organizations are formally defined
     if (orgId === 'default' && orgs.length === 0) {
         // Create a formal entry for the default org with the new name
@@ -333,13 +332,13 @@ export function renameOrganization(orgId: string, newName: string): { success: b
         writeAppConfig({ ...cfg, organizations: orgs, activeOrgId: 'default' })
         return { success: true }
     }
-    
+
     const idx = orgs.findIndex(o => o.id === orgId)
     if (idx === -1) throw new Error('Organisation nicht gefunden')
-    
+
     orgs[idx] = { ...orgs[idx], name: newName.trim() }
     writeAppConfig({ ...cfg, organizations: orgs })
-    
+
     return { success: true }
 }
 
@@ -350,13 +349,13 @@ export function renameOrganization(orgId: string, newName: string): { success: b
 export function deleteOrganization(orgId: string, deleteData: boolean = false): { success: boolean } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
-    
+
     if (orgs.length <= 1) throw new Error('Die letzte Organisation kann nicht gelöscht werden')
     const activeOrgId = cfg.activeOrgId ?? (orgs[0]?.id || 'default')
-    
+
     const org = orgs.find(o => o.id === orgId)
     if (!org) throw new Error('Organisation nicht gefunden')
-    
+
     // Remove from list
     const newOrgs = orgs.filter(o => o.id !== orgId)
 
@@ -369,7 +368,7 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
     } else {
         writeAppConfig({ ...cfg, organizations: newOrgs })
     }
-    
+
     // Optionally delete data folder
     if (deleteData && org.dbRoot) {
         try {
@@ -378,7 +377,7 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
             console.warn('Could not delete org folder:', e)
         }
     }
-    
+
     return { success: true }
 }
 
@@ -401,12 +400,12 @@ export function getOrganizationAppearance(orgId: string): { colorTheme: string |
  * Set the appearance settings for a specific organization
  */
 export function setOrganizationAppearance(
-    orgId: string, 
+    orgId: string,
     appearance: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }
 ): { success: boolean } {
     const cfg = readAppConfig()
     let orgs = cfg.organizations || []
-    
+
     // Ensure the default org exists in the array if we're setting its appearance
     if (orgs.length === 0) {
         const currentRoot = getConfiguredRoot()
@@ -421,9 +420,9 @@ export function setOrganizationAppearance(
             glassModals: undefined
         }]
     }
-    
+
     const idx = orgs.findIndex(o => o.id === orgId)
-    
+
     if (idx === -1) {
         // If org doesn't exist yet (e.g., default), create it
         if (orgId === 'default') {
@@ -444,7 +443,7 @@ export function setOrganizationAppearance(
     } else {
         const existingOrg = { ...orgs[idx] } as typeof orgs[number] & { backgroundContrast?: boolean }
         delete existingOrg.backgroundContrast
-        orgs[idx] = { 
+        orgs[idx] = {
             ...existingOrg,
             ...(appearance.colorTheme !== undefined && { colorTheme: appearance.colorTheme }),
             ...(appearance.backgroundImage !== undefined && { backgroundImage: appearance.backgroundImage }),
@@ -452,7 +451,7 @@ export function setOrganizationAppearance(
             ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals })
         }
     }
-    
+
     writeAppConfig({ ...cfg, organizations: orgs, activeOrgId: cfg.activeOrgId || 'default' })
     return { success: true }
 }
@@ -464,12 +463,12 @@ export function getActiveOrganizationAppearance(): { colorTheme: string | null; 
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
-    
+
     // If orgs array is empty, return defaults
     if (orgs.length === 0) {
         return { colorTheme: null, backgroundImage: null, customBackgroundImage: null, glassModals: false }
     }
-    
+
     // Find active org
     const activeOrg = orgs.find(o => o.id === activeId) || orgs[0]
     return {

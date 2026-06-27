@@ -221,8 +221,9 @@ export function GeneralPane({
               <span className="bg-card__name">🏔️ Schneeberge</span>
             </button>
             {/* Custom */}
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               className={`bg-card ${backgroundImage === 'custom' ? 'active' : ''}`}
               onClick={() => {
                 if (customBackgroundImage) {
@@ -230,6 +231,12 @@ export function GeneralPane({
                 } else {
                   openCustomBgPicker()
                 }
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                if (customBackgroundImage) setBackgroundImage('custom')
+                else openCustomBgPicker()
               }}
               aria-pressed={backgroundImage === 'custom'}
             >
@@ -273,7 +280,7 @@ export function GeneralPane({
                 )}
               </div>
               <span className="bg-card__name">🖼️ Eigenes</span>
-            </button>
+            </div>
           </div>
         </div>
 

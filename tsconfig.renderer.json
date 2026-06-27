@@ -12,9 +12,10 @@
         "moduleResolution": "Bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
+        "strict": true,
         "noEmit": true,
         "jsx": "react-jsx",
-        "ignoreDeprecations": "6.0",
+        "ignoreDeprecations": "5.0",
         "baseUrl": ".",
         "paths": {
             "@main/*": [

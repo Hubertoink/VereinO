@@ -1,120 +1,70 @@
-import React from 'react'
-
 interface LoadingStateProps {
   message?: string
   size?: 'small' | 'medium' | 'large'
 }
 
-/**
- * LoadingState - Einheitliche Lade-Anzeige mit App-Icon
- * 
- * Zeigt das VereinO Icon mit Spinner-Animation und optionalem Text
- * Kann in verschiedenen Größen verwendet werden
- */
-export default function LoadingState({ 
-  message = 'Lade…', 
-  size = 'medium' 
-}: LoadingStateProps) {
-  const dimensions = {
-    small: { icon: 32, spinner: 40, fontSize: 13 },
-    medium: { icon: 48, spinner: 56, fontSize: 14 },
-    large: { icon: 64, spinner: 72, fontSize: 16 }
-  }
+const dimensions = {
+  small: { spinner: 18, fontSize: 13, padding: '20px 16px' },
+  medium: { spinner: 26, fontSize: 14, padding: '32px 20px' },
+  large: { spinner: 34, fontSize: 16, padding: '40px 20px' }
+} as const
 
+/**
+ * Ruhige, neutrale Ladeanzeige für kurze Übergänge.
+ */
+export default function LoadingState({
+  message = 'Lade…',
+  size = 'medium'
+}: LoadingStateProps) {
   const dim = dimensions[size]
 
   return (
-    <div 
+    <div
       className="loading-state"
+      role="status"
+      aria-live="polite"
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 16,
-        padding: '40px 20px',
+        gap: 12,
+        padding: dim.padding,
         textAlign: 'center'
       }}
     >
-      {/* Rotating spinner ring with icon in center */}
-      <div 
-        style={{ 
-          position: 'relative',
-          width: dim.spinner,
-          height: dim.spinner
-        }}
+      <svg
+        className="loading-spinner"
+        width={dim.spinner}
+        height={dim.spinner}
+        viewBox="0 0 32 32"
+        aria-hidden="true"
+        style={{ animation: 'spin 0.85s linear infinite' }}
       >
-        {/* Spinner ring */}
-        <svg
-          className="loading-spinner"
-          width={dim.spinner}
-          height={dim.spinner}
-          viewBox="0 0 50 50"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            animation: 'spin 1.2s linear infinite'
-          }}
-        >
-          <circle
-            cx="25"
-            cy="25"
-            r="20"
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeDasharray="31.4 94.2"
-            opacity="0.8"
-          />
-        </svg>
+        <circle
+          cx="16"
+          cy="16"
+          r="13"
+          fill="none"
+          stroke="var(--text-dim)"
+          strokeWidth="3"
+          opacity="0.18"
+        />
+        <circle
+          cx="16"
+          cy="16"
+          r="13"
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray="24 58"
+        />
+      </svg>
 
-        {/* VereinO Icon - simplified euro symbol with circle */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: dim.icon,
-            height: dim.icon,
-            borderRadius: '50%',
-            background: 'var(--accent)',
-            color: '#0B0E14',
-            fontWeight: 700,
-            fontSize: dim.icon * 0.6,
-            fontFamily: 'Georgia, serif'
-          }}
-        >
-          €
-        </div>
-      </div>
-
-      {/* Loading message */}
       <div style={{ color: 'var(--text-dim)', fontSize: dim.fontSize }}>
         {message}
-      </div>
-
-      {/* Publisher info */}
-      <div 
-        style={{ 
-          color: 'var(--text-dim)', 
-          fontSize: dim.fontSize - 2,
-          opacity: 0.6,
-          marginTop: -8
-        }}
-      >
-        VereinO · Nikolas Häfner
       </div>
     </div>
   )
 }
-
-// CSS keyframes sind bereits in styles.css (falls nicht, hier als Kommentar):
-// @keyframes spin {
-//   to { transform: rotate(360deg); }
-// }

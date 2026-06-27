@@ -125,7 +125,6 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                             diff,
                             bySphere: res.bySphere,
                             byPaymentMethod: res.byPaymentMethod,
-                            count: res.totals?.count,
                             transferGross,
                             inBySphere: inRes?.bySphere,
                             inByPaymentMethod: inRes?.byPaymentMethod,

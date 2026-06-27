@@ -7,7 +7,7 @@ const reactHooks = require('eslint-plugin-react-hooks')
 module.exports = [
   // Ignore build artefacts
   {
-    ignores: ['dist', 'dist-electron', 'release', 'node_modules', 'fix-arrows.cjs']
+    ignores: ['dist', 'dist-electron', 'release', 'node_modules', 'fix-arrows.cjs', 'electron/main/**/*.js']
   },
   // TypeScript + React files
   {
@@ -31,6 +31,27 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': ['off', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-require-imports': 'off',
       'react-hooks/exhaustive-deps': 'off'
+    }
+  },
+  {
+    files: ['electron/preload/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error'
+    }
+  },
+  {
+    files: [
+      'src/types/**/*.ts',
+      'src/renderer/services/adapter/**/*.ts',
+      'src/renderer/utils/**/*.ts',
+      'src/renderer/utils/**/*.tsx',
+      'electron/main/services/backupDirectory.ts',
+      'electron/main/services/externalUrl.ts',
+      'electron/main/services/safetyBackup.ts'
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
     }
   },
   // Plain JS files (keep basic recommended checks)

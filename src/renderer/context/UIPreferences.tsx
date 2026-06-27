@@ -1,52 +1,19 @@
-import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { isValidTheme, type ColorTheme } from './uiTheme'
-
-type NavLayout = 'top' | 'left'
-type NavIconColorMode = 'color' | 'mono'
-type DateFormat = 'de' | 'iso'
-type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
-type QuickAddAfterSave = 'close' | 'new'
+import {
+  UIPreferencesContext,
+  type BackgroundImage,
+  type DateFormat,
+  type JournalRowDensity,
+  type JournalRowStyle,
+  type NavIconColorMode,
+  type NavLayout,
+  type QuickAddAfterSave
+} from './UIPreferencesContextCore'
 
 const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom']
 
 // Glassmorphism: transparent modals with blur
-
-interface UIPreferencesContextValue {
-  navLayout: NavLayout
-  setNavLayout: (val: NavLayout) => void
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (val: boolean) => void
-  colorTheme: ColorTheme
-  setColorTheme: (val: ColorTheme) => void
-  navIconColorMode: NavIconColorMode
-  setNavIconColorMode: (val: NavIconColorMode) => void
-  dateFormat: DateFormat
-  setDateFormat: (val: DateFormat) => void
-  journalRowStyle: JournalRowStyle
-  setJournalRowStyle: (val: JournalRowStyle) => void
-  journalRowDensity: JournalRowDensity
-  setJournalRowDensity: (val: JournalRowDensity) => void
-  showBookingDraftTabs: boolean
-  setShowBookingDraftTabs: (val: boolean) => void
-  showBookingEditTabs: boolean
-  setShowBookingEditTabs: (val: boolean) => void
-  bookingsOpenDetached: boolean
-  setBookingsOpenDetached: (val: boolean) => void
-  allowVoucherDeletion: boolean
-  setAllowVoucherDeletion: (val: boolean) => void
-  quickAddAfterSave: QuickAddAfterSave
-  setQuickAddAfterSave: (val: QuickAddAfterSave) => void
-  backgroundImage: BackgroundImage
-  setBackgroundImage: (val: BackgroundImage) => void
-  customBackgroundImage: string | null
-  setCustomBackgroundImage: (val: string | null) => void
-  glassModals: boolean
-  setGlassModals: (val: boolean) => void
-}
-
-const UIPreferencesContext = createContext<UIPreferencesContextValue | null>(null)
 
 function safeLocalStorageSet(key: string, value: string) {
   try {
@@ -105,11 +72,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
   const [customBackgroundImage, setCustomBackgroundImageState] = useState<string | null>(null)
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
-  
+
   // Track current org ID for appearance persistence
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null)
   const appearanceInitializedRef = useRef(false)
-  
+
   useLayoutEffect(() => {
     const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('ui.colorTheme') : null
     applyColorThemeToDocument(storedTheme)
@@ -209,20 +176,20 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       if (typeof off === 'function') off()
     }
   }, [])
-  
+
   // Helper to save appearance to organization
   const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
   }
-  
+
   // Wrapper to save theme to organization when changed
   const setColorTheme = (val: ColorTheme) => {
     setColorThemeState(val)
     saveAppearanceToOrg({ colorTheme: val })
   }
-  
+
   // Wrapper to save background image to organization when changed
   const setBackgroundImage = (val: BackgroundImage) => {
     setBackgroundImageState(val)
@@ -233,7 +200,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     setCustomBackgroundImageState(val)
     saveAppearanceToOrg({ customBackgroundImage: val })
   }
-  
+
   // Wrapper to save glass modals to organization when changed
   const setGlassModals = (val: boolean) => {
     setGlassModalsState(val)
@@ -428,10 +395,4 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       {children}
     </UIPreferencesContext.Provider>
   )
-}
-
-export const useUIPreferences = () => {
-  const ctx = useContext(UIPreferencesContext)
-  if (!ctx) throw new Error('useUIPreferences must be used within UIPreferencesProvider')
-  return ctx
 }

@@ -115,7 +115,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                   const icons: Record<string, string> = { BANK: '🏦', CASH: '💵', PAYPAL: 'P', CARD: '💳', OTHER: '•' }
                   const color = r.color || (r.kind === 'CASH' ? '#42a5f5' : r.kind === 'BANK' ? '#26a69a' : 'var(--accent)')
                   return (
-                    <div key={(r.accountId ?? r.key ?? 'NULL') + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
+                    <div key={`${r.accountId ?? r.key ?? 'NULL'}-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, fontSize: 13 }}>
                         <span>{icons[r.kind ?? 'OTHER'] || '•'}</span>
                         {r.key}

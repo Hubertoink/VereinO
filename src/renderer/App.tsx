@@ -1,19 +1,8 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ICONS } from './utils/icons'
-import ReportsView from './views/Reports/ReportsView'
 import ActivityReportEditorModal from './views/Reports/ActivityReportEditorModal'
-import { SettingsView } from './views/Settings/SettingsView'
-import DashboardView from './views/Dashboard/DashboardView'
-import InvoicesView from './views/InvoicesView'
-import MembersView from './views/Mitglieder/MembersView'
-import ReceiptsView from './views/ReceiptsView'
-import DashboardEarmarksPeek from './views/Dashboard/DashboardEarmarksPeek'
 import JournalView from './views/Journal/JournalView'
 import { getDefaultJournalCols, getDefaultJournalOrder } from './views/Journal/utils/journalColumnVisibility'
-import SubmissionsView from './views/Submissions/SubmissionsView'
-import AdvancesView from './views/Advances/AdvancesView'
-import { createPortal } from 'react-dom'
-import TagModal from './components/modals/TagModal'
 import TagsManagerModal from './components/modals/TagsManagerModal'
 import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
 import UpdateAvailableModal, { type UpdateModalState } from './components/modals/UpdateAvailableModal'
@@ -21,19 +10,15 @@ import MetaFilterModal from './components/modals/MetaFilterModal'
 import TimeFilterModal from './components/modals/TimeFilterModal'
 import ExportOptionsModal from './components/modals/ExportOptionsModal'
 import AttachmentsModal from './components/modals/AttachmentsModal'
-import PaymentsAssignModal from './components/modals/PaymentsAssignModal'
-import BatchEarmarkModal from './components/modals/BatchEarmarkModal'
 import QuickAddModal from './components/modals/QuickAddModal'
 import VoucherInfoModal from './components/modals/VoucherInfoModal'
-import DbMigrateModal from './DbMigrateModal'
-import SmartRestoreModal from './components/modals/SmartRestoreModal'
 import SetupWizardModal from './components/modals/SetupWizardModal'
-import EarmarkUsageCards from './components/tiles/EarmarkUsageCards'
-import BudgetsView from './views/Budgets/BudgetsView'
-import EarmarksView from './views/Earmarks/EarmarksView'
+import LoadingState from './components/LoadingState'
 import { useQuickAdd } from './hooks/useQuickAdd'
-import { ToastProvider, useToast } from './context/ToastContext'
-import { UIPreferencesProvider, useUIPreferences } from './context/UIPreferences'
+import { ToastProvider } from './context/ToastContext'
+import { useToast } from './context/useToast'
+import { UIPreferencesProvider } from './context/UIPreferences'
+import { useUIPreferences } from './context/useUIPreferences'
 import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
@@ -44,7 +29,19 @@ import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
-import { notifyDataChanged } from './utils/refresh'
+
+const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
+const SettingsView = lazy(() =>
+    import('./views/Settings/SettingsView').then((module) => ({ default: module.SettingsView }))
+)
+const DashboardView = lazy(() => import('./views/Dashboard/DashboardView'))
+const InvoicesView = lazy(() => import('./views/InvoicesView'))
+const MembersView = lazy(() => import('./views/Mitglieder/MembersView'))
+const ReceiptsView = lazy(() => import('./views/ReceiptsView'))
+const SubmissionsView = lazy(() => import('./views/Submissions/SubmissionsView'))
+const AdvancesView = lazy(() => import('./views/Advances/AdvancesView'))
+const BudgetsView = lazy(() => import('./views/Budgets/BudgetsView'))
+const EarmarksView = lazy(() => import('./views/Earmarks/EarmarksView'))
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -78,21 +75,6 @@ function friendlyVoucherError(e: any) {
     return 'Fehler: ' + msg
 }
 
-// Simple contrast helper for hex colors (returns black or white text)
-function contrastText(bg?: string | null) {
-    if (!bg) return '#000'
-    const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-    if (!m) return '#000'
-    const hex = m[1]
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
-    // Perceived luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? '#000' : '#fff'
-}
-
-const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
 function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
     const [org, setOrg] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
@@ -389,7 +371,7 @@ function DetachedQuickAddWindow() {
                 const res = await window.api?.vouchers.create?.(payload)
                 if (res) {
                     notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
-                    const warnings = (res as any).warnings as string[] | undefined
+                    const warnings = res?.warnings
                     if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
                     await window.api?.quickAdd?.notifySaved?.({ ...res, draftId: detachedDraftIdRef.current })
                 }
@@ -595,7 +577,7 @@ function DetachedQuickAddWindow() {
                 await window.api?.attachments.add?.({ voucherId: Number(editQa.id), fileName: file.name, dataBase64, mimeType: file.type || undefined })
             }
             notify('success', 'Buchung gespeichert')
-            const warnings = (res as any)?.warnings as string[] | undefined
+            const warnings = res?.warnings
             if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
             await window.api?.quickAdd?.notifySaved?.({ id: Number(editQa.id), draftId: detachedDraftIdRef.current, mode: 'edit' })
             window.api?.window?.confirmClose?.()
@@ -763,8 +745,6 @@ function DetachedQuickAddWindow() {
                         onClose={() => setDetailAttachmentsVoucher(null)}
                         onChanged={async () => {
                             await refreshDetailVoucher()
-                            bumpDataVersion()
-                            notifyDataChanged((window as any).api)
                         }}
                     />
                 )}
@@ -910,7 +890,7 @@ function DetachedQuickAddWindow() {
 function AppInner() {
     // Use toast context
     const { notify } = useToast()
-    
+
     // Use UI preferences context
     const {
         navLayout,
@@ -977,7 +957,7 @@ function AppInner() {
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
-    
+
     // Open invoices count for nav badge
     const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
     useEffect(() => {
@@ -998,7 +978,7 @@ function AppInner() {
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
-    
+
     // Global data refresh key to trigger summary re-fetches across views
     const [refreshKey, setRefreshKey] = useState(0)
     const bumpDataVersion = useCallback(() => setRefreshKey((k) => k + 1), [])
@@ -1019,7 +999,6 @@ function AppInner() {
                 setFlashId(id)
                 window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 3000)
             }
-            bumpDataVersion()
             window.dispatchEvent(new Event('data-changed'))
         })
         return () => { if (typeof off === 'function') off() }
@@ -1185,7 +1164,7 @@ function AppInner() {
     }, [showStartupUpdateNotice])
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
-    
+
     // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
     const [reportsTab, setReportsTab] = useState<string>(() => {
         try { return 'overview' } catch { return 'overview' }
@@ -1374,7 +1353,7 @@ function AppInner() {
         clearDrafts,
         hasOpenDrafts
     } = useQuickAdd(
-        today, 
+        today,
         async (p: any) => {
         try {
             const res = await window.api?.vouchers.create?.(p)
@@ -1864,7 +1843,7 @@ function AppInner() {
     const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
     const chips = useMemo(() => {
         const list: Array<{ key: string; label: string; clear: () => void }> = []
-        if (from || to) list.push({ key: 'range', label: `${from || '?'} ? ${to || '?'}`, clear: () => { setFrom(''); setTo('') } })
+        if (from || to) list.push({ key: 'range', label: `${from || '…'} – ${to || '…'}`, clear: () => { setFrom(''); setTo('') } })
         if (filterSphere) list.push({ key: 'sphere', label: `Sphäre: ${filterSphere}`, clear: () => setFilterSphere(null) })
         if (filterType) list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
         if (filterPaymentAccountId != null) {
@@ -1880,7 +1859,7 @@ function AppInner() {
             list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
         }
         if (filterTag) list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-    if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '?' : ''), clear: () => setQ('') })
+        if (q) list.push({ key: 'q', label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''), clear: () => setQ('') })
         return list
     }, [from, to, filterSphere, filterType, filterPM, filterPaymentAccountId, filterEarmark, filterBudgetId, filterTag, earmarks, budgetNames, q, paymentAccounts])
     // Legacy alias: older render sections still refer to activeChips; keep in sync
@@ -2061,11 +2040,11 @@ function AppInner() {
         const byIdEarmark = new Map(earmarks.map(e => [e.id, e]))
         const makeLabel = (b: any) => {
             if (b.name && String(b.name).trim()) return String(b.name).trim()
-            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} ? ${b.categoryName}`
-            if (b.projectName && String(b.projectName).trim()) return `${b.year} ? ${b.projectName}`
+            if (b.categoryName && String(b.categoryName).trim()) return `${b.year} - ${b.categoryName}`
+            if (b.projectName && String(b.projectName).trim()) return `${b.year} - ${b.projectName}`
             if (b.earmarkId) {
                 const em = byIdEarmark.get(b.earmarkId)
-                if (em) return `${b.year} ? ?? ${em.code}`
+                if (em) return `${b.year} - ${em.code}`
             }
             return String(b.year)
         }
@@ -2091,11 +2070,11 @@ function AppInner() {
                 for (const b of res.rows) {
                     let label = ''
                     if (b.name && String(b.name).trim()) label = String(b.name).trim()
-                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} ? ${b.categoryName}`
-                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} ? ${b.projectName}`
+                    else if (b.categoryName && String(b.categoryName).trim()) label = `${b.year} - ${b.categoryName}`
+                    else if (b.projectName && String(b.projectName).trim()) label = `${b.year} - ${b.projectName}`
                     else if (b.earmarkId) {
                         const em: any = byIdEarmark.get(b.earmarkId)
-                        if (em) label = `${b.year} ? ?? ${em.code}`
+                        if (em) label = `${b.year} - ${em.code}`
                     }
                     if (!label) label = String(b.year)
                     map.set(b.id, label)
@@ -2109,7 +2088,7 @@ function AppInner() {
         // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
         if (activePage === 'Buchungen') { loadBindings(); loadBudgets() }
         if (activePage === 'Reports') { loadBudgets() }
-         
+
     }, [activePage])
 
     // (earmarks loaded above)
@@ -2186,7 +2165,7 @@ function AppInner() {
 
             {/* Main content */}
             <main className={`app-main${activePage === 'Buchungen' ? ' app-main--journal' : ''}`}>
-                    
+                <Suspense fallback={<LoadingState message="Bereich wird geladen…" />}>
                     {activePage === 'Reports' && (
                         <ReportsView
                             from={reportsFrom}
@@ -2454,6 +2433,7 @@ function AppInner() {
                             paymentAccounts={paymentAccounts}
                         />
                     )}
+                </Suspense>
             </main>
 
             <LeaderShortcuts commands={shortcutCommands} />
@@ -2746,710 +2726,6 @@ function AppInner() {
         </div>
     )
 }
-// Meta Filter Modal: groups Sphäre, Zweckbindung, Budget
-// MetaFilterModal extracted to components/modals/MetaFilterModal.tsx
-
-// Time Filter Modal: controls date range and quick year selection
-// TimeFilterModal extracted to components/modals/TimeFilterModal.tsx
-
-// Export Options Modal for Reports
-// ExportOptionsModal extracted to components/modals/ExportOptionsModal.tsx
-
-// AutoBackupPromptModal extracted to components/modals/AutoBackupPromptModal.tsx
-
-
-function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; name: string; memberNo?: string }) {
-    const [open, setOpen] = useState(false)
-    const [status, setStatus] = useState<any>(null)
-    const [history, setHistory] = useState<any[]>([])
-    const [memberData, setMemberData] = useState<any>(null)
-    const [due, setDue] = useState<Array<{ periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
-    // Per-period UI state for linking/search
-    const [selVoucherByPeriod, setSelVoucherByPeriod] = useState<Record<string, number | null>>({})
-    const [manualListByPeriod, setManualListByPeriod] = useState<Record<string, Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>>({})
-    const [searchByPeriod, setSearchByPeriod] = useState<Record<string, string>>({})
-    // Pagination for due rows
-    const [duePage, setDuePage] = useState(1)
-    const pageSize = 5
-    // Preload status so the indicator has color even before opening the modal
-    useEffect(() => {
-        let alive = true
-        async function loadStatusAndBasics() {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId })
-                if (alive) setStatus(s || null)
-            } catch { /* noop */ }
-        }
-        loadStatusAndBasics()
-        // Refresh when data across the app changes (e.g., marking payments paid)
-        const onChanged = () => loadStatusAndBasics()
-        try { window.addEventListener('data-changed', onChanged) } catch {}
-        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
-    }, [memberId])
-
-    useEffect(() => {
-        if (!open) return
-        let alive = true
-        ;(async () => {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId })
-                const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
-                const member = await (window as any).api?.members?.get?.({ id: memberId })
-                if (alive) {
-                    setStatus(s || null)
-                    setMemberData(member || null)
-                    setHistory(h?.rows || [])
-                    // load due list for this member: from initial nextDue to today; only unpaid items
-                    if (s?.interval) {
-                        const today = new Date()
-                        const from = (s?.nextDue || s?.joinDate || new Date(today.getUTCFullYear(), 0, 1).toISOString().slice(0,10))
-                        const to = today.toISOString().slice(0,10)
-                        const res = await (window as any).api?.payments?.listDue?.({ interval: s.interval, from, to, memberId, includePaid: false })
-                        const rows = (res?.rows || []).filter((r: any) => r.memberId === memberId && !r.paid)
-                        setDue(rows.map((r: any) => ({ periodKey: r.periodKey, interval: r.interval, amount: r.amount, paid: r.paid, voucherId: r.voucherId, verified: r.verified })))
-                    } else { setDue([]) }
-                }
-            } catch { }
-        })()
-        return () => { alive = false }
-    }, [open, memberId])
-    // Reset pagination to page 1 when the due list changes
-    useEffect(() => { setDuePage(1) }, [due.length])
-    const color = status?.state === 'OVERDUE' ? 'var(--danger)' : status?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)'
-    return (
-        <>
-            <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
-            </button>
-            {open && (
-                <div className="modal-overlay" onClick={() => setOpen(false)}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1200px)', maxWidth: 1200, display: 'grid', gap: 10 }}>
-                        <header className="flex justify-between items-center">
-                            <h3 className="m-0">Beitragsstatus</h3>
-                            <button className="btn" onClick={()=>setOpen(false)}>?</button>
-                        </header>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-                            <div className="helper font-semibold">{name}{memberNo ? ` (${memberNo})` : ''}</div>
-                            <span className="helper">�</span>
-                            <span className="helper">Eintritt: {status?.joinDate || '?'}</span>
-                            <span className="helper">?</span>
-                            <span className="helper">Status: {status?.state === 'OVERDUE' ? `?berf?llig (${status?.overdue})` : status?.state === 'OK' ? 'OK' : '?'}</span>
-                            <span className="helper">?</span>
-                            <span className="helper">Letzte Zahlung: {status?.lastPeriod ? `${status.lastPeriod} (${status?.lastDate||''})` : '?'}</span>
-                            <span className="helper">?</span>
-                            <span className="helper">Initiale F?lligkeit: {status?.nextDue || '?'}</span>
-                        </div>
-                        <MemberTimeline status={status} history={history} />
-                        {/* Due payments for this member */}
-                        <div className="card p-10">
-                            <strong>F?llige Beitr?ge</strong>
-                            {due.length === 0 ? (
-                                <div className="helper mt-6">Aktuell keine offenen Perioden.</div>
-                            ) : (
-                                <>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                                        <div className="helper">Seite {duePage} von {Math.max(1, Math.ceil(due.length / pageSize))} ? {due.length} offen</div>
-                                        <div className="flex gap-6">
-                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(1)} disabled={duePage <= 1}>?</button>
-                                            <button className={`btn ${duePage <= 1 ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.max(1, p - 1))} disabled={duePage <= 1}>‹</button>
-                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(p => Math.min(Math.max(1, Math.ceil(due.length / pageSize)), p + 1))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>›</button>
-                                            <button className={`btn ${duePage >= Math.max(1, Math.ceil(due.length / pageSize)) ? "opacity-60 cursor-not-allowed" : ""}`} onClick={() => setDuePage(Math.max(1, Math.ceil(due.length / pageSize)))} disabled={duePage >= Math.max(1, Math.ceil(due.length / pageSize))}>?</button>
-                                        </div>
-                                    </div>
-                                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                                        <thead>
-                                            <tr>
-                                                <th align="left">Periode</th>
-                                                <th align="right">Betrag</th>
-                                                <th align="left">Verkn?pfen</th>
-                                                <th align="left">Aktion</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {due.slice((duePage-1)*pageSize, duePage*pageSize).map((r, i) => {
-                                                const selVoucher = selVoucherByPeriod[r.periodKey] ?? null
-                                                const manualList = manualListByPeriod[r.periodKey] || []
-                                                const search = searchByPeriod[r.periodKey] || ''
-                                                return (
-                                                    <tr key={r.periodKey}>
-                                                        <td>{r.periodKey}</td>
-                                                        <td align="right">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(r.amount)}</td>
-                                                        <td>
-                                                            <div className="grid gap-6">
-                                                                <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucherByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value ? Number(e.target.value) : null }))} title="Passende Buchung verkn?pfen">
-                                                                    <option value="">? ohne Verkn?pfung ?</option>
-                                                                    {manualList.map(s => (
-                                                                        <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} ? {s.date} ? {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(s.gross)} ? {(s.description || s.counterparty || '')}</option>
-                                                                    ))}
-                                                                </select>
-                                                                <div className="flex gap-6">
-                                                                    <input className="input" placeholder="Buchung suchen?" value={search} onChange={e => setSearchByPeriod(prev => ({ ...prev, [r.periodKey]: e.target.value }))} title="Suche in Buchungen (Betrag/Datum/Text)" />
-                                                                    <button className="btn" onClick={async () => {
-                                                                        try {
-                                                                            // widen range for earlier periods: from period start - 90 days to today
-                                                                            const { start, end } = periodRangeLocal(r.periodKey)
-                                                                            const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
-                                                                            const todayISO = new Date().toISOString().slice(0,10)
-                                                                            const fromISO = s.toISOString().slice(0,10)
-                                                                            const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 50 })
-                                                                            const list = (res?.rows || []).map((v: any) => ({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }))
-                                                                            setManualListByPeriod(prev => ({ ...prev, [r.periodKey]: list }))
-                                                                        } catch {}
-                                                                    }}>Suchen</button>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <button className="btn primary" onClick={async () => {
-                                                                try {
-                                                                    await (window as any).api?.payments?.markPaid?.({ memberId, periodKey: r.periodKey, interval: r.interval, amount: r.amount, voucherId: selVoucher || null })
-                                                                    // refresh blocks
-                                                                    const s = await (window as any).api?.payments?.status?.({ memberId })
-                                                                    const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
-                                                                    setStatus(s || null)
-                                                                    setHistory(h?.rows || [])
-                                                                    const nextDueList = due.filter((d) => d.periodKey !== r.periodKey)
-                                                                    setDue(nextDueList)
-                                                                    // cleanup per-row state
-                                                                    setSelVoucherByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-                                                                    setManualListByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-                                                                    setSearchByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-                                                                    // adjust page if we are beyond last page after removal
-                                                                    const newTotalPages = Math.max(1, Math.ceil(nextDueList.length / pageSize))
-                                                                    setDuePage(p => Math.min(p, newTotalPages))
-                                                                    window.dispatchEvent(new Event('data-changed'))
-                                                                } catch (e: any) { alert(e?.message || String(e)) }
-                                                            }}>Bezahlen</button>
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                    {/* Duplicate pagination controls removed (footer) to avoid redundancy */}
-                                </>
-                            )}
-                        </div>
-                        <div className="flex justify-start items-center">
-                            <button className="btn primary" onClick={async ()=>{
-                                try {
-                                    const addr = memberData?.address || null
-                                    const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
-                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
-                                } catch (e: any) { alert(e?.message || String(e)) }
-                            }}>Mitglied anschreiben</button>
-                        </div>
-                        <div className="card p-10">
-                            <strong>Historie</strong>
-                            <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                                <thead>
-                                    <tr>
-                                        <th align="left">Periode</th>
-                                        <th align="left">Datum</th>
-                                        <th align="right">Betrag</th>
-                                        <th align="left">Beleg</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.map((r,i)=> (
-                                        <tr key={i}>
-                                            <td>{r.periodKey}</td>
-                                            <td>{r.datePaid}</td>
-                                            <td align="right">{new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(r.amount)}</td>
-                                            <td>{r.voucherNo ? `#${r.voucherNo}` : '?'} {r.description ? `? ${r.description}` : ''}</td>
-                                        </tr>
-                                    ))}
-                                    {history.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="flex justify-end">
-                            <button className="btn" onClick={()=>setOpen(false)}>Schließen</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    )
-}
-
-function MemberTimeline({ status, history }: { status: any; history: Array<{ periodKey: string; datePaid: string; amount: number }> }) {
-    // Build a horizontal timeline starting at join date and going forward to current (+a few future periods)
-    const interval: 'MONTHLY'|'QUARTERLY'|'YEARLY' = status?.interval || 'MONTHLY'
-    const today = new Date()
-    const currentKey = (() => {
-        const y = today.getUTCFullYear(); const m = today.getUTCMonth()+1
-        if (interval==='MONTHLY') return `${y}-${String(m).padStart(2,'0')}`
-        if (interval==='QUARTERLY') return `${y}-Q${Math.floor((m-1)/3)+1}`
-        return String(y)
-    })()
-    // helpers to move between period keys locally
-    function prevKeyLocal(key: string): string {
-        const [yStr, rest] = key.split('-'); const y = Number(yStr)
-        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q>1) return `${y}-Q${q-1}`; return `${y-1}-Q4` }
-        if (rest) { const m = Number(rest); if (m>1) return `${y}-${String(m-1).padStart(2,'0')}`; return `${y-1}-12` }
-        return String(y-1)
-    }
-    function nextKeyLocal(key: string): string {
-        const [yStr, rest] = key.split('-'); const y = Number(yStr)
-        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q<4) return `${y}-Q${q+1}`; return `${y+1}-Q1` }
-        if (rest) { const m = Number(rest); if (m<12) return `${y}-${String(m+1).padStart(2,'0')}`; return `${y+1}-01` }
-        return String(y+1)
-    }
-    function compareKeysLocal(a: string, b: string): number {
-        if (interval === 'MONTHLY') {
-            const [ay, am] = a.split('-'); const [by, bm] = b.split('-')
-            const ai = Number(ay)*12 + Number(am)
-            const bi = Number(by)*12 + Number(bm)
-            return ai === bi ? 0 : (ai < bi ? -1 : 1)
-        }
-        if (interval === 'QUARTERLY') {
-            const [ay, aqS] = a.split('-'); const [by, bqS] = b.split('-')
-            const aq = Number((aqS||'Q1').replace('Q','')); const bq = Number((bqS||'Q1').replace('Q',''))
-            const ai = Number(ay)*4 + aq
-            const bi = Number(by)*4 + bq
-            return ai === bi ? 0 : (ai < bi ? -1 : 1)
-        }
-        const ai = Number(a); const bi = Number(b)
-        return ai === bi ? 0 : (ai < bi ? -1 : 1)
-    }
-    function periodKeyFromDateLocal(d: Date): string { return (interval==='MONTHLY' ? `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}` : interval==='QUARTERLY' ? `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth()/3)+1}` : String(d.getUTCFullYear())) }
-    // Determine start at (current - pastCount) clamped to join date; end at current + futureCount
-    const joinKey = (() => { try { if (!status?.joinDate) return null; const jd = new Date(status.joinDate); if (isNaN(jd.getTime())) return null; return periodKeyFromDateLocal(jd) } catch { return null } })()
-    const pastCount = interval==='QUARTERLY' ? 2 : 5
-    const futureCount = 3
-    const startFromCurrent = (() => { let k = currentKey; for (let i=0;i<pastCount;i++) k = prevKeyLocal(k); return k })()
-    let startKey = startFromCurrent
-    if (joinKey && compareKeysLocal(joinKey, startKey) > 0) startKey = joinKey
-    // Clamp start to the first due, so items before initial due are not shown
-    const firstDueKeyForClamp = (() => {
-        if (status?.nextDue) { try { return periodKeyFromDateLocal(new Date(status.nextDue)) } catch { /* ignore */ } }
-        return null
-    })()
-    if (firstDueKeyForClamp && compareKeysLocal(firstDueKeyForClamp, startKey) > 0) startKey = firstDueKeyForClamp
-    // Determine end at current plus futureCount periods
-    const forward = futureCount
-    let endKey = currentKey
-    for (let i=0;i<forward;i++){ endKey = nextKeyLocal(endKey) }
-    // Build keys from start to end (inclusive)
-    const keys: string[] = []
-    let k = startKey
-    keys.push(k)
-    while (compareKeysLocal(k, endKey) < 0) { k = nextKeyLocal(k); keys.push(k) }
-    // Map paid keys
-    const paidSet = new Set((history||[]).map(h=>h.periodKey))
-    const nextDue = status?.nextDue || null
-    // Determine first due period key (anchor) from nextDue; fall back to current if missing
-    const firstDueKey = (() => {
-        if (nextDue) {
-            try { const d = new Date(nextDue); return periodKeyFromDateLocal(d) } catch { /* ignore */ }
-        }
-        return currentKey
-    })()
-    return (
-        <div className="card p-10">
-            <strong>Zeitstrahl</strong>
-            <div style={{ marginTop: 8, overflowX: 'auto' }}>
-                <svg width={Math.max(640, keys.length*56)} height={58} role="img" aria-label="Zeitstrahl Zahlungen">
-                    {/* baseline */}
-                    <line x1={12} y1={28} x2={Math.max(640, keys.length*56)-12} y2={28} stroke="var(--border)" strokeWidth={2} />
-                    {keys.map((pk, i) => {
-                        const x = 28 + i*56
-                        const isCurrent = pk===currentKey
-                        const isPaid = paidSet.has(pk)
-                        // Overdue if unpaid and period <= current and period >= firstDue
-                        const isBeforeOrEqCurrent = compareKeysLocal(pk, currentKey) <= 0
-                        const isOnOrAfterFirstDue = compareKeysLocal(pk, firstDueKey) >= 0
-                        const isOverdue = !isPaid && isBeforeOrEqCurrent && isOnOrAfterFirstDue
-                        const color = isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : (isCurrent ? 'var(--warning)' : 'var(--muted)'))
-                        return (
-                            <g key={pk}>
-                                <circle cx={x} cy={28} r={6} fill={color}>
-                                    <title>{`${pk} ? ${isPaid ? 'bezahlt' : (isOverdue ? '?berf?llig' : (isCurrent ? 'aktuell' : 'offen'))}`}</title>
-                                </circle>
-                                <text x={x} y={12} textAnchor="middle" fontSize={10} fill="var(--text-dim)">{pk}</text>
-                                <text x={x} y={50} textAnchor="middle" fontSize={10} fill={isPaid ? 'var(--success)' : (isOverdue ? 'var(--danger)' : 'var(--text-dim)')}>
-                                    {isPaid ? 'bezahlt' : (isOverdue ? '?berf?llig' : (isCurrent ? 'jetzt' : ''))}
-                                </text>
-                            </g>
-                        )
-                    })}
-                    {/* next due is shown above, avoid overlaying labels here */}
-                </svg>
-            </div>
-        </div>
-    )
-}
-
-/* INLINE PaymentsAssignModal content removed */
-
-function sanitizePeriodKey(s: string, interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'): string {
-    const t = s.trim().toUpperCase()
-    if (interval === 'MONTHLY') {
-        const m = /^(\d{4})-(\d{1,2})$/.exec(t)
-        if (!m) return t
-        const y = m[1]; const mo = String(Math.max(1, Math.min(12, Number(m[2])))).padStart(2,'0')
-        return `${y}-${mo}`
-    }
-    if (interval === 'QUARTERLY') {
-        const m = /^(\d{4})-Q(\d)$/i.exec(t)
-        if (!m) return t
-        const y = m[1]; const q = Math.max(1, Math.min(4, Number(m[2])))
-        return `${y}-Q${q}`
-    }
-    const y = /^\d{4}$/.exec(t)?.[0]
-    return y || t
-}
-
-function periodRangeLocal(periodKey: string): { start: string; end: string } {
-    // mirror of backend periodRange for the renderer search UX
-    const [yStr, rest] = periodKey.split('-'); const y = Number(yStr)
-    if (/^Q\d$/.test(rest||'')) {
-        const q = Number((rest||'Q1').replace('Q',''))
-        const start = new Date(Date.UTC(y, (q-1)*3, 1))
-        const end = new Date(Date.UTC(y, q*3, 0))
-        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-    }
-    if (rest) {
-        const m = Number(rest)
-        const start = new Date(Date.UTC(y, m-1, 1))
-        const end = new Date(Date.UTC(y, m, 0))
-        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-    }
-    const start = new Date(Date.UTC(y, 0, 1))
-    const end = new Date(Date.UTC(y, 12, 0))
-    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-}
-
-
-// Binding Modal
-// BindingModal extracted to components/modals/BindingModal.tsx
-
-// Budget Modal
-// BudgetModal extracted to components/modals/BudgetModal.tsx
-
-// Invoices View
-// InvoicesView extracted to views/InvoicesView.tsx
-
-function TagsEditor({ label, value, onChange, tagDefs, className }: { label?: string; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string }) {
-    const [input, setInput] = useState('')
-    const [focused, setFocused] = useState(false)
-    const sugg = useMemo(() => {
-        const q = input.trim().toLowerCase()
-        const existing = new Set((value || []).map(v => v.toLowerCase()))
-        return (tagDefs || []).filter(t => !existing.has((t.name || '').toLowerCase()) && (!q || t.name.toLowerCase().includes(q))).slice(0, 8)
-    }, [input, tagDefs, value])
-    function addTag(name: string) {
-        const n = (name || '').trim()
-        if (!n) return
-        if (!(value || []).includes(n)) onChange([...(value || []), n])
-        setInput('')
-    }
-    function removeTag(name: string) {
-        onChange((value || []).filter(v => v !== name))
-    }
-    const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
-    return (
-        <div className={`field ${className || ''}`.trim()} style={{ gridColumn: '1 / span 2' }}>
-            {label && <label>{label}</label>}
-            <div className="input" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', minHeight: 34 }}>
-                {(value || []).map((t) => {
-                    const bg = colorFor(t) || undefined
-                    const fg = contrastText(bg)
-                    return (
-                        <span key={t} className="chip" style={{ background: bg, color: bg ? fg : undefined }}>
-                            {t}
-                            <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">?</button>
-                        </span>
-                    )
-                })}
-                {/* Quick add via dropdown */}
-                <select
-                    className="input"
-                    value=""
-                    onChange={(e) => { const name = e.target.value; if (name) addTag(name) }}
-                    style={{ minWidth: 140 }}
-                    title="Tag aus Liste hinzuf?gen"
-                >
-                    <option value="">+ Tag ausw?hlen?</option>
-                    {(tagDefs || []).filter(t => !(value || []).some(v => v.toLowerCase() === (t.name || '').toLowerCase())).map(t => (
-                        <option key={t.id} value={t.name}>{t.name}</option>
-                    ))}
-                </select>
-                <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(input) }
-                        if (e.key === 'Backspace' && !input && (value || []).length) { removeTag((value || [])[value.length - 1]) }
-                    }}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
-                    placeholder={(value || []).length ? '' : 'Tag hinzuf?gen?'}
-                    style={{ flex: 1, minWidth: 120, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)' }}
-                />
-            </div>
-            {focused && sugg.length > 0 && (
-                <div className="card" style={{ padding: 6, marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {sugg.map(s => {
-                        const bg = s.color || undefined
-                        const fg = contrastText(bg)
-                        return <button key={s.id} type="button" className="btn" style={{ background: bg, color: bg ? fg : undefined }} onClick={() => addTag(s.name)}>{s.name}</button>
-                    })}
-                </div>
-            )}
-        </div>
-    )
-}
-
-// Lightweight totals bar for current filters
-import FilterTotalsComponent from './views/Journal/components/FilterTotals'
-const FilterTotals = FilterTotalsComponent
-
-// EarmarkUsageCards moved to components/tiles/EarmarkUsageCards
-
-// Reports-* component implementations removed (moved to dedicated files under components/reports and views/Dashboard/charts)
-
-// JournalTable with in-place header drag-and-drop reordering
-function JournalTable({ rows, order, cols, onReorder, earmarks, tagDefs, eurFmt, fmtDate, onEdit, onDelete, onToggleSort, sortDir, sortBy, onTagClick, onEarmarkClick, onBudgetClick, highlightId, lockedUntil }: {
-    rows: Array<{ id: number; voucherNo: string; date: string; type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; description?: string | null; paymentMethod?: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; netAmount: number; vatRate: number; vatAmount: number; grossAmount: number; fileCount?: number; earmarkId?: number | null; earmarkCode?: string | null; budgetId?: number | null; budgetLabel?: string | null; tags?: string[] }>
-    order: string[]
-    cols: Record<string, boolean>
-    onReorder: (o: string[]) => void
-    earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
-    tagDefs: Array<{ id: number; name: string; color?: string | null }>
-    eurFmt: Intl.NumberFormat
-    fmtDate: (s?: string) => string
-    onEdit: (r: { id: number; date: string; description: string | null; paymentMethod: 'BAR' | 'BANK' | null; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; tags?: string[]; netAmount?: number; grossAmount?: number; vatRate?: number }) => void
-    onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
-    onToggleSort: (col: 'date' | 'net' | 'gross') => void
-    sortDir: 'ASC' | 'DESC'
-    sortBy: 'date' | 'net' | 'gross'
-    onTagClick?: (name: string) => void
-    onEarmarkClick?: (id: number) => void
-    onBudgetClick?: (id: number) => void
-    highlightId?: number | null
-    lockedUntil?: string | null
-}) {
-    const dragIdx = useRef<number | null>(null)
-    const visibleOrder = order.filter(k => cols[k])
-    function onHeaderDragStart(e: React.DragEvent<HTMLTableCellElement>, idx: number) {
-        dragIdx.current = idx
-        e.dataTransfer.effectAllowed = 'move'
-    }
-    function onHeaderDragOver(e: React.DragEvent<HTMLTableCellElement>) {
-        e.preventDefault(); e.dataTransfer.dropEffect = 'move'
-    }
-    function onHeaderDrop(e: React.DragEvent<HTMLTableCellElement>, idx: number) {
-        e.preventDefault()
-        const from = dragIdx.current
-        dragIdx.current = null
-        if (from == null || from === idx) return
-        // Reorder within full order, not just visible
-        const keyFrom = visibleOrder[from]
-        const keyTo = visibleOrder[idx]
-        const next = order.slice()
-        const a = next.indexOf(keyFrom)
-        const b = next.indexOf(keyTo)
-        if (a === -1 || b === -1) return
-        const [moved] = next.splice(a, 1)
-        next.splice(b, 0, moved)
-        onReorder(next)
-    }
-    const renderSortIcon = (col: 'date' | 'net' | 'gross') => {
-        const active = sortBy === col
-        const sym = active ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH
-        const color = active ? 'var(--warning)' : 'var(--text-dim)'
-        return <span className={`sort-icon ${active ? 'active' : 'inactive'}`} aria-hidden="true" style={{ color }}>{sym}</span>
-    }
-    const thFor = (k: string) => (
-        k === 'actions' ? <th key={k} align="center" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Aktionen</th>
-            : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} className="cursor-pointer">Datum {renderSortIcon('date')}</th>
-                : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
-                    : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Sphäre</th>
-                            : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
-                                : k === 'earmark' ? <th key={k} align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
-                                    : k === 'budget' ? <th key={k} align="center" title="Budget" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
-                                        : k === 'paymentMethod' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Zahlweg</th>
-                                            : k === 'attachments' ? <th key={k} align="center" title="Anhänge" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>??</th>
-                                                : k === 'net' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('net')} className="cursor-pointer">Netto {renderSortIcon('net')}</th>
-                                                    : k === 'vat' ? <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>MwSt</th>
-                                                        : <th key={k} align="right" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('gross')} className="cursor-pointer">Brutto {renderSortIcon('gross')}</th>
-    )
-    const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
-    const isLocked = (d: string) => {
-        if (!lockedUntil) return false
-        return String(d) <= String(lockedUntil)
-    }
-    const tdFor = (k: string, r: any) => (
-        k === 'actions' ? (
-            <td key={k} align="center" className="text-nowrap">
-                {isLocked(r.date) ? (
-                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">??</span>
-                ) : (
-                    <button className="btn" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, budgetId: r.budgetId ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate })}>?</button>
-                )}
-            </td>
-        ) : k === 'date' ? (
-            <td key={k}>{fmtDate(r.date)}</td>
-        ) : k === 'voucherNo' ? (
-            <td key={k}>{r.voucherNo}</td>
-        ) : k === 'type' ? (
-            <td key={k}><span className={`badge ${r.type.toLowerCase()}`}>{r.type}</span></td>
-        ) : k === 'sphere' ? (
-            <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
-        ) : k === 'description' ? (
-            <td key={k}>
-                <div className="flex items-center gap-6 flex-wrap">
-                    <span style={{ minWidth: 160, flex: '1 1 auto' }}>{r.description || ''}</span>
-                    {(r.tags || []).map((t: string) => {
-                        const bg = colorFor(t) || undefined
-                        const fg = contrastText(bg)
-                        return (
-                            <button
-                                key={t}
-                                className="chip"
-                                style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
-                                title={`Nach Tag "${t}" filtern`}
-                                onClick={() => onTagClick?.(t)}
-                            >
-                                {t}
-                            </button>
-                        )
-                    })}
-                </div>
-            </td>
-        ) : k === 'earmark' ? (
-            <td key={k} align="center">{r.earmarkCode ? (() => {
-                const em = earmarks.find(e => e.code === r.earmarkCode)
-                const bg = em?.color
-                const fg = contrastText(bg)
-                const id = r.earmarkId as number | null | undefined
-                return (
-                    <button
-                        className="badge"
-                        title={`Nach Zweckbindung ${r.earmarkCode} filtern`}
-                        style={{ background: bg || undefined, color: bg ? fg : undefined, cursor: 'pointer' }}
-                        onClick={() => { if (id != null) onEarmarkClick?.(id) }}
-                    >
-                        {r.earmarkCode}
-                    </button>
-                )
-            })() : ''}</td>
-        ) : k === 'paymentMethod' ? (
-            <td key={k}>
-                {r.type === 'TRANSFER' ? (
-                    (() => {
-                        const from = r.transferFrom
-                        const to = r.transferTo
-                        const title = from && to ? `${from === 'BAR' ? 'Bar' : 'Bank'} → ${to === 'BAR' ? 'Bar' : 'Bank'}` : 'Transfer'
-                        return (
-                            <span className={`badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} title={title} aria-label={title}>
-                                <span className="pm-icon">
-                                    {from === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
-                                </span>
-                                <span className="transfer-arrow">→</span>
-                                <span className="pm-icon">
-                                    {to === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}
-                                </span>
-                            </span>
-                        )
-                    })()
-                ) : (
-                    r.paymentMethod ? (
-                        <span className={`badge pm-${(r.paymentMethod || '').toLowerCase()}`} title={r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'} aria-label={`Zahlweg: ${r.paymentMethod === 'BAR' ? 'Bar' : 'Bank'}`}>
-                            {r.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
-                        </span>
-                    ) : ''
-                )}
-            </td>
-        ) : k === 'budget' ? (
-            <td key={k} align="center">{r.budgetLabel ? (
-                (() => {
-                    const bg = (r as any).budgetColor || undefined; const fg = contrastText(bg);
-                    const id = r.budgetId as number | null | undefined
-                    return (
-                        <button
-                            className="badge"
-                            title={`Nach Budget ${r.budgetLabel} filtern`}
-                            style={{ background: bg, color: bg ? fg : undefined, cursor: 'pointer' }}
-                            onClick={() => { if (id != null) onBudgetClick?.(id) }}
-                        >
-                            {r.budgetLabel}
-                        </button>
-                    )
-                })()
-            ) : ''}</td>
-        ) : k === 'attachments' ? (
-            <td key={k} align="center">{typeof r.fileCount === 'number' && r.fileCount > 0 ? (<span className="badge" title={`${r.fileCount} Anhang/Anhänge`}>?? {r.fileCount}</span>) : ''}</td>
-        ) : k === 'net' ? (
-            <td key={k} align="right">{eurFmt.format(r.netAmount)}</td>
-        ) : k === 'vat' ? (
-            <td key={k} align="right">{eurFmt.format(r.vatAmount)}</td>
-        ) : (
-            <td key={k} align="right" className={r.type === 'IN' ? 'gross-in' : r.type === 'OUT' ? 'gross-out' : 'gross-transfer'}>{eurFmt.format(r.grossAmount)}</td>
-        )
-    )
-    return (
-        <div className="journal-table-scroll-wrapper">
-        <table className="journal-table" cellPadding={6}>
-            <thead>
-                <tr>
-                    {visibleOrder.map((k) => thFor(k))}
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((r) => (
-                    <tr key={r.id} className={highlightId === r.id ? 'row-flash' : undefined}>
-                        {visibleOrder.map((k) => tdFor(k, r))}
-                    </tr>
-                ))}
-                {rows.length === 0 && (
-                    <tr>
-                        <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
-        </div>
-    )
-}
-
-// Small inline icons used in table badges
-function IconBank({ size = 14 }: { size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 2L1 8h18L10 2z" fill="#3b82f6" />
-            <rect x="3" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
-            <rect x="7" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
-            <rect x="11" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
-            <rect x="15" y="9" width="2" height="6" rx="0.5" fill="#3b82f6" />
-            <rect x="1" y="15.5" width="18" height="2.5" rx="0.5" fill="#3b82f6" />
-        </svg>
-    )
-}
-
-function IconCash({ size = 14 }: { size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="1" y="4" width="18" height="12" rx="2" fill="#22c55e" />
-            <rect x="3" y="6" width="14" height="8" rx="1" fill="none" stroke="#16a34a" strokeWidth="0.8" strokeDasharray="2 1" opacity="0.5" />
-            <text x="10" y="13" textAnchor="middle" fontSize="8" fontWeight="700" fill="#fff" fontFamily="sans-serif">€</text>
-        </svg>
-    )
-}
-
-function IconArrow({ size = 14 }: { size?: number }) {
-    const s = size
-    return (
-        <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14" />
-            <path d="M13 8l6 4-6 4" />
-        </svg>
-    )
-}
-
 // Wrapper with context providers
 export default function App() {
     const isDetachedQuickAdd = new URLSearchParams(window.location.search).get('window') === 'quick-add'

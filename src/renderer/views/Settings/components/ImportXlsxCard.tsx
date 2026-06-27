@@ -440,7 +440,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <tbody>
                 {visibleRows.map((row) => (
                   <tr key={row.id} className={`import-row-${row.status}`}>
-                    <td><input type="checkbox" checked={selected.has(row.id)} onChange={(e) => setSelected((prev) => { const next = new Set(prev); e.target.checked ? next.add(row.id) : next.delete(row.id); return next })} /></td>
+                    <td><input type="checkbox" checked={selected.has(row.id)} onChange={(e) => setSelected((prev) => { const next = new Set(prev); if (e.target.checked) next.add(row.id); else next.delete(row.id); return next })} /></td>
                     <td>{row.sourceRow}</td>
                     <td>{row.status}</td>
                     <td><input value={row.values.date ?? ''} onChange={(e) => updateRow(row.id, 'date', e.target.value)} /></td>

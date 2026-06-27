@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useToast } from '../context/ToastContext'
+import { useToast } from '../context/useToast'
 import TagsEditor from '../components/TagsEditor'
 import ModalHeader from '../components/ModalHeader'
 import LoadingState from '../components/LoadingState'
@@ -163,7 +163,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [detail, setDetail] = useState<null | { id: number; date: string; dueDate?: string | null; invoiceNo?: string | null; party: string; description?: string | null; grossAmount: number; paymentMethod?: string | null; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; earmarkId?: number | null; budgetId?: number | null; autoPost?: number; voucherType: 'IN' | 'OUT'; postedVoucherId?: number | null; postedVoucherNo?: string | null; payments: Array<{ id: number; date: string; amount: number }>; files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>; tags: string[]; paidSum: number; status: 'OPEN' | 'PARTIAL' | 'PAID' }>(null)
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false)
   async function openDetails(id: number) { setDetailId(id) }
-  
+
   useEffect(() => {
     let cancelled = false
     async function fetchDetail() {
@@ -199,16 +199,16 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     if (!isFinite(amt) || Math.abs(amt) < 0.01) { alert('Bitte einen Betrag angeben'); return }
     const remainingCap = typeof showPayModal.remaining === 'number' ? Math.max(0, Math.round(showPayModal.remaining * 100) / 100) : undefined
     if (remainingCap != null && amt - remainingCap > 1e-6) { alert(`Der Betrag übersteigt den offenen Rest (${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(remainingCap)}).`); return }
-    
+
     // Check if invoice has paymentMethod and autoPost - if no paymentMethod and invoice will be auto-posted, ask user
     const invoiceRow = rows.find(r => r.id === showPayModal.id)
     if (!invoiceRow) { alert('Verbindlichkeit nicht gefunden'); return }
-    
+
     const hasAutoPost = !!(invoiceRow.autoPost ?? 0)
     const hasPaymentMethod = !!(invoiceRow.paymentMethod && invoiceRow.paymentMethod !== '')
     const paidAfter = (invoiceRow.paidSum || 0) + amt
     const willBePaid = paidAfter >= (invoiceRow.grossAmount || 0) - 0.01
-    
+
     // If payment method is missing and invoice has auto-post enabled and will be fully paid, ask user
     // For manual posting, the check happens when clicking "Als Buchung hinzufügen"
     if (!hasPaymentMethod && hasAutoPost && willBePaid && !invoiceRow.postedVoucherId) {
@@ -222,7 +222,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       })
       return
     }
-    
+
     setBusyAction(true)
     try {
       const res = await window.api?.invoices?.addPayment?.({ invoiceId: showPayModal.id, date: payDate, amount: amt })
@@ -250,7 +250,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       // Update invoice payment method first
       const invoiceRow = rows.find(r => r.id === showPaymentMethodModal.invoiceId)
       if (!invoiceRow) throw new Error('Verbindlichkeit nicht gefunden')
-      
+
       await window.api?.invoices?.update?.({
         id: showPaymentMethodModal.invoiceId,
         date: invoiceRow.date,
@@ -267,13 +267,13 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         voucherType: invoiceRow.voucherType,
         tags: invoiceRow.tags || []
       })
-      
+
       // Update rows state with new payment method
-      setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId 
-        ? { ...r, paymentMethod: method } 
+      setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId
+        ? { ...r, paymentMethod: method }
         : r
       ))
-      
+
       // For auto-posting: add payment now (which will trigger auto-posting)
       // For manual posting: just open the postToVoucher modal
       if (showPaymentMethodModal.willCreateVoucher) {
@@ -283,18 +283,18 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           date: showPaymentMethodModal.paymentDate,
           amount: showPaymentMethodModal.paymentAmount
         })
-        
+
         if (res) {
-          setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId 
-            ? { ...r, paidSum: res.paidSum ?? (r.paidSum + showPaymentMethodModal.paymentAmount), status: res.status } 
+          setRows(prev => prev.map(r => r.id === showPaymentMethodModal.invoiceId
+            ? { ...r, paidSum: res.paidSum ?? (r.paidSum + showPaymentMethodModal.paymentAmount), status: res.status }
             : r
           ))
-          
+
           if (res.status === 'PAID') {
             const invoiceLabel = showPaymentMethodModal.invoiceNo || `#${showPaymentMethodModal.invoiceId}`
             notify('success', `Verbindlichkeit ${invoiceLabel} wurde automatisch als Buchung gebucht`)
           }
-          
+
           setShowPaymentMethodModal(null)
           setShowPayModal(null)
         }
@@ -303,13 +303,13 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         const invoiceNo = showPaymentMethodModal.invoiceNo
         const party = showPaymentMethodModal.party
         setShowPaymentMethodModal(null)
-        setPostToVoucherModal({ 
-          id: showPaymentMethodModal.invoiceId, 
-          party: party, 
-          invoiceNo: invoiceNo 
+        setPostToVoucherModal({
+          id: showPaymentMethodModal.invoiceId,
+          party: party || '',
+          invoiceNo: invoiceNo
         })
       }
-      
+
       try { window.dispatchEvent(new Event('data-changed')) } catch { }
       await loadSummary()
     } catch (e: any) {
@@ -406,7 +406,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       if (e.key === 'Escape') { setForm(null); e.preventDefault(); return }
       // Ctrl+S to save (no Enter save)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { saveForm(); e.preventDefault(); return }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (form.mode === 'create') fileInputRef.current?.click(); else editInvoiceFileInputRef.current?.click(); e.preventDefault(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (form?.mode === 'create') fileInputRef.current?.click(); else editInvoiceFileInputRef.current?.click(); e.preventDefault(); return }
     }
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
   }, [form, saveForm])
@@ -655,10 +655,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         return (
           <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
             <div className="modal payment-modal-grid" onClick={e => e.stopPropagation()}>
-              <ModalHeader 
-                title="Zahlung hinzufügen" 
+              <ModalHeader
+                title="Zahlung hinzufügen"
                 subtitle={`${showPayModal.invoiceNo ? `${typeName} ${showPayModal.invoiceNo}` : `${typeName} #${showPayModal.id}`} · ${showPayModal.party || ''}`}
-                onClose={() => setShowPayModal(null)} 
+                onClose={() => setShowPayModal(null)}
               />
             {typeof showPayModal.remaining === 'number' && (<div className="helper">Offener Rest: <strong>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.max(0, Math.round(showPayModal.remaining * 100) / 100))}</strong></div>)}
             <div className="row">
@@ -688,25 +688,25 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       {showPaymentMethodModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPaymentMethodModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500, textAlign: 'center' }}>
-            <ModalHeader 
-              title="Zahlweg festlegen" 
+            <ModalHeader
+              title="Zahlweg festlegen"
               subtitle={`Verbindlichkeit #${showPaymentMethodModal.invoiceId}`}
-              onClose={() => setShowPaymentMethodModal(null)} 
+              onClose={() => setShowPaymentMethodModal(null)}
             />
             <div className="helper" style={{ marginBottom: 24 }}>
               Die Verbindlichkeit wird automatisch verbucht. Bitte wählen Sie den Zahlweg:
             </div>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
-              <button 
-                className="btn primary" 
+              <button
+                className="btn primary"
                 style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }}
                 onClick={() => confirmPaymentMethod('BAR')}
                 disabled={busyAction}
               >
                 💵 Bar
               </button>
-              <button 
-                className="btn primary" 
+              <button
+                className="btn primary"
                 style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }}
                 onClick={() => confirmPaymentMethod('BANK')}
                 disabled={busyAction}
@@ -851,8 +851,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                 </div>
 
                 {/* Anhänge Card - Kompakt */}
-                <div 
-                  className="card" 
+                <div
+                  className="card"
                   style={{ padding: 10 }}
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                   onDrop={async (e) => {
@@ -924,7 +924,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                       )
                     }
                     return (
-                      <div 
+                      <div
                         className="invoices-dropzone-compact"
                         onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}
                       >
@@ -1097,10 +1097,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
-            <ModalHeader 
-              title="Verbindlichkeit löschen" 
+            <ModalHeader
+              title="Verbindlichkeit löschen"
               subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`}
-              onClose={() => setDeleteConfirm(null)} 
+              onClose={() => setDeleteConfirm(null)}
             />
             <div>Diese Verbindlichkeit wirklich löschen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -1116,7 +1116,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
             <ModalHeader
               title="Als Buchung hinzufügen"
               subtitle={`${postToVoucherModal.invoiceNo ? `Verbindlichkeit ${postToVoucherModal.invoiceNo}` : `Verbindlichkeit #${postToVoucherModal.id}`}`}
-              onClose={() => setPostToVoucherModal(null)} 
+              onClose={() => setPostToVoucherModal(null)}
             />
             <div style={{ marginBottom: 16 }}>
               <strong>{postToVoucherModal.party}</strong>
@@ -1132,9 +1132,9 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                   const result = await (window as any).api?.invoices?.postToVoucher?.({ invoiceId: postToVoucherModal.id })
                   if (result?.voucherId) {
                     // Update the row in state immediately
-                    setRows(prev => prev.map(r => 
-                      r.id === postToVoucherModal.id 
-                        ? { ...r, postedVoucherId: result.voucherId } 
+                    setRows(prev => prev.map(r =>
+                      r.id === postToVoucherModal.id
+                        ? { ...r, postedVoucherId: result.voucherId }
                         : r
                     ))
                   }

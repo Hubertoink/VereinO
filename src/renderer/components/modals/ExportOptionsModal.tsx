@@ -26,6 +26,7 @@ type FiscalReportExportOptions = {
   includeActivityReport?: boolean
   includeInactiveBindings?: boolean
   includeArchivedBudgets?: boolean
+  includeInternalVouchers?: boolean
   selectedBindingIds?: number[]
   selectedBudgetIds?: number[]
 }
@@ -39,6 +40,7 @@ type TreasurerReportExportOptions = {
   includeTagSummary?: boolean
   includeVoucherList?: boolean
   includeTags?: boolean
+  includeInternalVouchers?: boolean
   voucherListFrom?: string
   voucherListTo?: string
   voucherListSort?: 'ASC' | 'DESC'
@@ -110,7 +112,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
     else set.add(k)
     setFields(Array.from(set) as any)
   }
-  
+
   const applyJournalColumns = () => {
     try {
       const stored = localStorage.getItem('journalCols')
@@ -326,10 +328,10 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   const getFieldLabel = (key: string) => all.find(f => f.key === key)?.label || key
 
   if (!open) return null
-  
+
   const currentYear = new Date().getFullYear()
   const years = availableYears.length > 0 ? availableYears : [currentYear]
-  
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: '95vw' }}>
@@ -386,24 +388,24 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             )}
           </div>
-          <button 
-            className="btn ghost" 
-            onClick={onClose} 
+          <button
+            className="btn ghost"
+            onClick={onClose}
             aria-label="Schließen"
             style={{ width: 32, height: 32, padding: 0, display: 'grid', placeItems: 'center', fontSize: 18 }}
           >
             ×
           </button>
         </header>
-        
+
         {/* Fiscal Year Selection (only for fiscal export) */}
         {exportType === 'fiscal' && setFiscalYear && (
           <>
             <div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Geschäftsjahr</label>
-              <select 
-                className="input" 
-                value={fiscalYear || currentYear} 
+              <select
+                className="input"
+                value={fiscalYear || currentYear}
                 onChange={(e) => setFiscalYear(Number(e.target.value))}
               >
                 {years.map(y => (
@@ -414,16 +416,16 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 Zeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
               </div>
             </div>
-            
+
             <div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Zusätzliche Optionen</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={includeBindings ?? false} 
-                    onChange={(e) => setIncludeBindings?.(e.target.checked)} 
-                    style={{ marginRight: 6 }} 
+                  <input
+                    type="checkbox"
+                    checked={includeBindings ?? false}
+                    onChange={(e) => setIncludeBindings?.(e.target.checked)}
+                    style={{ marginRight: 6 }}
                   />
                   Zweckbindungen einbeziehen
                 </label>
@@ -471,11 +473,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </div>
                 )}
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={includeBudgets ?? false} 
-                    onChange={(e) => setIncludeBudgets?.(e.target.checked)} 
-                    style={{ marginRight: 6 }} 
+                  <input
+                    type="checkbox"
+                    checked={includeBudgets ?? false}
+                    onChange={(e) => setIncludeBudgets?.(e.target.checked)}
+                    style={{ marginRight: 6 }}
                   />
                   Budgets einbeziehen
                 </label>
@@ -523,11 +525,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </div>
                 )}
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={includeVoucherList ?? false} 
-                    onChange={(e) => setIncludeVoucherList?.(e.target.checked)} 
-                    style={{ marginRight: 6 }} 
+                  <input
+                    type="checkbox"
+                    checked={includeVoucherList ?? false}
+                    onChange={(e) => setIncludeVoucherList?.(e.target.checked)}
+                    style={{ marginRight: 6 }}
                   />
                   Detaillierte Belegübersicht anhängen
                 </label>
@@ -565,9 +567,9 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           <>
             <div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Geschäftsjahr</label>
-              <select 
-                className="input" 
-                value={fiscalYear || currentYear} 
+              <select
+                className="input"
+                value={fiscalYear || currentYear}
                 onChange={(e) => setFiscalYear(Number(e.target.value))}
               >
                 {years.map(y => (
@@ -655,7 +657,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             )}
           </>
         )}
-        
+
         {/* Standard export options (only for standard export) */}
         {exportType === 'standard' && (
           <>
@@ -694,7 +696,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             </div>
           </>
         )}
-        
+
         <div className="row">
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Organisationsname (optional)</label>
@@ -713,9 +715,9 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </span>
               </label>
             </div>
-            <div style={{ 
-              border: '1px solid var(--border)', 
-              borderRadius: 8, 
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
               overflow: 'hidden',
               background: 'var(--surface)'
             }}>
@@ -806,8 +808,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </div>
               )}
               {previewTotal > PREVIEW_LIMIT && !previewLoading && (
-                <div style={{ 
-                  padding: '8px 12px', 
+                <div style={{
+                  padding: '8px 12px',
                   background: 'color-mix(in oklab, var(--accent) 8%, transparent)',
                   borderTop: '1px solid var(--border)',
                   fontSize: 11,
@@ -820,11 +822,11 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             </div>
           </div>
         )}
-        
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           {exportType === 'fiscal' ? (
-            <button 
-              className="btn" 
+            <button
+              className="btn"
               onClick={() => onExport('PDF_FISCAL', {
                 includeBindings,
                 includeVoucherList,
@@ -841,8 +843,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               📄 PDF (Finanzamt)
             </button>
           ) : exportType === 'treasurer' ? (
-            <button 
-              className="btn" 
+            <button
+              className="btn"
               onClick={() => onExport('PDF_TREASURER', {
                 cashBalanceDate: trCashBalanceDate,
                 includeMembers: trIncludeMembers,
@@ -863,22 +865,22 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             </button>
           ) : (
             <>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 onClick={() => onExport('CSV')}
                 style={{ background: 'color-mix(in oklab, #607d8b 75%, transparent)', color: '#fff' }}
               >
                 CSV
               </button>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 onClick={() => onExport('PDF')}
                 style={{ background: 'color-mix(in oklab, #e53935 85%, transparent)', color: '#fff' }}
               >
                 PDF
               </button>
-              <button 
-                className="btn" 
+              <button
+                className="btn"
                 onClick={() => onExport('XLSX')}
                 style={{ background: 'color-mix(in oklab, #43a047 85%, transparent)', color: '#fff' }}
               >

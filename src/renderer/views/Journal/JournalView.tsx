@@ -5,90 +5,32 @@ import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import TagsEditor from '../../components/TagsEditor'
 import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 import { getEffectiveJournalCols, getEffectiveJournalOrder } from './utils/journalColumnVisibility'
+import {
+    getDetailsJournalColumnPreset,
+    getMinimalJournalColumnPreset,
+    getStandardJournalColumnPreset
+} from './utils/journalColumnPresets'
+import { buildVoucherUpdatePayloadFromEditRow, serializeEditRow } from './utils/journalEditState'
 import { shouldPromptDiscardForEdit } from './utils/journalEditDiscardPrompt'
 import { getInternalAssignmentValidationState } from '../../components/modals/voucherMetaValidation'
+import {
+    DEFAULT_ORDER as SHARED_DEFAULT_ORDER,
+    LABEL_FOR_COL,
+    type BookingEditTab as SharedBookingEditTab,
+    type BudgetAssignment,
+    type ColKey as SharedColKey,
+    type EarmarkAssignment,
+    type EditVoucherRow as SharedEditVoucherRow,
+    type VoucherRow
+} from './types'
 
-// Type für Voucher-Zeilen
-type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
-type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
+type EditVoucherRow = SharedEditVoucherRow
 
-type VoucherRow = {
-    id: number
-    voucherNo: string
-    date: string
-    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    description?: string | null
-    note?: string | null
-    isAdvancePlaceholder?: boolean
-    isCashCheck?: boolean
-    paymentMethod?: 'BAR' | 'BANK' | null
-    paymentAccountId?: number | null
-    paymentAccountName?: string | null
-    paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-    paymentAccountColor?: string | null
-    transferFrom?: 'BAR' | 'BANK' | null
-    transferTo?: 'BAR' | 'BANK' | null
-    transferFromAccountId?: number | null
-    transferFromAccountName?: string | null
-    transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-    transferFromAccountColor?: string | null
-    transferToAccountId?: number | null
-    transferToAccountName?: string | null
-    transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-    transferToAccountColor?: string | null
-    netAmount: number
-    vatRate: number
-    vatAmount: number
-    grossAmount: number
-    amountMode?: 'NET' | 'GROSS'
-    originalId?: number | null
-    originalVoucherNo?: string | null
-    reversedById?: number | null
-    reversedByVoucherNo?: string | null
-    hasFiles?: boolean
-    earmarkId?: number | null
-    earmarkCode?: string | null
-    earmarkAmount?: number | null
-    budgetId?: number | null
-    budgetLabel?: string | null
-    budgetAmount?: number | null
-    fileCount?: number
-    tags?: string[]
-    // Multiple assignments
-    budgets?: BudgetAssignment[]
-    earmarksAssigned?: EarmarkAssignment[]
-}
+type BookingEditTab = SharedBookingEditTab
 
-type EditVoucherRow = VoucherRow & { mode?: 'NET' | 'GROSS'; transferFrom?: 'BAR' | 'BANK' | null; transferTo?: 'BAR' | 'BANK' | null }
+type ColKey = SharedColKey
 
-type BookingEditTab = {
-    id: string
-    row: EditVoucherRow
-    initialSnapshot: string
-    detached?: boolean
-}
-
-type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
-
-const DEFAULT_ORDER: ColKey[] = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-
-const LABEL_FOR_COL: Record<ColKey, string> = {
-    actions: 'Aktionen',
-    date: 'Datum',
-    voucherNo: 'Nr.',
-    type: 'Art',
-    sphere: 'Sphäre',
-    description: 'Beschreibung',
-    note: 'Kommentar',
-    earmark: 'Zweckbindung',
-    budget: 'Budget',
-    paymentMethod: 'Zahlweg',
-    attachments: 'Anhänge',
-    net: 'Netto',
-    vat: 'MwSt',
-    gross: 'Brutto'
-}
+const DEFAULT_ORDER: ColKey[] = SHARED_DEFAULT_ORDER
 
 type PageShortcutAction = {
     id: string
@@ -102,7 +44,7 @@ interface JournalViewProps {
     // Props die von App.tsx kommen
     flashId: number | null
     setFlashId: (id: number | null | ((prev: number | null) => number | null)) => void
-    periodLock: { closedUntil: string } | null
+    periodLock: { closedUntil: string | null } | null
     refreshKey: number
     notify: (type: 'info' | 'success' | 'error', text: string, duration?: number, action?: { label: string; onClick: () => void }) => void
     bumpDataVersion: () => void
@@ -259,19 +201,19 @@ export default function JournalView({
     const [totalRows, setTotalRows] = useState<number>(0)
     const [stornoPairIds, setStornoPairIds] = useState<[number, number] | null>(null)
     const voucherTooltipCache = useRef(new Map<number, VoucherRow>())
-    const [page, setPage] = useState<number>(() => { 
-        try { return Number(localStorage.getItem('journal.page') || '1') } 
-        catch { return 1 } 
+    const [page, setPage] = useState<number>(() => {
+        try { return Number(localStorage.getItem('journal.page') || '1') }
+        catch { return 1 }
     })
     const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => {
         try { return (localStorage.getItem('journal.sortDir') as any) || 'DESC' }
         catch { return 'DESC' }
     })
-    const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net' | 'budget' | 'earmark' | 'payment' | 'sphere'>(() => { 
-        try { return (localStorage.getItem('journal.sortBy') as any) || 'date' } 
-        catch { return 'date' } 
+    const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net' | 'budget' | 'earmark' | 'payment' | 'sphere'>(() => {
+        try { return (localStorage.getItem('journal.sortBy') as any) || 'date' }
+        catch { return 'date' }
     })
-    
+
     // Nutze journalLimit aus Props (von Settings)
     const journalLimit = journalLimitProp
 
@@ -286,7 +228,7 @@ export default function JournalView({
     const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
     const [filterTag, setFilterTag] = useState<string | null>(null)
     const [q, setQ] = useState<string>('')
-    
+
     // Use props if provided, otherwise use local state
     const activeFrom = fromProp !== undefined ? fromProp : from
     const activeTo = toProp !== undefined ? toProp : to
@@ -299,7 +241,7 @@ export default function JournalView({
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
     const activeQ = qProp !== undefined ? qProp : q
     const activePage = pageProp !== undefined ? pageProp : page
-    
+
     // Setters that use props if available
     const activeSetFrom = setFromProp || setFrom
     const activeSetTo = setToProp || setTo
@@ -339,85 +281,21 @@ export default function JournalView({
     )
 
     const presetStandard = useCallback(() => {
-        const nextCols: Record<ColKey, boolean> = {
-            actions: allowVoucherDeletion,
-            date: true,
-            voucherNo: false,
-            type: true,
-            sphere: true,
-            description: true,
-            note: true,
-            earmark: true,
-            budget: true,
-            paymentMethod: true,
-            attachments: true,
-            net: false,
-            vat: false,
-            gross: true
-        }
-        const nextOrder: ColKey[] = [
-            'actions',
-            'date',
-            'type',
-            'sphere',
-            'description',
-            'note',
-            'earmark',
-            'budget',
-            'paymentMethod',
-            'attachments',
-            'gross',
-            'voucherNo',
-            'net',
-            'vat'
-        ]
-        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
-        setOrder(getEffectiveJournalOrder(nextOrder, allowVoucherDeletion))
+        const preset = getStandardJournalColumnPreset(allowVoucherDeletion)
+        setCols(preset.cols)
+        setOrder(preset.order)
     }, [allowVoucherDeletion, setCols, setOrder])
 
     const presetMinimal = useCallback(() => {
-        const nextCols: Record<ColKey, boolean> = {
-            actions: allowVoucherDeletion,
-            date: true,
-            voucherNo: false,
-            type: false,
-            sphere: false,
-            description: true,
-            note: false,
-            earmark: false,
-            budget: false,
-            paymentMethod: false,
-            attachments: false,
-            net: false,
-            vat: false,
-            gross: true
-        }
-        const nextOrder: ColKey[] = allowVoucherDeletion
-            ? ['actions', 'date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
-            : ['date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
-        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
-        setOrder(getEffectiveJournalOrder(nextOrder, allowVoucherDeletion))
+        const preset = getMinimalJournalColumnPreset(allowVoucherDeletion)
+        setCols(preset.cols)
+        setOrder(preset.order)
     }, [allowVoucherDeletion, setCols, setOrder])
 
     const presetDetails = useCallback(() => {
-        const nextCols: Record<ColKey, boolean> = {
-            actions: allowVoucherDeletion,
-            date: true,
-            voucherNo: true,
-            type: true,
-            sphere: true,
-            description: true,
-            note: true,
-            earmark: true,
-            budget: true,
-            paymentMethod: true,
-            attachments: true,
-            net: true,
-            vat: true,
-            gross: true
-        }
-        setCols(getEffectiveJournalCols(nextCols, allowVoucherDeletion))
-        setOrder(getEffectiveJournalOrder(allowVoucherDeletion ? DEFAULT_ORDER : DEFAULT_ORDER.filter((k) => k !== 'actions'), allowVoucherDeletion))
+        const preset = getDetailsJournalColumnPreset(allowVoucherDeletion)
+        setCols(preset.cols)
+        setOrder(preset.order)
     }, [allowVoucherDeletion, setCols, setOrder])
 
     // Modal states
@@ -441,38 +319,6 @@ export default function JournalView({
     const journalCols = useMemo(() => getEffectiveJournalCols(cols, allowVoucherDeletion), [allowVoucherDeletion, cols])
 
     const journalOrder = useMemo(() => getEffectiveJournalOrder(order, allowVoucherDeletion), [allowVoucherDeletion, order])
-
-    const serializeEditRow = useCallback((row: EditVoucherRow | null) => {
-        if (!row) return null
-        return JSON.stringify({
-            date: row.date || '',
-            type: row.type || null,
-            sphere: row.sphere || null,
-            description: (row.description || '').trim(),
-            note: (row.note || '').trim(),
-            paymentMethod: row.paymentMethod || null,
-            paymentAccountId: row.paymentAccountId || null,
-            transferFrom: row.transferFrom || null,
-            transferTo: row.transferTo || null,
-            transferFromAccountId: row.transferFromAccountId || null,
-            transferToAccountId: row.transferToAccountId || null,
-            mode: (row as any).mode || 'GROSS',
-            grossAmount: Number((row as any).grossAmount ?? 0),
-            netAmount: Number((row as any).netAmount ?? 0),
-            vatRate: Number((row as any).vatRate ?? 0),
-            tags: Array.isArray(row.tags) ? [...row.tags].sort() : [],
-            budgets: Array.isArray((row as any).budgets)
-                ? [...(row as any).budgets]
-                    .map((b: any) => ({ budgetId: Number(b.budgetId || 0), amount: Number(b.amount || 0) }))
-                    .sort((a: any, b: any) => a.budgetId - b.budgetId || a.amount - b.amount)
-                : [],
-            earmarksAssigned: Array.isArray((row as any).earmarksAssigned)
-                ? [...(row as any).earmarksAssigned]
-                    .map((e: any) => ({ earmarkId: Number(e.earmarkId || 0), amount: Number(e.amount || 0) }))
-                    .sort((a: any, b: any) => a.earmarkId - b.earmarkId || a.amount - b.amount)
-                : []
-        })
-    }, [])
 
     const setEditRow = useCallback((next: React.SetStateAction<EditVoucherRow | null>) => {
         setEditRowState((prev) => {
@@ -967,7 +813,7 @@ export default function JournalView({
                 }
                 return
             }
-            
+
             // Escape to close
             if (e.key === 'Escape') {
                 e.preventDefault()
@@ -1271,17 +1117,17 @@ export default function JournalView({
             )}
 
             {/* Filter Totals */}
-            <FilterTotals 
-                refreshKey={refreshKey} 
-                from={activeFrom || undefined} 
-                to={activeTo || undefined} 
-                paymentMethod={activeFilterPM || undefined} 
-                sphere={activeFilterSphere || undefined} 
-                type={activeFilterType || undefined} 
-                earmarkId={activeFilterEarmark || undefined} 
-                budgetId={activeFilterBudgetId ?? undefined} 
-                q={activeQ || undefined} 
-                tag={activeFilterTag || undefined} 
+            <FilterTotals
+                refreshKey={refreshKey}
+                from={activeFrom || undefined}
+                to={activeTo || undefined}
+                paymentMethod={activeFilterPM || undefined}
+                sphere={activeFilterSphere || undefined}
+                type={activeFilterType || undefined}
+                earmarkId={activeFilterEarmark || undefined}
+                budgetId={activeFilterBudgetId ?? undefined}
+                q={activeQ || undefined}
+                tag={activeFilterTag || undefined}
             />
 
             {/* Main Table Card */}
@@ -1339,7 +1185,9 @@ export default function JournalView({
                                 <span>Seite:</span>
                                 <span className="pagination-bar__stat-value">{activePage} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
                             </div>
-                            <div className="helper" style={{ marginLeft: 8 }}>Doppelklick für Details - Stornieren in Details</div>
+                            <div className="helper" style={{ marginLeft: 8 }}>
+                                Doppelklick für Details{!allowVoucherDeletion ? ' – Stornieren in Details' : ''}
+                            </div>
                         </div>
                         <div className="pagination-bar__controls">
                             <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
@@ -1511,7 +1359,7 @@ export default function JournalView({
                                         isInternal: editRow.type === 'INTERNAL',
                                         grossAmount: Number((editRow as any).grossAmount) || 0,
                                     })
-                                    
+
                                     // Validate: No duplicate budgets
                                     const budgetIds = budgets.map((b: { budgetId: number }) => b.budgetId)
                                     if (new Set(budgetIds).size !== budgetIds.length) {
@@ -1542,54 +1390,7 @@ export default function JournalView({
                                         return
                                     }
 
-                                    const payload: any = { 
-                                        id: editRow.id, 
-                                        date: editRow.date, 
-                                        description: editRow.description ?? null,
-                                        note: editRow.note?.trim() ? editRow.note.trim() : null,
-                                        type: editRow.type, 
-                                        sphere: editRow.sphere, 
-                                        // Legacy fields (kept for backwards compatibility, first item from arrays)
-                                        earmarkId: earmarksArr.length > 0 ? earmarksArr[0].earmarkId : null, 
-                                        earmarkAmount: earmarksArr.length > 0 ? earmarksArr[0].amount : null,
-                                        budgetId: budgets.length > 0 ? budgets[0].budgetId : null, 
-                                        budgetAmount: budgets.length > 0 ? budgets[0].amount : null,
-                                        // New arrays for multiple assignments
-                                        budgets,
-                                        earmarks: earmarksArr,
-                                        tags: editRow.tags || [] 
-                                    }
-                                    if (editRow.type === 'TRANSFER') {
-                                        delete payload.paymentMethod
-                                        payload.paymentAccountId = null
-                                        payload.transferFrom = editRow.transferFrom ?? null
-                                        payload.transferTo = editRow.transferTo ?? null
-                                        payload.transferFromAccountId = editRow.transferFromAccountId ?? null
-                                        payload.transferToAccountId = editRow.transferToAccountId ?? null
-                                    } else if (editRow.type === 'INTERNAL') {
-                                        delete payload.paymentMethod
-                                        payload.paymentAccountId = null
-                                        payload.transferFrom = null
-                                        payload.transferTo = null
-                                        payload.transferFromAccountId = null
-                                        payload.transferToAccountId = null
-                                    } else {
-                                        payload.paymentMethod = editRow.paymentMethod ?? null
-                                        payload.paymentAccountId = editRow.paymentAccountId ?? null
-                                        payload.transferFrom = null
-                                        payload.transferTo = null
-                                        payload.transferFromAccountId = null
-                                        payload.transferToAccountId = null
-                                    }
-                                    if ((editRow as any).mode === 'GROSS' && (editRow as any).grossAmount != null && (editRow as any).grossAmount !== '') {
-                                        payload.grossAmount = Number((editRow as any).grossAmount)
-                                        payload.vatRate = 0 // Bei Brutto keine MwSt-Aufschlüsselung
-                                        payload.amountMode = 'GROSS'
-                                    } else if ((editRow as any).mode === 'NET' && (editRow as any).netAmount != null && (editRow as any).netAmount !== '') {
-                                        payload.netAmount = Number((editRow as any).netAmount)
-                                        if ((editRow as any).vatRate != null) payload.vatRate = Number((editRow as any).vatRate)
-                                        payload.amountMode = 'NET'
-                                    }
+                                    const payload = buildVoucherUpdatePayloadFromEditRow(editRow, budgets, earmarksArr)
                                     const res = await window.api?.vouchers.update?.(payload)
                                     notify('success', 'Buchung gespeichert')
                                     const w = (res as any)?.warnings as string[] | undefined
@@ -2115,10 +1916,10 @@ export default function JournalView({
                                                                     notify('error', 'Speichern fehlgeschlagen: ' + m)
                                                                 }
                                                             }}>Herunterladen</button>
-                                                            <button 
+                                                            <button
                                                                 type="button"
-                                                                className="btn danger" 
-                                                                title="Löschen" 
+                                                                className="btn danger"
+                                                                title="Löschen"
                                                                 onClick={(e) => {
                                                                     e.preventDefault()
                                                                     e.stopPropagation()
@@ -2131,13 +1932,13 @@ export default function JournalView({
                                                     ))}
                                                 </ul>
                                             ) : (
-                                                <div 
+                                                <div
                                                     className="journal-edit-modal__empty-attachments"
-                                                    style={{ 
-                                                        marginTop: 8, 
-                                                        padding: 20, 
-                                                        border: '2px dashed var(--border)', 
-                                                        borderRadius: 8, 
+                                                    style={{
+                                                        marginTop: 8,
+                                                        padding: 20,
+                                                        border: '2px dashed var(--border)',
+                                                        borderRadius: 8,
                                                         textAlign: 'center',
                                                         cursor: 'pointer'
                                                     }}

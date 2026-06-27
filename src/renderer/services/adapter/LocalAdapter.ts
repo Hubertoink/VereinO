@@ -1,179 +1,145 @@
-import type { IDataAdapter } from './IDataAdapter'
+import type {
+  EncodedAttachment,
+  IDataAdapter
+} from './IDataAdapter'
+import type { RendererApi } from '../../../types/api'
+
+function browserApi(): RendererApi {
+  return (globalThis as typeof globalThis & { window: { api: RendererApi } }).window.api
+}
+
+async function encodeAttachment(file: File | EncodedAttachment): Promise<EncodedAttachment> {
+  if (!(file instanceof File)) return file
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return {
+    name: file.name,
+    dataBase64: btoa(binary),
+    mimeType: file.type || undefined
+  }
+}
 
 /**
- * Local Adapter - verwendet bestehende window.api (IPC) Calls
- * Wrapper um die lokalen SQLite-Zugriffe
+ * Adapter for the Electron preload API and local SQLite database.
  */
 export class LocalAdapter implements IDataAdapter {
-  vouchers = {
-    list: async (params: { year?: number; page?: number; limit?: number }) => {
-      return await window.api?.vouchers?.list?.(params)
+  constructor(private readonly api: RendererApi = browserApi()) {}
+
+  vouchers: IDataAdapter['vouchers'] = {
+    list: async (params) => {
+      const limit = params.limit ?? 50
+      const offset = params.page && params.page > 1 ? (params.page - 1) * limit : 0
+      const yearFilter = params.year
+        ? { from: `${params.year}-01-01`, to: `${params.year}-12-31` }
+        : {}
+      return this.api.vouchers.list({ limit, offset, ...yearFilter })
     },
-    recent: async (params: { limit: number }) => {
-      return await window.api?.vouchers?.recent?.(params)
-    },
-    create: async (params: any) => {
-      return await window.api?.vouchers?.create?.(params)
-    },
-    update: async (params: any) => {
-      return await window.api?.vouchers?.update?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.vouchers?.delete?.(params)
-    },
-    reverse: async (params: { originalId: number; reason: string }) => {
-      return await window.api?.vouchers?.reverse?.(params)
-    }
+    recent: (params) => this.api.vouchers.recent(params),
+    create: (params) => this.api.vouchers.create(params),
+    update: (params) => this.api.vouchers.update(params),
+    delete: (params) => this.api.vouchers.delete(params),
+    reverse: (params) => this.api.vouchers.reverse(params)
   }
 
-  members = {
-    list: async (params: { search?: string; active?: boolean }) => {
-      return await window.api?.members?.list?.(params)
-    },
-    get: async (params: { id: number }) => {
-      return await window.api?.members?.get?.(params)
-    },
-    create: async (params: any) => {
-      return await window.api?.members?.create?.(params)
-    },
-    update: async (params: any) => {
-      return await window.api?.members?.update?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.members?.delete?.(params)
-    },
+  members: IDataAdapter['members'] = {
+    list: (params) => this.api.members.list({
+      q: params.search,
+      status: params.active ? 'ACTIVE' : undefined
+    }),
+    get: (params) => this.api.members.get(params),
+    create: (params) => this.api.members.create(params),
+    update: (params) => this.api.members.update(params),
+    delete: (params) => this.api.members.delete(params),
     payments: {
-      list: async (params: { memberId: number }) => {
-        return await window.api?.members?.payments?.list?.(params)
+      list: async (params) => {
+        const result = await this.api.payments.history({ memberId: params.memberId })
+        return { rows: result.rows, total: result.total }
       },
-      create: async (params: any) => {
-        return await window.api?.members?.payments?.create?.(params)
+      create: async () => {
+        throw new Error('Member payment creation is not available through the local adapter yet.')
       }
     }
   }
 
-  attachments = {
-    list: async (params: { voucherId: number }) => {
-      return await window.api?.attachments?.list?.(params)
+  attachments: IDataAdapter['attachments'] = {
+    list: (params) => this.api.attachments.list(params),
+    add: async (params) => {
+      const files: Array<{ id: number }> = []
+      for (const source of params.files) {
+        const file = await encodeAttachment(source)
+        const result = await this.api.attachments.add({
+          voucherId: params.voucherId,
+          fileName: file.name || 'Datei',
+          dataBase64: file.dataBase64,
+          mimeType: file.mimeType || file.mime
+        })
+        if (typeof result.id !== 'number') {
+          throw new Error('Attachment upload returned no file id.')
+        }
+        files.push({ id: result.id })
+      }
+      return { files }
     },
-    add: async (params: { voucherId: number; files: any[] }) => {
-      return await window.api?.attachments?.add?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.attachments?.delete?.(params)
-    },
-    download: async (params: { id: number }) => {
-      return await window.api?.attachments?.download?.(params)
-    }
+    delete: (params) => this.api.attachments.delete({ fileId: params.id }),
+    download: (params) => this.api.attachments.saveAs({ fileId: params.id })
   }
 
-  bindings = {
-    list: async (params: { activeOnly?: boolean }) => {
-      return await window.api?.bindings?.list?.(params)
-    },
-    create: async (params: any) => {
-      return await window.api?.bindings?.create?.(params)
-    },
-    update: async (params: any) => {
-      return await window.api?.bindings?.update?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.bindings?.delete?.(params)
-    }
+  bindings: IDataAdapter['bindings'] = {
+    list: (params) => this.api.bindings.list(params),
+    create: (params) => this.api.bindings.upsert(params),
+    update: (params) => this.api.bindings.upsert(params),
+    delete: (params) => this.api.bindings.delete(params)
   }
 
-  budgets = {
-    list: async (params: object) => {
-      return await window.api?.budgets?.list?.(params)
-    },
-    create: async (params: any) => {
-      return await window.api?.budgets?.create?.(params)
-    },
-    update: async (params: any) => {
-      return await window.api?.budgets?.update?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.budgets?.delete?.(params)
-    }
+  budgets: IDataAdapter['budgets'] = {
+    list: (params) => this.api.budgets.list(params),
+    create: (params) => this.api.budgets.upsert(params),
+    update: (params) => this.api.budgets.upsert(params),
+    delete: (params) => this.api.budgets.delete(params)
   }
 
-  tags = {
-    list: async (params: { includeUsage?: boolean }) => {
-      return await window.api?.tags?.list?.(params)
-    },
-    create: async (params: any) => {
-      return await window.api?.tags?.create?.(params)
-    },
-    update: async (params: any) => {
-      return await window.api?.tags?.update?.(params)
-    },
-    delete: async (params: { id: number }) => {
-      return await window.api?.tags?.delete?.(params)
-    }
+  tags: IDataAdapter['tags'] = {
+    list: (params) => this.api.tags.list(params),
+    create: (params) => this.api.tags.upsert(params),
+    update: (params) => this.api.tags.upsert(params),
+    delete: (params) => this.api.tags.delete(params)
   }
 
-  settings = {
-    get: async (params: { key: string }) => {
-      return await window.api?.settings?.get?.(params)
-    },
-    set: async (params: { key: string; value: string }) => {
-      return await window.api?.settings?.set?.(params)
-    },
-    delete: async (params: { key: string }) => {
-      return await window.api?.settings?.delete?.(params)
-    }
+  settings: IDataAdapter['settings'] = {
+    get: <T = unknown>(params: { key: string }) => this.api.settings.get<T>(params),
+    set: (params) => this.api.settings.set(params),
+    delete: (params) => this.api.settings.set({ key: params.key, value: null })
   }
 
-  reports = {
-    years: async () => {
-      return await window.api?.reports?.years?.()
-    },
-    summary: async (params: { from: string; to: string }) => {
-      return await window.api?.reports?.summary?.(params)
-    }
+  reports: IDataAdapter['reports'] = {
+    years: () => this.api.reports.years(),
+    summary: (params) => this.api.reports.summary(params)
   }
 
-  yearEnd = {
-    status: async () => {
-      return await window.api?.yearEnd?.status?.()
-    },
-    preview: async (params: { year: number }) => {
-      return await window.api?.yearEnd?.preview?.(params)
-    },
-    export: async (params: { year: number }) => {
-      return await window.api?.yearEnd?.export?.(params)
-    },
-    close: async (params: { year: number }) => {
-      return await window.api?.yearEnd?.close?.(params)
-    },
-    reopen: async (params: { year: number }) => {
-      return await window.api?.yearEnd?.reopen?.(params)
-    }
+  yearEnd: IDataAdapter['yearEnd'] = {
+    status: () => this.api.yearEnd.status(),
+    preview: (params) => this.api.yearEnd.preview(params),
+    export: (params) => this.api.yearEnd.export(params),
+    close: (params) => this.api.yearEnd.close(params),
+    reopen: (params) => this.api.yearEnd.reopen(params)
   }
 
-  backup = {
-    create: async () => {
-      return await window.api?.backup?.create?.()
-    },
-    restore: async (filePath: string) => {
-      return await window.api?.backup?.restore?.(filePath)
-    },
-    inspect: async (dbPath: string) => {
-      return await window.api?.backup?.inspect?.(dbPath)
-    },
-    inspectCurrent: async () => {
-      return await window.api?.backup?.inspectCurrent?.()
-    }
+  backup: IDataAdapter['backup'] = {
+    create: () => this.api.backup.make('manual'),
+    restore: (filePath) => this.api.backup.restore(filePath),
+    inspect: (dbPath) => this.api.backup.inspect(dbPath),
+    inspectCurrent: () => this.api.backup.inspectCurrent()
   }
 
-  db = {
+  db: IDataAdapter['db'] = {
     smartRestore: {
-      preview: async () => {
-        return await window.api?.db?.smartRestore?.preview?.()
-      },
-      apply: async (params: { action: string }) => {
-        return await window.api?.db?.smartRestore?.apply?.(params)
-      }
+      preview: () => this.api.db.smartRestore.preview(),
+      apply: (params) => this.api.db.smartRestore.apply(params)
     }
   }
 }

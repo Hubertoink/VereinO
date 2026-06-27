@@ -144,7 +144,7 @@ export function listInvoicesPaged(filters: {
   limit?: number
   offset?: number
   sort?: 'ASC' | 'DESC'
-  sortBy?: 'date' | 'due'
+  sortBy?: 'date' | 'due' | 'amount' | 'status'
   status?: InvoiceStatus | 'ALL'
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   budgetId?: number
@@ -208,28 +208,28 @@ export function listInvoicesPaged(filters: {
   })
 
   const filtered = (status && status !== 'ALL') ? mapped.filter(r => r.status === status) : mapped
-  
+
   // Recalculate total after status filter by counting all matching rows (not just the limited result)
   let actualTotal = total
   if (status && status !== 'ALL') {
     // We need to count all rows with this status, not just the limited result
     // Fetch all rows without limit to count them properly
     const allRowsForCount = d.prepare(`
-      SELECT 
+      SELECT
         i.id,
         i.gross_amount as grossAmount,
         IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum
       ${base}
       GROUP BY i.id
     `).all(...params) as any[]
-    
+
     const allMapped = allRowsForCount.map(r => {
       const status2 = computeStatus(Number(r.grossAmount || 0), Number(r.paidSum || 0))
       return { ...r, status: status2 as InvoiceStatus }
     })
     actualTotal = allMapped.filter(r => r.status === status).length
   }
-  
+
   return { rows: filtered, total: actualTotal }
 }
 
@@ -432,18 +432,18 @@ export function postInvoiceToVoucher(invoiceId: number) {
     const inv = d.prepare('SELECT * FROM invoices WHERE id=?').get(invoiceId) as any
     if (!inv) throw new Error('Rechnung nicht gefunden')
     if (inv.posted_voucher_id) throw new Error('Rechnung wurde bereits als Buchung hinzugefügt')
-    
+
     const paidRow = d.prepare('SELECT IFNULL(SUM(amount),0) as s FROM invoice_payments WHERE invoice_id = ?').get(invoiceId) as any
     const paid = Number(paidRow?.s || 0)
     const gross = Number(inv.gross_amount || 0)
-    
+
     if (paid < gross) throw new Error('Rechnung ist noch nicht vollständig bezahlt')
-    
+
     const vDate = new Date().toISOString().slice(0, 10)
     const desc = (inv.description && String(inv.description).trim())
       ? String(inv.description).trim()
       : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
-    
+
     const res = createVoucher({
       date: vDate,
       type: inv.voucher_type,
@@ -456,10 +456,10 @@ export function postInvoiceToVoucher(invoiceId: number) {
       budgetId: inv.budget_id ?? null,
       tags: (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
     } as any)
-    
+
     const voucherId = res.id
     d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
-    
+
     return { id: invoiceId, voucherId }
   })
 }

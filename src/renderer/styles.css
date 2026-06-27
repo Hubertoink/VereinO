@@ -9653,6 +9653,46 @@ html[data-glass-modals="true"] .flyout-arrow {
     table-layout: fixed;
 }
 
+/* A visible end-cap makes the bottom scroll position feel intentional. */
+.journal-table-end {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 780px;
+    width: max(100%, 780px);
+    min-height: 28px;
+    padding: 7px 16px 9px;
+    border-top: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--surface) 78%, transparent),
+        color-mix(in oklab, var(--surface) 52%, transparent)
+    );
+    color: color-mix(in oklab, var(--text-dim) 72%, transparent);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-sizing: border-box;
+}
+
+.journal-table-end::before,
+.journal-table-end::after {
+    content: '';
+    width: clamp(28px, 6vw, 80px);
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklab, var(--border) 82%, transparent)
+    );
+}
+
+.journal-table-end::after {
+    transform: scaleX(-1);
+}
+
 /* Keep the journal controls visible and scroll only the booking rows. */
 .app-main--journal {
     overflow: hidden;

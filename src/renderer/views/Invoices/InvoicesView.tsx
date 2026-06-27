@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useToast } from '../../context/ToastContext'
+import { useToast } from '../../context/useToast'
 
 // Local copy of contrastText (could be centralized later)
 function contrastText(bg?: string | null) {
@@ -178,15 +178,15 @@ export default function InvoicesView() {
         // Check if invoice has autoPost enabled before updating
         const invoiceRow = rows.find(r => r.id === showPayModal.id)
         const hasAutoPost = invoiceRow && !!(invoiceRow.autoPost ?? 0)
-        
+
         setRows(prev => prev.map(r => r.id === showPayModal.id ? { ...r, paidSum: res.paidSum ?? (r.paidSum + amt), status: res.status } : r))
-        
+
         // Show toast notification if invoice is now fully paid and has autoPost enabled
         if (res.status === 'PAID' && hasAutoPost) {
           const invoiceLabel = showPayModal.invoiceNo || `#${showPayModal.id}`
           notify('success', `Verbindlichkeit ${invoiceLabel} wurde automatisch als Buchung gebucht`)
         }
-        
+
         setShowPayModal(null)
         try { window.dispatchEvent(new Event('data-changed')) } catch { }
         await loadSummary()
@@ -232,7 +232,7 @@ export default function InvoicesView() {
   const partySuggestions = useMemo(() => { const set = new Set<string>(); for (const r of rows) { if (r?.party) set.add(String(r.party)) } return Array.from(set).sort().slice(0, 30) }, [rows])
   const descSuggestions = useMemo(() => { const set = new Set<string>(); for (const r of rows) { if (r?.description) set.add(String(r.description)) } return Array.from(set).sort().slice(0, 30) }, [rows])
 
-  useEffect(() => { if (!form) return; function onKey(e: KeyboardEvent) { const target = e.target as HTMLElement | null; const tagName = (target?.tagName || '').toLowerCase(); const inEditable = !!(target && ((target as any).isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select')); if (e.key === 'Escape') { setForm(null); e.preventDefault(); return } if (e.key === 'Enter' && !e.shiftKey && inEditable && tagName !== 'textarea') { saveForm(); e.preventDefault(); return } if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (form.mode === 'create') fileInputRef.current?.click(); else editInvoiceFileInputRef.current?.click(); e.preventDefault(); return } } window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [form])
+  useEffect(() => { if (!form) return; function onKey(e: KeyboardEvent) { const target = e.target as HTMLElement | null; const tagName = (target?.tagName || '').toLowerCase(); const inEditable = !!(target && ((target as any).isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select')); if (e.key === 'Escape') { setForm(null); e.preventDefault(); return } if (e.key === 'Enter' && !e.shiftKey && inEditable && tagName !== 'textarea') { saveForm(); e.preventDefault(); return } if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { if (form?.mode === 'create') fileInputRef.current?.click(); else editInvoiceFileInputRef.current?.click(); e.preventDefault(); return } } window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [form])
   useEffect(() => { let alive = true; async function loadFiles() { try { if (form && form.mode === 'edit' && (form.draft as any).id) { const res = await window.api?.invoiceFiles?.list?.({ invoiceId: (form.draft as any).id }); if (alive && res?.files) setEditInvoiceFiles(res.files as any) } else { if (alive) setEditInvoiceFiles([]) } } catch { } } loadFiles(); return () => { alive = false } }, [form?.mode, (form?.draft as any)?.id])
 
   return (

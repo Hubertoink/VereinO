@@ -36,7 +36,17 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
   async function doMakeBackup() {
     setBusy(true); setErr('')
-    try { const res = await makeBackup('manual'); if (res?.filePath) { notify('success', `Backup erstellt: ${res.filePath}`); refreshBackups() } }
+    try {
+      const res = await makeBackup('manual')
+      if (res.ok && res.filePath) {
+        notify('success', `Backup erstellt: ${res.filePath}`)
+        await refreshBackups()
+      } else {
+        const message = res.error || 'Backup fehlgeschlagen'
+        setErr(message)
+        notify('error', message)
+      }
+    }
     catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
     finally { setBusy(false) }
   }

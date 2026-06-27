@@ -2,6 +2,7 @@
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
+import type { BudgetAssignment, EarmarkAssignment, VoucherRow } from '../types'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
@@ -277,57 +278,8 @@ function paymentAccountIcon(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
     return <IconBank size={size} />
 }
 
-// Types for multiple budget/earmark assignments
-type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
-type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
-
 interface JournalTableProps {
-    rows: Array<{
-        id: number
-        voucherNo: string
-        date: string
-        type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-        sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-        description?: string | null
-        note?: string | null
-        isAdvancePlaceholder?: boolean
-        isCashCheck?: boolean
-        originalId?: number | null
-        originalVoucherNo?: string | null
-        reversedById?: number | null
-        reversedByVoucherNo?: string | null
-        paymentMethod?: 'BAR' | 'BANK' | null
-        paymentAccountId?: number | null
-        paymentAccountName?: string | null
-        paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-        paymentAccountColor?: string | null
-        transferFrom?: 'BAR' | 'BANK' | null
-        transferTo?: 'BAR' | 'BANK' | null
-        transferFromAccountId?: number | null
-        transferFromAccountName?: string | null
-        transferFromAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-        transferFromAccountColor?: string | null
-        transferToAccountId?: number | null
-        transferToAccountName?: string | null
-        transferToAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
-        transferToAccountColor?: string | null
-        netAmount: number
-        vatRate: number
-        vatAmount: number
-        grossAmount: number
-        amountMode?: 'NET' | 'GROSS'
-        fileCount?: number
-        earmarkId?: number | null
-        earmarkAmount?: number | null
-        earmarkCode?: string | null
-        budgetId?: number | null
-        budgetAmount?: number | null
-        budgetLabel?: string | null
-        tags?: string[]
-        // Multiple assignments
-        budgets?: BudgetAssignment[]
-        earmarksAssigned?: EarmarkAssignment[]
-    }>
+    rows: VoucherRow[]
     order: string[]
     cols: Record<string, boolean>
     onReorder: (o: string[]) => void
@@ -514,7 +466,7 @@ export default function JournalTable({
             paymentUsageInFlight.current.delete(paymentAccountId)
         }
     }, [])
-    
+
     // Column resize state
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => loadColumnWidths())
     const resizingCol = useRef<string | null>(null)
@@ -535,11 +487,11 @@ export default function JournalTable({
         e.stopPropagation()
         resizingCol.current = colKey
         resizeStartX.current = e.clientX
-        
+
         // Get current column width
         const th = (e.target as HTMLElement).closest('th')
         resizeStartWidth.current = th?.offsetWidth || 100
-        
+
         document.addEventListener('mousemove', handleResizeMove)
         document.addEventListener('mouseup', handleResizeEnd)
         document.body.style.cursor = 'col-resize'
@@ -551,7 +503,7 @@ export default function JournalTable({
         if (!resizingCol.current || !tableRef.current) return
         const delta = e.clientX - resizeStartX.current
         const newWidth = Math.max(40, resizeStartWidth.current + delta)
-        
+
         // Get container width to limit total table width
         const container = tableRef.current.parentElement
         if (container) {
@@ -559,7 +511,7 @@ export default function JournalTable({
             const currentTableWidth = tableRef.current.offsetWidth
             const currentColWidth = resizeStartWidth.current
             const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
-            
+
             // If table would exceed container, limit the column width
             if (projectedTableWidth > containerWidth && delta > 0) {
                 const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
@@ -569,7 +521,7 @@ export default function JournalTable({
                 return
             }
         }
-        
+
         setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
     }, [])
 
@@ -796,18 +748,18 @@ export default function JournalTable({
             <td key={k} align="center">
                 {(() => {
                     // Use earmarksAssigned array if available, otherwise fall back to single earmark
-                    const assignments = r.earmarksAssigned && r.earmarksAssigned.length > 0 
-                        ? r.earmarksAssigned 
-                        : r.earmarkId && r.earmarkCode 
-                            ? [{ earmarkId: r.earmarkId, code: r.earmarkCode, amount: 0 }] 
+                    const assignments = r.earmarksAssigned && r.earmarksAssigned.length > 0
+                        ? r.earmarksAssigned
+                        : r.earmarkId && r.earmarkCode
+                            ? [{ earmarkId: r.earmarkId, code: r.earmarkCode, amount: 0 }]
                             : []
-                    
+
                     if (assignments.length === 0) return ''
-                    
+
                     // Function to truncate text for table display
-                    const truncate = (text: string, maxLen: number = 8) => 
+                    const truncate = (text: string, maxLen: number = 8) =>
                         text.length > maxLen ? text.slice(0, maxLen) + '…' : text
-                    
+
                     return (
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
                             {assignments.slice(0, 3).map((ea: any, idx: number) => {
@@ -913,18 +865,18 @@ export default function JournalTable({
             <td key={k} align="center">
                 {(() => {
                     // Use budgets array if available, otherwise fall back to single budget
-                    const assignments = r.budgets && r.budgets.length > 0 
-                        ? r.budgets 
-                        : r.budgetId && r.budgetLabel 
-                            ? [{ budgetId: r.budgetId, label: r.budgetLabel, amount: 0, color: (r as any).budgetColor }] 
+                    const assignments = r.budgets && r.budgets.length > 0
+                        ? r.budgets
+                        : r.budgetId && r.budgetLabel
+                            ? [{ budgetId: r.budgetId, label: r.budgetLabel, amount: 0, color: (r as any).budgetColor }]
                             : []
-                    
+
                     if (assignments.length === 0) return ''
-                    
+
                     // Function to truncate text for table display
-                    const truncate = (text: string, maxLen: number = 8) => 
+                    const truncate = (text: string, maxLen: number = 8) =>
                         text.length > maxLen ? text.slice(0, maxLen) + '…' : text
-                    
+
                     return (
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
                             {assignments.slice(0, 3).map((ba: any, idx: number) => {
@@ -1012,8 +964,8 @@ export default function JournalTable({
             </thead>
             <tbody>
                 {rows.map((r) => (
-                    <tr 
-                        key={r.id} 
+                    <tr
+                        key={r.id}
                         className={[
                             highlightId === r.id ? 'row-flash' : '',
                             r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
@@ -1032,6 +984,9 @@ export default function JournalTable({
                 )}
             </tbody>
         </table>
+        <div className="journal-table-end" aria-hidden="true">
+            <span>Ende der Seite</span>
+        </div>
         </div>
     )
 }

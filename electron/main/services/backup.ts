@@ -4,6 +4,7 @@ import { app, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
 import { getAppDataDir, getCurrentDbInfo, getDb, closeDb } from '../db/database'
 import { applyMigrations } from '../db/migrations'
+import { isUsableBackupDirectory, resolveBackupDirectory } from './backupDirectory'
 
 export type BackupEntry = { filePath: string; size: number; mtime: number }
 
@@ -47,19 +48,22 @@ function relinkFilePaths(d: any, filesDir: string) {
 }
 
 export function getBackupDir(): string {
-    // Allow user-defined backup directory via settings key 'backup.dir'
     const cfg = getSetting<string>('backup.dir')
-    const effective = (cfg && typeof cfg === 'string' && cfg.trim()) ? cfg.trim() : path.join(getAppDataDir().root, 'backups')
-    const dir = effective
-    try { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }) } catch { /* ignore */ }
-    return dir
+    const defaultDir = path.join(getAppDataDir().root, 'backups')
+    const resolution = resolveBackupDirectory(cfg, defaultDir)
+    if (resolution.usedFallback) {
+        // Repair stale paths, for example after moving a database from another
+        // Windows user profile or disconnecting an external drive.
+        try { setSetting('backup.dir', null) } catch { /* fallback remains usable for this run */ }
+    }
+    return resolution.dir
 }
 
 export function setBackupDir(dir: string | null | undefined): { ok: boolean; dir: string } {
     try {
         if (dir && String(dir).trim()) {
             const val = String(dir).trim()
-            try { if (!fs.existsSync(val)) fs.mkdirSync(val, { recursive: true }) } catch { /* ignore */ }
+            if (!isUsableBackupDirectory(val)) throw new Error(`Der Backup-Ordner ist nicht beschreibbar: ${val}`)
             setSetting('backup.dir', val)
         } else {
             // Reset to default by clearing setting
@@ -89,7 +93,7 @@ export function setBackupDirWithMigration(dir: string | null | undefined): { ok:
         let targetEff: string
         if (dir && String(dir).trim()) {
             const val = String(dir).trim()
-            try { if (!fs.existsSync(val)) fs.mkdirSync(val, { recursive: true }) } catch { /* ignore */ }
+            if (!isUsableBackupDirectory(val)) throw new Error(`Der Backup-Ordner ist nicht beschreibbar: ${val}`)
             setSetting('backup.dir', val)
             targetEff = val
         } else {

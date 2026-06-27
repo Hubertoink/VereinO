@@ -133,7 +133,7 @@ const PreviewTable = memo(function PreviewTable({
               )
               
               // Determine background
-              let bg = undefined
+              let bg: string | undefined
               if (isHint) {
                 bg = 'color-mix(in oklab, var(--muted) 8%, transparent)'
               } else if (st) {
@@ -353,7 +353,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
             notify?.('info', `Fehler-Excel gespeichert: ${res.errorFilePath}`)
           }
         } else {
-          const parts = []
+          const parts: string[] = []
           if (res.imported > 0) parts.push(`${res.imported} importiert`)
           if (res.updated > 0) parts.push(`${res.updated} aktualisiert`)
           if (res.skipped > 0) parts.push(`${res.skipped} übersprungen`)

@@ -1,4 +1,4 @@
-﻿ 
+﻿
 import React, { useEffect, useMemo, useState } from 'react'
 import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 
@@ -12,9 +12,9 @@ type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'descriptio
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
 // Toggle button component for binary options
-function ToggleButtons<T extends string>({ value, onChange, options }: { 
+function ToggleButtons<T extends string>({ value, onChange, options }: {
     value: T
-    onChange: (v: T) => void 
+    onChange: (v: T) => void
     options: Array<{ value: T; label: string; icon?: string }>
 }) {
     return (
@@ -483,7 +483,7 @@ export default function SetupWizardModal({
                             </select>
                         </div>
                     </div>
-                    
+
                     {/* Row 2: Theme selection */}
                     <div className="setup-section">
                         <label>Farb-Theme</label>
@@ -502,7 +502,7 @@ export default function SetupWizardModal({
                             ))}
                         </div>
                     </div>
-                    
+
                     {/* Row 3: Background image */}
                     <div className="setup-section">
                         <label>Hintergrundbild</label>
@@ -575,7 +575,7 @@ export default function SetupWizardModal({
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Preview row */}
                     <div className="setup-preview-row">
                         <MiniNavPreview />
@@ -590,11 +590,11 @@ export default function SetupWizardModal({
             const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
             const lines = journalRowStyle === 'lines' || journalRowStyle === 'both'
             const demoRows = [
-                { actions: '✏️', date: '11 Sep', voucherNo: 'V001', type: 'IN', sphere: 'IDEELL', description: 'Mitgliedsbeitrag', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '+50,00 €', vat: '0,00 €', gross: '+50,00 €' },
-                { actions: '✏️', date: '12 Sep', voucherNo: 'V002', type: 'OUT', sphere: 'IDEELL', description: 'Material', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '−12,90 €', vat: '0,00 €', gross: '−12,90 €' }
+                { actions: '✏️', date: '11 Sep', voucherNo: 'V001', type: 'IN', sphere: 'IDEELL', description: 'Mitgliedsbeitrag', note: '', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '+50,00 €', vat: '0,00 €', gross: '+50,00 €' },
+                { actions: '✏️', date: '12 Sep', voucherNo: 'V002', type: 'OUT', sphere: 'IDEELL', description: 'Material', note: '', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '−12,90 €', vat: '0,00 €', gross: '−12,90 €' }
             ]
             const headerLabels: Record<ColKey, string> = {
-                actions: 'Aktionen', date: 'Datum', voucherNo: 'Nr.', type: 'Art', sphere: 'Sphäre', description: 'Beschreibung', earmark: 'Zw.', budget: 'Budget', paymentMethod: 'Zahlweg', attachments: 'Anh.', net: 'Netto', vat: 'MwSt', gross: 'Brutto'
+                actions: 'Aktionen', date: 'Datum', voucherNo: 'Nr.', type: 'Art', sphere: 'Sphäre', description: 'Beschreibung', note: 'Kommentar', earmark: 'Zw.', budget: 'Budget', paymentMethod: 'Zahlweg', attachments: 'Anh.', net: 'Netto', vat: 'MwSt', gross: 'Brutto'
             }
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>

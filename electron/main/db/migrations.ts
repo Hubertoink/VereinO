@@ -1,4 +1,4 @@
-import Database = require('better-sqlite3')
+import Database from 'better-sqlite3'
 type DB = InstanceType<typeof Database>
 
 type Mig = { version: number; up: string | ((db: DB) => void) }
@@ -1190,7 +1190,7 @@ export function applyMigrations(db: DB) {
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue
-    
+
     // Special handling for migration 20 - check if columns already exist
     if (mig.version === 20 || mig.version === 29 || mig.version === 30) {
       try {
@@ -1230,7 +1230,7 @@ export function applyMigrations(db: DB) {
         console.warn(`[Migration ${mig.version}] Failed to check if columns exist:`, e)
       }
     }
-    
+
     try {
       const exec = db.transaction(() => {
         if (typeof mig.up === 'function') {

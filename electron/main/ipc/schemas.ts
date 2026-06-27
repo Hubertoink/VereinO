@@ -570,6 +570,19 @@ export const InvoiceByIdOutput = z.object({
 export const InvoiceAddPaymentInput = z.object({ invoiceId: z.number(), date: z.string(), amount: z.number() })
 export const InvoiceAddPaymentOutput = z.object({ id: z.number(), status: InvoiceStatus, paidSum: z.number(), voucherId: z.number().nullable().optional() })
 
+export type TInvoiceCreateInput = z.infer<typeof InvoiceCreateInput>
+export type TInvoiceCreateOutput = z.infer<typeof InvoiceCreateOutput>
+export type TInvoiceUpdateInput = z.infer<typeof InvoiceUpdateInput>
+export type TInvoiceUpdateOutput = z.infer<typeof InvoiceUpdateOutput>
+export type TInvoiceDeleteInput = z.infer<typeof InvoiceDeleteInput>
+export type TInvoiceDeleteOutput = z.infer<typeof InvoiceDeleteOutput>
+export type TInvoicesListInput = z.infer<typeof InvoicesListInput>
+export type TInvoicesListOutput = z.infer<typeof InvoicesListOutput>
+export type TInvoiceByIdInput = z.infer<typeof InvoiceByIdInput>
+export type TInvoiceByIdOutput = z.infer<typeof InvoiceByIdOutput>
+export type TInvoiceAddPaymentInput = z.infer<typeof InvoiceAddPaymentInput>
+export type TInvoiceAddPaymentOutput = z.infer<typeof InvoiceAddPaymentOutput>
+
 export const InvoicePostToVoucherInput = z.object({ invoiceId: z.number() })
 export const InvoicePostToVoucherOutput = z.object({ id: z.number(), voucherId: z.number() })
 export type TInvoicePostToVoucherInput = z.infer<typeof InvoicePostToVoucherInput>
@@ -666,6 +679,7 @@ export const VoucherMetaUpdateInput = z.object({
     earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number() })).optional(),
     tags: z.array(z.string()).optional()
 })
+export type TVoucherMetaUpdateInput = z.infer<typeof VoucherMetaUpdateInput>
 export const VoucherDeleteInput = z.object({ id: z.number() })
 export const VoucherDeleteOutput = z.object({ id: z.number() })
 
@@ -697,6 +711,12 @@ export const PaymentAccountUpsertInput = z.object({
 export const PaymentAccountUpsertOutput = z.object({ id: z.number() })
 export const PaymentAccountDeleteInput = z.object({ id: z.number() })
 export const PaymentAccountDeleteOutput = z.object({ id: z.number() })
+export type TPaymentAccountsListInput = z.infer<typeof PaymentAccountsListInput>
+export type TPaymentAccountsListOutput = z.infer<typeof PaymentAccountsListOutput>
+export type TPaymentAccountUpsertInput = z.infer<typeof PaymentAccountUpsertInput>
+export type TPaymentAccountUpsertOutput = z.infer<typeof PaymentAccountUpsertOutput>
+export type TPaymentAccountDeleteInput = z.infer<typeof PaymentAccountDeleteInput>
+export type TPaymentAccountDeleteOutput = z.infer<typeof PaymentAccountDeleteOutput>
 
 // Batch assign earmark to vouchers
 export const VouchersBatchAssignEarmarkInput = z.object({
@@ -783,6 +803,10 @@ export type TBindingUpsertInput = z.infer<typeof BindingUpsertInput>
 export type TBindingListInput = z.infer<typeof BindingListInput>
 export type TBindingDeleteInput = z.infer<typeof BindingDeleteInput>
 export type TBindingUsageInput = z.infer<typeof BindingUsageInput>
+export type TBindingUpsertOutput = z.infer<typeof BindingUpsertOutput>
+export type TBindingListOutput = z.infer<typeof BindingListOutput>
+export type TBindingDeleteOutput = z.infer<typeof BindingDeleteOutput>
+export type TBindingUsageOutput = z.infer<typeof BindingUsageOutput>
 
 // Budgets
 export const BudgetUpsertInput = z.object({
@@ -852,6 +876,9 @@ export type TBudgetListInput = z.infer<typeof BudgetListInput>
 export type TBudgetDeleteInput = z.infer<typeof BudgetDeleteInput>
 export type TBudgetUsageInput = z.infer<typeof BudgetUsageInput>
 export type TBudgetUsageOutput = z.infer<typeof BudgetUsageOutput>
+export type TBudgetUpsertOutput = z.infer<typeof BudgetUpsertOutput>
+export type TBudgetListOutput = z.infer<typeof BudgetListOutput>
+export type TBudgetDeleteOutput = z.infer<typeof BudgetDeleteOutput>
 
 // Vorschüsse (Mitglieder/Personen)
 export const AdvanceStatus = z.enum(['OPEN', 'RESOLVED'])
@@ -1033,14 +1060,22 @@ export const AdvanceDeleteOutput = z.object({ id: z.number() })
 export type TAdvancesListInput = z.infer<typeof AdvancesListInput>
 export type TAdvancesListOutput = z.infer<typeof AdvancesListOutput>
 export type TAdvanceCreateInput = z.infer<typeof AdvanceCreateInput>
+export type TAdvanceCreateOutput = z.infer<typeof AdvanceCreateOutput>
 export type TAdvanceGetInput = z.infer<typeof AdvanceGetInput>
+export type TAdvanceGetOutput = z.infer<typeof AdvanceGetOutput>
 export type TAdvanceSettleInput = z.infer<typeof AdvanceSettleInput>
+export type TAdvanceSettleOutput = z.infer<typeof AdvanceSettleOutput>
 export type TAdvanceDeleteInput = z.infer<typeof AdvanceDeleteInput>
+export type TAdvanceDeleteOutput = z.infer<typeof AdvanceDeleteOutput>
 
 export type TAdvancePurchaseCreateInput = z.infer<typeof AdvancePurchaseCreateInput>
+export type TAdvancePurchaseCreateOutput = z.infer<typeof AdvancePurchaseCreateOutput>
 export type TAdvancePurchaseDeleteInput = z.infer<typeof AdvancePurchaseDeleteInput>
+export type TAdvancePurchaseDeleteOutput = z.infer<typeof AdvancePurchaseDeleteOutput>
 export type TAdvancePurchaseUpdateInput = z.infer<typeof AdvancePurchaseUpdateInput>
+export type TAdvancePurchaseUpdateOutput = z.infer<typeof AdvancePurchaseUpdateOutput>
 export type TAdvanceResolveInput = z.infer<typeof AdvanceResolveInput>
+export type TAdvanceResolveOutput = z.infer<typeof AdvanceResolveOutput>
 
 // Quotes (weekly)
 export const QuoteWeeklyInput = z.object({ date: z.string().optional() }).optional()
@@ -1158,6 +1193,15 @@ export const ImportEditableExportInput = z.object({}).optional()
 export const ImportEditableExportOutput = z.object({ filePath: z.string() })
 export type TImportEditableExportInput = z.infer<typeof ImportEditableExportInput>
 export type TImportEditableExportOutput = z.infer<typeof ImportEditableExportOutput>
+export type TImportPreviewInput = z.infer<typeof ImportPreviewInput>
+export type TImportPreviewOutput = z.infer<typeof ImportPreviewOutput>
+export type TImportExecuteInput = z.infer<typeof ImportExecuteInput>
+export type TImportExecuteOutput = z.infer<typeof ImportExecuteOutput>
+export type TImportAnalyzeInput = z.infer<typeof ImportAnalyzeInput>
+export type TImportAnalyzeOutput = z.infer<typeof ImportAnalyzeOutput>
+export type TImportCommitDraftInput = z.infer<typeof ImportCommitDraftInput>
+export type TImportCreateMissingInput = z.infer<typeof ImportCreateMissingInput>
+export type TImportCreateMissingOutput = z.infer<typeof ImportCreateMissingOutput>
 
 // Attachments (files linked to vouchers)
 export const AttachmentsListInput = z.object({ voucherId: z.number() })
@@ -1247,6 +1291,16 @@ export const MemberDeleteInput = z.object({ id: z.number() })
 export const MemberDeleteOutput = z.object({ id: z.number() })
 export const MemberGetInput = z.object({ id: z.number() })
 export const MemberGetOutput = z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, boardRole: BoardRole.nullable().optional(), createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() }).nullable()
+export type TMembersListInput = z.infer<typeof MembersListInput>
+export type TMembersListOutput = z.infer<typeof MembersListOutput>
+export type TMemberCreateInput = z.infer<typeof MemberCreateInput>
+export type TMemberCreateOutput = z.infer<typeof MemberCreateOutput>
+export type TMemberUpdateInput = z.infer<typeof MemberUpdateInput>
+export type TMemberUpdateOutput = z.infer<typeof MemberUpdateOutput>
+export type TMemberDeleteInput = z.infer<typeof MemberDeleteInput>
+export type TMemberDeleteOutput = z.infer<typeof MemberDeleteOutput>
+export type TMemberGetInput = z.infer<typeof MemberGetInput>
+export type TMemberGetOutput = z.infer<typeof MemberGetOutput>
 
 // Membership payments (Phase 3)
 export const PaymentsListDueInput = z.object({ interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']), periodKey: z.string().optional(), from: z.string().optional(), to: z.string().optional(), q: z.string().optional(), includePaid: z.boolean().optional(), memberId: z.number().optional() })

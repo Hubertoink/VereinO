@@ -5,6 +5,7 @@ import * as backup from './services/backup'
 import { applyMigrations, ensureActivityReportsTable, ensureAdvanceTables, ensureVoucherColumns, ensureVoucherJunctionTables } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import { initUpdateManager } from './updateManager'
+import { requireAllowedExternalUrl } from './services/externalUrl'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -44,7 +45,14 @@ function getDetachedQuickAddBounds(): WindowBounds | undefined {
 
 function createWindowOpenHandler() {
     return ({ url }: { url: string }) => {
-        shell.openExternal(url)
+        try {
+            const allowedUrl = requireAllowedExternalUrl(url)
+            void shell.openExternal(allowedUrl).catch((error) => {
+                console.error('Externe URL konnte nicht geöffnet werden:', error)
+            })
+        } catch (error) {
+            console.warn('Blockierte externe URL:', error)
+        }
         return { action: 'deny' as const }
     }
 }

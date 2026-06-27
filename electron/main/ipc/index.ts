@@ -36,6 +36,8 @@ import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGe
 import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
 import { checkForAppUpdates, downloadAppUpdate, getUpdateState, installAppUpdate } from '../updateManager'
 import { deletePaymentAccount, listPaymentAccounts, upsertPaymentAccount } from '../repositories/paymentAccounts'
+import { requireSafetyBackup } from '../services/safetyBackup'
+import { registerBackupAndShellHandlers } from './backupAndShellHandlers'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -89,6 +91,7 @@ type RegisterIpcHandlersOptions = {
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
+    registerBackupAndShellHandlers()
     const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 
     // App info
@@ -908,7 +911,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const parsed = VouchersClearAllInput.parse(payload)
         if (!parsed.confirm) throw new Error('Nicht bestätigt')
         // Safety: backup before destructive action
-        try { await backup.makeBackup('preClearAll') } catch { /* ignore */ }
+        await requireSafetyBackup(backup.makeBackup, 'preClearAll', 'Alle Buchungen löschen')
         const res = clearAllVouchers()
         return VouchersClearAllOutput.parse(res)
     })
@@ -1034,7 +1037,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     ipcMain.handle('imports.execute', async (_e, payload) => {
         const parsed = ImportExecuteInput.parse(payload)
         // Safety: backup before potentially large data modification
-        try { await backup.makeBackup('preImportRows') } catch { /* ignore */ }
+        await requireSafetyBackup(backup.makeBackup, 'preImportRows', 'Import ausführen')
         try { ensureVoucherForeignKeyTargets(getDb() as any) } catch { /* ignore */ }
         const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
         return ImportExecuteOutput.parse(res as any)
@@ -1046,7 +1049,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     })
     ipcMain.handle('imports.commitDraft', async (_e, payload) => {
         const parsed = ImportCommitDraftInput.parse(payload)
-        try { await backup.makeBackup('preImportDraft') } catch { /* ignore */ }
+        await requireSafetyBackup(backup.makeBackup, 'preImportDraft', 'Importentwurf übernehmen')
         try { ensureVoucherForeignKeyTargets(getDb() as any) } catch { /* ignore */ }
         const res = await commitImportDraft(parsed.rows as any)
         return ImportExecuteOutput.parse(res as any)
@@ -1452,7 +1455,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     ipcMain.handle('yearEnd.close', async (_e, payload) => {
         const parsed = YearEndCloseInput.parse(payload)
         // Safety: create a backup before locking a period
-        try { await backup.makeBackup('preClose') } catch { /* ignore backup errors */ }
+        await requireSafetyBackup(backup.makeBackup, 'preClose', 'Jahresabschluss durchführen')
         const res = yearEnd.closeYear(parsed.year)
         return YearEndCloseOutput.parse(res as any)
     })
@@ -1663,54 +1666,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const parsed = DonationsExportMoneyReceiptInput.parse(payload)
         const res = await exportMoneyDonationReceiptPdf(parsed)
         return DonationsExportMoneyReceiptOutput.parse(res)
-    })
-
-    // Backups: make/list/openFolder
-    ipcMain.handle('backup.make', async (_e, payload?: { reason?: string }) => {
-        try {
-            const res = await backup.makeBackup(payload?.reason)
-            return { ok: true, filePath: res.filePath }
-        } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.list', async () => {
-        try { return { ok: true, ...backup.listBackups() } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.openFolder', async () => {
-        try { return await backup.openBackupFolder() } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.getDir', async () => {
-        try { return { ok: true, dir: backup.getBackupDir() } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.setDir', async () => {
-        try {
-            const pick = await dialog.showOpenDialog({ title: 'Backup-Ordner wählen…', properties: ['openDirectory', 'createDirectory'] })
-            if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-            const res = backup.setBackupDirWithMigration(pick.filePaths[0])
-            return { ok: res.ok, dir: res.dir, moved: (res as any).moved }
-        } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.resetDir', async () => {
-        try { const res = backup.setBackupDirWithMigration(null); return { ok: res.ok, dir: res.dir, moved: (res as any).moved } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.inspect', async (_e, payload: { filePath: string }) => {
-        try { return backup.inspectBackup(payload.filePath) } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.inspectCurrent', async () => {
-        try { return backup.inspectCurrent() } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('backup.restore', async (_e, payload: { filePath: string }) => {
-        try { return backup.restoreBackup(payload.filePath) } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-
-    // Shell helpers: reveal exported files or open folders
-    ipcMain.handle('shell.showItemInFolder', async (_e, payload: { fullPath: string }) => {
-        try { shell.showItemInFolder(payload.fullPath); return { ok: true } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('shell.openPath', async (_e, payload: { fullPath: string }) => {
-        try { const res = await shell.openPath(payload.fullPath); return { ok: !res, error: res || null } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
-    })
-    ipcMain.handle('shell.openExternal', async (_e, payload: { url: string }) => {
-        try { await shell.openExternal(payload.url); return { ok: true } } catch (e: any) { return { ok: false, error: e?.message || String(e) } }
     })
 
     // Members: quick letter generation (RTF) and open

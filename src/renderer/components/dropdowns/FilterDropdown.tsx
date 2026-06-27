@@ -88,7 +88,6 @@ export default function FilterDropdown({
   useLayoutEffect(() => {
     if (!tooltip || !showTooltip) return
     updateTooltipPosition()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tooltip, showTooltip])
 
   useEffect(() => {
@@ -102,7 +101,6 @@ export default function FilterDropdown({
       window.removeEventListener('resize', onReposition)
       window.removeEventListener('scroll', onReposition, true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tooltip, showTooltip])
 
   useEffect(() => {
