@@ -29,6 +29,7 @@ import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
+import { base64ToFile, bufferToBase64Safe } from './utils/fileEncoding'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const SettingsView = lazy(() =>
@@ -45,24 +46,6 @@ const EarmarksView = lazy(() => import('./views/Earmarks/EarmarksView'))
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
-// Safe ArrayBuffer -> base64 converter (chunked to avoid "Maximum call stack size exceeded")
-function bufferToBase64Safe(buf: ArrayBuffer) {
-    const bytes = new Uint8Array(buf)
-    const chunk = 0x8000
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-    }
-    return btoa(binary)
-}
-
-function base64ToFile(name: string, dataBase64: string, mime?: string) {
-    const binary = atob(dataBase64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-    return new File([bytes], name, { type: mime || '' })
-}
-
 function friendlyVoucherError(e: any) {
     const msg = String(e?.message || e || '')
     if (/Zweckbindung.*liegt vor Beginn/i.test(msg)) return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
@@ -76,16 +59,13 @@ function friendlyVoucherError(e: any) {
 }
 
 function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info', text: string) => void }) {
-    const [org, setOrg] = useState<string>('')
     const [cashier, setCashier] = useState<string>('')
     useEffect(() => {
         let cancelled = false
         async function load() {
             try {
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
                 const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
                 if (!cancelled) {
-                    setOrg((on?.value as any) || '')
                     setCashier((cn?.value as any) || '')
                 }
             } catch { }
@@ -95,7 +75,7 @@ function TopHeaderOrg({ notify }: { notify?: (type: 'success' | 'error' | 'info'
         window.addEventListener('data-changed', onChanged)
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
-    const text = [org || null, cashier || null].filter(Boolean).join(' | ')
+    const text = cashier.trim()
     return (
         <div className="inline-flex items-center gap-8">
             <img src={appLogo} alt="VereinO" width={20} height={20} style={{ borderRadius: 4, display: 'block' }} />

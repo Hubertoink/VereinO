@@ -28,8 +28,9 @@
     overflow-y: auto;
     background: color-mix(in oklab, var(--surface) 85%, transparent);
     border: 1px solid var(--border);
-    border-radius: 0 0 var(--radius) var(--radius);
+    border-radius: 18px;
     padding: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 .settings-pane { display: grid; gap: 16px; }
 .settings-pane-card { padding: 12px; }
@@ -53,52 +54,168 @@
     border: 0;
 }
 
-/* Settings Navigation - Aktenreiter (file tab) style */
-.settings-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 0;
-    padding-bottom: 0;
-    position: relative;
+/* Settings Navigation */
+.settings-nav-shell {
+    margin: 6px 0 14px;
+    padding: 10px 12px 12px;
+    border: 1px solid color-mix(in oklab, var(--border) 88%, transparent);
+    border-radius: 18px;
+    background: color-mix(in oklab, var(--surface) 72%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in oklab, #fff 4%, transparent),
+        0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
-/* Horizontal line that extends from the last tab to the right edge */
-.settings-tabs::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid var(--border);
-    align-self: flex-end;
-    margin-bottom: 0;
+.settings-nav-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.settings-nav-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--text-dim) 90%, transparent);
+}
+
+.settings-clusters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+
+.settings-cluster-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 0 8px;
+    border: none;
+    background: transparent;
+    color: color-mix(in oklab, var(--text) 68%, transparent);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.settings-cluster-trigger::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -11px;
+    height: 2px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--accent) 78%, transparent);
+    transform: scaleX(0.35);
+    transform-origin: center;
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+}
+
+.settings-cluster-trigger:hover,
+.settings-cluster-trigger.open {
+    color: var(--text);
+    transform: translateY(-1px);
+}
+
+.settings-cluster-trigger.active {
+    color: color-mix(in oklab, var(--accent) 72%, var(--text));
+}
+
+.settings-cluster-trigger:hover::after,
+.settings-cluster-trigger.open::after {
+    opacity: 0.65;
+    transform: scaleX(0.72);
+}
+
+.settings-cluster-trigger.active::after {
+    opacity: 1;
+    transform: scaleX(1);
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--accent) 88%, transparent) 0%,
+        color-mix(in oklab, var(--accent-hover) 72%, transparent) 100%
+    );
+}
+
+.settings-cluster-caret {
+    font-size: 12px;
+    opacity: 0.56;
+    transform: translateY(-1px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.settings-cluster-trigger.open .settings-cluster-caret {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.settings-cluster-trigger.active .settings-cluster-caret {
+    color: color-mix(in oklab, var(--accent) 80%, var(--text));
+}
+
+.settings-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.settings-tabs {
+    display: contents;
 }
 
 .settings-tab {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 500;
-    background: color-mix(in oklab, var(--muted) 40%, transparent);
-    border: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    border-radius: var(--radius) var(--radius) 0 0;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 13px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1;
+    background: color-mix(in oklab, var(--surface) 52%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+    border-radius: 999px;
     cursor: pointer;
     color: var(--text-dim);
-    transition: background 0.15s, color 0.15s;
-    margin-bottom: -1px;
+    transition:
+        background 0.18s ease,
+        color 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.18s ease,
+        box-shadow 0.18s ease;
 }
 
 .settings-tab:hover {
-    background: color-mix(in oklab, var(--muted) 60%, transparent);
+    background: color-mix(in oklab, var(--surface) 76%, transparent);
     color: var(--text);
+    border-color: color-mix(in oklab, var(--accent) 18%, var(--border));
+    transform: translateY(-1px);
 }
 
 .settings-tab.active {
-    background: color-mix(in oklab, var(--surface) 85%, transparent);
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--accent) 14%, var(--surface)) 0%,
+        color-mix(in oklab, var(--accent) 9%, var(--surface)) 100%
+    );
     color: var(--text);
-    font-weight: 600;
-    border-bottom-color: color-mix(in oklab, var(--surface) 85%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent),
+        0 8px 18px rgba(0, 0, 0, 0.14);
 }
 
 .settings-tab-icon {
@@ -107,6 +224,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .settings-tab-icon svg {
@@ -277,13 +395,28 @@ label.settings-toggle-card {
 }
 
 @media (max-width: 1050px) {
-    .settings-tabs {
+    .settings-nav-shell {
+        padding: 10px;
+        border-radius: 16px;
+    }
+
+    .settings-clusters,
+    .settings-subnav {
         flex-wrap: nowrap;
         overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: thin;
+    }
+
+    .settings-clusters {
+        gap: 16px;
+        margin-bottom: 10px;
     }
 
     .settings-tab {
-        padding: 8px 10px;
+        min-height: 40px;
+        padding: 8px 12px;
+        flex: 0 0 auto;
     }
 
     .settings-tab-label--full {
@@ -306,6 +439,31 @@ label.settings-toggle-card {
     .settings-layout-grid,
     .settings-layout-grid--wide {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1650px) {
+    .settings-nav-shell {
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .settings-clusters {
+        gap: 14px;
+    }
+
+    .settings-cluster-trigger {
+        font-size: 13px;
+    }
+
+    .settings-cluster-trigger::after {
+        bottom: -10px;
+    }
+
+    .settings-tab {
+        padding: 8px 12px;
+        gap: 7px;
     }
 }
 
@@ -9483,6 +9641,14 @@ html[data-glass-modals="true"] .flyout-arrow {
     gap: 10px;
 }
 
+.donations-template-helper {
+    margin-top: 4px;
+}
+
+.donations-template-link {
+    white-space: nowrap;
+}
+
 /* Receipt type tab bar */
 .donations-type-tabs {
     display: grid;
@@ -9550,11 +9716,21 @@ html[data-glass-modals="true"] .flyout-arrow {
     gap: 10px 20px;
 }
 
+.donations-checks-grid-2col {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 20px;
+}
+
 .donations-check {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 13px;
+}
+
+.donations-check-box {
+    align-items: flex-start;
 }
 
 /* Inline info button next to checkbox labels */

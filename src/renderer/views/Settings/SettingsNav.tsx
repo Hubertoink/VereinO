@@ -6,10 +6,6 @@ interface SettingsNavProps {
   onSelect: (key: TileKey) => void
 }
 
-/**
- * Settings Icons - Lucide-style outline icons
- * Consistent with the main navigation icons
- */
 const iconProps = {
   width: 18,
   height: 18,
@@ -22,27 +18,25 @@ const iconProps = {
   'aria-hidden': true,
 }
 
-// Settings tab icon colors (matching app style)
 const settingsIconColors: Record<TileKey, string> = {
-  general: '#7C4DFF',     // Purple - Appearance/Display
-  table: '#2962FF',       // Blue - Table
-  storage: '#00B8D4',     // Cyan - Storage & Backup
-  import: '#F50057',      // Pink/Red - Import
-  org: '#26A69A',         // Teal - Organization
-  donations: '#FF7043',   // Orange - Donations
+  general: '#7C4DFF',
+  table: '#2962FF',
+  storage: '#00B8D4',
+  import: '#F50057',
+  org: '#26A69A',
+  donations: '#FF7043',
   paymentAccounts: '#1976D2',
-  tags: '#FFD600',        // Yellow - Tags
-  cashCheck: '#00C853',   // Reuse Year End green
-  yearEnd: '#00C853',     // Green - Year End
-  updates: '#00B8D4',     // Cyan - Updates
-  tutorial: '#FF7043',    // Orange - Tutorial
-  about: '#9C27B0',       // Purple - About
+  tags: '#FFD600',
+  cashCheck: '#00C853',
+  yearEnd: '#00C853',
+  updates: '#00B8D4',
+  tutorial: '#FF7043',
+  about: '#9C27B0',
 }
 
 function getSettingsIcon(key: TileKey): React.ReactNode {
   switch (key) {
     case 'general':
-      // Palette/Appearance icon
       return (
         <svg {...iconProps}>
           <circle cx="13.5" cy="6.5" r="2.5" />
@@ -53,7 +47,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'table':
-      // Table/Grid icon
       return (
         <svg {...iconProps}>
           <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -63,7 +56,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'storage':
-      // Database/Storage icon
       return (
         <svg {...iconProps}>
           <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -72,7 +64,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'import':
-      // Upload/Import icon
       return (
         <svg {...iconProps}>
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -81,7 +72,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'org':
-      // Building/Organization icon
       return (
         <svg {...iconProps}>
           <rect x="4" y="2" width="16" height="20" rx="2" />
@@ -114,7 +104,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'tags':
-      // Tag icon
       return (
         <svg {...iconProps}>
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -123,16 +112,14 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'cashCheck':
-      // Wallet/Cash-check icon
       return (
         <svg {...iconProps}>
           <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-          <path d="M21 10h-4a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h4" />
+          <path d="M21 10h-4a2 2 0 0 0-2 2 2 2 0 0 0 2 2h4" />
           <path d="M7 9h5" />
         </svg>
       )
     case 'yearEnd':
-      // Calendar/Year-End icon
       return (
         <svg {...iconProps}>
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -156,7 +143,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'tutorial':
-      // Graduation cap / Learning icon
       return (
         <svg {...iconProps}>
           <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
@@ -164,7 +150,6 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
         </svg>
       )
     case 'about':
-      // Info icon
       return (
         <svg {...iconProps}>
           <circle cx="12" cy="12" r="10" />
@@ -177,47 +162,123 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
   }
 }
 
-/**
- * SettingsNav - Tile-based Navigation for Settings
- * 
- * File tab (Aktenreiter) layout for switching between settings categories
- */
+type SettingsGroup = {
+  key: 'display' | 'data' | 'club' | 'admin'
+  label: string
+  items: Array<{ key: TileKey; label: string; shortLabel: string }>
+}
+
+const GROUPS: SettingsGroup[] = [
+  {
+    key: 'display',
+    label: 'Darstellung',
+    items: [
+      { key: 'general', label: 'Darstellung', shortLabel: 'Darst.' },
+      { key: 'table', label: 'Tabelle', shortLabel: 'Tab.' },
+    ],
+  },
+  {
+    key: 'data',
+    label: 'Daten',
+    items: [
+      { key: 'storage', label: 'Speicher & Backup', shortLabel: 'Speicher' },
+      { key: 'import', label: 'Import', shortLabel: 'Import' },
+      { key: 'updates', label: 'Updates', shortLabel: 'Updates' },
+    ],
+  },
+  {
+    key: 'club',
+    label: 'Verein',
+    items: [
+      { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
+      { key: 'paymentAccounts', label: 'Konten', shortLabel: 'Konten' },
+      { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
+    ],
+  },
+  {
+    key: 'admin',
+    label: 'Verwaltung',
+    items: [
+      { key: 'cashCheck', label: 'Kassenprüfung', shortLabel: 'Kassenpr.' },
+      { key: 'yearEnd', label: 'Jahresabschluss', shortLabel: 'Jahresab.' },
+      { key: 'donations', label: 'Spenden', shortLabel: 'Spenden' },
+    ],
+  },
+]
+
 export function SettingsNav({ active, onSelect }: SettingsNavProps) {
-  const tiles: Array<{ key: TileKey; label: string; shortLabel: string }> = [
-    { key: 'general', label: 'Darstellung', shortLabel: 'Darst.' },
-    { key: 'table', label: 'Tabelle', shortLabel: 'Tab.' },
-    { key: 'storage', label: 'Speicher & Backup', shortLabel: 'Speicher' },
-    { key: 'import', label: 'Import', shortLabel: 'Import' },
-    { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
-    { key: 'donations', label: 'Spenden', shortLabel: 'Spenden' },
-    { key: 'paymentAccounts', label: 'Konten', shortLabel: 'Konten' },
-    { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
-    { key: 'cashCheck', label: 'Kassenprüfung', shortLabel: 'Kassenpr.' },
-    { key: 'yearEnd', label: 'Jahresabschluss', shortLabel: 'Jahresab.' },
-    { key: 'updates', label: 'Updates', shortLabel: 'Updates' },
-  ]
+  const activeGroupKey =
+    GROUPS.find((group) => group.items.some((item) => item.key === active))?.key ?? GROUPS[0].key
+
+  const [openGroupKey, setOpenGroupKey] = React.useState<SettingsGroup['key'] | null>(null)
+
+  React.useEffect(() => {
+    setOpenGroupKey(null)
+  }, [active])
+
+  const visibleGroupKey = openGroupKey ?? activeGroupKey
+  const visibleGroup = GROUPS.find((group) => group.key === visibleGroupKey) ?? GROUPS[0]
 
   return (
-    <div className="settings-tabs">
-      {tiles.map((tile) => (
-        <button
-          key={tile.key}
-          className={`settings-tab ${active === tile.key ? 'active' : ''}`}
-          onClick={() => onSelect(tile.key)}
-          aria-current={active === tile.key ? 'page' : undefined}
-          title={tile.label}
-        >
-          <span 
-            className="settings-tab-icon" 
-            aria-hidden="true"
-            style={{ color: settingsIconColors[tile.key] }}
+    <div
+      className="settings-nav-shell"
+      onMouseLeave={() => setOpenGroupKey(null)}
+    >
+      <div className="settings-nav-meta">
+        <span className="settings-nav-eyebrow">Bereiche</span>
+      </div>
+
+      <div className="settings-clusters" role="tablist" aria-label="Einstellungsbereiche">
+        {GROUPS.map((group) => {
+          const groupIsActive = group.key === activeGroupKey
+          const groupIsOpen = group.key === visibleGroupKey
+
+          return (
+            <button
+              key={group.key}
+              type="button"
+              className={`settings-cluster-trigger ${groupIsActive ? 'active' : ''} ${groupIsOpen ? 'open' : ''}`}
+              onMouseEnter={() => setOpenGroupKey(group.key)}
+              onFocus={() => setOpenGroupKey(group.key)}
+              onClick={() => {
+                if (group.key === activeGroupKey) {
+                  setOpenGroupKey((current) => current === group.key ? null : group.key)
+                  return
+                }
+                onSelect(group.items[0].key)
+                setOpenGroupKey(group.key)
+              }}
+              aria-expanded={groupIsOpen}
+            >
+              <span>{group.label}</span>
+              <span className="settings-cluster-caret" aria-hidden="true">⌄</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="settings-subnav" role="group" aria-label={visibleGroup.label}>
+        {visibleGroup.items.map((tile) => (
+          <button
+            key={tile.key}
+            type="button"
+            className={`settings-tab ${active === tile.key ? 'active' : ''}`}
+            onClick={() => onSelect(tile.key)}
+            aria-current={active === tile.key ? 'page' : undefined}
+            title={tile.label}
           >
-            {getSettingsIcon(tile.key)}
-          </span>
-          <span className="settings-tab-label settings-tab-label--full">{tile.label}</span>
-          <span className="settings-tab-label settings-tab-label--short">{tile.shortLabel}</span>
-        </button>
-      ))}
+            <span
+              className="settings-tab-icon"
+              aria-hidden="true"
+              style={{ color: settingsIconColors[tile.key] }}
+            >
+              {getSettingsIcon(tile.key)}
+            </span>
+            <span className="settings-tab-label settings-tab-label--full">{tile.label}</span>
+            <span className="settings-tab-label settings-tab-label--short">{tile.shortLabel}</span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

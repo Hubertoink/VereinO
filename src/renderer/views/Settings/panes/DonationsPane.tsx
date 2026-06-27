@@ -28,9 +28,10 @@ function normalizeDraft(input: Partial<DonationReceiptDraft>): DonationReceiptDr
     receiptDate: String(input.receiptDate || ''),
     place: String(input.place || ''),
     waiverReimbursement: input.waiverReimbursement == null ? true : Boolean(input.waiverReimbursement),
+    taxExemptionConfirmed: input.taxExemptionConfirmed == null ? true : Boolean(input.taxExemptionConfirmed),
+    statuteRequirementsConfirmed: input.statuteRequirementsConfirmed == null ? true : Boolean(input.statuteRequirementsConfirmed),
     directUse: input.directUse == null ? true : Boolean(input.directUse),
-    forwardedToOtherEntity: Boolean(input.forwardedToOtherEntity),
-    forwardedRecipient: String(input.forwardedRecipient || ''),
+    noMembershipContribution: Boolean(input.noMembershipContribution),
     signerName: String(input.signerName || '')
   }
 }
@@ -161,8 +162,8 @@ export function DonationsPane({ notify }: OrgPaneProps) {
         </div>
         <div className="row">
           <div className="field">
-            <label>Datum Feststellungsbescheid (§ 60a AO)</label>
-            <input className="input" type="date" value={defaults.exemptionNoticeDate} onChange={(e) => setDefaults((p) => ({ ...p, exemptionNoticeDate: e.target.value }))} title="Datum Feststellungsbescheid" />
+            <label>Datum eigener Bescheid / Freistellung</label>
+            <input className="input" type="date" value={defaults.exemptionNoticeDate} onChange={(e) => setDefaults((p) => ({ ...p, exemptionNoticeDate: e.target.value }))} title="Datum des eigenen Bescheids" />
           </div>
           <div className="field" />
         </div>

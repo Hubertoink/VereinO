@@ -1,27 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { notifyDataChanged } from '../../utils/refresh'
+import { base64ToUint8Array, bufferToBase64Safe } from '../../utils/fileEncoding'
 
 // Vite will copy the worker file and return a URL string
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-
-// Safe ArrayBuffer -> base64 converter (chunked to avoid call stack overflow)
-function bufferToBase64Safe(buf: ArrayBuffer) {
-    const bytes = new Uint8Array(buf)
-    const chunk = 0x8000
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-    }
-    return btoa(binary)
-}
-
-function base64ToUint8Array(base64: string) {
-    const binary = atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    return bytes
-}
 
 // Icon components for toolbar
 const IconClose = () => (
@@ -76,6 +59,13 @@ const IconImage = () => (
     </svg>
 )
 
+type PreviewState =
+    | null
+    | { kind: 'image'; url: string }
+    | { kind: 'pdf'; data: Uint8Array; fileId: number }
+
+type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf')
+
 export default function AttachmentsModal({
     voucher,
     onClose,
@@ -90,18 +80,27 @@ export default function AttachmentsModal({
     const [error, setError] = useState<string>('')
     const [selectedId, setSelectedId] = useState<number | null>(null)
     const [confirmDelete, setConfirmDelete] = useState<null | { id: number; fileName: string }>(null)
-    const [preview, setPreview] = useState<null | { kind: 'image'; url: string } | { kind: 'pdf'; data: Uint8Array }>(null)
+    const [preview, setPreview] = useState<PreviewState>(null)
     const [pdfError, setPdfError] = useState<string>('')
     const [pdfMeta, setPdfMeta] = useState<null | { page: number; numPages: number }>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const pdfCanvasRef = useRef<HTMLCanvasElement | null>(null)
     const previewAreaRef = useRef<HTMLDivElement | null>(null)
     const pdfDocRef = useRef<any>(null)
+    const pdfDocCacheRef = useRef(new Map<number, Promise<any>>())
+    const previewCacheRef = useRef(new Map<number, Exclude<PreviewState, null>>())
+    const pdfJsRef = useRef<PdfJsModule | null>(null)
+    const renderTaskRef = useRef<any>(null)
+    const resizeFrameRef = useRef<number | null>(null)
+    const currentPreviewRequestRef = useRef(0)
     const [previewAreaWidth, setPreviewAreaWidth] = useState<number>(0)
 
     useEffect(() => {
         let alive = true
         setLoading(true); setError('')
+        previewCacheRef.current.clear()
+        pdfDocCacheRef.current.clear()
+        pdfDocRef.current = null
         ;(window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
             .then((res: any) => {
                 if (!alive) return
@@ -120,11 +119,22 @@ export default function AttachmentsModal({
     }, [voucher.voucherId])
 
     async function refreshPreview(id: number | null) {
+        const requestId = currentPreviewRequestRef.current + 1
+        currentPreviewRequestRef.current = requestId
         setPreview(null)
         setPdfError('')
         setPdfMeta(null)
         pdfDocRef.current = null
+        if (renderTaskRef.current) {
+            try { renderTaskRef.current.cancel() } catch { }
+            renderTaskRef.current = null
+        }
         if (id == null) return
+        const cachedPreview = previewCacheRef.current.get(id)
+        if (cachedPreview) {
+            setPreview(cachedPreview)
+            return
+        }
         const f = files.find(x => x.id === id)
         if (!f) return
         const name = f.fileName || ''
@@ -134,13 +144,17 @@ export default function AttachmentsModal({
         if (!isImg && !isPdf) return
         try {
             const res = await (window as any).api?.attachments.read?.({ fileId: id })
-            if (!res) return
+            if (!res || currentPreviewRequestRef.current !== requestId) return
             if (isImg) {
-                setPreview({ kind: 'image', url: `data:${res.mimeType || 'image/*'};base64,${res.dataBase64}` })
+                const nextPreview: Exclude<PreviewState, null> = { kind: 'image', url: `data:${res.mimeType || 'image/*'};base64,${res.dataBase64}` }
+                previewCacheRef.current.set(id, nextPreview)
+                setPreview(nextPreview)
                 return
             }
             if (isPdf) {
-                setPreview({ kind: 'pdf', data: base64ToUint8Array(res.dataBase64) })
+                const nextPreview: Exclude<PreviewState, null> = { kind: 'pdf', data: base64ToUint8Array(res.dataBase64), fileId: id }
+                previewCacheRef.current.set(id, nextPreview)
+                setPreview(nextPreview)
             }
         } catch (e: any) {
             setError('Vorschau nicht möglich: ' + (e?.message || String(e)))
@@ -153,26 +167,45 @@ export default function AttachmentsModal({
         const el = previewAreaRef.current
         if (!el) return
         const ro = new ResizeObserver(() => {
-            setPreviewAreaWidth(el.clientWidth)
+            if (resizeFrameRef.current != null) cancelAnimationFrame(resizeFrameRef.current)
+            resizeFrameRef.current = requestAnimationFrame(() => {
+                setPreviewAreaWidth((current) => {
+                    const next = el.clientWidth
+                    return Math.abs(current - next) >= 8 ? next : current
+                })
+                resizeFrameRef.current = null
+            })
         })
         ro.observe(el)
         setPreviewAreaWidth(el.clientWidth)
-        return () => ro.disconnect()
+        return () => {
+            ro.disconnect()
+            if (resizeFrameRef.current != null) cancelAnimationFrame(resizeFrameRef.current)
+        }
     }, [])
 
     useEffect(() => {
         let cancelled = false
 
+        async function ensurePdfJs() {
+            if (pdfJsRef.current) return pdfJsRef.current
+            const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
+            ;(pdfjs as any).GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+            pdfJsRef.current = pdfjs
+            return pdfjs
+        }
+
         async function loadPdfDocument() {
             if (!preview || preview.kind !== 'pdf') return
             setPdfError('')
-
-            // Lazy-load pdfjs only when needed
-            const pdfjs = await import('pdfjs-dist/legacy/build/pdf')
-            ;(pdfjs as any).GlobalWorkerOptions.workerSrc = pdfWorkerUrl
-
-            const loadingTask = pdfjs.getDocument({ data: preview.data })
-            const doc = await loadingTask.promise
+            const pdfjs = await ensurePdfJs()
+            let docPromise = pdfDocCacheRef.current.get(preview.fileId)
+            if (!docPromise) {
+                const nextDocPromise = pdfjs.getDocument({ data: preview.data }).promise
+                pdfDocCacheRef.current.set(preview.fileId, nextDocPromise)
+                docPromise = nextDocPromise
+            }
+            const doc = await docPromise
             if (cancelled) return
             pdfDocRef.current = doc
             setPdfMeta({ page: 1, numPages: doc.numPages || 1 })
@@ -192,7 +225,12 @@ export default function AttachmentsModal({
             const fitScale = availWidth > 0 ? Math.min(1, (availWidth / baseViewport.width) * 0.95) : 1
             const scale = Math.max(0.5, Math.min(1, fitScale))
 
-            const outputScale = window.devicePixelRatio || 1
+            if (renderTaskRef.current) {
+                try { renderTaskRef.current.cancel() } catch { }
+                renderTaskRef.current = null
+            }
+
+            const outputScale = Math.min(window.devicePixelRatio || 1, 1.5)
             const viewport = page.getViewport({ scale })
             const ctx = canvas.getContext('2d')
             if (!ctx) return
@@ -204,11 +242,18 @@ export default function AttachmentsModal({
 
             ctx.setTransform(outputScale, 0, 0, outputScale, 0, 0)
 
-            await page.render({ canvasContext: ctx, viewport }).promise
+            const renderTask = page.render({ canvasContext: ctx, viewport })
+            renderTaskRef.current = renderTask
+            await renderTask.promise
+            if (renderTaskRef.current === renderTask) renderTaskRef.current = null
+            try { page.cleanup() } catch { }
         }
 
-        // Clear canvas when not showing a PDF
         if (!preview || preview.kind !== 'pdf') {
+            if (renderTaskRef.current) {
+                try { renderTaskRef.current.cancel() } catch { }
+                renderTaskRef.current = null
+            }
             const c = pdfCanvasRef.current
             if (c) {
                 const ctx = c.getContext('2d')
@@ -217,10 +262,10 @@ export default function AttachmentsModal({
             return
         }
 
-        // Load doc once per selection
         if (!pdfDocRef.current) {
             loadPdfDocument().catch((e: any) => {
                 if (cancelled) return
+                if (String(e?.name || '').includes('RenderingCancelled')) return
                 setPdfError('PDF Vorschau nicht möglich: ' + (e?.message || String(e)))
             })
             return () => { cancelled = true }
@@ -228,11 +273,15 @@ export default function AttachmentsModal({
 
         renderPdfPage().catch((e: any) => {
             if (cancelled) return
+            if (String(e?.name || '').includes('RenderingCancelled')) return
             setPdfError('PDF Vorschau nicht möglich: ' + (e?.message || String(e)))
         })
 
         return () => {
             cancelled = true
+            if (renderTaskRef.current) {
+                try { renderTaskRef.current.cancel() } catch { }
+            }
         }
     }, [preview, pdfMeta?.page, previewAreaWidth])
 
@@ -280,6 +329,8 @@ export default function AttachmentsModal({
         if (!confirmDelete) return
         try {
             await (window as any).api?.attachments.delete?.({ fileId: confirmDelete.id })
+            previewCacheRef.current.delete(confirmDelete.id)
+            pdfDocCacheRef.current.delete(confirmDelete.id)
             const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
