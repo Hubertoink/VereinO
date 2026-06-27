@@ -11,7 +11,8 @@
         "esModuleInterop": true,
         "types": [
             "node",
-            "electron"
+            "electron",
+            "jest"
         ]
     },
     "include": [
