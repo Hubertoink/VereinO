@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../TagsEditor'
 import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
+import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { getInternalAssignmentValidationState, isMetaAmountValid } from './voucherMetaValidation'
 
 // Types for multiple budget/earmark assignments
@@ -62,19 +63,6 @@ interface VoucherInfoModalProps {
   windowMode?: boolean
 }
 
-// Helper for contrast text color
-function contrastText(bg?: string | null) {
-  if (!bg) return '#000'
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-  if (!m) return '#000'
-  const hex = m[1]
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#000' : '#fff'
-}
-
 const IconEdit = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" />
@@ -125,10 +113,10 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   })
   
   // Build tag display info
-  const tagList = (voucher.tags || []).map(tagName => {
-    const def = tagDefs.find(t => t.name.toLowerCase() === tagName.toLowerCase())
-    return { name: tagName, color: def?.color || null }
-  })
+  const tagList = (voucher.tags || []).map(tagName => ({
+    name: tagName,
+    color: resolveTagDisplayColor(tagName, tagDefs),
+  }))
   
   // Payment label for copy functions
   let paymentLabel = ''
@@ -579,7 +567,7 @@ Status: ${statusLabel}`
                         className="badge-budget" 
                         style={{ 
                           background: bg, 
-                          color: bg ? contrastText(bg) : undefined,
+                          color: bg ? getContrastTextColor(bg) : undefined,
                           border: bg ? `1px solid ${bg}` : undefined,
                           padding: '2px 8px',
                           borderRadius: 4,
@@ -650,7 +638,7 @@ Status: ${statusLabel}`
                         className="badge-earmark" 
                         style={{ 
                           background: bg, 
-                          color: bg ? contrastText(bg) : undefined,
+                          color: bg ? getContrastTextColor(bg) : undefined,
                           border: bg ? `1px solid ${bg}` : undefined,
                           padding: '2px 8px',
                           borderRadius: 4,
@@ -688,7 +676,7 @@ Status: ${statusLabel}`
                       className="chip" 
                       style={{ 
                         background: tag.color || undefined, 
-                        color: tag.color ? contrastText(tag.color) : undefined,
+                        color: tag.color ? getContrastTextColor(tag.color) : undefined,
                         padding: '2px 8px',
                         borderRadius: 4,
                         fontSize: 12

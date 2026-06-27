@@ -124,15 +124,6 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         if (!/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(s)) return { ok: false, msg: 'Format ungültig' }
         return { ok: true }
     }
-    function nextDuePreview(amount?: number | null, interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null, anchor?: string | null): string | null {
-        if (!amount || !interval) return null
-        let d = anchor ? new Date(anchor) : new Date()
-        if (isNaN(d.getTime())) d = new Date()
-        const add = interval === 'MONTHLY' ? 1 : interval === 'QUARTERLY' ? 3 : 12
-        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + add, 1))
-        const iso = d.toISOString().slice(0, 10)
-        return `${interval === 'MONTHLY' ? 'Monatlich' : interval === 'QUARTERLY' ? 'Quartal' : 'Jährlich'}: ${eurFmt.format(amount)} → Initiale Fälligkeit ca. ${iso}`
-    }
 
     const [requiredTouched, setRequiredTouched] = useState(false)
     const [missingRequired, setMissingRequired] = useState<string[]>([])
@@ -692,7 +683,6 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         <div className="card" style={{ padding: 12, marginTop: 8 }}>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
                                 <div className="helper">Finanzen & SEPA-Mandat</div>
-                                <div className="helper" style={{ fontSize: '0.85em' }} aria-live="polite">{nextDuePreview(form.draft.contribution_amount ?? null, form.draft.contribution_interval ?? null, form.draft.next_due_date ?? form.draft.mandate_date ?? form.draft.join_date ?? null) || ''}</div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                                 {(() => { const v = validateIBAN(form.draft.iban); return (

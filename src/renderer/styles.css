@@ -1863,13 +1863,15 @@ button.badge:hover { filter: brightness(1.03); }
 }
 
 .badge.in {
-    background: color-mix(in oklab, var(--badge-in) 25%, transparent);
+    background: var(--badge-in);
     color: var(--badge-text);
+    border: 1px solid color-mix(in oklab, var(--badge-in) 55%, var(--border));
 }
 
 .badge.out {
-    background: color-mix(in oklab, var(--badge-out) 25%, transparent);
+    background: var(--badge-out);
     color: var(--badge-text);
+    border: 1px solid color-mix(in oklab, var(--badge-out) 55%, var(--border));
 }
 
 .badge.transfer {
@@ -5631,6 +5633,15 @@ label .req-asterisk {
 
 /* TagsEditor */
 .tags-editor-input { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-height:34px; }
+.tags-editor-input .chip {
+    font-size: 12px;
+    padding: 4px 8px;
+    min-height: 24px;
+}
+.tags-editor-input .chip .chip-x {
+    font-size: 13px;
+    line-height: 1;
+}
 .tags-editor-text-input { flex:1; min-width:120px; border:none; outline:none; background:transparent; color:var(--text); }
 .tags-suggestions { padding:6px; margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; }
 .tag-suggestion-btn { position:relative; }
@@ -5956,23 +5967,24 @@ label .req-asterisk {
             overflow-y: auto;
         }
 
-        /* Compact tags inside booking modal */
+        /* Tags inside booking modal should feel more proportional to the surrounding panel */
         .booking-modal .chip {
-            font-size: 10px;
-            padding: 1px 5px;
-            gap: 3px;
+            font-size: 11px;
+            padding: 3px 7px;
+            gap: 4px;
+            min-height: 24px;
         }
         .booking-modal .chip .chip-x {
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1;
         }
         .booking-modal .tags-editor-input {
-            gap: 4px;
-            min-height: 30px;
+            gap: 5px;
+            min-height: 34px;
         }
         .booking-modal .tag-suggestion-btn {
-            font-size: 10px;
-            padding: 3px 8px;
+            font-size: 11px;
+            padding: 4px 8px;
             border-radius: 8px;
         }
         .booking-modal .tags-suggestions {

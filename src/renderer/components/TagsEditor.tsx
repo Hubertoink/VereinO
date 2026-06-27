@@ -1,17 +1,5 @@
 import React, { useMemo, useState } from 'react'
-
-// Local contrast text helper to ensure readable tag chips
-function contrastText(bg?: string | null) {
-  if (!bg) return '#000'
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-  if (!m) return '#000'
-  const hex = m[1]
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#000' : '#fff'
-}
+import { getContrastTextColor, resolveTagDisplayColor } from '../utils/tagColors'
 
 export default function TagsEditor({ label, labelAccessory, value, onChange, tagDefs, className, inputRef }: { label?: string; labelAccessory?: React.ReactNode; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string; inputRef?: React.Ref<HTMLInputElement> }) {
   const [input, setInput] = useState('')
@@ -28,14 +16,14 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
     setInput('')
   }
   function removeTag(name: string) { onChange((value || []).filter(v => v !== name)) }
-  const colorFor = (name: string) => (tagDefs || []).find(t => (t.name || '').toLowerCase() === (name || '').toLowerCase())?.color
+  const colorFor = (name: string) => resolveTagDisplayColor(name, tagDefs)
   return (
     <div className={`field field-full-width ${className || ''}`.trim()}>
       {label && <label>{label}{labelAccessory}</label>}
       <div className="input tags-editor-input">
         {(value || []).map(t => {
           const bg = colorFor(t) || undefined
-          const fg = contrastText(bg)
+          const fg = getContrastTextColor(bg)
           return (
             <span key={t} className="chip" style={{ background: bg, color: bg ? fg : undefined }}>
               {t}
@@ -59,8 +47,8 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
       {suggestions.length > 0 && (
         <div className="card tags-suggestions" aria-label="Verfügbare Tags">
           {suggestions.map(s => {
-            const bg = s.color || undefined
-            const fg = contrastText(bg)
+            const bg = colorFor(s.name) || undefined
+            const fg = getContrastTextColor(bg)
             const selected = (value || []).some(v => v.toLowerCase() === (s.name || '').toLowerCase())
             return (
               <button

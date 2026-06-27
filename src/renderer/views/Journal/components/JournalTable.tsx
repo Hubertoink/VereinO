@@ -1,6 +1,7 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
+import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
 import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
 import type { BudgetAssignment, EarmarkAssignment, VoucherRow } from '../types'
 
@@ -234,20 +235,6 @@ function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, ch
             )}
         </HoverTooltip>
     )
-}
-
-// Helper function for contrast text color
-function contrastText(bg?: string | null) {
-    if (!bg) return '#000'
-    const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-    if (!m) return '#000'
-    const hex = m[1]
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
-    // Perceived luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.6 ? '#000' : '#fff'
 }
 
 // LocalStorage key for column widths
@@ -710,7 +697,7 @@ export default function JournalTable({
                     {(r.tags || []).map((t: string) => {
                         const tagDef = tagDefFor(t)
                         const bg = colorFor(t) || undefined
-                        const fg = contrastText(bg)
+                        const fg = getContrastTextColor(bg)
                         return (
                             <UsageHover
                                 key={t}
@@ -766,7 +753,7 @@ export default function JournalTable({
                                 const code = ea.code || earmarks.find(e => e.id === ea.earmarkId)?.code || `#${ea.earmarkId}`
                                 const em = earmarks.find(e => e.id === ea.earmarkId || e.code === code)
                                 const bg = ea.color || em?.color
-                                const fg = contrastText(bg)
+                                const fg = getContrastTextColor(bg)
                                 const fullLabel = code
                                 const displayLabel = truncate(code)
                                 return (
@@ -882,7 +869,7 @@ export default function JournalTable({
                             {assignments.slice(0, 3).map((ba: any, idx: number) => {
                                 const label = ba.label || `Budget #${ba.budgetId}`
                                 const bg = ba.color || undefined
-                                const fg = contrastText(bg)
+                                const fg = getContrastTextColor(bg)
                                 const displayLabel = truncate(label)
                                 return (
                                     <UsageHover
