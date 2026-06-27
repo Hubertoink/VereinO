@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
 
+import { deleteOrganizationStorage } from './organizationDeletion'
+
 const require = createRequire(import.meta.url)
 let BetterSqlite3: any
 try {
@@ -372,7 +374,7 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
     // Optionally delete data folder
     if (deleteData && org.dbRoot) {
         try {
-            fs.rmSync(org.dbRoot, { recursive: true, force: true })
+            deleteOrganizationStorage(org.dbRoot, path.join(app.getPath('userData'), 'organizations'))
         } catch (e) {
             console.warn('Could not delete org folder:', e)
         }
