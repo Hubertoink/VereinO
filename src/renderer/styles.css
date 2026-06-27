@@ -4829,12 +4829,14 @@ textarea:focus {
     position: relative;
     display: inline-flex;
     min-width: 0;
+    pointer-events: auto;
 }
 
 .org-switcher-trigger {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    pointer-events: auto;
     padding: 4px 10px;
     border-radius: 8px;
     background: var(--surface);
@@ -5047,6 +5049,7 @@ textarea:focus {
     gap: 12px;
     padding: 4px 8px;
     border-bottom: 1px solid var(--border);
+    overflow: visible;
     -webkit-backdrop-filter: var(--blur);
     backdrop-filter: var(--blur);
     background: color-mix(in oklab, var(--surface) 50%, transparent);
@@ -5055,7 +5058,10 @@ textarea:focus {
 .app-header-top { grid-template-columns: minmax(0, 1fr) minmax(28px, 0.45fr) auto minmax(28px, 0.45fr) 92px; }
 .app-header-left { grid-template-columns: minmax(0, 1fr) 92px; }
 .app-header > * { min-width: 0; }
-.no-drag { pointer-events: auto; }
+.no-drag {
+    pointer-events: auto;
+    -webkit-app-region: no-drag;
+}
 .app-header__left,
 .app-header__nav,
 .app-header__controls {
@@ -5065,8 +5071,9 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    overflow: hidden;
+    overflow: visible;
     min-width: 0;
+    position: relative;
 }
 .app-header__nav {
     display: inline-flex;

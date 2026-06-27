@@ -110,9 +110,9 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
 
   return (
     <>
-      <div className="org-switcher" ref={dropdownRef} onKeyDown={handleKeyDown}>
+      <div className="org-switcher no-drag" ref={dropdownRef} onKeyDown={handleKeyDown}>
         <button
-          className="org-switcher-trigger"
+          className="org-switcher-trigger no-drag"
           onClick={() => setIsOpen(!isOpen)}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
@@ -132,7 +132,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
             {organizations.map((org) => (
               <button
                 key={org.id}
-                className={`org-switcher-item ${org.isActive ? 'active' : ''}`}
+                className={`org-switcher-item no-drag ${org.isActive ? 'active' : ''}`}
                 onClick={() => handleSwitch(org)}
                 role="option"
                 aria-selected={org.isActive}
@@ -145,7 +145,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
 
             <div className="org-switcher-divider" />
             
-            <button className="org-switcher-item org-switcher-new" onClick={handleNewOrg}>
+            <button className="org-switcher-item org-switcher-new no-drag" onClick={handleNewOrg}>
               <span>➕</span>
               <span>Neue Organisation…</span>
             </button>
