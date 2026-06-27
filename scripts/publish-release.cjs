@@ -7,6 +7,7 @@ const releaseDir = path.join(rootDir, 'release')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 const version = pkg.version
 const tag = `v${version}`
+const isPrerelease = version.includes('-')
 
 const assetNames = [
   'latest.yml',
@@ -44,7 +45,13 @@ const releaseView = cp.spawnSync('gh', ['release', 'view', tag], {
 })
 
 if (releaseView.status !== 0) {
-  run('gh', ['release', 'create', tag, '--title', tag, '--generate-notes'])
+  const createArgs = ['release', 'create', tag, '--title', tag, '--generate-notes']
+
+  if (isPrerelease) {
+    createArgs.push('--prerelease')
+  }
+
+  run('gh', createArgs)
 }
 
 run('gh', ['release', 'upload', tag, ...assetPaths, '--clobber'])
