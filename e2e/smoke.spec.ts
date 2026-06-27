@@ -59,7 +59,7 @@ test('creates and lists a backup through the real IPC bridge', async () => {
     return { created, listed }
   })
 
-  expect(result.created.ok).toBe(true)
+  expect(result.created.ok, result.created.error || 'Backup creation failed without an error message').toBe(true)
   expect(result.created.filePath).toMatch(/database_.+_e2e\.sqlite$/)
   expect(result.listed.ok).toBe(true)
   expect(result.listed.backups?.some(({ filePath }) => filePath === result.created.filePath)).toBe(true)
