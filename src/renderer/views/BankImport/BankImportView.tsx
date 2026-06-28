@@ -1007,14 +1007,12 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
   const limit = 50
 
   const toggleSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
-    setSortBy((current) => {
-      if (current === column) {
-        setSortDir((dir) => (dir === 'DESC' ? 'ASC' : 'DESC'))
-        return current
-      }
+    if (sortBy === column) {
+      setSortDir((dir) => (dir === 'DESC' ? 'ASC' : 'DESC'))
+    } else {
+      setSortBy(column)
       setSortDir(column === 'date' || column === 'amount' ? 'DESC' : 'ASC')
-      return column
-    })
+    }
     setPage(1)
   }
 

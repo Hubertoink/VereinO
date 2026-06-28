@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'SemVer-Tag für das Release, z. B. v2.3.0'
+        description: 'SemVer-Tag für das Release, z. B. v2.3.1'
         required: true
 
 permissions:
