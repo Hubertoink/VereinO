@@ -1323,7 +1323,8 @@ export const BankTransactionLinkInput = BankTransactionIdInput.extend({ voucherI
 export const BankTransactionCheckInput = BankTransactionIdInput.extend({ note: z.string().nullable().optional() })
 export const BankTransactionMatchesInput = BankTransactionIdInput.extend({
     q: z.string().optional(),
-    includeAllDates: z.boolean().optional()
+    includeAllDates: z.boolean().optional(),
+    manual: z.boolean().optional()
 })
 export const BankTransactionOutput = z.record(z.any())
 export const BankTransactionsListOutput = z.object({

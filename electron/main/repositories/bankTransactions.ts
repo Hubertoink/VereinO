@@ -410,19 +410,28 @@ function wordSet(value?: string | null) {
   return new Set(normalized(value).split(/[^a-z0-9äöüß]+/).filter((word) => word.length >= 3))
 }
 
-export function findBankTransactionMatches(input: { id: number; q?: string; includeAllDates?: boolean }) {
+export function findBankTransactionMatches(input: { id: number; q?: string; includeAllDates?: boolean; manual?: boolean }) {
   const d = getDb()
   const transaction = getBankTransaction(input.id) as any
+  const manual = Boolean(input.manual)
   const where = [
-    `v.type = ?`,
-    `ROUND(v.gross_amount, 2) = ROUND(?, 2)`,
     `v.reversed_by_id IS NULL`,
     `NOT EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
   ]
-  const params: unknown[] = [transaction.direction, transaction.amount, input.id]
-  if (!input.includeAllDates) {
-    where.push(`ABS(julianday(v.date) - julianday(?)) <= 14`)
-    params.push(transaction.bookingDate)
+  const params: unknown[] = [input.id]
+  if (manual) {
+    if (!input.includeAllDates) {
+      where.push(`ABS(julianday(v.date) - julianday(?)) <= 31`)
+      params.push(transaction.bookingDate)
+    }
+  } else {
+    where.push(`v.type = ?`)
+    where.push(`ROUND(v.gross_amount, 2) = ROUND(?, 2)`)
+    params.push(transaction.direction, transaction.amount)
+    if (!input.includeAllDates) {
+      where.push(`ABS(julianday(v.date) - julianday(?)) <= 14`)
+      params.push(transaction.bookingDate)
+    }
   }
   if (input.q?.trim()) {
     where.push(`(v.voucher_no LIKE ? OR COALESCE(v.description, '') LIKE ? OR COALESCE(v.note, '') LIKE ?)`)
@@ -454,11 +463,16 @@ export function findBankTransactionMatches(input: { id: number; q?: string; incl
     const textScore = Math.min(45, sharedWords * 15)
     const accountScore = paymentAccountMismatch ? -20 : 20
     let score = Math.max(0, Math.min(100, dateScore + textScore + accountScore))
-    if (paymentAccountMismatch && sharedWords === 0 && dateDistance > 2) score = 0
-    if (!paymentAccountMismatch && sharedWords === 0 && dateDistance > 7) score = Math.min(score, 10)
+    if (!manual) {
+      if (paymentAccountMismatch && sharedWords === 0 && dateDistance > 2) score = 0
+      if (!paymentAccountMismatch && sharedWords === 0 && dateDistance > 7) score = Math.min(score, 10)
+    } else {
+      if (paymentAccountMismatch) score = Math.max(5, score)
+      if (sharedWords === 0 && dateDistance > 20) score = Math.max(1, Math.min(score, 15))
+    }
     return { ...row, dateDistance, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
   }).sort((a, b) => {
-    if (Number(a.paymentAccountMismatch) !== Number(b.paymentAccountMismatch)) return Number(a.paymentAccountMismatch) - Number(b.paymentAccountMismatch)
-    return b.score - a.score || a.dateDistance - b.dateDistance
+    if (!manual && Number(a.paymentAccountMismatch) !== Number(b.paymentAccountMismatch)) return Number(a.paymentAccountMismatch) - Number(b.paymentAccountMismatch)
+    return a.dateDistance - b.dateDistance || b.score - a.score
   })
 }

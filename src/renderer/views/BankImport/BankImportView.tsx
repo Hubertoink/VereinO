@@ -297,7 +297,8 @@ function ManualAssignmentModal({
       const result = await window.api.bankTransactions.matches({
         id: transaction.id,
         q: query || undefined,
-        includeAllDates
+        includeAllDates,
+        manual: true
       })
       setResults(result.rows as BankTransactionMatch[])
     } catch (reason: any) {
@@ -336,7 +337,7 @@ function ManualAssignmentModal({
               placeholder="Buchungsnummer oder Text suchen …"
               autoFocus
             />
-            <span className="helper">Es werden nur kompatible Buchungen mit passendem Betrag und Typ angezeigt.</span>
+            <span className="helper">Hier siehst du alle Buchungen rund um den Zeitraum. Die Entscheidung triffst du manuell.</span>
           </div>
           <div className="bank-manual-assign-table-wrap">
             <table className="bank-manual-assign-table">
