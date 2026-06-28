@@ -1315,6 +1315,8 @@ export const BankTransactionsListInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     q: z.string().optional(),
+    sortBy: z.enum(['status', 'date', 'description', 'account', 'type', 'amount']).optional(),
+    sortDir: z.enum(['ASC', 'DESC']).optional(),
     page: z.number().int().positive().optional(),
     limit: z.number().int().positive().max(200).optional()
 })

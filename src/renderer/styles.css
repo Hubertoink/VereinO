@@ -10258,12 +10258,36 @@ html[data-glass-modals="true"] .flyout-arrow {
   justify-content: flex-end;
 }
 
+.bank-search-wrap {
+  position: relative;
+  flex: 1 1 355px;
+  min-width: 220px;
+}
+
 .bank-import-search {
-  width: min(355px, 38vw);
+  width: 100%;
+  padding-right: 42px;
 }
 
 .bank-account-filter {
   min-width: 148px;
+}
+
+.bank-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--text-dim);
+}
+
+.bank-search-clear:hover {
+  color: var(--text);
 }
 
 .bank-status-tabs {
@@ -10335,10 +10359,26 @@ html[data-glass-modals="true"] .flyout-arrow {
   font-weight: 600;
 }
 
+.bank-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
 .bank-table th.number,
 .bank-table td.number {
   text-align: right;
   white-space: nowrap;
+}
+
+.bank-sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.bank-sort-icon.active {
+  color: var(--warning);
 }
 
 .bank-table tbody tr[tabindex] {
@@ -11020,6 +11060,7 @@ html[data-glass-modals="true"] .flyout-arrow {
     justify-content: stretch;
   }
 
+  .bank-search-wrap,
   .bank-import-search,
   .bank-page-tools .input {
     width: 100%;

@@ -282,6 +282,8 @@ export function listBankTransactions(input: {
   from?: string
   to?: string
   q?: string
+  sortBy?: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
+  sortDir?: 'ASC' | 'DESC'
   page?: number
   limit?: number
 }) {
@@ -315,13 +317,26 @@ export function listBankTransactions(input: {
     params.push(like, like, like, like)
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const sortDir = input.sortDir === 'ASC' ? 'ASC' : 'DESC'
+  const sortColumn = input.sortBy === 'status'
+    ? 'bt.status'
+    : input.sortBy === 'description'
+      ? `COALESCE(bt.counterparty, bt.purpose, '')`
+      : input.sortBy === 'account'
+        ? 'pa.name'
+        : input.sortBy === 'type'
+          ? 'bt.direction'
+          : input.sortBy === 'amount'
+            ? 'bt.amount'
+            : 'bt.booking_date'
+  const orderSql = `ORDER BY ${sortColumn} ${sortDir}, bt.booking_date DESC, bt.id DESC`
   const page = Math.max(1, Number(input.page || 1))
   const limit = Math.min(200, Math.max(1, Number(input.limit || 50)))
   const total = Number((d.prepare(`SELECT COUNT(*) as count FROM bank_transactions bt ${whereSql}`).get(...params) as any)?.count || 0)
   const rows = d.prepare(`
     ${BANK_TRANSACTION_SELECT}
     ${whereSql}
-    ORDER BY bt.booking_date DESC, bt.id DESC
+    ${orderSql}
     LIMIT ? OFFSET ?
   `).all(...params, limit, (page - 1) * limit)
   const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>

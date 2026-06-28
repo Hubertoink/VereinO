@@ -1000,9 +1000,29 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'ALL' | BankTransaction['status']>('OPEN')
   const [accountId, setAccountId] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<'status' | 'date' | 'description' | 'account' | 'type' | 'amount'>('date')
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(false)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
   const limit = 50
+
+  const toggleSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
+    setSortBy((current) => {
+      if (current === column) {
+        setSortDir((dir) => (dir === 'DESC' ? 'ASC' : 'DESC'))
+        return current
+      }
+      setSortDir(column === 'date' || column === 'amount' ? 'DESC' : 'ASC')
+      return column
+    })
+    setPage(1)
+  }
+
+  const renderSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
+    const active = sortBy === column
+    const symbol = active ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'
+    return <span className={`bank-sort-icon ${active ? 'active' : ''}`} aria-hidden="true">{symbol}</span>
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1011,6 +1031,8 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
         status,
         paymentAccountId: accountId || undefined,
         q: query || undefined,
+        sortBy,
+        sortDir,
         page,
         limit
       })
@@ -1022,7 +1044,7 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
     } finally {
       setLoading(false)
     }
-  }, [accountId, notify, page, query, status])
+  }, [accountId, notify, page, query, status, sortBy, sortDir])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 180)
@@ -1044,7 +1066,10 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
       <div className="bank-page-header">
         <h1>Bankimport</h1>
         <div className="bank-page-tools">
-          <input className="input bank-import-search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Suche Bankbelege (Text, Referenz, Gegenpartei)..." aria-label="Bankbelege durchsuchen" />
+          <div className="bank-search-wrap">
+            <input className="input bank-import-search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Suche Bankbelege (Text, Referenz, Gegenpartei)..." aria-label="Bankbelege durchsuchen" />
+            {query && <button className="btn ghost bank-search-clear" type="button" aria-label="Suche leeren" onClick={() => { setQuery(''); setPage(1) }}>×</button>}
+          </div>
           <select className="input bank-account-filter" value={accountId ?? ''} style={{ color: paymentAccountsById.get(Number(accountId || 0))?.color || undefined }} onChange={(event) => { setAccountId(event.target.value ? Number(event.target.value) : null); setPage(1) }} aria-label="Nach Zahlkonto filtern">
             <option value="">Alle Zahlkonten</option>
             {activeAccounts.map((account) => <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
@@ -1077,7 +1102,14 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
       <div className="bank-table-card">
         <table className="bank-table">
           <thead>
-            <tr><th>Status</th><th>Datum</th><th>Beschreibung</th><th>Zahlkonto</th><th>Typ</th><th className="number">Summe</th></tr>
+            <tr>
+              <th className="sortable" onClick={() => toggleSort('status')}>Status {renderSort('status')}</th>
+              <th className="sortable" onClick={() => toggleSort('date')}>Datum {renderSort('date')}</th>
+              <th className="sortable" onClick={() => toggleSort('description')}>Beschreibung {renderSort('description')}</th>
+              <th className="sortable" onClick={() => toggleSort('account')}>Zahlkonto {renderSort('account')}</th>
+              <th className="sortable" onClick={() => toggleSort('type')}>Typ {renderSort('type')}</th>
+              <th className="number sortable" onClick={() => toggleSort('amount')}>Summe {renderSort('amount')}</th>
+            </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
