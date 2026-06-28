@@ -109,6 +109,7 @@ type BankTransactionMatch = {
   voucherNo?: string | null
   date?: string | null
   description?: string | null
+  grossAmount?: number | null
   paymentAccountName?: string | null
   paymentAccountColor?: string | null
   paymentAccountMismatch?: boolean
@@ -288,6 +289,7 @@ function ManualAssignmentModal({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<BankTransactionMatch[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null)
 
   const loadResults = useCallback(async () => {
     setLoading(true)
@@ -309,6 +311,10 @@ function ManualAssignmentModal({
     const timer = window.setTimeout(() => { void loadResults() }, 160)
     return () => window.clearTimeout(timer)
   }, [loadResults])
+
+  useEffect(() => {
+    setSelectedVoucherId((current) => (current && results.some((row) => row.id === current) ? current : null))
+  }, [results])
 
   return createPortal(
     <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -332,16 +338,68 @@ function ManualAssignmentModal({
             />
             <span className="helper">Es werden nur kompatible Buchungen mit passendem Betrag und Typ angezeigt.</span>
           </div>
-          <div className="bank-match-list bank-manual-assign-list">
-            {loading && <div className="helper">Buchungen werden gesucht …</div>}
-            {!loading && results.map((match) => (
-              <BankMatchRow key={match.id} match={match} busy={busy} onLink={onLink} />
-            ))}
-            {!loading && results.length === 0 && <div className="bank-empty-small">Keine passende Buchung für die manuelle Zuweisung gefunden.</div>}
+          <div className="bank-manual-assign-table-wrap">
+            <table className="bank-manual-assign-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Datum</th>
+                  <th>Beschreibung</th>
+                  <th>Summe</th>
+                  <th>Zahlweg</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={5}><div className="bank-empty-small">Buchungen werden gesucht …</div></td>
+                  </tr>
+                )}
+                {!loading && results.map((match) => (
+                  <tr
+                    key={match.id}
+                    className={selectedVoucherId === match.id ? 'is-selected' : undefined}
+                    onClick={() => setSelectedVoucherId(match.id)}
+                  >
+                    <td>
+                      <input
+                        type="radio"
+                        name={`manual-assign-${transaction.id}`}
+                        checked={selectedVoucherId === match.id}
+                        onChange={() => setSelectedVoucherId(match.id)}
+                        aria-label={`Buchung ${match.voucherNo || match.id} auswählen`}
+                      />
+                    </td>
+                    <td>{formatDate(match.date)}</td>
+                    <td>
+                      <div className="bank-manual-assign-description">
+                        <strong>{match.voucherNo || `#${match.id}`}</strong>
+                        <span>{match.description || 'Ohne Beschreibung'}</span>
+                      </div>
+                    </td>
+                    <td>{euro.format(Number(match.grossAmount ?? transaction.amount ?? 0))}</td>
+                    <td>
+                      <span
+                        className={match.paymentAccountMismatch ? 'bank-match-warning' : 'bank-manual-assign-account'}
+                        style={!match.paymentAccountMismatch ? { color: match.paymentAccountColor || undefined } : undefined}
+                      >
+                        {match.paymentAccountName || '–'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {!loading && results.length === 0 && (
+                  <tr>
+                    <td colSpan={5}><div className="bank-empty-small">Keine passende Buchung für die manuelle Zuweisung gefunden.</div></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
         <footer className="bank-modal-footer">
+          <button className="btn primary" disabled={busy || !selectedVoucherId} onClick={() => selectedVoucherId && onLink(selectedVoucherId)}>Ausgewählte Buchung zuweisen</button>
           <button className="btn" onClick={onClose}>Schließen</button>
         </footer>
       </div>
