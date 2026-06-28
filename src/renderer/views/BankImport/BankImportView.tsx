@@ -735,14 +735,15 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
           <div className="bank-review-layout">
             <section className="bank-review-section">
               <div className="bank-section-title">
-                <div><strong>Passende Buchungen</strong><span className="helper">Exakte Konto-Treffer stehen oben. Abweichende Zahlkonten werden mit Warnhinweis gezeigt und bewusst niedriger bewertet.</span></div>
-                <div className="bank-check-toggle">
-                  <label className="bank-check-label"><input type="checkbox" checked={includeAllDates} onChange={(event) => setIncludeAllDates(event.target.checked)} /> Alle Daten</label>
-                  <span className="helper bank-check-hint">Wenn aktiv, werden auch Buchungen außerhalb von +/-14 Tagen einbezogen.</span>
+                <div className="bank-section-title__label">
+                  <strong>Passende Buchungen</strong>
                 </div>
-              </div>
-              <div className="bank-match-search">
-                <input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buchungsnummer oder Text suchen …" />
+                <div className="bank-match-toolbar">
+                  <input className="input bank-match-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buchungsnummer oder Text suchen …" />
+                  <div className="bank-check-toggle">
+                    <label className="bank-check-label"><input type="checkbox" checked={includeAllDates} onChange={(event) => setIncludeAllDates(event.target.checked)} /> Alle Daten</label>
+                  </div>
+                </div>
               </div>
               <div className="bank-match-list">
                 {loading && <div className="helper">Treffer werden gesucht …</div>}
