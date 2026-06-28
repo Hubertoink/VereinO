@@ -104,6 +104,18 @@ type ImportCommitResult = {
   errors: Array<{ row: number; message: string }>
 }
 
+type BankTransactionMatch = {
+  id: number
+  voucherNo?: string | null
+  date?: string | null
+  description?: string | null
+  paymentAccountName?: string | null
+  paymentAccountColor?: string | null
+  paymentAccountMismatch?: boolean
+  paymentAccountWarning?: string | null
+  score?: number
+}
+
 type Props = {
   paymentAccounts: PaymentAccount[]
   notify: (type: 'success' | 'error' | 'info', text: string) => void
@@ -220,6 +232,121 @@ function DuplicateRecordCard({
         </div>
       </div>
     </div>
+  )
+}
+
+function BankMatchRow({ match, busy, onLink }: {
+  match: BankTransactionMatch
+  busy: boolean
+  onLink: (voucherId: number) => void
+}) {
+  const scoreValue = Number(match.score || 0)
+  const scoreLevel = scoreValue >= 60 ? 'high' : scoreValue >= 30 ? 'medium' : 'low'
+  const scoreLabel = scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
+
+  return (
+    <div className="bank-match-row">
+      <div>
+        <strong>{match.voucherNo}</strong>
+        <span>{formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}</span>
+        {!match.paymentAccountMismatch && match.paymentAccountName ? (
+          <span style={{ color: match.paymentAccountColor || undefined }}>Zahlkonto: {match.paymentAccountName}</span>
+        ) : null}
+        {match.paymentAccountMismatch && (
+          <span className="bank-match-warning">
+            {match.paymentAccountWarning || `Zahlkonto abweichend: ${match.paymentAccountName || 'ohne Konto'}`}
+          </span>
+        )}
+      </div>
+      <span
+        className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}
+        title={scoreValue >= 15 ? `Übereinstimmung: ${Math.round(scoreValue)} %` : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`}
+        aria-label={scoreValue >= 15 ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung` : 'Sehr schwacher Treffer'}
+      >
+        {scoreLabel}
+      </span>
+      <button className="btn" disabled={busy} onClick={() => onLink(match.id)}>Zuordnen</button>
+    </div>
+  )
+}
+
+function ManualAssignmentModal({
+  transaction,
+  includeAllDates,
+  busy,
+  onClose,
+  onLink,
+  notify
+}: {
+  transaction: BankTransaction
+  includeAllDates: boolean
+  busy: boolean
+  onClose: () => void
+  onLink: (voucherId: number) => void
+  notify: Props['notify']
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<BankTransactionMatch[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadResults = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await window.api.bankTransactions.matches({
+        id: transaction.id,
+        q: query || undefined,
+        includeAllDates
+      })
+      setResults(result.rows as BankTransactionMatch[])
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setLoading(false)
+    }
+  }, [includeAllDates, notify, query, transaction.id])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadResults() }, 160)
+    return () => window.clearTimeout(timer)
+  }, [loadResults])
+
+  return createPortal(
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal bank-manual-assign-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2>Manuelle Zuweisung</h2>
+            <p>{transaction.counterparty || 'Ohne Gegenpartei'} · {euro.format(transaction.amount)} · {transaction.direction}</p>
+          </div>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+        </header>
+
+        <section className="bank-review-section">
+          <div className="bank-manual-assign-toolbar">
+            <input
+              className="input bank-match-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buchungsnummer oder Text suchen …"
+              autoFocus
+            />
+            <span className="helper">Es werden nur kompatible Buchungen mit passendem Betrag und Typ angezeigt.</span>
+          </div>
+          <div className="bank-match-list bank-manual-assign-list">
+            {loading && <div className="helper">Buchungen werden gesucht …</div>}
+            {!loading && results.map((match) => (
+              <BankMatchRow key={match.id} match={match} busy={busy} onLink={onLink} />
+            ))}
+            {!loading && results.length === 0 && <div className="bank-empty-small">Keine passende Buchung für die manuelle Zuweisung gefunden.</div>}
+          </div>
+        </section>
+
+        <footer className="bank-modal-footer">
+          <button className="btn" onClick={onClose}>Schließen</button>
+        </footer>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -609,28 +736,28 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
   onOpenVoucher: Props['onOpenVoucher']
   notify: Props['notify']
 }) {
-  const [matches, setMatches] = useState<Array<Record<string, any>>>([])
+  const [matches, setMatches] = useState<BankTransactionMatch[]>([])
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
-  const [search, setSearch] = useState('')
   const [includeAllDates, setIncludeAllDates] = useState(false)
   const [checkedNote, setCheckedNote] = useState(transaction.checkedNote || '')
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [showCheckForm, setShowCheckForm] = useState(false)
+  const [showManualAssign, setShowManualAssign] = useState(false)
   const actionMenuRef = React.useRef<HTMLDivElement | null>(null)
 
   const loadMatches = useCallback(async () => {
     if (transaction.status !== 'OPEN') return
     setLoading(true)
     try {
-      const result = await window.api.bankTransactions.matches({ id: transaction.id, q: search || undefined, includeAllDates })
-      setMatches(result.rows)
+      const result = await window.api.bankTransactions.matches({ id: transaction.id, includeAllDates })
+      setMatches(result.rows as BankTransactionMatch[])
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
     } finally {
       setLoading(false)
     }
-  }, [includeAllDates, notify, search, transaction.id, transaction.status])
+  }, [includeAllDates, notify, transaction.id, transaction.status])
 
   useEffect(() => { void loadMatches() }, [loadMatches])
 
@@ -739,7 +866,7 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
                   <strong>Passende Buchungen</strong>
                 </div>
                 <div className="bank-match-toolbar">
-                  <input className="input bank-match-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buchungsnummer oder Text suchen …" />
+                  <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>Manuell zuweisen</button>
                   <div className="bank-check-toggle">
                     <label className="bank-check-label"><input type="checkbox" checked={includeAllDates} onChange={(event) => setIncludeAllDates(event.target.checked)} /> Alle Daten</label>
                   </div>
@@ -748,35 +875,7 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
               <div className="bank-match-list">
                 {loading && <div className="helper">Treffer werden gesucht …</div>}
                 {!loading && matches.map((match) => (
-                  <div className="bank-match-row" key={match.id}>
-                    <div>
-                      <strong>{match.voucherNo}</strong>
-                      <span>{formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}</span>
-                      {!match.paymentAccountMismatch && match.paymentAccountName ? (
-                        <span style={{ color: match.paymentAccountColor || undefined }}>Zahlkonto: {match.paymentAccountName}</span>
-                      ) : null}
-                      {match.paymentAccountMismatch && (
-                        <span className="bank-match-warning">
-                          {match.paymentAccountWarning || `Zahlkonto abweichend: ${match.paymentAccountName || 'ohne Konto'}`}
-                        </span>
-                      )}
-                    </div>
-                    {(() => {
-                      const scoreValue = Number(match.score || 0)
-                      const scoreLevel = scoreValue >= 60 ? 'high' : scoreValue >= 30 ? 'medium' : 'low'
-                      const scoreLabel = scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
-                      return (
-                        <span
-                          className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}
-                          title={scoreValue >= 15 ? `Übereinstimmung: ${Math.round(scoreValue)} %` : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`}
-                          aria-label={scoreValue >= 15 ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung` : 'Sehr schwacher Treffer'}
-                        >
-                          {scoreLabel}
-                        </span>
-                      )
-                    })()}
-                    <button className="btn" disabled={busy} onClick={() => void link(match.id)}>Zuordnen</button>
-                  </div>
+                  <BankMatchRow key={match.id} match={match} busy={busy} onLink={(voucherId) => { void link(voucherId) }} />
                 ))}
                 {!loading && matches.length === 0 && <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>}
               </div>
@@ -813,6 +912,17 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
               </div>
             )}
           </section>
+        )}
+
+        {showManualAssign && (
+          <ManualAssignmentModal
+            transaction={transaction}
+            includeAllDates={includeAllDates}
+            busy={busy}
+            onClose={() => setShowManualAssign(false)}
+            onLink={(voucherId) => { void link(voucherId) }}
+            notify={notify}
+          />
         )}
 
         <footer className="bank-modal-footer"><button className="btn" onClick={onClose}>Schließen</button></footer>

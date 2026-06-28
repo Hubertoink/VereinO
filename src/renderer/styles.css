@@ -10425,7 +10425,8 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .bank-import-modal,
 .bank-review-modal,
-.bank-import-result-modal {
+.bank-import-result-modal,
+.bank-manual-assign-modal {
   width: min(1080px, 96vw);
   max-height: 92vh;
   overflow: auto;
@@ -10436,6 +10437,10 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .bank-review-modal {
   width: min(1160px, 96vw);
+}
+
+.bank-manual-assign-modal {
+  width: min(920px, 94vw);
 }
 
 .bank-import-result-modal {
@@ -10593,6 +10598,16 @@ html[data-glass-modals="true"] .flyout-arrow {
   gap: 7px;
   max-height: 330px;
   overflow: auto;
+}
+
+.bank-manual-assign-toolbar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.bank-manual-assign-list {
+  max-height: min(55vh, 520px);
 }
 
 .bank-match-row {
