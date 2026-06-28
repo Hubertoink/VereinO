@@ -187,7 +187,7 @@ export default function InvoicesView() {
   const [requiredTouched, setRequiredTouched] = useState(false)
 
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
+  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY' | 'DOT') || 'ISO' } catch { return 'ISO' } }, [])
   const fmtDateLocal = useMemo(() => {
     const pretty = (value?: string) => {
       if (!value) return ''
@@ -196,7 +196,13 @@ export default function InvoicesView() {
       const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
       return `${match[3]} ${date.toLocaleString('de-DE', { month: 'short' }).replace('.', '')} ${match[1]}`
     }
-    return (value?: string) => dateFmtPref === 'PRETTY' ? pretty(value) : (value || '')
+    const dot = (value?: string) => {
+      if (!value) return ''
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+      if (!match) return value || ''
+      return `${match[3]}.${match[2]}.${match[1]}`
+    }
+    return (value?: string) => dateFmtPref === 'PRETTY' ? pretty(value) : dateFmtPref === 'DOT' ? dot(value) : (value || '')
   }, [dateFmtPref])
 
   const [qDebounced, setQDebounced] = useState('')

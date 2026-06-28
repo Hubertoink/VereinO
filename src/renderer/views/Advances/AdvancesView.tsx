@@ -3,7 +3,7 @@ import { useToast } from '../../context/useToast'
 import QuickAddModal from '../../components/modals/QuickAddModal'
 import type { QA } from '../../hooks/useQuickAdd'
 
-type DateFmt = 'ISO' | 'PRETTY'
+type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 
 type AdvanceStatus = 'OPEN' | 'RESOLVED' | 'ALL'
 
@@ -116,7 +116,13 @@ export default function AdvancesView() {
       const dd = String(d).padStart(2, '0')
       return `${dd} ${mon} ${y}`
     }
-    return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : (s || '')
+    const dot = (s?: string) => {
+      if (!s) return ''
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+      if (!m) return s
+      return `${m[3]}.${m[2]}.${m[1]}`
+    }
+    return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : dateFmt === 'DOT' ? dot(s) : (s || '')
   }, [dateFmt])
 
   const getBookedAmount = (amount: number, openAmount: number) => {

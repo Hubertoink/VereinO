@@ -1290,7 +1290,7 @@ function AppInner() {
     }, [])
 
     // UI preference: date format (ISO vs PRETTY)
-    type DateFmt = 'ISO' | 'PRETTY'
+    type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
     const [dateFmt, setDateFmt] = useState<DateFmt>(() => {
         try { return (localStorage.getItem('ui.dateFmt') as DateFmt) || 'ISO' } catch { return 'ISO' }
     })
@@ -1307,7 +1307,13 @@ function AppInner() {
             const dd = String(d).padStart(2, '0')
             return `${dd} ${mon} ${y}`
         }
-        return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : (s || '')
+        const dot = (s?: string) => {
+            if (!s) return ''
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+            if (!m) return s
+            return `${m[3]}.${m[2]}.${m[1]}`
+        }
+        return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : dateFmt === 'DOT' ? dot(s) : (s || '')
     }, [dateFmt])
 
     // Quick-Add modal state and actions
@@ -1688,9 +1694,10 @@ function AppInner() {
                                 ]
                             },
                             {
-                                key: 'd', label: 'Datumsformat …', description: `Aktuell: ${dateFmt === 'ISO' ? '2025-01-15' : '15. Jan 2025'}`, children: [
+                                key: 'd', label: 'Datumsformat …', description: `Aktuell: ${dateFmt === 'ISO' ? '2025-01-15' : dateFmt === 'DOT' ? '15.01.2025' : '15. Jan 2025'}`, children: [
                                     { key: 'i', label: 'ISO · 2025-01-15', action: () => setDateFmt('ISO') },
-                                    { key: 'l', label: 'Lesbar · 15. Jan 2025', action: () => setDateFmt('PRETTY') }
+                                    { key: 'l', label: 'Lesbar · 15. Jan 2025', action: () => setDateFmt('PRETTY') },
+                                    { key: 't', label: 'TT.MM.JJJJ · 15.01.2025', action: () => setDateFmt('DOT') }
                                 ]
                             }
                         ]

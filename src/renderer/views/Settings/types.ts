@@ -49,7 +49,7 @@ export type JournalRowDensity = 'normal' | 'compact'
 
 export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
 
-export type DateFmt = 'ISO' | 'PRETTY'
+export type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 
 export type QuickAddAfterSave = 'close' | 'new'
 

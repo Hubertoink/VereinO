@@ -200,7 +200,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   }, [colPrefs])
 
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY') || 'ISO' } catch { return 'ISO' } }, [])
+  const dateFmtPref = useMemo(() => { try { return (localStorage.getItem('ui.dateFmt') as 'ISO' | 'PRETTY' | 'DOT') || 'ISO' } catch { return 'ISO' } }, [])
   const fmtDateLocal = useMemo(() => {
     const pretty = (s?: string) => {
       if (!s) return ''
@@ -210,7 +210,13 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       const mon = dt.toLocaleString('de-DE', { month: 'short' }).replace('.', '')
       return `${m[3]} ${mon} ${m[1]}`
     }
-    return (s?: string) => dateFmtPref === 'PRETTY' ? pretty(s) : (s || '')
+    const dot = (s?: string) => {
+      if (!s) return ''
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '')
+      if (!m) return s || ''
+      return `${m[3]}.${m[2]}.${m[1]}`
+    }
+    return (s?: string) => dateFmtPref === 'PRETTY' ? pretty(s) : dateFmtPref === 'DOT' ? dot(s) : (s || '')
   }, [dateFmtPref])
 
   const [qDebounced, setQDebounced] = useState('')

@@ -52,6 +52,7 @@ export function GeneralPane({
   // Date format examples
   const sample = '2025-01-15'
   const pretty = '15. Jan 2025'
+  const dot = '15.01.2025'
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const openCustomBgPicker = () => {
@@ -578,6 +579,13 @@ export function GeneralPane({
                 onClick={() => setDateFmt('PRETTY')}
               >
                 {pretty}
+              </button>
+              <button
+                type="button"
+                className={`btn-option ${dateFmt === 'DOT' ? 'active' : ''}`}
+                onClick={() => setDateFmt('DOT')}
+              >
+                {dot}
               </button>
             </div>
           </div>
