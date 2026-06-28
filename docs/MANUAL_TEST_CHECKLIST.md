@@ -315,6 +315,21 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Erfolgreicher Import erzeugt vorher ein Sicherheitsbackup.
 - [ ] Importierte Buchungen erscheinen in Journal, Dashboard und Reports.
 
+### Bankimport
+
+- [ ] `Bankimport` erscheint in der Hauptnavigation neben Buchungen und Verbindlichkeiten.
+- [ ] CAMT.052/053 erkennt Konto-IBAN, Datum, Richtung, Betrag, Gegenpartei und Verwendungszweck.
+- [ ] CSV erkennt Semikolon/Komma, deutsche Beträge und erlaubt die Spaltenzuordnung vor dem Import.
+- [ ] Ein Import ohne aktives Zahlkonto oder mit Nicht-EUR-Zeilen wird verständlich abgewiesen.
+- [ ] Der erneute Import derselben Datei überspringt vorhandene Bankbelege und meldet die Duplikate.
+- [ ] Offene Bankbelege lassen sich nach Status, Zahlkonto und Suchtext filtern.
+- [ ] Das Prüfmodal schlägt nur Buchungen mit gleicher Art, gleichem Zahlkonto und Cent-genauem Betrag vor.
+- [ ] Die Zuordnung zu einer bestehenden Buchung setzt den Bankbeleg auf `Zugeordnet`.
+- [ ] `Buchung anlegen` öffnet das Buchungsmodal mit Datum, Art, Betrag, Zahlkonto und Beschreibung; Speichern verknüpft den Bankbeleg.
+- [ ] `Als geprüft markieren` schließt einen Bankbeleg ohne Buchung ab; `Wieder öffnen` setzt ihn erneut auf offen.
+- [ ] Eine zugeordnete Buchung kann aus dem Bankbeleg geöffnet werden.
+- [ ] Wird eine verknüpfte Buchung endgültig gelöscht, wird der Bankbeleg wieder offen.
+
 ## 22. Backup, Wiederherstellung und Speicherort
 
 Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.

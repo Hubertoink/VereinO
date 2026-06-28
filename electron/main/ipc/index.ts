@@ -24,7 +24,7 @@ import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
 import { previewFile, executeFile, analyzeFile, commitImportDraft, createMissingImportMasterData, generateImportTemplate, generateImportTestData, exportEditableVouchersWorkbook } from '../services/imports'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { PaymentAccountsListInput, PaymentAccountsListOutput, PaymentAccountUpsertInput, PaymentAccountUpsertOutput, PaymentAccountDeleteInput, PaymentAccountDeleteOutput } from './schemas'
-import { applyMigrations, ensureAdvanceTables, ensureVoucherColumns, ensureVoucherForeignKeyTargets } from '../db/migrations'
+import { applyMigrations, ensureAdvanceTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherForeignKeyTargets } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
@@ -38,6 +38,30 @@ import { checkForAppUpdates, downloadAppUpdate, getUpdateState, installAppUpdate
 import { deletePaymentAccount, listPaymentAccounts, upsertPaymentAccount } from '../repositories/paymentAccounts'
 import { requireSafetyBackup } from '../services/safetyBackup'
 import { registerBackupAndShellHandlers } from './backupAndShellHandlers'
+import {
+    BankImportCommitInput,
+    BankImportCommitOutput,
+    BankImportPreviewInput,
+    BankImportPreviewOutput,
+    BankTransactionCheckInput,
+    BankTransactionIdInput,
+    BankTransactionLinkInput,
+    BankTransactionMatchesInput,
+    BankTransactionMatchesOutput,
+    BankTransactionOutput,
+    BankTransactionsListInput,
+    BankTransactionsListOutput
+} from './schemas'
+import {
+    commitBankImport,
+    findBankTransactionMatches,
+    getBankTransaction,
+    linkBankTransaction,
+    listBankTransactions,
+    markBankTransactionChecked,
+    previewBankImport,
+    reopenBankTransaction
+} from '../repositories/bankTransactions'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -64,6 +88,7 @@ async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[])
             const db = getDb()
             ensureVoucherColumns(db as any)
             ensureAdvanceTables(db as any)
+            ensureInvoiceTables(db as any)
             applyMigrations(db as any)
         } catch {
         }
@@ -1076,6 +1101,44 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         return ImportEditableExportOutput.parse(res)
     })
 
+    // Bank statement imports are staged for review before they become vouchers.
+    ipcMain.handle('bankImports.preview', async (_e, payload) => {
+        const parsed = BankImportPreviewInput.parse(payload)
+        return BankImportPreviewOutput.parse(previewBankImport(parsed as any))
+    })
+    ipcMain.handle('bankImports.commit', async (_e, payload) => {
+        const parsed = BankImportCommitInput.parse(payload)
+        await requireSafetyBackup(backup.makeBackup, 'preBankImport', 'Bankdaten importieren')
+        return BankImportCommitOutput.parse(commitBankImport(parsed as any))
+    })
+    ipcMain.handle('bankTransactions.list', async (_e, payload) => {
+        const parsed = BankTransactionsListInput.parse(payload ?? {})
+        return BankTransactionsListOutput.parse(listBankTransactions(parsed as any))
+    })
+    ipcMain.handle('bankTransactions.get', async (_e, payload) => {
+        const parsed = BankTransactionIdInput.parse(payload)
+        return BankTransactionOutput.parse(getBankTransaction(parsed.id))
+    })
+    ipcMain.handle('bankTransactions.matches', async (_e, payload) => {
+        const parsed = BankTransactionMatchesInput.parse(payload)
+        return BankTransactionMatchesOutput.parse({ rows: findBankTransactionMatches(parsed) })
+    })
+    ipcMain.handle('bankTransactions.link', async (_e, payload) => {
+        const parsed = BankTransactionLinkInput.parse(payload)
+        return BankTransactionOutput.parse(await withSchemaHealRetry(
+            () => linkBankTransaction({ ...parsed, origin: 'EXISTING' }),
+            ['bank_transactions', 'bank_import_batches']
+        ))
+    })
+    ipcMain.handle('bankTransactions.check', async (_e, payload) => {
+        const parsed = BankTransactionCheckInput.parse(payload)
+        return BankTransactionOutput.parse(markBankTransactionChecked(parsed))
+    })
+    ipcMain.handle('bankTransactions.reopen', async (_e, payload) => {
+        const parsed = BankTransactionIdInput.parse(payload)
+        return BankTransactionOutput.parse(reopenBankTransaction(parsed.id))
+    })
+
     // Attachments
     ipcMain.handle('attachments.list', async (_e, payload) => {
         const parsed = AttachmentsListInput.parse(payload)
@@ -1516,12 +1579,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     // Invoices
     ipcMain.handle('invoices.create', async (_e, payload) => {
         const parsed = InvoiceCreateInput.parse(payload)
-        const res = createInvoice(parsed as any)
+        const res = await withSchemaHealRetry(
+            () => createInvoice(parsed as any),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceCreateOutput.parse(res)
     })
     ipcMain.handle('invoices.update', async (_e, payload) => {
         const parsed = InvoiceUpdateInput.parse(payload)
-        const res = updateInvoice(parsed as any)
+        const res = await withSchemaHealRetry(
+            () => updateInvoice(parsed as any),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceUpdateOutput.parse(res)
     })
     ipcMain.handle('invoices.delete', async (_e, payload) => {
@@ -1531,32 +1600,50 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     })
     ipcMain.handle('invoices.list', async (_e, payload) => {
         const parsed = InvoicesListInput.parse(payload) ?? {}
-        const { rows, total } = listInvoicesPaged(parsed as any)
+        const { rows, total } = await withSchemaHealRetry(
+            () => listInvoicesPaged(parsed as any),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoicesListOutput.parse({ rows, total })
     })
     ipcMain.handle('invoices.summary', async (_e, payload) => {
         const parsed = InvoicesSummaryInput.parse(payload) ?? {}
-        const res = summarizeInvoices(parsed as any)
+        const res = await withSchemaHealRetry(
+            () => summarizeInvoices(parsed as any),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoicesSummaryOutput.parse(res as any)
     })
     ipcMain.handle('invoices.get', async (_e, payload) => {
         const parsed = InvoiceByIdInput.parse(payload)
-        const res = getInvoiceById(parsed.id)
+        const res = await withSchemaHealRetry(
+            () => getInvoiceById(parsed.id),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceByIdOutput.parse(res as any)
     })
     ipcMain.handle('invoices.addPayment', async (_e, payload) => {
         const parsed = InvoiceAddPaymentInput.parse(payload)
-        const res = addPayment(parsed)
+        const res = await withSchemaHealRetry(
+            () => addPayment(parsed),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceAddPaymentOutput.parse(res as any)
     })
     ipcMain.handle('invoices.markPaid', async (_e, payload) => {
         const parsed = InvoiceByIdInput.parse(payload)
-        const res = markPaid(parsed.id)
+        const res = await withSchemaHealRetry(
+            () => markPaid(parsed.id),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceAddPaymentOutput.parse(res as any)
     })
     ipcMain.handle('invoices.postToVoucher', async (_e, payload) => {
         const parsed = InvoicePostToVoucherInput.parse(payload)
-        const res = postInvoiceToVoucher(parsed.invoiceId)
+        const res = await withSchemaHealRetry(
+            () => postInvoiceToVoucher(parsed.invoiceId),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoicePostToVoucherOutput.parse(res)
     })
 
@@ -1607,7 +1694,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     // Invoice files CRUD for edit modal
     ipcMain.handle('invoiceFiles.list', async (_e, payload) => {
         const parsed = InvoiceFilesListInput.parse(payload)
-        const files = listFilesForInvoice(parsed.invoiceId)
+        const files = await withSchemaHealRetry(
+            () => listFilesForInvoice(parsed.invoiceId),
+            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+        )
         return InvoiceFilesListOutput.parse({ files: files.map(f => ({ id: f.id, fileName: f.fileName, mimeType: f.mimeType ?? null, size: f.size ?? null, createdAt: f.createdAt ?? null })) })
     })
     ipcMain.handle('invoiceFiles.add', async (_e, payload) => {

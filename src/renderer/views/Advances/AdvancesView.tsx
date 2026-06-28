@@ -50,6 +50,10 @@ type AdvanceDetail = AdvanceRow & {
     grossAmount: number
     vatRate: number
     paymentMethod?: 'BAR' | 'BANK' | null
+    paymentAccountId?: number | null
+    paymentAccountName?: string | null
+    paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
+    paymentAccountColor?: string | null
     categoryId?: number | null
     projectId?: number | null
     budgets?: Array<{ budgetId: number; amount: number }>
@@ -60,6 +64,37 @@ type AdvanceDetail = AdvanceRow & {
     voucherNo?: string | null
     createdAt?: string
   }>
+}
+
+type PaymentAccount = {
+  id: number
+  name: string
+  kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
+  color?: string | null
+  sortOrder: number
+  isActive: number
+}
+
+function paymentMethodForAccountKind(kind?: PaymentAccount['kind'] | null): 'BAR' | 'BANK' | undefined {
+  if (!kind) return undefined
+  return kind === 'CASH' ? 'BAR' : 'BANK'
+}
+
+function buildAdvancePurchaseQa(accounts: PaymentAccount[]): QA {
+  const activeAccounts = accounts.filter((account) => account.isActive !== 0)
+  const defaultCashAccount = activeAccounts.find((account) => account.kind === 'CASH') ?? activeAccounts[0] ?? null
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    type: 'OUT',
+    sphere: 'IDEELL',
+    mode: 'GROSS',
+    grossAmount: 0,
+    vatRate: 0,
+    description: '',
+    paymentMethod: paymentMethodForAccountKind(defaultCashAccount?.kind) ?? 'BAR',
+    paymentAccountId: defaultCashAccount?.id ?? null,
+    paymentAccountName: defaultCashAccount?.name ?? null
+  } as QA
 }
 
 export default function AdvancesView() {
@@ -104,6 +139,7 @@ export default function AdvancesView() {
     Array<{ id: number; code: string; name: string; color?: string | null; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isActive?: number }>
   >([])
   const [invoices, setInvoices] = useState<Array<{ id: number; invoiceNo?: string | null; party: string; status: 'OPEN' | 'PARTIAL' | 'PAID'; remaining: number }>>([])
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
 
   const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
   const [descSuggest, setDescSuggest] = useState<string[]>([])
@@ -142,19 +178,7 @@ export default function AdvancesView() {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false)
   const [purchaseFiles, setPurchaseFiles] = useState<File[]>([])
-  const [purchaseQa, setPurchaseQa] = useState<QA>(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    return {
-      date: today,
-      type: 'OUT',
-      sphere: 'IDEELL',
-      mode: 'GROSS',
-      grossAmount: 0,
-      vatRate: 0,
-      description: '',
-      paymentMethod: 'BAR'
-    }
-  })
+  const [purchaseQa, setPurchaseQa] = useState<QA>(() => buildAdvancePurchaseQa([]))
   const [editPurchaseId, setEditPurchaseId] = useState<number | null>(null)
 
   function startEditPurchase(p: NonNullable<AdvanceDetail['purchases']>[number]) {
@@ -169,6 +193,8 @@ export default function AdvancesView() {
       vatRate: p.vatRate ?? 0,
       description: p.description || '',
       paymentMethod: p.paymentMethod ?? 'BAR',
+      paymentAccountId: p.paymentAccountId ?? null,
+      paymentAccountName: p.paymentAccountName ?? null,
       tags: p.tags ?? [],
       budgets: (p.budgets ?? []).map((b: any) => ({ budgetId: b.budgetId, amount: b.amount })),
       earmarksAssigned: (p.earmarks ?? []).map((e: any) => ({ earmarkId: e.earmarkId, amount: e.amount }))
@@ -224,12 +250,13 @@ export default function AdvancesView() {
   }
 
   async function loadMeta() {
-    const [budgetState, earmarkState, openInvState, partialInvState, tagsState] = await Promise.allSettled([
+    const [budgetState, earmarkState, openInvState, partialInvState, tagsState, paymentAccountsState] = await Promise.allSettled([
       (window as any).api?.budgets?.list?.({ includeArchived: false }),
       (window as any).api?.bindings?.list?.({ activeOnly: true }),
       (window as any).api?.invoices?.list?.({ limit: 80, offset: 0, status: 'OPEN', sort: 'ASC', sortBy: 'due' }),
       (window as any).api?.invoices?.list?.({ limit: 80, offset: 0, status: 'PARTIAL', sort: 'ASC', sortBy: 'due' }),
-      (window as any).api?.tags?.list?.({ includeUsage: true })
+      (window as any).api?.tags?.list?.({ includeUsage: true }),
+      (window as any).api?.paymentAccounts?.list?.()
     ])
 
     const budgetRes = budgetState.status === 'fulfilled' ? budgetState.value : null
@@ -237,6 +264,7 @@ export default function AdvancesView() {
     const openInvRes = openInvState.status === 'fulfilled' ? openInvState.value : null
     const partialInvRes = partialInvState.status === 'fulfilled' ? partialInvState.value : null
     const tagsRes = tagsState.status === 'fulfilled' ? tagsState.value : null
+    const paymentAccountsRes = paymentAccountsState.status === 'fulfilled' ? paymentAccountsState.value : null
 
     setBudgets((budgetRes?.rows || []).map((budget: any) => ({
       id: budget.id,
@@ -259,6 +287,14 @@ export default function AdvancesView() {
       isActive: earmark.isActive ?? 1
     })))
     setTagDefs((tagsRes?.rows || []).map((t: any) => ({ id: t.id, name: t.name, color: t.color ?? null })))
+    setPaymentAccounts((paymentAccountsRes?.rows || []).map((account: any) => ({
+      id: account.id,
+      name: account.name,
+      kind: account.kind,
+      color: account.color ?? null,
+      sortOrder: account.sortOrder ?? 0,
+      isActive: account.isActive ?? 1
+    })))
 
     const invoiceRows = [...(openInvRes?.rows || []), ...(partialInvRes?.rows || [])]
     const seen = new Set<number>()
@@ -444,6 +480,7 @@ export default function AdvancesView() {
     }
 
     payload.paymentMethod = qa.paymentMethod
+    payload.paymentAccountId = (qa as any).paymentAccountId ?? null
 
     if ((qa as any).mode === 'GROSS') {
       payload.grossAmount = Number((qa as any).grossAmount ?? 0)
@@ -494,10 +531,9 @@ export default function AdvancesView() {
       setPurchaseFiles([])
       setEditPurchaseId(null)
       setPurchaseQa((prev) => ({
-        ...prev,
-        description: '',
-        tags: [],
-        ...(prev.mode === 'GROSS' ? { grossAmount: 0 } : { netAmount: 0 })
+        ...buildAdvancePurchaseQa(paymentAccounts),
+        date: prev.date,
+        sphere: prev.sphere
       }))
       await Promise.all([loadList(), loadDetail(advanceId)])
       notify('success', editPurchaseId ? 'Buchung aktualisiert' : 'Buchung hinzugefügt')
@@ -650,7 +686,7 @@ export default function AdvancesView() {
                   <div className="helper">Ausgegeben am {fmtDate(detail.issuedAt)}</div>
                 </div>
                 <div className="advances-detail-actions">
-                  <button className="btn" type="button" onClick={() => { setEditPurchaseId(null); setPurchaseModalOpen(true) }} disabled={detail.status !== 'OPEN'}>+ Buchung</button>
+                  <button className="btn" type="button" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }} disabled={detail.status !== 'OPEN'}>+ Buchung</button>
                   <button className="btn primary" type="button" onClick={resolveSelectedAdvance} disabled={detail.status !== 'OPEN'}>Auflösen</button>
                 </div>
               </div>
@@ -696,7 +732,7 @@ export default function AdvancesView() {
                             <div style={{ fontWeight: 500 }}>{p.description || '—'}</div>
                             <div className="helper">{p.type} · {p.sphere}</div>
                           </td>
-                          <td>{p.paymentMethod || '—'}</td>
+                          <td>{p.paymentAccountName || p.paymentMethod || '—'}</td>
                           <td>{eurFmt.format(p.grossAmount)}</td>
                           <td>{p.voucherId ? 'Gebucht' : 'Entwurf'}</td>
                           <td style={{ textAlign: 'right' }}>
@@ -934,6 +970,7 @@ export default function AdvancesView() {
             eurFmt={eurFmt}
             budgetsForEdit={budgets}
             earmarks={earmarks as any}
+            paymentAccounts={paymentAccounts}
             tagDefs={tagDefs as any}
             descSuggest={descSuggest}
             title={editPurchaseId ? 'Buchung bearbeiten' : '+ Buchung'}

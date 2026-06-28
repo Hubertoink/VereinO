@@ -43,6 +43,7 @@ const SubmissionsView = lazy(() => import('./views/Submissions/SubmissionsView')
 const AdvancesView = lazy(() => import('./views/Advances/AdvancesView'))
 const BudgetsView = lazy(() => import('./views/Budgets/BudgetsView'))
 const EarmarksView = lazy(() => import('./views/Earmarks/EarmarksView'))
+const BankImportView = lazy(() => import('./views/BankImport/BankImportView'))
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -1349,6 +1350,7 @@ function AppInner() {
                 }
                 // JournalView handles reload via refreshKey dependency; bump version to trigger it
                 bumpDataVersion()
+                if (p?.bankTransactionId) window.dispatchEvent(new Event('data-changed'))
             }
             return res
         } catch (e: any) {
@@ -1596,7 +1598,7 @@ function AppInner() {
                 description: 'Bereich in VereinO öffnen',
                 children: navItems.map((item) => ({
                     key: ({
-                        Dashboard: 'd', Buchungen: 'b', Verbindlichkeiten: 'v', Mitglieder: 'm',
+                        Dashboard: 'd', Buchungen: 'b', Bankimport: 'k', Verbindlichkeiten: 'v', Mitglieder: 'm',
                         Vorschuesse: 'o', Budgets: 'p', Zweckbindungen: 'z', Einreichungen: 'i',
                         Belege: 'l', Reports: 'r', Einstellungen: 'e'
                     } as Record<NavKey, string>)[item.key],
@@ -1611,6 +1613,7 @@ function AppInner() {
                 description: 'Bereich öffnen und Suchfeld fokussieren',
                 children: [
                     { key: 'b', label: 'Buchungen', action: () => navigateAndFocus('Buchungen', '.journal-filter-toolbar__search') },
+                    { key: 'k', label: 'Bankimport', action: () => navigateAndFocus('Bankimport', '.bank-import-search') },
                     { key: 'v', label: 'Verbindlichkeiten', action: () => navigateAndFocus('Verbindlichkeiten', '.invoices-search') },
                     { key: 'm', label: 'Mitglieder', action: () => navigateAndFocus('Mitglieder', '.members-search') },
                     { key: 'o', label: 'Vorschüsse', action: () => navigateAndFocus('Vorschuesse', 'input[placeholder^="Suchen (Person"]') }
@@ -2077,6 +2080,7 @@ function AppInner() {
     const navIconPalette: Record<string, string> = {
         'Dashboard': '#7C4DFF',
         'Buchungen': '#2962FF',
+        'Bankimport': '#1976D2',
         'Verbindlichkeiten': '#00B8D4',
         'Mitglieder': '#26A69A',
         'Vorschuesse': '#4CAF50',
@@ -2401,6 +2405,36 @@ function AppInner() {
                         />
                     )}
 
+                    {activePage === 'Bankimport' && (
+                        <BankImportView
+                            paymentAccounts={paymentAccounts}
+                            notify={notify}
+                            onCreateBooking={(transaction) => {
+                                openQuickAdd({
+                                    qa: {
+                                        date: transaction.bookingDate,
+                                        type: transaction.direction,
+                                        sphere: 'IDEELL',
+                                        mode: 'GROSS',
+                                        grossAmount: Number(transaction.amount),
+                                        vatRate: 0,
+                                        description: [transaction.counterparty, transaction.purpose].filter(Boolean).join(' · ').slice(0, 255),
+                                        note: [transaction.endToEndId && `End-to-End-ID: ${transaction.endToEndId}`, transaction.bankReference && `Bankreferenz: ${transaction.bankReference}`].filter(Boolean).join('\n'),
+                                        paymentMethod: 'BANK',
+                                        paymentAccountId: transaction.paymentAccountId,
+                                        paymentAccountName: transaction.paymentAccountName,
+                                        bankTransactionId: transaction.id
+                                    }
+                                })
+                            }}
+                            onOpenVoucher={(voucherId, voucherNo, voucherDate) => {
+                                window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
+                                    detail: { voucherId, voucherNo, voucherDate }
+                                }))
+                            }}
+                        />
+                    )}
+
                     {activePage === 'Einreichungen' && (
                         <SubmissionsView
                             notify={notify}
@@ -2466,7 +2500,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Bankimport' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
                 <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>

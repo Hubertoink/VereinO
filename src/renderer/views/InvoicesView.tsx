@@ -10,10 +10,14 @@ import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
 import type {
   EditInvoiceFile,
+  InvoiceBudgetAssignment,
   InvoiceBudgetOption,
   InvoiceDetail,
+  InvoiceDraft,
+  InvoiceEarmarkAssignment,
   InvoiceEarmarkOption,
   InvoiceFormState,
+  InvoicePaymentAccountOption,
   InvoiceListRow,
   InvoiceStatus,
   InvoiceTagDef
@@ -42,6 +46,112 @@ interface InvoicesViewProps {
   registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
+function firstBudgetId(budgets: InvoiceBudgetAssignment[]) {
+  return typeof budgets[0]?.budgetId === 'number' && budgets[0].budgetId > 0 ? budgets[0].budgetId : ''
+}
+
+function firstEarmarkId(earmarks: InvoiceEarmarkAssignment[]) {
+  return typeof earmarks[0]?.earmarkId === 'number' && earmarks[0].earmarkId > 0 ? earmarks[0].earmarkId : ''
+}
+
+function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): InvoiceDraft {
+  const budgets = Array.isArray(row?.budgets) && row.budgets.length
+    ? row.budgets.map((item) => ({ budgetId: Number(item.budgetId || 0), amount: Number(item.amount || 0) }))
+    : typeof row?.budgetId === 'number'
+      ? [{ budgetId: row.budgetId, amount: Number(row?.grossAmount || 0) }]
+      : []
+  const earmarks = Array.isArray(row?.earmarks) && row.earmarks.length
+    ? row.earmarks.map((item) => ({ earmarkId: Number(item.earmarkId || 0), amount: Number(item.amount || 0) }))
+    : typeof row?.earmarkId === 'number'
+      ? [{ earmarkId: row.earmarkId, amount: Number(row?.grossAmount || 0) }]
+      : []
+
+  return {
+    id: row?.id,
+    date: row?.date || new Date().toISOString().slice(0, 10),
+    dueDate: row?.dueDate ?? null,
+    invoiceNo: row?.invoiceNo ?? '',
+    party: row?.party ?? '',
+    description: row?.description ?? '',
+    grossAmount: row?.grossAmount != null ? String(row.grossAmount) : '',
+    paymentMethod: row?.paymentMethod === 'BAR' || row?.paymentMethod === 'BANK' ? row.paymentMethod : '',
+    paymentAccountId: typeof row?.paymentAccountId === 'number' ? row.paymentAccountId : '',
+    sphere: row?.sphere ?? 'IDEELL',
+    earmarkId: firstEarmarkId(earmarks),
+    budgetId: firstBudgetId(budgets),
+    budgets,
+    earmarks,
+    autoPost: !!(row?.autoPost ?? true),
+    voucherType: row?.voucherType ?? 'OUT',
+    tags: Array.isArray(row?.tags) ? row.tags : []
+  }
+}
+
+function ActionMenu({
+  actions,
+  title = 'Aktionen'
+}: {
+  actions: Array<{ label: string; tone?: 'danger' | 'primary'; onClick: () => void }>
+  title?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        className="btn"
+        title={title}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        style={{ minWidth: 40 }}
+      >
+        ...
+      </button>
+      {open && (
+        <div
+          className="card"
+          role="menu"
+          style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 1000, padding: 6, minWidth: 150, display: 'grid', gap: 6 }}
+        >
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              role="menuitem"
+              className={`btn ${action.tone === 'danger' ? 'danger' : action.tone === 'primary' ? 'primary' : ''}`.trim()}
+              onClick={() => {
+                setOpen(false)
+                action.onClick()
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
   const { notify } = useToast()
 
@@ -66,6 +176,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [tags, setTags] = useState<InvoiceTagDef[]>([])
   const [budgets, setBudgets] = useState<InvoiceBudgetOption[]>([])
   const [earmarks, setEarmarks] = useState<InvoiceEarmarkOption[]>([])
+  const [paymentAccounts, setPaymentAccounts] = useState<InvoicePaymentAccountOption[]>([])
   const [flashId, setFlashId] = useState<number | null>(null)
 
   const [colPrefs, setColPrefs] = useState<{ showTags: boolean; showBezahlt: boolean; showRest: boolean; showAttachments: boolean }>(() => {
@@ -122,6 +233,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       try {
         const bindingsRes = await window.api?.bindings?.list?.({ activeOnly: true })
         if (!cancelled) setEarmarks((bindingsRes?.rows || []).map((row) => ({ id: row.id, code: row.code, name: row.name, color: row.color ?? null })))
+      } catch {}
+      try {
+        const paymentAccountsRes = await window.api?.paymentAccounts?.list?.()
+        if (!cancelled) setPaymentAccounts((paymentAccountsRes?.rows || []).map((row: any) => ({ id: row.id, name: row.name, kind: row.kind ?? null })))
       } catch {}
       try {
         const yearsRes = await window.api?.reports?.years?.()
@@ -326,9 +441,12 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         description: invoiceRow.description || null,
         grossAmount: invoiceRow.grossAmount,
         paymentMethod: method,
+        paymentAccountId: invoiceRow.paymentAccountId ?? null,
         sphere: invoiceRow.sphere,
         earmarkId: invoiceRow.earmarkId || null,
         budgetId: invoiceRow.budgetId || null,
+        budgets: invoiceRow.budgets || [],
+        earmarks: invoiceRow.earmarks || [],
         autoPost: !!(invoiceRow.autoPost ?? 0),
         voucherType: invoiceRow.voucherType,
         tags: invoiceRow.tags || []
@@ -397,53 +515,29 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [editInvoiceFiles, setEditInvoiceFiles] = useState<EditInvoiceFile[]>([])
   const [formError, setFormError] = useState('')
   const [requiredTouched, setRequiredTouched] = useState(false)
-  const [missingRequired, setMissingRequired] = useState<string[]>([])
 
   const openCreate = useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10)
     setForm({
       mode: 'create',
-      draft: {
-        date: today,
-        dueDate: null,
-        invoiceNo: '',
-        party: '',
-        description: '',
-        grossAmount: '',
-        paymentMethod: 'BANK',
-        sphere: 'IDEELL',
-        earmarkId: '',
-        budgetId: '',
-        autoPost: true,
-        voucherType: 'OUT',
-        tags: []
-      }
+      draft: normalizeInvoiceDraft({ voucherType: 'OUT' })
     })
     setFormFiles([])
     setFormError('')
     setRequiredTouched(false)
   }, [])
 
-  function openEdit(row: InvoiceListRow | InvoiceDetail) {
-    const paymentMethod = row.paymentMethod === 'BAR' || row.paymentMethod === 'BANK' ? row.paymentMethod : ''
+  async function openEdit(row: InvoiceListRow | InvoiceDetail) {
+    let source = row as Partial<InvoiceListRow & InvoiceDetail>
+    if (!Array.isArray(source.budgets) || !Array.isArray(source.earmarks)) {
+      try {
+        const full = await window.api?.invoices?.get?.({ id: row.id })
+        if (full) source = full
+      } catch {
+      }
+    }
     setForm({
       mode: 'edit',
-      draft: {
-        id: row.id,
-        date: row.date,
-        dueDate: row.dueDate ?? null,
-        invoiceNo: row.invoiceNo ?? '',
-        party: row.party,
-        description: row.description ?? '',
-        grossAmount: String(row.grossAmount ?? ''),
-        paymentMethod,
-        sphere: row.sphere,
-        earmarkId: typeof row.earmarkId === 'number' ? row.earmarkId : '',
-        budgetId: typeof row.budgetId === 'number' ? row.budgetId : '',
-        autoPost: !!(row.autoPost ?? 0),
-        voucherType: row.voucherType,
-        tags: row.tags || []
-      },
+      draft: normalizeInvoiceDraft(source),
       sourceRow: row
     })
     setFormFiles([])
@@ -470,10 +564,11 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     const amount = parseAmount(draft.grossAmount)
     if (amount == null || amount <= 0) missing.push('Betrag')
     if (missing.length) {
-      setMissingRequired(missing)
       return
     }
     try {
+      const cleanBudgets = (draft.budgets || []).filter((item) => item.budgetId && Number(item.amount) > 0).map((item) => ({ budgetId: Number(item.budgetId), amount: Number(item.amount) }))
+      const cleanEarmarks = (draft.earmarks || []).filter((item) => item.earmarkId && Number(item.amount) > 0).map((item) => ({ earmarkId: Number(item.earmarkId), amount: Number(item.amount) }))
       if (form.mode === 'create') {
         const files = formFiles.length ? await encodeFilesForUpload(formFiles) : undefined
         const payload = {
@@ -484,9 +579,12 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           description: (draft.description || '').trim() || null,
           grossAmount: amount,
           paymentMethod: draft.paymentMethod || null,
+          paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
           sphere: draft.sphere,
-          earmarkId: typeof draft.earmarkId === 'number' ? draft.earmarkId : null,
-          budgetId: typeof draft.budgetId === 'number' ? draft.budgetId : null,
+          earmarkId: typeof cleanEarmarks[0]?.earmarkId === 'number' ? cleanEarmarks[0].earmarkId : null,
+          budgetId: typeof cleanBudgets[0]?.budgetId === 'number' ? cleanBudgets[0].budgetId : null,
+          budgets: cleanBudgets,
+          earmarks: cleanEarmarks,
           autoPost: !!draft.autoPost,
           voucherType: draft.voucherType,
           files,
@@ -511,9 +609,12 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           description: (draft.description || '').trim() || null,
           grossAmount: amount,
           paymentMethod: draft.paymentMethod || null,
+          paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
           sphere: draft.sphere,
-          earmarkId: typeof draft.earmarkId === 'number' ? draft.earmarkId : null,
-          budgetId: typeof draft.budgetId === 'number' ? draft.budgetId : null,
+          earmarkId: typeof cleanEarmarks[0]?.earmarkId === 'number' ? cleanEarmarks[0].earmarkId : null,
+          budgetId: typeof cleanBudgets[0]?.budgetId === 'number' ? cleanBudgets[0].budgetId : null,
+          budgets: cleanBudgets,
+          earmarks: cleanEarmarks,
           autoPost: !!draft.autoPost,
           voucherType: draft.voucherType,
           tags: draft.tags || []
@@ -715,32 +816,39 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                     <td>{statusBadge(row.status)}</td>
                     {colPrefs.showAttachments && <td align="center">{fileCount > 0 ? <span className="badge">📎 {fileCount}</span> : ''}</td>}
                     <td align="center" className="invoices-actions-nowrap">
-                      <button className="btn" title="Details" onClick={() => void openDetails(row.id)}>ℹ</button>
-                      {row.status !== 'PAID' && <button className="btn btn-edit" title="Bearbeiten" onClick={() => openEdit(row)}>✎</button>}
-                      {remaining > 0 && row.status !== 'PAID' && <button className="btn invoices-payment-add" title="Zahlung hinzufügen" onClick={() => { setShowPayModal({ id: row.id, party: row.party, invoiceNo: row.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) }}>€+</button>}
-                      {row.status === 'PAID' && !row.autoPost && !row.postedVoucherId && (
-                        <button
-                          className="btn primary"
-                          title="Als Buchung hinzufügen"
-                          onClick={() => {
-                            const hasPaymentMethod = !!(row.paymentMethod && row.paymentMethod !== '')
-                            if (!hasPaymentMethod) {
-                              setShowPaymentMethodModal({
-                                invoiceId: row.id,
-                                invoiceNo: row.invoiceNo,
-                                party: row.party,
-                                paymentAmount: 0,
-                                paymentDate: '',
-                                willCreateVoucher: false
-                              })
-                            } else {
-                              setPostToVoucherModal({ id: row.id, party: row.party, invoiceNo: row.invoiceNo })
-                            }
-                          }}
-                        >
-                          📝
-                        </button>
-                      )}
+                      {(() => {
+                        const actions = [
+                          { label: 'Info', onClick: () => void openDetails(row.id) },
+                          ...(row.status !== 'PAID' ? [{ label: 'Bearbeiten', onClick: () => void openEdit(row) }] : []),
+                          ...(remaining > 0 && row.status !== 'PAID'
+                            ? [{ label: 'Zahlung', tone: 'primary' as const, onClick: () => { setShowPayModal({ id: row.id, party: row.party, invoiceNo: row.invoiceNo || null, remaining }); setPayAmount(String(remaining || '')) } }]
+                            : []),
+                          ...(row.status === 'PAID' && !row.autoPost && !row.postedVoucherId
+                            ? [{
+                                label: 'Buchen',
+                                tone: 'primary' as const,
+                                onClick: () => {
+                                  const hasPaymentMethod = !!(row.paymentMethod && row.paymentMethod !== '')
+                                  if (!hasPaymentMethod) {
+                                    setShowPaymentMethodModal({
+                                      invoiceId: row.id,
+                                      invoiceNo: row.invoiceNo,
+                                      party: row.party,
+                                      paymentAmount: 0,
+                                      paymentDate: '',
+                                      willCreateVoucher: false
+                                    })
+                                  } else {
+                                    setPostToVoucherModal({ id: row.id, party: row.party, invoiceNo: row.invoiceNo })
+                                  }
+                                }
+                              }]
+                            : [])
+                        ]
+                        return actions.length > 1
+                          ? <ActionMenu actions={actions} title="Aktionen" />
+                          : <button className="btn" onClick={actions[0].onClick}>{actions[0].label}</button>
+                      })()}
                     </td>
                   </tr>
                 )
@@ -825,10 +933,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           form={form}
           formError={formError}
           requiredTouched={requiredTouched}
-          missingRequired={missingRequired}
           tags={tags}
           budgets={budgets}
           earmarks={earmarks}
+          paymentAccounts={paymentAccounts}
           partySuggestions={partySuggestions}
           descSuggestions={descSuggestions}
           formFiles={formFiles}
@@ -837,7 +945,6 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           onDraftChange={(draft) => setForm((current) => current ? { ...current, draft } : current)}
           onSave={saveForm}
           onRequestDelete={() => { if (form.sourceRow) setDeleteConfirm(form.sourceRow) }}
-          onClearMissingRequired={() => setMissingRequired([])}
           onSetRequiredTouched={setRequiredTouched}
           onRemovePendingFile={removeFileAt}
           onAddCreateFiles={(files) => setFormFiles((prev) => [...prev, ...files])}
@@ -857,7 +964,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           statusBadge={statusBadge}
           notify={notify}
           onClose={() => { setDetailId(null); setDetail(null) }}
-          onEdit={(nextDetail) => { setDetailId(null); setDetail(null); openEdit(nextDetail) }}
+          onEdit={(nextDetail) => { setDetailId(null); setDetail(null); void openEdit(nextDetail) }}
           onTagFilter={(nextTag) => { setTag(nextTag); setOffset(0) }}
           onDetailChange={setDetail}
         />

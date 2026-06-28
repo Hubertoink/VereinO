@@ -537,8 +537,8 @@ function ReviewModal({
                                 <div className="card" style={{ padding: 16 }}>
                                     <div className="helper mb-12" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notizen</div>
                                     <textarea
-                                        className="input"
-                                        rows={2}
+                                        className="input booking-note-textarea"
+                                        rows={3}
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
                                         placeholder="Anmerkungen zur Entscheidung..."
@@ -553,8 +553,8 @@ function ReviewModal({
                         <div className="field mb-16">
                             <label>Notizen (optional)</label>
                             <textarea
-                                className="input"
-                                rows={2}
+                                className="input booking-note-textarea"
+                                rows={3}
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 placeholder="Anmerkungen zur Entscheidung..."
@@ -885,6 +885,16 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
     }, [submissions])
 
     const paymentAccountOptions = useMemo(() => (paymentAccounts || []).filter((account) => account.isActive !== 0), [paymentAccounts])
+    const summaryCardStyle = (active: boolean, accent?: string) => ({
+        width: '100%',
+        padding: 16,
+        textAlign: 'center' as const,
+        cursor: 'pointer',
+        font: 'inherit',
+        color: 'inherit',
+        borderLeft: accent ? `4px solid ${accent}` : undefined,
+        boxShadow: active ? 'inset 0 0 0 2px color-mix(in oklab, var(--accent) 60%, white)' : undefined
+    })
 
     return (
         <div className="page-content">
@@ -953,22 +963,22 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
 
             {/* Stats */}
             <div className="grid gap-16 mb-16" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'ALL')} onClick={() => setFilterStatus('ALL')}>
                     <div className="helper">Gesamt</div>
                     <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
-                </div>
-                <div className="card" style={{ padding: 16, textAlign: 'center', borderLeft: '4px solid var(--warning)' }}>
+                </button>
+                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'pending', 'var(--warning)')} onClick={() => setFilterStatus('pending')}>
                     <div className="helper">Ausstehend</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--warning)' }}>{stats.pending}</div>
-                </div>
-                <div className="card" style={{ padding: 16, textAlign: 'center', borderLeft: '4px solid var(--success)' }}>
+                </button>
+                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'approved', 'var(--success)')} onClick={() => setFilterStatus('approved')}>
                     <div className="helper">Genehmigt</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>{stats.approved}</div>
-                </div>
-                <div className="card" style={{ padding: 16, textAlign: 'center', borderLeft: '4px solid var(--danger)' }}>
+                </button>
+                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'rejected', 'var(--danger)')} onClick={() => setFilterStatus('rejected')}>
                     <div className="helper">Abgelehnt</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>{stats.rejected}</div>
-                </div>
+                </button>
             </div>
 
             {/* Filter */}

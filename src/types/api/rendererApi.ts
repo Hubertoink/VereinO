@@ -6,9 +6,11 @@ import type { MembersApi } from './membersApi'
 import type { OperationsApi } from './operationsApi'
 import type { ReportsApi } from './reportsApi'
 import type { SystemApi } from './systemApi'
+import type { BankImportsApi } from './bankImportsApi'
 
 export interface RendererApi
     extends CoreApi,
+        BankImportsApi,
         FinanceApi,
         ImportsApi,
         InvoicesApi,

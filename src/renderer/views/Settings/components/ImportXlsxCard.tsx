@@ -125,6 +125,10 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     setRows([])
     setSelected(new Set())
     setFileName(f.name)
+    if (!f.name.toLowerCase().endsWith('.xlsx')) {
+      setError('Kontoauszüge werden im Hauptbereich „Bankimport“ verarbeitet. Hier sind nur XLSX-Buchungsdateien möglich.')
+      return
+    }
     try {
       const b64 = bufferToBase64(await f.arrayBuffer())
       setBase64(b64)
@@ -281,7 +285,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
 
   return (
     <div className="card import-assistant" style={{ padding: 12 }}>
-      <input ref={fileRef} type="file" accept=".xlsx,.xml" hidden onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
+      <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
       <div className="import-steps">
         {['Datei', 'Zuordnung', 'Validierung & Entwurf'].map((label, index) => (
           <span key={label} className={`import-step ${step >= index ? 'active' : ''}`}>{index + 1}. {label}</span>

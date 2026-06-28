@@ -1,12 +1,29 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { createVoucher, deleteVoucher } from './vouchers'
+import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 
 type DB = InstanceType<typeof Database>
 
 type AdvanceStatus = 'OPEN' | 'RESOLVED'
 
 type AdvancePurchaseType = 'IN' | 'OUT'
+
+function hasAdvancePurchasePaymentAccountColumn(d: DB) {
+  const cols = d.prepare('PRAGMA table_info(member_advance_purchases)').all() as Array<{ name: string }>
+  return cols.some((col) => col.name === 'payment_account_id')
+}
+
+function ensureAdvancePurchasePaymentAccountColumn(d: DB) {
+  if (hasAdvancePurchasePaymentAccountColumn(d)) return true
+  try {
+    d.exec('ALTER TABLE member_advance_purchases ADD COLUMN payment_account_id INTEGER REFERENCES payment_accounts(id);')
+    d.exec('CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_payment_account ON member_advance_purchases(payment_account_id);')
+  } catch {
+    // Ignore if another startup path has already healed the schema.
+  }
+  return hasAdvancePurchasePaymentAccountColumn(d)
+}
 
 function safeJsonParse<T>(raw: unknown, fallback: T): T {
   if (typeof raw !== 'string' || !raw.trim()) return fallback
@@ -114,6 +131,7 @@ export function listAdvances(params?: {
 
 export function getAdvanceById(input: { id: number }) {
   const d = getDb()
+  const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
   const row = d.prepare(`
     SELECT
       a.id,
@@ -152,6 +170,10 @@ export function getAdvanceById(input: { id: number }) {
       p.gross_amount as grossAmount,
       p.vat_rate as vatRate,
       p.payment_method as paymentMethod,
+      ${hasPaymentAccountColumn ? 'p.payment_account_id' : 'NULL'} as paymentAccountId,
+      ${hasPaymentAccountColumn ? 'pa.name' : 'NULL'} as paymentAccountName,
+      ${hasPaymentAccountColumn ? 'pa.kind' : 'NULL'} as paymentAccountKind,
+      ${hasPaymentAccountColumn ? 'pa.color' : 'NULL'} as paymentAccountColor,
       p.category_id as categoryId,
       p.project_id as projectId,
       p.budgets_json as budgetsJson,
@@ -163,6 +185,7 @@ export function getAdvanceById(input: { id: number }) {
       v.voucher_no as voucherNo
     FROM member_advance_purchases p
     LEFT JOIN vouchers v ON v.id = p.voucher_id
+    ${hasPaymentAccountColumn ? 'LEFT JOIN payment_accounts pa ON pa.id = p.payment_account_id' : ''}
     WHERE p.advance_id = ?
     ORDER BY p.date DESC, p.id DESC
   `).all(input.id) as any[]
@@ -269,6 +292,7 @@ export function addAdvancePurchase(input: {
   grossAmount?: number
   vatRate: number
   paymentMethod?: 'BAR' | 'BANK' | null
+  paymentAccountId?: number | null
   categoryId?: number | null
   projectId?: number | null
   budgets?: Array<{ budgetId: number; amount: number }>
@@ -280,6 +304,7 @@ export function addAdvancePurchase(input: {
   if (!input.date) throw new Error('Datum ist erforderlich')
 
   const d = getDb()
+  const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
   const advance = d.prepare('SELECT id, resolved_at as resolvedAt FROM member_advances WHERE id = ?').get(input.advanceId) as any
   if (!advance) throw new Error('Vorschuss nicht gefunden')
   if (advance?.resolvedAt) throw new Error('Vorschuss ist bereits aufgelöst')
@@ -291,15 +316,19 @@ export function addAdvancePurchase(input: {
   const vatRate = Number(input.vatRate || 0)
   const computedGross = amountGross != null ? amountGross : toMoney(amountNet! + toMoney((amountNet! * vatRate) / 100))
   const computedNet = amountNet != null ? amountNet : 0
+  const paymentAccountId = input.paymentAccountId ? Number(input.paymentAccountId) : null
+  const paymentAccount = paymentAccountId ? getPaymentAccountById(paymentAccountId, d) : undefined
+  if (paymentAccountId && !paymentAccount) throw new Error('Zahlkonto nicht gefunden')
+  const paymentMethod = input.paymentMethod ?? paymentMethodForAccountKind(paymentAccount?.kind) ?? null
 
   return withTransaction((tx: DB) => {
     const info = tx.prepare(`
       INSERT INTO member_advance_purchases(
         advance_id, date, type, sphere, description,
-        net_amount, gross_amount, vat_rate, payment_method,
+        net_amount, gross_amount, vat_rate, payment_method${hasPaymentAccountColumn ? ', payment_account_id' : ''},
         category_id, project_id,
         budgets_json, earmarks_json, tags_json, files_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentAccountColumn ? ', ?' : ''}, ?, ?, ?, ?, ?, ?)
     `).run(
       input.advanceId,
       input.date,
@@ -309,7 +338,8 @@ export function addAdvancePurchase(input: {
       computedNet,
       computedGross,
       vatRate,
-      input.paymentMethod ?? null,
+      paymentMethod,
+      ...(hasPaymentAccountColumn ? [paymentAccountId] : []),
       input.categoryId ?? null,
       input.projectId ?? null,
       JSON.stringify(input.budgets ?? []),
@@ -331,6 +361,7 @@ export function updateAdvancePurchase(input: {
   grossAmount?: number
   vatRate: number
   paymentMethod?: 'BAR' | 'BANK' | null
+  paymentAccountId?: number | null
   categoryId?: number | null
   projectId?: number | null
   budgets?: Array<{ budgetId: number; amount: number }>
@@ -342,6 +373,7 @@ export function updateAdvancePurchase(input: {
   if (!input.date) throw new Error('Datum ist erforderlich')
 
   const d = getDb()
+  const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
   const row = d.prepare(`
     SELECT p.id, p.voucher_id as voucherId, a.resolved_at as resolvedAt
     FROM member_advance_purchases p
@@ -359,12 +391,16 @@ export function updateAdvancePurchase(input: {
   const vatRate = Number(input.vatRate || 0)
   const computedGross = amountGross != null ? amountGross : toMoney(amountNet! + toMoney((amountNet! * vatRate) / 100))
   const computedNet = amountNet != null ? amountNet : 0
+  const paymentAccountId = input.paymentAccountId ? Number(input.paymentAccountId) : null
+  const paymentAccount = paymentAccountId ? getPaymentAccountById(paymentAccountId, d) : undefined
+  if (paymentAccountId && !paymentAccount) throw new Error('Zahlkonto nicht gefunden')
+  const paymentMethod = input.paymentMethod ?? paymentMethodForAccountKind(paymentAccount?.kind) ?? null
 
   return withTransaction((tx: DB) => {
     tx.prepare(`
       UPDATE member_advance_purchases SET
         date = ?, type = ?, sphere = ?, description = ?,
-        net_amount = ?, gross_amount = ?, vat_rate = ?, payment_method = ?,
+        net_amount = ?, gross_amount = ?, vat_rate = ?, payment_method = ?${hasPaymentAccountColumn ? ', payment_account_id = ?' : ''},
         category_id = ?, project_id = ?,
         budgets_json = ?, earmarks_json = ?, tags_json = ?, files_json = ?
       WHERE id = ?
@@ -376,7 +412,8 @@ export function updateAdvancePurchase(input: {
       computedNet,
       computedGross,
       vatRate,
-      input.paymentMethod ?? null,
+      paymentMethod,
+      ...(hasPaymentAccountColumn ? [paymentAccountId] : []),
       input.categoryId ?? null,
       input.projectId ?? null,
       JSON.stringify(input.budgets ?? []),
@@ -409,6 +446,7 @@ export function deleteAdvancePurchase(input: { id: number }) {
 
 export function resolveAdvance(input: { id: number }) {
   return withTransaction((d: DB) => {
+    const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
     const advance = d.prepare(`
       SELECT id, recipient_name as recipientName, issued_at as issuedAt, amount, placeholder_voucher_id as placeholderVoucherId, resolved_at as resolvedAt
       FROM member_advances WHERE id = ?
@@ -418,7 +456,7 @@ export function resolveAdvance(input: { id: number }) {
 
     const purchases = d.prepare(`
       SELECT id, date, type, sphere, description, net_amount as netAmount, gross_amount as grossAmount, vat_rate as vatRate,
-             payment_method as paymentMethod, category_id as categoryId, project_id as projectId,
+             payment_method as paymentMethod, ${hasPaymentAccountColumn ? 'payment_account_id' : 'NULL'} as paymentAccountId, category_id as categoryId, project_id as projectId,
              budgets_json as budgetsJson, earmarks_json as earmarksJson, tags_json as tagsJson, files_json as filesJson
       FROM member_advance_purchases
       WHERE advance_id = ? AND voucher_id IS NULL
@@ -441,6 +479,7 @@ export function resolveAdvance(input: { id: number }) {
         grossAmount: typeof p.netAmount === 'number' && Number(p.netAmount) > 0 ? undefined : Number(p.grossAmount || 0),
         vatRate: Number(p.vatRate || 0),
         paymentMethod: p.paymentMethod ?? undefined,
+        paymentAccountId: p.paymentAccountId ?? undefined,
         categoryId: p.categoryId ?? undefined,
         projectId: p.projectId ?? undefined,
         budgets: budgets.length ? budgets : undefined,

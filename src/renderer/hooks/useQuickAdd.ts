@@ -25,6 +25,7 @@ type QA = {
     budgets?: Array<{ budgetId: number; amount: number }>
     earmarksAssigned?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
+    bankTransactionId?: number
 }
 
 type QuickAddDraft = {
@@ -388,6 +389,9 @@ export function useQuickAdd(
         }
 
         if (Array.isArray((activeDraft.qa as any).tags)) payload.tags = (activeDraft.qa as any).tags
+        if (typeof (activeDraft.qa as any).bankTransactionId === 'number') {
+            payload.bankTransactionId = (activeDraft.qa as any).bankTransactionId
+        }
 
         // Convert attachments to Base64
         if (activeDraft.files.length) {

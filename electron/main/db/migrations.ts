@@ -613,6 +613,7 @@ export const MIGRATIONS: Mig[] = [
       gross_amount REAL NOT NULL DEFAULT 0,
       vat_rate REAL NOT NULL DEFAULT 0,
       payment_method TEXT CHECK(payment_method IN ('BAR','BANK')),
+      payment_account_id INTEGER REFERENCES payment_accounts(id),
       category_id INTEGER,
       project_id INTEGER,
       budgets_json TEXT NOT NULL DEFAULT '[]',
@@ -629,6 +630,7 @@ export const MIGRATIONS: Mig[] = [
     CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
     CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
     CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+    CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_payment_account ON member_advance_purchases(payment_account_id);
 
     CREATE TABLE IF NOT EXISTS member_advance_settlements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -725,6 +727,18 @@ export const MIGRATIONS: Mig[] = [
     version: 32,
     up: (db: DB) => {
       ensureInternalVoucherType(db)
+    }
+  },
+  {
+    version: 33,
+    up: (db: DB) => {
+      ensureBankImportTables(db)
+    }
+  },
+  {
+    version: 34,
+    up: (db: DB) => {
+      ensureAdvanceTables(db)
     }
   }
 ]
@@ -861,6 +875,7 @@ export function ensureAdvanceTables(db: DB) {
         gross_amount REAL NOT NULL DEFAULT 0,
         vat_rate REAL NOT NULL DEFAULT 0,
         payment_method TEXT CHECK(payment_method IN ('BAR','BANK')),
+        payment_account_id INTEGER REFERENCES payment_accounts(id),
         category_id INTEGER,
         project_id INTEGER,
         budgets_json TEXT NOT NULL DEFAULT '[]',
@@ -877,6 +892,7 @@ export function ensureAdvanceTables(db: DB) {
       CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_advance ON member_advance_purchases(advance_id);
       CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_date ON member_advance_purchases(date);
       CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_voucher ON member_advance_purchases(voucher_id);
+      CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_payment_account ON member_advance_purchases(payment_account_id);
 
       CREATE TABLE IF NOT EXISTS member_advance_settlements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -896,6 +912,17 @@ export function ensureAdvanceTables(db: DB) {
       CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_voucher ON member_advance_settlements(voucher_id);
       CREATE INDEX IF NOT EXISTS idx_member_advance_settlements_invoice ON member_advance_settlements(invoice_id);
     `)
+  } catch {
+    return
+  }
+
+  try {
+    const purchaseCols = db.prepare('PRAGMA table_info(member_advance_purchases)').all() as Array<{ name: string }>
+    const purchaseNames = new Set(purchaseCols.map((col) => col.name))
+    if (!purchaseNames.has('payment_account_id')) {
+      db.exec('ALTER TABLE member_advance_purchases ADD COLUMN payment_account_id INTEGER REFERENCES payment_accounts(id);')
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_member_advance_purchases_payment_account ON member_advance_purchases(payment_account_id);')
   } catch {
     return
   }
@@ -1020,6 +1047,154 @@ export function ensurePaymentAccountTables(db: DB) {
         END
       )
       WHERE payment_account_id IS NULL;
+    `)
+  } catch {
+    return
+  }
+}
+
+export function ensureBankImportTables(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bank_import_batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_name TEXT NOT NULL,
+        format TEXT NOT NULL CHECK(format IN ('CAMT', 'CSV')),
+        file_hash TEXT NOT NULL,
+        payment_account_id INTEGER NOT NULL REFERENCES payment_accounts(id),
+        imported_count INTEGER NOT NULL DEFAULT 0,
+        duplicate_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS bank_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id INTEGER NOT NULL REFERENCES bank_import_batches(id) ON DELETE CASCADE,
+        payment_account_id INTEGER NOT NULL REFERENCES payment_accounts(id),
+        booking_date TEXT NOT NULL,
+        value_date TEXT,
+        direction TEXT NOT NULL CHECK(direction IN ('IN', 'OUT')),
+        amount REAL NOT NULL CHECK(amount > 0),
+        currency TEXT NOT NULL DEFAULT 'EUR',
+        counterparty TEXT,
+        counterparty_iban TEXT,
+        purpose TEXT,
+        end_to_end_id TEXT,
+        bank_reference TEXT,
+        raw_json TEXT NOT NULL DEFAULT '{}',
+        fingerprint TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'LINKED', 'CHECKED')),
+        voucher_id INTEGER UNIQUE REFERENCES vouchers(id) ON DELETE SET NULL,
+        link_origin TEXT CHECK(link_origin IN ('EXISTING', 'CREATED')),
+        checked_note TEXT,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_bank_transactions_status_date
+        ON bank_transactions(status, booking_date DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS idx_bank_transactions_account_date
+        ON bank_transactions(payment_account_id, booking_date DESC);
+      CREATE INDEX IF NOT EXISTS idx_bank_transactions_batch
+        ON bank_transactions(batch_id);
+
+      DROP TRIGGER IF EXISTS trg_bank_transactions_voucher_deleted;
+      CREATE TRIGGER trg_bank_transactions_voucher_deleted
+      BEFORE DELETE ON vouchers
+      BEGIN
+        UPDATE bank_transactions
+        SET status = 'OPEN',
+            voucher_id = NULL,
+            link_origin = NULL,
+            resolved_at = NULL,
+            updated_at = datetime('now')
+        WHERE voucher_id = OLD.id;
+      END;
+    `)
+  } catch {
+    // Base tables may not exist before the regular migrations run.
+  }
+}
+
+export function ensureInvoiceTables(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY,
+        date TEXT NOT NULL,
+        due_date TEXT,
+        invoice_no TEXT,
+        party TEXT NOT NULL,
+        description TEXT,
+        gross_amount NUMERIC NOT NULL,
+        payment_method TEXT,
+        sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL,
+        earmark_id INTEGER,
+        budget_id INTEGER,
+        payment_account_id INTEGER,
+        auto_post INTEGER NOT NULL DEFAULT 1,
+        voucher_type TEXT CHECK(voucher_type IN ('IN','OUT')) NOT NULL,
+        posted_voucher_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_payments (
+        id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        amount NUMERIC NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_files (
+        id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL,
+        file_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        mime_type TEXT,
+        size INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_tags (
+        invoice_id INTEGER NOT NULL,
+        tag_id INTEGER NOT NULL,
+        PRIMARY KEY (invoice_id, tag_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_budgets (
+        id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL,
+        budget_id INTEGER NOT NULL,
+        amount NUMERIC NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS invoice_earmarks (
+        id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL,
+        earmark_id INTEGER NOT NULL,
+        amount NUMERIC NOT NULL DEFAULT 0
+      );
+    `)
+
+    const invoiceCols = db.prepare('PRAGMA table_info(invoices)').all() as Array<{ name: string }>
+    const invoiceNames = new Set(invoiceCols.map((col) => col.name))
+    if (!invoiceNames.has('payment_account_id')) db.exec('ALTER TABLE invoices ADD COLUMN payment_account_id INTEGER;')
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_invoices_due ON invoices(due_date);
+      CREATE INDEX IF NOT EXISTS idx_invoices_sphere ON invoices(sphere);
+      CREATE INDEX IF NOT EXISTS idx_invoices_budget ON invoices(budget_id);
+      CREATE INDEX IF NOT EXISTS idx_invoices_payment_account ON invoices(payment_account_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_payments_invoice ON invoice_payments(invoice_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_tags_invoice ON invoice_tags(invoice_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_budgets_invoice ON invoice_budgets(invoice_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_budgets_budget ON invoice_budgets(budget_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_earmarks_invoice ON invoice_earmarks(invoice_id);
+      CREATE INDEX IF NOT EXISTS idx_invoice_earmarks_earmark ON invoice_earmarks(earmark_id);
     `)
   } catch {
     return
@@ -1186,6 +1361,7 @@ export function applyMigrations(db: DB) {
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)
   ensureSubmissionColumns(db)
+  ensureBankImportTables(db)
 
   const applied = getAppliedVersions(db)
   for (const mig of MIGRATIONS) {
@@ -1265,4 +1441,5 @@ export function applyMigrations(db: DB) {
   ensureActivityReportsTable(db)
   ensureAdvanceTables(db)
   ensureSubmissionColumns(db)
+  ensureBankImportTables(db)
 }

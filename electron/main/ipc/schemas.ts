@@ -52,7 +52,8 @@ export const VoucherCreateInput = z
                 })
             )
             .optional(),
-        tags: z.array(z.string()).optional()
+        tags: z.array(z.string()).optional(),
+        bankTransactionId: z.number().int().positive().optional()
     })
     .refine((v) => v.netAmount != null || v.grossAmount != null, {
         message: 'Either netAmount or grossAmount must be provided'
@@ -453,11 +454,14 @@ export const InvoiceCreateInput = z.object({
     description: z.string().nullable().optional(),
     grossAmount: z.number(),
     paymentMethod: z.string().nullable().optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere,
     earmarkId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
     autoPost: z.boolean().optional(),
     voucherType: z.enum(['IN', 'OUT']),
+    budgets: z.array(z.object({ budgetId: z.number(), amount: z.number().optional() })).optional(),
+    earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number().optional() })).optional(),
     files: z.array(z.object({ name: z.string(), dataBase64: z.string(), mime: z.string().optional() })).optional(),
     tags: z.array(z.string()).optional()
 })
@@ -472,11 +476,14 @@ export const InvoiceUpdateInput = z.object({
     description: z.string().nullable().optional(),
     grossAmount: z.number().optional(),
     paymentMethod: z.string().nullable().optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
     earmarkId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
     autoPost: z.boolean().optional(),
     voucherType: z.enum(['IN', 'OUT']).optional(),
+    budgets: z.array(z.object({ budgetId: z.number(), amount: z.number().optional() })).optional(),
+    earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number().optional() })).optional(),
     tags: z.array(z.string()).optional()
 })
 export const InvoiceUpdateOutput = z.object({ id: z.number() })
@@ -507,6 +514,7 @@ export const InvoicesListOutput = z.object({
         description: z.string().nullable().optional(),
         grossAmount: z.number(),
         paymentMethod: z.string().nullable().optional(),
+        paymentAccountId: z.number().nullable().optional(),
         sphere: Sphere,
         earmarkId: z.number().nullable().optional(),
         budgetId: z.number().nullable().optional(),
@@ -553,6 +561,7 @@ export const InvoiceByIdOutput = z.object({
     description: z.string().nullable().optional(),
     grossAmount: z.number(),
     paymentMethod: z.string().nullable().optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere,
     earmarkId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
@@ -560,6 +569,8 @@ export const InvoiceByIdOutput = z.object({
     voucherType: z.enum(['IN', 'OUT']),
     postedVoucherId: z.number().nullable().optional(),
     postedVoucherNo: z.string().nullable().optional(),
+    budgets: z.array(z.object({ budgetId: z.number(), amount: z.number() })).optional(),
+    earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number() })).optional(),
     payments: z.array(z.object({ id: z.number(), date: z.string(), amount: z.number() })),
     files: z.array(z.object({ id: z.number(), fileName: z.string(), mimeType: z.string().nullable().optional(), size: z.number().nullable().optional(), createdAt: z.string().nullable().optional() })),
     tags: z.array(z.string()),
@@ -968,6 +979,10 @@ export const AdvanceGetOutput = z.object({
         grossAmount: z.number(),
         vatRate: z.number(),
         paymentMethod: PaymentMethod.nullable().optional(),
+        paymentAccountId: z.number().nullable().optional(),
+        paymentAccountName: z.string().nullable().optional(),
+        paymentAccountKind: PaymentAccountKind.nullable().optional(),
+        paymentAccountColor: z.string().nullable().optional(),
         categoryId: z.number().nullable().optional(),
         projectId: z.number().nullable().optional(),
         budgets: z.array(VoucherBudgetAssignment).optional(),
@@ -990,6 +1005,7 @@ export const AdvancePurchaseCreateInput = z.object({
     grossAmount: z.number().optional(),
     vatRate: z.number(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     categoryId: z.number().optional(),
     projectId: z.number().optional(),
     budgets: z.array(VoucherBudgetAssignment).optional(),
@@ -1022,6 +1038,7 @@ export const AdvancePurchaseUpdateInput = z.object({
     grossAmount: z.number().optional(),
     vatRate: z.number(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     categoryId: z.number().optional(),
     projectId: z.number().optional(),
     budgets: z.array(VoucherBudgetAssignment).optional(),
@@ -1202,6 +1219,134 @@ export type TImportAnalyzeOutput = z.infer<typeof ImportAnalyzeOutput>
 export type TImportCommitDraftInput = z.infer<typeof ImportCommitDraftInput>
 export type TImportCreateMissingInput = z.infer<typeof ImportCreateMissingInput>
 export type TImportCreateMissingOutput = z.infer<typeof ImportCreateMissingOutput>
+
+const BankCsvMappingSchema = z.object({
+    bookingDate: z.string().nullable().optional(),
+    valueDate: z.string().nullable().optional(),
+    amount: z.string().nullable().optional(),
+    debit: z.string().nullable().optional(),
+    credit: z.string().nullable().optional(),
+    currency: z.string().nullable().optional(),
+    counterparty: z.string().nullable().optional(),
+    counterpartyIban: z.string().nullable().optional(),
+    purpose: z.string().nullable().optional(),
+    endToEndId: z.string().nullable().optional(),
+    reference: z.string().nullable().optional(),
+    accountIban: z.string().nullable().optional()
+})
+
+export const BankImportPreviewInput = z.object({
+    fileBase64: z.string(),
+    fileName: z.string().min(1),
+    paymentAccountId: z.number().int().positive().nullable().optional(),
+    mapping: BankCsvMappingSchema.optional()
+})
+
+const BankImportPreviewRow = z.object({
+    sourceRow: z.number(),
+    bookingDate: z.string(),
+    valueDate: z.string().nullable(),
+    direction: z.enum(['IN', 'OUT']),
+    amount: z.number(),
+    currency: z.string(),
+    counterparty: z.string().nullable(),
+    counterpartyIban: z.string().nullable(),
+    purpose: z.string().nullable(),
+    endToEndId: z.string().nullable(),
+    bankReference: z.string().nullable(),
+    errors: z.array(z.string())
+})
+
+export const BankImportPreviewOutput = z.object({
+    format: z.enum(['CAMT', 'CSV']),
+    headers: z.array(z.string()),
+    suggestedMapping: BankCsvMappingSchema,
+    accountIbans: z.array(z.string()),
+    detectedPaymentAccountId: z.number().nullable(),
+    rows: z.array(BankImportPreviewRow),
+    summary: z.object({ total: z.number(), valid: z.number(), errors: z.number() })
+})
+
+export const BankImportCommitInput = BankImportPreviewInput
+    .extend({
+        forceImportSourceRows: z.array(z.number().int().positive()).optional()
+    })
+
+const BankImportDuplicateRow = z.object({
+    sourceRow: z.number(),
+    bookingDate: z.string(),
+    valueDate: z.string().nullable(),
+    direction: z.enum(['IN', 'OUT']),
+    amount: z.number(),
+    currency: z.string(),
+    counterparty: z.string().nullable(),
+    purpose: z.string().nullable(),
+    endToEndId: z.string().nullable(),
+    bankReference: z.string().nullable(),
+    duplicateBy: z.enum(['REFERENCE', 'FINGERPRINT']),
+    duplicateValue: z.string(),
+    existing: z.object({
+        id: z.number(),
+        status: z.string(),
+        bookingDate: z.string(),
+        direction: z.enum(['IN', 'OUT']),
+        amount: z.number(),
+        counterparty: z.string().nullable().optional(),
+        purpose: z.string().nullable().optional(),
+        endToEndId: z.string().nullable().optional(),
+        bankReference: z.string().nullable().optional(),
+        paymentAccountName: z.string(),
+        sourceFileName: z.string()
+    })
+})
+
+export const BankImportCommitOutput = z.object({
+    batchId: z.number(),
+    imported: z.number(),
+    duplicates: z.number(),
+    duplicateRows: z.array(BankImportDuplicateRow),
+    errors: z.array(z.object({ row: z.number(), message: z.string() }))
+})
+
+export const BankTransactionStatus = z.enum(['OPEN', 'LINKED', 'CHECKED'])
+export const BankTransactionsListInput = z.object({
+    status: z.union([BankTransactionStatus, z.literal('ALL')]).optional(),
+    paymentAccountId: z.number().int().positive().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    q: z.string().optional(),
+    page: z.number().int().positive().optional(),
+    limit: z.number().int().positive().max(200).optional()
+})
+export const BankTransactionIdInput = z.object({ id: z.number().int().positive() })
+export const BankTransactionLinkInput = BankTransactionIdInput.extend({ voucherId: z.number().int().positive() })
+export const BankTransactionCheckInput = BankTransactionIdInput.extend({ note: z.string().nullable().optional() })
+export const BankTransactionMatchesInput = BankTransactionIdInput.extend({
+    q: z.string().optional(),
+    includeAllDates: z.boolean().optional()
+})
+export const BankTransactionOutput = z.record(z.any())
+export const BankTransactionsListOutput = z.object({
+    rows: z.array(BankTransactionOutput),
+    total: z.number(),
+    page: z.number(),
+    limit: z.number(),
+    stats: z.object({ total: z.number(), open: z.number(), linked: z.number(), checked: z.number() })
+})
+export const BankTransactionMatchesOutput = z.object({ rows: z.array(z.record(z.any())) })
+
+export type TBankImportPreviewInput = z.infer<typeof BankImportPreviewInput>
+export type TBankImportPreviewOutput = z.infer<typeof BankImportPreviewOutput>
+export type TBankImportCommitInput = z.infer<typeof BankImportCommitInput>
+export type TBankImportCommitOutput = z.infer<typeof BankImportCommitOutput>
+export type TBankTransactionsListInput = z.infer<typeof BankTransactionsListInput>
+export type TBankTransactionsListOutput = z.infer<typeof BankTransactionsListOutput>
+export type TBankTransactionIdInput = z.infer<typeof BankTransactionIdInput>
+export type TBankTransactionLinkInput = z.infer<typeof BankTransactionLinkInput>
+export type TBankTransactionCheckInput = z.infer<typeof BankTransactionCheckInput>
+export type TBankTransactionMatchesInput = z.infer<typeof BankTransactionMatchesInput>
+export type TBankTransactionOutput = z.infer<typeof BankTransactionOutput>
+export type TBankTransactionMatchesOutput = z.infer<typeof BankTransactionMatchesOutput>
 
 // Attachments (files linked to vouchers)
 export const AttachmentsListInput = z.object({ voucherId: z.number() })

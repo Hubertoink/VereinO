@@ -1,0 +1,945 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+type PaymentAccount = {
+  id: number
+  name: string
+  kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
+  iban?: string | null
+  color?: string | null
+  isActive: number
+}
+
+type BankTransaction = {
+  id: number
+  bookingDate: string
+  valueDate?: string | null
+  direction: 'IN' | 'OUT'
+  amount: number
+  currency: string
+  counterparty?: string | null
+  counterpartyIban?: string | null
+  purpose?: string | null
+  endToEndId?: string | null
+  bankReference?: string | null
+  status: 'OPEN' | 'LINKED' | 'CHECKED'
+  paymentAccountId: number
+  paymentAccountName: string
+  paymentAccountColor?: string | null
+  voucherId?: number | null
+  voucherNo?: string | null
+  voucherDescription?: string | null
+  voucherReversedById?: number | null
+  linkOrigin?: 'EXISTING' | 'CREATED' | null
+  checkedNote?: string | null
+  resolvedAt?: string | null
+  sourceFileName: string
+}
+
+type CsvMapping = {
+  bookingDate?: string | null
+  valueDate?: string | null
+  amount?: string | null
+  debit?: string | null
+  credit?: string | null
+  currency?: string | null
+  counterparty?: string | null
+  counterpartyIban?: string | null
+  purpose?: string | null
+  endToEndId?: string | null
+  reference?: string | null
+  accountIban?: string | null
+}
+
+type ImportPreview = {
+  format: 'CAMT' | 'CSV'
+  headers: string[]
+  suggestedMapping: CsvMapping
+  accountIbans: string[]
+  detectedPaymentAccountId: number | null
+  rows: Array<{
+    sourceRow: number
+    bookingDate: string
+    direction: 'IN' | 'OUT'
+    amount: number
+    currency: string
+    counterparty?: string | null
+    purpose?: string | null
+    errors: string[]
+  }>
+  summary: { total: number; valid: number; errors: number }
+}
+
+type ImportCommitResult = {
+  batchId: number
+  imported: number
+  duplicates: number
+  duplicateRows: Array<{
+    sourceRow: number
+    bookingDate: string
+    valueDate?: string | null
+    direction: 'IN' | 'OUT'
+    amount: number
+    currency: string
+    counterparty?: string | null
+    purpose?: string | null
+    endToEndId?: string | null
+    bankReference?: string | null
+    duplicateBy: 'REFERENCE' | 'FINGERPRINT'
+    duplicateValue: string
+    existing: {
+      id: number
+      status: string
+      bookingDate: string
+      direction: 'IN' | 'OUT'
+      amount: number
+      counterparty?: string | null
+      purpose?: string | null
+      endToEndId?: string | null
+      bankReference?: string | null
+      paymentAccountName: string
+      sourceFileName: string
+    }
+  }>
+  errors: Array<{ row: number; message: string }>
+}
+
+type Props = {
+  paymentAccounts: PaymentAccount[]
+  notify: (type: 'success' | 'error' | 'info', text: string) => void
+  onCreateBooking: (transaction: BankTransaction) => void
+  onOpenVoucher: (voucherId: number, voucherNo?: string | null, date?: string) => void
+}
+
+const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+const date = new Intl.DateTimeFormat('de-DE')
+
+function formatDate(value?: string | null) {
+  if (!value) return '–'
+  const parsed = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? value : date.format(parsed)
+}
+
+function statusLabel(status: BankTransaction['status']) {
+  if (status === 'LINKED') return 'Zugeordnet'
+  if (status === 'CHECKED') return 'Geprüft'
+  return 'Offen'
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error)
+    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '')
+    reader.readAsDataURL(file)
+  })
+}
+
+function MappingSelect({ label, value, headers, onChange }: {
+  label: string
+  value?: string | null
+  headers: string[]
+  onChange: (value: string | null) => void
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select className="input" value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
+        <option value="">Nicht zugeordnet</option>
+        {headers.map((header) => <option key={header} value={header}>{header}</option>)}
+      </select>
+    </label>
+  )
+}
+
+function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
+  return reason === 'REFERENCE' ? 'Bankreferenz / End-to-End-ID' : 'Fingerprint aus Konto, Datum, Betrag und Text'
+}
+
+function DuplicateRecordCard({
+  title,
+  row
+}: {
+  title: string
+  row: {
+    bookingDate: string
+    direction: 'IN' | 'OUT'
+    amount: number
+    counterparty?: string | null
+    purpose?: string | null
+    bankReference?: string | null
+    endToEndId?: string | null
+    paymentAccountName?: string | null
+    sourceFileName?: string | null
+    idLabel?: string | null
+  }
+}) {
+  return (
+    <div className="bank-duplicate-record">
+      <div className="bank-duplicate-record__title">{title}</div>
+      <div className="bank-duplicate-record__grid">
+        <div>
+          <span>Datum</span>
+          <strong>{formatDate(row.bookingDate)}</strong>
+        </div>
+        <div>
+          <span>Typ</span>
+          <strong>{row.direction}</strong>
+        </div>
+        <div>
+          <span>Summe</span>
+          <strong>{euro.format(row.amount)}</strong>
+        </div>
+        <div>
+          <span>Beleg</span>
+          <strong>{row.idLabel || '–'}</strong>
+        </div>
+        <div>
+          <span>Partei</span>
+          <strong>{row.counterparty || '–'}</strong>
+        </div>
+        <div>
+          <span>Zweck</span>
+          <strong>{row.purpose || '–'}</strong>
+        </div>
+        <div>
+          <span>Bankreferenz</span>
+          <strong>{row.bankReference || '–'}</strong>
+        </div>
+        <div>
+          <span>End-to-End-ID</span>
+          <strong>{row.endToEndId || '–'}</strong>
+        </div>
+        <div>
+          <span>Zahlkonto</span>
+          <strong>{row.paymentAccountName || '–'}</strong>
+        </div>
+        <div>
+          <span>Quelldatei</span>
+          <strong>{row.sourceFileName || '–'}</strong>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BankImportResultModal({
+  result,
+  selectedRows,
+  onToggleRow,
+  onImportSelected,
+  onClose,
+  busy
+}: {
+  result: ImportCommitResult
+  selectedRows: number[]
+  onToggleRow: (row: number) => void
+  onImportSelected: () => void
+  onClose: () => void
+  busy: boolean
+}) {
+  const selectedCount = selectedRows.length
+
+  return createPortal(
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal bank-import-result-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2>Import geprüft</h2>
+            <p>{result.imported} importiert, {result.duplicates} als Duplikat erkannt, {result.errors.length} fehlerhaft.</p>
+          </div>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+        </header>
+
+        {result.duplicateRows.length > 0 && (
+          <section className="bank-review-section">
+            <div className="bank-section-title">
+              <div>
+                <strong>Erkannte Duplikate</strong>
+                <span className="helper">Hier siehst du, warum eine Zeile übersprungen wurde und auf welchen bestehenden Bankbeleg sie gematcht hat.</span>
+              </div>
+            </div>
+            <div className="bank-duplicate-list">
+              {result.duplicateRows.map((row) => {
+                const selected = selectedRows.includes(row.sourceRow)
+                return (
+                  <label key={row.sourceRow} className={`bank-duplicate-row ${selected ? 'active' : ''}`}>
+                    <input type="checkbox" checked={selected} onChange={() => onToggleRow(row.sourceRow)} />
+                    <div className="bank-duplicate-row__content">
+                      <div className="bank-duplicate-row__head">
+                        <strong>Zeile {row.sourceRow}: {formatDate(row.bookingDate)} · {row.direction} · {euro.format(row.amount)}</strong>
+                        <span className="bank-duplicate-pill">{duplicateReasonLabel(row.duplicateBy)}</span>
+                      </div>
+                      <div className="bank-duplicate-compact">
+                        <div className="bank-duplicate-compact__card">
+                          <span>Importzeile</span>
+                          <strong>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</strong>
+                          <small>{formatDate(row.bookingDate)} · {row.direction} · {euro.format(row.amount)}</small>
+                        </div>
+                        <div className="bank-duplicate-compact__equals">=</div>
+                        <div className="bank-duplicate-compact__card">
+                          <span>Bestehender Bankbeleg</span>
+                          <strong>{row.existing.counterparty || row.existing.purpose || `#${row.existing.id}`}</strong>
+                          <small>#{row.existing.id} · {formatDate(row.existing.bookingDate)} · {row.existing.direction} · {euro.format(row.existing.amount)}</small>
+                        </div>
+                      </div>
+                      <details className="bank-duplicate-details">
+                        <summary className="bank-duplicate-details__summary">Mehr Vergleich anzeigen</summary>
+                        <div className="bank-duplicate-grid">
+                          <DuplicateRecordCard
+                            title="Importzeile"
+                            row={{
+                              bookingDate: row.bookingDate,
+                              direction: row.direction,
+                              amount: row.amount,
+                              counterparty: row.counterparty,
+                              purpose: row.purpose,
+                              bankReference: row.bankReference,
+                              endToEndId: row.endToEndId,
+                              paymentAccountName: null,
+                              sourceFileName: null,
+                              idLabel: `Zeile ${row.sourceRow}`
+                            }}
+                          />
+                          <DuplicateRecordCard
+                            title="Bestehender Bankbeleg"
+                            row={{
+                              bookingDate: row.existing.bookingDate,
+                              direction: row.existing.direction,
+                              amount: row.existing.amount,
+                              counterparty: row.existing.counterparty,
+                              purpose: row.existing.purpose,
+                              bankReference: row.existing.bankReference,
+                              endToEndId: row.existing.endToEndId,
+                              paymentAccountName: row.existing.paymentAccountName,
+                              sourceFileName: row.existing.sourceFileName,
+                              idLabel: `#${row.existing.id}`
+                            }}
+                          />
+                          <div className="bank-duplicate-grid__wide">
+                            <span>Abgleich über</span>
+                            <strong className="word-break-all">{row.duplicateValue}</strong>
+                          </div>
+                        </div>
+                      </details>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {result.errors.length > 0 && (
+          <section className="bank-review-section">
+            <div className="bank-section-title">
+              <strong>Fehlerhafte Zeilen</strong>
+            </div>
+            <div className="bank-error-list">
+              {result.errors.map((entry) => <div key={`${entry.row}-${entry.message}`}>Zeile {entry.row}: {entry.message}</div>)}
+            </div>
+          </section>
+        )}
+
+        <footer className="bank-modal-footer">
+          {result.duplicateRows.length > 0 && (
+            <button className="btn" disabled={busy || selectedCount === 0} onClick={onImportSelected}>
+              {busy ? 'Importiere …' : `${selectedCount} Duplikat(e) trotzdem importieren`}
+            </button>
+          )}
+          <button className="btn primary" onClick={onClose}>Fertig</button>
+        </footer>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function BankImportModal({ accounts, onClose, onImported, notify }: {
+  accounts: PaymentAccount[]
+  onClose: () => void
+  onImported: () => void
+  notify: Props['notify']
+}) {
+  const paymentAccountRef = React.useRef<HTMLSelectElement | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [fileBase64, setFileBase64] = useState('')
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [mapping, setMapping] = useState<CsvMapping>({})
+  const [paymentAccountId, setPaymentAccountId] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [paymentAccountError, setPaymentAccountError] = useState(false)
+  const [commitResult, setCommitResult] = useState<ImportCommitResult | null>(null)
+  const [selectedDuplicateRows, setSelectedDuplicateRows] = useState<number[]>([])
+
+  const loadPreview = async (nextFile: File, nextBase64: string, nextMapping?: CsvMapping) => {
+    setBusy(true)
+    setError('')
+    try {
+      const result = await window.api.bankImports.preview({
+        fileBase64: nextBase64,
+        fileName: nextFile.name,
+        mapping: nextMapping
+      }) as ImportPreview
+      setPreview(result)
+      if (!nextMapping) setMapping(result.suggestedMapping)
+      if (result.detectedPaymentAccountId) {
+        setPaymentAccountId(result.detectedPaymentAccountId)
+        setPaymentAccountError(false)
+      }
+    } catch (reason: any) {
+      setError(reason?.message || String(reason))
+      setPreview(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const chooseFile = async (nextFile?: File) => {
+    if (!nextFile) return
+    if (!/\.(xml|csv)$/i.test(nextFile.name)) {
+      setError('Bitte wähle eine CAMT-XML- oder CSV-Datei.')
+      return
+    }
+    setFile(nextFile)
+    const nextBase64 = await fileToBase64(nextFile)
+    setFileBase64(nextBase64)
+    await loadPreview(nextFile, nextBase64)
+  }
+
+  const commit = async () => {
+    if (!file || !fileBase64) return
+    if (!paymentAccountId) {
+      setPaymentAccountError(true)
+      window.setTimeout(() => paymentAccountRef.current?.focus(), 0)
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const result = await window.api.bankImports.commit({
+        fileBase64,
+        fileName: file.name,
+        paymentAccountId,
+        mapping: preview?.format === 'CSV' ? mapping : undefined
+      }) as ImportCommitResult
+      notify('success', `${result.imported} Bankbeleg(e) importiert${result.duplicates ? `, ${result.duplicates} Duplikat(e) übersprungen` : ''}.`)
+      if (result.errors.length) notify('info', `${result.errors.length} fehlerhafte Zeile(n) wurden nicht übernommen.`)
+      setCommitResult(result)
+      setSelectedDuplicateRows([])
+      onImported()
+    } catch (reason: any) {
+      setError(reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const importSelectedDuplicates = async () => {
+    if (!file || !fileBase64 || !paymentAccountId || selectedDuplicateRows.length === 0) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await window.api.bankImports.commit({
+        fileBase64,
+        fileName: file.name,
+        paymentAccountId,
+        mapping: preview?.format === 'CSV' ? mapping : undefined,
+        forceImportSourceRows: selectedDuplicateRows
+      }) as ImportCommitResult
+      notify('success', `${result.imported} Duplikat(e) bewusst importiert.`)
+      setCommitResult((current) => current ? {
+        ...current,
+        imported: current.imported + result.imported,
+        duplicates: Math.max(0, current.duplicates - result.imported),
+        duplicateRows: current.duplicateRows.filter((row) => !selectedDuplicateRows.includes(row.sourceRow))
+      } : current)
+      setSelectedDuplicateRows([])
+      onImported()
+    } catch (reason: any) {
+      setError(reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setMap = (key: keyof CsvMapping, value: string | null) => setMapping((current) => ({ ...current, [key]: value }))
+  const activeAccounts = accounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH')
+  const paymentAccountsById = new Map(activeAccounts.map((account) => [account.id, account]))
+  const selectedPaymentAccountColor = paymentAccountsById.get(Number(paymentAccountId || 0))?.color || undefined
+
+  return createPortal(
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal bank-import-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2>Bankdaten importieren</h2>
+            <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
+          </div>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+        </header>
+
+        <div className="bank-import-drop">
+          <strong>{file?.name || 'Kontoauszug auswählen'}</strong>
+          <span className="helper">XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.</span>
+          <label className="btn">
+            Datei wählen
+            <input type="file" accept=".xml,.csv,text/csv,application/xml,text/xml" hidden onChange={(event) => void chooseFile(event.target.files?.[0])} />
+          </label>
+        </div>
+
+        {error && <div className="inline-error">{error}</div>}
+        {busy && <div className="helper">Datei wird geprüft …</div>}
+
+        {preview && (
+          <>
+            <div className="bank-import-summary">
+              <span><strong>{preview.format}</strong> erkannt</span>
+              <span>{preview.summary.total} Zeilen</span>
+              <span className="text-success">{preview.summary.valid} gültig</span>
+              <span className={preview.summary.errors ? 'text-danger' : ''}>{preview.summary.errors} fehlerhaft</span>
+            </div>
+
+            <label className="field">
+              <span>
+                Zahlkonto <span className="req-asterisk" aria-hidden="true">*</span>
+                {paymentAccountError && <span className="booking-field-error has-tooltip" data-tooltip="Bitte ein Zahlkonto für den Import auswählen." tabIndex={0}>!</span>}
+              </span>
+              <select
+                ref={paymentAccountRef}
+                className={`input ${paymentAccountError ? 'input-error' : ''}`}
+                value={paymentAccountId ?? ''}
+                style={{ color: selectedPaymentAccountColor }}
+                onChange={(event) => {
+                  const nextValue = event.target.value ? Number(event.target.value) : null
+                  setPaymentAccountId(nextValue)
+                  if (nextValue) setPaymentAccountError(false)
+                }}
+                aria-invalid={paymentAccountError}
+              >
+                <option value="">Zahlkonto wählen</option>
+                {activeAccounts.map((account) => (
+                  <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}{account.iban ? ` · ${account.iban}` : ''}</option>
+                ))}
+              </select>
+              {paymentAccountError && <span className="helper text-danger">Bitte wähle ein Zahlkonto aus.</span>}
+              {preview.accountIbans.length > 0 && <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>}
+            </label>
+
+            {preview.format === 'CSV' && (
+              <section className="bank-mapping-card">
+                <div className="bank-section-title">
+                  <strong>Spaltenzuordnung</strong>
+                  <button className="btn" disabled={busy} onClick={() => file && void loadPreview(file, fileBase64, mapping)}>Vorschau aktualisieren</button>
+                </div>
+                <div className="bank-mapping-grid">
+                  <MappingSelect label="Buchungsdatum *" value={mapping.bookingDate} headers={preview.headers} onChange={(value) => setMap('bookingDate', value)} />
+                  <MappingSelect label="Betrag mit Vorzeichen" value={mapping.amount} headers={preview.headers} onChange={(value) => setMap('amount', value)} />
+                  <MappingSelect label="Soll / Belastung" value={mapping.debit} headers={preview.headers} onChange={(value) => setMap('debit', value)} />
+                  <MappingSelect label="Haben / Gutschrift" value={mapping.credit} headers={preview.headers} onChange={(value) => setMap('credit', value)} />
+                  <MappingSelect label="Verwendungszweck" value={mapping.purpose} headers={preview.headers} onChange={(value) => setMap('purpose', value)} />
+                </div>
+                <details className="bank-more-options">
+                  <summary className="btn">... Weitere Spalten</summary>
+                  <div className="bank-mapping-grid">
+                    <MappingSelect label="Wertstellung" value={mapping.valueDate} headers={preview.headers} onChange={(value) => setMap('valueDate', value)} />
+                    <MappingSelect label="Währung" value={mapping.currency} headers={preview.headers} onChange={(value) => setMap('currency', value)} />
+                    <MappingSelect label="Gegenpartei" value={mapping.counterparty} headers={preview.headers} onChange={(value) => setMap('counterparty', value)} />
+                    <MappingSelect label="IBAN Gegenkonto" value={mapping.counterpartyIban} headers={preview.headers} onChange={(value) => setMap('counterpartyIban', value)} />
+                    <MappingSelect label="Bankreferenz" value={mapping.reference} headers={preview.headers} onChange={(value) => setMap('reference', value)} />
+                  </div>
+                </details>
+              </section>
+            )}
+
+            <div className="bank-preview-table-wrap">
+              <table className="bank-table bank-preview-table">
+                <thead><tr><th>Zeile</th><th>Datum</th><th>Gegenpartei / Zweck</th><th>Typ</th><th className="number">Summe</th><th>Prüfung</th></tr></thead>
+                <tbody>
+                  {preview.rows.slice(0, 30).map((row) => (
+                    <tr key={row.sourceRow} className={row.errors.length ? 'bank-row-error' : ''}>
+                      <td>{row.sourceRow}</td>
+                      <td>{formatDate(row.bookingDate)}</td>
+                      <td>{row.counterparty || row.purpose || '–'}</td>
+                      <td>{row.direction}</td>
+                      <td className="number">{euro.format(row.amount)}</td>
+                      <td>{row.errors.join(' ') || 'OK'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <footer className="bank-modal-footer">
+          <button className="btn" onClick={onClose}>Abbrechen</button>
+          <button className="btn primary" disabled={busy || !preview || preview.summary.valid === 0} onClick={() => void commit()}>
+            {busy ? 'Importiere …' : `${preview?.summary.valid ?? 0} Beleg(e) importieren`}
+          </button>
+        </footer>
+      </div>
+      {commitResult && (
+        <BankImportResultModal
+          result={commitResult}
+          selectedRows={selectedDuplicateRows}
+          onToggleRow={(row) => setSelectedDuplicateRows((current) => current.includes(row) ? current.filter((entry) => entry !== row) : [...current, row])}
+          onImportSelected={() => void importSelectedDuplicates()}
+          onClose={() => {
+            if ((commitResult.duplicateRows.length === 0 || selectedDuplicateRows.length === 0) && commitResult.errors.length === 0) {
+              onClose()
+              return
+            }
+            onClose()
+          }}
+          busy={busy}
+        />
+      )}
+    </div>,
+    document.body
+  )
+}
+
+function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onOpenVoucher, notify }: {
+  transaction: BankTransaction
+  onClose: () => void
+  onChanged: () => void
+  onCreateBooking: Props['onCreateBooking']
+  onOpenVoucher: Props['onOpenVoucher']
+  notify: Props['notify']
+}) {
+  const [matches, setMatches] = useState<Array<Record<string, any>>>([])
+  const [loading, setLoading] = useState(transaction.status === 'OPEN')
+  const [search, setSearch] = useState('')
+  const [includeAllDates, setIncludeAllDates] = useState(false)
+  const [checkedNote, setCheckedNote] = useState(transaction.checkedNote || '')
+  const [busy, setBusy] = useState(false)
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
+  const [showCheckForm, setShowCheckForm] = useState(false)
+  const actionMenuRef = React.useRef<HTMLDivElement | null>(null)
+
+  const loadMatches = useCallback(async () => {
+    if (transaction.status !== 'OPEN') return
+    setLoading(true)
+    try {
+      const result = await window.api.bankTransactions.matches({ id: transaction.id, q: search || undefined, includeAllDates })
+      setMatches(result.rows)
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setLoading(false)
+    }
+  }, [includeAllDates, notify, search, transaction.id, transaction.status])
+
+  useEffect(() => { void loadMatches() }, [loadMatches])
+
+  useEffect(() => {
+    if (!actionMenuOpen) return
+    const closeMenu = (event: MouseEvent) => {
+      if (!actionMenuRef.current?.contains(event.target as Node)) setActionMenuOpen(false)
+    }
+    window.addEventListener('mousedown', closeMenu)
+    return () => window.removeEventListener('mousedown', closeMenu)
+  }, [actionMenuOpen])
+
+  const link = async (voucherId: number) => {
+    setBusy(true)
+    try {
+      await window.api.bankTransactions.link({ id: transaction.id, voucherId })
+      notify('success', 'Bankbeleg wurde der Buchung zugeordnet.')
+      onChanged()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const check = async () => {
+    setBusy(true)
+    try {
+      await window.api.bankTransactions.check({ id: transaction.id, note: checkedNote || null })
+      notify('success', 'Bankbeleg wurde als geprüft abgeschlossen.')
+      onChanged()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const reopen = async () => {
+    setBusy(true)
+    try {
+      await window.api.bankTransactions.reopen({ id: transaction.id })
+      notify('success', 'Bankbeleg ist wieder offen.')
+      onChanged()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return createPortal(
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal bank-review-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2>Bankbeleg #{transaction.id}</h2>
+            <p>{transaction.counterparty || 'Ohne Gegenpartei'}</p>
+          </div>
+          <div className="bank-header-actions">
+            <span className={`bank-status bank-status--${transaction.status.toLowerCase()}`}>{statusLabel(transaction.status)}</span>
+            <div className="bank-action-menu" ref={actionMenuRef}>
+              <button className="btn bank-action-menu__trigger" onClick={() => setActionMenuOpen((open) => !open)} aria-label="Aktionen" aria-expanded={actionMenuOpen}>...</button>
+              {actionMenuOpen && (
+                <div className="bank-action-menu__popover">
+                  {transaction.status === 'OPEN' && (
+                    <>
+                      <button className="btn" onClick={() => { setActionMenuOpen(false); onCreateBooking(transaction); onClose() }}>Buchung anlegen</button>
+                      <button className="btn" onClick={() => { setActionMenuOpen(false); setShowCheckForm(true) }}>Ohne Buchung erledigen</button>
+                    </>
+                  )}
+                  {transaction.status === 'LINKED' && transaction.voucherId && (
+                    <button className="btn" onClick={() => { setActionMenuOpen(false); onOpenVoucher(transaction.voucherId!, transaction.voucherNo, transaction.bookingDate) }}>Buchung öffnen</button>
+                  )}
+                  {transaction.status !== 'OPEN' && (
+                    <button className="btn" disabled={busy} onClick={() => { setActionMenuOpen(false); void reopen() }}>Wieder öffnen</button>
+                  )}
+                </div>
+              )}
+            </div>
+            <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+          </div>
+        </header>
+
+        <section className="bank-detail-card">
+          <div><span>Datum</span><strong>{formatDate(transaction.bookingDate)}</strong></div>
+          <div><span>Wertstellung</span><strong>{formatDate(transaction.valueDate)}</strong></div>
+          <div><span>Typ</span><strong className={transaction.direction === 'IN' ? 'text-success' : 'text-danger'}>{transaction.direction}</strong></div>
+          <div><span>Summe</span><strong>{euro.format(transaction.amount)}</strong></div>
+          <div><span>Zahlkonto</span><strong style={{ color: transaction.paymentAccountColor || undefined }}>{transaction.paymentAccountName}</strong></div>
+          <div><span>IBAN Gegenkonto</span><strong>{transaction.counterpartyIban || '–'}</strong></div>
+          <div className="bank-detail-wide"><span>Verwendungszweck</span><strong>{transaction.purpose || '–'}</strong></div>
+          <div><span>End-to-End-ID</span><strong>{transaction.endToEndId || '–'}</strong></div>
+          <div><span>Bankreferenz</span><strong>{transaction.bankReference || '–'}</strong></div>
+          <div className="bank-detail-wide"><span>Quelldatei</span><strong title={transaction.sourceFileName}>{transaction.sourceFileName}</strong></div>
+        </section>
+
+        {transaction.status === 'OPEN' ? (
+          <div className="bank-review-layout">
+            <section className="bank-review-section">
+              <div className="bank-section-title">
+                <div><strong>Passende Buchungen</strong><span className="helper">Exakte Konto-Treffer stehen oben. Abweichende Zahlkonten werden mit Warnhinweis gezeigt und bewusst niedriger bewertet.</span></div>
+                <div className="bank-check-toggle">
+                  <label className="bank-check-label"><input type="checkbox" checked={includeAllDates} onChange={(event) => setIncludeAllDates(event.target.checked)} /> Alle Daten</label>
+                  <span className="helper bank-check-hint">Wenn aktiv, werden auch Buchungen außerhalb von +/-14 Tagen einbezogen.</span>
+                </div>
+              </div>
+              <div className="bank-match-search">
+                <input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buchungsnummer oder Text suchen …" />
+              </div>
+              <div className="bank-match-list">
+                {loading && <div className="helper">Treffer werden gesucht …</div>}
+                {!loading && matches.map((match) => (
+                  <div className="bank-match-row" key={match.id}>
+                    <div>
+                      <strong>{match.voucherNo}</strong>
+                      <span>{formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}</span>
+                      {!match.paymentAccountMismatch && match.paymentAccountName ? (
+                        <span style={{ color: match.paymentAccountColor || undefined }}>Zahlkonto: {match.paymentAccountName}</span>
+                      ) : null}
+                      {match.paymentAccountMismatch && (
+                        <span className="bank-match-warning">
+                          {match.paymentAccountWarning || `Zahlkonto abweichend: ${match.paymentAccountName || 'ohne Konto'}`}
+                        </span>
+                      )}
+                    </div>
+                    {(() => {
+                      const scoreValue = Number(match.score || 0)
+                      const scoreLevel = scoreValue >= 60 ? 'high' : scoreValue >= 30 ? 'medium' : 'low'
+                      const scoreLabel = scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
+                      return (
+                        <span
+                          className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}
+                          title={scoreValue >= 15 ? `Übereinstimmung: ${Math.round(scoreValue)} %` : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`}
+                          aria-label={scoreValue >= 15 ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung` : 'Sehr schwacher Treffer'}
+                        >
+                          {scoreLabel}
+                        </span>
+                      )
+                    })()}
+                    <button className="btn" disabled={busy} onClick={() => void link(match.id)}>Zuordnen</button>
+                  </div>
+                ))}
+                {!loading && matches.length === 0 && <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>}
+              </div>
+            </section>
+
+            {showCheckForm && (
+              <section className="bank-check-panel">
+                <div>
+                  <strong>Ohne Buchung erledigen</strong>
+                  <span>Nicht buchungsrelevante oder bereits extern geprüfte Bewegung.</span>
+                </div>
+                <div className="bank-check-panel__controls">
+                  <textarea className="input booking-note-textarea" value={checkedNote} onChange={(event) => setCheckedNote(event.target.value)} placeholder="Optionaler Prüfhinweis …" />
+                  <button className="btn" onClick={() => setShowCheckForm(false)}>Abbrechen</button>
+                  <button className="btn primary" disabled={busy} onClick={() => void check()}>Als geprüft markieren</button>
+                </div>
+              </section>
+            )}
+          </div>
+        ) : (
+          <section className="bank-resolution-card">
+            {transaction.status === 'LINKED' ? (
+              <>
+                <div>
+                  <span>Zugeordnete Buchung</span>
+                  <strong>{transaction.voucherNo || `#${transaction.voucherId}`}{transaction.voucherReversedById ? ' · storniert' : ''}</strong>
+                  <small>{transaction.linkOrigin === 'CREATED' ? 'Aus diesem Bankbeleg angelegt' : 'Bestehender Buchung zugeordnet'}</small>
+                </div>
+              </>
+            ) : (
+              <div>
+                <span>Prüfvermerk</span>
+                <strong>{transaction.checkedNote || 'Ohne zusätzlichen Hinweis geprüft.'}</strong>
+              </div>
+            )}
+          </section>
+        )}
+
+        <footer className="bank-modal-footer"><button className="btn" onClick={onClose}>Schließen</button></footer>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+export default function BankImportView({ paymentAccounts, notify, onCreateBooking, onOpenVoucher }: Props) {
+  const [rows, setRows] = useState<BankTransaction[]>([])
+  const [stats, setStats] = useState({ total: 0, open: 0, linked: 0, checked: 0 })
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState<'ALL' | BankTransaction['status']>('OPEN')
+  const [accountId, setAccountId] = useState<number | null>(null)
+  const [showImport, setShowImport] = useState(false)
+  const [selected, setSelected] = useState<BankTransaction | null>(null)
+  const limit = 50
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await window.api.bankTransactions.list({
+        status,
+        paymentAccountId: accountId || undefined,
+        q: query || undefined,
+        page,
+        limit
+      })
+      setRows(result.rows as BankTransaction[])
+      setStats(result.stats)
+      setTotal(result.total)
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setLoading(false)
+    }
+  }, [accountId, notify, page, query, status])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 180)
+    return () => window.clearTimeout(timer)
+  }, [load])
+
+  useEffect(() => {
+    const refresh = () => void load()
+    window.addEventListener('data-changed', refresh)
+    return () => window.removeEventListener('data-changed', refresh)
+  }, [load])
+
+  const activeAccounts = useMemo(() => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'), [paymentAccounts])
+  const paymentAccountsById = useMemo(() => new Map(activeAccounts.map((account) => [account.id, account])), [activeAccounts])
+  const pageCount = Math.max(1, Math.ceil(total / limit))
+
+  return (
+    <div className="card bank-import-container">
+      <div className="bank-page-header">
+        <h1>Bankimport</h1>
+        <div className="bank-page-tools">
+          <input className="input bank-import-search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Suche Bankbelege (Text, Referenz, Gegenpartei)..." aria-label="Bankbelege durchsuchen" />
+          <select className="input bank-account-filter" value={accountId ?? ''} style={{ color: paymentAccountsById.get(Number(accountId || 0))?.color || undefined }} onChange={(event) => { setAccountId(event.target.value ? Number(event.target.value) : null); setPage(1) }} aria-label="Nach Zahlkonto filtern">
+            <option value="">Alle Zahlkonten</option>
+            {activeAccounts.map((account) => <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
+          </select>
+          <div className="filter-divider" />
+          <button className="btn primary" onClick={() => setShowImport(true)}>+ Import</button>
+        </div>
+      </div>
+
+      <div className="helper bank-page-summary">
+        Offene Bankbelege: <strong>{stats.open}</strong>
+        <span className="summary-remaining">
+          ({stats.total} gesamt; Zugeordnet: {stats.linked}, Geprüft: {stats.checked})
+        </span>
+      </div>
+
+      <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
+        {([
+          ['ALL', 'Gesamt', stats.total],
+          ['OPEN', 'Offen', stats.open],
+          ['LINKED', 'Zugeordnet', stats.linked],
+          ['CHECKED', 'Geprüft', stats.checked]
+        ] as const).map(([key, label, count]) => (
+          <button key={key} className={status === key ? 'active' : ''} onClick={() => { setStatus(key); setPage(1) }}>
+            <span>{label}</span><strong>{count}</strong>
+          </button>
+        ))}
+      </div>
+
+      <div className="bank-table-card">
+        <table className="bank-table">
+          <thead>
+            <tr><th>Status</th><th>Datum</th><th>Beschreibung</th><th>Zahlkonto</th><th>Typ</th><th className="number">Summe</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} tabIndex={0} onClick={() => setSelected(row)} onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && setSelected(row)}>
+                <td><span className={`bank-status bank-status--${row.status.toLowerCase()}`} title={statusLabel(row.status)}><i />{statusLabel(row.status)}</span></td>
+                <td>{formatDate(row.bookingDate)}</td>
+                <td>
+                  <div className="bank-description-cell">
+                    <strong>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</strong>
+                    {row.counterparty && row.purpose && <span>{row.purpose}</span>}
+                  </div>
+                </td>
+                <td style={{ color: row.paymentAccountColor || undefined }}><span className="bank-account-dot" style={{ background: row.paymentAccountColor || 'var(--accent)' }} />{row.paymentAccountName}</td>
+                <td><span className={`badge ${row.direction === 'IN' ? 'in' : 'out'}`}>{row.direction}</span></td>
+                <td className={`number bank-amount bank-amount--${row.direction.toLowerCase()}`}>{row.direction === 'OUT' ? '−' : '+'}{euro.format(row.amount)}</td>
+              </tr>
+            ))}
+            {!loading && rows.length === 0 && <tr><td colSpan={6}><div className="bank-empty">Keine Bankbelege für diesen Filter gefunden.</div></td></tr>}
+            {loading && <tr><td colSpan={6}><div className="bank-empty">Bankbelege werden geladen …</div></td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <footer className="bank-pagination">
+        <span>{total} Einträge · Seite {page} / {pageCount}</span>
+        <div><button className="btn" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>‹</button><button className="btn" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>›</button></div>
+      </footer>
+
+      {showImport && <BankImportModal accounts={paymentAccounts} notify={notify} onClose={() => setShowImport(false)} onImported={() => { setPage(1); void load() }} />}
+      {selected && <BankReviewModal transaction={selected} notify={notify} onClose={() => setSelected(null)} onChanged={() => { window.dispatchEvent(new Event('data-changed')); void load() }} onCreateBooking={onCreateBooking} onOpenVoucher={onOpenVoucher} />}
+    </div>
+  )
+}
+
+export type { BankTransaction }

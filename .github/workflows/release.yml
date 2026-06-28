@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
+        description: 'SemVer-Tag für das Release, z. B. v2.3.0'
         required: true
 
 permissions:

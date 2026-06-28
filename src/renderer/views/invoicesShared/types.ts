@@ -3,6 +3,16 @@ export type InvoicePaymentMethod = '' | 'BAR' | 'BANK'
 export type InvoiceSphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 export type InvoiceVoucherType = 'IN' | 'OUT'
 
+export type InvoiceBudgetAssignment = {
+  budgetId: number
+  amount: number
+}
+
+export type InvoiceEarmarkAssignment = {
+  earmarkId: number
+  amount: number
+}
+
 export type InvoiceTagDef = {
   id: number
   name: string
@@ -13,6 +23,14 @@ export type InvoiceBudgetOption = {
   id: number
   name?: string | null
   year: number
+}
+
+export type InvoicePaymentAccountOption = {
+  id: number
+  name: string
+  kind?: string | null
+  color?: string | null
+  isActive?: number
 }
 
 export type InvoiceEarmarkOption = {
@@ -31,12 +49,15 @@ export type InvoiceListRow = {
   description?: string | null
   grossAmount: number
   paymentMethod?: string | null
+  paymentAccountId?: number | null
   sphere: InvoiceSphere
   earmarkId?: number | null
   budgetId?: number | null
   autoPost?: number | boolean
   voucherType: InvoiceVoucherType
   tags?: string[]
+  budgets?: InvoiceBudgetAssignment[]
+  earmarks?: InvoiceEarmarkAssignment[]
   paidSum?: number
   status: InvoiceStatus
   postedVoucherId?: number | null
@@ -53,9 +74,12 @@ export type InvoiceDraft = {
   description?: string | null
   grossAmount: string
   paymentMethod?: InvoicePaymentMethod
+  paymentAccountId?: number | ''
   sphere: InvoiceSphere
   earmarkId?: number | ''
   budgetId?: number | ''
+  budgets: InvoiceBudgetAssignment[]
+  earmarks: InvoiceEarmarkAssignment[]
   autoPost: boolean
   voucherType: InvoiceVoucherType
   tags: string[]
@@ -83,6 +107,7 @@ export type InvoiceDetail = {
   description?: string | null
   grossAmount: number
   paymentMethod?: string | null
+  paymentAccountId?: number | null
   sphere: InvoiceSphere
   earmarkId?: number | null
   budgetId?: number | null
@@ -90,6 +115,8 @@ export type InvoiceDetail = {
   voucherType: InvoiceVoucherType
   postedVoucherId?: number | null
   postedVoucherNo?: string | null
+  budgets?: InvoiceBudgetAssignment[]
+  earmarks?: InvoiceEarmarkAssignment[]
   payments: Array<{ id: number; date: string; amount: number }>
   files: Array<{ id: number; fileName: string; mimeType?: string | null; size?: number | null; createdAt?: string | null }>
   tags: string[]

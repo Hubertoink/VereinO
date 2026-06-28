@@ -2,10 +2,13 @@ import React, { createRef, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../../components/TagsEditor'
 import type {
+  InvoiceBudgetAssignment,
   EditInvoiceFile,
   InvoiceBudgetOption,
+  InvoiceEarmarkAssignment,
   InvoiceDraft,
   InvoiceEarmarkOption,
+  InvoicePaymentAccountOption,
   InvoiceFormState,
   InvoiceTagDef
 } from './types'
@@ -14,10 +17,10 @@ type Props = {
   form: InvoiceFormState
   formError: string
   requiredTouched: boolean
-  missingRequired: string[]
   tags: InvoiceTagDef[]
   budgets: InvoiceBudgetOption[]
   earmarks: InvoiceEarmarkOption[]
+  paymentAccounts: InvoicePaymentAccountOption[]
   partySuggestions: string[]
   descSuggestions: string[]
   formFiles: File[]
@@ -26,7 +29,6 @@ type Props = {
   onDraftChange: (draft: InvoiceDraft) => void
   onSave: () => void
   onRequestDelete: () => void
-  onClearMissingRequired: () => void
   onSetRequiredTouched: (value: boolean) => void
   onRemovePendingFile: (index: number) => void
   onAddCreateFiles: (files: File[]) => void
@@ -35,14 +37,22 @@ type Props = {
   parseAmount: (input: string) => number | null
 }
 
+const PAYMENT_ACCOUNT_KIND_LABEL: Record<string, string> = {
+  CASH: 'Bar',
+  BANK: 'Bank',
+  PAYPAL: 'PayPal',
+  CARD: 'Karte',
+  OTHER: 'Sonstiges'
+}
+
 export default function InvoiceFormModal({
   form,
   formError,
   requiredTouched,
-  missingRequired,
   tags,
   budgets,
   earmarks,
+  paymentAccounts,
   partySuggestions,
   descSuggestions,
   formFiles,
@@ -51,7 +61,6 @@ export default function InvoiceFormModal({
   onDraftChange,
   onSave,
   onRequestDelete,
-  onClearMissingRequired,
   onSetRequiredTouched,
   onRemovePendingFile,
   onAddCreateFiles,
@@ -90,6 +99,59 @@ export default function InvoiceFormModal({
   }, [form.mode, onClose, onSave])
 
   const setDraft = (patch: Partial<InvoiceDraft>) => onDraftChange({ ...form.draft, ...patch })
+  const activePaymentAccounts = paymentAccounts.filter((account) => account.isActive !== 0)
+  const paymentAccountById = new Map(paymentAccounts.map((account) => [account.id, account]))
+  const totalBudgetAmount = (form.draft.budgets || []).reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const totalEarmarkAmount = (form.draft.earmarks || []).reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const grossAmountValue = parseAmount(form.draft.grossAmount) || 0
+
+  function addBudgetAssignment() {
+    setDraft({
+      budgets: [...(form.draft.budgets || []), { budgetId: 0, amount: grossAmountValue || 0 }],
+      budgetId: ''
+    })
+  }
+
+  function updateBudgetAssignment(index: number, patch: Partial<InvoiceBudgetAssignment>) {
+    const next = [...(form.draft.budgets || [])]
+    next[index] = { ...next[index], ...patch }
+    setDraft({
+      budgets: next,
+      budgetId: typeof next[0]?.budgetId === 'number' && next[0].budgetId > 0 ? next[0].budgetId : ''
+    })
+  }
+
+  function removeBudgetAssignment(index: number) {
+    const next = (form.draft.budgets || []).filter((_, currentIndex) => currentIndex !== index)
+    setDraft({
+      budgets: next,
+      budgetId: typeof next[0]?.budgetId === 'number' && next[0].budgetId > 0 ? next[0].budgetId : ''
+    })
+  }
+
+  function addEarmarkAssignment() {
+    setDraft({
+      earmarks: [...(form.draft.earmarks || []), { earmarkId: 0, amount: grossAmountValue || 0 }],
+      earmarkId: ''
+    })
+  }
+
+  function updateEarmarkAssignment(index: number, patch: Partial<InvoiceEarmarkAssignment>) {
+    const next = [...(form.draft.earmarks || [])]
+    next[index] = { ...next[index], ...patch }
+    setDraft({
+      earmarks: next,
+      earmarkId: typeof next[0]?.earmarkId === 'number' && next[0].earmarkId > 0 ? next[0].earmarkId : ''
+    })
+  }
+
+  function removeEarmarkAssignment(index: number) {
+    const next = (form.draft.earmarks || []).filter((_, currentIndex) => currentIndex !== index)
+    setDraft({
+      earmarks: next,
+      earmarkId: typeof next[0]?.earmarkId === 'number' && next[0].earmarkId > 0 ? next[0].earmarkId : ''
+    })
+  }
 
   async function handleCreateFiles(fileList: FileList | null) {
     const files = Array.from(fileList || [])
@@ -167,11 +229,26 @@ export default function InvoiceFormModal({
                       </select>
                     </div>
                     <div className="field">
-                      <label>Zahlweg</label>
-                      <div className="btn-group" role="group">
-                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BAR' ? 'btn-toggle-active' : ''}`} onClick={() => setDraft({ paymentMethod: 'BAR' })}>Bar</button>
-                        <button type="button" className={`btn ${form.draft.paymentMethod === 'BANK' ? 'btn-toggle-active' : ''}`} onClick={() => setDraft({ paymentMethod: 'BANK' })}>Bank</button>
-                      </div>
+                      <label>Konto</label>
+                      <select
+                        className="input"
+                        value={form.draft.paymentAccountId ?? ''}
+                        onChange={(e) => {
+                          const nextAccountId = e.target.value ? Number(e.target.value) : ''
+                          const nextAccount = typeof nextAccountId === 'number' ? paymentAccountById.get(nextAccountId) : null
+                          setDraft({
+                            paymentAccountId: nextAccountId,
+                            paymentMethod: nextAccount?.kind === 'CASH' ? 'BAR' : nextAccount ? 'BANK' : ''
+                          })
+                        }}
+                      >
+                        <option value="">-</option>
+                        {activePaymentAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {(PAYMENT_ACCOUNT_KIND_LABEL[account.kind || 'OTHER'] || 'Sonstiges') + ' · ' + account.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -250,20 +327,83 @@ export default function InvoiceFormModal({
                   </div>
                   <div className="row">
                     <div className="field">
-                      <label>Budget</label>
-                      <select className="input" value={form.draft.budgetId ?? ''} onChange={(e) => setDraft({ budgetId: e.target.value ? Number(e.target.value) : '' })}>
-                        <option value="">-</option>
-                        {budgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.year}{budget.name ? ` - ${budget.name}` : ''}</option>)}
-                      </select>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        Budget
+                        <button type="button" className="btn ghost" style={{ padding: '2px 6px', fontSize: 12 }} onClick={addBudgetAssignment}>+</button>
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(form.draft.budgets || []).map((assignment, index) => (
+                          <div key={`budget-${index}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <select
+                              className="input"
+                              style={{ flex: 1 }}
+                              value={assignment.budgetId || ''}
+                              onChange={(e) => updateBudgetAssignment(index, { budgetId: e.target.value ? Number(e.target.value) : 0 })}
+                            >
+                              <option value="">-</option>
+                              {budgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.year}{budget.name ? ` - ${budget.name}` : ''}</option>)}
+                            </select>
+                            <span className="adorn-wrap" style={{ width: 110 }}>
+                              <input
+                                className="input"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={assignment.amount ?? ''}
+                                onChange={(e) => updateBudgetAssignment(index, { amount: e.target.value ? Number(e.target.value) : 0 })}
+                              />
+                              <span className="adorn-suffix">€</span>
+                            </span>
+                            <button type="button" className="btn ghost" style={{ padding: '2px 6px' }} onClick={() => removeBudgetAssignment(index)}>×</button>
+                          </div>
+                        ))}
+                        <div className="helper">
+                          {(form.draft.budgets || []).length > 0 ? `Summe: ${totalBudgetAmount.toFixed(2)} €` : 'Kein Budget zugeordnet. Klicke + zum Hinzufügen.'}
+                        </div>
+                      </div>
                     </div>
                     <div className="field">
-                      <label>Zweckbindung</label>
-                      <select className="input" value={form.draft.earmarkId ?? ''} onChange={(e) => setDraft({ earmarkId: e.target.value ? Number(e.target.value) : '' })}>
-                        <option value="">-</option>
-                        {earmarks.map((earmark) => <option key={earmark.id} value={earmark.id}>{earmark.code} - {earmark.name}</option>)}
-                      </select>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        Zweckbindung
+                        <button type="button" className="btn ghost" style={{ padding: '2px 6px', fontSize: 12 }} onClick={addEarmarkAssignment}>+</button>
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(form.draft.earmarks || []).map((assignment, index) => (
+                          <div key={`earmark-${index}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <select
+                              className="input"
+                              style={{ flex: 1 }}
+                              value={assignment.earmarkId || ''}
+                              onChange={(e) => updateEarmarkAssignment(index, { earmarkId: e.target.value ? Number(e.target.value) : 0 })}
+                            >
+                              <option value="">-</option>
+                              {earmarks.map((earmark) => <option key={earmark.id} value={earmark.id}>{earmark.code} - {earmark.name}</option>)}
+                            </select>
+                            <span className="adorn-wrap" style={{ width: 110 }}>
+                              <input
+                                className="input"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={assignment.amount ?? ''}
+                                onChange={(e) => updateEarmarkAssignment(index, { amount: e.target.value ? Number(e.target.value) : 0 })}
+                              />
+                              <span className="adorn-suffix">€</span>
+                            </span>
+                            <button type="button" className="btn ghost" style={{ padding: '2px 6px' }} onClick={() => removeEarmarkAssignment(index)}>×</button>
+                          </div>
+                        ))}
+                        <div className="helper">
+                          {(form.draft.earmarks || []).length > 0 ? `Summe: ${totalEarmarkAmount.toFixed(2)} €` : 'Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.'}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  {grossAmountValue > 0 && (
+                    <div className="helper" style={{ fontSize: 11 }}>
+                      Betrag: {grossAmountValue.toFixed(2)} € · Budgets: {totalBudgetAmount.toFixed(2)} € · Zweckbindungen: {totalEarmarkAmount.toFixed(2)} €
+                    </div>
+                  )}
                   <div className="invoices-auto-post-inline">
                     <label htmlFor="autoPostToggle">Auto-Buchung</label>
                     <input type="checkbox" id="autoPostToggle" className="toggle" checked={form.draft.autoPost} onChange={(e) => setDraft({ autoPost: e.target.checked })} />
@@ -331,27 +471,6 @@ export default function InvoiceFormModal({
 
             <datalist id="party-suggestions">{partySuggestions.map((party, index) => <option key={index} value={party} />)}</datalist>
             <datalist id="desc-suggestions">{descSuggestions.map((desc, index) => <option key={index} value={desc} />)}</datalist>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {missingRequired.length > 0 && createPortal(
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClearMissingRequired}>
-          <div className="modal invoices-missing-modal" onClick={(e) => e.stopPropagation()}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
-              <button className="btn" onClick={onClearMissingRequired} aria-label="Schließen">×</button>
-            </header>
-            <div className="card" style={{ padding: 10 }}>
-              <div>Bitte ergänze die folgenden Felder:</div>
-              <ul className="helper invoices-missing-list">
-                {missingRequired.map((field) => <li key={field}>{field}</li>)}
-              </ul>
-            </div>
-            <div className="invoices-missing-actions">
-              <button className="btn primary" onClick={onClearMissingRequired}>OK</button>
-            </div>
           </div>
         </div>,
         document.body

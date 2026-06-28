@@ -7,6 +7,7 @@ type Props = {
   detail: InvoiceDetail | null
   loading: boolean
   tags: InvoiceTagDef[]
+  paymentAccounts?: Array<{ id: number; name: string }>
   fmtDateLocal: (value?: string) => string
   eurFmt: Intl.NumberFormat
   statusBadge: (status: InvoiceStatus) => React.ReactNode
@@ -29,10 +30,65 @@ function contrastText(bg?: string | null) {
   return luminance > 0.6 ? '#000' : '#fff'
 }
 
+function ActionMenu({ actions }: { actions: Array<{ label: string; tone?: 'danger'; onClick: () => void }> }) {
+  const [open, setOpen] = React.useState(false)
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button type="button" className="btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)} style={{ minWidth: 40, textAlign: 'center' }}>...</button>
+      {open && (
+      <div className="card" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 1000, padding: 6, display: 'grid', gap: 6, minWidth: 150 }}>
+        {actions.map((action) => (
+          <button
+            key={action.label}
+            type="button"
+            role="menuitem"
+            className={`btn ${action.tone === 'danger' ? 'danger' : ''}`.trim()}
+            onClick={() => {
+              setOpen(false)
+              action.onClick()
+            }}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+      )}
+    </div>
+  )
+}
+
+function renderLockIcon(color: string) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+
 export default function InvoiceDetailModal({
   detail,
   loading,
   tags,
+  paymentAccounts = [],
   fmtDateLocal,
   eurFmt,
   statusBadge,
@@ -43,6 +99,7 @@ export default function InvoiceDetailModal({
   onDetailChange
 }: Props) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<null | { fileId: number; fileName: string }>(null)
+  const paymentAccountName = detail?.paymentAccountId ? paymentAccounts.find((account) => account.id === detail.paymentAccountId)?.name : null
 
   async function deleteDetailFile(fileId: number) {
     if (!detail) return
@@ -82,7 +139,7 @@ export default function InvoiceDetailModal({
         <div className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
-            {detail && <button className="btn" onClick={() => onEdit(detail)}>Bearbeiten</button>}
+            {detail && <ActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
             <button className="btn ghost" onClick={onClose}>×</button>
           </div>
         </div>
@@ -102,6 +159,7 @@ export default function InvoiceDetailModal({
                 <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '')}</div></div>
                 <div><div className="helper">Sphäre</div><div>{detail.sphere}</div></div>
                 <div><div className="helper">Zahlweg</div><div>{detail.paymentMethod || '-'}</div></div>
+                <div><div className="helper">Zahlkonto</div><div>{paymentAccountName || (detail.paymentAccountId ? `#${detail.paymentAccountId}` : '-')}</div></div>
                 <div><div className="helper">Betrag</div><div>{eurFmt.format(detail.grossAmount)}</div></div>
                 <div><div className="helper">Bezahlt</div><div>{eurFmt.format(detail.paidSum || 0)}</div></div>
                 <div><div className="helper">Rest</div><div className={Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100) > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100))}</div></div>
@@ -131,6 +189,33 @@ export default function InvoiceDetailModal({
                   </div>
                 </div>
               </div>
+              {((detail.budgets && detail.budgets.length > 0) || (detail.earmarks && detail.earmarks.length > 0)) && (
+                <div className="invoices-detail-split" style={{ marginTop: 10 }}>
+                  <div className="card" style={{ padding: 12 }}>
+                    <strong>Budgets</strong>
+                    <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
+                      <thead><tr><th align="left">Budget-ID</th><th align="right">Betrag</th></tr></thead>
+                      <tbody>
+                        {(detail.budgets || []).map((item, index) => <tr key={`budget-${index}`}><td>{item.budgetId}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
+                        {(detail.budgets || []).length === 0 && <tr><td colSpan={2} className="helper">Keine Budgets.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="card" style={{ padding: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <strong>Zweckbindungen</strong>
+                      {(detail.earmarks || []).length > 0 ? <span title="Zweckbindungs-Zuordnungen">{renderLockIcon('currentColor')}</span> : null}
+                    </div>
+                    <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
+                      <thead><tr><th align="left">Zweckbindung-ID</th><th align="right">Betrag</th></tr></thead>
+                      <tbody>
+                        {(detail.earmarks || []).map((item, index) => <tr key={`earmark-${index}`}><td>{item.earmarkId}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
+                        {(detail.earmarks || []).length === 0 && <tr><td colSpan={2} className="helper">Keine Zweckbindungen.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {(detail.tags || []).length > 0 && (
                 <div className="invoices-detail-tags">
                   {(detail.tags || []).map((tag) => {
@@ -166,13 +251,21 @@ export default function InvoiceDetailModal({
                       const sizeMB = file.size != null ? Number(file.size) / 1024 / 1024 : null
                       return (
                         <tr key={file.id}>
-                          <td>{file.fileName}</td>
+                          <td title={file.fileName}>
+                            <span style={{ display: 'block', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {file.fileName}
+                            </span>
+                          </td>
                           <td align="right">{sizeMB != null ? `${sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)} MB` : '-'}</td>
                           <td>{file.createdAt || '-'}</td>
-                          <td align="center" style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
-                            <button className="btn" title="Datei öffnen" onClick={() => void openDetailFile(file.id)}>Öffnen</button>
-                            <button className="btn" title="Speichern unter ..." onClick={() => void saveDetailFile(file.id)}>Speichern...</button>
-                            <button className="btn danger" title="Datei entfernen" onClick={() => setDeleteConfirm({ fileId: file.id, fileName: file.fileName })}>Entfernen</button>
+                          <td align="center">
+                            <ActionMenu
+                              actions={[
+                                { label: 'Öffnen', onClick: () => void openDetailFile(file.id) },
+                                { label: 'Speichern...', onClick: () => void saveDetailFile(file.id) },
+                                { label: 'Entfernen', tone: 'danger', onClick: () => setDeleteConfirm({ fileId: file.id, fileName: file.fileName }) }
+                              ]}
+                            />
                           </td>
                         </tr>
                       )

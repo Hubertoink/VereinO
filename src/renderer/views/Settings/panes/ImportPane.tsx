@@ -38,7 +38,7 @@ const MembersIcon = () => (
 )
 
 /**
- * ImportPane - Data Import (XLSX & camt.053 XML)
+ * ImportPane - master data and voucher workbook imports
  * Provides full import functionality: file upload, preview, mapping, and execution.
  */
 export function ImportPane({ notify }: ImportPaneProps) {
@@ -107,7 +107,7 @@ export function ImportPane({ notify }: ImportPaneProps) {
       {activeTab === 'vouchers' && (
         <div>
           <div className="helper" style={{ marginBottom: 8 }}>
-            Excel (.xlsx) oder camt.053 XML (.xml). Vorschau → Zuordnung prüfen → Import.
+            Excel (.xlsx). Vorschau → Zuordnung prüfen → Import. Kontoauszüge werden im Hauptbereich „Bankimport“ verarbeitet.
             <ul style={{ margin: '4px 0 0 16px' }}>
               <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
               <li>Ein Datensatz pro Zeile. Summen-/Saldo-Zeilen werden ignoriert.</li>

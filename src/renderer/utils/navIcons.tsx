@@ -41,6 +41,19 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
       )
+    case 'Bankimport':
+      return (
+        <svg {...iconProps}>
+          <path d="M3 10h18" />
+          <path d="M5 10V8l7-5 7 5v2" />
+          <path d="M6 10v8" />
+          <path d="M10 10v8" />
+          <path d="M14 10v8" />
+          <path d="M18 10v8" />
+          <path d="M3 21h18" />
+          <path d="m16 4 2 2 3-3" />
+        </svg>
+      )
     case 'Verbindlichkeiten':
       // File/Invoice icon
       return (
@@ -130,6 +143,7 @@ export function getNavIcon(key: NavKey): React.ReactNode {
 export const navIconPalette: Record<NavKey, string> = {
   Dashboard: '#7C4DFF',
   Buchungen: '#2962FF',
+  Bankimport: '#1976D2',
   Verbindlichkeiten: '#00B8D4',
   Mitglieder: '#26A69A',
   Vorschuesse: '#4CAF50',

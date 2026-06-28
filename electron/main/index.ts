@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, Menu, session, dialog, screen } from 'electr
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
-import { applyMigrations, ensureActivityReportsTable, ensureAdvanceTables, ensureVoucherColumns, ensureVoucherJunctionTables } from './db/migrations'
+import { applyMigrations, ensureActivityReportsTable, ensureAdvanceTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherJunctionTables } from './db/migrations'
 import { registerIpcHandlers } from './ipc'
 import { initUpdateManager } from './updateManager'
 import { requireAllowedExternalUrl } from './services/externalUrl'
@@ -310,6 +310,7 @@ app.whenReady().then(async () => {
         ensureVoucherJunctionTables(db)
         ensureActivityReportsTable(db)
         ensureAdvanceTables(db)
+        ensureInvoiceTables(db)
         applyMigrations(db)
         
         // CRITICAL FIX: Always ensure enforce_time_range columns exist

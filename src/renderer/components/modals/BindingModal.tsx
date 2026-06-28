@@ -71,13 +71,13 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <ModalHeader 
+        <ModalHeader
           title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
           onClose={onClose}
         />
         <div className="row">
           <div className="field">
-            <label htmlFor="binding-code">Code<span className="req-asterisk">*</span></label>
+            <label htmlFor="binding-code">Code <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-code"
               className={`input ${requiredTouched && !v.code.trim() ? 'input-error' : ''}`}
@@ -86,11 +86,11 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               placeholder="z.B. ZW01"
             />
             {requiredTouched && !v.code.trim() && (
-              <div className="helper error-text">Bitte Code angeben</div>
+              <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Code angeben</div>
             )}
           </div>
           <div className="field">
-            <label htmlFor="binding-name">Name<span className="req-asterisk">*</span></label>
+            <label htmlFor="binding-name">Name <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-name"
               className={`input ${requiredTouched && !v.name.trim() ? 'input-error' : ''}`}
@@ -99,34 +99,36 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               placeholder="z.B. Sommerfest 2025"
             />
             {requiredTouched && !v.name.trim() && (
-              <div className="helper error-text">Bitte Namen angeben</div>
+              <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
             )}
           </div>
           <div className="field field-full-width">
             <label htmlFor="binding-description">Beschreibung</label>
             <input id="binding-description" className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} placeholder="Optional" />
           </div>
-          <div className="field">
-            <label htmlFor="binding-start-date">Von</label>
-            <input id="binding-start-date" className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
-          </div>
-          <div className="field">
-            <label htmlFor="binding-end-date">Bis</label>
-            <input id="binding-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+          <div className="date-range-container">
+            <div className="field">
+              <label htmlFor="binding-start-date">Von</label>
+              <input id="binding-start-date" className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+            </div>
+            <div className="field">
+              <label htmlFor="binding-end-date">Bis</label>
+              <input id="binding-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+            </div>
           </div>
           {(v.startDate || v.endDate) && (
             <div className="field field-full-width">
-              <label htmlFor="binding-enforce-range" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <label htmlFor="binding-enforce-range" className="budget-enforce-range-label">
                 <input 
                   id="binding-enforce-range" 
                   type="checkbox" 
                   checked={!!v.enforceTimeRange} 
                   onChange={(e) => setV({ ...v, enforceTimeRange: e.target.checked ? 1 : 0 })} 
-                  style={{ cursor: 'pointer' }}
+                  className="budget-enforce-range-checkbox"
                 />
-                <span>Zeitraum strikt prüfen (Buchungen außerhalb ablehnen)</span>
+                <span>Zeitraum verbindlich machen</span>
               </label>
-                <div className="helper">Wenn aktiv: Buchungen dürfen diese Zweckbindung nur im Zeitraum Von/Bis nutzen.</div>
+              <div className="helper">Wenn aktiv: Buchungen dürfen diese Zweckbindung nur im Zeitraum Von/Bis nutzen.</div>
             </div>
           )}
           <div className="field">
@@ -148,11 +150,11 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <label>Farbe</label>
             <div className="color-picker-container">
               {EARMARK_PALETTE.map((c) => (
-                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ background: c }} aria-label={`Farbe ${c}`}>
+                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ '--swatch-color': c } as React.CSSProperties} aria-label={`Farbe ${c}`}>
                   <span aria-hidden="true" />
                 </button>
               ))}
-              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ background: v.color || 'var(--muted)', color: v.color ? contrastText(v.color) : 'var(--text)' }}>
+              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ '--swatch-color': v.color || 'var(--muted)', '--swatch-text': v.color ? contrastText(v.color) : 'var(--text)' } as React.CSSProperties}>
                 Eigene…
               </button>
               <button type="button" className="btn custom-color-btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe">Keine</button>
@@ -205,8 +207,8 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               </div>
             </div>
             <div className="card color-preview-card">
-              <div className="color-preview-swatch" style={{ background: draftColor }} />
-              <div className="helper">Kontrast: <span className="contrast-sample" style={{ background: draftColor, color: contrastText(draftColor) }}>{contrastText(draftColor)}</span></div>
+              <div className="color-preview-swatch" style={{ '--preview-color': draftColor } as React.CSSProperties} />
+              <div className="helper">Kontrast: <span className="contrast-sample" style={{ '--preview-color': draftColor, '--preview-text': contrastText(draftColor) } as React.CSSProperties}>{contrastText(draftColor)}</span></div>
             </div>
             <div className="delete-modal-actions">
               <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>

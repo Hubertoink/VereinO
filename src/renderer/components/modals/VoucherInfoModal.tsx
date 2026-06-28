@@ -48,8 +48,8 @@ interface VoucherInfoModalProps {
   eurFmt: Intl.NumberFormat
   fmtDate: (d: string) => string
   notify: (type: 'info' | 'success' | 'error', text: string, duration?: number) => void
-  earmarks?: Array<{ id: number; code: string; name: string; color?: string | null }>
-  budgets?: Array<{ id: number; label: string; color?: string | null }>
+  earmarks?: Array<{ id: number; code: string; name: string; color?: string | null; isActive?: number | boolean }>
+  budgets?: Array<{ id: number; label: string; color?: string | null; isArchived?: number }>
   tagDefs?: Array<{ id: number; name: string; color?: string | null }>
   allowVoucherDeletion?: boolean
   onReverse?: () => void
@@ -167,8 +167,8 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     setEditingMeta(false)
   }, [voucher.id])
 
-  const availableBudgets = useMemo(() => budgets || [], [budgets])
-  const availableEarmarks = useMemo(() => earmarks || [], [earmarks])
+  const availableBudgets = useMemo(() => (budgets || []).filter((budget) => !budget?.isArchived), [budgets])
+  const availableEarmarks = useMemo(() => (earmarks || []).filter((earmark) => earmark?.isActive !== 0 && earmark?.isActive !== false), [earmarks])
   const isLockedByStorno = isReversalVoucher || isReversedOriginal
   const canEditMeta = !!onSaveMeta && !isLockedByStorno
   const canSaveMeta = canEditMeta && !savingMeta
@@ -532,22 +532,28 @@ Status: ${statusLabel}`
                         }}
                       >
                         <option value="">Budget wählen</option>
+                        {item.budgetId && !availableBudgets.some((budget) => budget.id === item.budgetId) ? (
+                          <option value={item.budgetId}>{`Aktuelles archiviertes Budget #${item.budgetId}`}</option>
+                        ) : null}
                         {availableBudgets.map((b) => <option key={b.id} value={b.id}>{b.label || `#${b.id}`}</option>)}
                       </select>
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.amount || ''}
-                        style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || budgetExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
-                        onChange={(e) => {
-                          const next = [...metaBudgets]
-                          next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
-                          setMetaBudgets(next)
-                        }}
-                        title="Zuordnungsbetrag"
-                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.amount || ''}
+                          style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || budgetExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
+                          onChange={(e) => {
+                            const next = [...metaBudgets]
+                            next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
+                            setMetaBudgets(next)
+                          }}
+                          title="Zuordnungsbetrag"
+                        />
+                        <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>€</span>
+                      </div>
                       <button className="btn ghost" type="button" onClick={() => setMetaBudgets(metaBudgets.filter((_, i) => i !== idx))}>Entfernen</button>
                     </div>
                   ))}
@@ -603,22 +609,28 @@ Status: ${statusLabel}`
                         }}
                       >
                         <option value="">Zweckbindung wählen</option>
+                        {item.earmarkId && !availableEarmarks.some((earmark) => earmark.id === item.earmarkId) ? (
+                          <option value={item.earmarkId}>{`Aktuelle inaktive Zweckbindung #${item.earmarkId}`}</option>
+                        ) : null}
                         {availableEarmarks.map((em) => <option key={em.id} value={em.id}>{em.code} - {em.name}</option>)}
                       </select>
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.amount || ''}
-                        style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || earmarkExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
-                        onChange={(e) => {
-                          const next = [...metaEarmarks]
-                          next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
-                          setMetaEarmarks(next)
-                        }}
-                        title="Zuordnungsbetrag"
-                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.amount || ''}
+                          style={!isMetaAmountValid(Number(item.amount), voucher.type === 'INTERNAL') || earmarkExceedsGross ? { borderColor: 'var(--danger)' } : undefined}
+                          onChange={(e) => {
+                            const next = [...metaEarmarks]
+                            next[idx] = { ...next[idx], amount: Number(e.target.value || 0) }
+                            setMetaEarmarks(next)
+                          }}
+                          title="Zuordnungsbetrag"
+                        />
+                        <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>€</span>
+                      </div>
                       <button className="btn ghost" type="button" onClick={() => setMetaEarmarks(metaEarmarks.filter((_, i) => i !== idx))}>Entfernen</button>
                     </div>
                   ))}

@@ -24,6 +24,15 @@ function getStatusColor(pct: number): { bg: string; text: string; label: string;
   return { bg: 'rgba(76, 175, 80, 0.15)', text: '#66bb6a', label: 'Im Plan', icon: '✓' }
 }
 
+function renderLockIcon(color: string) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+
 export interface EarmarkUsageCardBinding {
   id: number
   code: string
@@ -121,7 +130,9 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                   </div>
                 </div>
                 {!!b.enforceTimeRange && (
-                  <span title="Strikter Zeitraum aktiv" style={{ fontSize: 16 }}>🔒</span>
+                  <span title="Strikter Zeitraum aktiv">
+                    {renderLockIcon(fg)}
+                  </span>
                 )}
               </div>
             </div>

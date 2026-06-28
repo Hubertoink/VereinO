@@ -333,6 +333,18 @@ const rendererApi = {
         testdata: () => invoke('imports.testdata'),
         editableExport: () => invoke('imports.editableExport')
     },
+    bankImports: {
+        preview: (payload) => invoke('bankImports.preview', payload),
+        commit: (payload) => invoke('bankImports.commit', payload)
+    },
+    bankTransactions: {
+        list: (payload) => invoke('bankTransactions.list', payload),
+        get: (payload) => invoke('bankTransactions.get', payload),
+        matches: (payload) => invoke('bankTransactions.matches', payload),
+        link: (payload) => invoke('bankTransactions.link', payload),
+        check: (payload) => invoke('bankTransactions.check', payload),
+        reopen: (payload) => invoke('bankTransactions.reopen', payload)
+    },
     shell: {
         showItemInFolder: (fullPath: string) =>
             invokeRaw<RendererResultAt<'shell.showItemInFolder'>>('shell.showItemInFolder', { fullPath }),

@@ -7,6 +7,7 @@ import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
 import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
+import { linkBankTransaction } from './bankTransactions'
 import {
     getVoucherBudgets,
     getVoucherEarmarks,
@@ -173,6 +174,7 @@ export function createVoucher(input: {
     createdBy?: number | null
     files?: { name: string; dataBase64: string; mime?: string }[]
     tags?: string[]
+    bankTransactionId?: number
 }) {
     return withTransaction((d: DB) => {
         const warnings: string[] = []
@@ -333,6 +335,10 @@ export function createVoucher(input: {
             for (const a of earmarkAssignments) {
                 if (a.earmarkId && (input.type === 'INTERNAL' ? a.amount !== 0 : a.amount > 0)) stmtE.run(id, a.earmarkId, a.amount)
             }
+        }
+
+        if (input.bankTransactionId) {
+            linkBankTransaction({ id: input.bankTransactionId, voucherId: id, origin: 'CREATED' }, d)
         }
 
         if (input.files?.length) {

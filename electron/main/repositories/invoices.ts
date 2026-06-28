@@ -4,10 +4,14 @@ import Database from 'better-sqlite3'
 import { getAppDataDir, getDb, withTransaction } from '../db/database'
 import { createVoucher } from './vouchers'
 import { setVoucherTags } from './tags'
+import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 
  type DB = InstanceType<typeof Database>
 
 export type InvoiceStatus = 'OPEN' | 'PARTIAL' | 'PAID'
+
+type InvoiceBudgetAssignment = { budgetId: number; amount: number }
+type InvoiceEarmarkAssignment = { earmarkId: number; amount: number }
 
 function clamp2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -28,6 +32,111 @@ function setInvoiceTags(d: DB, invoiceId: number, tags?: string[]) {
   }
 }
 
+function normalizeInvoiceBudgetAssignments(input: { budgets?: Array<InvoiceBudgetAssignment>; budgetId?: number | null; budgetAmount?: number | null }, fallbackGrossAmount: number) {
+  if (Array.isArray(input.budgets) && input.budgets.length) {
+    return input.budgets.filter((b) => b?.budgetId).map((b) => ({ budgetId: Number(b.budgetId), amount: clamp2(Number(b.amount ?? fallbackGrossAmount ?? 0)) }))
+  }
+  if (input.budgetId != null) {
+    return [{ budgetId: Number(input.budgetId), amount: clamp2(Number(input.budgetAmount ?? fallbackGrossAmount ?? 0)) }]
+  }
+  return [] as InvoiceBudgetAssignment[]
+}
+
+function normalizeInvoiceEarmarkAssignments(input: { earmarks?: Array<InvoiceEarmarkAssignment>; earmarkId?: number | null; earmarkAmount?: number | null }, fallbackGrossAmount: number) {
+  if (Array.isArray(input.earmarks) && input.earmarks.length) {
+    return input.earmarks.filter((e) => e?.earmarkId).map((e) => ({ earmarkId: Number(e.earmarkId), amount: clamp2(Number(e.amount ?? fallbackGrossAmount ?? 0)) }))
+  }
+  if (input.earmarkId != null) {
+    return [{ earmarkId: Number(input.earmarkId), amount: clamp2(Number(input.earmarkAmount ?? fallbackGrossAmount ?? 0)) }]
+  }
+  return [] as InvoiceEarmarkAssignment[]
+}
+
+function saveInvoiceAssignments(d: DB, invoiceId: number, budgets: InvoiceBudgetAssignment[], earmarks: InvoiceEarmarkAssignment[]) {
+  d.prepare('DELETE FROM invoice_budgets WHERE invoice_id=?').run(invoiceId)
+  d.prepare('DELETE FROM invoice_earmarks WHERE invoice_id=?').run(invoiceId)
+  if (budgets.length) {
+    const stmt = d.prepare('INSERT INTO invoice_budgets(invoice_id, budget_id, amount) VALUES (?,?,?)')
+    for (const b of budgets) stmt.run(invoiceId, b.budgetId, b.amount)
+  }
+  if (earmarks.length) {
+    const stmt = d.prepare('INSERT INTO invoice_earmarks(invoice_id, earmark_id, amount) VALUES (?,?,?)')
+    for (const e of earmarks) stmt.run(invoiceId, e.earmarkId, e.amount)
+  }
+}
+
+function buildInvoiceVoucherNote(invoice: any) {
+  const parts = [
+    invoice?.party ? `Partei: ${String(invoice.party).trim()}` : '',
+    invoice?.invoice_no ? `Verbindlichkeit-Nr.: ${String(invoice.invoice_no).trim()}` : ''
+  ].filter(Boolean)
+  return parts.length ? parts.join('\n') : null
+}
+
+function copyInvoiceFilesToVoucher(d: DB, invoiceId: number, voucherId: number) {
+  const files = d.prepare(`
+    SELECT file_name as fileName, file_path as filePath, mime_type as mimeType, size
+    FROM invoice_files
+    WHERE invoice_id = ?
+    ORDER BY created_at ASC, id ASC
+  `).all(invoiceId) as Array<{ fileName: string; filePath?: string | null; mimeType?: string | null; size?: number | null }>
+  if (!files.length) return
+  const { filesDir } = getAppDataDir()
+  const insert = d.prepare('INSERT INTO voucher_files(voucher_id, file_name, file_path, mime_type, size) VALUES (?,?,?,?,?)')
+  for (const file of files) {
+    const baseName = path.basename(file.filePath || '')
+    let sourcePath = file.filePath || ''
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      const fallbackPath = path.join(filesDir, baseName)
+      if (fs.existsSync(fallbackPath)) sourcePath = fallbackPath
+    }
+    if (!sourcePath || !fs.existsSync(sourcePath)) continue
+    const safeName = `${voucherId}-${Date.now()}-${file.fileName.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
+    const targetPath = path.join(filesDir, safeName)
+    fs.copyFileSync(sourcePath, targetPath)
+    const size = file.size != null ? Number(file.size) : fs.statSync(targetPath).size
+    insert.run(voucherId, file.fileName, targetPath, file.mimeType ?? null, size)
+  }
+}
+
+export function buildInvoiceVoucherCreationInput(input: {
+  invoiceId: number
+  date: string
+  paidAmount: number
+  invoice: any
+  tags?: string[]
+  budgets?: InvoiceBudgetAssignment[]
+  earmarks?: InvoiceEarmarkAssignment[]
+  paymentAccount?: { id: number; name?: string | null; kind?: string | null } | null
+}) {
+  const invoice = input.invoice || {}
+  const grossAmount = clamp2(Number(input.paidAmount ?? invoice.gross_amount ?? 0))
+  const paymentAccountId = input.paymentAccount?.id ?? invoice.payment_account_id ?? invoice.paymentAccountId ?? null
+  const paymentAccount = input.paymentAccount ?? (paymentAccountId != null ? getPaymentAccountById(Number(paymentAccountId)) : undefined)
+  const paymentMethod = paymentMethodForAccountKind(paymentAccount?.kind as any) ?? invoice.payment_method ?? null
+  const budgets = Array.isArray(input.budgets) && input.budgets.length
+    ? input.budgets.filter((b) => b?.budgetId).map((b) => ({ budgetId: Number(b.budgetId), amount: clamp2(Number(b.amount ?? grossAmount ?? 0)) }))
+    : normalizeInvoiceBudgetAssignments({ budgetId: invoice.budget_id ?? invoice.budgetId ?? null, budgetAmount: invoice.budget_amount ?? null, budgets: invoice.budgets }, grossAmount)
+  const earmarks = Array.isArray(input.earmarks) && input.earmarks.length
+    ? input.earmarks.filter((e) => e?.earmarkId).map((e) => ({ earmarkId: Number(e.earmarkId), amount: clamp2(Number(e.amount ?? grossAmount ?? 0)) }))
+    : normalizeInvoiceEarmarkAssignments({ earmarkId: invoice.earmark_id ?? invoice.earmarkId ?? null, earmarkAmount: invoice.earmark_amount ?? null, earmarks: invoice.earmarks }, grossAmount)
+
+  return {
+    date: input.date,
+    type: invoice.voucher_type ?? 'OUT',
+    sphere: invoice.sphere,
+    description: invoice.description && String(invoice.description).trim() ? String(invoice.description).trim() : `Zahlung zu Rechnung ${invoice.invoice_no ?? '#' + input.invoiceId}`,
+    note: buildInvoiceVoucherNote(invoice),
+    grossAmount,
+    vatRate: 0,
+    paymentMethod: paymentMethod as 'BAR' | 'BANK' | null,
+    paymentAccountId: paymentAccountId != null ? Number(paymentAccountId) : null,
+    budgets,
+    earmarks,
+    tags: Array.isArray(input.tags) ? input.tags : []
+  }
+}
+
 export function createInvoice(input: {
   date: string
   dueDate?: string | null
@@ -36,17 +145,26 @@ export function createInvoice(input: {
   description?: string | null
   grossAmount: number
   paymentMethod?: string | null
+  paymentAccountId?: number | null
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   earmarkId?: number | null
+  earmarkAmount?: number | null
   budgetId?: number | null
+  budgetAmount?: number | null
+  budgets?: InvoiceBudgetAssignment[]
+  earmarks?: InvoiceEarmarkAssignment[]
   autoPost?: boolean
   voucherType: 'IN' | 'OUT'
   files?: { name: string; dataBase64: string; mime?: string }[]
   tags?: string[]
 }) {
   return withTransaction((d: DB) => {
-    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, description, gross_amount, payment_method, sphere, earmark_id, budget_id, auto_post, voucher_type)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const normalizedBudgets = normalizeInvoiceBudgetAssignments(input, clamp2(input.grossAmount))
+    const normalizedEarmarks = normalizeInvoiceEarmarkAssignments(input, clamp2(input.grossAmount))
+    const normalizedBudgetId = normalizedBudgets[0]?.budgetId ?? input.budgetId ?? null
+    const normalizedEarmarkId = normalizedEarmarks[0]?.earmarkId ?? input.earmarkId ?? null
+    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, description, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         input.date,
         input.dueDate ?? null,
         input.invoiceNo ?? null,
@@ -55,8 +173,9 @@ export function createInvoice(input: {
         clamp2(input.grossAmount),
         input.paymentMethod ?? null,
         input.sphere,
-        input.earmarkId ?? null,
-        input.budgetId ?? null,
+        normalizedEarmarkId,
+        normalizedBudgetId,
+        input.paymentAccountId ?? null,
         input.autoPost === false ? 0 : 1,
         input.voucherType
       )
@@ -73,6 +192,7 @@ export function createInvoice(input: {
         d.prepare('INSERT INTO invoice_files(invoice_id, file_name, file_path, mime_type, size) VALUES (?,?,?,?,?)').run(id, f.name, abs, f.mime ?? null, buff.length)
       }
     }
+    saveInvoiceAssignments(d, id, normalizedBudgets, normalizedEarmarks)
     setInvoiceTags(d, id, input.tags)
     return { id }
   })
@@ -87,16 +207,29 @@ export function updateInvoice(input: {
   description?: string | null
   grossAmount?: number
   paymentMethod?: string | null
+  paymentAccountId?: number | null
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   earmarkId?: number | null
+  earmarkAmount?: number | null
   budgetId?: number | null
+  budgetAmount?: number | null
+  budgets?: InvoiceBudgetAssignment[]
+  earmarks?: InvoiceEarmarkAssignment[]
   autoPost?: boolean
   voucherType?: 'IN' | 'OUT'
   tags?: string[]
 }) {
   return withTransaction((d: DB) => {
-    const cur = d.prepare('SELECT * FROM invoices WHERE id=?').get(input.id)
+    const cur = d.prepare('SELECT * FROM invoices WHERE id=?').get(input.id) as any
     if (!cur) throw new Error('Rechnung nicht gefunden')
+    const normalizedBudgets = input.budgets !== undefined
+      ? normalizeInvoiceBudgetAssignments({ budgets: input.budgets, budgetId: input.budgetId, budgetAmount: input.budgetAmount }, Number(cur.gross_amount || 0))
+      : (input.budgetId != null || input.budgetAmount != null ? normalizeInvoiceBudgetAssignments({ budgetId: input.budgetId, budgetAmount: input.budgetAmount }, Number(cur.gross_amount || 0)) : undefined)
+    const normalizedEarmarks = input.earmarks !== undefined
+      ? normalizeInvoiceEarmarkAssignments({ earmarks: input.earmarks, earmarkId: input.earmarkId, earmarkAmount: input.earmarkAmount }, Number(cur.gross_amount || 0))
+      : (input.earmarkId != null || input.earmarkAmount != null ? normalizeInvoiceEarmarkAssignments({ earmarkId: input.earmarkId, earmarkAmount: input.earmarkAmount }, Number(cur.gross_amount || 0)) : undefined)
+    const nextBudgetId = input.budgetId !== undefined ? input.budgetId : (input.budgets !== undefined && normalizedBudgets?.length ? normalizedBudgets[0].budgetId : undefined)
+    const nextEarmarkId = input.earmarkId !== undefined ? input.earmarkId : (input.earmarks !== undefined && normalizedEarmarks?.length ? normalizedEarmarks[0].earmarkId : undefined)
     d.prepare(`UPDATE invoices SET
       date=COALESCE(?, date),
       due_date=COALESCE(?, due_date),
@@ -108,6 +241,7 @@ export function updateInvoice(input: {
       sphere=COALESCE(?, sphere),
       earmark_id=COALESCE(?, earmark_id),
       budget_id=COALESCE(?, budget_id),
+      payment_account_id=COALESCE(?, payment_account_id),
       auto_post=COALESCE(?, auto_post),
       voucher_type=COALESCE(?, voucher_type),
       updated_at=datetime('now')
@@ -120,12 +254,18 @@ export function updateInvoice(input: {
       input.grossAmount != null ? clamp2(input.grossAmount) : null,
       input.paymentMethod ?? null,
       input.sphere ?? null,
-      input.earmarkId ?? null,
-      input.budgetId ?? null,
+      nextEarmarkId ?? null,
+      nextBudgetId ?? null,
+      input.paymentAccountId ?? null,
       input.autoPost == null ? null : (input.autoPost ? 1 : 0),
       input.voucherType ?? null,
       input.id
     )
+    if (normalizedBudgets !== undefined || normalizedEarmarks !== undefined) {
+      const budgetsToPersist = normalizedBudgets ?? normalizeInvoiceBudgetAssignments({ budgetId: cur.budget_id ?? null, budgetAmount: null }, Number(cur.gross_amount || 0))
+      const earmarksToPersist = normalizedEarmarks ?? normalizeInvoiceEarmarkAssignments({ earmarkId: cur.earmark_id ?? null, earmarkAmount: null }, Number(cur.gross_amount || 0))
+      saveInvoiceAssignments(d, input.id, budgetsToPersist, earmarksToPersist)
+    }
     if (input.tags) {
       d.prepare('DELETE FROM invoice_tags WHERE invoice_id=?').run(input.id)
       setInvoiceTags(d, input.id, input.tags)
@@ -289,7 +429,7 @@ export function summarizeInvoices(filters: {
 export function getInvoiceById(id: number) {
   const d = getDb()
   const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description,
-           i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.sphere,
+           i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId, i.sphere,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
            (SELECT v.voucher_no FROM vouchers v WHERE v.id = i.posted_voucher_id) as postedVoucherNo
@@ -298,9 +438,11 @@ export function getInvoiceById(id: number) {
   const payments = d.prepare('SELECT id, date, amount FROM invoice_payments WHERE invoice_id = ? ORDER BY date ASC, id ASC').all(id) as any[]
   const files = d.prepare('SELECT id, file_name as fileName, mime_type as mimeType, size, created_at as createdAt FROM invoice_files WHERE invoice_id = ? ORDER BY created_at DESC').all(id) as any[]
   const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ? ORDER BY t.name`).all(id) as any[]).map((x: any) => x.name)
+  const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(id) as InvoiceBudgetAssignment[]
+  const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(id) as InvoiceEarmarkAssignment[]
   const paidSum = (d.prepare('SELECT IFNULL(SUM(amount),0) as s FROM invoice_payments WHERE invoice_id = ?').get(id) as any)?.s || 0
   const status: InvoiceStatus = computeStatus(Number(r.grossAmount || 0), Number(paidSum))
-  return { ...r, payments, files, tags, paidSum, status }
+  return { ...r, payments, files, tags, budgets, earmarks, paidSum, status }
 }
 
 export function getInvoiceFileById(fileId: number) {
@@ -369,20 +511,24 @@ export function addPayment(input: { invoiceId: number; date: string; amount: num
       const desc = (inv.description && String(inv.description).trim())
         ? String(inv.description).trim()
         : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + input.invoiceId}`
-      const res = createVoucher({
+      const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(input.invoiceId) as any[]).map(x => x.name)
+      const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(input.invoiceId) as InvoiceBudgetAssignment[]
+      const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(input.invoiceId) as InvoiceEarmarkAssignment[]
+      const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
+      const voucherInput = buildInvoiceVoucherCreationInput({
+        invoiceId: input.invoiceId,
         date: vDate,
-        type: inv.voucher_type,
-        sphere: inv.sphere,
-        description: desc,
-        grossAmount: clamp2(paid),
-        vatRate: 0,
-        paymentMethod: inv.payment_method ?? null,
-        earmarkId: inv.earmark_id ?? null,
-        budgetId: inv.budget_id ?? null,
-        tags: (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(input.invoiceId) as any[]).map(x => x.name)
-      } as any)
+        paidAmount: clamp2(paid),
+        invoice: inv,
+        tags,
+        budgets,
+        earmarks,
+        paymentAccount
+      })
+      const res = createVoucher(voucherInput as any)
       voucherId = res.id
       d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, input.invoiceId)
+      copyInvoiceFilesToVoucher(d, input.invoiceId, voucherId)
     }
     return { id: input.invoiceId, status, paidSum: paid, voucherId }
   })
@@ -407,20 +553,24 @@ export function markPaid(invoiceId: number) {
       const desc = (inv.description && String(inv.description).trim())
         ? String(inv.description).trim()
         : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
-      const res = createVoucher({
+      const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
+      const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceBudgetAssignment[]
+      const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceEarmarkAssignment[]
+      const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
+      const voucherInput = buildInvoiceVoucherCreationInput({
+        invoiceId,
         date: new Date().toISOString().slice(0,10),
-        type: inv.voucher_type,
-        sphere: inv.sphere,
-        description: desc,
-        grossAmount: total,
-        vatRate: 0,
-        paymentMethod: inv.payment_method ?? null,
-        earmarkId: inv.earmark_id ?? null,
-        budgetId: inv.budget_id ?? null,
-        tags: (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
-      } as any)
+        paidAmount: total,
+        invoice: inv,
+        tags,
+        budgets,
+        earmarks,
+        paymentAccount
+      })
+      const res = createVoucher(voucherInput as any)
       voucherId = res.id
       d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
+      copyInvoiceFilesToVoucher(d, invoiceId, voucherId)
     }
     return { id: invoiceId, status: 'PAID' as InvoiceStatus, voucherId }
   })
@@ -444,21 +594,25 @@ export function postInvoiceToVoucher(invoiceId: number) {
       ? String(inv.description).trim()
       : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
 
-    const res = createVoucher({
+    const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
+    const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceBudgetAssignment[]
+    const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceEarmarkAssignment[]
+    const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
+    const voucherInput = buildInvoiceVoucherCreationInput({
+      invoiceId,
       date: vDate,
-      type: inv.voucher_type,
-      sphere: inv.sphere,
-      description: desc,
-      grossAmount: clamp2(paid),
-      vatRate: 0,
-      paymentMethod: inv.payment_method ?? null,
-      earmarkId: inv.earmark_id ?? null,
-      budgetId: inv.budget_id ?? null,
-      tags: (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
-    } as any)
+      paidAmount: clamp2(paid),
+      invoice: inv,
+      tags,
+      budgets,
+      earmarks,
+      paymentAccount
+    })
+    const res = createVoucher(voucherInput as any)
 
     const voucherId = res.id
     d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
+    copyInvoiceFilesToVoucher(d, invoiceId, voucherId)
 
     return { id: invoiceId, voucherId }
   })
