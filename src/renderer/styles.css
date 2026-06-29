@@ -2232,25 +2232,44 @@ tbody tr:nth-child(even):hover {
 }
 .resizable-th {
     position: relative;
+    overflow: visible;
 }
 .col-resize-handle {
     position: absolute;
-    right: 0;
+    right: -8px;
     top: 0;
-    width: 6px;
+    width: 16px;
     height: 100%;
     cursor: col-resize;
     background: transparent;
-    z-index: 5;
+    z-index: 8;
     user-select: none;
-    border-right: 1px solid var(--border);
-    opacity: 0.5;
-    transition: opacity 0.15s, border-color 0.15s;
+    opacity: 0.9;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    touch-action: none;
+}
+.col-resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: transparent;
+    box-shadow:
+        0 0 0 1px transparent,
+        0 0 10px transparent;
 }
 .col-resize-handle:hover,
 .col-resize-handle.resizing {
-    border-right-color: var(--accent);
     opacity: 1;
+    transform: scaleX(1.05);
+}
+.col-resize-handle:hover::before,
+.col-resize-handle.resizing::before {
+    background: color-mix(in oklab, var(--accent) 55%, var(--text) 45%);
 }
 
 /* Unified header styling for journal-table */
@@ -2298,6 +2317,12 @@ tbody tr:nth-child(even):hover {
         0 2px 8px -1px rgba(0,0,0,0.2),
         0 4px 12px -2px rgba(0,0,0,0.15),
         0 1px 0 0 var(--table-row-sep, var(--border)); 
+}
+
+.journal-table thead th:not(:last-child) {
+    border-right-color: color-mix(in oklab, var(--table-row-sep, var(--border)) 55%, var(--text) 45%);
+    border-right-style: solid;
+    border-right-width: 1px;
 }
 
 /* Brutto colorization in journal table */
@@ -10256,17 +10281,23 @@ html[data-glass-modals="true"] .flyout-arrow {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .bank-search-wrap {
   position: relative;
   flex: 1 1 355px;
-  min-width: 220px;
+  min-width: 0;
+  max-width: min(100%, 520px);
 }
 
 .bank-import-search {
+  display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding-right: 42px;
+  box-sizing: border-box;
 }
 
 .bank-account-filter {

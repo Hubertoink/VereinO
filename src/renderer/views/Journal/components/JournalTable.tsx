@@ -459,6 +459,7 @@ export default function JournalTable({
     const resizingCol = useRef<string | null>(null)
     const resizeStartX = useRef<number>(0)
     const resizeStartWidth = useRef<number>(0)
+    const activeResizeHandle = useRef<HTMLElement | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
 
     // Save column widths when they change
@@ -476,8 +477,11 @@ export default function JournalTable({
         resizeStartX.current = e.clientX
 
         // Get current column width
-        const th = (e.target as HTMLElement).closest('th')
+        const handle = e.currentTarget as HTMLElement
+        const th = handle.closest('th')
         resizeStartWidth.current = th?.offsetWidth || 100
+        activeResizeHandle.current = handle
+        handle.classList.add('resizing')
 
         document.addEventListener('mousemove', handleResizeMove)
         document.addEventListener('mouseup', handleResizeEnd)
@@ -515,6 +519,8 @@ export default function JournalTable({
     // Handle resize end
     const handleResizeEnd = useCallback(() => {
         resizingCol.current = null
+        activeResizeHandle.current?.classList.remove('resizing')
+        activeResizeHandle.current = null
         document.removeEventListener('mousemove', handleResizeMove)
         document.removeEventListener('mouseup', handleResizeEnd)
         document.body.style.cursor = ''

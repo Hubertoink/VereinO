@@ -68,7 +68,7 @@ interface JournalViewProps {
     // Settings from App
     journalLimit: number
     setJournalLimit: (n: number) => void
-    dateFmt: 'ISO' | 'PRETTY'
+    dateFmt: 'ISO' | 'PRETTY' | 'DOT'
     // Column visibility & order (shared with Settings)
     cols: Record<ColKey, boolean>
     setCols: (cols: Record<ColKey, boolean>) => void
