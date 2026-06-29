@@ -451,9 +451,11 @@ export default function DashboardView({
 
         return (
           <>
-            {/* Alle Komponenten untereinander in einer Spalte */}
-            <div style={{ display: 'grid', gap: 12 }}>
-              <BalanceAreaChart {...balanceFilters} baseSaldo={baseSaldo} />
+            <div className="dashboard-chart-stack">
+              <div className="dashboard-chart-pair">
+                <BalanceAreaChart {...balanceFilters} baseSaldo={baseSaldo} />
+                <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} />
+              </div>
               {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
               {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
@@ -470,9 +472,10 @@ export default function DashboardView({
                   {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
                 </div>
               </div>
-              <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} />
-              <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
-              <SphereShareCard from={balanceFilters.from} to={balanceFilters.to} />
+              <div className="dashboard-chart-secondary-grid">
+                <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
+                <SphereShareCard from={balanceFilters.from} to={balanceFilters.to} />
+              </div>
               <IncomeExpenseBars {...balanceFilters} />
             </div>
           </>

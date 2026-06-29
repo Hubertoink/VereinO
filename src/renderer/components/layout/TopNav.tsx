@@ -8,11 +8,12 @@ interface TopNavProps {
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'
   pendingSubmissionsCount?: number
+  openBankImportsCount?: number
   openInvoicesCount?: number
   showBadges?: boolean
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, showBadges = true }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
       {navItems.map((item, idx) => {
@@ -23,6 +24,7 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
         // Determine badge count based on nav item
         let badgeCount = 0
         if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
+        if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
         
         const showBadge = showBadges && badgeCount > 0

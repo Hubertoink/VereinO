@@ -42,7 +42,7 @@ export interface BudgetTileBudget {
   enforceTimeRange?: number
 }
 
-export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void }) {
+export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, compact = false }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void; compact?: boolean }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   
@@ -69,7 +69,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
   if (!budgets.length) return null
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(auto-fill, minmax(220px, 1fr))' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: compact ? 10 : 14 }}>
         {budgets.map(b => {
           const bg = b.color || '#6366f1'
           const fg = contrastText(bg)
@@ -88,6 +88,50 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings }:
           const totalCount = (usage[b.id]?.countInside ?? 0) + (usage[b.id]?.countOutside ?? 0)
           
           const isArchived = !!(b as any).isArchived
+
+          if (compact) {
+            return (
+              <div
+                key={b.id}
+                className="card budget-compact-card"
+                style={{
+                  '--tile-color': bg,
+                  opacity: isArchived ? 0.55 : undefined,
+                  filter: isArchived ? 'grayscale(60%)' : undefined,
+                  borderStyle: isArchived ? 'dashed' : undefined
+                } as React.CSSProperties}
+              >
+                <div className="budget-compact-card__head">
+                  <span className="budget-compact-card__code">{b.year}</span>
+                  {!!b.enforceTimeRange && (
+                    <span title="Strikter Zeitraum aktiv">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <strong className="budget-compact-card__title" title={title}>{title}</strong>
+                <div className="budget-compact-card__amounts">
+                  <div><span>Budget</span><strong>{eurFmt.format(plan)}</strong></div>
+                  <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{eurFmt.format(remaining)}</strong></div>
+                  <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                </div>
+                <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
+                  <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+                </div>
+                <div className="budget-compact-card__meta">
+                  <span>{fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                  {totalCount > 0 && <span>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>}
+                </div>
+                <div className="budget-compact-card__actions">
+                  <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Buchungen</button>
+                  <button className="btn btn-edit" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>
+                </div>
+              </div>
+            )
+          }
           
           return (
             <div 

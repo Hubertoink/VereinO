@@ -52,9 +52,10 @@ export interface EarmarkUsageCardsProps {
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   onEdit?: (b: EarmarkUsageCardBinding) => void
   onGoToBookings?: (earmarkId: number) => void
+  compact?: boolean
 }
 
-export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, onGoToBookings }: EarmarkUsageCardsProps) {
+export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, onGoToBookings, compact = false }: EarmarkUsageCardsProps) {
   const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   
@@ -77,7 +78,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
   if (!bindings.length) return null
   
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginTop: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(auto-fill, minmax(220px, 1fr))' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: compact ? 10 : 14, marginTop: 12 }}>
       {bindings.map(b => {
         const u = usage[b.id]
         const bg = b.color || '#8b5cf6'
@@ -96,6 +97,43 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
         const totalCount = u?.totalCount as number | undefined
         
         const isArchived = b.isActive === 0 || b.isActive === false
+
+        if (compact) {
+          return (
+            <div
+              key={b.id}
+              className="card budget-compact-card"
+              style={{
+                '--tile-color': bg,
+                opacity: isArchived ? 0.55 : undefined,
+                filter: isArchived ? 'grayscale(60%)' : undefined,
+                borderStyle: isArchived ? 'dashed' : undefined
+              } as React.CSSProperties}
+            >
+              <div className="budget-compact-card__head">
+                <span className="budget-compact-card__code">{b.code}</span>
+                {!!b.enforceTimeRange && <span title="Strikter Zeitraum aktiv">{renderLockIcon('currentColor')}</span>}
+              </div>
+              <strong className="budget-compact-card__title" title={b.name}>{b.name}</strong>
+              <div className="budget-compact-card__amounts">
+                <div><span>Budget</span><strong>{fmt.format(budget)}</strong></div>
+                <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{fmt.format(remaining)}</strong></div>
+                <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+              </div>
+              <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
+                <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+              </div>
+              <div className="budget-compact-card__meta">
+                <span>{fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                {totalCount != null && totalCount > 0 && <span>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>}
+              </div>
+              <div className="budget-compact-card__actions">
+                <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Buchungen</button>
+                {onEdit && <button className="btn btn-edit" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
+              </div>
+            </div>
+          )
+        }
         
         return (
           <div

@@ -939,6 +939,24 @@ function AppInner() {
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
 
+    // Open bank transactions count for nav badge
+    const [openBankImportsCount, setOpenBankImportsCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadOpenCount() {
+            try {
+                const res = await (window as any).api?.bankTransactions?.list?.({ status: 'OPEN', limit: 1, page: 1 })
+                if (!cancelled) {
+                    setOpenBankImportsCount(res?.stats?.open || res?.total || 0)
+                }
+            } catch { /* ignore */ }
+        }
+        loadOpenCount()
+        const onChanged = () => loadOpenCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+
     // Open invoices count for nav badge
     const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
     useEffect(() => {
@@ -2121,6 +2139,7 @@ function AppInner() {
                             onNavigate={setActivePage}
                             navIconColorMode={navIconColorMode}
                             pendingSubmissionsCount={pendingSubmissionsCount}
+                            openBankImportsCount={openBankImportsCount}
                             openInvoicesCount={openInvoicesCount}
                             showBadges
                         />
@@ -2148,6 +2167,7 @@ function AppInner() {
                         navIconColorMode={navIconColorMode}
                         collapsed={true}
                         pendingSubmissionsCount={pendingSubmissionsCount}
+                        openBankImportsCount={openBankImportsCount}
                         openInvoicesCount={openInvoicesCount}
                         showBadges
                     />
@@ -2616,6 +2636,20 @@ function AppInner() {
                     setBackgroundImage={(v) => { setBackgroundImage(v); try { localStorage.setItem('ui.backgroundImage', v) } catch {}; try { document.documentElement.setAttribute('data-background-image', v) } catch {} }}
                     customBackgroundImage={customBackgroundImage}
                     setCustomBackgroundImage={(v) => { setCustomBackgroundImage(v) }}
+                    glassModals={glassModals}
+                    setGlassModals={(v) => { setGlassModals(v); try { localStorage.setItem('ui.glassModals', String(v)) } catch {}; try { document.documentElement.setAttribute('data-glass-modals', String(v)) } catch {} }}
+                    dateFmt={dateFmt}
+                    setDateFmt={(v) => { setDateFmt(v); try { localStorage.setItem('ui.dateFmt', v) } catch {} }}
+                    showBookingDraftTabs={showBookingDraftTabs}
+                    setShowBookingDraftTabs={(v) => { setShowBookingDraftTabs(v); try { localStorage.setItem('ui.showBookingDraftTabs', String(v)) } catch {} }}
+                    showBookingEditTabs={showBookingEditTabs}
+                    setShowBookingEditTabs={(v) => { setShowBookingEditTabs(v); try { localStorage.setItem('ui.showBookingEditTabs', String(v)) } catch {} }}
+                    bookingsOpenDetached={bookingsOpenDetached}
+                    setBookingsOpenDetached={(v) => { setBookingsOpenDetached(v); try { localStorage.setItem('ui.bookingsOpenDetached', String(v)) } catch {} }}
+                    allowVoucherDeletion={allowVoucherDeletion}
+                    setAllowVoucherDeletion={(v) => { setAllowVoucherDeletion(v); try { localStorage.setItem('ui.allowVoucherDeletion', String(v)) } catch {} }}
+                    quickAddAfterSave={quickAddAfterSave}
+                    setQuickAddAfterSave={(v) => { setQuickAddAfterSave(v); try { localStorage.setItem('ui.quickAddAfterSave', v) } catch {} }}
                     existingTags={tagDefs as any}
                     notify={notify}
                 />

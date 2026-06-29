@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.3] - 2026-06-29
+
+### Hinzugefügt
+
+- Navigation: Bankimport zeigt ein Zahlenbadge für offene Bankbelege.
+- Einrichtung: Setup-Assistent um neue Schritte für Darstellung, Workflow, Buchungsansicht, Tags und Backup erweitert.
+- Budgets und Zweckbindungen: Karten können zwischen Detail- und Kompaktansicht umgeschaltet werden.
+- Budgets und Zweckbindungen: Verwaltungstabellen zeigen eingeklappt maximal fünf Einträge und aufgeklappt 10er-Pagination.
+
+### Geändert
+
+- Dashboard: Liniendiagramme werden bei Vollbild kompakter angeordnet; Einnahmen vs. Ausgaben bleibt als eigene Kachel sichtbar.
+- Darstellung: Kontrast der Umschaltbuttons in dunklen und hellen Themes verbessert.
+
 ## [2.1.5] - 2026-06-25
 
 ### Hinzugefügt

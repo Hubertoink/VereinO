@@ -1,6 +1,8 @@
 ﻿
 import React, { useEffect, useMemo, useState } from 'react'
 import { compressImageFileToDataUrl } from '../../utils/imageCompression'
+import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
+import type { QuickAddAfterSave } from '../../context/UIPreferencesContextCore'
 
 type NavLayout = 'left' | 'top'
 type NavIconColorMode = 'color' | 'mono'
@@ -8,6 +10,7 @@ type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamla
 type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 type JournalRowDensity = 'normal' | 'compact'
 type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
+type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
@@ -43,6 +46,13 @@ export default function SetupWizardModal({
     journalRowDensity, setJournalRowDensity,
     backgroundImage, setBackgroundImage,
     customBackgroundImage, setCustomBackgroundImage,
+    glassModals, setGlassModals,
+    dateFmt, setDateFmt,
+    showBookingDraftTabs, setShowBookingDraftTabs,
+    showBookingEditTabs, setShowBookingEditTabs,
+    bookingsOpenDetached, setBookingsOpenDetached,
+    allowVoucherDeletion, setAllowVoucherDeletion,
+    quickAddAfterSave, setQuickAddAfterSave,
     existingTags,
     notify
 }: {
@@ -61,6 +71,20 @@ export default function SetupWizardModal({
     setBackgroundImage: (v: BackgroundImage) => void
     customBackgroundImage: string | null
     setCustomBackgroundImage: (v: string | null) => void
+    glassModals: boolean
+    setGlassModals: (v: boolean) => void
+    dateFmt: DateFmt
+    setDateFmt: (v: DateFmt) => void
+    showBookingDraftTabs: boolean
+    setShowBookingDraftTabs: (v: boolean) => void
+    showBookingEditTabs: boolean
+    setShowBookingEditTabs: (v: boolean) => void
+    bookingsOpenDetached: boolean
+    setBookingsOpenDetached: (v: boolean) => void
+    allowVoucherDeletion: boolean
+    setAllowVoucherDeletion: (v: boolean) => void
+    quickAddAfterSave: QuickAddAfterSave
+    setQuickAddAfterSave: (v: QuickAddAfterSave) => void
     existingTags: Array<{ name: string; color?: string | null }>
     notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
@@ -74,8 +98,7 @@ export default function SetupWizardModal({
     const [colsOrder, setColsOrder] = useState<ColKey[]>(['actions', 'date', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat'])
     const mandatoryCols: ColKey[] = ['actions','date','description','gross']
 
-    // Note: We no longer override existing settings on wizard open.
-    // The wizard now shows current values and only persists on "Fertig".
+    // The wizard shows current values and marks setup completed on "Fertig".
 
     // Load existing values to prefill
     useEffect(() => {
@@ -117,6 +140,7 @@ export default function SetupWizardModal({
     const [backupMode, setBackupMode] = useState<'SILENT' | 'PROMPT' | 'OFF'>('PROMPT')
     const [backupIntervalDays, setBackupIntervalDays] = useState<number>(7)
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
+    const [isSaving, setIsSaving] = useState<boolean>(false)
 
     const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
     const [isCustomBgProcessing, setIsCustomBgProcessing] = useState<boolean>(false)
@@ -195,6 +219,8 @@ export default function SetupWizardModal({
     }
 
     async function finish(persistAndClose: boolean) {
+        if (isSaving) return
+        setIsSaving(true)
         try {
             // Persist org data
             await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
@@ -206,9 +232,17 @@ export default function SetupWizardModal({
             try { localStorage.setItem('ui.colorTheme', colorTheme) } catch {}
             try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch {}
             try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch {}
+            try { localStorage.setItem('ui.glassModals', String(glassModals)) } catch {}
+            try { localStorage.setItem('ui.dateFmt', dateFmt) } catch {}
+            try { localStorage.setItem('ui.showBookingDraftTabs', String(showBookingDraftTabs)) } catch {}
+            try { localStorage.setItem('ui.showBookingEditTabs', String(allowVoucherDeletion && showBookingEditTabs)) } catch {}
+            try { localStorage.setItem('ui.bookingsOpenDetached', String(bookingsOpenDetached)) } catch {}
+            try { localStorage.setItem('ui.allowVoucherDeletion', String(allowVoucherDeletion)) } catch {}
+            try { localStorage.setItem('ui.quickAddAfterSave', quickAddAfterSave) } catch {}
             try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch {}
             try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch {}
             try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch {}
+            try { document.documentElement.setAttribute('data-glass-modals', String(glassModals)) } catch {}
 
             // Persist table column settings (from state; if not set ensure preset applied)
             if (tablePreset !== 'custom') applyTablePreset(tablePreset)
@@ -242,16 +276,21 @@ export default function SetupWizardModal({
         } catch (e: any) {
             notify('error', e?.message || String(e))
         } finally {
+            setIsSaving(false)
             if (persistAndClose) onClose()
         }
     }
 
-    const LAST_STEP = 5
+    const setupSteps = ['Start', 'Organisation', 'Darstellung', 'Workflow', 'Buchungen', 'Tags', 'Backup'] as const
+    const LAST_STEP = setupSteps.length - 1
 
     function Header() {
         return (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ margin: 0 }}>Erste Schritte</h2>
+                <div>
+                    <h2 style={{ margin: 0 }}>Erste Schritte</h2>
+                    <div className="helper">{setupSteps[step]}</div>
+                </div>
                 {/* Später oben rechts entfernt – nur noch unten in der Button-Leiste */}
             </div>
         )
@@ -324,7 +363,7 @@ export default function SetupWizardModal({
     // Load backup dir when entering the backup step
     useEffect(() => {
         let alive = true
-        if (step === 5) {
+        if (step === 6) {
             (async () => {
                 try {
                     const res = await (window as any).api?.backup?.getDir?.()
@@ -384,6 +423,11 @@ export default function SetupWizardModal({
         } catch (e: any) { notify('error', e?.message || String(e)) }
     }
 
+    const formatSummaryValue = (value: string | null | undefined) => {
+        const text = String(value || '').trim()
+        return text || 'Nicht gesetzt'
+    }
+
     function renderStep() {
         if (step === 0) {
             return (
@@ -391,10 +435,10 @@ export default function SetupWizardModal({
                     <div className="helper">Willkommen! Dieses kurze Setup richtet die wichtigsten Dinge ein. Du kannst jederzeit abbrechen und später in den Einstellungen alles ändern.</div>
                     <ul style={{ margin: '8px 0 0 18px', display: 'grid', gap: 6 }}>
                         <li>Organisation: Name und Kassier/Nutzer</li>
-                        <li>Darstellung: Menü, Zeilenlayout/-höhe, Farben (mit Vorschau)</li>
+                        <li>Darstellung: Menü, Farben, Hintergrund, Glaseffekt und Datumsformat</li>
+                        <li>Workflow: Buchungsreiter, eigenes Buchungsfenster, Speichern-Verhalten und Storno/Löschen</li>
                         <li>Buchungsansicht: Spaltenanordnung und Sichtbarkeit</li>
-                        <li>Tags: häufige Stichwörter anlegen</li>
-                        <li>Backups: Speicherort wählen und Hinweise</li>
+                        <li>Tags und Backups: Startwerte und Sicherungsmodus</li>
                     </ul>
                 </div>
             )
@@ -417,25 +461,6 @@ export default function SetupWizardModal({
             )
         }
         if (step === 2) {
-            const themeOptions: Array<{ value: ColorTheme; label: string; isLight?: boolean }> = [
-                { value: 'default', label: 'Standard' },
-                { value: 'fiery-ocean', label: 'Fiery Ocean' },
-                { value: 'peachy-delight', label: 'Peachy Delight' },
-                { value: 'pastel-dreamland', label: 'Pastel Dreamland' },
-                { value: 'ocean-breeze', label: 'Ocean Breeze' },
-                { value: 'earthy-tones', label: 'Earthy Tones' },
-                { value: 'monochrome-harmony', label: 'Monochrome' },
-                { value: 'vintage-charm', label: 'Vintage Charm' },
-                { value: 'soft-blush', label: 'Soft Blush', isLight: true },
-                { value: 'professional-light', label: 'Professional', isLight: true }
-            ]
-            const bgOptions: Array<{ value: BackgroundImage; label: string }> = [
-                { value: 'none', label: 'Keiner' },
-                { value: 'cherry-blossom', label: 'Kirschblüten' },
-                { value: 'foggy-forest', label: 'Nebelwald' },
-                { value: 'mountain-snow', label: 'Bergschnee' },
-                { value: 'custom', label: 'Eigenes…' }
-            ]
             return (
                 <div className="card setup-appearance-card">
                     {/* Row 1: Binary toggles */}
@@ -463,24 +488,23 @@ export default function SetupWizardModal({
                             />
                         </div>
                         <div className="setup-field">
-                            <label>Zeilenhöhe</label>
+                            <label>Datumsformat</label>
                             <ToggleButtons
-                                value={journalRowDensity}
-                                onChange={setJournalRowDensity}
-                                options={[
-                                    { value: 'normal', label: 'Normal', icon: '' },
-                                    { value: 'compact', label: 'Kompakt', icon: '' }
-                                ]}
+                                value={dateFmt}
+                                onChange={setDateFmt}
+                                options={DATE_FORMAT_OPTIONS.map((option) => ({ value: option.id, label: option.label }))}
                             />
                         </div>
                         <div className="setup-field">
-                            <label>Zeilenlayout</label>
-                            <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as JournalRowStyle)}>
-                                <option value="both">Linien + Zebra</option>
-                                <option value="lines">Nur Linien</option>
-                                <option value="zebra">Nur Zebra</option>
-                                <option value="none">Ohne</option>
-                            </select>
+                            <label>Glaseffekt</label>
+                            <ToggleButtons
+                                value={glassModals ? 'on' : 'off'}
+                                onChange={(value) => setGlassModals(value === 'on')}
+                                options={[
+                                    { value: 'off', label: 'Aus' },
+                                    { value: 'on', label: 'Ein' }
+                                ]}
+                            />
                         </div>
                     </div>
 
@@ -488,16 +512,16 @@ export default function SetupWizardModal({
                     <div className="setup-section">
                         <label>Farb-Theme</label>
                         <div className="theme-picker">
-                            {themeOptions.map(t => (
+                            {COLOR_THEME_OPTIONS.map(t => (
                                 <button
-                                    key={t.value}
+                                    key={t.id}
                                     type="button"
-                                    className={`theme-chip ${colorTheme === t.value ? 'active' : ''}`}
-                                    onClick={() => setColorTheme(t.value)}
-                                    data-theme={t.value}
+                                    className={`theme-chip ${colorTheme === t.id ? 'active' : ''}`}
+                                    onClick={() => setColorTheme(t.id)}
+                                    data-theme={t.id}
                                 >
-                                    <span className="theme-swatch" data-theme={t.value} />
-                                    <span>{t.label}</span>
+                                    <span className="theme-swatch" data-theme={t.id} />
+                                    <span>{t.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -507,14 +531,14 @@ export default function SetupWizardModal({
                     <div className="setup-section">
                         <label>Hintergrundbild</label>
                         <div className="background-picker">
-                            {bgOptions.map(bg => (
+                            {BACKGROUND_IMAGE_OPTIONS.map(bg => (
                                 <button
-                                    key={bg.value}
+                                    key={bg.id}
                                     type="button"
-                                    className={`background-chip ${backgroundImage === bg.value ? 'active' : ''}`}
+                                    className={`background-chip ${backgroundImage === bg.id ? 'active' : ''}`}
                                     onClick={() => {
-                                        if (bg.value !== 'custom') {
-                                            setBackgroundImage(bg.value)
+                                        if (bg.id !== 'custom') {
+                                            setBackgroundImage(bg.id)
                                             return
                                         }
                                         // Custom: if we already have an image, just select; otherwise open picker
@@ -525,17 +549,17 @@ export default function SetupWizardModal({
                                         }
                                     }}
                                 >
-                                    {bg.value === 'custom' ? (
+                                    {bg.id === 'custom' ? (
                                         <span
                                             className={`background-preview bg-custom${customBackgroundImage ? '' : ' custom-bg-preview--empty'}`}
                                             style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
                                         >
-                                            {!customBackgroundImage ? '🖼️' : null}
+                                            {!customBackgroundImage ? '+' : null}
                                         </span>
                                     ) : (
-                                        <span className={`background-preview bg-${bg.value}`} />
+                                        <span className={`background-preview bg-${bg.id}`} />
                                     )}
-                                    <span>{bg.label}</span>
+                                    <span>{bg.compactName}</span>
                                 </button>
                             ))}
                         </div>
@@ -585,6 +609,89 @@ export default function SetupWizardModal({
             )
         }
         if (step === 3) {
+            return (
+                <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
+                    <div className="helper">Lege fest, wie sich das Buchungsfenster im Alltag verhält.</div>
+                    <div className="settings-layout-grid settings-layout-grid--wide">
+                        <label className="settings-toggle-card" htmlFor="setup-booking-draft-tabs">
+                            <span className="settings-toggle-card__copy">
+                                <strong>Buchungsreiter</strong>
+                                <span>Mehrere offene Buchungsentwürfe im Hauptfenster halten.</span>
+                            </span>
+                            <input
+                                id="setup-booking-draft-tabs"
+                                role="switch"
+                                aria-checked={showBookingDraftTabs}
+                                className="toggle"
+                                type="checkbox"
+                                checked={showBookingDraftTabs}
+                                onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
+                            />
+                        </label>
+                        <label className={`settings-toggle-card ${!allowVoucherDeletion ? 'is-disabled' : ''}`} htmlFor="setup-booking-edit-tabs">
+                            <span className="settings-toggle-card__copy">
+                                <strong>Bearbeitungen als Reiter</strong>
+                                <span>{allowVoucherDeletion ? 'Mehrere geöffnete Bearbeitungen als eigene Reiter halten.' : 'Verfügbar, wenn endgültiges Löschen erlaubt ist.'}</span>
+                            </span>
+                            <input
+                                id="setup-booking-edit-tabs"
+                                role="switch"
+                                aria-checked={allowVoucherDeletion && showBookingEditTabs}
+                                className="toggle"
+                                type="checkbox"
+                                checked={allowVoucherDeletion && showBookingEditTabs}
+                                disabled={!allowVoucherDeletion}
+                                onChange={(e) => setShowBookingEditTabs(e.target.checked)}
+                            />
+                        </label>
+                        <label className="settings-toggle-card" htmlFor="setup-bookings-open-detached">
+                            <span className="settings-toggle-card__copy">
+                                <strong>Eigenes Buchungsfenster</strong>
+                                <span>Neue und bearbeitete Buchungen in einem separaten Fenster öffnen.</span>
+                            </span>
+                            <input
+                                id="setup-bookings-open-detached"
+                                role="switch"
+                                aria-checked={bookingsOpenDetached}
+                                className="toggle"
+                                type="checkbox"
+                                checked={bookingsOpenDetached}
+                                onChange={(e) => setBookingsOpenDetached(e.target.checked)}
+                            />
+                        </label>
+                        <div className="settings-layout-control">
+                            <div className="settings-layout-label-row">
+                                <label>Nach Speichern</label>
+                                <span>Standardaktion nach einer gespeicherten Buchung.</span>
+                            </div>
+                            <div className="btn-group">
+                                <button type="button" className={`btn-option ${quickAddAfterSave === 'close' ? 'active' : ''}`} onClick={() => setQuickAddAfterSave('close')}>Schließen</button>
+                                <button type="button" className={`btn-option ${quickAddAfterSave === 'new' ? 'active' : ''}`} onClick={() => setQuickAddAfterSave('new')}>Neue Buchung</button>
+                            </div>
+                        </div>
+                        <label className="settings-toggle-card" htmlFor="setup-voucher-delete-mode">
+                            <span className="settings-toggle-card__copy">
+                                <strong>Buchungen endgültig löschen</strong>
+                                <span>Aus nutzt Storno, Ein erlaubt dauerhaftes Entfernen.</span>
+                            </span>
+                            <input
+                                id="setup-voucher-delete-mode"
+                                role="switch"
+                                aria-checked={allowVoucherDeletion}
+                                className="toggle"
+                                type="checkbox"
+                                checked={allowVoucherDeletion}
+                                onChange={(e) => {
+                                    setAllowVoucherDeletion(e.target.checked)
+                                    if (!e.target.checked) setShowBookingEditTabs(false)
+                                }}
+                            />
+                        </label>
+                    </div>
+                </div>
+            )
+        }
+        if (step === 4) {
             const baseDensity = journalRowDensity === 'compact' ? 4 : 8
             const density = Math.max(2, Math.round(baseDensity * 0.7)) // etwas kompakter für die Vorschau
             const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
@@ -598,7 +705,29 @@ export default function SetupWizardModal({
             }
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Lege fest, welche Spalten in der Buchungsübersicht angezeigt und in welcher Reihenfolge sie erscheinen. Voreinstellungen geben dir einen Startpunkt.</div>
+                    <div className="helper">Lege Zeilenhöhe, Zeilenlayout und die sichtbaren Spalten in der Buchungsübersicht fest.</div>
+                    <div className="setup-toggle-row">
+                        <div className="setup-field">
+                            <label>Zeilenhöhe</label>
+                            <ToggleButtons
+                                value={journalRowDensity}
+                                onChange={setJournalRowDensity}
+                                options={[
+                                    { value: 'normal', label: 'Normal' },
+                                    { value: 'compact', label: 'Kompakt' }
+                                ]}
+                            />
+                        </div>
+                        <div className="setup-field">
+                            <label>Zeilenlayout</label>
+                            <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as JournalRowStyle)}>
+                                <option value="both">Linien + Zebra</option>
+                                <option value="lines">Nur Linien</option>
+                                <option value="zebra">Nur Zebra</option>
+                                <option value="none">Ohne</option>
+                            </select>
+                        </div>
+                    </div>
                     <div className="field" style={{ minWidth: 300 }}>
                         <label>Spalten-Preset</label>
                         <select className="input" value={tablePreset} onChange={(e) => setTablePreset(e.target.value as TablePreset)}>
@@ -659,7 +788,7 @@ export default function SetupWizardModal({
                 </div>
             )
         }
-        if (step === 4) {
+        if (step === 5) {
             const all = suggestedTags
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
@@ -689,10 +818,16 @@ export default function SetupWizardModal({
                 </div>
             )
         }
-    // step === 5 Backup
+    // step === 6 Backup
     return (
             <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
                 <div className="helper">Sicherungen enthalten u. a. die Datenbank (.sqlite) und werden im gewählten Ordner abgelegt. Beim Ordnerwechsel werden vorhandene .sqlite-Backups automatisch übernommen.</div>
+                <div className="setup-summary-grid">
+                    <div><span>Organisation</span><strong>{formatSummaryValue(orgName)}</strong></div>
+                    <div><span>Darstellung</span><strong>{COLOR_THEME_OPTIONS.find((theme) => theme.id === colorTheme)?.name || colorTheme}</strong></div>
+                    <div><span>Buchungsfenster</span><strong>{bookingsOpenDetached ? 'Eigenes Fenster' : showBookingDraftTabs ? 'Reiter im Hauptfenster' : 'Ein Fenster'}</strong></div>
+                    <div><span>Nach Speichern</span><strong>{quickAddAfterSave === 'new' ? 'Neue Buchung' : 'Schließen'}</strong></div>
+                </div>
                 <div className="row">
                     <div className="field" style={{ minWidth: 420 }}>
                         <label>Aktueller Sicherungsordner</label>
@@ -738,24 +873,24 @@ export default function SetupWizardModal({
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'clamp(1000px, 92vw, 1400px)', display: 'grid', gap: 12 }}>
                 <Header />
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {Array.from({ length: LAST_STEP + 1 }, (_, i) => i).map((i) => (
-                        <div key={i} title={`Schritt ${i + 1}`} style={{ width: 26, height: 6, borderRadius: 4, background: i <= step ? 'var(--accent)' : 'var(--border)' }} />
+                    {setupSteps.map((label, i) => (
+                        <div key={label} title={label} style={{ width: 26, height: 6, borderRadius: 4, background: i <= step ? 'var(--accent)' : 'var(--border)' }} />
                     ))}
                 </div>
                 {renderStep()}
                 <div style={{ display: 'flex', justifyContent: step > 0 ? 'space-between' : 'flex-end', gap: 8 }}>
                     {step > 0 && (
-                        <button className="btn hover-highlight" onClick={() => setStep(s => Math.max(0, s - 1))}>Zurück</button>
+                            <button className="btn hover-highlight" disabled={isSaving} onClick={() => setStep(s => Math.max(0, s - 1))}>Zurück</button>
                     )}
                     {step < LAST_STEP ? (
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn hover-highlight" onClick={() => setStep(s => Math.min(LAST_STEP, s + 1))}>Weiter</button>
-                            <button className="btn ghost hover-highlight" onClick={onClose}>Später</button>
+                            <button className="btn hover-highlight" disabled={isSaving} onClick={() => setStep(s => Math.min(LAST_STEP, s + 1))}>Weiter</button>
+                            <button className="btn ghost hover-highlight" disabled={isSaving} onClick={onClose}>Später</button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn ghost hover-highlight" onClick={onClose}>Später</button>
-                            <button className="btn primary hover-highlight" onClick={() => finish(true)}>Fertig</button>
+                            <button className="btn ghost hover-highlight" disabled={isSaving} onClick={onClose}>Später</button>
+                            <button className="btn primary hover-highlight" disabled={isSaving} onClick={() => finish(true)}>{isSaving ? 'Speichere...' : 'Fertig'}</button>
                         </div>
                     )}
                 </div>

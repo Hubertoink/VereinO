@@ -10,11 +10,12 @@ interface SideNavProps {
   collapsed: boolean
   onToggleCollapse?: () => void
   pendingSubmissionsCount?: number
+  openBankImportsCount?: number
   openInvoicesCount?: number
   showBadges?: boolean
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openInvoicesCount = 0, showBadges = true }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, showBadges = true }: SideNavProps) {
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
       {navItems.map((item, idx) => {
@@ -24,6 +25,7 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
         // Determine badge count based on nav item
         let badgeCount = 0
         if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
+        if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
         
         const showBadge = showBadges && badgeCount > 0

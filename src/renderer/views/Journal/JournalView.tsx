@@ -1201,6 +1201,7 @@ export default function JournalView({
                         rows={rows}
                         order={journalOrder}
                         cols={journalCols}
+                        onSetColumnVisibility={(columnKey, visible) => setCols({ ...journalCols, [columnKey]: visible } as Record<ColKey, boolean>)}
                         onReorder={(o: any) => setOrder(o as any)}
                         earmarks={earmarks}
                         tagDefs={tagDefs}

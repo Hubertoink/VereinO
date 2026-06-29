@@ -2,6 +2,7 @@ import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 import HoverTooltip from '../../../components/common/HoverTooltip'
+import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
 
 /**
  * GeneralPane - Darstellung & Layout Settings
@@ -49,10 +50,6 @@ export function GeneralPane({
   glassModals,
   setGlassModals,
 }: GeneralPaneProps) {
-  // Date format examples
-  const sample = '2025-01-15'
-  const pretty = '15. Jan 2025'
-  const dot = '15.01.2025'
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const openCustomBgPicker = () => {
@@ -145,18 +142,7 @@ export function GeneralPane({
         <div className="field" style={{ marginTop: 16 }}>
           <label>Farb-Theme</label>
           <div className="theme-picker-grid">
-            {[
-              { id: 'default', name: 'Standard', mode: 'auto' },
-              { id: 'fiery-ocean', name: 'Fiery Ocean', mode: 'dark' },
-              { id: 'peachy-delight', name: 'Peachy Delight', mode: 'dark' },
-              { id: 'pastel-dreamland', name: 'Pastel Dreamland', mode: 'dark' },
-              { id: 'ocean-breeze', name: 'Ocean Breeze', mode: 'dark' },
-              { id: 'earthy-tones', name: 'Earthy Tones', mode: 'dark' },
-              { id: 'monochrome-harmony', name: 'Monochrome', mode: 'dark' },
-              { id: 'vintage-charm', name: 'Vintage Charm', mode: 'dark' },
-              { id: 'soft-blush', name: 'Soft Blush', mode: 'light' },
-              { id: 'professional-light', name: 'Professional', mode: 'light' },
-            ].map((theme) => (
+            {COLOR_THEME_OPTIONS.map((theme) => (
               <button
                 key={theme.id}
                 type="button"
@@ -179,49 +165,20 @@ export function GeneralPane({
         <div className="field" style={{ marginTop: 20 }}>
           <label>Hintergrundbild</label>
           <div className="bg-picker-grid">
-            {/* None */}
-            <button
-              type="button"
-              className={`bg-card ${backgroundImage === 'none' ? 'active' : ''}`}
-              onClick={() => setBackgroundImage('none')}
-              aria-pressed={backgroundImage === 'none'}
-            >
-              <div className="bg-card__preview bg-card__preview--none">
-                <span>—</span>
-              </div>
-              <span className="bg-card__name">Keins</span>
-            </button>
-            {/* Cherry Blossom */}
-            <button
-              type="button"
-              className={`bg-card ${backgroundImage === 'cherry-blossom' ? 'active' : ''}`}
-              onClick={() => setBackgroundImage('cherry-blossom')}
-              aria-pressed={backgroundImage === 'cherry-blossom'}
-            >
-              <div className="bg-card__preview bg-card__preview--cherry-blossom" />
-              <span className="bg-card__name">🌸 Kirschblüten</span>
-            </button>
-            {/* Foggy Forest */}
-            <button
-              type="button"
-              className={`bg-card ${backgroundImage === 'foggy-forest' ? 'active' : ''}`}
-              onClick={() => setBackgroundImage('foggy-forest')}
-              aria-pressed={backgroundImage === 'foggy-forest'}
-            >
-              <div className="bg-card__preview bg-card__preview--foggy-forest" />
-              <span className="bg-card__name">🌲 Nebliger Wald</span>
-            </button>
-            {/* Mountain Snow */}
-            <button
-              type="button"
-              className={`bg-card ${backgroundImage === 'mountain-snow' ? 'active' : ''}`}
-              onClick={() => setBackgroundImage('mountain-snow')}
-              aria-pressed={backgroundImage === 'mountain-snow'}
-            >
-              <div className="bg-card__preview bg-card__preview--mountain-snow" />
-              <span className="bg-card__name">🏔️ Schneeberge</span>
-            </button>
-            {/* Custom */}
+            {BACKGROUND_IMAGE_OPTIONS.filter((option) => option.id !== 'custom').map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`bg-card ${backgroundImage === option.id ? 'active' : ''}`}
+                onClick={() => setBackgroundImage(option.id)}
+                aria-pressed={backgroundImage === option.id}
+              >
+                <div className={`bg-card__preview bg-card__preview--${option.id}`}>
+                  {option.id === 'none' && <span>-</span>}
+                </div>
+                <span className="bg-card__name">{option.name}</span>
+              </button>
+            ))}
             <div
               role="button"
               tabIndex={0}
@@ -280,7 +237,7 @@ export function GeneralPane({
                   </div>
                 )}
               </div>
-              <span className="bg-card__name">🖼️ Eigenes</span>
+              <span className="bg-card__name">Eigenes</span>
             </div>
           </div>
         </div>
@@ -566,27 +523,16 @@ export function GeneralPane({
           <div className="field">
             <label>Datumsformat</label>
             <div className="btn-group">
-              <button
-                type="button"
-                className={`btn-option ${dateFmt === 'ISO' ? 'active' : ''}`}
-                onClick={() => setDateFmt('ISO')}
-              >
-                {sample}
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${dateFmt === 'PRETTY' ? 'active' : ''}`}
-                onClick={() => setDateFmt('PRETTY')}
-              >
-                {pretty}
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${dateFmt === 'DOT' ? 'active' : ''}`}
-                onClick={() => setDateFmt('DOT')}
-              >
-                {dot}
-              </button>
+              {DATE_FORMAT_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`btn-option ${dateFmt === option.id ? 'active' : ''}`}
+                  onClick={() => setDateFmt(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

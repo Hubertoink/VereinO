@@ -1,9 +1,10 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
 import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
-import type { BudgetAssignment, EarmarkAssignment, VoucherRow } from '../types'
+import { LABEL_FOR_COL, type BudgetAssignment, type EarmarkAssignment, type VoucherRow } from '../types'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
@@ -269,6 +270,7 @@ interface JournalTableProps {
     rows: VoucherRow[]
     order: string[]
     cols: Record<string, boolean>
+    onSetColumnVisibility?: (columnKey: string, visible: boolean) => void
     onReorder: (o: string[]) => void
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
@@ -331,6 +333,7 @@ export default function JournalTable({
     rows,
     order,
     cols,
+    onSetColumnVisibility,
     onReorder,
     earmarks,
     tagDefs,
@@ -354,6 +357,7 @@ export default function JournalTable({
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
     const visibleOrder = order.filter(k => cols[k])
+    const [headerMenu, setHeaderMenu] = useState<{ columnKey: string; x: number; y: number } | null>(null)
 
     const budgetUsageCache = useRef(new Map<number, any>())
     const budgetUsageInFlight = useRef(new Map<number, Promise<any>>())
@@ -469,6 +473,24 @@ export default function JournalTable({
         }
     }, [columnWidths])
 
+    useEffect(() => {
+        if (!headerMenu) return
+        const close = () => setHeaderMenu(null)
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') close()
+        }
+        window.addEventListener('mousedown', close)
+        window.addEventListener('scroll', close, true)
+        window.addEventListener('resize', close)
+        window.addEventListener('keydown', closeOnEscape)
+        return () => {
+            window.removeEventListener('mousedown', close)
+            window.removeEventListener('scroll', close, true)
+            window.removeEventListener('resize', close)
+            window.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [headerMenu])
+
     // Handle resize start
     const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
         e.preventDefault()
@@ -557,6 +579,16 @@ export default function JournalTable({
         const color = active ? 'var(--warning)' : 'var(--text-dim)'
         return <span className={`sort-icon ${active ? 'active' : 'inactive'}`} aria-hidden="true" style={{ color }}>{sym}</span>
     }
+    const openHeaderMenu = useCallback((event: React.MouseEvent, columnKey: string) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setHeaderMenu({ columnKey, x: event.clientX, y: event.clientY })
+    }, [])
+    const hideColumn = useCallback((columnKey: string) => {
+        if (visibleOrder.length <= 1) return
+        onSetColumnVisibility?.(columnKey, false)
+        setHeaderMenu(null)
+    }, [onSetColumnVisibility, visibleOrder.length])
     const thFor = (k: string) => (
         k === 'actions' ? <th key={k} align="center" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Aktionen</th>
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
@@ -929,57 +961,90 @@ export default function JournalTable({
         )
     )
     return (
-        <div className="journal-table-scroll-wrapper">
-        <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
-            <colgroup>
-                {visibleOrder.map((k) => (
-                    <col key={k} style={{ width: getColWidth(k) }} />
-                ))}
-            </colgroup>
-            <thead>
-                <tr>
-                    {visibleOrder.map((k, idx) => {
-                        const isLast = idx === visibleOrder.length - 1
-                        const th = thFor(k)
-                        // Clone the th and add resize handle
-                        return React.cloneElement(th, {
-                            key: k,
-                            className: `${th.props.className || ''} resizable-th`.trim(),
-                            children: (
-                                <>
-                                    {th.props.children}
-                                    {!isLast && <ResizeHandle colKey={k} />}
-                                </>
-                            )
-                        })
-                    })}
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((r) => (
-                    <tr
-                        key={r.id}
-                        className={[
-                            highlightId === r.id ? 'row-flash' : '',
-                            r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
-                            isReversalVoucher(r) ? 'journal-row-storno' : '',
-                            isReversedOriginal(r) ? 'journal-row-storniert' : ''
-                        ].filter(Boolean).join(' ') || undefined}
-                        onDoubleClick={() => onRowDoubleClick?.(r)}
-                    >
-                        {visibleOrder.map((k) => tdFor(k, r))}
-                    </tr>
-                ))}
-                {rows.length === 0 && (
+        <>
+            <div className="journal-table-scroll-wrapper">
+            <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
+                <colgroup>
+                    {visibleOrder.map((k) => (
+                        <col key={k} style={{ width: getColWidth(k) }} />
+                    ))}
+                </colgroup>
+                <thead>
                     <tr>
-                        <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                        {visibleOrder.map((k, idx) => {
+                            const isLast = idx === visibleOrder.length - 1
+                            const th = thFor(k)
+                            // Clone the th and add resize handle
+                            return React.cloneElement(th, {
+                                key: k,
+                                className: `${th.props.className || ''} resizable-th`.trim(),
+                                onContextMenu: (event: React.MouseEvent) => openHeaderMenu(event, k),
+                                children: (
+                                    <>
+                                        {th.props.children}
+                                        {!isLast && <ResizeHandle colKey={k} />}
+                                    </>
+                                )
+                            })
+                        })}
                     </tr>
-                )}
-            </tbody>
-        </table>
-        <div className="journal-table-end" aria-hidden="true">
-            <span>Ende der Seite</span>
-        </div>
-        </div>
+                </thead>
+                <tbody>
+                    {rows.map((r) => (
+                        <tr
+                            key={r.id}
+                            className={[
+                                highlightId === r.id ? 'row-flash' : '',
+                                r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
+                                isReversalVoucher(r) ? 'journal-row-storno' : '',
+                                isReversedOriginal(r) ? 'journal-row-storniert' : ''
+                            ].filter(Boolean).join(' ') || undefined}
+                            onDoubleClick={() => onRowDoubleClick?.(r)}
+                        >
+                            {visibleOrder.map((k) => tdFor(k, r))}
+                        </tr>
+                    ))}
+                    {rows.length === 0 && (
+                        <tr>
+                            <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+            <div className="journal-table-end" aria-hidden="true">
+                <span>Ende der Seite</span>
+            </div>
+            </div>
+            {headerMenu ? createPortal(
+                <div
+                    className="journal-header-menu flyout-popover"
+                    style={{
+                        position: 'fixed',
+                        left: Math.min(headerMenu.x, window.innerWidth - 240),
+                        top: Math.min(headerMenu.y, window.innerHeight - 120),
+                        zIndex: 1200,
+                        padding: '8px',
+                        minWidth: 220
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                >
+                    <div className="journal-header-menu__title">
+                        {LABEL_FOR_COL[headerMenu.columnKey as keyof typeof LABEL_FOR_COL] || headerMenu.columnKey}
+                    </div>
+                    <button
+                        className="btn journal-header-menu__item"
+                        type="button"
+                        disabled={visibleOrder.length <= 1}
+                        onClick={() => hideColumn(headerMenu.columnKey)}
+                    >
+                        Spalte ausblenden
+                    </button>
+                    {visibleOrder.length <= 1 ? (
+                        <div className="helper journal-header-menu__hint">Mindestens eine Spalte muss sichtbar bleiben.</div>
+                    ) : null}
+                </div>,
+                document.body
+            ) : null}
+        </>
     )
 }

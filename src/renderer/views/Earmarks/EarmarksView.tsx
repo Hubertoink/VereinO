@@ -28,6 +28,9 @@ type BindingEdit = {
   enforceTimeRange?: number
 }
 
+const COLLAPSED_TABLE_ROWS = 5
+const TABLE_PAGE_SIZE = 10
+
 export default function EarmarksView({
   from,
   to,
@@ -49,6 +52,11 @@ export default function EarmarksView({
   const [archiveConfirm, setArchiveConfirm] = useState<Binding | null>(null)
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [tableExpanded, setTableExpanded] = useState(false)
+  const [tablePage, setTablePage] = useState(1)
+  const [compactCards, setCompactCards] = useState<boolean>(() => {
+    try { return localStorage.getItem('ui.earmarks.compactCards') === 'true' } catch { return false }
+  })
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
 
@@ -69,6 +77,10 @@ export default function EarmarksView({
   }, [showArchived])
 
   const archivedCount = useMemo(() => allBindings.filter((b) => !b.isActive).length, [allBindings])
+
+  useEffect(() => {
+    try { localStorage.setItem('ui.earmarks.compactCards', String(compactCards)) } catch {}
+  }, [compactCards])
 
   const handleSaved = async () => {
     notify('success', 'Zweckbindung gespeichert')
@@ -92,6 +104,21 @@ export default function EarmarksView({
       return parts.join(' ').toLowerCase().includes(needle)
     })
   }, [bindings, q])
+
+  const tablePageCount = Math.max(1, Math.ceil(visibleBindings.length / TABLE_PAGE_SIZE))
+  const tableRows = useMemo(() => {
+    if (!tableExpanded) return visibleBindings.slice(0, COLLAPSED_TABLE_ROWS)
+    const start = (tablePage - 1) * TABLE_PAGE_SIZE
+    return visibleBindings.slice(start, start + TABLE_PAGE_SIZE)
+  }, [tableExpanded, tablePage, visibleBindings])
+
+  useEffect(() => {
+    setTablePage(1)
+  }, [q, showArchived])
+
+  useEffect(() => {
+    if (tablePage > tablePageCount) setTablePage(tablePageCount)
+  }, [tablePage, tablePageCount])
 
   async function doArchive(b: Binding) {
     const nextActive = !b.isActive
@@ -145,6 +172,10 @@ export default function EarmarksView({
             placeholder="Suche (Code, Name, Zeitraum, Beschreibung)"
             style={{ flex: 1, minWidth: 260 }}
           />
+          <div className="btn-group" role="group" aria-label="Kartenansicht">
+            <button type="button" className={`btn-option ${!compactCards ? 'active' : ''}`} onClick={() => setCompactCards(false)}>Detail</button>
+            <button type="button" className={`btn-option ${compactCards ? 'active' : ''}`} onClick={() => setCompactCards(true)}>Kompakt</button>
+          </div>
           <div className="helper">{visibleBindings.length} von {bindings.length}</div>
         </div>
 
@@ -161,7 +192,7 @@ export default function EarmarksView({
             </tr>
           </thead>
           <tbody>
-            {visibleBindings.map((b) => (
+            {tableRows.map((b) => (
               <tr key={b.id} style={!b.isActive ? { opacity: 0.5 } : undefined}>
                 <td>{b.code}</td>
                 <td>{b.name}{!b.isActive ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-dim)' }}>(archiviert)</span> : null}</td>
@@ -232,6 +263,51 @@ export default function EarmarksView({
           </tbody>
         </table>
 
+        {visibleBindings.length > COLLAPSED_TABLE_ROWS && (
+          <div className="pagination-bar management-table-bar">
+            <div className="pagination-bar__info">
+              <div className="pagination-bar__stat">
+                <span>Sichtbar:</span>
+                <span className="pagination-bar__stat-value">
+                  {tableExpanded
+                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, visibleBindings.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, visibleBindings.length)} von ${visibleBindings.length}`
+                    : `${Math.min(COLLAPSED_TABLE_ROWS, visibleBindings.length)} von ${visibleBindings.length}`}
+                </span>
+              </div>
+              {tableExpanded && (
+                <>
+                  <div className="pagination-bar__divider" />
+                  <div className="pagination-bar__stat">
+                    <span>Seite:</span>
+                    <span className="pagination-bar__stat-value">{tablePage} / {tablePageCount}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="pagination-bar__controls">
+              {tableExpanded && (
+                <>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste">«</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück">‹</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter">›</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte">»</button>
+                </>
+              )}
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  setTableExpanded((expanded) => !expanded)
+                  setTablePage(1)
+                }}
+                aria-expanded={tableExpanded}
+              >
+                {tableExpanded ? 'Einklappen' : 'Alle anzeigen'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {editBinding && (
           <BindingModal value={editBinding} onClose={() => setEditBinding(null)} onSaved={handleSaved} />
         )}
@@ -243,6 +319,7 @@ export default function EarmarksView({
         from={from}
         to={to}
         sphere={filterSphere}
+        compact={compactCards}
         onEdit={(b: any) =>
           setEditBinding({
             id: b.id,

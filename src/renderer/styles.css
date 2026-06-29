@@ -527,12 +527,12 @@ label.settings-toggle-card {
     padding: 6px 14px;
     font-size: 13px;
     font-weight: 500;
-    background: color-mix(in oklab, var(--muted) 40%, transparent);
-    color: var(--text-dim);
-    border: none;
+    background: color-mix(in oklab, var(--surface) 84%, var(--text) 4%);
+    color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+    border: 1px solid color-mix(in oklab, var(--border) 85%, var(--text) 15%);
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .btn-group .btn-option:not(:last-child) {
@@ -540,14 +540,20 @@ label.settings-toggle-card {
 }
 
 .btn-group .btn-option:hover {
-    background: color-mix(in oklab, var(--muted) 70%, transparent);
+    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
     color: var(--text);
+    border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
 }
 
 .btn-group .btn-option.active {
     background: var(--accent);
     color: #0B0E14;
+    border-color: color-mix(in oklab, var(--accent) 70%, var(--border));
     font-weight: 600;
+}
+
+:root[data-color-theme="vintage-charm"] .btn-group .btn-option.active {
+    color: #fff;
 }
 .swatches { display: flex; gap: 8px; margin-top: 8px; }
 .swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); }
@@ -2325,6 +2331,29 @@ tbody tr:nth-child(even):hover {
     border-right-width: 1px;
 }
 
+.journal-header-menu {
+    display: grid;
+    gap: 6px;
+}
+
+.journal-header-menu__title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    padding: 2px 4px 4px;
+}
+
+.journal-header-menu__item {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 8px 10px;
+}
+
+.journal-header-menu__hint {
+    padding: 2px 4px 0;
+}
+
 /* Brutto colorization in journal table */
 td.gross-in {
     color: var(--success-strong);
@@ -4083,6 +4112,106 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 11px;
 }
 
+/* Compact budget / earmark overview cards */
+.budget-compact-card {
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+    border: 1px solid color-mix(in oklab, var(--tile-color, var(--accent)) 44%, var(--border));
+    border-left: 4px solid var(--tile-color, var(--accent));
+    background:
+        linear-gradient(180deg, color-mix(in oklab, var(--tile-color, var(--accent)) 8%, transparent), transparent 45%),
+        color-mix(in oklab, var(--surface) 92%, transparent);
+}
+
+.budget-compact-card__head,
+.budget-compact-card__meta,
+.budget-compact-card__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.budget-compact-card__code {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: color-mix(in oklab, var(--tile-color, var(--accent)) 22%, var(--surface));
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.budget-compact-card__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 1.2;
+}
+
+.budget-compact-card__amounts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.budget-compact-card__amounts > div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.budget-compact-card__amounts span,
+.budget-compact-card__meta {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.budget-compact-card__amounts strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.budget-compact-card__progress {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--muted) 72%, transparent);
+}
+
+.budget-compact-card__progress > span {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: inherit;
+}
+
+.budget-compact-card__meta {
+    min-height: 14px;
+    overflow: hidden;
+}
+
+.budget-compact-card__meta span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.budget-compact-card__actions .btn {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
 /* Earmark (Zweckbindung) badges - compact, with icon and hover effect */
 .badge-earmark {
     display: inline-flex;
@@ -5792,6 +5921,37 @@ label .req-asterisk {
         overflow: hidden;
     }
 
+    .dashboard-chart-stack {
+        display: grid;
+        gap: 12px;
+    }
+
+    .dashboard-chart-pair,
+    .dashboard-chart-secondary-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .dashboard-chart-secondary-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .dashboard-chart-pair .chart-card-overflow .chart-overflow-container {
+        max-width: 1120px;
+        margin-inline: auto;
+    }
+
+    @media (min-width: 1440px) {
+        .dashboard-chart-pair {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: stretch;
+        }
+
+        .dashboard-chart-pair .chart-card-overflow .chart-overflow-container {
+            max-width: 760px;
+        }
+    }
+
     /* Helper with top margin */
     .helper-mt-6 {
         margin-top: 6px;
@@ -5929,6 +6089,9 @@ label .req-asterisk {
                 text-align: right;
                 font-weight: 600;
             }
+
+            .text-success { color: var(--success); }
+            .text-danger { color: var(--danger); }
 
         /* ============================================
            QuickAddModal Utility Classes
@@ -7097,6 +7260,7 @@ html[data-glass-modals="true"] .flyout-arrow {
     border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
+    background: color-mix(in oklab, var(--surface) 78%, var(--text) 4%);
 }
 
 .toggle-button {
@@ -7106,12 +7270,13 @@ html[data-glass-modals="true"] .flyout-arrow {
     justify-content: center;
     gap: 6px;
     padding: 8px 12px;
-    background: transparent;
+    background: color-mix(in oklab, var(--surface) 82%, var(--text) 4%);
     border: none;
-    color: var(--muted);
+    color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
     cursor: pointer;
     font-size: 13px;
     transition: all 0.15s ease;
+    opacity: 1;
 }
 
 .toggle-button:not(:last-child) {
@@ -7119,14 +7284,44 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .toggle-button:hover {
-    background: color-mix(in oklab, var(--accent) 10%, transparent);
+    background: color-mix(in oklab, var(--accent) 14%, var(--surface));
     color: var(--text);
 }
 
 .toggle-button.active {
     background: var(--accent);
-    color: var(--bg);
+    color: #0B0E14;
     font-weight: 500;
+}
+
+:root[data-color-theme="vintage-charm"] .toggle-button.active {
+    color: #fff;
+}
+
+.setup-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.setup-summary-grid > div {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--border) 82%, var(--text) 10%);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, var(--surface) 84%, var(--text) 4%);
+}
+
+.setup-summary-grid span {
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.setup-summary-grid strong {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .toggle-icon {
@@ -9145,6 +9340,16 @@ html[data-glass-modals="true"] .flyout-arrow {
 
 .pagination-bar__page strong {
     color: var(--text);
+}
+
+.management-table-bar {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    background: color-mix(in oklab, var(--surface) 72%, transparent);
+}
+
+.management-table-bar .btn {
+    min-height: 30px;
 }
 
 /* ==========================

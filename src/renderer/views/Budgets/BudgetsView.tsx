@@ -38,6 +38,9 @@ type BudgetEdit = {
   enforceTimeRange?: number
 }
 
+const COLLAPSED_TABLE_ROWS = 5
+const TABLE_PAGE_SIZE = 10
+
 export default function BudgetsView({
   onGoToBookings,
   notify
@@ -51,6 +54,11 @@ export default function BudgetsView({
   const [archiveConfirm, setArchiveConfirm] = useState<Budget | null>(null)
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [tableExpanded, setTableExpanded] = useState(false)
+  const [tablePage, setTablePage] = useState(1)
+  const [compactCards, setCompactCards] = useState<boolean>(() => {
+    try { return localStorage.getItem('ui.budgets.compactCards') === 'true' } catch { return false }
+  })
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
 
@@ -73,6 +81,10 @@ export default function BudgetsView({
 
   const archivedCount = useMemo(() => allBudgets.filter((b) => b.isArchived).length, [allBudgets])
 
+  useEffect(() => {
+    try { localStorage.setItem('ui.budgets.compactCards', String(compactCards)) } catch {}
+  }, [compactCards])
+
   const handleSaved = async () => {
     notify('success', 'Budget gespeichert')
     await loadBudgets()
@@ -94,6 +106,21 @@ export default function BudgetsView({
       return parts.join(' ').toLowerCase().includes(needle)
     })
   }, [budgets, q])
+
+  const tablePageCount = Math.max(1, Math.ceil(visibleBudgets.length / TABLE_PAGE_SIZE))
+  const tableRows = useMemo(() => {
+    if (!tableExpanded) return visibleBudgets.slice(0, COLLAPSED_TABLE_ROWS)
+    const start = (tablePage - 1) * TABLE_PAGE_SIZE
+    return visibleBudgets.slice(start, start + TABLE_PAGE_SIZE)
+  }, [tableExpanded, tablePage, visibleBudgets])
+
+  useEffect(() => {
+    setTablePage(1)
+  }, [q, showArchived])
+
+  useEffect(() => {
+    if (tablePage > tablePageCount) setTablePage(tablePageCount)
+  }, [tablePage, tablePageCount])
 
   async function doArchive(b: Budget) {
     const nextArchived = !b.isArchived
@@ -151,6 +178,10 @@ export default function BudgetsView({
             placeholder="Suche (Name, Kategorie, Projekt, Jahr, Zeitraum)"
             style={{ flex: 1, minWidth: 260 }}
           />
+          <div className="btn-group" role="group" aria-label="Kartenansicht">
+            <button type="button" className={`btn-option ${!compactCards ? 'active' : ''}`} onClick={() => setCompactCards(false)}>Detail</button>
+            <button type="button" className={`btn-option ${compactCards ? 'active' : ''}`} onClick={() => setCompactCards(true)}>Kompakt</button>
+          </div>
           <div className="helper">{visibleBudgets.length} von {budgets.length}</div>
         </div>
 
@@ -169,7 +200,7 @@ export default function BudgetsView({
             </tr>
           </thead>
           <tbody>
-            {visibleBudgets.map((b) => (
+            {tableRows.map((b) => (
               <tr key={b.id} style={b.isArchived ? { opacity: 0.5 } : undefined}>
                 <td>{b.year}</td>
                 <td>{b.name ?? '—'}{b.isArchived ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-dim)' }}>(archiviert)</span> : null}</td>
@@ -244,12 +275,58 @@ export default function BudgetsView({
             )}
           </tbody>
         </table>
+
+        {visibleBudgets.length > COLLAPSED_TABLE_ROWS && (
+          <div className="pagination-bar management-table-bar">
+            <div className="pagination-bar__info">
+              <div className="pagination-bar__stat">
+                <span>Sichtbar:</span>
+                <span className="pagination-bar__stat-value">
+                  {tableExpanded
+                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, visibleBudgets.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, visibleBudgets.length)} von ${visibleBudgets.length}`
+                    : `${Math.min(COLLAPSED_TABLE_ROWS, visibleBudgets.length)} von ${visibleBudgets.length}`}
+                </span>
+              </div>
+              {tableExpanded && (
+                <>
+                  <div className="pagination-bar__divider" />
+                  <div className="pagination-bar__stat">
+                    <span>Seite:</span>
+                    <span className="pagination-bar__stat-value">{tablePage} / {tablePageCount}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="pagination-bar__controls">
+              {tableExpanded && (
+                <>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste">«</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück">‹</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter">›</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte">»</button>
+                </>
+              )}
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  setTableExpanded((expanded) => !expanded)
+                  setTablePage(1)
+                }}
+                aria-expanded={tableExpanded}
+              >
+                {tableExpanded ? 'Einklappen' : 'Alle anzeigen'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Budget Tiles */}
       <BudgetTiles
         budgets={visibleBudgets}
         eurFmt={eurFmt}
+        compact={compactCards}
         onEdit={(b) =>
           setEditBudget({
             id: b.id,

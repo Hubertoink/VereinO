@@ -40,6 +40,7 @@ Diese Punkte zuerst prüfen. Bei einem Fehler den ausführlichen Test abbrechen.
 ## 2. Start, Fenster und Navigation
 
 - [ ] Setup-Assistent funktioniert bei einer neuen/leeren Installation.
+- [ ] Setup-Assistent zeigt Organisation, Darstellung, Workflow, Buchungsansicht, Tags und Backup als eigene Schritte.
 - [ ] Minimieren, Maximieren, Wiederherstellen und Schließen funktionieren.
 - [ ] Fenstergröße und Position werden sinnvoll wiederhergestellt.
 - [ ] Ein Fenster außerhalb eines nicht mehr vorhandenen Monitors wird sichtbar geöffnet.
@@ -187,6 +188,8 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Verbrauch, Zufluss und Restbetrag stimmen mit Testbuchungen überein.
 - [ ] Budgetdetail zeigt die zugehörigen Buchungen.
 - [ ] Klick aus Budgetdetail springt korrekt ins Journal.
+- [ ] Budgetkarten lassen sich zwischen Detail- und Kompaktansicht umschalten; Auswahl bleibt nach Neustart erhalten.
+- [ ] Budgettabelle zeigt eingeklappt maximal fünf Einträge und aufgeklappt 10er-Pagination.
 - [ ] Zeitraumprüfung lässt sich aktivieren/deaktivieren.
 - [ ] Löschen eines unbenutzten Budgets funktioniert.
 - [ ] Löschen eines benutzten Budgets warnt oder wird blockiert.
@@ -199,6 +202,8 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Einnahmen erhöhen und Ausgaben vermindern den verfügbaren Rahmen korrekt.
 - [ ] Überziehungsschutz zeigt die erwartete Warnung beziehungsweise Blockierung.
 - [ ] Detailansicht und Sprung ins Journal funktionieren.
+- [ ] Zweckbindungskarten lassen sich zwischen Detail- und Kompaktansicht umschalten; Auswahl bleibt nach Neustart erhalten.
+- [ ] Zweckbindungstabelle zeigt eingeklappt maximal fünf Einträge und aufgeklappt 10er-Pagination.
 - [ ] Zeitraumprüfung lässt sich aktivieren/deaktivieren.
 - [ ] Löschen einer unbenutzten Zweckbindung funktioniert.
 - [ ] Benutzte Zweckbindung bleibt historisch auflösbar.
@@ -318,6 +323,7 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 ### Bankimport
 
 - [ ] `Bankimport` erscheint in der Hauptnavigation neben Buchungen und Verbindlichkeiten.
+- [ ] Wenn offene Bankbelege vorhanden sind, zeigt der Menüpunkt `Bankimport` einen Zahlenbadge mit der Anzahl offener Bankbelege.
 - [ ] CAMT.052/053 erkennt Konto-IBAN, Datum, Richtung, Betrag, Gegenpartei und Verwendungszweck.
 - [ ] CSV erkennt Semikolon/Komma, deutsche Beträge und erlaubt die Spaltenzuordnung vor dem Import.
 - [ ] Ein Import ohne aktives Zahlkonto oder mit Nicht-EUR-Zeilen wird verständlich abgewiesen.
@@ -371,6 +377,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] Darstellung: jedes Theme, Hintergrundbild und Glasmodus prüfen.
 - [ ] Menüführung, Iconfarben, Zeilenstil und Dichte prüfen.
 - [ ] Verhalten für Buchungsentwürfe, Bearbeitungstabs und Löschen/Stornieren prüfen.
+- [ ] Setup erneut öffnen und prüfen, dass Darstellung, Datumsformat, Workflow-Optionen und Backupmodus sichtbar sind.
 - [ ] Datumsformat ISO/lesbar auf mehreren Seiten prüfen.
 - [ ] Tabellen-Spalten und Reihenfolge speichern.
 - [ ] Organisation: Name, Anschrift, Kassierer, Logo und Berichtsdaten speichern.
