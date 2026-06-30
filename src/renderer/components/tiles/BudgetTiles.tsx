@@ -45,6 +45,12 @@ export interface BudgetTileBudget {
 export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, compact = false }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void; compact?: boolean }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
+  const formatRange = (start?: string | null, end?: string | null) => {
+    if (start && end) return `${fmtDate(start)} – ${fmtDate(end)}`
+    if (start) return `ab ${fmtDate(start)}`
+    if (end) return `bis ${fmtDate(end)}`
+    return null
+  }
   
   useEffect(() => {
     let alive = true
@@ -85,7 +91,9 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
           const title = (b.name && b.name.trim()) || b.categoryName || b.projectName || `Budget ${b.year}`
           const startDate = b.startDate ?? usage[b.id]?.startDate ?? null
           const endDate = b.endDate ?? usage[b.id]?.endDate ?? null
+          const dateRange = formatRange(startDate, endDate)
           const totalCount = (usage[b.id]?.countInside ?? 0) + (usage[b.id]?.countOutside ?? 0)
+          const hasBudget = plan > 0
           
           const isArchived = !!(b as any).isArchived
 
@@ -113,16 +121,30 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
                   )}
                 </div>
                 <strong className="budget-compact-card__title" title={title}>{title}</strong>
-                <div className="budget-compact-card__amounts">
-                  <div><span>Budget</span><strong>{eurFmt.format(plan)}</strong></div>
-                  <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{eurFmt.format(remaining)}</strong></div>
-                  <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                <div
+                  className="budget-compact-card__amounts"
+                  style={{ gridTemplateColumns: hasBudget ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}
+                >
+                  {hasBudget ? (
+                    <>
+                      <div><span>Budget</span><strong>{eurFmt.format(plan)}</strong></div>
+                      <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{eurFmt.format(remaining)}</strong></div>
+                      <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                    </>
+                  ) : (
+                    <>
+                      <div><span>Einnahmen</span><strong className="text-success">{eurFmt.format(inflow)}</strong></div>
+                      <div><span>Ausgaben</span><strong className="text-danger">{eurFmt.format(spent)}</strong></div>
+                    </>
+                  )}
                 </div>
-                <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
-                  <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
-                </div>
+                {hasBudget && (
+                  <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
+                    <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+                  </div>
+                )}
                 <div className="budget-compact-card__meta">
-                  <span>{fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                  {dateRange && <span>{dateRange}</span>}
                   {totalCount > 0 && <span>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>}
                 </div>
                 <div className="budget-compact-card__actions">
@@ -184,10 +206,14 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
 
                 {/* Budget & Remaining */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Budget</div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{eurFmt.format(plan)}</div>
-                  </div>
+                  {hasBudget ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Budget</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{eurFmt.format(plan)}</div>
+                    </div>
+                  ) : (
+                    <div />
+                  )}
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Verfügbar</div>
                     <div style={{ fontSize: 18, fontWeight: 700, color: remaining >= 0 ? '#66bb6a' : '#ef5350' }}>
@@ -219,8 +245,8 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
 
                 {/* Meta Info */}
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
-                  {(startDate || endDate) && (
-                    <span>🗓️ {fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                  {dateRange && (
+                    <span>🗓️ {dateRange}</span>
                   )}
                   {totalCount > 0 && (
                     <span>📄 {totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>

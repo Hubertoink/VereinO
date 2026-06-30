@@ -537,16 +537,33 @@ function DashboardRecentActivity({
     const a = String(row.action || '').toUpperCase()
     const e = String(row.entity || '').toUpperCase()
     const d = row.diff || {}
+    const voucherLabel = row.voucherNo ? `#${row.voucherNo}` : (row.voucherId ? `#${row.voucherId}` : '')
+    const voucherText = row.voucherDescription ? ` · ${String(row.voucherDescription).trim()}` : ''
+    const bankLine = [row.bankCounterparty, row.bankPurpose].map((value: any) => String(value || '').trim()).filter(Boolean).join(' · ')
+    const formatBudgetLabel = (id: any) => {
+      if (!id) return '—'
+      const b = budgets.find(bu => bu.id === Number(id))
+      return b ? (b.name || `Budget ${b.year}`) : `#${id}`
+    }
+    const formatEarmarkLabel = (id: any) => {
+      if (!id) return '—'
+      const em = earmarks.find(item => item.id === Number(id))
+      return em ? `${em.code}${em.name ? ` · ${em.name}` : ''}` : `#${id}`
+    }
+    const summarizeAssignments = (items: any[] | undefined, formatter: (id: any) => string, key: 'budgetId' | 'earmarkId') => {
+      if (!Array.isArray(items) || items.length === 0) return '—'
+      return items.map((item) => formatter(item?.[key])).filter(Boolean).join(', ')
+    }
     
     // Handle batch assignments (robust to missing fields/casing)
     if (a === 'BATCH_ASSIGN_EARMARK') {
       const count = Number(d?.count || 0)
-      const earmarkLabel = d?.earmarkId ? `#${d.earmarkId}` : 'Zweckbindung'
+      const earmarkLabel = d?.earmarkName ? `${d.earmarkCode || ''}${d.earmarkCode ? ' · ' : ''}${d.earmarkName}` : (d?.earmarkId ? formatEarmarkLabel(d.earmarkId) : 'Zweckbindung')
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Zweckbindung: ${earmarkLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_BUDGET') {
       const count = Number(d?.count || 0)
-      const budgetLabel = d?.budgetId ? `#${d.budgetId}` : 'Budget'
+      const budgetLabel = d?.budgetName ? `${d.budgetName}${d?.budgetYear ? ` (${d.budgetYear})` : ''}` : (d?.budgetId ? formatBudgetLabel(d.budgetId) : 'Budget')
       return { title: `Batchzuweisung: ${count} Buchung(en)`, details: `Budget: ${budgetLabel}`.trim(), tone: 'ok' }
     }
     if (a === 'BATCH_ASSIGN_TAGS') {
@@ -590,17 +607,9 @@ function DashboardRecentActivity({
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
         add('sphere', d.before?.sphere, d.after?.sphere)
         // Zweckbindung: Code anzeigen statt ID
-        add('earmarkId', d.before?.earmarkId, d.after?.earmarkId, (id: any) => {
-          if (!id) return '—'
-          const em = earmarks.find(e => e.id === Number(id))
-          return em ? `${em.code}` : `#${id}`
-        })
+        add('earmarkId', d.before?.earmarkId, d.after?.earmarkId, formatEarmarkLabel)
         // Budget: Name anzeigen statt ID
-        add('budgetId', d.before?.budgetId, d.after?.budgetId, (id: any) => {
-          if (!id) return '—'
-          const b = budgets.find(bu => bu.id === Number(id))
-          return b ? (b.name || `${b.year}`) : `#${id}`
-        })
+        add('budgetId', d.before?.budgetId, d.after?.budgetId, formatBudgetLabel)
         // Tags
         const tagsBefore = Array.isArray(d.before?.tags) ? d.before.tags : []
         const tagsAfter = Array.isArray(d.after?.tags) ? d.after.tags : (Array.isArray(ch.tags) ? ch.tags : [])
@@ -610,6 +619,28 @@ function DashboardRecentActivity({
         if (removedTags.length) changes.push(`Tags entfernt: ${removedTags.join(', ')}`)
         if (!changes.length) changes.push('Keine relevanten Änderungen')
         return { title: `Beleg #${row.entityId} geändert`, details: changes.slice(0,3).join(' · '), tone: 'ok' }
+      }
+      if (a === 'UPDATE_META') {
+        const changes: string[] = []
+        const beforeBudget = summarizeAssignments(d.before?.budgets, formatBudgetLabel, 'budgetId')
+        const afterBudget = summarizeAssignments(d.after?.budgets, formatBudgetLabel, 'budgetId')
+        const beforeEarmark = summarizeAssignments(d.before?.earmarks, formatEarmarkLabel, 'earmarkId')
+        const afterEarmark = summarizeAssignments(d.after?.earmarks, formatEarmarkLabel, 'earmarkId')
+        const beforeTags = Array.isArray(d.before?.tags) ? d.before.tags : []
+        const afterTags = Array.isArray(d.after?.tags) ? d.after.tags : []
+        if (beforeBudget !== afterBudget) changes.push(`Budget: ${afterBudget}`)
+        if (beforeEarmark !== afterEarmark) changes.push(`Zweckbindung: ${afterEarmark}`)
+        if (JSON.stringify(beforeTags) !== JSON.stringify(afterTags)) changes.push(`Tags: ${afterTags.length ? afterTags.join(', ') : '—'}`)
+        if (!changes.length) {
+          if (d.after?.budgetId !== undefined || d.before?.budgetId !== undefined) changes.push(`Budget: ${formatBudgetLabel(d.after?.budgetId)}`)
+          if (d.after?.earmarkId !== undefined || d.before?.earmarkId !== undefined) changes.push(`Zweckbindung: ${formatEarmarkLabel(d.after?.earmarkId)}`)
+        }
+        const desc = String(d.after?.description || d.before?.description || '').trim()
+        return {
+          title: `Zuordnung für Beleg #${row.entityId} aktualisiert${desc ? ` · ${desc.slice(0, 60)}` : ''}`,
+          details: changes.slice(0, 3).join(' · ') || 'Metadaten angepasst',
+          tone: 'ok'
+        }
       }
       if (a === 'DELETE') {
         const s = d.snapshot || {}
@@ -622,8 +653,32 @@ function DashboardRecentActivity({
         return { title: `Alle Belege gelöscht`, details: `${d.deleted || 0} Einträge entfernt`, tone: 'err' }
       }
     }
+    if (e === 'BANK_TRANSACTIONS' || e === 'BANK_TRANSACTION') {
+      const accountLabel = row.bankPaymentAccountName ? ` · ${row.bankPaymentAccountName}` : ''
+      const bankDetails = bankLine || 'Bankumsatz'
+      if (a === 'LINK') {
+        const origin = String(d?.origin || '').toUpperCase()
+        const title = origin === 'CREATED'
+          ? `Beleg aus Bankumsatz erstellt${voucherLabel ? ` (${voucherLabel})` : ''}${voucherText}`
+          : `Bankumsatz mit Beleg verknüpft${voucherLabel ? ` (${voucherLabel})` : ''}${voucherText}`
+        return { title, details: `${bankDetails}${accountLabel}`, tone: 'ok' }
+      }
+      if (a === 'REOPEN') {
+        return { title: 'Bankumsatz wieder geöffnet', details: `${bankDetails}${accountLabel}`, tone: 'warn' }
+      }
+      if (a === 'CHECK') {
+        return { title: 'Bankumsatz als geprüft markiert', details: d?.note ? `${bankDetails} · ${d.note}` : `${bankDetails}${accountLabel}`, tone: 'ok' }
+      }
+    }
     if (e === 'IMPORTS' && a === 'EXECUTE') {
       return { title: `Import ausgeführt (${d.format || 'Datei'})`, details: `importiert ${d.imported || 0}, übersprungen ${d.skipped || 0}, Fehler ${d.errorCount || 0}` }
+    }
+    if (e === 'BANK_IMPORTS' && a === 'EXECUTE') {
+      return {
+        title: `Bankimport ausgeführt${d?.fileName ? ` · ${String(d.fileName).slice(0, 40)}` : ''}`,
+        details: `Importiert ${d.imported || 0} · Duplikate ${d.duplicates || 0} · Fehler ${d.errorCount || 0}`,
+        tone: 'ok'
+      }
     }
     // Fallback
     return { title: `${a} ${e} #${row.entityId || ''}`.trim(), details: '' }
@@ -633,7 +688,7 @@ function DashboardRecentActivity({
     const a = String(kind || '').toUpperCase()
     const common = { width: 16, height: 16, viewBox: '0 0 24 24' } as any
     // Dedicated icon for batch assignments
-    if (a.startsWith('BATCH_ASSIGN')) {
+    if (a.startsWith('BATCH_ASSIGN') || a === 'UPDATE_META') {
       return (
         <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="Batchzuweisung">
           {/* Stacked squares to indicate multiple items */}
@@ -670,6 +725,29 @@ function DashboardRecentActivity({
         </svg>
       )
     }
+    if (a === 'LINK') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="verknüpft">
+          <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" />
+          <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 1 0 7.07 7.07L13 19" />
+        </svg>
+      )
+    }
+    if (a === 'REOPEN') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="wieder geöffnet">
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 3v6h6" />
+        </svg>
+      )
+    }
+    if (a === 'EXECUTE') {
+      return (
+        <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-label="ausgeführt">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      )
+    }
     // default dot
     return (
       <svg {...common} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -696,7 +774,9 @@ function DashboardRecentActivity({
           const recDateRaw = r.recordDate ? String(r.recordDate).slice(0, 10) : null
           const color = info.tone === 'err' ? 'var(--danger)' : info.tone === 'warn' ? '#f9a825' : 'var(--accent)'
           const isVoucherEntity = (String(r.entity || '').toUpperCase() === 'VOUCHERS' || String(r.entity || '').toUpperCase() === 'VOUCHER')
-          const canGoToVoucher = !!onGoToVoucher && isVoucherEntity && Number(r.entityId) > 0 && String(r.action || '').toUpperCase() !== 'DELETE'
+          const linkedVoucherId = Number(r.voucherId || r.diff?.voucherId || 0)
+          const voucherIdTarget = isVoucherEntity ? Number(r.entityId) : linkedVoucherId
+          const canGoToVoucher = !!onGoToVoucher && voucherIdTarget > 0 && String(r.action || '').toUpperCase() !== 'DELETE'
           return (
             <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'baseline' }}>
               <div className="helper" style={{ whiteSpace: 'nowrap' }}>{tsAct}</div>
@@ -715,7 +795,7 @@ function DashboardRecentActivity({
                         className="btn ghost icon-btn"
                         title="Zum Beleg"
                         aria-label="Zum Beleg"
-                        onClick={() => onGoToVoucher?.({ voucherId: Number(r.entityId), recordDate: recDateRaw })}
+                        onClick={() => onGoToVoucher?.({ voucherId: voucherIdTarget, recordDate: recDateRaw })}
                       >
                         ↗
                       </button>

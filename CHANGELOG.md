@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.4] - 2026-06-30
+
+### Geändert
+
+- Budgets und Zweckbindungen: Kompaktkarten blenden leere Budgets und Zeiträume sauber aus und zeigen ohne Budget stattdessen Einnahmen/Ausgaben bzw. Zugewiesen/Verbraucht.
+- Dashboard: Letzte Aktivitäten beschreiben Budget-/Zweckbindungszuweisungen und Bankverknüpfungen deutlich verständlicher, inklusive passender Icons und direkter Belegsprünge bei verknüpften Bankumsätzen.
+
 ## [2.3.3] - 2026-06-29
 
 ### Hinzugefügt

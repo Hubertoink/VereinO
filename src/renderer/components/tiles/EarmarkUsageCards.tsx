@@ -58,6 +58,12 @@ export interface EarmarkUsageCardsProps {
 export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, onGoToBookings, compact = false }: EarmarkUsageCardsProps) {
   const [usage, setUsage] = useState<Record<number, { allocated: number; released: number; balance: number; budget: number; remaining: number; totalCount?: number; insideCount?: number; outsideCount?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
+  const formatRange = (start?: string | null, end?: string | null) => {
+    if (start && end) return `${fmtDate(start)} – ${fmtDate(end)}`
+    if (start) return `ab ${fmtDate(start)}`
+    if (end) return `bis ${fmtDate(end)}`
+    return null
+  }
   
   useEffect(() => {
     let alive = true
@@ -94,7 +100,9 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
         const status = getStatusColor(pct)
         const startDate = b.startDate ?? u?.startDate ?? null
         const endDate = b.endDate ?? u?.endDate ?? null
+        const dateRange = formatRange(startDate, endDate)
         const totalCount = u?.totalCount as number | undefined
+        const hasBudget = budget > 0
         
         const isArchived = b.isActive === 0 || b.isActive === false
 
@@ -115,16 +123,30 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                 {!!b.enforceTimeRange && <span title="Strikter Zeitraum aktiv">{renderLockIcon('currentColor')}</span>}
               </div>
               <strong className="budget-compact-card__title" title={b.name}>{b.name}</strong>
-              <div className="budget-compact-card__amounts">
-                <div><span>Budget</span><strong>{fmt.format(budget)}</strong></div>
-                <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{fmt.format(remaining)}</strong></div>
-                <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+              <div
+                className="budget-compact-card__amounts"
+                style={{ gridTemplateColumns: hasBudget ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}
+              >
+                {hasBudget ? (
+                  <>
+                    <div><span>Budget</span><strong>{fmt.format(budget)}</strong></div>
+                    <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{fmt.format(remaining)}</strong></div>
+                    <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                  </>
+                ) : (
+                  <>
+                    <div><span>Zugewiesen</span><strong className="text-success">{fmt.format(allocated)}</strong></div>
+                    <div><span>Verbraucht</span><strong className="text-danger">{fmt.format(released)}</strong></div>
+                  </>
+                )}
               </div>
-              <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
-                <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
-              </div>
+              {hasBudget && (
+                <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
+                  <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+                </div>
+              )}
               <div className="budget-compact-card__meta">
-                <span>{fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                {dateRange && <span>{dateRange}</span>}
                 {totalCount != null && totalCount > 0 && <span>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>}
               </div>
               <div className="budget-compact-card__actions">
@@ -191,10 +213,14 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
 
               {/* Budget & Remaining */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Anfangsbudget</div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{fmt.format(budget)}</div>
-                </div>
+                {hasBudget ? (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Anfangsbudget</div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>{fmt.format(budget)}</div>
+                  </div>
+                ) : (
+                  <div />
+                )}
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Saldo</div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: balance >= 0 ? '#66bb6a' : '#ef5350' }}>
@@ -232,8 +258,8 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
 
               {/* Meta Info */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
-                {(startDate || endDate) && (
-                  <span>🗓️ {fmtDate(startDate)} – {fmtDate(endDate)}</span>
+                {dateRange && (
+                  <span>🗓️ {dateRange}</span>
                 )}
                 {totalCount != null && totalCount > 0 && (
                   <span>📄 {totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>

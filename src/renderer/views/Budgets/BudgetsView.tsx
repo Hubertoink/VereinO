@@ -61,6 +61,12 @@ export default function BudgetsView({
   })
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
+  const formatRange = (start?: string | null, end?: string | null) => {
+    if (start && end) return `${fmtDate(start)} – ${fmtDate(end)}`
+    if (start) return `ab ${fmtDate(start)}`
+    if (end) return `bis ${fmtDate(end)}`
+    return '—'
+  }
 
   async function loadBudgets() {
     // Always load all to know archive count
@@ -206,9 +212,7 @@ export default function BudgetsView({
                 <td>{b.name ?? '—'}{b.isArchived ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-dim)' }}>(archiviert)</span> : null}</td>
                 <td>{b.categoryName ?? '—'}</td>
                 <td>{b.projectName ?? '—'}</td>
-                <td>
-                  {fmtDate(b.startDate)} – {fmtDate(b.endDate)}
-                </td>
+                <td>{formatRange(b.startDate, b.endDate)}</td>
                 <td>
                   {b.color ? (
                     <span
@@ -225,7 +229,7 @@ export default function BudgetsView({
                     '—'
                   )}
                 </td>
-                <td align="right">{eurFmt.format(b.amountPlanned)}</td>
+                <td align="right">{b.amountPlanned > 0 ? eurFmt.format(b.amountPlanned) : '—'}</td>
                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
                   <button
                     className="btn"

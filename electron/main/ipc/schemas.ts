@@ -1560,6 +1560,15 @@ export const AuditRecentOutput = z.object({
         action: z.string(),
         createdAt: z.string(),
         recordDate: z.string().nullable().optional(),
+        voucherId: z.number().nullable().optional(),
+        voucherNo: z.number().nullable().optional(),
+        voucherDescription: z.string().nullable().optional(),
+        bankBookingDate: z.string().nullable().optional(),
+        bankAmount: z.number().nullable().optional(),
+        bankDirection: z.string().nullable().optional(),
+        bankCounterparty: z.string().nullable().optional(),
+        bankPurpose: z.string().nullable().optional(),
+        bankPaymentAccountName: z.string().nullable().optional(),
         diff: z.any().nullable().optional()
     }))
 })
