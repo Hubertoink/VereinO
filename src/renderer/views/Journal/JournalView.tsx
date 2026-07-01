@@ -1122,6 +1122,7 @@ export default function JournalView({
                 from={activeFrom || undefined}
                 to={activeTo || undefined}
                 paymentMethod={activeFilterPM || undefined}
+                paymentAccountId={activeFilterPaymentAccountId ?? undefined}
                 sphere={activeFilterSphere || undefined}
                 type={activeFilterType || undefined}
                 earmarkId={activeFilterEarmark || undefined}

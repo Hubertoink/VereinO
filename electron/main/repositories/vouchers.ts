@@ -1649,7 +1649,7 @@ export function clearAllVouchers() {
     })
 }
 
-export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number }) {
+export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number; paymentAccountId?: number | null }) {
     const d = getDb()
     const to = params.to ?? new Date().toISOString().slice(0, 10)
     // Wenn 'from' übergeben wird, nutze es; sonst gesamter Zeitraum (kein Untergrenze)
@@ -1660,6 +1660,11 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
     if (params.sphere) { wh.push('v.sphere = @sphere'); bind.sphere = params.sphere }
 
     const budgetId = (typeof params.budgetId === 'number' && Number.isFinite(params.budgetId)) ? params.budgetId : undefined
+    const normalizedPaymentAccountId = params.paymentAccountId != null ? Number(params.paymentAccountId) : null
+    if (normalizedPaymentAccountId) {
+        wh.push('(v.payment_account_id = @paymentAccountId OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = @paymentAccountId OR v.transfer_to_account_id = @paymentAccountId)))')
+        bind.paymentAccountId = normalizedPaymentAccountId
+    }
 
     let joinSql = ''
     let grossExpr = 'v.gross_amount'

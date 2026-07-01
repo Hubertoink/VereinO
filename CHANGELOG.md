@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.5] - 2026-07-01
+
+### Behoben
+
+- Buchungsjournal: Die Zusammenfassung für Einnahmen, Ausgaben und Überschuss/Defizit wird bei Zahlweg- und Kontofiltern jetzt korrekt neu berechnet.
+
 ## [2.3.4] - 2026-06-30
 
 ### Geändert

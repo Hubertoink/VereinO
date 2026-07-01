@@ -346,7 +346,8 @@ export const ReportsCashBalanceInput = z.object({
     from: z.string().optional(),
     to: z.string().optional(),
     sphere: Sphere.optional(),
-    budgetId: z.number().optional()
+    budgetId: z.number().optional(),
+    paymentAccountId: z.number().nullable().optional()
 })
 export const ReportsCashBalanceOutput = z.object({
     BAR: z.number(),

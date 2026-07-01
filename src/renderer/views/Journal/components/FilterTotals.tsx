@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import HoverTooltip from '../../../components/common/HoverTooltip'
+import { buildFilterTotalsPayload } from '../utils/filterTotalsPayload'
 
 interface FilterTotalsProps {
     refreshKey?: number
     from?: string
     to?: string
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     earmarkId?: number
@@ -76,7 +78,7 @@ function TooltipList({
     )
 }
 
-export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag }: FilterTotalsProps) {
+export default function FilterTotals({ refreshKey, from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, budgetId, q, tag }: FilterTotalsProps) {
     const [loading, setLoading] = useState(false)
     const [values, setValues] = useState<SummaryData | null>(null)
     
@@ -92,7 +94,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                     const diff = Math.round((inflow - spent) * 100) / 100
                     if (alive) setValues({ inGross: inflow, outGross: spent, diff })
                 } else {
-                    const basePayload = { from, to, paymentMethod, sphere, type, earmarkId, q, tag }
+                    const basePayload = buildFilterTotalsPayload({ from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, q, tag })
                     const res = await window.api?.reports.summary?.(basePayload)
 
                     // When no specific type is filtered, we fetch type-specific breakdowns so the
@@ -104,7 +106,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
                         const [ir, or, cb] = await Promise.all([
                             window.api?.reports.summary?.({ ...basePayload, type: 'IN' }),
                             window.api?.reports.summary?.({ ...basePayload, type: 'OUT' }),
-                            window.api?.reports.cashBalance?.({ from, to, sphere, budgetId: undefined })
+                            window.api?.reports.cashBalance?.({ from, to, sphere, budgetId: undefined, paymentAccountId: paymentAccountId ?? undefined })
                         ])
                         inRes = ir || null
                         outRes = or || null
@@ -142,7 +144,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, sphe
         }
         run()
         return () => { alive = false }
-    }, [from, to, paymentMethod, sphere, type, earmarkId, budgetId, q, tag, refreshKey])
+    }, [from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, budgetId, q, tag, refreshKey])
     
     const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     
