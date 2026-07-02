@@ -14,14 +14,26 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
+  package:
+    name: Package ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            artifact: release-windows
+          - platform: linux
+            os: ubuntu-latest
+            artifact: release-linux
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,8 +47,28 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Package installer
+      - name: Package app
         run: npm run package -- --publish never
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*
+            !release/*-unpacked/**
+          if-no-files-found: error
+
+  build-and-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: package
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -46,10 +78,6 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'preview') }}
           files: |
-            release/VereinO-Setup-*.exe
-            release/VereinO-Setup-*.exe.blockmap
-            release/latest.yml
-            release/*.yml
-            release/win-unpacked/**
+            release-artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

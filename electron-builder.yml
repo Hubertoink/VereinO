@@ -20,6 +20,8 @@ mac:
 linux:
   target: [AppImage]
   category: Finance
+  icon: build/icon.png
+  artifactName: '${productName}-${version}-${arch}.${ext}'
 publish:
   provider: github
   owner: Hubertoink

@@ -45,21 +45,25 @@ Für den In-App-Updater reicht ein GitHub-Tag oder ein Release mit Notes allein 
 
 Wenn diese Dateien im Release fehlen, schlägt die Update-Prüfung in der installierten App mit `404 latest.yml` fehl.
 
-Verbindlicher Ablauf für Windows-Releases:
+Verbindlicher Ablauf für Windows- und Linux-Releases:
 
 1. Version in `package.json` erhöhen und Changelog vorbereiten.
-2. Commit, Tag und Push wie gewohnt erstellen.
-3. Release-Artefakte bauen: `npm run release:artifacts`
-4. Artefakte in den GitHub-Release hochladen: `npm run release:publish`
+2. Commit und Tag wie gewohnt erstellen.
+3. Git-Tag pushen: `git push origin vX.Y.Z`
+4. Der Release-Workflow baut und veröffentlicht die Artefakte automatisch.
 5. Im GitHub-Release prüfen, dass mindestens diese Assets vorhanden sind:
    - `latest.yml`
    - `VereinO-Setup-x.y.z-x64.exe`
    - `VereinO-Setup-x.y.z-x64.exe.blockmap`
+   - `latest-linux.yml`
+   - `VereinO-x.y.z-x64.AppImage`
+   - `VereinO-x.y.z-x64.AppImage.blockmap`
 
 Wichtig:
 - `gh release create` ohne anschließenden Asset-Upload ist für Auto-Updates unvollständig.
 - `latest.yml` muss zur selben Version gehören wie der Installer im Release.
 - Falls ein Release bereits existiert, aktualisiert `npm run release:publish` die Assets mit `--clobber`.
+- `npm run release:publish` ist weiterhin nur der manuelle Windows-Pfad; für Windows + Linux den GitHub-Release-Workflow verwenden.
 
 ## Kategorien
 
