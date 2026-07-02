@@ -56,8 +56,7 @@ Verbindlicher Ablauf für Windows- und Linux-Releases:
    - `VereinO-Setup-x.y.z-x64.exe`
    - `VereinO-Setup-x.y.z-x64.exe.blockmap`
    - `latest-linux.yml`
-   - `VereinO-x.y.z-x64.AppImage`
-   - `VereinO-x.y.z-x64.AppImage.blockmap`
+   - `VereinO-x.y.z-x86_64.AppImage`
 
 Wichtig:
 - `gh release create` ohne anschließenden Asset-Upload ist für Auto-Updates unvollständig.
