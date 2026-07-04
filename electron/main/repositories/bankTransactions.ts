@@ -350,6 +350,33 @@ export function listBankTransactions(input: {
   return { rows, total, page, limit, stats }
 }
 
+export function getBankImportStatus() {
+  const d = getDb()
+  const latest = d.prepare(`
+    SELECT MAX(bt.booking_date) as lastBookingDate, COUNT(*) as total
+    FROM bank_transactions bt
+  `).get() as { lastBookingDate?: string | null; total?: number } | undefined
+  const accounts = d.prepare(`
+    SELECT
+      pa.id,
+      pa.name,
+      pa.color,
+      MAX(bt.booking_date) as lastBookingDate,
+      COUNT(bt.id) as total
+    FROM payment_accounts pa
+    LEFT JOIN bank_transactions bt ON bt.payment_account_id = pa.id
+    WHERE pa.is_active = 1
+      AND pa.kind <> 'CASH'
+    GROUP BY pa.id, pa.name, pa.color
+    ORDER BY pa.sort_order ASC, pa.name COLLATE NOCASE ASC
+  `).all() as Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; total: number }>
+  return {
+    lastBookingDate: latest?.lastBookingDate ?? null,
+    total: Number(latest?.total || 0),
+    accounts
+  }
+}
+
 export function getBankTransaction(id: number) {
   const row = getDb().prepare(`${BANK_TRANSACTION_SELECT} WHERE bt.id = ?`).get(id)
   if (!row) throw new Error('Bankbeleg nicht gefunden.')

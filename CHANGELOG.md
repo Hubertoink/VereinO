@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.3.6] - 2026-07-04
+
+### Geändert
+
+- Baseline-Release vor der OpenAI-KI-Integration mit aktuellem Arbeitsstand.
+
 ## [2.3.5] - 2026-07-01
 
 ### Behoben

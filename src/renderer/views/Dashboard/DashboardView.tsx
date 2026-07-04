@@ -13,14 +13,30 @@ import SphereShareCard from './SphereShareCard'
 import type { CommonFilters } from './types'
 
 type GoToVoucherArgs = { voucherId: number; recordDate?: string | null }
+type DashboardTaskTone = 'danger' | 'warning' | 'info' | 'success'
+
+type DashboardTaskItem = {
+  key: string
+  label: string
+  value: string
+  detail: string
+  tone: DashboardTaskTone
+  onClick?: () => void
+}
 
 export default function DashboardView({
   today,
   onGoToInvoices,
+  onGoToBankImport,
+  onGoToMembers,
+  onGoToSubmissions,
   onGoToVoucher
 }: {
   today: string
   onGoToInvoices: () => void
+  onGoToBankImport?: () => void
+  onGoToMembers?: () => void
+  onGoToSubmissions?: () => void
   onGoToVoucher?: (args: GoToVoucherArgs) => void
 }) {
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
@@ -146,6 +162,10 @@ export default function DashboardView({
   const [invOverdueCount, setInvOverdueCount] = useState<number>(0)
   const [invOverdueRemaining, setInvOverdueRemaining] = useState<number>(0)
   const [invTopDue, setInvTopDue] = useState<Array<{ id: number; party: string; dueDate?: string | null; remaining: number }>>([])
+  const [bankOpenCount, setBankOpenCount] = useState(0)
+  const [bankImportReminder, setBankImportReminder] = useState<{ summary: string; detail: string } | null>(null)
+  const [dueMembershipFees, setDueMembershipFees] = useState<{ dueMembers: number; duePeriods: number }>({ dueMembers: 0, duePeriods: 0 })
+  const [pendingSubmissions, setPendingSubmissions] = useState(0)
 
   // Member statistics
   const [memberStats, setMemberStats] = useState<{ total: number; active: number; new: number; paused: number; left: number }>({ total: 0, active: 0, new: 0, paused: 0, left: 0 })
@@ -222,6 +242,138 @@ export default function DashboardView({
     return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
   }, [loadInvoiceTiles])
 
+  const loadTaskSummary = useCallback(async () => {
+    const formatDate = (value?: string | null) => {
+      if (!value) return '—'
+      const parsed = new Date(`${value}T00:00:00`)
+      return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('de-DE').format(parsed)
+    }
+    const parseLocalDate = (value?: string | null) => {
+      if (!value) return null
+      const [year, month, day] = value.split('-').map(Number)
+      if (!year || !month || !day) return null
+      const parsed = new Date(year, month - 1, day)
+      return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+    const toISODate = (value: Date) => {
+      const year = value.getFullYear()
+      const month = String(value.getMonth() + 1).padStart(2, '0')
+      const day = String(value.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    const addDays = (value: Date, days: number) => {
+      const next = new Date(value)
+      next.setDate(next.getDate() + days)
+      return next
+    }
+    const formatMonthRange = (from: Date, to: Date) => {
+      const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
+      const fromMonth = monthFmt.format(from)
+      const toMonth = monthFmt.format(to)
+      return fromMonth === toMonth ? fromMonth : `${fromMonth} bis ${toMonth}`
+    }
+
+    try {
+      const [bankList, bankStatus, memberDue, submissions] = await Promise.all([
+        (window as any).api?.bankTransactions?.list?.({ status: 'OPEN', limit: 1, page: 1 }),
+        (window as any).api?.bankTransactions?.importStatus?.(),
+        (window as any).api?.payments?.dueSummary?.(),
+        (window as any).api?.submissions?.summary?.()
+      ])
+      setBankOpenCount(bankList?.stats?.open || bankList?.total || 0)
+      setDueMembershipFees({
+        dueMembers: Number(memberDue?.dueMembers || 0),
+        duePeriods: Number(memberDue?.duePeriods || 0)
+      })
+      setPendingSubmissions(Number(submissions?.pending || 0))
+
+      const totalImports = Number(bankStatus?.total || 0)
+      const lastDate = parseLocalDate(bankStatus?.lastBookingDate || null)
+      const todayDate = parseLocalDate(String(today || '').slice(0, 10)) || new Date()
+      const previousMonthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0)
+      if (totalImports === 0) {
+        setBankImportReminder({
+          summary: 'Erster Import offen',
+          detail: 'Es wurden noch keine Bankbelege importiert.'
+        })
+      } else if (lastDate && lastDate < previousMonthEnd) {
+        const from = addDays(lastDate, 1)
+        if (from <= previousMonthEnd) {
+          setBankImportReminder({
+            summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
+            detail: `${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}`
+          })
+        } else {
+          setBankImportReminder(null)
+        }
+      } else {
+        setBankImportReminder(null)
+      }
+    } catch {
+      setBankOpenCount(0)
+      setDueMembershipFees({ dueMembers: 0, duePeriods: 0 })
+      setPendingSubmissions(0)
+      setBankImportReminder(null)
+    }
+  }, [today])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => { if (alive) await loadTaskSummary() }
+    void load()
+    const onChanged = () => { void load() }
+    window.addEventListener('data-changed', onChanged)
+    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+  }, [loadTaskSummary])
+
+  const taskItems = useMemo<DashboardTaskItem[]>(() => {
+    const items: DashboardTaskItem[] = []
+    if (bankOpenCount > 0 || bankImportReminder) {
+      items.push({
+        key: 'bank',
+        label: 'Bankimport',
+        value: bankOpenCount > 0 ? String(bankOpenCount) : '!',
+        detail: bankOpenCount > 0
+          ? `${bankOpenCount} offene Bankbelege${bankImportReminder ? ` · ${bankImportReminder.summary}` : ''}`
+          : bankImportReminder?.detail || 'Import empfohlen',
+        tone: bankOpenCount > 0 ? 'danger' : 'warning',
+        onClick: onGoToBankImport
+      })
+    }
+    if (dueMembershipFees.dueMembers > 0) {
+      items.push({
+        key: 'members',
+        label: 'Mitgliedsbeiträge',
+        value: String(dueMembershipFees.dueMembers),
+        detail: `${dueMembershipFees.duePeriods} fällige Periode(n)`,
+        tone: 'warning',
+        onClick: onGoToMembers
+      })
+    }
+    if (invOverdueCount > 0 || invDueSoonCount > 0) {
+      const overdue = invOverdueCount > 0
+      items.push({
+        key: 'invoices',
+        label: overdue ? 'Überfällige Verbindlichkeiten' : 'Bald fällige Verbindlichkeiten',
+        value: String(overdue ? invOverdueCount : invDueSoonCount),
+        detail: eur.format(overdue ? invOverdueRemaining : invDueSoonRemaining),
+        tone: overdue ? 'danger' : 'warning',
+        onClick: onGoToInvoices
+      })
+    }
+    if (pendingSubmissions > 0) {
+      items.push({
+        key: 'submissions',
+        label: 'Einreichungen',
+        value: String(pendingSubmissions),
+        detail: 'wartet auf Prüfung',
+        tone: 'info',
+        onClick: onGoToSubmissions
+      })
+    }
+    return items
+  }, [bankImportReminder, bankOpenCount, dueMembershipFees, eur, invDueSoonCount, invDueSoonRemaining, invOverdueCount, invOverdueRemaining, onGoToBankImport, onGoToInvoices, onGoToMembers, onGoToSubmissions, pendingSubmissions])
+
   // Active Zweckbindungen (earmarks) & Budgets for dashboard cards (max 2 each, exclude ended)
   const [activeEarmarks, setActiveEarmarks] = useState<Array<{ id: number; code: string; name: string; endDate?: string | null; color?: string | null }>>([])
   const [activeBudgets, setActiveBudgets] = useState<Array<{ id: number; name?: string | null; amountPlanned: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
@@ -290,6 +442,7 @@ export default function DashboardView({
           <div className="helper">{quote?.author || quote?.source || ''}</div>
         </div>
       </div>
+      <DashboardTaskStrip items={taskItems} />
         <div className="dashboard-grid-auto">
           <div className="dashboard-period-row card" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', gap: 10 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
@@ -484,6 +637,48 @@ export default function DashboardView({
 
       <DashboardRecentActivity onGoToVoucher={onGoToVoucher} />
     </div>
+  )
+}
+
+function DashboardTaskStrip({ items }: { items: DashboardTaskItem[] }) {
+  const visibleItems = items.length > 0 ? items : [{
+    key: 'done',
+    label: 'Alles erledigt',
+    value: 'OK',
+    detail: 'Keine offenen Hinweise',
+    tone: 'success' as const
+  }]
+
+  return (
+    <section className="dashboard-task-strip" aria-label="Heute wichtige Aufgaben">
+      <div className="dashboard-task-strip__head">
+        <strong>Heute wichtig</strong>
+        <span className="helper">{items.length > 0 ? `${items.length} Hinweis(e)` : 'Alles ruhig'}</span>
+      </div>
+      <div className="dashboard-task-strip__items">
+        {visibleItems.map((item) => {
+          const clickable = !!item.onClick
+          const content = (
+            <>
+              <span className={`dashboard-task-strip__badge dashboard-task-strip__badge--${item.tone}`}>{item.value}</span>
+              <span className="dashboard-task-strip__text">
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+              </span>
+            </>
+          )
+          return clickable ? (
+            <button key={item.key} type="button" className={`dashboard-task-strip__item dashboard-task-strip__item--${item.tone}`} onClick={item.onClick}>
+              {content}
+            </button>
+          ) : (
+            <div key={item.key} className={`dashboard-task-strip__item dashboard-task-strip__item--${item.tone}`}>
+              {content}
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

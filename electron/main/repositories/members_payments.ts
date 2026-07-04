@@ -328,6 +328,30 @@ export function status(input: { memberId: number }) {
   return { hasPlan: 1, interval, amount, lastPeriod, lastDate, nextDue: nextDue || null, overdue, state, joinDate: m.joinDate || null, leaveDate: leaveDate || null, firstOverdue: firstOverdue || null }
 }
 
+export function dueSummary() {
+  const d = getDb()
+  const includePaused = !!getSetting<boolean>('membership.includePaused')
+  const statuses = includePaused ? ["'ACTIVE'", "'PAUSED'"] : ["'ACTIVE'"]
+  const members = d.prepare(`
+    SELECT id
+    FROM members
+    WHERE contribution_amount IS NOT NULL
+      AND contribution_interval IS NOT NULL
+      AND status IN (${statuses.join(',')})
+  `).all() as Array<{ id: number }>
+  let dueMembers = 0
+  let duePeriods = 0
+  for (const member of members) {
+    const s = status({ memberId: member.id })
+    const overdue = Number((s as any)?.overdue || 0)
+    if (overdue > 0) {
+      dueMembers += 1
+      duePeriods += overdue
+    }
+  }
+  return { dueMembers, duePeriods }
+}
+
 export function nextPeriod(pk: string, interval: Interval): string {
   if (interval === 'MONTHLY') {
     const [y,m] = pk.split('-'); const Y=Number(y), M=Number(m)

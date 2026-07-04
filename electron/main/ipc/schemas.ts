@@ -1337,12 +1337,24 @@ export const BankTransactionsListOutput = z.object({
     limit: z.number(),
     stats: z.object({ total: z.number(), open: z.number(), linked: z.number(), checked: z.number() })
 })
+export const BankImportStatusOutput = z.object({
+    lastBookingDate: z.string().nullable(),
+    total: z.number(),
+    accounts: z.array(z.object({
+        id: z.number(),
+        name: z.string(),
+        color: z.string().nullable().optional(),
+        lastBookingDate: z.string().nullable().optional(),
+        total: z.number()
+    }))
+})
 export const BankTransactionMatchesOutput = z.object({ rows: z.array(z.record(z.any())) })
 
 export type TBankImportPreviewInput = z.infer<typeof BankImportPreviewInput>
 export type TBankImportPreviewOutput = z.infer<typeof BankImportPreviewOutput>
 export type TBankImportCommitInput = z.infer<typeof BankImportCommitInput>
 export type TBankImportCommitOutput = z.infer<typeof BankImportCommitOutput>
+export type TBankImportStatusOutput = z.infer<typeof BankImportStatusOutput>
 export type TBankTransactionsListInput = z.infer<typeof BankTransactionsListInput>
 export type TBankTransactionsListOutput = z.infer<typeof BankTransactionsListOutput>
 export type TBankTransactionIdInput = z.infer<typeof BankTransactionIdInput>
@@ -1460,6 +1472,7 @@ export const PaymentsUnmarkInput = z.object({ memberId: z.number(), periodKey: z
 export const PaymentsUnmarkOutput = z.object({ ok: z.boolean() })
 export const PaymentsSuggestVouchersInput = z.object({ name: z.string().nullable().optional(), amount: z.number(), periodKey: z.string(), memberId: z.number().optional() })
 export const PaymentsSuggestVouchersOutput = z.object({ rows: z.array(z.object({ id: z.number(), voucherNo: z.string(), date: z.string(), description: z.string().nullable().optional(), counterparty: z.string().nullable().optional(), gross: z.number() })) })
+export const PaymentsDueSummaryOutput = z.object({ dueMembers: z.number(), duePeriods: z.number() })
 export type TPaymentsListDueInput = z.infer<typeof PaymentsListDueInput>
 export type TPaymentsListDueOutput = z.infer<typeof PaymentsListDueOutput>
 export type TPaymentsMarkPaidInput = z.infer<typeof PaymentsMarkPaidInput>
@@ -1468,6 +1481,7 @@ export type TPaymentsUnmarkInput = z.infer<typeof PaymentsUnmarkInput>
 export type TPaymentsUnmarkOutput = z.infer<typeof PaymentsUnmarkOutput>
 export type TPaymentsSuggestVouchersInput = z.infer<typeof PaymentsSuggestVouchersInput>
 export type TPaymentsSuggestVouchersOutput = z.infer<typeof PaymentsSuggestVouchersOutput>
+export type TPaymentsDueSummaryOutput = z.infer<typeof PaymentsDueSummaryOutput>
 // Settings (simple key-value)
 export const SettingsGetInput = z.object({ key: z.string() })
 export const SettingsGetOutput = z.object({ value: z.any().optional() })
@@ -1562,7 +1576,7 @@ export const AuditRecentOutput = z.object({
         createdAt: z.string(),
         recordDate: z.string().nullable().optional(),
         voucherId: z.number().nullable().optional(),
-        voucherNo: z.number().nullable().optional(),
+        voucherNo: z.string().nullable().optional(),
         voucherDescription: z.string().nullable().optional(),
         bankBookingDate: z.string().nullable().optional(),
         bankAmount: z.number().nullable().optional(),

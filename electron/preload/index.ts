@@ -211,6 +211,7 @@ const rendererApi = {
         markPaid: (payload) => invoke('payments.markPaid', payload),
         unmark: (payload) => invoke('payments.unmark', payload),
         suggestVouchers: (payload) => invoke('payments.suggestVouchers', payload),
+        dueSummary: () => invoke('payments.dueSummary'),
         status: (payload) => invoke('payments.status', payload),
         history: (payload) => invoke('payments.history', payload)
     },
@@ -339,6 +340,7 @@ const rendererApi = {
     },
     bankTransactions: {
         list: (payload) => invoke('bankTransactions.list', payload),
+        importStatus: () => invoke('bankTransactions.importStatus'),
         get: (payload) => invoke('bankTransactions.get', payload),
         matches: (payload) => invoke('bankTransactions.matches', payload),
         link: (payload) => invoke('bankTransactions.link', payload),

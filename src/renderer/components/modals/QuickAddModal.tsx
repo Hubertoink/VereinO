@@ -3,11 +3,27 @@ import TagsEditor from '../TagsEditor'
 import type { QA } from '../../hooks/useQuickAdd'
 import WindowControls from '../layout/WindowControls'
 import { getInternalAssignmentValidationState } from './voucherMetaValidation'
+import {
+    AI_PATTERNS_CHANGED_EVENT,
+    buildAISuggestions,
+    readAISuggestionLearning,
+    rememberBookingAIPattern,
+    type BookingAISuggestion
+} from '../../utils/bookingAiPatterns'
 
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
 type ExistingAttachment = { id: number; fileName: string }
 type PaymentAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }
+type AISuggestionPartKey =
+    | 'type'
+    | 'sphere'
+    | 'paymentAccount'
+    | 'transferFromAccount'
+    | 'transferToAccount'
+    | `tag:${string}`
+    | `budget:${number}`
+    | `earmark:${number}`
 
 interface QuickAddModalProps {
     qa: QA
@@ -128,9 +144,13 @@ export default function QuickAddModal({
     const descriptionInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
+    const aiAssistRef = React.useRef<HTMLDivElement | null>(null)
     const dragStartRef = React.useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null)
     const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 })
     const [saveMenuOpen, setSaveMenuOpen] = React.useState(false)
+    const [aiMenuOpen, setAiMenuOpen] = React.useState(false)
+    const [aiLearningVersion, setAiLearningVersion] = React.useState(0)
+    const [aiDisabledParts, setAiDisabledParts] = React.useState<Record<string, AISuggestionPartKey[]>>({})
 
     const grossAmt = (() => {
         if (qa.type === 'TRANSFER' || qa.type === 'INTERNAL') return Number((qa as any).grossAmount || 0)
@@ -224,6 +244,211 @@ export default function QuickAddModal({
     const defaultSaveLabel = saveLabel || 'Speichern'
     const canDrag = !windowMode
     const hasAnyAttachment = files.length > 0 || existingFiles.length > 0
+    const aiLearning = React.useMemo(() => readAISuggestionLearning(), [aiLearningVersion])
+    const aiSuggestions = React.useMemo(
+        () => buildAISuggestions({
+            description: qa.description || '',
+            grossAmount: grossAmt,
+            currentTags: (qa as any).tags || [],
+            currentType: qa.type,
+            currentSphere: qa.sphere,
+            currentBudgets: budgetsList.map((item) => ({ id: item.budgetId, amount: item.amount })),
+            currentEarmarks: earmarksList.map((item) => ({ id: item.earmarkId, amount: item.amount })),
+            currentPaymentAccountId: (qa as any).paymentAccountId || null,
+            currentTransferFromAccountId: (qa as any).transferFromAccountId || null,
+            currentTransferToAccountId: (qa as any).transferToAccountId || null,
+            tagDefs,
+            paymentAccounts: activePaymentAccounts,
+            learning: aiLearning
+        }),
+        [activePaymentAccounts, aiLearning, qa.description, qa.sphere, qa.type, (qa as any).tags, (qa as any).paymentAccountId, (qa as any).transferFromAccountId, (qa as any).transferToAccountId, budgetsList, earmarksList, grossAmt, tagDefs]
+    )
+
+    React.useEffect(() => {
+        if (!aiSuggestions.length) setAiMenuOpen(false)
+    }, [aiSuggestions.length])
+
+    React.useEffect(() => {
+        if (!aiMenuOpen) return
+        const closeOnOutside = (event: PointerEvent) => {
+            const target = event.target as Node | null
+            if (target && aiAssistRef.current?.contains(target)) return
+            setAiMenuOpen(false)
+        }
+        document.addEventListener('pointerdown', closeOnOutside)
+        return () => document.removeEventListener('pointerdown', closeOnOutside)
+    }, [aiMenuOpen])
+
+    React.useEffect(() => {
+        setAiDisabledParts((current) => {
+            const activeKeys = new Set(aiSuggestions.map((suggestion) => suggestion.key))
+            const next = Object.fromEntries(Object.entries(current).filter(([key]) => activeKeys.has(key)))
+            return Object.keys(next).length === Object.keys(current).length ? current : next
+        })
+    }, [aiSuggestions])
+
+    React.useEffect(() => {
+        const refreshLearning = () => setAiLearningVersion((value) => value + 1)
+        window.addEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
+        window.addEventListener('storage', refreshLearning)
+        return () => {
+            window.removeEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
+            window.removeEventListener('storage', refreshLearning)
+        }
+    }, [])
+
+    const rememberCurrentBookingPattern = React.useCallback((draft: QA = qa) => {
+        rememberBookingAIPattern({
+            description: draft.description || '',
+            grossAmount: grossAmt,
+            tags: (draft as any).tags || [],
+            type: draft.type,
+            sphere: draft.sphere,
+            budgets: ((draft as any).budgets || []) as BudgetAssignment[],
+            earmarks: ((draft as any).earmarksAssigned || []) as EarmarkAssignment[],
+            paymentAccountId: draft.type === 'TRANSFER' || draft.type === 'INTERNAL' ? null : Number((draft as any).paymentAccountId || 0) || null,
+            transferFromAccountId: draft.type === 'TRANSFER' ? Number((draft as any).transferFromAccountId || 0) || null : null,
+            transferToAccountId: draft.type === 'TRANSFER' ? Number((draft as any).transferToAccountId || 0) || null : null,
+        })
+        setAiLearningVersion((value) => value + 1)
+    }, [grossAmt, qa])
+
+    const isAISuggestionPartDisabled = React.useCallback((suggestionKey: string, partKey: AISuggestionPartKey) => (
+        aiDisabledParts[suggestionKey]?.includes(partKey) || false
+    ), [aiDisabledParts])
+
+    const toggleAISuggestionPart = React.useCallback((suggestionKey: string, partKey: AISuggestionPartKey) => {
+        setAiDisabledParts((current) => {
+            const currentParts = current[suggestionKey] || []
+            const nextParts = currentParts.includes(partKey)
+                ? currentParts.filter((key) => key !== partKey)
+                : [...currentParts, partKey]
+            const next = { ...current }
+            if (nextParts.length) next[suggestionKey] = nextParts
+            else delete next[suggestionKey]
+            return next
+        })
+    }, [])
+
+    const activeSuggestion = React.useCallback((suggestion: BookingAISuggestion): BookingAISuggestion => {
+        const disabled = new Set(aiDisabledParts[suggestion.key] || [])
+        return {
+            ...suggestion,
+            type: disabled.has('type') ? undefined : suggestion.type,
+            sphere: disabled.has('sphere') ? undefined : suggestion.sphere,
+            paymentAccountId: disabled.has('paymentAccount') ? undefined : suggestion.paymentAccountId,
+            transferFromAccountId: disabled.has('transferFromAccount') ? undefined : suggestion.transferFromAccountId,
+            transferToAccountId: disabled.has('transferToAccount') ? undefined : suggestion.transferToAccountId,
+            tags: (suggestion.tags || []).filter((tag) => !disabled.has(`tag:${tag}`)),
+            budgets: (suggestion.budgets || []).filter((budget) => !disabled.has(`budget:${budget.id}`)),
+            earmarks: (suggestion.earmarks || []).filter((earmark) => !disabled.has(`earmark:${earmark.id}`)),
+        }
+    }, [aiDisabledParts])
+
+    const applyAISuggestion = React.useCallback((suggestion: BookingAISuggestion) => {
+        const active = activeSuggestion(suggestion)
+        const currentTags = ((qa as any).tags || []) as string[]
+        const currentTagsLower = new Set(currentTags.map((tag) => tag.toLowerCase()))
+        const nextTags = [
+            ...currentTags,
+            ...(active.tags || []).filter((tag) => !currentTagsLower.has(tag.toLowerCase()))
+        ]
+        const currentBudgetIds = new Set(budgetsList.map((item) => item.budgetId))
+        const currentEarmarkIds = new Set(earmarksList.map((item) => item.earmarkId))
+        const nextBudgets = [
+            ...budgetsList,
+            ...(active.budgets || [])
+                .filter((item) => item.id && !currentBudgetIds.has(item.id))
+                .map((item) => ({ budgetId: item.id, amount: item.amountMode === 'FULL' ? grossAmt : Number(item.amount || grossAmt || 0) }))
+        ]
+        const nextEarmarks = [
+            ...earmarksList,
+            ...(active.earmarks || [])
+                .filter((item) => item.id && !currentEarmarkIds.has(item.id))
+                .map((item) => ({ earmarkId: item.id, amount: item.amountMode === 'FULL' ? grossAmt : Number(item.amount || grossAmt || 0) }))
+        ]
+        const nextQa: any = {
+            ...(qa as any),
+            tags: nextTags,
+            budgets: nextBudgets,
+            earmarksAssigned: nextEarmarks
+        }
+        if (active.sphere) nextQa.sphere = active.sphere
+        if (active.type && active.type !== qa.type) {
+            nextQa.type = active.type
+            if (active.type === 'TRANSFER') {
+                nextQa.transferFromAccountId = nextQa.transferFromAccountId || defaultCashAccount?.id || null
+                nextQa.transferFromAccountName = nextQa.transferFromAccountName || defaultCashAccount?.name || null
+                nextQa.transferFrom = nextQa.transferFrom || accountMethod(defaultCashAccount?.kind) || 'BAR'
+                nextQa.transferToAccountId = nextQa.transferToAccountId || defaultBankAccount?.id || null
+                nextQa.transferToAccountName = nextQa.transferToAccountName || defaultBankAccount?.name || null
+                nextQa.transferTo = nextQa.transferTo || accountMethod(defaultBankAccount?.kind) || 'BANK'
+                nextQa.paymentAccountId = null
+                nextQa.paymentAccountName = null
+                nextQa.paymentMethod = null
+            } else if (active.type !== 'INTERNAL') {
+                const fallback = active.type === 'IN' ? defaultBankAccount : (defaultCashAccount || defaultBankAccount)
+                nextQa.paymentAccountId = nextQa.paymentAccountId || fallback?.id || null
+                nextQa.paymentAccountName = nextQa.paymentAccountName || fallback?.name || null
+                nextQa.paymentMethod = accountMethod(paymentAccountsById.get(Number(nextQa.paymentAccountId || 0))?.kind) || nextQa.paymentMethod
+            }
+        }
+        if (active.paymentAccountId && nextQa.type !== 'TRANSFER' && nextQa.type !== 'INTERNAL') {
+            const account = paymentAccountsById.get(Number(active.paymentAccountId))
+            nextQa.paymentAccountId = account?.id ?? active.paymentAccountId
+            nextQa.paymentAccountName = account?.name ?? nextQa.paymentAccountName
+            nextQa.paymentMethod = accountMethod(account?.kind) || nextQa.paymentMethod
+            nextQa.transferFromAccountId = null
+            nextQa.transferFromAccountName = null
+            nextQa.transferToAccountId = null
+            nextQa.transferToAccountName = null
+        }
+        if ((active.transferFromAccountId || active.transferToAccountId) && nextQa.type === 'TRANSFER') {
+            if (active.transferFromAccountId) {
+                const fromAccount = paymentAccountsById.get(Number(active.transferFromAccountId))
+                nextQa.transferFromAccountId = fromAccount?.id ?? active.transferFromAccountId
+                nextQa.transferFromAccountName = fromAccount?.name ?? nextQa.transferFromAccountName
+                nextQa.transferFrom = accountMethod(fromAccount?.kind) || nextQa.transferFrom
+            }
+            if (active.transferToAccountId) {
+                const toAccount = paymentAccountsById.get(Number(active.transferToAccountId))
+                nextQa.transferToAccountId = toAccount?.id ?? active.transferToAccountId
+                nextQa.transferToAccountName = toAccount?.name ?? nextQa.transferToAccountName
+                nextQa.transferTo = accountMethod(toAccount?.kind) || nextQa.transferTo
+            }
+            nextQa.paymentAccountId = null
+            nextQa.paymentAccountName = null
+            nextQa.paymentMethod = null
+        }
+        setQa(nextQa as QA)
+        rememberCurrentBookingPattern(nextQa as QA)
+        setAiMenuOpen(false)
+    }, [activeSuggestion, budgetsList, defaultBankAccount, defaultCashAccount, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
+
+    const handleSave = React.useCallback(() => {
+        rememberCurrentBookingPattern()
+        onSave()
+    }, [onSave, rememberCurrentBookingPattern])
+
+    const handleSaveAndNew = React.useCallback(() => {
+        rememberCurrentBookingPattern()
+        saveAndNew()
+    }, [rememberCurrentBookingPattern, saveAndNew])
+
+    const handleSaveAndClose = React.useCallback(() => {
+        rememberCurrentBookingPattern()
+        saveAndClose()
+    }, [rememberCurrentBookingPattern, saveAndClose])
+
+    const tagByName = React.useMemo(() => new Map(tagDefs.map((tag) => [tag.name.toLowerCase(), tag])), [tagDefs])
+    const budgetById = React.useMemo(() => new Map((budgetsForEdit || []).map((budget) => [budget.id, budget])), [budgetsForEdit])
+    const earmarkById = React.useMemo(() => new Map((earmarks || []).map((earmark) => [earmark.id, earmark])), [earmarks])
+
+    const assignmentAmount = React.useCallback((amount?: number, amountMode?: 'FULL' | 'FIXED') => {
+        if (amountMode === 'FULL') return eurFmt.format(grossAmt)
+        if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) return eurFmt.format(amount)
+        return null
+    }, [eurFmt, grossAmt])
 
     const focusInput = React.useCallback((input: HTMLInputElement | null) => {
         if (!input) return
@@ -394,29 +619,225 @@ export default function QuickAddModal({
                 
                 <form
                     className="quick-add-form"
-                    onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) onSave(); }}
+                    onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) handleSave(); }}
                 >
                     {/* Live Summary */}
-                    <div className="card summary-card">
-                        <div className="helper">Zusammenfassung</div>
-                        <div className="summary-text-bold">
-                            {(() => {
-                                const date = fmtDate(qa.date)
-                                const type = qa.type
-                                const pm = qa.type === 'TRANSFER'
-                                    ? `${(qa as any).transferFromAccountName || paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.name || paymentMethodLabel((qa as any).transferFrom)} → ${(qa as any).transferToAccountName || paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.name || paymentMethodLabel((qa as any).transferTo)}`
-                                    : ((qa as any).paymentAccountName || paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.name || paymentMethodLabel((qa as any).paymentMethod))
-                                const amount = (() => {
-                                    if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                    if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                    const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                    return eurFmt.format(g)
-                                })()
-                                const sphere = qa.sphere
-                                const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
-                            })()}
+                    <div className={`card summary-card booking-ai-summary ${aiSuggestions.length ? 'booking-ai-summary--active' : ''}`}>
+                        <div className="booking-ai-summary__main">
+                            <div className="helper">Zusammenfassung</div>
+                            <div className="summary-text-bold">
+                                {(() => {
+                                    const date = fmtDate(qa.date)
+                                    const type = qa.type
+                                    const pm = qa.type === 'TRANSFER'
+                                        ? `${(qa as any).transferFromAccountName || paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.name || paymentMethodLabel((qa as any).transferFrom)} → ${(qa as any).transferToAccountName || paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.name || paymentMethodLabel((qa as any).transferTo)}`
+                                        : ((qa as any).paymentAccountName || paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.name || paymentMethodLabel((qa as any).paymentMethod))
+                                    const amount = (() => {
+                                        if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                        if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
+                                        const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
+                                        return eurFmt.format(g)
+                                    })()
+                                    const sphere = qa.sphere
+                                    const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
+                                    return <>{date} · {type} · {pm} · <span style={{ color: amountColor }}>{amount}</span> · {sphere}</>
+                                })()}
+                            </div>
                         </div>
+                        {aiSuggestions.length > 0 && (
+                            <div className="booking-ai-assist" ref={aiAssistRef}>
+                                <button
+                                    type="button"
+                                    className="btn ghost booking-ai-assist__trigger"
+                                    onClick={() => setAiMenuOpen((open) => !open)}
+                                    aria-label="Intelligente Buchungsvorschläge"
+                                    aria-expanded={aiMenuOpen}
+                                    title="Intelligente Vorschläge"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M12 2l1.7 5.1L19 9l-5.3 1.9L12 16l-1.7-5.1L5 9l5.3-1.9L12 2z" />
+                                        <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" />
+                                        <path d="M5 15l.7 1.8L7.5 17.5l-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z" />
+                                    </svg>
+                                    <span>{aiSuggestions.length}</span>
+                                </button>
+                                {aiMenuOpen && (
+                                    <div className="booking-ai-assist__panel" role="dialog" aria-label="Intelligente Buchungsvorschläge">
+                                        <div className="booking-ai-assist__panel-head">
+                                            <strong>Vorschläge erkannt</strong>
+                                            <span>Lokal gelerntes MVP</span>
+                                        </div>
+                                        <div className="booking-ai-assist__list">
+                                            {aiSuggestions.map((suggestion) => {
+                                                const typeClass = suggestion.type === 'IN' ? 'booking-ai-chip--in' : suggestion.type === 'OUT' ? 'booking-ai-chip--out' : 'booking-ai-chip--neutral'
+                                                const chipClass = (partKey: AISuggestionPartKey, extra = '') => `booking-ai-chip ${extra} ${isAISuggestionPartDisabled(suggestion.key, partKey) ? 'booking-ai-chip--disabled' : ''}`
+                                                const active = activeSuggestion(suggestion)
+                                                const hasActiveParts = !!active.type || !!active.sphere || !!active.paymentAccountId || !!active.transferFromAccountId || !!active.transferToAccountId || !!active.tags?.length || !!active.budgets?.length || !!active.earmarks?.length
+                                                return (
+                                                <div key={suggestion.key} className="booking-ai-suggestion">
+                                                    <div className="booking-ai-suggestion__copy">
+                                                        <strong>{suggestion.title}</strong>
+                                                        <span>{suggestion.reason}{suggestion.learned ? ' · gelernt' : ''}</span>
+                                                    </div>
+                                                    <div className="booking-ai-suggestion__chips">
+                                                        {suggestion.type && (
+                                                            <button
+                                                                type="button"
+                                                                className={chipClass('type', typeClass)}
+                                                                onClick={() => toggleAISuggestionPart(suggestion.key, 'type')}
+                                                                aria-pressed={!isAISuggestionPartDisabled(suggestion.key, 'type')}
+                                                                title="Art für diese Übernahme ein-/ausschließen"
+                                                            >
+                                                                {suggestion.type}
+                                                            </button>
+                                                        )}
+                                                        {suggestion.sphere && (
+                                                            <button
+                                                                type="button"
+                                                                className={chipClass('sphere', 'booking-ai-chip--sphere')}
+                                                                onClick={() => toggleAISuggestionPart(suggestion.key, 'sphere')}
+                                                                aria-pressed={!isAISuggestionPartDisabled(suggestion.key, 'sphere')}
+                                                                title="Sphäre für diese Übernahme ein-/ausschließen"
+                                                            >
+                                                                {suggestion.sphere}
+                                                            </button>
+                                                        )}
+                                                        {suggestion.paymentAccountId && (() => {
+                                                            const partKey: AISuggestionPartKey = 'paymentAccount'
+                                                            const account = paymentAccountsById.get(Number(suggestion.paymentAccountId))
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    className={chipClass(partKey, 'booking-ai-chip--account')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Konto für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && account?.color ? {
+                                                                        borderColor: account.color,
+                                                                        background: `${account.color}24`,
+                                                                        color: account.color
+                                                                    } : undefined}
+                                                                >
+                                                                    Konto: {account?.name || `#${suggestion.paymentAccountId}`}
+                                                                </button>
+                                                            )
+                                                        })()}
+                                                        {suggestion.transferFromAccountId && (() => {
+                                                            const partKey: AISuggestionPartKey = 'transferFromAccount'
+                                                            const account = paymentAccountsById.get(Number(suggestion.transferFromAccountId))
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    className={chipClass(partKey, 'booking-ai-chip--account')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Quellkonto für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && account?.color ? {
+                                                                        borderColor: account.color,
+                                                                        background: `${account.color}24`,
+                                                                        color: account.color
+                                                                    } : undefined}
+                                                                >
+                                                                    Von: {account?.name || `#${suggestion.transferFromAccountId}`}
+                                                                </button>
+                                                            )
+                                                        })()}
+                                                        {suggestion.transferToAccountId && (() => {
+                                                            const partKey: AISuggestionPartKey = 'transferToAccount'
+                                                            const account = paymentAccountsById.get(Number(suggestion.transferToAccountId))
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    className={chipClass(partKey, 'booking-ai-chip--account')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Zielkonto für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && account?.color ? {
+                                                                        borderColor: account.color,
+                                                                        background: `${account.color}24`,
+                                                                        color: account.color
+                                                                    } : undefined}
+                                                                >
+                                                                    Nach: {account?.name || `#${suggestion.transferToAccountId}`}
+                                                                </button>
+                                                            )
+                                                        })()}
+                                                        {(suggestion.tags || []).map((tag) => {
+                                                            const partKey: AISuggestionPartKey = `tag:${tag}`
+                                                            const tagDef = tagByName.get(tag.toLowerCase())
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={tag}
+                                                                    className={chipClass(partKey, 'booking-ai-chip--tag')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Tag für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && tagDef?.color ? {
+                                                                        borderColor: tagDef.color,
+                                                                        background: `${tagDef.color}26`,
+                                                                        color: tagDef.color
+                                                                    } : undefined}
+                                                                >
+                                                                    {tag}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                        {(suggestion.budgets || []).map((budget) => {
+                                                            const partKey: AISuggestionPartKey = `budget:${budget.id}`
+                                                            const info = budgetById.get(budget.id)
+                                                            const amount = assignmentAmount(budget.amount, budget.amountMode)
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={`budget-${budget.id}`}
+                                                                    className={chipClass(partKey, 'booking-ai-chip--budget')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Budget für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && info?.color ? {
+                                                                        borderColor: info.color,
+                                                                        background: `${info.color}22`,
+                                                                        color: info.color
+                                                                    } : undefined}
+                                                                >
+                                                                    {info?.label || `Budget #${budget.id}`}{amount ? ` · ${amount}` : ''}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                        {(suggestion.earmarks || []).map((earmark) => {
+                                                            const partKey: AISuggestionPartKey = `earmark:${earmark.id}`
+                                                            const info = earmarkById.get(earmark.id)
+                                                            const amount = assignmentAmount(earmark.amount, earmark.amountMode)
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={`earmark-${earmark.id}`}
+                                                                    className={chipClass(partKey, 'booking-ai-chip--earmark')}
+                                                                    onClick={() => toggleAISuggestionPart(suggestion.key, partKey)}
+                                                                    aria-pressed={!isAISuggestionPartDisabled(suggestion.key, partKey)}
+                                                                    title="Zweckbindung für diese Übernahme ein-/ausschließen"
+                                                                    style={!isAISuggestionPartDisabled(suggestion.key, partKey) && info?.color ? {
+                                                                        borderColor: info.color,
+                                                                        background: `${info.color}22`,
+                                                                        color: info.color
+                                                                    } : undefined}
+                                                                >
+                                                                    {info ? `${info.code} ${info.name}` : `Zweckbindung #${earmark.id}`}{amount ? ` · ${amount}` : ''}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                    <div className="booking-ai-suggestion__actions">
+                                                        <button type="button" className="btn primary booking-ai-suggestion__apply" onClick={() => applyAISuggestion(suggestion)} disabled={!hasActiveParts} title="Aktive Bestandteile übernehmen" aria-label="Aktive Bestandteile übernehmen">+</button>
+                                                    </div>
+                                                </div>
+                                            )})}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Blocks A+B in a side-by-side grid on wide screens */}
@@ -1005,10 +1426,10 @@ export default function QuickAddModal({
                                     </button>
                                     {saveMenuOpen && (
                                         <div className="booking-split-save__menu" role="menu">
-                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); saveAndClose() }}>
+                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); handleSaveAndClose() }}>
                                                 Speichern & schließen
                                             </button>
-                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); saveAndNew() }}>
+                                            <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); handleSaveAndNew() }}>
                                                 Speichern & neu
                                             </button>
                                         </div>

@@ -1,7 +1,7 @@
 import React from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
-import type { NavKey } from '../../utils/navItems'
+import type { NavItem, NavKey } from '../../utils/navItems'
 
 interface SideNavProps {
   activePage: NavKey
@@ -12,13 +12,15 @@ interface SideNavProps {
   pendingSubmissionsCount?: number
   openBankImportsCount?: number
   openInvoicesCount?: number
+  dueMembershipFeesCount?: number
   showBadges?: boolean
+  items?: NavItem[]
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, showBadges = true }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems }: SideNavProps) {
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
-      {navItems.map((item, idx) => {
+      {items.map((item, idx) => {
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         
@@ -27,13 +29,14 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
         if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
         if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
+        if (item.key === 'Mitglieder') badgeCount = dueMembershipFeesCount
         
         const showBadge = showBadges && badgeCount > 0
         const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)
         
         return (
           <React.Fragment key={item.key}>
-            {idx > 0 && item.group !== navItems[idx - 1]?.group && (
+            {idx > 0 && item.group !== items[idx - 1]?.group && (
               <div className="nav-divider" aria-hidden="true" />
             )}
             <button

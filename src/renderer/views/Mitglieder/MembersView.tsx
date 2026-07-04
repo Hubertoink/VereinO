@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
+import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
 
 type PageShortcutAction = {
@@ -12,6 +13,10 @@ type PageShortcutAction = {
     action: () => void
 }
 
+type MemberContributionFilter = 'ALL' | 'DUE' | 'NOT_DUE' | 'NO_PLAN'
+type MemberIntervalFilter = 'ALL' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+type MemberBoardFilter = 'ALL' | 'ANY' | 'NONE' | 'V1' | 'V2' | 'KASSIER' | 'KASSENPR1' | 'KASSENPR2' | 'SCHRIFT'
+
 interface MembersViewProps {
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
@@ -19,6 +24,9 @@ interface MembersViewProps {
 export default function MembersView({ registerPageShortcuts }: MembersViewProps = {}) {
     const [q, setQ] = useState('')
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
+    const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>('ALL')
+    const [intervalFilter, setIntervalFilter] = useState<MemberIntervalFilter>('ALL')
+    const [boardFilter, setBoardFilter] = useState<MemberBoardFilter>('ALL')
     const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })
     const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
     useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
@@ -178,13 +186,59 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     async function load() {
         setBusy(true)
         try {
-            const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset, sortBy, sort })
-            setRows(res?.rows || []); setTotal(res?.total || 0)
+            const hasAdvancedFilters = contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'
+            if (!hasAdvancedFilters) {
+                const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset, sortBy, sort })
+                setRows(res?.rows || []); setTotal(res?.total || 0)
+                return
+            }
+
+            const pageSize = 200
+            let ofs = 0
+            let totalRows = 0
+            const allRows: typeof rows = []
+            do {
+                const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit: pageSize, offset: ofs, sortBy, sort })
+                const batch = (res?.rows || []) as typeof rows
+                totalRows = res?.total ?? batch.length
+                allRows.push(...batch)
+                ofs += pageSize
+            } while (ofs < totalRows)
+
+            const dueStateById = new Map<number, any>()
+            const needsDueState = contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE'
+            const filtered: typeof rows = []
+            for (const row of allRows) {
+                const hasPlan = Number(row.contribution_amount || 0) > 0 && !!row.contribution_interval
+                if (intervalFilter !== 'ALL' && row.contribution_interval !== intervalFilter) continue
+                if (boardFilter === 'ANY' && !row.boardRole) continue
+                if (boardFilter === 'NONE' && row.boardRole) continue
+                if (!['ALL', 'ANY', 'NONE'].includes(boardFilter) && row.boardRole !== boardFilter) continue
+
+                if (contributionFilter === 'NO_PLAN' && hasPlan) continue
+                if (contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
+                    let paymentState = dueStateById.get(row.id)
+                    if (!paymentState && hasPlan && needsDueState) {
+                        try {
+                            paymentState = await (window as any).api?.payments?.status?.({ memberId: row.id })
+                        } catch {
+                            paymentState = { state: 'NONE', overdue: 0 }
+                        }
+                        dueStateById.set(row.id, paymentState)
+                    }
+                    const isDue = hasPlan && paymentState?.state === 'OVERDUE' && Number(paymentState?.overdue || 0) > 0
+                    if (contributionFilter === 'DUE' && !isDue) continue
+                    if (contributionFilter === 'NOT_DUE' && (!hasPlan || isDue)) continue
+                }
+                filtered.push(row)
+            }
+            setTotal(filtered.length)
+            setRows(filtered.slice(offset, offset + limit))
         } catch (e: any) {
             console.error('members.list failed', e)
         } finally { setBusy(false) }
     }
-    useEffect(() => { load() }, [q, status, limit, offset, sortBy, sort])
+    useEffect(() => { load() }, [q, status, contributionFilter, intervalFilter, boardFilter, limit, offset, sortBy, sort])
 
     const saveMemberForm = useCallback(async () => {
         if (!form) return
@@ -403,13 +457,19 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 <div className="members-header-left">
                     <h1 className="members-title">Mitglieder</h1>
                     <input className="input members-search" placeholder="Suche (Name, E-Mail, Tel., Nr.)" value={q} onChange={(e) => { setOffset(0); setQ(e.target.value) }} />
-                    <select className="input" value={status} onChange={(e) => { setOffset(0); setStatus(e.target.value as any) }}>
-                        <option value="ALL">Alle</option>
-                        <option value="ACTIVE">Aktiv</option>
-                        <option value="NEW">Neu</option>
-                        <option value="PAUSED">Pause</option>
-                        <option value="LEFT">Ausgetreten</option>
-                    </select>
+                    <MemberFilterDropdown
+                        status={status}
+                        contributionFilter={contributionFilter}
+                        intervalFilter={intervalFilter}
+                        boardFilter={boardFilter}
+                        onApply={(values) => {
+                            setStatus(values.status)
+                            setContributionFilter(values.contributionFilter)
+                            setIntervalFilter(values.intervalFilter)
+                            setBoardFilter(values.boardFilter)
+                            setOffset(0)
+                        }}
+                    />
                     <ColumnSelectDropdown
                         title="Spalten"
                         tip="Tipp: Du kannst IBAN/Beitrag ausblenden und stattdessen die Adresse anzeigen."
@@ -446,8 +506,8 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             }
                         ]}
                     />
-                    {(() => { const hasFilters = !!(q.trim() || status !== 'ALL'); return hasFilters ? (
-                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
+                    {(() => { const hasFilters = !!(q.trim() || status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'); return hasFilters ? (
+                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setContributionFilter('ALL'); setIntervalFilter('ALL'); setBoardFilter('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
                     ) : null })()}
                 </div>
                 <div className="members-header-right">
@@ -889,6 +949,138 @@ interface VoucherSuggestion {
     counterparty?: string | null
     gross: number
     score?: number
+}
+
+function MemberFilterDropdown({
+    status,
+    contributionFilter,
+    intervalFilter,
+    boardFilter,
+    onApply
+}: {
+    status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
+    contributionFilter: MemberContributionFilter
+    intervalFilter: MemberIntervalFilter
+    boardFilter: MemberBoardFilter
+    onApply: (values: {
+        status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
+        contributionFilter: MemberContributionFilter
+        intervalFilter: MemberIntervalFilter
+        boardFilter: MemberBoardFilter
+    }) => void
+}) {
+    const closeRef = useRef<(() => void) | null>(null)
+    const [draftStatus, setDraftStatus] = useState(status)
+    const [draftContributionFilter, setDraftContributionFilter] = useState(contributionFilter)
+    const [draftIntervalFilter, setDraftIntervalFilter] = useState(intervalFilter)
+    const [draftBoardFilter, setDraftBoardFilter] = useState(boardFilter)
+
+    useEffect(() => {
+        setDraftStatus(status)
+        setDraftContributionFilter(contributionFilter)
+        setDraftIntervalFilter(intervalFilter)
+        setDraftBoardFilter(boardFilter)
+    }, [status, contributionFilter, intervalFilter, boardFilter])
+
+    const hasFilters = status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'
+
+    function apply(values?: {
+        status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
+        contributionFilter: MemberContributionFilter
+        intervalFilter: MemberIntervalFilter
+        boardFilter: MemberBoardFilter
+    }) {
+        onApply(values || {
+            status: draftStatus,
+            contributionFilter: draftContributionFilter,
+            intervalFilter: draftIntervalFilter,
+            boardFilter: draftBoardFilter
+        })
+        closeRef.current?.()
+    }
+
+    function reset() {
+        const values = {
+            status: 'ALL' as const,
+            contributionFilter: 'ALL' as const,
+            intervalFilter: 'ALL' as const,
+            boardFilter: 'ALL' as const
+        }
+        setDraftStatus(values.status)
+        setDraftContributionFilter(values.contributionFilter)
+        setDraftIntervalFilter(values.intervalFilter)
+        setDraftBoardFilter(values.boardFilter)
+        apply(values)
+    }
+
+    return (
+        <FilterDropdown
+            trigger={
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
+                </svg>
+            }
+            title="Filter"
+            hasActiveFilters={hasFilters}
+            alignRight
+            width={420}
+            ariaLabel="Mitglieder filtern"
+            buttonTitle="Filter"
+            colorVariant="filter"
+            closeRef={closeRef}
+        >
+            <div className="filter-dropdown__grid">
+                <div className="filter-dropdown__field">
+                    <label className="filter-dropdown__label">Status</label>
+                    <select className="input" value={draftStatus} onChange={(e) => setDraftStatus(e.target.value as typeof draftStatus)}>
+                        <option value="ALL">Alle</option>
+                        <option value="ACTIVE">Aktiv</option>
+                        <option value="NEW">Neu</option>
+                        <option value="PAUSED">Pause</option>
+                        <option value="LEFT">Ausgetreten</option>
+                    </select>
+                </div>
+                <div className="filter-dropdown__field">
+                    <label className="filter-dropdown__label">Beiträge</label>
+                    <select className="input" value={draftContributionFilter} onChange={(e) => setDraftContributionFilter(e.target.value as MemberContributionFilter)}>
+                        <option value="ALL">Alle</option>
+                        <option value="DUE">Fällig</option>
+                        <option value="NOT_DUE">Nicht fällig</option>
+                        <option value="NO_PLAN">Ohne Beitragsplan</option>
+                    </select>
+                </div>
+                <div className="filter-dropdown__field">
+                    <label className="filter-dropdown__label">Intervall</label>
+                    <select className="input" value={draftIntervalFilter} onChange={(e) => setDraftIntervalFilter(e.target.value as MemberIntervalFilter)}>
+                        <option value="ALL">Alle</option>
+                        <option value="MONTHLY">Monatlich</option>
+                        <option value="QUARTERLY">Quartal</option>
+                        <option value="YEARLY">Jährlich</option>
+                    </select>
+                </div>
+                <div className="filter-dropdown__field">
+                    <label className="filter-dropdown__label">Vorstand</label>
+                    <select className="input" value={draftBoardFilter} onChange={(e) => setDraftBoardFilter(e.target.value as MemberBoardFilter)}>
+                        <option value="ALL">Alle</option>
+                        <option value="ANY">Mit Funktion</option>
+                        <option value="NONE">Ohne Funktion</option>
+                        <option value="V1">1. Vorsitz</option>
+                        <option value="V2">2. Vorsitz</option>
+                        <option value="KASSIER">Kassier</option>
+                        <option value="SCHRIFT">Schriftführer</option>
+                        <option value="KASSENPR1">1. Kassenprüfer</option>
+                        <option value="KASSENPR2">2. Kassenprüfer</option>
+                    </select>
+                </div>
+            </div>
+            <div className="filter-dropdown__actions">
+                <button className="btn" type="button" onClick={reset}>Zurücksetzen</button>
+                <div className="filter-dropdown__actions-right">
+                    <button className="btn primary" type="button" onClick={() => apply()}>Übernehmen</button>
+                </div>
+            </div>
+        </FilterDropdown>
+    )
 }
 
 function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; name: string; memberNo?: string }) {

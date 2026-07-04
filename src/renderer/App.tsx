@@ -957,6 +957,24 @@ function AppInner() {
         return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
     }, [])
 
+    // Due membership fees count for nav badge
+    const [dueMembershipFeesCount, setDueMembershipFeesCount] = useState(0)
+    useEffect(() => {
+        let cancelled = false
+        async function loadDueMembershipFeesCount() {
+            try {
+                const res = await (window as any).api?.payments?.dueSummary?.()
+                if (!cancelled) {
+                    setDueMembershipFeesCount(res?.dueMembers || 0)
+                }
+            } catch { /* ignore */ }
+        }
+        loadDueMembershipFeesCount()
+        const onChanged = () => loadDueMembershipFeesCount()
+        window.addEventListener('data-changed', onChanged)
+        return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    }, [])
+
     // Open invoices count for nav badge
     const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
     useEffect(() => {
@@ -1023,6 +1041,29 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    const requiredNavItems = useMemo(() => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']), [])
+    const [visibleNavItems, setVisibleNavItemsState] = useState<NavKey[]>(() => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem('ui.visibleNavItems') || 'null')
+            if (!Array.isArray(parsed)) return navItems.map((item) => item.key)
+            const valid = new Set(navItems.map((item) => item.key))
+            return Array.from(new Set([...parsed.filter((key) => valid.has(key)), ...requiredNavItems])) as NavKey[]
+        } catch {
+            return navItems.map((item) => item.key)
+        }
+    })
+    const setVisibleNavItems = useCallback((items: NavKey[]) => {
+        const valid = new Set(navItems.map((item) => item.key))
+        const next = Array.from(new Set([...items.filter((key) => valid.has(key)), ...requiredNavItems])) as NavKey[]
+        setVisibleNavItemsState(next)
+        try { localStorage.setItem('ui.visibleNavItems', JSON.stringify(next)) } catch { }
+    }, [requiredNavItems])
+    const visibleNavSet = useMemo(() => new Set(visibleNavItems), [visibleNavItems])
+    const visibleNavigationItems = useMemo(() => navItems.filter((item) => visibleNavSet.has(item.key)), [visibleNavSet])
+    useEffect(() => {
+        if (visibleNavSet.has(activePage)) return
+        setActivePage(visibleNavSet.has('Dashboard') ? 'Dashboard' : 'Buchungen')
+    }, [activePage, visibleNavSet])
     const [receiptTarget, setReceiptTarget] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     const registerPageShortcuts = useCallback((shortcuts: PageShortcutAction[]) => {
@@ -1620,7 +1661,7 @@ function AppInner() {
                 key: 'g',
                 label: 'Gehe zu …',
                 description: 'Bereich in VereinO öffnen',
-                children: navItems.map((item) => ({
+                children: visibleNavigationItems.map((item) => ({
                     key: ({
                         Dashboard: 'd', Buchungen: 'b', Bankimport: 'k', Verbindlichkeiten: 'v', Mitglieder: 'm',
                         Vorschuesse: 'o', Budgets: 'p', Zweckbindungen: 'z', Einreichungen: 'i',
@@ -1727,13 +1768,14 @@ function AppInner() {
                     { key: 'o', label: 'Organisation', action: () => openSettingsTile('org') },
                     { key: 'p', label: 'Spenden', action: () => openSettingsTile('donations') },
                     { key: 'g', label: 'Tags', action: () => openSettingsTile('tags') },
+                    { key: 'm', label: 'KI-Muster', action: () => openSettingsTile('aiPatterns') },
                     { key: 'k', label: 'Kassenprüfung', action: () => openSettingsTile('cashCheck') },
                     { key: 'j', label: 'Jahresabschluss', action: () => openSettingsTile('yearEnd') },
                     { key: 'u', label: 'Updates', action: () => openSettingsTile('updates') }
                 ]
             }
         ]
-    }, [activePage, activePageShortcuts, allowVoucherDeletion, bookingsOpenDetached, dateFmt, journalLimit, journalRowDensity, journalRowStyle, navIconColorMode, navLayout, navigateAndFocus, openBookingEntry, openSettingsTile, quickAddAfterSave, showBookingDraftTabs])
+    }, [activePage, activePageShortcuts, allowVoucherDeletion, bookingsOpenDetached, dateFmt, journalLimit, journalRowDensity, journalRowStyle, navIconColorMode, navLayout, navigateAndFocus, openBookingEntry, openSettingsTile, quickAddAfterSave, showBookingDraftTabs, visibleNavigationItems])
 
     async function createSampleVoucher() {
         try {
@@ -2141,7 +2183,9 @@ function AppInner() {
                             pendingSubmissionsCount={pendingSubmissionsCount}
                             openBankImportsCount={openBankImportsCount}
                             openInvoicesCount={openInvoicesCount}
+                            dueMembershipFeesCount={dueMembershipFeesCount}
                             showBadges
+                            items={visibleNavigationItems}
                         />
                     </div>
                 ) : null}
@@ -2169,7 +2213,9 @@ function AppInner() {
                         pendingSubmissionsCount={pendingSubmissionsCount}
                         openBankImportsCount={openBankImportsCount}
                         openInvoicesCount={openInvoicesCount}
+                        dueMembershipFeesCount={dueMembershipFeesCount}
                         showBadges
+                        items={visibleNavigationItems}
                     />
                 </aside>
             )}
@@ -2208,6 +2254,9 @@ function AppInner() {
                         <DashboardView
                             today={today}
                             onGoToInvoices={() => setActivePage('Verbindlichkeiten')}
+                            onGoToBankImport={() => setActivePage('Bankimport')}
+                            onGoToMembers={() => setActivePage('Mitglieder')}
+                            onGoToSubmissions={() => setActivePage('Einreichungen')}
                             onGoToVoucher={({ voucherId, recordDate }) => {
                                 // Reset filters so the voucher can be found reliably
                                 setFilterEarmark(null)
@@ -2348,6 +2397,8 @@ function AppInner() {
                             setAllowVoucherDeletion={setAllowVoucherDeletion}
                             quickAddAfterSave={quickAddAfterSave}
                             setQuickAddAfterSave={setQuickAddAfterSave}
+                            visibleNavItems={visibleNavItems}
+                            setVisibleNavItems={setVisibleNavItems}
                             tagDefs={tagDefs}
                             setTagDefs={setTagDefs}
                             paymentAccounts={paymentAccounts}

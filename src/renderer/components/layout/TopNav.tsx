@@ -1,7 +1,7 @@
 import React from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
-import type { NavKey } from '../../utils/navItems'
+import type { NavItem, NavKey } from '../../utils/navItems'
 
 interface TopNavProps {
   activePage: NavKey
@@ -10,22 +10,25 @@ interface TopNavProps {
   pendingSubmissionsCount?: number
   openBankImportsCount?: number
   openInvoicesCount?: number
+  dueMembershipFeesCount?: number
   showBadges?: boolean
+  items?: NavItem[]
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, showBadges = true }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
-      {navItems.map((item, idx) => {
+      {items.map((item, idx) => {
         const isActive = activePage === item.key
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
-        const showDividerBefore = idx > 0 && item.group !== navItems[idx - 1]?.group
+        const showDividerBefore = idx > 0 && item.group !== items[idx - 1]?.group
         
         // Determine badge count based on nav item
         let badgeCount = 0
         if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
         if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
+        if (item.key === 'Mitglieder') badgeCount = dueMembershipFeesCount
         
         const showBadge = showBadges && badgeCount > 0
         const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)

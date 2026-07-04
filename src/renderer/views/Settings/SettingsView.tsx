@@ -9,6 +9,7 @@ import { OrgPane } from './panes/OrgPane'
 import { DonationsPane } from './panes/DonationsPane'
 import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
 import { TagsPane } from './panes/TagsPane'
+import { AIPatternsPane } from './panes/AIPatternsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { UpdatesPane } from './panes/UpdatesPane'
@@ -23,6 +24,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'donations',
   'paymentAccounts',
   'tags',
+  'aiPatterns',
   'cashCheck',
   'yearEnd',
   'updates',
@@ -132,6 +134,8 @@ export function SettingsView(props: SettingsProps) {
             setAllowVoucherDeletion={props.setAllowVoucherDeletion}
             quickAddAfterSave={props.quickAddAfterSave}
             setQuickAddAfterSave={props.setQuickAddAfterSave}
+            visibleNavItems={props.visibleNavItems}
+            setVisibleNavItems={props.setVisibleNavItems}
           />
         )}
         
@@ -179,6 +183,14 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openTagsManager={props.openTagsManager}
+          />
+        )}
+
+        {activeTile === 'aiPatterns' && (
+          <AIPatternsPane
+            tagDefs={props.tagDefs}
+            paymentAccounts={props.paymentAccounts}
+            notify={props.notify}
           />
         )}
 

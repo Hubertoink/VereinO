@@ -343,9 +343,9 @@ export function createSubmissionsRepository(db: DB) {
     summary(): { pending: number; approved: number; rejected: number; total: number } {
       const row = db.prepare(`
         SELECT 
-          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-          SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
-          SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+          COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0) as approved,
+          COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0) as rejected,
           COUNT(*) as total
         FROM submissions
       `).get() as { pending: number; approved: number; rejected: number; total: number }

@@ -4,6 +4,8 @@
  * Central type definitions for the Settings module
  */
 
+import type { NavKey } from '../../utils/navItems'
+
 // ============================================================================
 // Navigation & Layout Types
 // ============================================================================
@@ -17,6 +19,7 @@ export type TileKey =
   | 'donations'
   | 'paymentAccounts'
   | 'tags'
+  | 'aiPatterns'
   | 'cashCheck'
   | 'yearEnd'
   | 'updates'
@@ -162,6 +165,8 @@ export interface SettingsProps {
   setAllowVoucherDeletion: (v: boolean) => void
   quickAddAfterSave: QuickAddAfterSave
   setQuickAddAfterSave: (v: QuickAddAfterSave) => void
+  visibleNavItems: NavKey[]
+  setVisibleNavItems: (v: NavKey[]) => void
 
   // Tags
   tagDefs: TagDef[]
@@ -216,6 +221,8 @@ export interface GeneralPaneProps {
   setAllowVoucherDeletion: (v: boolean) => void
   quickAddAfterSave: QuickAddAfterSave
   setQuickAddAfterSave: (v: QuickAddAfterSave) => void
+  visibleNavItems: NavKey[]
+  setVisibleNavItems: (v: NavKey[]) => void
 }
 
 export interface TablePaneProps {

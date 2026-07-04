@@ -3,6 +3,8 @@ import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
+import { navItems, type NavKey } from '../../../utils/navItems'
+import { getNavIcon } from '../../../utils/navIcons'
 
 /**
  * GeneralPane - Darstellung & Layout Settings
@@ -43,6 +45,8 @@ export function GeneralPane({
   setAllowVoucherDeletion,
   quickAddAfterSave,
   setQuickAddAfterSave,
+  visibleNavItems,
+  setVisibleNavItems,
   backgroundImage,
   setBackgroundImage,
   customBackgroundImage,
@@ -51,6 +55,7 @@ export function GeneralPane({
   setGlassModals,
 }: GeneralPaneProps) {
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
+  const lockedNavItems = React.useMemo(() => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']), [])
 
   const openCustomBgPicker = () => {
     customBgInputRef.current?.click()
@@ -98,6 +103,14 @@ export function GeneralPane({
     setCustomBackgroundImage(null)
     if (backgroundImage === 'custom') setBackgroundImage('none')
     notify('info', 'Eigenes Hintergrundbild entfernt.')
+  }
+
+  const toggleNavItem = (key: NavKey, checked: boolean) => {
+    if (lockedNavItems.has(key)) return
+    const next = checked
+      ? Array.from(new Set([...visibleNavItems, key]))
+      : visibleNavItems.filter((item) => item !== key)
+    setVisibleNavItems(next)
   }
 
   return (
@@ -319,6 +332,35 @@ export function GeneralPane({
                   onChange={(e) => setNavIconColorMode(e.target.checked ? 'color' : 'mono')}
                 />
               </label>
+            </div>
+
+            <div className="settings-layout-control settings-nav-visibility-control">
+              <div className="settings-layout-label-row">
+                <label>Reiterleiste</label>
+                <span>Bestimme, welche Hauptbereiche in der Navigation sichtbar sind.</span>
+              </div>
+              <div className="settings-nav-visibility-grid">
+                {navItems.map((item) => {
+                  const locked = lockedNavItems.has(item.key)
+                  const checked = locked || visibleNavItems.includes(item.key)
+                  return (
+                    <label key={item.key} className={`settings-nav-visibility-item ${locked ? 'is-locked' : ''}`}>
+                      <span className={`settings-nav-visibility-icon ${navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}`}>
+                        {getNavIcon(item.key)}
+                      </span>
+                      <span>{item.label}</span>
+                      <input
+                        type="checkbox"
+                        className="toggle"
+                        checked={checked}
+                        disabled={locked}
+                        onChange={(event) => toggleNavItem(item.key, event.target.checked)}
+                        aria-label={`${item.label} in Navigation anzeigen`}
+                      />
+                    </label>
+                  )
+                })}
+              </div>
             </div>
           </section>
 

@@ -1,6 +1,7 @@
 import type {
   TBankImportCommitInput,
   TBankImportCommitOutput,
+  TBankImportStatusOutput,
   TBankImportPreviewInput,
   TBankImportPreviewOutput,
   TBankTransactionCheckInput,
@@ -20,6 +21,7 @@ export interface BankImportsApi {
   }
   bankTransactions: {
     list: (payload?: TBankTransactionsListInput) => Promise<TBankTransactionsListOutput>
+    importStatus: () => Promise<TBankImportStatusOutput>
     get: (payload: TBankTransactionIdInput) => Promise<TBankTransactionOutput>
     matches: (payload: TBankTransactionMatchesInput) => Promise<TBankTransactionMatchesOutput>
     link: (payload: TBankTransactionLinkInput) => Promise<TBankTransactionOutput>

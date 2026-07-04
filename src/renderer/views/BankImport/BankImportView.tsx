@@ -36,6 +36,12 @@ type BankTransaction = {
   sourceFileName: string
 }
 
+type BankImportStatus = {
+  lastBookingDate: string | null
+  total: number
+  accounts: Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; total: number }>
+}
+
 type CsvMapping = {
   bookingDate?: string | null
   valueDate?: string | null
@@ -131,6 +137,57 @@ function formatDate(value?: string | null) {
   if (!value) return '–'
   const parsed = new Date(`${value}T00:00:00`)
   return Number.isNaN(parsed.getTime()) ? value : date.format(parsed)
+}
+
+function parseLocalDate(value?: string | null) {
+  if (!value) return null
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  const parsed = new Date(year, month - 1, day)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function toISODate(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(value: Date, days: number) {
+  const next = new Date(value)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function formatMonthRange(from: Date, to: Date) {
+  const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
+  const fromMonth = monthFmt.format(from)
+  const toMonth = monthFmt.format(to)
+  return fromMonth === toMonth ? fromMonth : `${fromMonth} bis ${toMonth}`
+}
+
+function getBankImportReminder(status: BankImportStatus | null) {
+  if (!status) return null
+  if (status.total === 0) {
+    return {
+      title: 'Bankdaten importieren',
+      summary: 'Erster Import offen',
+      detail: 'Es wurden noch keine Bankbelege importiert. Starte mit dem ersten Kontoauszug deines Zahlkontos.'
+    }
+  }
+  const lastDate = parseLocalDate(status.lastBookingDate)
+  if (!lastDate) return null
+  const today = new Date()
+  const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+  if (lastDate >= previousMonthEnd) return null
+  const from = addDays(lastDate, 1)
+  if (from > previousMonthEnd) return null
+  return {
+    title: 'Neuer Bankimport empfohlen',
+    summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
+    detail: `Letzter importierter Buchungstag: ${formatDate(toISODate(lastDate))}. Empfohlener Importzeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}.`
+  }
 }
 
 function statusLabel(status: BankTransaction['status']) {
@@ -1004,6 +1061,7 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(false)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
+  const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const limit = 50
 
   const toggleSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
@@ -1044,20 +1102,32 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
     }
   }, [accountId, notify, page, query, status, sortBy, sortDir])
 
+  const loadImportStatus = useCallback(async () => {
+    try {
+      const result = await window.api.bankTransactions.importStatus()
+      setImportStatus(result as BankImportStatus)
+    } catch {
+      setImportStatus(null)
+    }
+  }, [])
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 180)
     return () => window.clearTimeout(timer)
   }, [load])
 
+  useEffect(() => { void loadImportStatus() }, [loadImportStatus])
+
   useEffect(() => {
-    const refresh = () => void load()
+    const refresh = () => { void load(); void loadImportStatus() }
     window.addEventListener('data-changed', refresh)
     return () => window.removeEventListener('data-changed', refresh)
-  }, [load])
+  }, [load, loadImportStatus])
 
   const activeAccounts = useMemo(() => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'), [paymentAccounts])
   const paymentAccountsById = useMemo(() => new Map(activeAccounts.map((account) => [account.id, account])), [activeAccounts])
   const pageCount = Math.max(1, Math.ceil(total / limit))
+  const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
 
   return (
     <div className="card bank-import-container">
@@ -1082,6 +1152,16 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
         <span className="summary-remaining">
           ({stats.total} gesamt; Zugeordnet: {stats.linked}, Geprüft: {stats.checked})
         </span>
+        {importReminder && (
+          <span className="bank-import-reminder" tabIndex={0} aria-label={`${importReminder.title}: ${importReminder.detail}`}>
+            <span className="bank-import-reminder__icon" aria-hidden="true">!</span>
+            <span className="bank-import-reminder__summary">{importReminder.summary}</span>
+            <span className="bank-import-reminder__popover" role="tooltip">
+              <strong>{importReminder.title}</strong>
+              <span>{importReminder.detail}</span>
+            </span>
+          </span>
+        )}
       </div>
 
       <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
@@ -1136,7 +1216,7 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
         <div><button className="btn" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>‹</button><button className="btn" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>›</button></div>
       </footer>
 
-      {showImport && <BankImportModal accounts={paymentAccounts} notify={notify} onClose={() => setShowImport(false)} onImported={() => { setPage(1); void load() }} />}
+      {showImport && <BankImportModal accounts={paymentAccounts} notify={notify} onClose={() => setShowImport(false)} onImported={() => { setPage(1); void load(); void loadImportStatus() }} />}
       {selected && <BankReviewModal transaction={selected} notify={notify} onClose={() => setSelected(null)} onChanged={() => { window.dispatchEvent(new Event('data-changed')); void load() }} onCreateBooking={onCreateBooking} onOpenVoucher={onOpenVoucher} />}
     </div>
   )

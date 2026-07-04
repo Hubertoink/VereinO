@@ -15,6 +15,7 @@ import type {
     TPaymentsMarkPaidOutput,
     TPaymentsSuggestVouchersInput,
     TPaymentsSuggestVouchersOutput,
+    TPaymentsDueSummaryOutput,
     TPaymentsUnmarkInput,
     TPaymentsUnmarkOutput
 } from '../../../electron/main/ipc/schemas'
@@ -66,6 +67,7 @@ export interface MembersApi {
         markPaid: (payload: TPaymentsMarkPaidInput) => Promise<TPaymentsMarkPaidOutput>
         unmark: (payload: TPaymentsUnmarkInput) => Promise<TPaymentsUnmarkOutput>
         suggestVouchers: (payload: TPaymentsSuggestVouchersInput) => Promise<TPaymentsSuggestVouchersOutput>
+        dueSummary: () => Promise<TPaymentsDueSummaryOutput>
         status: (payload: { memberId: number }) => Promise<{
             hasPlan: 0 | 1
             state: 'NONE' | 'OK' | 'OVERDUE'
