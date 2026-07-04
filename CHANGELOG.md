@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.4.0] - 2026-07-05
+
+### Hinzugefügt
+
+- KI: Neuer OpenAI-gestützter Assistent mit Chatoberfläche, Anhängen, Verlauf, Einstellungen und Review-Pipeline.
+- KI: Buchungsvorschläge aus Belegen, Excel-Dateien und Bankimporten können vorbereitet und nach Prüfung übernommen werden.
+- KI: VereinO-Datenkontext für Mitglieder, Buchungen, Tags, Kategorien, Zahlungskonten und Reports ergänzt.
+
+### Geändert
+
+- Navigation: Der KI-Reiter ist als Modul verfügbar, aber bei neuen Installationen standardmäßig nicht sichtbar.
+
 ## [2.3.6] - 2026-07-04
 
 ### Geändert

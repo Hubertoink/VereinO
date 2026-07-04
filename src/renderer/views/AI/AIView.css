@@ -1,0 +1,1664 @@
+/* Styles for src/renderer/views/AI/AIView.tsx. Keep this file scoped to .ai-* selectors. */
+
+.ai-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  isolation: isolate;
+  min-height: calc(100vh - 104px);
+  color: var(--text);
+}
+
+.ai-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-header h1 {
+  margin: 0;
+}
+
+.ai-header p {
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+}
+
+.ai-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-icon-btn {
+  min-width: 38px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 18px;
+}
+
+.ai-assistant-layout {
+  display: block;
+  width: min(960px, 100%);
+  margin: 0 auto;
+}
+
+.ai-chat-surface {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.ai-welcome {
+  display: grid;
+  justify-items: center;
+  margin: 28px 0 2px;
+  text-align: center;
+}
+
+.ai-welcome h2 {
+  margin: 0;
+  max-width: 820px;
+  color: var(--text);
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.ai-composer-card,
+.ai-conversation-card,
+.ai-assistant-sidebar,
+.ai-bank-review-card,
+.ai-member-review-card,
+.ai-planner-question-card {
+  padding: 16px;
+  background: color-mix(in oklab, var(--surface) 97%, var(--bg) 3%);
+  border-color: color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 20%);
+}
+
+.ai-composer-card {
+  padding: 18px;
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface) 96%, #10223a 4%) 0%,
+      color-mix(in oklab, var(--surface) 92%, var(--accent) 8%) 100%
+    );
+  box-shadow:
+    0 24px 64px rgb(0 0 0 / 26%),
+    0 0 0 1px color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+.ai-composer-card--followup {
+  position: sticky;
+  bottom: 14px;
+  z-index: 4;
+  margin-top: 2px;
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface) 94%, var(--accent) 6%) 0%,
+      color-mix(in oklab, var(--surface) 96%, #00b8d4 4%) 100%
+    );
+}
+
+.ai-composer-card--followup .ai-prompt-input {
+  min-height: 48px;
+}
+
+.ai-prompt-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: -4px auto 10px;
+  max-width: 760px;
+}
+
+.ai-prompt-examples button {
+  border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--border));
+  border-radius: 999px;
+  padding: 8px 13px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface) 76%, var(--accent) 12%) 0%,
+      color-mix(in oklab, var(--surface) 84%, #00b8d4 10%) 100%
+    );
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.ai-prompt-examples button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--border));
+  background: color-mix(in oklab, var(--accent) 16%, var(--surface));
+}
+
+.ai-planner-question-card {
+  display: grid;
+  gap: 14px;
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface) 95%, var(--accent) 5%) 0%,
+      color-mix(in oklab, var(--surface) 96%, #ffd166 4%) 100%
+    );
+}
+
+.ai-planner-question-card p {
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 84%, var(--bg) 16%);
+}
+
+.ai-planner-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.ai-planner-options button {
+  display: grid;
+  gap: 5px;
+  min-height: 82px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, var(--text) 18%);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface-alt) 90%, var(--surface) 10%);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.ai-planner-options button:hover:not(:disabled),
+.ai-planner-options button:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent) 64%, var(--border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  outline: none;
+}
+
+.ai-planner-options button.primary {
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent) 22%, var(--surface) 78%) 0%,
+      color-mix(in oklab, var(--surface) 88%, #00b8d4 12%) 100%
+    );
+}
+
+.ai-planner-options strong {
+  font-size: 14px;
+}
+
+.ai-planner-options span {
+  color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ai-attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ai-attachment-strip span {
+  display: inline-grid;
+  grid-template-columns: 22px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  max-width: 260px;
+  border: 1px solid color-mix(in oklab, var(--border) 78%, var(--text) 22%);
+  border-radius: 10px;
+  padding: 5px 8px 5px 5px;
+  background: color-mix(in oklab, var(--surface-alt) 88%, var(--surface) 12%);
+  color: color-mix(in oklab, var(--text) 78%, var(--bg) 22%);
+  font-size: 12px;
+}
+
+.ai-attachment-remove {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--danger) 24%, var(--surface) 76%);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.ai-attachment-preview:hover .ai-attachment-remove,
+.ai-attachment-preview:focus-within .ai-attachment-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ai-attachment-remove:hover,
+.ai-attachment-remove:focus-visible {
+  background: color-mix(in oklab, var(--danger) 44%, var(--surface) 56%);
+  outline: none;
+}
+
+.ai-attachment-preview img,
+.ai-attachment-preview i {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+}
+
+.ai-attachment-preview i {
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in oklab, var(--text) 78%, var(--bg) 22%);
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ai-attachment-preview strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-prompt-box {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  position: relative;
+}
+
+.ai-prompt-box.is-busy {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ai-prompt-input {
+  min-height: 76px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ai-prompt-input:focus {
+  box-shadow: none;
+}
+
+.ai-prompt-input:disabled {
+  opacity: 0.78;
+  cursor: wait;
+}
+
+.ai-mention-menu {
+  position: absolute;
+  left: 58px;
+  bottom: calc(100% + 10px);
+  z-index: 12;
+  display: grid;
+  gap: 6px;
+  width: min(430px, calc(100vw - 72px));
+  max-height: 310px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--accent) 36%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 96%, var(--bg) 4%);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 32%);
+}
+
+.ai-mention-menu button {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 2px 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-mention-menu button:hover,
+.ai-mention-menu button:focus-visible {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  outline: none;
+}
+
+.ai-mention-menu span {
+  grid-row: span 2;
+  color: color-mix(in oklab, var(--text) 60%, var(--bg) 40%);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ai-mention-menu strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.ai-mention-menu small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+}
+
+.ai-send-btn {
+  min-height: 38px;
+  min-width: 73px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ai-send-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in oklab, var(--surface) 42%, transparent);
+  border-top-color: currentColor;
+  border-radius: 999px;
+  animation: ai-spin 0.72s linear infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-conversation-card {
+  min-height: 0;
+}
+
+.ai-conversation-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: color-mix(in oklab, var(--text) 70%, var(--bg) 30%);
+  font-size: 13px;
+}
+
+.ai-new-chat-btn {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--border) 72%, var(--text) 28%);
+  background: color-mix(in oklab, var(--surface-alt) 80%, transparent);
+  color: color-mix(in oklab, var(--text) 78%, var(--bg) 22%);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ai-new-chat-btn:hover,
+.ai-new-chat-btn:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--accent) 38%, var(--border));
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.ai-message-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-message {
+  display: grid;
+  gap: 8px;
+  max-width: 86%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, var(--text) 18%);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+  overflow-wrap: anywhere;
+}
+
+.ai-message--user {
+  justify-self: end;
+  background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+}
+
+.ai-message-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-message-head span {
+  color: color-mix(in oklab, var(--text) 66%, var(--bg) 34%);
+  font-size: 12px;
+  text-align: right;
+}
+
+.ai-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: color-mix(in oklab, var(--text) 84%, var(--bg) 16%);
+  line-height: 1.45;
+}
+
+.ai-markdown {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  color: color-mix(in oklab, var(--text) 84%, var(--bg) 16%);
+  line-height: 1.48;
+  overflow-wrap: anywhere;
+}
+
+.ai-markdown h4 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.ai-markdown p {
+  margin: 0;
+  white-space: normal;
+}
+
+.ai-markdown ul,
+.ai-markdown ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ai-markdown li {
+  padding-left: 2px;
+}
+
+.ai-markdown strong {
+  color: var(--text);
+}
+
+.ai-assistant-sidebar {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 2400;
+  width: min(380px, calc(100vw - 48px));
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 104px);
+  overflow: auto;
+}
+
+.ai-history-drawer {
+  padding: 16px;
+}
+
+.ai-history-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, var(--text) 18%);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface) 88%, var(--bg) 12%);
+}
+
+.ai-bank-filter-note {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ai-history-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 4px;
+}
+
+.ai-history-group-title span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
+.ai-history-group > button {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+  color: var(--text);
+  padding: 10px;
+  cursor: pointer;
+}
+
+.ai-history-group > button.active {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.ai-assistant-sidebar small {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+}
+
+.ai-bank-suggestion-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-member-review-card {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-member-review-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-member-review-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-member-review-row.is-created {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 9%, var(--surface));
+}
+
+.ai-member-review-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.ai-member-review-row > div:first-child span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
+.ai-member-review-row dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.ai-member-review-row dl div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-member-review-row dt {
+  color: color-mix(in oklab, var(--text) 58%, var(--bg) 42%);
+  font-size: 11px;
+}
+
+.ai-member-review-row dd {
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 84%, var(--bg) 16%);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ai-contribution-payment-card {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-contribution-payment-row {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-contribution-payment-row.is-created {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.ai-contribution-payment-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.ai-contribution-payment-row > div:first-child span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
+.ai-contribution-payment-row dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.ai-contribution-payment-row dl div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-contribution-payment-row dt {
+  color: color-mix(in oklab, var(--text) 58%, var(--bg) 42%);
+  font-size: 11px;
+}
+
+.ai-contribution-payment-row dd {
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 84%, var(--bg) 16%);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ai-member-update-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ai-member-update-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.3fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-member-update-row.is-created {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.ai-member-update-row label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-member-update-row input {
+  accent-color: var(--accent);
+}
+
+.ai-member-update-row label span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-member-update-row label strong,
+.ai-member-update-row label em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-member-update-row label em,
+.ai-member-update-row small {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.ai-member-update-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-member-update-values span,
+.ai-member-update-values strong {
+  overflow-wrap: anywhere;
+}
+
+.ai-member-update-values span {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+}
+
+.ai-member-update-values strong {
+  color: color-mix(in oklab, var(--success) 84%, var(--text) 16%);
+}
+
+.ai-member-update-values b {
+  color: color-mix(in oklab, var(--text) 50%, var(--bg) 50%);
+  font-weight: 700;
+}
+
+.ai-tag-action-card {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-tag-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-tag-action-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-tag-action-row.is-created {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.ai-tag-action-row label {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-tag-action-row input {
+  accent-color: var(--accent);
+}
+
+.ai-tag-action-row label strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-tag-action-kind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ai-tag-action-kind--create {
+  color: color-mix(in oklab, var(--success) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--success) 16%, var(--surface));
+}
+
+.ai-tag-action-kind--update {
+  color: color-mix(in oklab, var(--accent) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--accent) 16%, var(--surface));
+}
+
+.ai-tag-action-kind--delete {
+  color: color-mix(in oklab, var(--danger) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--danger) 16%, var(--surface));
+}
+
+.ai-tag-action-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-tag-action-values span,
+.ai-tag-action-values strong {
+  overflow-wrap: anywhere;
+}
+
+.ai-tag-action-values span {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+}
+
+.ai-tag-action-values strong {
+  color: color-mix(in oklab, var(--text) 88%, var(--bg) 12%);
+}
+
+.ai-tag-action-row i {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 24%);
+}
+
+.ai-voucher-action-card {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-voucher-action-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+
+.ai-voucher-action-summary span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+}
+
+.ai-voucher-action-list {
+  display: grid;
+  gap: 8px;
+  max-height: 480px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ai-voucher-action-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1.2fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-voucher-action-row.is-created {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.ai-voucher-action-row label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-voucher-action-row input {
+  accent-color: var(--accent);
+}
+
+.ai-voucher-action-row label span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-voucher-action-row label strong,
+.ai-voucher-action-row label em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-voucher-action-row label em {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.ai-voucher-tag-diff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ai-voucher-tag-diff span,
+.ai-voucher-tag-diff strong {
+  overflow-wrap: anywhere;
+}
+
+.ai-voucher-tag-diff span {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+}
+
+.ai-voucher-tag-diff strong {
+  color: color-mix(in oklab, var(--success) 84%, var(--text) 16%);
+}
+
+.ai-voucher-tag-diff b {
+  color: color-mix(in oklab, var(--text) 50%, var(--bg) 50%);
+}
+
+.ai-bank-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ai-bank-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+}
+
+.ai-bank-group-head span {
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+  font-size: 12px;
+}
+
+.ai-bank-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 84%, var(--text) 16%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-bank-suggestion--match {
+  border-color: color-mix(in oklab, var(--success) 40%, var(--border));
+  background: color-mix(in oklab, var(--success) 8%, var(--surface));
+}
+
+.ai-bank-suggestion--create {
+  border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+}
+
+.ai-bank-suggestion--manual {
+  border-color: color-mix(in oklab, var(--warning) 34%, var(--border));
+}
+
+.ai-bank-suggestion--done {
+  opacity: 0.82;
+  border-color: color-mix(in oklab, var(--success) 32%, var(--border));
+}
+
+.ai-bank-suggestion-main,
+.ai-bank-suggestion-detail {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ai-bank-suggestion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ai-bank-suggestion-title strong,
+.ai-bank-suggestion-title em {
+  white-space: nowrap;
+}
+
+.ai-bank-suggestion-title em {
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.ai-bank-suggestion-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface-alt) 80%, var(--surface) 20%);
+  color: color-mix(in oklab, var(--text) 78%, var(--bg) 22%);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ai-bank-suggestion--match .ai-bank-suggestion-badge,
+.ai-bank-suggestion--done .ai-bank-suggestion-badge,
+.ai-bank-resolved {
+  color: color-mix(in oklab, var(--success) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--success) 16%, var(--surface));
+}
+
+.ai-bank-suggestion--manual .ai-bank-suggestion-badge {
+  color: color-mix(in oklab, var(--warning) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--warning) 16%, var(--surface));
+}
+
+.ai-bank-suggestion p,
+.ai-bank-suggestion small,
+.ai-bank-suggestion-detail span {
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
+  overflow-wrap: anywhere;
+}
+
+.ai-bank-suggestion-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 150px;
+}
+
+.ai-bank-resolved {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ai-bank-resolved--muted {
+  color: color-mix(in oklab, var(--text) 64%, var(--bg) 36%);
+  background: color-mix(in oklab, var(--surface-alt) 82%, var(--surface) 18%);
+}
+
+@media (max-width: 860px) {
+  .ai-member-review-row dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-member-update-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-member-update-values {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ai-member-update-values b {
+    display: none;
+  }
+
+  .ai-tag-action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-tag-action-values {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ai-tag-action-values b {
+    display: none;
+  }
+
+  .ai-voucher-action-row,
+  .ai-voucher-tag-diff {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-voucher-tag-diff b {
+    display: none;
+  }
+
+  .ai-bank-suggestion {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-bank-suggestion-actions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+}
+
+.ai-usage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface) 91%);
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+  font-size: 13px;
+}
+
+.ai-usage-row strong {
+  color: var(--text);
+}
+
+.ai-settings-drawer {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 2400;
+  width: min(720px, calc(100vw - 48px));
+}
+
+.ai-key-state,
+.ai-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+}
+
+.ai-key-state.is-ready,
+.ai-status--approved,
+.ai-status--needs_review {
+  color: color-mix(in oklab, var(--success) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--success) 18%, var(--surface));
+  border-color: color-mix(in oklab, var(--success) 36%, var(--border));
+}
+
+.ai-key-state.is-missing,
+.ai-status--failed,
+.ai-status--rejected {
+  color: color-mix(in oklab, var(--danger) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--danger) 18%, var(--surface));
+  border-color: color-mix(in oklab, var(--danger) 36%, var(--border));
+}
+
+.ai-status--processing {
+  color: color-mix(in oklab, var(--accent) 78%, var(--text) 22%);
+  background: color-mix(in oklab, var(--accent) 16%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 36%, var(--border));
+}
+
+.ai-tabs,
+.ai-candidate-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--border));
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--surface) 92%, var(--accent) 8%) 0%,
+      color-mix(in oklab, var(--surface) 88%, #00b8d4 12%) 45%,
+      color-mix(in oklab, var(--surface) 90%, #ff7aa8 10%) 100%
+    );
+  box-shadow:
+    0 12px 34px rgb(0 0 0 / 18%),
+    inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.ai-tabs::before,
+.ai-candidate-tabs::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      120deg,
+      transparent 0%,
+      color-mix(in oklab, var(--accent) 18%, transparent) 24%,
+      color-mix(in oklab, #00b8d4 16%, transparent) 42%,
+      transparent 66%
+    );
+  opacity: 0.75;
+  transform: translateX(-48%);
+  animation: ai-tabs-sheen 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ai-tabs button,
+.ai-candidate-tabs button {
+  position: relative;
+  z-index: 1;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 52%, transparent);
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ai-candidate-tabs button {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-candidate-tabs button small {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ai-candidate-tabs button.is-open {
+  border-color: color-mix(in oklab, var(--danger) 28%, var(--border));
+}
+
+.ai-candidate-tabs button.is-open small {
+  color: color-mix(in oklab, var(--danger) 74%, var(--text) 26%);
+  background: color-mix(in oklab, var(--danger) 16%, var(--surface));
+}
+
+.ai-candidate-tabs button.is-booked {
+  border-color: color-mix(in oklab, var(--success) 38%, var(--border));
+  background: color-mix(in oklab, var(--success) 11%, var(--surface));
+}
+
+.ai-candidate-tabs button.is-booked small {
+  color: color-mix(in oklab, var(--success) 80%, var(--text) 20%);
+  background: color-mix(in oklab, var(--success) 18%, var(--surface));
+}
+
+.ai-tabs button:hover,
+.ai-candidate-tabs button:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--accent) 28%, var(--border));
+  background: color-mix(in oklab, var(--surface) 74%, var(--accent) 8%);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 14%);
+}
+
+.ai-tabs button.active,
+.ai-candidate-tabs button.active {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--accent) 58%, #ff7aa8 22%);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent) 22%, var(--surface)) 0%,
+      color-mix(in oklab, #00b8d4 18%, var(--surface)) 48%,
+      color-mix(in oklab, #ff7aa8 20%, var(--surface)) 100%
+    );
+  box-shadow:
+    0 10px 26px color-mix(in oklab, var(--accent) 24%, transparent),
+    inset 0 0 0 1px rgb(255 255 255 / 10%);
+}
+
+.ai-tabs button.active::after,
+.ai-candidate-tabs button.active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #00b8d4, #ff7aa8);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--accent) 62%, transparent);
+  animation: ai-active-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes ai-tabs-sheen {
+  0%,
+  42% {
+    transform: translateX(-48%);
+  }
+
+  62%,
+  100% {
+    transform: translateX(54%);
+  }
+}
+
+@keyframes ai-active-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scaleX(0.86);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-tabs::before,
+  .ai-candidate-tabs::before,
+  .ai-tabs button.active::after,
+  .ai-candidate-tabs button.active::after {
+    animation: none;
+  }
+
+  .ai-tabs button,
+  .ai-candidate-tabs button {
+    transition: none;
+  }
+}
+
+.ai-task-grid,
+.ai-text-layout,
+.ai-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ai-task-card,
+.ai-settings-card,
+.ai-history-card,
+.ai-text-composer,
+.ai-review-card,
+.ai-job-list {
+  padding: 16px;
+  background: color-mix(in oklab, var(--surface) 97%, var(--bg) 3%);
+  border-color: color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 20%);
+}
+
+html[data-glass-modals="true"] .ai-page .card {
+  background: color-mix(in oklab, var(--surface) 97%, var(--bg) 3%) !important;
+  border-color: color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+}
+
+.ai-task-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.ai-task-card p,
+.ai-text-composer p,
+.ai-settings-card p,
+.ai-review-card p {
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+}
+
+.ai-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 118px;
+  margin: 14px 0;
+  padding: 18px;
+  border: 1px dashed color-mix(in oklab, var(--border) 78%, var(--text) 22%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-alt) 92%, var(--surface) 8%);
+  cursor: pointer;
+}
+
+.ai-dropzone input {
+  display: none;
+}
+
+.ai-dropzone span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ai-workspace {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.ai-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-job-list > button {
+  text-align: left;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+  color: var(--text);
+  padding: 10px;
+  cursor: pointer;
+}
+
+.ai-job-list > button.active {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.ai-job-list span,
+.ai-job-list small {
+  display: block;
+}
+
+.ai-job-list small {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  margin-top: 4px;
+}
+
+.ai-review-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
+.ai-preview-panel,
+.ai-candidate-panel {
+  min-width: 0;
+}
+
+.ai-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ai-section-head span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
+.ai-file-preview {
+  display: block;
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  background: color-mix(in oklab, var(--surface-alt) 92%, var(--surface) 8%);
+}
+
+.ai-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-file-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
+}
+
+.ai-file-row span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
+.ai-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-field-wide {
+  grid-column: 1 / -1;
+}
+
+.ai-settings-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
+}
+
+.ai-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.ai-evidence span {
+  border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
+  background: color-mix(in oklab, var(--surface) 88%, var(--bg) 12%);
+}
+
+.ai-evidence .ai-warning {
+  color: var(--warning);
+  background: color-mix(in oklab, var(--warning) 10%, transparent);
+}
+
+.ai-review-actions,
+.ai-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ai-amount-preview {
+  margin-right: auto;
+  font-weight: 800;
+}
+
+.ai-textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.ai-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
+  text-align: center;
+}
+
+.ai-history-table th,
+.ai-history-table td {
+  white-space: nowrap;
+}
+
+.ai-history-table td:first-child {
+  white-space: normal;
+}
+
+@media (max-width: 980px) {
+  .ai-task-grid,
+  .ai-text-layout,
+  .ai-workspace,
+  .ai-assistant-layout,
+  .ai-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-header {
+    flex-direction: column;
+  }
+
+  .ai-welcome h2 {
+    font-size: 26px;
+  }
+
+  .ai-assistant-sidebar {
+    left: 16px;
+    right: 16px;
+    top: 72px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+  }
+
+  .ai-message {
+    max-width: 100%;
+  }
+
+  .ai-prompt-box {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ai-send-btn {
+    grid-column: 1 / -1;
+  }
+
+  .ai-settings-drawer {
+    left: 16px;
+    right: 16px;
+    top: 72px;
+    width: auto;
+  }
+}

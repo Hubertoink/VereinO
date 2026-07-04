@@ -119,6 +119,32 @@ const rendererApi = {
         }
     },
     ping: () => 'pong',
+    ai: {
+        settings: {
+            get: () => invoke('ai.settings.get'),
+            set: (payload) => cleanInvoke('ai.settings.set', payload),
+            testConnection: () => cleanInvoke('ai.settings.testConnection')
+        },
+        jobs: {
+            create: (payload) => cleanInvoke('ai.jobs.create', payload),
+            list: (payload) => invoke('ai.jobs.list', payload),
+            get: (payload) => invoke('ai.jobs.get', payload),
+            process: (payload) => cleanInvoke('ai.jobs.process', payload),
+            updateCandidate: (payload) => cleanInvoke('ai.jobs.updateCandidate', payload),
+            approveCandidate: (payload) => cleanInvoke('ai.jobs.approveCandidate', payload),
+            reject: (payload) => cleanInvoke('ai.jobs.reject', payload),
+            delete: (payload) => invoke('ai.jobs.delete', payload)
+        },
+        text: {
+            generate: (payload) => cleanInvoke('ai.text.generate', payload)
+        },
+        actions: {
+            plan: (payload) => cleanInvoke('ai.actions.plan', payload)
+        },
+        bankImports: {
+            reviewOpen: (payload) => cleanInvoke('ai.bankImports.reviewOpen', payload)
+        }
+    },
     vouchers: {
         create: (payload) => cleanInvoke('vouchers.create', payload),
         reverse: (payload) => cleanInvoke('vouchers.reverse', payload),

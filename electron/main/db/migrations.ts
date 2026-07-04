@@ -1118,6 +1118,54 @@ export function ensureBankImportTables(db: DB) {
   }
 }
 
+export function ensureAiTables(db: DB) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL CHECK(type IN ('BOOKING_FROM_DOCUMENTS', 'MEMBER_TEXT', 'REPORT_TEXT')),
+        status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'QUEUED', 'PROCESSING', 'NEEDS_REVIEW', 'APPROVED', 'REJECTED', 'FAILED')),
+        title TEXT,
+        prompt TEXT,
+        model TEXT,
+        usage_json TEXT,
+        error TEXT,
+        voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        processed_at TEXT,
+        approved_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_job_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES ai_jobs(id) ON DELETE CASCADE,
+        file_name TEXT NOT NULL,
+        mime_type TEXT,
+        size INTEGER NOT NULL DEFAULT 0,
+        data BLOB NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_job_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES ai_jobs(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK(kind IN ('BOOKING_CANDIDATE', 'TEXT_DRAFT')),
+        result_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_jobs_status_created ON ai_jobs(status, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_job_files_job ON ai_job_files(job_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_job_results_job ON ai_job_results(job_id);
+    `)
+    try { db.prepare('ALTER TABLE ai_jobs ADD COLUMN usage_json TEXT').run() } catch { }
+  } catch {
+    // Base tables may not exist before the regular migrations run.
+  }
+}
+
 export function ensureInvoiceTables(db: DB) {
   try {
     db.exec(`

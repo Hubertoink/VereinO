@@ -27,7 +27,7 @@ Empfohlene Teststammdaten:
 Diese Punkte zuerst prüfen. Bei einem Fehler den ausführlichen Test abbrechen.
 
 - [ ] App startet ohne Fehlermeldung und zeigt die zuletzt aktive Organisation.
-- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, Einreichungen, Belege, Reports und Einstellungen.
+- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Bankimport, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, Einreichungen, KI, Belege, Reports und Einstellungen.
 - [ ] Eine Einnahme kann angelegt, gespeichert und im Journal wiedergefunden werden.
 - [ ] Eine Ausgabe kann angelegt, bearbeitet und gespeichert werden.
 - [ ] Eine Buchung mit Datei kann geöffnet werden; der Anhang bleibt nach Neustart vorhanden.
@@ -336,7 +336,31 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Eine zugeordnete Buchung kann aus dem Bankbeleg geöffnet werden.
 - [ ] Wird eine verknüpfte Buchung endgültig gelöscht, wird der Bankbeleg wieder offen.
 
-## 22. Backup, Wiederherstellung und Speicherort
+## 22. KI
+
+- [ ] `KI` erscheint in der Hauptnavigation und öffnet ohne API-Key einen verständlichen Setup-Zustand.
+- [ ] KI-Seite zeigt eine zentrale Prompt-Eingabe mit Beispielprompts, Anhänge-Plus, Verlauf und Einstellungs-Icon.
+- [ ] OpenAI API-Key speichern; der Status wechselt auf `API-Key aktiv`.
+- [ ] Beleganalyse-Modell und Textmodell lassen sich getrennt per Dropdown wählen und speichern.
+- [ ] Verbindungstest mit gültigem API-Key meldet Erfolg.
+- [ ] Verbindungstest ohne/mit ungültigem API-Key zeigt eine verständliche Fehlermeldung.
+- [ ] PDF-Rechnung per Plus anhängen und über Prompt als KI-Aufgabe verarbeiten.
+- [ ] JPG/PNG-Beleg per Plus anhängen und über Prompt als KI-Aufgabe verarbeiten.
+- [ ] Mehrere Rechnungen in einem Prompt anhängen; alle Dateien erscheinen im Review.
+- [ ] KI-Vorschlag bleibt im KI-Reiter und erzeugt noch keine Buchung.
+- [ ] Review-Felder Datum, Art, Sphäre, Betrag, MwSt., Beschreibung und Tags bearbeiten.
+- [ ] `Jetzt buchen` erzeugt erst nach Review eine echte Buchung mit Beleganhang.
+- [ ] Gebuchte KI-Aufgabe zeigt Status `Gebucht` und verknüpfte Buchungsdaten.
+- [ ] Fehlerhafte/nicht unterstützte Datei erzeugt einen Fehlerstatus, ohne bestehende Daten zu verändern.
+- [ ] Textentwurf für Einladung per Prompt erstellen und bearbeiten.
+- [ ] Textentwurf für Mitgliederkommunikation per Prompt erstellen.
+- [ ] Berichtstext aus Stichpunkten per Prompt erstellen.
+- [ ] Prompt zu offenen Bankimport-Belegen erzeugt eine KI-Zusammenfassung mit Vorschlägen.
+- [ ] Bankimport-KI-Funktionen sind nur über die KI-Seite erreichbar, nicht als eigener Button im Bankimport.
+- [ ] KI-Aufgaben bleiben nach App-Neustart im Verlauf sichtbar.
+- [ ] Organisationswechsel vermischt KI-Aufgaben nicht mit anderen Organisationsdaten.
+
+## 23. Backup, Wiederherstellung und Speicherort
 
 Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 
@@ -361,7 +385,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] „Alle Buchungen löschen“ erzeugt vorher ein Backup.
 - [ ] Wenn das Sicherheitsbackup fehlschlägt, werden keine Buchungen gelöscht.
 
-## 23. Jahresabschluss
+## 24. Jahresabschluss
 
 - [ ] Vorschau für ein offenes Jahr prüfen.
 - [ ] Exportpaket für den Jahresabschluss erzeugen.
@@ -372,7 +396,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] Fehlgeschlagenes Sicherheitsbackup verhindert den Abschluss.
 - [ ] Abschlussstatus bleibt nach Neustart bestehen.
 
-## 24. Einstellungen
+## 25. Einstellungen
 
 - [ ] Darstellung: jedes Theme, Hintergrundbild und Glasmodus prüfen.
 - [ ] Menüführung, Iconfarben, Zeilenstil und Dichte prüfen.
@@ -387,7 +411,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] Einstellungen bleiben nach Seitenwechsel, Organisationswechsel und Neustart erhalten.
 - [ ] Organisationsbezogene Einstellungen vermischen sich nicht zwischen Organisationen.
 
-## 25. Updates, externe Dateien und Links
+## 26. Updates, externe Dateien und Links
 
 - [ ] Updateprüfung ohne verfügbares Update zeigt einen ruhigen, verständlichen Status.
 - [ ] Verfügbares Update, Downloadfortschritt und Installationsaufforderung prüfen, sofern Testrelease vorhanden.
@@ -397,7 +421,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] `file:`, `javascript:`, `data:` und unbekannte URL-Protokolle werden nicht extern ausgeführt.
 - [ ] Externe URL mit eingebetteten Zugangsdaten wird abgewiesen.
 
-## 26. Persistenz und Wiederanlauf
+## 27. Persistenz und Wiederanlauf
 
 - [ ] App nach jeder CRUD-Aktion schließen und neu öffnen.
 - [ ] Filter, Spalten, Theme, Navigation und Seitengröße bleiben wie vorgesehen erhalten.
@@ -408,7 +432,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] App startet auch nach einem erzwungenen Prozessabbruch ohne beschädigte Datenbank.
 - [ ] Migration einer Kopie einer älteren VereinO-Datenbank funktioniert.
 
-## 27. Fehlerfälle und Robustheit
+## 28. Fehlerfälle und Robustheit
 
 - [ ] Pflichtfelder leer lassen und Fehlermeldungen auf Verständlichkeit prüfen.
 - [ ] Doppelklick auf Speichern erzeugt keinen doppelten Datensatz.
@@ -421,7 +445,7 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] Mehrfaches Öffnen/Schließen von Modalen erzeugt keine doppelten Events oder Toasts.
 - [ ] Keine unverständlichen Electron-IPC-Präfixe in Fehlermeldungen.
 
-## 28. Abschlusskontrolle
+## 29. Abschlusskontrolle
 
 - [ ] Ausgangszahlen und Endzahlen sind durch die ausgeführten Testaktionen erklärbar.
 - [ ] Keine Daten der zweiten Testorganisation wurden verändert.

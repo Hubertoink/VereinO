@@ -1,5 +1,6 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherMetaUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportAnalyzeInput, ImportAnalyzeOutput, ImportCommitDraftInput, ImportCreateMissingInput, ImportCreateMissingOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, ImportEditableExportInput, ImportEditableExportOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, TagUsageInput, TagUsageOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, PaymentsDueSummaryOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput, SubmissionsExportCatalogOutput, DonationsExportMoneyReceiptInput, DonationsExportMoneyReceiptOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsOutput } from './schemas'
+import { AiActionPlanInput, AiActionPlanOutput, AiBankImportReviewInput, AiBankImportReviewOutput, AiBookingAnalysisResult, AiJobIdInput, AiJobsApproveCandidateInput, AiJobsApproveCandidateOutput, AiJobsCreateInput, AiJobsCreateOutput, AiJobsDeleteOutput, AiJobsGetOutput, AiJobsListInput, AiJobsListOutput, AiJobsProcessOutput, AiJobsRejectInput, AiJobsUpdateCandidateInput, AiSettingsGetOutput, AiSettingsSetInput, AiSettingsSetOutput, AiSettingsTestOutput, AiTextGenerateInput, AiTextGenerateOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, updateVoucherMeta, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
@@ -24,7 +25,7 @@ import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
 import { previewFile, executeFile, analyzeFile, commitImportDraft, createMissingImportMasterData, generateImportTemplate, generateImportTestData, exportEditableVouchersWorkbook } from '../services/imports'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
 import { PaymentAccountsListInput, PaymentAccountsListOutput, PaymentAccountUpsertInput, PaymentAccountUpsertOutput, PaymentAccountDeleteInput, PaymentAccountDeleteOutput } from './schemas'
-import { applyMigrations, ensureAdvanceTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherForeignKeyTargets } from '../db/migrations'
+import { applyMigrations, ensureAdvanceTables, ensureAiTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherForeignKeyTargets } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
 import * as yearEnd from '../services/yearEnd'
@@ -64,6 +65,8 @@ import {
     previewBankImport,
     reopenBankTransaction
 } from '../repositories/bankTransactions'
+import { createAiJob, deleteAiJob, getAiJob, listAiJobs, rejectAiJob, saveAiJobResult, setAiJobStatus, updateAiJobCandidate } from '../repositories/aiJobs'
+import { analyzeBookingDocuments, generateAiText, getAiSettings, planAiAction, reviewBankImportTransactions, setAiSettings, testAiConnection } from '../services/ai'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -90,6 +93,7 @@ async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[])
             const db = getDb()
             ensureVoucherColumns(db as any)
             ensureAdvanceTables(db as any)
+            ensureAiTables(db as any)
             ensureInvoiceTables(db as any)
             applyMigrations(db as any)
         } catch {
@@ -115,6 +119,285 @@ type RegisterIpcHandlersOptions = {
     cancelPendingMainClose?: () => { ok: boolean }
     getDetachedQuickAddInitial?: (token: string) => any
     notifyQuickAddSaved?: (payload?: any) => void
+}
+
+function budgetLabelForAi(budget: any) {
+    if (budget.label) return budget.label
+    if (budget.name) return budget.name
+    if (budget.categoryName) return `${budget.year} - ${budget.categoryName}`
+    if (budget.projectName) return `${budget.year} - ${budget.projectName}`
+    return `Budget #${budget.id}`
+}
+
+function roundMoney(value: unknown) {
+    return Math.round(Number(value || 0) * 100) / 100
+}
+
+function dateRangeForYear(year: number, today: string) {
+    return {
+        from: `${year}-01-01`,
+        to: year === Number(today.slice(0, 4)) ? today : `${year}-12-31`
+    }
+}
+
+function compactReportSummary(filters: any = {}) {
+    const summary = summarizeVouchers(filters)
+    return {
+        totals: {
+            net: roundMoney(summary.totals?.net),
+            vat: roundMoney(summary.totals?.vat),
+            gross: roundMoney(summary.totals?.gross)
+        },
+        byType: (summary.byType || []).map((row: any) => ({
+            type: row.key,
+            net: roundMoney(row.net),
+            vat: roundMoney(row.vat),
+            gross: roundMoney(row.gross)
+        })),
+        bySphere: (summary.bySphere || []).map((row: any) => ({
+            sphere: row.key,
+            gross: roundMoney(row.gross)
+        })),
+        byPaymentAccount: (summary.byPaymentAccount || []).map((row: any) => ({
+            accountId: row.accountId,
+            name: row.key,
+            kind: row.kind,
+            gross: roundMoney(row.gross)
+        }))
+    }
+}
+
+function compactVoucherForAi(row: any) {
+    return {
+        id: row.id,
+        voucherNo: row.voucherNo,
+        date: row.date,
+        type: row.type,
+        sphere: row.sphere,
+        description: row.description,
+        counterparty: row.counterparty,
+        grossAmount: roundMoney(row.grossAmount),
+        paymentMethod: row.paymentMethod,
+        paymentAccountId: row.paymentAccountId,
+        paymentAccountName: row.paymentAccountName,
+        budgetId: row.budgetId,
+        budgetLabel: row.budgetLabel,
+        earmarkId: row.earmarkId,
+        earmarkCode: row.earmarkCode,
+        tags: row.tags || []
+    }
+}
+
+function normalizeAiLookup(value: unknown) {
+    return String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+}
+
+function paymentMethodForAiAccountKind(kind?: string | null): 'BAR' | 'BANK' | null {
+    if (kind === 'CASH') return 'BAR'
+    if (kind === 'BANK' || kind === 'PAYPAL' || kind === 'CARD' || kind === 'OTHER') return 'BANK'
+    return null
+}
+
+function findAiPaymentAccountHint(prompt: string, paymentAccounts: any[]) {
+    const normalizedPrompt = normalizeAiLookup(prompt)
+    if (!normalizedPrompt) return null
+    const candidates = (paymentAccounts || [])
+        .filter((account) => account?.isActive !== 0)
+        .map((account) => ({ account, normalizedName: normalizeAiLookup(account.name) }))
+        .filter((item) => item.normalizedName && normalizedPrompt.includes(item.normalizedName))
+        .sort((a, b) => b.normalizedName.length - a.normalizedName.length)
+    return candidates[0]?.account || null
+}
+
+function shouldApplyPaymentHintToAll(prompt: string) {
+    const normalizedPrompt = normalizeAiLookup(prompt)
+    return /(alle|allen|jede|jeden|saemtliche|samtliche|immer|standard|default|grundsaetzlich|grundsatzlich|nicht anders angegeben|gehen diese auf|sollen auf|soll bei allen)/.test(normalizedPrompt)
+}
+
+function applyPaymentAccountHintToAiAnalysis(result: any, prompt: string, paymentAccounts: any[]) {
+    const account = findAiPaymentAccountHint(prompt, paymentAccounts)
+    if (!account || !Array.isArray(result?.candidates)) return result
+    const paymentMethod = paymentMethodForAiAccountKind(account.kind)
+    const applyAll = shouldApplyPaymentHintToAll(prompt)
+    let changed = false
+    const nextCandidates = result.candidates.map((candidate: any) => {
+        if (!applyAll && candidate.paymentAccountId) return candidate
+        changed = true
+        return {
+            ...candidate,
+            paymentAccountId: Number(account.id),
+            paymentMethod,
+            warnings: (candidate.warnings || []).filter((warning: string) => !/kein konto|kein zahlungsweg|zahlung.*platzhalter/i.test(String(warning)))
+        }
+    })
+    if (!changed) return result
+    return {
+        ...result,
+        candidates: nextCandidates,
+        warnings: [...(result.warnings || []), `Zahlungskonto aus Nutzerhinweis gesetzt: ${account.name}.`]
+    }
+}
+
+function buildAiContext() {
+    const today = new Date().toISOString().slice(0, 10)
+    const currentYear = Number(today.slice(0, 4))
+    const organization = (() => {
+        try {
+            const active = getActiveOrganization() as any
+            return {
+                name: active?.name ?? active?.displayName ?? null,
+                activeName: active?.name ?? active?.displayName ?? null
+            }
+        } catch {
+            return undefined
+        }
+    })()
+    const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
+    const budgets = listBudgets({ includeArchived: true } as any) || []
+    const earmarks = listBindings({} as any) || []
+    const tags = listTags({ includeUsage: true } as any) || []
+    const members = listMembers({ status: 'ALL', limit: 2000, sortBy: 'name', sort: 'ASC' } as any)
+    const memberStatusCounts = members.rows.reduce<Record<string, number>>((acc, member: any) => {
+        acc[member.status] = (acc[member.status] || 0) + 1
+        return acc
+    }, {})
+    const years = Array.from(new Set([currentYear, ...listVoucherYears()]))
+        .filter((year) => Number.isFinite(Number(year)))
+        .map(Number)
+        .sort((a, b) => b - a)
+        .slice(0, 8)
+    const currentRange = dateRangeForYear(currentYear, today)
+    const currentYearIncome = summarizeVouchers({ ...currentRange, type: 'IN' } as any).totals
+    const currentYearExpenses = summarizeVouchers({ ...currentRange, type: 'OUT' } as any).totals
+    const latestVouchers = listVouchersAdvanced({ limit: 500, sort: 'DESC' } as any).map(compactVoucherForAi)
+    const currentYearVouchers = listVouchersAdvanced({ ...currentRange, limit: 1000, sort: 'DESC' } as any).map(compactVoucherForAi)
+    const invoiceSummary = summarizeInvoices({} as any)
+    const openInvoiceSummary = summarizeInvoices({ status: 'OPEN' } as any)
+    const openInvoices = listInvoicesPaged({ status: 'OPEN', limit: 200, sortBy: 'due', sort: 'ASC' } as any).rows.map((invoice: any) => ({
+        id: invoice.id,
+        invoiceNo: invoice.invoiceNo,
+        date: invoice.date,
+        dueDate: invoice.dueDate,
+        party: invoice.party,
+        description: invoice.description,
+        grossAmount: roundMoney(invoice.grossAmount),
+        paidSum: roundMoney(invoice.paidSum),
+        status: invoice.status,
+        voucherType: invoice.voucherType,
+        sphere: invoice.sphere,
+        budgetId: invoice.budgetId,
+        tags: invoice.tags || []
+    }))
+    return {
+        organization,
+        generatedAt: today,
+        paymentAccounts: paymentAccounts.map((account: any) => ({
+            id: account.id,
+            name: account.name,
+            kind: account.kind,
+            ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
+            color: account.color,
+            sortOrder: account.sortOrder,
+            isActive: account.isActive
+        })),
+        budgets: budgets.map((budget: any) => ({
+            id: budget.id,
+            label: budgetLabelForAi(budget),
+            year: budget.year,
+            sphere: budget.sphere,
+            categoryName: budget.categoryName,
+            projectName: budget.projectName,
+            amountPlanned: budget.amountPlanned,
+            isArchived: budget.isArchived
+        })),
+        earmarks: earmarks.map((earmark: any) => ({
+            id: earmark.id,
+            code: earmark.code,
+            name: earmark.name,
+            isActive: earmark.isActive
+        })),
+        tags: tags.map((tag: any) => ({ id: tag.id, name: tag.name, color: tag.color, usage: Number(tag.usage || 0) })),
+        members: {
+            total: members.total,
+            byStatus: memberStatusCounts,
+            contributionDue: mp.dueSummary(),
+            rows: members.rows.map((member: any) => ({
+                id: member.id,
+                memberNo: member.memberNo,
+                name: member.name,
+                email: member.email,
+                phone: member.phone,
+                status: member.status,
+                boardRole: member.boardRole,
+                tags: member.tags || [],
+                contributionAmount: member.contribution_amount,
+                contributionInterval: member.contribution_interval,
+                joinDate: member.join_date,
+                leaveDate: member.leave_date,
+                nextDueDate: member.next_due_date,
+                notes: member.notes,
+                hasIban: !!member.iban,
+                hasMandate: !!member.mandate_ref
+            }))
+        },
+        reports: {
+            currentDate: today,
+            currentYear,
+            allTime: compactReportSummary({ includeInternalVouchers: true }),
+            currentYearToDate: compactReportSummary(currentRange),
+            currentYearIncomeGross: roundMoney(currentYearIncome?.gross),
+            currentYearExpenseGross: roundMoney(currentYearExpenses?.gross),
+            cashBalance: cashBalance({ to: today } as any),
+            monthlyCurrentYearNet: monthlyVouchers(currentRange as any),
+            monthlyCurrentYearIncome: monthlyVouchers({ ...currentRange, type: 'IN' } as any),
+            monthlyCurrentYearExpenses: monthlyVouchers({ ...currentRange, type: 'OUT' } as any),
+            yearly: years.map((year) => {
+                const range = dateRangeForYear(year, today)
+                const income = summarizeVouchers({ ...range, type: 'IN' } as any).totals
+                const expenses = summarizeVouchers({ ...range, type: 'OUT' } as any).totals
+                return {
+                    year,
+                    range,
+                    summary: compactReportSummary(range),
+                    incomeGross: roundMoney(income?.gross),
+                    expenseGross: roundMoney(expenses?.gross)
+                }
+            }),
+            latestVouchers,
+            currentYearVouchers
+        },
+        invoices: {
+            summary: {
+                count: invoiceSummary.count,
+                gross: roundMoney(invoiceSummary.gross),
+                paid: roundMoney(invoiceSummary.paid),
+                remaining: roundMoney(invoiceSummary.remaining),
+                grossIn: roundMoney(invoiceSummary.grossIn),
+                grossOut: roundMoney(invoiceSummary.grossOut)
+            },
+            openSummary: {
+                count: openInvoiceSummary.count,
+                gross: roundMoney(openInvoiceSummary.gross),
+                paid: roundMoney(openInvoiceSummary.paid),
+                remaining: roundMoney(openInvoiceSummary.remaining),
+                grossIn: roundMoney(openInvoiceSummary.grossIn),
+                grossOut: roundMoney(openInvoiceSummary.grossOut)
+            },
+            openRows: openInvoices
+        }
+    }
+}
+
+function notifyDataChanged() {
+    for (const win of BrowserWindow.getAllWindows()) {
+        try { win.webContents.send('app:data-changed') } catch { }
+    }
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
@@ -199,6 +482,218 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         for (const win of BrowserWindow.getAllWindows()) {
             try { win.webContents.send('app:data-changed') } catch { }
         }
+    })
+    ipcMain.handle('ai.settings.get', async () => AiSettingsGetOutput.parse(getAiSettings()))
+    ipcMain.handle('ai.settings.set', async (_e, payload) => {
+        const parsed = AiSettingsSetInput.parse(payload)
+        return AiSettingsSetOutput.parse(setAiSettings(parsed))
+    })
+    ipcMain.handle('ai.settings.testConnection', async () => AiSettingsTestOutput.parse(await testAiConnection()))
+    ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
+        const parsed = AiBankImportReviewInput.parse(payload)
+        const limit = Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
+        const openRows = (listBankTransactions({
+            status: 'OPEN',
+            sortBy: 'date',
+            sortDir: 'DESC',
+            page: 1,
+            limit
+        }) as any).rows as any[]
+        const transactions = openRows.map((transaction) => {
+            const matches = findBankTransactionMatches({ id: transaction.id, includeAllDates: false })
+                .filter((match: any) => Number(match.score || 0) > 0)
+                .slice(0, 5)
+            return {
+                id: transaction.id,
+                bookingDate: transaction.bookingDate,
+                direction: transaction.direction,
+                amount: Number(transaction.amount),
+                currency: transaction.currency,
+                counterparty: transaction.counterparty,
+                purpose: transaction.purpose,
+                endToEndId: transaction.endToEndId,
+                bankReference: transaction.bankReference,
+                paymentAccountId: transaction.paymentAccountId,
+                paymentAccountName: transaction.paymentAccountName,
+                matches
+            }
+        })
+        const reviewed = await reviewBankImportTransactions({
+            transactions,
+            context: buildAiContext()
+        })
+        const transactionById = new Map(openRows.map((row) => [Number(row.id), row]))
+        const matchesByTransactionId = new Map(transactions.map((row) => [Number(row.id), row.matches || []]))
+        const suggestions = reviewed.result.suggestions
+            .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
+            .map((suggestion) => {
+                const transaction = transactionById.get(Number(suggestion.transactionId))
+                const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
+                if (suggestion.action === 'LINK_EXISTING') {
+                    const match = matches.find((item: any) => Number(item.id) === Number(suggestion.voucherId))
+                    if (!match) {
+                        return {
+                            ...suggestion,
+                            action: 'NEEDS_MANUAL_REVIEW' as const,
+                            voucherId: null,
+                            voucherNo: null,
+                            reason: `${suggestion.reason} Lokaler Treffer konnte nicht sicher validiert werden.`,
+                            transaction
+                        }
+                    }
+                    return {
+                        ...suggestion,
+                        voucherNo: suggestion.voucherNo || match.voucherNo || null,
+                        transaction
+                    }
+                }
+                return { ...suggestion, transaction }
+            })
+        const seen = new Set(suggestions.map((suggestion) => Number(suggestion.transactionId)))
+        for (const transaction of openRows) {
+            if (!seen.has(Number(transaction.id))) {
+                suggestions.push({
+                    transactionId: Number(transaction.id),
+                    action: 'NEEDS_MANUAL_REVIEW',
+                    confidence: 0.2,
+                    reason: 'Die KI hat fuer diesen Bankbeleg keinen belastbaren Vorschlag geliefert.',
+                    warnings: ['Manuelle Pruefung empfohlen.'],
+                    evidence: [],
+                    transaction
+                })
+            }
+        }
+        return AiBankImportReviewOutput.parse({
+            ...reviewed.result,
+            suggestions
+        })
+    })
+    ipcMain.handle('ai.jobs.create', async (_e, payload) => {
+        const parsed = AiJobsCreateInput.parse(payload)
+        const job = createAiJob(parsed)
+        return AiJobsCreateOutput.parse(job)
+    })
+    ipcMain.handle('ai.jobs.list', async (_e, payload) => {
+        const parsed = AiJobsListInput.parse(payload)
+        return AiJobsListOutput.parse(listAiJobs(parsed as any))
+    })
+    ipcMain.handle('ai.jobs.get', async (_e, payload) => {
+        const parsed = AiJobIdInput.parse(payload)
+        return AiJobsGetOutput.parse(getAiJob(parsed.id))
+    })
+    ipcMain.handle('ai.jobs.process', async (_e, payload) => {
+        const parsed = AiJobIdInput.parse(payload)
+        const initial = setAiJobStatus(parsed.id, 'PROCESSING')
+        try {
+            if (initial.type === 'BOOKING_FROM_DOCUMENTS') {
+                const context = buildAiContext()
+                const analyzed = await analyzeBookingDocuments({
+                    files: initial.files.map((file) => ({
+                        fileName: file.fileName,
+                        mimeType: file.mimeType,
+                        dataBase64: file.dataBase64 || ''
+                    })),
+                    context,
+                    model: initial.model
+                })
+                const hardenedResult = applyPaymentAccountHintToAiAnalysis(analyzed.result, initial.prompt || initial.title || '', context.paymentAccounts || [])
+                saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', hardenedResult)
+                const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
+                return AiJobsProcessOutput.parse(processed)
+            }
+            const generated = await generateAiText({
+                type: initial.type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_MESSAGE',
+                prompt: initial.prompt || initial.title || '',
+                model: initial.model || undefined,
+                context: buildAiContext(),
+                files: initial.files.map((file) => ({
+                    fileName: file.fileName,
+                    mimeType: file.mimeType,
+                    dataBase64: file.dataBase64 || ''
+                }))
+            })
+            saveAiJobResult(parsed.id, 'TEXT_DRAFT', generated.result)
+            const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', { model: generated.model, usage: generated.usage })
+            return AiJobsProcessOutput.parse(processed)
+        } catch (error: any) {
+            const failed = setAiJobStatus(parsed.id, 'FAILED', { error: error?.message || String(error) })
+            return AiJobsProcessOutput.parse(failed)
+        }
+    })
+    ipcMain.handle('ai.jobs.updateCandidate', async (_e, payload) => {
+        const parsed = AiJobsUpdateCandidateInput.parse(payload)
+        const job = updateAiJobCandidate(parsed.id, parsed.result)
+        return AiJobsGetOutput.parse(job)
+    })
+    ipcMain.handle('ai.jobs.approveCandidate', async (_e, payload) => {
+        const parsed = AiJobsApproveCandidateInput.parse(payload)
+        const job = getAiJob(parsed.id)
+        const analysis = AiBookingAnalysisResult.parse(job.result)
+        const candidate = analysis.candidates[parsed.candidateIndex]
+        if (!candidate) throw new Error('KI-Buchungsvorschlag nicht gefunden.')
+        const hasCandidateReviewState = analysis.candidates.some((item) => item.review?.status === 'APPROVED' || item.review?.voucherId)
+        if (job.status === 'APPROVED' && !hasCandidateReviewState) {
+            throw new Error('Dieser ältere KI-Vorschlag wurde bereits als gebucht markiert und kann nicht erneut gebucht werden.')
+        }
+        if (candidate.review?.status === 'APPROVED' || candidate.review?.voucherId) {
+            throw new Error('Dieser KI-Buchungsvorschlag wurde bereits gebucht.')
+        }
+        const voucherPayload = VoucherCreateInput.parse({
+            date: candidate.date,
+            type: candidate.type,
+            sphere: candidate.sphere,
+            description: candidate.description,
+            grossAmount: candidate.grossAmount,
+            vatRate: candidate.vatRate ?? 0,
+            paymentMethod: candidate.paymentMethod ?? undefined,
+            paymentAccountId: candidate.paymentAccountId ?? undefined,
+            budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
+            earmarks: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
+            tags: candidate.tags || [],
+            files: job.files.map((file) => ({
+                name: file.fileName,
+                dataBase64: file.dataBase64 || '',
+                mime: file.mimeType || undefined
+            }))
+        })
+        const voucher = createVoucher(voucherPayload)
+        const nextAnalysis = {
+            ...analysis,
+            candidates: analysis.candidates.map((item, idx) => idx === parsed.candidateIndex
+                ? {
+                    ...item,
+                    review: {
+                        status: 'APPROVED' as const,
+                        voucherId: voucher.id,
+                        voucherNo: voucher.voucherNo,
+                        approvedAt: new Date().toISOString()
+                    }
+                }
+                : item)
+        }
+        saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', nextAnalysis)
+        const allCandidatesApproved = nextAnalysis.candidates.every((item) => item.review?.status === 'APPROVED' || item.review?.voucherId)
+        setAiJobStatus(parsed.id, allCandidatesApproved ? 'APPROVED' : 'NEEDS_REVIEW', { voucherId: voucher.id })
+        notifyDataChanged()
+        return AiJobsApproveCandidateOutput.parse({ ok: true, voucherId: voucher.id, voucherNo: voucher.voucherNo })
+    })
+    ipcMain.handle('ai.jobs.reject', async (_e, payload) => {
+        const parsed = AiJobsRejectInput.parse(payload)
+        return AiJobsGetOutput.parse(rejectAiJob(parsed.id, parsed.reason))
+    })
+    ipcMain.handle('ai.jobs.delete', async (_e, payload) => {
+        const parsed = AiJobIdInput.parse(payload)
+        return AiJobsDeleteOutput.parse(deleteAiJob(parsed.id))
+    })
+    ipcMain.handle('ai.text.generate', async (_e, payload) => {
+        const parsed = AiTextGenerateInput.parse(payload)
+        const generated = await generateAiText({ ...parsed, context: buildAiContext() })
+        return AiTextGenerateOutput.parse(generated.result)
+    })
+    ipcMain.handle('ai.actions.plan', async (_e, payload) => {
+        const parsed = AiActionPlanInput.parse(payload)
+        const planned = await planAiAction({ ...parsed, context: buildAiContext() })
+        return AiActionPlanOutput.parse(planned)
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)

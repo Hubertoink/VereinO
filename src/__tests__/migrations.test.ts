@@ -1,4 +1,4 @@
-import { ensureAdvanceTables, ensureBankImportTables, expandVoucherTypeConstraint } from '../../electron/main/db/migrations'
+import { ensureAdvanceTables, ensureAiTables, ensureBankImportTables, expandVoucherTypeConstraint } from '../../electron/main/db/migrations'
 
 describe('expandVoucherTypeConstraint', () => {
   it('updates the vouchers table SQL to support INTERNAL voucher types', () => {
@@ -23,6 +23,21 @@ describe('ensureBankImportTables', () => {
     expect(sql).toContain('voucher_id INTEGER UNIQUE REFERENCES vouchers(id) ON DELETE SET NULL')
     expect(sql).toContain('trg_bank_transactions_voucher_deleted')
     expect(sql).toContain('BEFORE DELETE ON vouchers')
+  })
+})
+
+describe('ensureAiTables', () => {
+  it('creates KI job, file and result tables for review-first processing', () => {
+    const exec = jest.fn()
+
+    ensureAiTables({ exec } as any)
+
+    const sql = String(exec.mock.calls[0][0])
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS ai_jobs')
+    expect(sql).toContain("CHECK(status IN ('DRAFT', 'QUEUED', 'PROCESSING', 'NEEDS_REVIEW', 'APPROVED', 'REJECTED', 'FAILED'))")
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS ai_job_files')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS ai_job_results')
+    expect(sql).toContain('voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL')
   })
 })
 

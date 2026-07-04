@@ -44,6 +44,7 @@ const AdvancesView = lazy(() => import('./views/Advances/AdvancesView'))
 const BudgetsView = lazy(() => import('./views/Budgets/BudgetsView'))
 const EarmarksView = lazy(() => import('./views/Earmarks/EarmarksView'))
 const BankImportView = lazy(() => import('./views/BankImport/BankImportView'))
+const AIView = lazy(() => import('./views/AI/AIView'))
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 
@@ -1042,14 +1043,18 @@ function AppInner() {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
     const requiredNavItems = useMemo(() => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']), [])
+    const defaultVisibleNavItems = useMemo(
+        () => navItems.filter((item) => item.key !== 'KI').map((item) => item.key),
+        []
+    )
     const [visibleNavItems, setVisibleNavItemsState] = useState<NavKey[]>(() => {
         try {
             const parsed = JSON.parse(localStorage.getItem('ui.visibleNavItems') || 'null')
-            if (!Array.isArray(parsed)) return navItems.map((item) => item.key)
+            if (!Array.isArray(parsed)) return defaultVisibleNavItems
             const valid = new Set(navItems.map((item) => item.key))
             return Array.from(new Set([...parsed.filter((key) => valid.has(key)), ...requiredNavItems])) as NavKey[]
         } catch {
-            return navItems.map((item) => item.key)
+            return defaultVisibleNavItems
         }
     })
     const setVisibleNavItems = useCallback((items: NavKey[]) => {
@@ -1423,6 +1428,16 @@ function AppInner() {
             return null
         }
     }, () => fileInputRef.current?.click(), notify, showBookingDraftTabs, quickAddAfterSave)
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent<{ qa?: any; files?: File[] }>).detail || {}
+            if (!detail.qa) return
+            openQuickAdd({ qa: detail.qa, files: detail.files || [] })
+        }
+        window.addEventListener('ai:open-booking-draft', handler)
+        return () => window.removeEventListener('ai:open-booking-draft', handler)
+    }, [openQuickAdd])
 
     const detachQuickAdd = useCallback(async () => {
         if (!activeDraftId) return
@@ -2513,6 +2528,16 @@ function AppInner() {
                         />
                     )}
 
+                    {activePage === 'KI' && (
+                        <AIView
+                            notify={notify}
+                            onBooked={() => {
+                                bumpDataVersion()
+                                window.dispatchEvent(new Event('data-changed'))
+                            }}
+                        />
+                    )}
+
                     {activePage === 'Einreichungen' && (
                         <SubmissionsView
                             notify={notify}
@@ -2578,7 +2603,7 @@ function AppInner() {
             )}
             {/* removed: Confirm mark as paid modal */}
             {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Bankimport' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
+            {activePage !== 'Einstellungen' && activePage !== 'Mitglieder' && activePage !== 'Verbindlichkeiten' && activePage !== 'Bankimport' && activePage !== 'KI' && activePage !== 'Budgets' && activePage !== 'Zweckbindungen' && activePage !== 'Vorschuesse' && (
                 <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
                     <span className="fab-buchung-icon">+</span>
                     <span className="fab-buchung-text">Buchung</span>

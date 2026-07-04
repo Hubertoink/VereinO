@@ -7,9 +7,11 @@ import type { OperationsApi } from './operationsApi'
 import type { ReportsApi } from './reportsApi'
 import type { SystemApi } from './systemApi'
 import type { BankImportsApi } from './bankImportsApi'
+import type { AiApi } from './aiApi'
 
 export interface RendererApi
-    extends CoreApi,
+    extends AiApi,
+        CoreApi,
         BankImportsApi,
         FinanceApi,
         ImportsApi,

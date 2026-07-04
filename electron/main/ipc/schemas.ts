@@ -1482,6 +1482,344 @@ export type TPaymentsUnmarkOutput = z.infer<typeof PaymentsUnmarkOutput>
 export type TPaymentsSuggestVouchersInput = z.infer<typeof PaymentsSuggestVouchersInput>
 export type TPaymentsSuggestVouchersOutput = z.infer<typeof PaymentsSuggestVouchersOutput>
 export type TPaymentsDueSummaryOutput = z.infer<typeof PaymentsDueSummaryOutput>
+
+// AI jobs and OpenAI-backed helpers
+export const AiJobType = z.enum(['BOOKING_FROM_DOCUMENTS', 'MEMBER_TEXT', 'REPORT_TEXT'])
+export const AiJobStatus = z.enum(['DRAFT', 'QUEUED', 'PROCESSING', 'NEEDS_REVIEW', 'APPROVED', 'REJECTED', 'FAILED'])
+export const AiResultKind = z.enum(['BOOKING_CANDIDATE', 'TEXT_DRAFT'])
+
+export const AiJobFileInput = z.object({
+    fileName: z.string().min(1),
+    mimeType: z.string().nullable().optional(),
+    dataBase64: z.string().min(1)
+})
+
+export const AiBookingAssignment = z.object({
+    id: z.number().int().positive(),
+    amount: z.number().nonnegative()
+})
+
+export const AiBookingCandidateReview = z.object({
+    status: z.enum(['OPEN', 'APPROVED']).default('OPEN'),
+    voucherId: z.number().int().positive().nullable().optional(),
+    voucherNo: z.string().nullable().optional(),
+    approvedAt: z.string().nullable().optional()
+})
+
+export const AiBookingCandidate = z.object({
+    date: z.string().min(4),
+    type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
+    sphere: Sphere,
+    description: z.string().min(1),
+    grossAmount: z.number().positive(),
+    vatRate: z.number().min(0).max(100).default(0),
+    paymentMethod: PaymentMethod.nullable().optional(),
+    paymentAccountId: z.number().int().positive().nullable().optional(),
+    counterparty: z.string().nullable().optional(),
+    budgets: z.array(AiBookingAssignment).default([]),
+    earmarks: z.array(AiBookingAssignment).default([]),
+    tags: z.array(z.string()).default([]),
+    confidence: z.number().min(0).max(1).default(0.5),
+    warnings: z.array(z.string()).default([]),
+    evidence: z.array(z.string()).default([]),
+    review: AiBookingCandidateReview.optional()
+})
+
+export const AiBookingAnalysisResult = z.object({
+    candidates: z.array(AiBookingCandidate).min(1),
+    summary: z.string().nullable().optional(),
+    warnings: z.array(z.string()).default([])
+})
+
+export const AiTextDraftResult = z.object({
+    title: z.string(),
+    body: z.string(),
+    notes: z.array(z.string()).default([])
+})
+
+export const AiBookingCandidateStructured = z.object({
+    date: z.string().min(4),
+    type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
+    sphere: Sphere,
+    description: z.string().min(1),
+    grossAmount: z.number().positive(),
+    vatRate: z.number().min(0).max(100),
+    paymentMethod: PaymentMethod.nullable(),
+    paymentAccountId: z.number().int().positive().nullable(),
+    counterparty: z.string().nullable(),
+    budgets: z.array(AiBookingAssignment),
+    earmarks: z.array(AiBookingAssignment),
+    tags: z.array(z.string()),
+    confidence: z.number().min(0).max(1),
+    warnings: z.array(z.string()),
+    evidence: z.array(z.string())
+})
+
+export const AiBookingAnalysisResultStructured = z.object({
+    candidates: z.array(AiBookingCandidateStructured).min(1),
+    summary: z.string().nullable(),
+    warnings: z.array(z.string())
+})
+
+export const AiTextDraftResultStructured = z.object({
+    title: z.string(),
+    body: z.string(),
+    notes: z.array(z.string())
+})
+
+export const AiBankImportAction = z.enum(['LINK_EXISTING', 'CREATE_BOOKING', 'MARK_CHECKED', 'NEEDS_MANUAL_REVIEW'])
+export const AiBankImportReviewSuggestion = z.object({
+    transactionId: z.number().int().positive(),
+    action: AiBankImportAction,
+    confidence: z.number().min(0).max(1).default(0.5),
+    reason: z.string().min(1),
+    voucherId: z.number().int().positive().nullable().optional(),
+    voucherNo: z.string().nullable().optional(),
+    bookingCandidate: AiBookingCandidate.nullable().optional(),
+    warnings: z.array(z.string()).default([]),
+    evidence: z.array(z.string()).default([]),
+    transaction: z.record(z.any()).optional()
+}).superRefine((value, ctx) => {
+    if (value.action === 'LINK_EXISTING' && !value.voucherId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'LINK_EXISTING requires voucherId', path: ['voucherId'] })
+    }
+    if (value.action === 'CREATE_BOOKING' && !value.bookingCandidate) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CREATE_BOOKING requires bookingCandidate', path: ['bookingCandidate'] })
+    }
+})
+
+export const AiBankImportReviewResult = z.object({
+    suggestions: z.array(AiBankImportReviewSuggestion).default([]),
+    summary: z.string().optional(),
+    warnings: z.array(z.string()).default([])
+})
+
+export const AiBankImportReviewSuggestionStructured = z.object({
+    transactionId: z.number().int().positive(),
+    action: AiBankImportAction,
+    confidence: z.number().min(0).max(1),
+    reason: z.string().min(1),
+    voucherId: z.number().int().positive().nullable(),
+    voucherNo: z.string().nullable(),
+    bookingCandidate: AiBookingCandidateStructured.nullable(),
+    warnings: z.array(z.string()),
+    evidence: z.array(z.string())
+}).superRefine((value, ctx) => {
+    if (value.action === 'LINK_EXISTING' && !value.voucherId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'LINK_EXISTING requires voucherId', path: ['voucherId'] })
+    }
+    if (value.action === 'CREATE_BOOKING' && !value.bookingCandidate) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CREATE_BOOKING requires bookingCandidate', path: ['bookingCandidate'] })
+    }
+})
+
+export const AiBankImportReviewResultStructured = z.object({
+    suggestions: z.array(AiBankImportReviewSuggestionStructured),
+    summary: z.string().nullable(),
+    warnings: z.array(z.string())
+})
+
+export const AiActionEntity = z.enum(['vouchers', 'members', 'payments', 'tags', 'budgets', 'earmarks', 'reports', 'bankImport', 'text', 'unknown'])
+export const AiActionOperation = z.enum(['read', 'create', 'update', 'delete', 'export', 'reviewBankImport', 'generateText', 'none'])
+export const AiActionSafety = z.enum(['READ_ONLY', 'REVIEW_REQUIRED', 'DIRECT_SAFE', 'BLOCKED'])
+export const AiActionFilter = z.object({
+    field: z.string(),
+    operator: z.enum(['eq', 'contains', 'in', 'date_gte', 'date_lte', 'amount_gte', 'amount_lte']).default('eq'),
+    value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))]).nullable()
+})
+export const AiActionChange = z.object({
+    field: z.string(),
+    mode: z.enum(['set', 'add', 'remove', 'append']).default('set'),
+    value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))]).nullable()
+})
+export const AiActionArg = z.object({
+    key: z.string(),
+    value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))]).nullable()
+})
+export const AiActionItem = z.object({
+    values: z.array(AiActionArg)
+})
+export const AiActionPlan = z.object({
+    title: z.string(),
+    summary: z.string(),
+    entity: AiActionEntity,
+    operation: AiActionOperation,
+    safety: AiActionSafety,
+    filters: z.array(AiActionFilter).default([]),
+    changes: z.array(AiActionChange).default([]),
+    args: z.array(AiActionArg).default([]),
+    items: z.array(AiActionItem).default([]),
+    requiresReview: z.boolean().default(true),
+    confidence: z.number().min(0).max(1).default(0.5),
+    answer: z.string().nullable().optional(),
+    warnings: z.array(z.string()).default([])
+})
+export const AiActionPlanStructured = z.object({
+    title: z.string(),
+    summary: z.string(),
+    entity: AiActionEntity,
+    operation: AiActionOperation,
+    safety: AiActionSafety,
+    filters: z.array(AiActionFilter),
+    changes: z.array(AiActionChange),
+    args: z.array(AiActionArg),
+    items: z.array(AiActionItem),
+    requiresReview: z.boolean(),
+    confidence: z.number().min(0).max(1),
+    answer: z.string().nullable(),
+    warnings: z.array(z.string())
+})
+
+export const AiUsageSchema = z.object({
+    inputTokens: z.number().default(0),
+    cachedInputTokens: z.number().default(0),
+    outputTokens: z.number().default(0),
+    reasoningTokens: z.number().default(0),
+    totalTokens: z.number().default(0),
+    estimatedCostUsd: z.number().nullable().optional(),
+    pricingNote: z.string().optional()
+})
+
+export const AiJobSchema = z.object({
+    id: z.number(),
+    type: AiJobType,
+    status: AiJobStatus,
+    title: z.string().nullable().optional(),
+    prompt: z.string().nullable().optional(),
+    model: z.string().nullable().optional(),
+    usage: AiUsageSchema.nullable().optional(),
+    error: z.string().nullable().optional(),
+    voucherId: z.number().nullable().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    processedAt: z.string().nullable().optional(),
+    approvedAt: z.string().nullable().optional(),
+    fileCount: z.number(),
+    resultKind: AiResultKind.nullable().optional(),
+    result: z.any().optional()
+})
+
+export const AiJobDetailSchema = AiJobSchema.extend({
+    files: z.array(z.object({
+        id: z.number(),
+        jobId: z.number(),
+        fileName: z.string(),
+        mimeType: z.string().nullable().optional(),
+        size: z.number(),
+        createdAt: z.string(),
+        dataBase64: z.string().optional()
+    }))
+})
+
+export const AiSettingsGetOutput = z.object({
+    hasApiKey: z.boolean(),
+    model: z.string(),
+    textModel: z.string(),
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).default('medium')
+})
+export const AiSettingsSetInput = z.object({
+    apiKey: z.string().optional(),
+    model: z.string().min(1).optional(),
+    textModel: z.string().min(1).optional(),
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).optional()
+})
+export const AiSettingsSetOutput = z.object({
+    ok: z.boolean(),
+    hasApiKey: z.boolean(),
+    model: z.string(),
+    textModel: z.string(),
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high'])
+})
+export const AiSettingsTestOutput = z.object({ ok: z.boolean(), error: z.string().optional() })
+export const AiBankImportReviewInput = z.object({
+    limit: z.number().int().min(1).max(50).default(20).optional()
+}).optional()
+export const AiBankImportReviewOutput = AiBankImportReviewResult
+export const AiJobsCreateInput = z.object({
+    type: AiJobType,
+    title: z.string().optional(),
+    prompt: z.string().optional(),
+    model: z.string().optional(),
+    files: z.array(AiJobFileInput).max(20).optional()
+})
+export const AiJobsCreateOutput = AiJobDetailSchema
+export const AiJobsListInput = z.object({
+    status: z.union([AiJobStatus, z.literal('ALL')]).optional(),
+    type: AiJobType.optional(),
+    limit: z.number().min(1).max(200).default(100).optional(),
+    offset: z.number().min(0).default(0).optional()
+}).optional()
+export const AiJobsListOutput = z.object({ rows: z.array(AiJobSchema), total: z.number() })
+export const AiJobIdInput = z.object({ id: z.number().int().positive() })
+export const AiJobsGetOutput = AiJobDetailSchema
+export const AiJobsProcessOutput = AiJobDetailSchema
+export const AiJobsUpdateCandidateInput = z.object({
+    id: z.number().int().positive(),
+    result: AiBookingAnalysisResult
+})
+export const AiJobsApproveCandidateInput = z.object({
+    id: z.number().int().positive(),
+    candidateIndex: z.number().int().min(0).default(0)
+})
+export const AiJobsApproveCandidateOutput = z.object({ ok: z.boolean(), voucherId: z.number(), voucherNo: z.string() })
+export const AiJobsRejectInput = z.object({ id: z.number().int().positive(), reason: z.string().optional() })
+export const AiJobsDeleteOutput = z.object({ ok: z.boolean() })
+export const AiTextGenerateInput = z.object({
+    type: z.enum(['INVITATION', 'MEMBER_MESSAGE', 'REPORT_TEXT']),
+    prompt: z.string().min(1),
+    tone: z.string().optional(),
+    audience: z.string().optional(),
+    model: z.string().optional()
+})
+export const AiTextGenerateOutput = AiTextDraftResult
+export const AiActionPlanInput = z.object({
+    prompt: z.string().min(1),
+    conversation: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        title: z.string().optional(),
+        body: z.string()
+    })).default([]).optional(),
+    model: z.string().optional()
+})
+export const AiActionPlanOutput = z.object({
+    model: z.string(),
+    plan: AiActionPlan,
+    usage: AiUsageSchema
+})
+
+export type TAiJobType = z.infer<typeof AiJobType>
+export type TAiJobStatus = z.infer<typeof AiJobStatus>
+export type TAiResultKind = z.infer<typeof AiResultKind>
+export type TAiJobFileInput = z.infer<typeof AiJobFileInput>
+export type TAiBookingCandidate = z.infer<typeof AiBookingCandidate>
+export type TAiBookingAnalysisResult = z.infer<typeof AiBookingAnalysisResult>
+export type TAiTextDraftResult = z.infer<typeof AiTextDraftResult>
+export type TAiActionPlan = z.infer<typeof AiActionPlan>
+export type TAiBankImportReviewSuggestion = z.infer<typeof AiBankImportReviewSuggestion>
+export type TAiBankImportReviewResult = z.infer<typeof AiBankImportReviewResult>
+export type TAiUsage = z.infer<typeof AiUsageSchema>
+export type TAiSettingsGetOutput = z.infer<typeof AiSettingsGetOutput>
+export type TAiSettingsSetInput = z.infer<typeof AiSettingsSetInput>
+export type TAiSettingsSetOutput = z.infer<typeof AiSettingsSetOutput>
+export type TAiSettingsTestOutput = z.infer<typeof AiSettingsTestOutput>
+export type TAiBankImportReviewInput = z.infer<typeof AiBankImportReviewInput>
+export type TAiBankImportReviewOutput = z.infer<typeof AiBankImportReviewOutput>
+export type TAiJobsCreateInput = z.infer<typeof AiJobsCreateInput>
+export type TAiJobsCreateOutput = z.infer<typeof AiJobsCreateOutput>
+export type TAiJobsListInput = z.infer<typeof AiJobsListInput>
+export type TAiJobsListOutput = z.infer<typeof AiJobsListOutput>
+export type TAiJobIdInput = z.infer<typeof AiJobIdInput>
+export type TAiJobsGetOutput = z.infer<typeof AiJobsGetOutput>
+export type TAiJobsProcessOutput = z.infer<typeof AiJobsProcessOutput>
+export type TAiJobsUpdateCandidateInput = z.infer<typeof AiJobsUpdateCandidateInput>
+export type TAiJobsApproveCandidateInput = z.infer<typeof AiJobsApproveCandidateInput>
+export type TAiJobsApproveCandidateOutput = z.infer<typeof AiJobsApproveCandidateOutput>
+export type TAiJobsRejectInput = z.infer<typeof AiJobsRejectInput>
+export type TAiJobsDeleteOutput = z.infer<typeof AiJobsDeleteOutput>
+export type TAiTextGenerateInput = z.infer<typeof AiTextGenerateInput>
+export type TAiTextGenerateOutput = z.infer<typeof AiTextGenerateOutput>
+export type TAiActionPlanInput = z.infer<typeof AiActionPlanInput>
+export type TAiActionPlanOutput = z.infer<typeof AiActionPlanOutput>
 // Settings (simple key-value)
 export const SettingsGetInput = z.object({ key: z.string() })
 export const SettingsGetOutput = z.object({ value: z.any().optional() })

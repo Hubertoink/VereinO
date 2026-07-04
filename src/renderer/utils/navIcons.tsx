@@ -109,6 +109,20 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
         </svg>
       )
+    case 'KI':
+      return (
+        <svg {...iconProps}>
+          <path d="M12 3v3" />
+          <path d="M12 18v3" />
+          <path d="M3 12h3" />
+          <path d="M18 12h3" />
+          <path d="m5.6 5.6 2.1 2.1" />
+          <path d="m16.3 16.3 2.1 2.1" />
+          <path d="m18.4 5.6-2.1 2.1" />
+          <path d="m7.7 16.3-2.1 2.1" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+      )
     case 'Belege':
       // Receipt/Ticket icon
       return (
@@ -150,6 +164,7 @@ export const navIconPalette: Record<NavKey, string> = {
   Budgets: '#00C853',
   Zweckbindungen: '#FFD600',
   Einreichungen: '#FF7043',
+  KI: '#6A5CFF',
   Belege: '#FF9100',
   Reports: '#F50057',
   Einstellungen: '#9C27B0'

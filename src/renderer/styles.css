@@ -5520,11 +5520,14 @@ textarea:focus {
 /* Icon color classes (used when navIconColorMode === 'color') */
 .icon-color-Dashboard { color: #7C4DFF; }
 .icon-color-Buchungen { color: #2962FF; }
+.icon-color-Bankimport { color: #1976D2; }
 .icon-color-Verbindlichkeiten { color: #00B8D4; }
 .icon-color-Mitglieder { color: #26A69A; }
 .icon-color-Vorschuesse { color: #4CAF50; }
 .icon-color-Budgets { color: #00C853; }
 .icon-color-Zweckbindungen { color: #FFD600; }
+.icon-color-Einreichungen { color: #FF7043; }
+.icon-color-KI { color: #6A5CFF; }
 .icon-color-Belege { color: #FF9100; }
 .icon-color-Reports { color: #F50057; }
 .icon-color-Einstellungen { color: #9C27B0; }
@@ -12094,3 +12097,4 @@ html[data-glass-modals="true"] .flyout-arrow {
     display: none;
   }
 }
+
