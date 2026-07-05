@@ -1,6 +1,14 @@
 import type {
   TAiActionPlanInput,
   TAiActionPlanOutput,
+  TAiAgentAutoRuleUpsertInput,
+  TAiAgentAutoRulesListInput,
+  TAiAgentAutoRulesListOutput,
+  TAiAgentMemoryListInput,
+  TAiAgentMemoryListOutput,
+  TAiAgentMemoryUpsertInput,
+  TAiAgentRunInput,
+  TAiAgentRunOutput,
   TAiJobIdInput,
   TAiJobsApproveCandidateInput,
   TAiJobsApproveCandidateOutput,
@@ -45,6 +53,17 @@ export interface AiApi {
     }
     actions: {
       plan: (payload: TAiActionPlanInput) => Promise<TAiActionPlanOutput>
+    }
+    agent: {
+      run: (payload: TAiAgentRunInput) => Promise<TAiAgentRunOutput>
+      memory: {
+        list: (payload?: TAiAgentMemoryListInput) => Promise<TAiAgentMemoryListOutput>
+        upsert: (payload: TAiAgentMemoryUpsertInput) => Promise<TAiAgentMemoryListOutput['rows'][number]>
+      }
+      autoRules: {
+        list: (payload?: TAiAgentAutoRulesListInput) => Promise<TAiAgentAutoRulesListOutput>
+        upsert: (payload: TAiAgentAutoRuleUpsertInput) => Promise<TAiAgentAutoRulesListOutput['rows'][number]>
+      }
     }
     bankImports: {
       reviewOpen: (payload?: TAiBankImportReviewInput) => Promise<TAiBankImportReviewOutput>

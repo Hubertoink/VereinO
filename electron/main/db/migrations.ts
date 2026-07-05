@@ -1159,6 +1159,56 @@ export function ensureAiTables(db: DB) {
       CREATE INDEX IF NOT EXISTS idx_ai_jobs_status_created ON ai_jobs(status, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_ai_job_files_job ON ai_job_files(job_id);
       CREATE INDEX IF NOT EXISTS idx_ai_job_results_job ON ai_job_results(job_id);
+
+      CREATE TABLE IF NOT EXISTS ai_agent_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        summary TEXT,
+        status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'ARCHIVED')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_agent_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL REFERENCES ai_agent_sessions(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'tool', 'system')),
+        kind TEXT NOT NULL,
+        content TEXT,
+        tool_name TEXT,
+        payload_json TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_agent_sessions_updated ON ai_agent_sessions(updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_agent_events_session_created ON ai_agent_events(session_id, created_at ASC, id ASC);
+
+      CREATE TABLE IF NOT EXISTS ai_agent_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL DEFAULT 'ORG' CHECK(scope IN ('ORG', 'USER', 'SESSION')),
+        key TEXT NOT NULL,
+        value TEXT NOT NULL,
+        source TEXT,
+        confidence REAL NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(scope, key)
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_agent_auto_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        draft_kind TEXT NOT NULL,
+        conditions_json TEXT NOT NULL DEFAULT '{}',
+        action TEXT NOT NULL DEFAULT 'AUTO_PRESELECT' CHECK(action IN ('AUTO_PRESELECT', 'AUTO_APPLY_SAFE')),
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_agent_memory_active_scope ON ai_agent_memory(is_active, scope, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_agent_auto_rules_enabled_kind ON ai_agent_auto_rules(enabled, draft_kind);
     `)
     try { db.prepare('ALTER TABLE ai_jobs ADD COLUMN usage_json TEXT').run() } catch { }
   } catch {

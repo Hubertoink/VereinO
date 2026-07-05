@@ -774,22 +774,25 @@ export function listVouchersAdvancedPaged(filters: {
     return { rows: mapped, total }
 }
 
-// Batch-assign an earmarkId to vouchers matching filters
-export function batchAssignEarmark(params: {
-    earmarkId: number
+type BatchVoucherFilterParams = {
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
     q?: string
-    onlyWithout?: boolean // when true, only rows where earmark_id IS NULL
-}) {
-    const d = getDb()
-    const wh: string[] = []
-    const args: any[] = []
-    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
+    tag?: string
+    filterEarmarkId?: number | null
+    filterBudgetId?: number | null
+}
+
+function appendBatchVoucherFilters(wh: string[], args: any[], params: BatchVoucherFilterParams) {
     if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
+    if (params.paymentAccountId != null) {
+        wh.push('(payment_account_id = ? OR (type = \'TRANSFER\' AND (transfer_from_account_id = ? OR transfer_to_account_id = ?)))')
+        args.push(params.paymentAccountId, params.paymentAccountId, params.paymentAccountId)
+    }
     if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
@@ -807,6 +810,30 @@ export function batchAssignEarmark(params: {
             }
         }
     }
+    if (params.filterEarmarkId != null) {
+        wh.push('(earmark_id = ? OR EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = vouchers.id AND ve.earmark_id = ?))')
+        args.push(params.filterEarmarkId, params.filterEarmarkId)
+    }
+    if (params.filterBudgetId != null) {
+        wh.push('(budget_id = ? OR EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = vouchers.id AND vb.budget_id = ?))')
+        args.push(params.filterBudgetId, params.filterBudgetId)
+    }
+    if (params.tag) {
+        wh.push('EXISTS (SELECT 1 FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id WHERE vt.voucher_id = vouchers.id AND lower(t.name) = lower(?))')
+        args.push(params.tag)
+    }
+}
+
+// Batch-assign an earmarkId to vouchers matching filters
+export function batchAssignEarmark(params: BatchVoucherFilterParams & {
+    earmarkId: number
+    onlyWithout?: boolean // when true, only rows where earmark_id IS NULL
+}) {
+    const d = getDb()
+    const wh: string[] = []
+    const args: any[] = []
+    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
+    appendBatchVoucherFilters(wh, args, params)
     if (params.onlyWithout) wh.push('earmark_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
 
@@ -835,38 +862,15 @@ export function batchAssignEarmark(params: {
 }
 
 // Batch-assign a budgetId to vouchers matching filters
-export function batchAssignBudget(params: {
+export function batchAssignBudget(params: BatchVoucherFilterParams & {
     budgetId: number
-    paymentMethod?: 'BAR' | 'BANK'
-    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    from?: string
-    to?: string
-    q?: string
     onlyWithout?: boolean
 }) {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
     wh.push('original_id IS NULL AND reversed_by_id IS NULL')
-    if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
-    if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
-    if (params.type) { wh.push('type = ?'); args.push(params.type) }
-    if (params.from) { wh.push('date >= ?'); args.push(params.from) }
-    if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    {
-        const nq = normalizeVoucherSearchQuery(params.q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(like, like, like, like)
-            }
-        }
-    }
+    appendBatchVoucherFilters(wh, args, params)
     if (params.onlyWithout) wh.push('budget_id IS NULL')
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
 
@@ -893,37 +897,14 @@ export function batchAssignBudget(params: {
 }
 
 // Batch-assign tags to vouchers matching filters (adds tags, does not remove existing)
-export function batchAssignTags(params: {
+export function batchAssignTags(params: BatchVoucherFilterParams & {
     tags: string[]
-    paymentMethod?: 'BAR' | 'BANK'
-    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    from?: string
-    to?: string
-    q?: string
 }) {
     const d = getDb()
     const wh: string[] = []
     const args: any[] = []
     wh.push('original_id IS NULL AND reversed_by_id IS NULL')
-    if (params.paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); args.push(params.paymentMethod, params.paymentMethod, params.paymentMethod) }
-    if (params.sphere) { wh.push('sphere = ?'); args.push(params.sphere) }
-    if (params.type) { wh.push('type = ?'); args.push(params.type) }
-    if (params.from) { wh.push('date >= ?'); args.push(params.from) }
-    if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    {
-        const nq = normalizeVoucherSearchQuery(params.q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(like, like, like, like)
-            }
-        }
-    }
+    appendBatchVoucherFilters(wh, args, params)
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
     // Collect voucher ids
     const ids = (d.prepare(`SELECT id FROM vouchers${whereSql}`).all(...args) as any[]).map(r => r.id)

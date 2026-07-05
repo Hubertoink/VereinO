@@ -1042,6 +1042,8 @@ function AppInner() {
     const [activePage, setActivePage] = useState<NavKey>(() => {
         try { return (localStorage.getItem('activePage') as NavKey) || 'Buchungen' } catch { return 'Buchungen' }
     })
+    const [aiBusy, setAiBusy] = useState(false)
+    const [aiViewMounted, setAiViewMounted] = useState(() => activePage === 'KI')
     const requiredNavItems = useMemo(() => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']), [])
     const defaultVisibleNavItems = useMemo(
         () => navItems.filter((item) => item.key !== 'KI').map((item) => item.key),
@@ -1069,6 +1071,9 @@ function AppInner() {
         if (visibleNavSet.has(activePage)) return
         setActivePage(visibleNavSet.has('Dashboard') ? 'Dashboard' : 'Buchungen')
     }, [activePage, visibleNavSet])
+    useEffect(() => {
+        if (activePage === 'KI') setAiViewMounted(true)
+    }, [activePage])
     const [receiptTarget, setReceiptTarget] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
     const [registeredPageShortcuts, setRegisteredPageShortcuts] = useState<PageShortcutAction[]>([])
     const registerPageShortcuts = useCallback((shortcuts: PageShortcutAction[]) => {
@@ -2201,6 +2206,7 @@ function AppInner() {
                             dueMembershipFeesCount={dueMembershipFeesCount}
                             showBadges
                             items={visibleNavigationItems}
+                            aiBusy={aiBusy}
                         />
                     </div>
                 ) : null}
@@ -2231,6 +2237,7 @@ function AppInner() {
                         dueMembershipFeesCount={dueMembershipFeesCount}
                         showBadges
                         items={visibleNavigationItems}
+                        aiBusy={aiBusy}
                     />
                 </aside>
             )}
@@ -2528,14 +2535,17 @@ function AppInner() {
                         />
                     )}
 
-                    {activePage === 'KI' && (
-                        <AIView
-                            notify={notify}
-                            onBooked={() => {
-                                bumpDataVersion()
-                                window.dispatchEvent(new Event('data-changed'))
-                            }}
-                        />
+                    {aiViewMounted && (
+                        <div className="ai-view-keepalive" hidden={activePage !== 'KI'}>
+                            <AIView
+                                notify={notify}
+                                onBusyChange={setAiBusy}
+                                onBooked={() => {
+                                    bumpDataVersion()
+                                    window.dispatchEvent(new Event('data-changed'))
+                                }}
+                            />
+                        </div>
                     )}
 
                     {activePage === 'Einreichungen' && (

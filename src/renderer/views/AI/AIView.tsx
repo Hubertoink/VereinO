@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './AIView.css'
+import { AgentRuntimePanel } from './AgentRuntimePanel'
+import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
+import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
+import { AgentVoucherReverseCard, type AiVoucherReverseState } from './AgentVoucherReverseCard'
+import { AgentVoucherRebookCard, type AiVoucherRebookState } from './AgentVoucherRebookCard'
+import { AgentVoucherUpdateCard, type AiVoucherUpdateChange, type AiVoucherUpdateState } from './AgentVoucherUpdateCard'
+import { useAiAgentWorkflow } from './useAiAgentWorkflow'
 import type {
   TAiActionPlan,
+  TAiAgentAutoRulesListOutput,
+  TAiAgentMemoryListOutput,
+  TAiAgentRunOutput,
+  TAiAgentTraceEvent,
   TAiBankImportReviewOutput,
   TAiBookingAnalysisResult,
   TAiBookingCandidate,
@@ -11,11 +22,14 @@ import type {
   TAiTextGenerateInput,
   TTagUpsertInput,
   TTagsListOutput,
+  TBudgetUpsertInput,
+  TBindingUpsertInput,
   TMemberCreateInput,
   TMemberUpdateInput,
   TMembersListOutput,
   TPaymentsListDueOutput,
   TVoucherMetaUpdateInput,
+  TVoucherCreateInput,
   TVouchersListOutput,
   TReportsExportInput
 } from '../../../../electron/main/ipc/schemas'
@@ -30,6 +44,7 @@ type Notify = (
 type Props = {
   notify: Notify
   onBooked?: () => void
+  onBusyChange?: (busy: boolean) => void
 }
 
 type AiMessage = {
@@ -41,6 +56,11 @@ type AiMessage = {
   jobId?: number
   reviewable?: boolean
   filePath?: string
+  bookingDraft?: {
+    title?: string
+    qa: Record<string, unknown>
+    files?: unknown[]
+  }
 }
 
 type AiAttachmentPreview = {
@@ -67,8 +87,19 @@ type AiMentionOption = {
   plannerHint: string
 }
 
+type AiVoucherMention = {
+  key: string
+  id?: number
+  voucherNo?: string
+  date?: string
+  description: string
+  amount?: string
+  type?: 'IN' | 'OUT'
+}
+
 type AiChatSnapshot = {
   messages?: AiMessage[]
+  agentSessionId?: string | null
   selectedJobId?: number | null
   selectedCandidate?: number
   bankReview?: AiBankReviewState | null
@@ -77,7 +108,13 @@ type AiChatSnapshot = {
   pendingContributionPayment?: AiContributionPaymentState | null
   pendingTagActions?: AiTagActionState | null
   pendingVoucherTagActions?: AiVoucherTagActionState | null
+  pendingVoucherUpdates?: AiVoucherUpdateState | null
+  pendingVoucherReverse?: AiVoucherReverseState | null
+  pendingVoucherRebook?: AiVoucherRebookState | null
+  pendingBudgetActions?: AiBudgetActionState | null
+  pendingEarmarkActions?: AiEarmarkActionState | null
   pendingPlannerQuestion?: AiPlannerQuestionState | null
+  agentTrace?: TAiAgentTraceEvent[]
 }
 
 type AiBankReviewSuggestion = TAiBankImportReviewOutput['suggestions'][number] & {
@@ -172,6 +209,30 @@ type AiTagActionChange = {
 
 type AiTagActionState = {
   changes: AiTagActionChange[]
+  sourcePrompt: string
+  status: 'DRAFT' | 'APPLIED'
+}
+
+type AiBudgetActionChange = AgentMasterDataChange & {
+  budgetId?: number | null
+  payload?: TBudgetUpsertInput | null
+}
+
+type AiBudgetActionState = {
+  changes: AiBudgetActionChange[]
+  reason?: string | null
+  sourcePrompt: string
+  status: 'DRAFT' | 'APPLIED'
+}
+
+type AiEarmarkActionChange = AgentMasterDataChange & {
+  earmarkId?: number | null
+  payload?: TBindingUpsertInput | null
+}
+
+type AiEarmarkActionState = {
+  changes: AiEarmarkActionChange[]
+  reason?: string | null
   sourcePrompt: string
   status: 'DRAFT' | 'APPLIED'
 }
@@ -349,6 +410,11 @@ function confidenceLabel(value?: number) {
   return `${percent}%`
 }
 
+function warningClassName(warning: string) {
+  const duplicate = /(doppelt|duplikat|bereits.*buchung|bereits.*vorhanden|double|duplicate)/i.test(String(warning || ''))
+  return duplicate ? 'ai-warning ai-warning--duplicate' : 'ai-warning'
+}
+
 function readAiChatSnapshot(): AiChatSnapshot {
   if (typeof window === 'undefined') return {}
   try {
@@ -418,15 +484,160 @@ function stripMarkdownInline(value: string) {
   return String(value || '').replace(/\*\*/g, '').trim()
 }
 
-function renderInlineMarkdown(text: string) {
+function voucherMentionFromContext(id: number | null, voucherNo: string | null, text: string, start: number): AiVoucherMention {
+  const context = cleanVoucherMentionText(text.slice(Math.max(0, start - 80), Math.min(text.length, start + 140)))
+  const date = context.match(/\b20\d{2}-\d{2}-\d{2}\b/)?.[0]
+  const amount = context.match(/[+-]?\d{1,3}(?:\.\d{3})*,\d{2}\s*€/)?.[0]
+  const type = context.match(/\b(IN|OUT)\b/)?.[1] as AiVoucherMention['type'] | undefined
+  const description = context
+    .replace(/\b(?:ID|Beleg|Belege|Buchung|Buchungen|Voucher)\s*#?\s*\d+(?:\s*\/\s*\d+)*/gi, '')
+    .replace(/\b20\d{2}-\d{2}-\d{2}_\d{5}\b/g, '')
+    .replace(/\b20\d{2}-\d{2}-\d{2}\b/g, '')
+    .replace(/[+-]?\d{1,3}(?:\.\d{3})*,\d{2}\s*€/g, '')
+    .replace(/[–—-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return {
+    key: id ? `id-${id}` : `no-${voucherNo}`,
+    id: id || undefined,
+    voucherNo: voucherNo || undefined,
+    date,
+    amount,
+    type,
+    description: description || (id ? `Buchung #${id}` : `Voucher ${voucherNo}`)
+  }
+}
+
+function shouldSkipInlineVoucherReference(text: string, start: number, label?: string) {
+  const before = normalizeLookup(text.slice(Math.max(0, start - 32), start))
+  const after = normalizeLookup(text.slice(start, start + 48))
+  if (/(budget|bankimport|banktransaktion|bankbeleg|zahlungskonto|konto)$/.test(before)) return true
+  if (/(budget id|bankimport id|banktransaktion id|bankbeleg id|paymentaccount id)/.test(`${before} ${after}`)) return true
+  return normalizeLookup(label) === 'id' && /(budget|bankimport|banktransaktion|bankbeleg)/.test(before)
+}
+
+function renderVoucherReference(mention: AiVoucherMention, onOpenVoucher: (mention: AiVoucherMention) => void, key: string) {
+  return (
+    <button
+      key={key}
+      type="button"
+      className={`ai-inline-voucher-ref ai-inline-voucher-ref--${mention.type ? mention.type.toLowerCase() : 'neutral'}`}
+      title={`${mention.description}${mention.amount ? ` · ${mention.amount}` : ''}`}
+      onClick={() => onOpenVoucher(mention)}
+    >
+      {mention.id ? `ID ${mention.id}` : mention.voucherNo}
+    </button>
+  )
+}
+
+function renderInlineVoucherReferences(text: string, onOpenVoucher?: (mention: AiVoucherMention) => void) {
+  if (!onOpenVoucher) return [text]
+  const nodes: React.ReactNode[] = []
+  const regex = /\b(Buchungen|Buchung|Belege|Beleg|Voucher|ID)\s*#?\s*((?:\d+\s*(?:\/\s*)?)+)|\b(20\d{2}-\d{2}-\d{2}_\d{5})\b/gi
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(text))) {
+    const start = match.index
+    if (start > lastIndex) nodes.push(text.slice(lastIndex, start))
+    if (match[3]) {
+      const voucherNo = match[3]
+      const mention = voucherMentionFromContext(null, voucherNo, text, start)
+      nodes.push(renderVoucherReference(mention, onOpenVoucher, `voucher-no-${voucherNo}-${start}`))
+    } else if (shouldSkipInlineVoucherReference(text, start, match[1])) {
+      nodes.push(match[0])
+    } else {
+      const ids = Array.from(match[2].matchAll(/\d+/g)).map((item) => Number(item[0])).filter((id) => Number.isInteger(id) && id > 0)
+      nodes.push(`${match[1]} `)
+      ids.forEach((id, idx) => {
+        if (idx > 0) nodes.push(' / ')
+        nodes.push(renderVoucherReference(voucherMentionFromContext(id, null, text, start), onOpenVoucher, `voucher-id-${id}-${start}-${idx}`))
+      })
+    }
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
+  return nodes.length ? nodes : [text]
+}
+
+function renderInlineMarkdown(text: string, onOpenVoucher?: (mention: AiVoucherMention) => void) {
   const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, idx) => {
     const strong = part.match(/^\*\*([^*]+)\*\*$/)
-    return strong ? <strong key={idx}>{strong[1]}</strong> : <React.Fragment key={idx}>{part}</React.Fragment>
+    return strong
+      ? <strong key={idx}>{renderInlineVoucherReferences(strong[1], onOpenVoucher)}</strong>
+      : <React.Fragment key={idx}>{renderInlineVoucherReferences(part, onOpenVoucher)}</React.Fragment>
   })
 }
 
-function AiMarkdown({ text }: { text: string }) {
+function splitMarkdownTableRow(line: string) {
+  const trimmed = String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '')
+  return trimmed.split('|').map((cell) => cell.trim())
+}
+
+function isMarkdownTableSeparator(line: string) {
+  const cells = splitMarkdownTableRow(line)
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))
+}
+
+function isMarkdownTableLine(line: string) {
+  return /^\s*\|.+\|\s*$/.test(line) && splitMarkdownTableRow(line).length > 1
+}
+
+function parseCompactMarkdownTable(line: string) {
+  const normalized = String(line || '').trim()
+  const separator = normalized.match(/\|\s*:?-{3,}:?(?:\s*\|\s*:?-{3,}:?)+\s*\|?/)
+  if (!separator) return null
+  const before = normalized.slice(0, separator.index).trim()
+  const after = normalized.slice((separator.index || 0) + separator[0].length).trim()
+  const headers = splitMarkdownTableRow(before)
+  if (headers.length < 2 || !after) return null
+  const cells = splitMarkdownTableRow(after)
+  if (cells.length < headers.length) return null
+  const rows: string[][] = []
+  for (let idx = 0; idx < cells.length; idx += headers.length) {
+    const row = cells.slice(idx, idx + headers.length)
+    if (row.length === headers.length && row.some(Boolean)) rows.push(row)
+  }
+  return rows.length ? { headers, rows } : null
+}
+
+function renderMarkdownTable(
+  headers: string[],
+  rows: string[][],
+  key: string,
+  onOpenVoucher?: (mention: AiVoucherMention) => void
+) {
+  const columnClassName = (header: string) => {
+    const normalized = normalizeLookup(header)
+    if (/(betrag|summe|saldo|einnahm|ausgab|brutto|netto|mwst|ust|preis|kosten)/.test(normalized)) return 'is-number'
+    if (/(datum|faellig|fallig|zeitraum)/.test(normalized)) return 'is-date'
+    return undefined
+  }
+  return (
+    <div key={key} className="ai-markdown-table-wrap">
+      <table className="ai-markdown-table">
+        <thead>
+          <tr>
+            {headers.map((header, headerIdx) => (
+              <th key={headerIdx} className={columnClassName(header)}>{renderInlineMarkdown(header, onOpenVoucher)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIdx) => (
+            <tr key={rowIdx}>
+              {headers.map((_, cellIdx) => (
+                <td key={cellIdx} className={columnClassName(headers[cellIdx] || '')}>{renderInlineMarkdown(row[cellIdx] || '', onOpenVoucher)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AiMarkdown({ text, onOpenVoucher }: { text: string; onOpenVoucher?: (mention: AiVoucherMention) => void }) {
   const blocks: React.ReactNode[] = []
   const lines = String(text || '').split(/\r?\n/)
   let idx = 0
@@ -440,9 +651,31 @@ function AiMarkdown({ text }: { text: string }) {
     const heading = line.match(/^(#{1,3})\s+(.+)$/) || line.match(/^\*\*([^*]+)\*\*$/)
     if (heading) {
       const content = heading[2] || heading[1]
-      blocks.push(<h4 key={`h-${idx}`}>{renderInlineMarkdown(content)}</h4>)
+      blocks.push(<h4 key={`h-${idx}`}>{renderInlineMarkdown(content, onOpenVoucher)}</h4>)
       idx += 1
       continue
+    }
+
+    if (isMarkdownTableLine(line)) {
+      const compactTable = parseCompactMarkdownTable(line)
+      if (compactTable) {
+        blocks.push(renderMarkdownTable(compactTable.headers, compactTable.rows, `table-${idx}`, onOpenVoucher))
+        idx += 1
+        continue
+      }
+
+      if (idx + 1 < lines.length && isMarkdownTableSeparator(lines[idx + 1])) {
+        const headers = splitMarkdownTableRow(line)
+        idx += 2
+        const rows: string[][] = []
+        while (idx < lines.length && isMarkdownTableLine(lines[idx])) {
+          const row = splitMarkdownTableRow(lines[idx])
+          rows.push(headers.map((_, cellIdx) => row[cellIdx] || ''))
+          idx += 1
+        }
+        blocks.push(renderMarkdownTable(headers, rows, `table-${idx}`, onOpenVoucher))
+        continue
+      }
     }
 
     if (/^[-*]\s+/.test(line)) {
@@ -451,7 +684,7 @@ function AiMarkdown({ text }: { text: string }) {
         items.push(lines[idx].trim().replace(/^[-*]\s+/, ''))
         idx += 1
       }
-      blocks.push(<ul key={`ul-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item)}</li>)}</ul>)
+      blocks.push(<ul key={`ul-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>)}</ul>)
       continue
     }
 
@@ -461,7 +694,7 @@ function AiMarkdown({ text }: { text: string }) {
         items.push(lines[idx].trim().replace(/^\d+[.)]\s+/, ''))
         idx += 1
       }
-      blocks.push(<ol key={`ol-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item)}</li>)}</ol>)
+      blocks.push(<ol key={`ol-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>)}</ol>)
       continue
     }
 
@@ -471,16 +704,24 @@ function AiMarkdown({ text }: { text: string }) {
       && lines[idx].trim()
       && !/^(#{1,3})\s+/.test(lines[idx].trim())
       && !/^\*\*[^*]+\*\*$/.test(lines[idx].trim())
+      && !isMarkdownTableLine(lines[idx].trim())
       && !/^[-*]\s+/.test(lines[idx].trim())
       && !/^\d+[.)]\s+/.test(lines[idx].trim())
     ) {
       paragraph.push(lines[idx].trim())
       idx += 1
     }
-    blocks.push(<p key={`p-${idx}`}>{renderInlineMarkdown(paragraph.join(' '))}</p>)
+    blocks.push(<p key={`p-${idx}`}>{renderInlineMarkdown(paragraph.join(' '), onOpenVoucher)}</p>)
   }
 
   return <div className="ai-markdown">{blocks}</div>
+}
+
+function cleanVoucherMentionText(value: string) {
+  return stripMarkdownInline(value)
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function parseMemberContributionAmount(prompt: string) {
@@ -828,11 +1069,21 @@ function buildMemberUpdateDraft(prompt: string, members: MemberRow[]): AiMemberU
 function findPaymentAccountHint(prompt: string, accounts: PaymentAccountOption[]) {
   const normalizedPrompt = normalizeLookup(prompt)
   if (!normalizedPrompt) return null
+  const genericTokens = new Set(['bank', 'konto', 'konten', 'kasse', 'cash', 'paypal', 'card', 'karte'])
   return accounts
     .filter((account) => account.isActive !== 0)
-    .map((account) => ({ account, normalizedName: normalizeLookup(account.name) }))
-    .filter((item) => item.normalizedName && normalizedPrompt.includes(item.normalizedName))
-    .sort((a, b) => b.normalizedName.length - a.normalizedName.length)[0]?.account || null
+    .map((account) => {
+      const normalizedName = normalizeLookup(account.name)
+      const tokens = normalizedName.split(' ').filter((token) => token.length >= 4 && !genericTokens.has(token))
+      let score = 0
+      if (normalizedName && normalizedPrompt.includes(normalizedName)) score += 1000 + normalizedName.length
+      for (const token of tokens) {
+        if (normalizedPrompt.includes(token)) score += token.length
+      }
+      return { account, normalizedName, score }
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || b.normalizedName.length - a.normalizedName.length)[0]?.account || null
 }
 
 function shouldApplyAccountHintToAll(prompt: string) {
@@ -1362,6 +1613,7 @@ function CandidateEditor({
   candidateIndex,
   onChange,
   onApprove,
+  onOpenDraft,
   paymentAccounts,
   busy
 }: {
@@ -1370,6 +1622,7 @@ function CandidateEditor({
   candidateIndex: number
   onChange: (candidate: TAiBookingCandidate) => void
   onApprove: () => void
+  onOpenDraft: () => void
   paymentAccounts: PaymentAccountOption[]
   busy: boolean
 }) {
@@ -1478,13 +1731,16 @@ function CandidateEditor({
 
         {(candidate.warnings?.length || candidate.evidence?.length) ? (
           <div className="ai-evidence">
-            {candidate.warnings?.map((warning, idx) => <span key={`w-${idx}`} className="ai-warning">{warning}</span>)}
+            {candidate.warnings?.map((warning, idx) => <span key={`w-${idx}`} className={warningClassName(warning)}>{warning}</span>)}
             {candidate.evidence?.map((item, idx) => <span key={`e-${idx}`}>{item}</span>)}
           </div>
         ) : null}
 
         <footer className="ai-review-actions">
           <span className="ai-amount-preview">{candidate.type === 'OUT' ? '-' : '+'}{euro.format(Number(candidate.grossAmount || 0))}</span>
+          <button className="btn" disabled={busy || isApproved} onClick={onOpenDraft}>
+            {isApproved ? 'Bereits gebucht' : 'Buchungsentwurf'}
+          </button>
           <button className="btn primary" disabled={busy || isApproved} onClick={onApprove}>
             {isApproved ? `Gebucht${candidate.review?.voucherNo ? ` · ${candidate.review.voucherNo}` : ''}` : busy ? 'Buche...' : 'Jetzt buchen'}
           </button>
@@ -1494,9 +1750,15 @@ function CandidateEditor({
   )
 }
 
-export default function AIView({ notify, onBooked }: Props) {
+export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const historyButtonRef = useRef<HTMLButtonElement | null>(null)
+  const agentContextButtonRef = useRef<HTMLButtonElement | null>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
+  const historyDrawerRef = useRef<HTMLElement | null>(null)
+  const agentContextDrawerRef = useRef<HTMLElement | null>(null)
+  const settingsDrawerRef = useRef<HTMLElement | null>(null)
   const [initialChat] = useState(readAiChatSnapshot)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
   const [apiKey, setApiKey] = useState('')
@@ -1517,10 +1779,306 @@ export default function AIView({ notify, onBooked }: Props) {
   const [pendingContributionPayment, setPendingContributionPayment] = useState<AiContributionPaymentState | null>(initialChat.pendingContributionPayment || null)
   const [pendingTagActions, setPendingTagActions] = useState<AiTagActionState | null>(initialChat.pendingTagActions || null)
   const [pendingVoucherTagActions, setPendingVoucherTagActions] = useState<AiVoucherTagActionState | null>(initialChat.pendingVoucherTagActions || null)
+  const [pendingVoucherUpdates, setPendingVoucherUpdates] = useState<AiVoucherUpdateState | null>(initialChat.pendingVoucherUpdates || null)
+  const [pendingVoucherReverse, setPendingVoucherReverse] = useState<AiVoucherReverseState | null>(initialChat.pendingVoucherReverse || null)
+  const [pendingVoucherRebook, setPendingVoucherRebook] = useState<AiVoucherRebookState | null>(initialChat.pendingVoucherRebook || null)
+  const [pendingBudgetActions, setPendingBudgetActions] = useState<AiBudgetActionState | null>(initialChat.pendingBudgetActions || null)
+  const [pendingEarmarkActions, setPendingEarmarkActions] = useState<AiEarmarkActionState | null>(initialChat.pendingEarmarkActions || null)
   const [pendingPlannerQuestion, setPendingPlannerQuestion] = useState<AiPlannerQuestionState | null>(initialChat.pendingPlannerQuestion || null)
+  const [agentTrace, setAgentTrace] = useState<TAiAgentTraceEvent[]>(initialChat.agentTrace || [])
+  const [agentMemory, setAgentMemory] = useState<TAiAgentMemoryListOutput['rows']>([])
+  const [agentAutoRules, setAgentAutoRules] = useState<TAiAgentAutoRulesListOutput['rows']>([])
   const [showHistory, setShowHistory] = useState(false)
+  const [showAgentContext, setShowAgentContext] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    onBusyChange?.(busy)
+  }, [busy, onBusyChange])
+
+  const pushMessage = (message: Omit<AiMessage, 'id'>) => {
+    setMessages((current) => [...current, { ...message, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }])
+  }
+
+  const hasOpenReviewWorkflow = () => !!selectedJob
+    || !!bankReview
+    || (!!pendingMembers && pendingMembers.status !== 'CREATED')
+    || (!!pendingMemberUpdates && pendingMemberUpdates.status !== 'APPLIED')
+    || (!!pendingContributionPayment && pendingContributionPayment.status !== 'CREATED')
+    || (!!pendingTagActions && pendingTagActions.status !== 'APPLIED')
+    || (!!pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED')
+    || (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED')
+    || (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED')
+    || (!!pendingVoucherRebook && pendingVoucherRebook.status !== 'APPLIED')
+    || (!!pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED')
+    || (!!pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED')
+    || (!!pendingPlannerQuestion && pendingPlannerQuestion.status === 'OPEN')
+
+  const prepareAgentDraft = (draft: TAiAgentRunOutput['drafts'][number], userPrompt: string) => {
+    const payload = draft.payload as any
+    const autoMeta = draft.autoApproval ? ` · Auto-Regel: ${draft.autoApproval.ruleNames.join(', ')}` : ''
+    if (draft.kind === 'voucherReverse') {
+      const vouchers = payload?.vouchers || []
+      if (!vouchers.length) return
+      setPendingVoucherReverse({
+        vouchers,
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Storno-Review vorbereitet',
+        body: `${vouchers.length} Buchung(en) wurden zum Stornieren vorbereitet. Bitte prüfe die Storno-Vorschau unten.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'voucherRebook') {
+      if (!payload?.original || !payload?.replacement) return
+      setPendingVoucherRebook({
+        original: payload.original,
+        replacement: payload.replacement,
+        reason: payload.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Storno & Ersatzbuchung vorbereitet',
+        body: `Ich habe einen Review vorbereitet: Beleg ${payload.original.voucherNo || `#${payload.original.id}`} wird storniert und als ${payload.replacement.type} neu angelegt.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'voucherUpdate') {
+      const changes = (payload?.changes || []) as AiVoucherUpdateChange[]
+      if (!changes.length) return
+      setPendingVoucherUpdates({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Buchungsänderungen vorbereitet',
+        body: `${changes.length} Änderung(en) wurden als Review vorbereitet. Bitte prüfe die Vorschau unten und übernimm sie erst danach.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'memberUpdate') {
+      const changes = (payload?.changes || []) as AiMemberUpdateChange[]
+      if (!changes.length) return
+      setPendingMemberUpdates({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Mitgliederänderungen vorbereitet',
+        body: `${changes.length} Mitgliederänderung(en) wurden als Review vorbereitet.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'tagChange') {
+      const changes = (payload?.changes || []) as AiTagActionChange[]
+      if (!changes.length) return
+      setPendingTagActions({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Tag-Änderungen vorbereitet',
+        body: `${changes.length} Tag-Änderung(en) wurden als Review vorbereitet.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'budgetChange') {
+      const changes = (payload?.changes || []) as AiBudgetActionChange[]
+      if (!changes.length) return
+      setPendingBudgetActions({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Budget-Änderungen vorbereitet',
+        body: `${changes.length} Budget-Änderung(en) wurden als Review vorbereitet. Bitte prüfe die Vorschau unten.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'earmarkChange') {
+      const changes = (payload?.changes || []) as AiEarmarkActionChange[]
+      if (!changes.length) return
+      setPendingEarmarkActions({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Zweckbindungs-Änderungen vorbereitet',
+        body: `${changes.length} Zweckbindungs-Änderung(en) wurden als Review vorbereitet. Bitte prüfe die Vorschau unten.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'reportExport') {
+      if (!payload?.filePath) return
+      pushMessage({
+        role: 'assistant',
+        title: 'Report exportiert',
+        body: [
+          `${draft.title} wurde erstellt.`,
+          payload.rowCount != null ? `${payload.rowCount} Buchung(en) im Export.` : null,
+          payload.filePath
+        ].filter(Boolean).join('\n'),
+        meta: 'Agent-Export',
+        filePath: payload.filePath
+      })
+      return
+    }
+    pushMessage({
+      role: 'assistant',
+      title: 'Agent-Draft vorbereitet',
+      body: `Der Agent hat einen ${draft.kind}-Draft vorbereitet: ${draft.title}. Für diese Draft-Art fehlt noch eine spezialisierte Review-Karte.`,
+      meta: `Agent-Review${autoMeta}`
+    })
+  }
+
+  const loadAgentKnowledge = useCallback(async () => {
+    try {
+      const [memory, rules] = await Promise.all([
+        window.api.ai.agent.memory.list({ activeOnly: true, limit: 80 }),
+        window.api.ai.agent.autoRules.list({ enabledOnly: true, limit: 80 })
+      ])
+      setAgentMemory(memory.rows || [])
+      setAgentAutoRules(rules.rows || [])
+    } catch {
+      setAgentMemory([])
+      setAgentAutoRules([])
+    }
+  }, [])
+
+  const updateAgentTrace = (trace: TAiAgentTraceEvent[]) => {
+    setAgentTrace(trace)
+    void loadAgentKnowledge()
+  }
+
+  const agentUiContext = useMemo(() => {
+    const jobAnalysis = bookingAnalysis(selectedJob)
+    const openBookingCandidates = selectedJob && jobAnalysis
+      ? jobAnalysis.candidates
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => !isCandidateApproved(item, selectedJob))
+      : []
+    return {
+      openReviewSummary: {
+        selectedJobId,
+        selectedCandidate,
+        bookingCandidates: openBookingCandidates.length,
+        bankSuggestions: bankReview?.suggestions.filter((suggestion) => !suggestion.resolved).length || 0,
+        memberCreate: pendingMembers ? { status: pendingMembers.status, count: pendingMembers.members.length } : null,
+        memberUpdate: pendingMemberUpdates ? {
+          status: pendingMemberUpdates.status,
+          count: pendingMemberUpdates.changes.length,
+          fields: Array.from(new Set(pendingMemberUpdates.changes.map((change) => change.field))),
+          sample: pendingMemberUpdates.changes.slice(0, 30).map((change) => ({
+            memberId: change.memberId,
+            memberName: change.memberName,
+            field: change.field,
+            oldDisplay: change.oldDisplay,
+            newDisplay: change.newDisplay,
+            selected: change.selected,
+            applied: !!change.applied
+          }))
+        } : null,
+        contributionPayment: pendingContributionPayment ? { status: pendingContributionPayment.status, memberName: pendingContributionPayment.memberName, amount: pendingContributionPayment.amount } : null,
+        tagActions: pendingTagActions ? { status: pendingTagActions.status, count: pendingTagActions.changes.length } : null,
+        voucherTagActions: pendingVoucherTagActions ? { status: pendingVoucherTagActions.status, count: pendingVoucherTagActions.changes.length } : null,
+        voucherUpdates: pendingVoucherUpdates ? {
+          status: pendingVoucherUpdates.status,
+          count: pendingVoucherUpdates.changes.length,
+          sample: pendingVoucherUpdates.changes.slice(0, 40).map((change) => ({
+            voucherId: change.voucherId,
+            voucherNo: change.voucherNo,
+            date: change.date,
+            description: change.description,
+            grossAmount: change.grossAmount,
+            oldBudgetId: change.oldBudgetId,
+            oldBudgetLabel: change.oldBudgetLabel,
+            newBudgetId: change.newBudgetId,
+            newBudgetLabel: change.newBudgetLabel,
+            oldTags: change.oldTags || [],
+            newTags: change.newTags || [],
+            selected: change.selected,
+            applied: !!change.applied
+          }))
+        } : null,
+        voucherReverse: pendingVoucherReverse ? { status: pendingVoucherReverse.status, count: pendingVoucherReverse.vouchers.length } : null,
+        voucherRebook: pendingVoucherRebook ? { status: pendingVoucherRebook.status, original: pendingVoucherRebook.original.voucherNo || pendingVoucherRebook.original.id } : null,
+        budgetActions: pendingBudgetActions ? {
+          status: pendingBudgetActions.status,
+          count: pendingBudgetActions.changes.length,
+          sample: pendingBudgetActions.changes.slice(0, 30).map((change) => ({
+            action: change.action,
+            budgetId: change.budgetId,
+            name: budgetLabelFromChange(change),
+            selected: change.selected,
+            applied: !!change.applied
+          }))
+        } : null,
+        earmarkActions: pendingEarmarkActions ? { status: pendingEarmarkActions.status, count: pendingEarmarkActions.changes.length } : null,
+        plannerQuestion: pendingPlannerQuestion?.status === 'OPEN' ? { question: pendingPlannerQuestion.question, missingTags: pendingPlannerQuestion.missingTags } : null
+      },
+      activeBookingReview: openBookingCandidates.length ? {
+        jobId: selectedJob?.id,
+        title: selectedJob?.title,
+        openCandidateCount: openBookingCandidates.length,
+        candidates: openBookingCandidates.slice(0, 20).map(({ item, idx }) => ({
+          index: idx,
+          date: item.date,
+          type: item.type,
+          sphere: item.sphere,
+          grossAmount: item.grossAmount,
+          paymentAccountId: item.paymentAccountId,
+          description: item.description,
+          tags: item.tags || [],
+          warnings: item.warnings || []
+        }))
+      } : null
+    }
+  }, [bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
+
+  const {
+    agentSessionId,
+    resetAgentSession,
+    shouldUseAgentRuntime,
+    runAgentRuntime
+  } = useAiAgentWorkflow({
+    initialSessionId: initialChat.agentSessionId || null,
+    filesLength: files.length,
+    hasOpenReviewWorkflow,
+    selectedJobId,
+    selectedCandidate,
+    formatUsage: formatAiUsage,
+    pushMessage,
+    prepareAgentDraft,
+    onTrace: updateAgentTrace,
+    getUiContext: () => agentUiContext
+  })
 
   const loadSettings = useCallback(async () => {
     try {
@@ -1613,7 +2171,8 @@ export default function AIView({ notify, onBooked }: Props) {
     void loadJobs()
     void loadPaymentAccounts()
     void loadMentionOptions()
-  }, [loadJobs, loadMentionOptions, loadPaymentAccounts, loadSettings])
+    void loadAgentKnowledge()
+  }, [loadAgentKnowledge, loadJobs, loadMentionOptions, loadPaymentAccounts, loadSettings])
 
   useEffect(() => {
     if (!selectedJobId || selectedJob?.id === selectedJobId) return
@@ -1631,8 +2190,36 @@ export default function AIView({ notify, onBooked }: Props) {
   }, [notify, selectedJob?.id, selectedJobId])
 
   useEffect(() => {
+    if (!showHistory && !showAgentContext && !showSettings) return
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (!target) return
+      const inHistory = !!historyDrawerRef.current?.contains(target) || !!historyButtonRef.current?.contains(target)
+      const inAgentContext = !!agentContextDrawerRef.current?.contains(target) || !!agentContextButtonRef.current?.contains(target)
+      const inSettings = !!settingsDrawerRef.current?.contains(target) || !!settingsButtonRef.current?.contains(target)
+      if (showHistory && !inHistory) setShowHistory(false)
+      if (showAgentContext && !inAgentContext) setShowAgentContext(false)
+      if (showSettings && !inSettings) setShowSettings(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowHistory(false)
+        setShowAgentContext(false)
+        setShowSettings(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showAgentContext, showHistory, showSettings])
+
+  useEffect(() => {
     writeAiChatSnapshot({
       messages,
+      agentSessionId,
       selectedJobId,
       selectedCandidate,
       bankReview,
@@ -1641,9 +2228,15 @@ export default function AIView({ notify, onBooked }: Props) {
       pendingContributionPayment,
       pendingTagActions,
       pendingVoucherTagActions,
-      pendingPlannerQuestion
+      pendingVoucherUpdates,
+      pendingVoucherReverse,
+      pendingVoucherRebook,
+      pendingBudgetActions,
+      pendingEarmarkActions,
+      pendingPlannerQuestion,
+      agentTrace
     })
-  }, [bankReview, messages, pendingContributionPayment, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherTagActions, selectedCandidate, selectedJobId])
+  }, [agentSessionId, agentTrace, bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJobId])
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -1679,6 +2272,142 @@ export default function AIView({ notify, onBooked }: Props) {
       done: suggestions.filter((suggestion) => !!suggestion.resolved)
     }
   }, [bankReview])
+  const agentReviewQueueItems = useMemo<AgentReviewQueueItem[]>(() => {
+    const items: AgentReviewQueueItem[] = []
+    if (pendingPlannerQuestion?.status === 'OPEN') {
+      items.push({
+        id: 'planner-question',
+        title: pendingPlannerQuestion.question,
+        summary: pendingPlannerQuestion.body,
+        status: 'WAITING',
+        count: pendingPlannerQuestion.options.length,
+        anchorId: 'ai-review-planner-question'
+      })
+    }
+    if (pendingMembers) {
+      items.push({
+        id: 'member-create',
+        title: 'Mitgliederanlage',
+        summary: pendingMembers.status === 'CREATED' ? 'Mitglieder wurden angelegt.' : 'Neue Mitglieder warten auf Freigabe.',
+        status: pendingMembers.status === 'CREATED' ? 'DONE' : 'OPEN',
+        count: pendingMembers.members.length,
+        anchorId: 'ai-review-members'
+      })
+    }
+    if (pendingMemberUpdates) {
+      items.push({
+        id: 'member-update',
+        title: 'Mitgliederänderungen',
+        summary: pendingMemberUpdates.status === 'APPLIED' ? 'Änderungen wurden übernommen.' : 'Mitgliedsdaten warten auf Review.',
+        status: pendingMemberUpdates.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingMemberUpdates.changes.length,
+        anchorId: 'ai-review-member-updates'
+      })
+    }
+    if (pendingContributionPayment) {
+      items.push({
+        id: 'contribution-payment',
+        title: 'Beitragsbuchung',
+        summary: pendingContributionPayment.description,
+        status: pendingContributionPayment.status === 'CREATED' ? 'DONE' : 'OPEN',
+        count: 1,
+        anchorId: 'ai-review-contribution-payment'
+      })
+    }
+    if (pendingTagActions) {
+      items.push({
+        id: 'tag-actions',
+        title: 'Tag-Änderungen',
+        summary: pendingTagActions.status === 'APPLIED' ? 'Tag-Änderungen wurden übernommen.' : 'Tags warten auf Freigabe.',
+        status: pendingTagActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingTagActions.changes.length,
+        anchorId: 'ai-review-tag-actions'
+      })
+    }
+    if (pendingVoucherTagActions) {
+      items.push({
+        id: 'voucher-tag-actions',
+        title: 'Buchungs-Tags',
+        summary: `Ergänzen: ${pendingVoucherTagActions.addedTags.join(', ')}`,
+        status: pendingVoucherTagActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingVoucherTagActions.changes.length,
+        anchorId: 'ai-review-voucher-tags'
+      })
+    }
+    if (pendingVoucherUpdates) {
+      items.push({
+        id: 'voucher-updates',
+        title: 'Agent-Buchungsreview',
+        summary: pendingVoucherUpdates.reason || 'Buchungsmetadaten warten auf Review.',
+        status: pendingVoucherUpdates.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingVoucherUpdates.changes.length,
+        anchorId: 'ai-review-voucher-updates'
+      })
+    }
+    if (pendingVoucherReverse) {
+      items.push({
+        id: 'voucher-reverse',
+        title: 'Storno-Review',
+        summary: pendingVoucherReverse.reason || 'Buchungen warten auf Storno-Freigabe.',
+        status: pendingVoucherReverse.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingVoucherReverse.vouchers.length,
+        anchorId: 'ai-review-voucher-reverse'
+      })
+    }
+    if (pendingVoucherRebook) {
+      items.push({
+        id: 'voucher-rebook',
+        title: 'Storno & Ersatzbuchung',
+        summary: pendingVoucherRebook.reason || `${pendingVoucherRebook.original.voucherNo || `#${pendingVoucherRebook.original.id}`} wird korrigiert neu angelegt.`,
+        status: pendingVoucherRebook.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: 1,
+        anchorId: 'ai-review-voucher-rebook'
+      })
+    }
+    if (pendingBudgetActions) {
+      items.push({
+        id: 'budget-actions',
+        title: 'Budget-Stammdaten',
+        summary: pendingBudgetActions.reason || 'Budgets warten auf Freigabe.',
+        status: pendingBudgetActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingBudgetActions.changes.length,
+        anchorId: 'ai-review-budget-actions'
+      })
+    }
+    if (pendingEarmarkActions) {
+      items.push({
+        id: 'earmark-actions',
+        title: 'Zweckbindungen',
+        summary: pendingEarmarkActions.reason || 'Zweckbindungen warten auf Freigabe.',
+        status: pendingEarmarkActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingEarmarkActions.changes.length,
+        anchorId: 'ai-review-earmark-actions'
+      })
+    }
+    if (bankReview) {
+      const openBankReviews = bankReview.suggestions.filter((suggestion) => !suggestion.resolved).length
+      items.push({
+        id: 'bank-review',
+        title: 'Bankimport-Vorschläge',
+        summary: bankReview.filterSummary || 'Banktransaktionen warten auf Prüfung.',
+        status: openBankReviews ? 'OPEN' : 'DONE',
+        count: openBankReviews || bankReview.suggestions.length,
+        anchorId: 'ai-review-bank'
+      })
+    }
+    if (selectedJob && analysis) {
+      const openCandidates = analysis.candidates.filter((item) => !isCandidateApproved(item, selectedJob)).length
+      items.push({
+        id: `booking-review-${selectedJob.id}`,
+        title: selectedJob.title || `Buchungsvorschlag #${selectedJob.id}`,
+        summary: openCandidates ? 'Buchungsvorschläge warten auf Review.' : 'Alle Vorschläge wurden verarbeitet.',
+        status: openCandidates ? 'OPEN' : 'DONE',
+        count: openCandidates || analysis.candidates.length,
+        anchorId: 'ai-review-booking'
+      })
+    }
+    return items
+  }, [analysis, bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedJob])
   const activeMention = useMemo(() => activeMentionTrigger(prompt, promptCursor), [prompt, promptCursor])
   const visibleMentions = useMemo(() => {
     if (!activeMention) return []
@@ -1690,7 +2419,7 @@ export default function AIView({ notify, onBooked }: Props) {
       })
       .slice(0, 9)
   }, [activeMention, mentionOptions])
-  const chatStarted = messages.length > 0 || !!selectedJob || !!bankReview || !!pendingMembers || !!pendingMemberUpdates || !!pendingContributionPayment || !!pendingTagActions || !!pendingVoucherTagActions || !!pendingPlannerQuestion
+  const chatStarted = messages.length > 0 || !!selectedJob || !!bankReview || !!pendingMembers || !!pendingMemberUpdates || !!pendingContributionPayment || !!pendingTagActions || !!pendingVoucherTagActions || !!pendingVoucherUpdates || !!pendingVoucherReverse || !!pendingVoucherRebook || !!pendingBudgetActions || !!pendingEarmarkActions || !!pendingPlannerQuestion
 
   const removeFile = (key: string) => {
     setFiles((current) => current.filter((file) => filePreviewKey(file) !== key))
@@ -1716,12 +2445,52 @@ export default function AIView({ notify, onBooked }: Props) {
     }, 0)
   }
 
-  const pushMessage = (message: Omit<AiMessage, 'id'>) => {
-    setMessages((current) => [...current, { ...message, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }])
+  const openAgentReviewQueueItem = (item: AgentReviewQueueItem) => {
+    document.getElementById(item.anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const openMessageBookingDraft = (draft: NonNullable<AiMessage['bookingDraft']>) => {
+    window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
+      detail: {
+        qa: draft.qa,
+        files: draft.files || []
+      }
+    }))
+  }
+
+  const openVoucherMention = async (mention: AiVoucherMention) => {
+    try {
+      const result = mention.id
+        ? await window.api.vouchers.list({ limit: 1, voucherIds: [mention.id] })
+        : mention.voucherNo
+          ? await window.api.vouchers.list({ limit: 1, q: mention.voucherNo })
+          : null
+      const row = result?.rows?.[0]
+      if (row?.id) {
+        const detached = await window.api.quickAdd.openDetached({
+          mode: 'details',
+          draftId: `ai-details-${row.id}-${Date.now()}`,
+          voucherId: row.id,
+          voucher: row
+        })
+        if (detached?.ok) return
+      }
+      window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
+        detail: {
+          voucherId: mention.id,
+          voucherNo: mention.voucherNo,
+          date: mention.date,
+          q: mention.voucherNo || (mention.id ? String(mention.id) : undefined)
+        }
+      }))
+    } catch (error: any) {
+      notify('error', error?.message || 'Buchung konnte nicht geöffnet werden.')
+    }
   }
 
   const buildConversationPrompt = (userPrompt: string) => {
-    if (!messages.length) return userPrompt
+    const aiContext = JSON.stringify(agentUiContext, null, 2)
+    if (!messages.length && !chatStarted) return userPrompt
     const history = messages.slice(-8).map((message) => {
       const speaker = message.role === 'user' ? 'Nutzer' : 'VereinO KI'
       return `${speaker}${message.title ? ` (${message.title})` : ''}: ${message.body}`
@@ -1730,7 +2499,10 @@ export default function AIView({ notify, onBooked }: Props) {
       'Dies ist eine Folgefrage in der VereinO-KI. Beziehe dich auf die bisherige Unterhaltung und bleibe im VereinO-Kontext.',
       '',
       'Bisherige Unterhaltung:',
-      history,
+      history || '-',
+      '',
+      'Aktueller VereinO-KI-Kontext aus der UI:',
+      aiContext,
       '',
       'Aktuelle Nutzernachricht:',
       userPrompt,
@@ -1741,6 +2513,7 @@ export default function AIView({ notify, onBooked }: Props) {
 
   const startNewChat = () => {
     setMessages([])
+    resetAgentSession()
     selectJob(null)
     setBankReview(null)
     setPendingMembers(null)
@@ -1748,9 +2521,18 @@ export default function AIView({ notify, onBooked }: Props) {
     setPendingContributionPayment(null)
     setPendingTagActions(null)
     setPendingVoucherTagActions(null)
+    setPendingVoucherUpdates(null)
+    setPendingVoucherReverse(null)
+    setPendingVoucherRebook(null)
+    setPendingBudgetActions(null)
+    setPendingEarmarkActions(null)
     setPendingPlannerQuestion(null)
+    setAgentTrace([])
     setFiles([])
     setPrompt('')
+    setShowHistory(false)
+    setShowAgentContext(false)
+    setShowSettings(false)
     clearAiChatSnapshot()
   }
 
@@ -1766,6 +2548,70 @@ export default function AIView({ notify, onBooked }: Props) {
           : suggestion)
       }
       : current)
+  }
+
+  const decodeBase64ToBytes = (dataBase64: string) => {
+    const binary = window.atob(dataBase64)
+    const bytes = new Uint8Array(binary.length)
+    for (let idx = 0; idx < binary.length; idx += 1) bytes[idx] = binary.charCodeAt(idx)
+    return bytes
+  }
+
+  const openBookingDraftForCandidate = (job: TAiJobsGetOutput, reviewCandidate: TAiBookingCandidate, candidateIndex: number) => {
+    const paymentAccountName = reviewCandidate.paymentAccountId
+      ? paymentAccounts.find((account) => account.id === reviewCandidate.paymentAccountId)?.name || null
+      : null
+    const draftFiles = (job.files || [])
+      .filter((file) => !!file.dataBase64)
+      .map((file) => new File(
+        [decodeBase64ToBytes(file.dataBase64!)],
+        file.fileName,
+        { type: file.mimeType || 'application/octet-stream' }
+      ))
+    window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
+      detail: {
+        qa: {
+          date: reviewCandidate.date,
+          type: reviewCandidate.type,
+          sphere: reviewCandidate.sphere,
+          mode: 'GROSS',
+          grossAmount: reviewCandidate.grossAmount,
+          vatRate: reviewCandidate.vatRate ?? 0,
+          description: reviewCandidate.description,
+          note: ['Aus KI-Buchungsvorschlag vorbereitet.', ...(reviewCandidate.warnings || [])].filter(Boolean).join('\n'),
+          paymentMethod: reviewCandidate.paymentMethod ?? null,
+          paymentAccountId: reviewCandidate.paymentAccountId ?? null,
+          paymentAccountName,
+          budgets: (reviewCandidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
+          earmarksAssigned: (reviewCandidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
+          tags: reviewCandidate.tags || []
+        },
+        files: draftFiles
+      }
+    }))
+    pushMessage({
+      role: 'assistant',
+      title: 'Buchungsentwurf geöffnet',
+      body: `Vorschlag ${candidateIndex + 1} aus "${job.title || `Buchungsvorschlag #${job.id}`}" wurde als bearbeitbarer Buchungsentwurf geöffnet.`,
+      meta: 'Review im Buchungsmodal'
+    })
+  }
+
+  const openBookingDraftFromJobId = async (jobId: number) => {
+    const job = selectedJob?.id === jobId ? selectedJob : await window.api.ai.jobs.get({ id: jobId })
+    const jobAnalysis = bookingAnalysis(job)
+    if (!jobAnalysis) {
+      notify('error', 'Für diesen KI-Auftrag fehlt ein Buchungsvorschlag.')
+      return
+    }
+    const draftIndex = firstOpenCandidateIndex(job)
+    const draftCandidate = jobAnalysis.candidates[draftIndex]
+    if (!draftCandidate || isCandidateApproved(draftCandidate, job)) {
+      notify('info', 'Dieser KI-Buchungsvorschlag ist bereits gebucht.')
+      return
+    }
+    selectJob(job, draftIndex)
+    openBookingDraftForCandidate(job, draftCandidate, draftIndex)
   }
 
   const processDocuments = async (userPrompt: string) => {
@@ -2418,6 +3264,39 @@ export default function AIView({ notify, onBooked }: Props) {
       await applyPendingMemberUpdates()
       return true
     }
+    const normalized = normalizeLookup(userPrompt)
+    const wantsLowercase = /(klein|kleinschreib|lowercase|lower case|minuskel)/.test(normalized)
+    const wantsUppercase = /(gross|groß|uppercase|upper case|majusk)/.test(normalized)
+    const wantsEmailTransform = /(email|e mail|mail|adresse|adressen)/.test(normalized)
+      || pendingMemberUpdates.changes.some((change) => change.field === 'email' && change.selected && !change.applied)
+    if ((wantsLowercase || wantsUppercase) && wantsEmailTransform) {
+      let changed = 0
+      setPendingMemberUpdates((current) => current
+        ? {
+          ...current,
+          changes: current.changes.map((change) => {
+            if (change.applied || change.field !== 'email' || typeof change.newValue !== 'string') return change
+            const nextValue = wantsLowercase ? change.newValue.toLowerCase() : change.newValue.toUpperCase()
+            if (nextValue === change.newValue) return change
+            changed += 1
+            return {
+              ...change,
+              newValue: nextValue,
+              newDisplay: displayMemberValue(change.field, nextValue),
+              selected: true
+            }
+          })
+        }
+        : current)
+      pushMessage({
+        role: 'assistant',
+        title: 'Mitgliederänderung angepasst',
+        body: changed
+          ? `${changed} E-Mail-Änderung(en) im offenen Review wurden ${wantsLowercase ? 'kleingeschrieben' : 'großgeschrieben'}. Bitte prüfe die Vorschau unten.`
+          : `Die E-Mail-Änderungen im offenen Review waren bereits ${wantsLowercase ? 'kleingeschrieben' : 'großgeschrieben'}.`
+      })
+      return true
+    }
     const contribution = parseContributionHint(userPrompt)
     if (!contribution.amount && !contribution.interval) return false
     setPendingMemberUpdates((current) => current
@@ -2544,6 +3423,50 @@ export default function AIView({ notify, onBooked }: Props) {
   const loadTags = async () => {
     const result = await window.api.tags.list({ includeUsage: true })
     return (result.rows || []) as TagRow[]
+  }
+
+  function budgetLabelFromRow(budget: any) {
+    return budget?.categoryName || budget?.projectName || budget?.name || (budget?.id ? `Budget #${budget.id}` : '')
+  }
+
+  function budgetLabelFromChange(change: AiBudgetActionChange) {
+    const payload = (change.payload || {}) as Partial<TBudgetUpsertInput>
+    return payload.categoryName || payload.projectName || payload.name || change.name || (change.budgetId ? `Budget #${change.budgetId}` : '')
+  }
+
+  const buildBudgetLookup = async (knownBudgets: Array<{ id: number; label: string }> = []) => {
+    const result = await window.api.budgets.list({ includeArchived: true })
+    const lookup = new Map<string, number>()
+    const add = (label: unknown, id: unknown) => {
+      const normalized = normalizeLookup(label)
+      const numericId = Number(id)
+      if (normalized && Number.isFinite(numericId)) lookup.set(normalized, numericId)
+    }
+    for (const budget of result.rows || []) {
+      add(budgetLabelFromRow(budget), budget.id)
+      add(budget.name, budget.id)
+      add(budget.categoryName, budget.id)
+      add(budget.projectName, budget.id)
+      add(`Budget #${budget.id}`, budget.id)
+    }
+    for (const budget of knownBudgets) add(budget.label, budget.id)
+    return lookup
+  }
+
+  const resolvePendingVoucherBudgetTargets = async (knownBudgets: Array<{ id: number; label: string }> = []) => {
+    const lookup = await buildBudgetLookup(knownBudgets)
+    setPendingVoucherUpdates((current) => {
+      if (!current) return current
+      let changed = false
+      const changes = current.changes.map((change) => {
+        if (change.newBudgetId != null || !change.newBudgetLabel) return change
+        const resolvedId = lookup.get(normalizeLookup(change.newBudgetLabel))
+        if (!resolvedId) return change
+        changed = true
+        return { ...change, newBudgetId: resolvedId }
+      })
+      return changed ? { ...current, changes } : current
+    })
   }
 
   const processTagRead = async (userPrompt = 'Tags, Kategorien, Budgets und Zweckbindungen abfragen') => {
@@ -2691,6 +3614,24 @@ export default function AIView({ notify, onBooked }: Props) {
       : current)
   }
 
+  const toggleBudgetAction = (id: string) => {
+    setPendingBudgetActions((current) => current
+      ? {
+        ...current,
+        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
+      }
+      : current)
+  }
+
+  const toggleEarmarkAction = (id: string) => {
+    setPendingEarmarkActions((current) => current
+      ? {
+        ...current,
+        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
+      }
+      : current)
+  }
+
   const applyPendingTagActions = async () => {
     if (!pendingTagActions || pendingTagActions.status === 'APPLIED') return
     const selected = pendingTagActions.changes.filter((change) => change.selected && !change.applied)
@@ -2729,6 +3670,93 @@ export default function AIView({ notify, onBooked }: Props) {
     } catch (error: any) {
       notify('error', error?.message || String(error))
       pushMessage({ role: 'assistant', title: 'Tag-Änderung fehlgeschlagen', body: error?.message || String(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingBudgetActions = async () => {
+    if (!pendingBudgetActions || pendingBudgetActions.status === 'APPLIED') return
+    const selected = pendingBudgetActions.changes.filter((change) => change.selected && !change.applied)
+    if (!selected.length) {
+      notify('info', 'Keine Budget-Änderungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      const resolvedBudgets: Array<{ id: number; label: string }> = []
+      for (const change of selected) {
+        if (change.action === 'DELETE') {
+          if (!change.budgetId) throw new Error(`Budget "${change.name}" kann ohne ID nicht gelöscht werden.`)
+          await window.api.budgets.delete({ id: change.budgetId })
+        } else if (change.payload) {
+          const result = await window.api.budgets.upsert(change.payload)
+          if (result?.id) resolvedBudgets.push({ id: result.id, label: budgetLabelFromChange(change) })
+        }
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      setPendingBudgetActions({
+        ...pendingBudgetActions,
+        status: 'APPLIED',
+        changes: pendingBudgetActions.changes.map((change) => {
+          if (!appliedIds.has(change.id)) return change
+          const resolved = resolvedBudgets.find((budget) => normalizeLookup(budget.label) === normalizeLookup(budgetLabelFromChange(change)))
+          return { ...change, budgetId: resolved?.id ?? change.budgetId, applied: true }
+        })
+      })
+      await resolvePendingVoucherBudgetTargets(resolvedBudgets)
+      pushMessage({
+        role: 'assistant',
+        title: 'Budgets geändert',
+        body: `${selected.length} Budget-Änderung(en) übernommen.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      await loadMentionOptions()
+      notify('success', `${selected.length} Budget-Änderungen übernommen.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({ role: 'assistant', title: 'Budget-Änderung fehlgeschlagen', body: error?.message || String(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingEarmarkActions = async () => {
+    if (!pendingEarmarkActions || pendingEarmarkActions.status === 'APPLIED') return
+    const selected = pendingEarmarkActions.changes.filter((change) => change.selected && !change.applied)
+    if (!selected.length) {
+      notify('info', 'Keine Zweckbindungs-Änderungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      for (const change of selected) {
+        if (change.action === 'DELETE') {
+          if (!change.earmarkId) throw new Error(`Zweckbindung "${change.name}" kann ohne ID nicht gelöscht werden.`)
+          await window.api.bindings.delete({ id: change.earmarkId })
+        } else if (change.payload) {
+          await window.api.bindings.upsert(change.payload)
+        }
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      setPendingEarmarkActions({
+        ...pendingEarmarkActions,
+        status: 'APPLIED',
+        changes: pendingEarmarkActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true } : change)
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Zweckbindungen geändert',
+        body: `${selected.length} Zweckbindungs-Änderung(en) übernommen.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      await loadMentionOptions()
+      notify('success', `${selected.length} Zweckbindungs-Änderungen übernommen.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({ role: 'assistant', title: 'Zweckbindungs-Änderung fehlgeschlagen', body: error?.message || String(error) })
     } finally {
       setBusy(false)
     }
@@ -2872,6 +3900,170 @@ export default function AIView({ notify, onBooked }: Props) {
     } catch (error: any) {
       notify('error', error?.message || String(error))
       pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggleVoucherUpdate = (id: string) => {
+    setPendingVoucherUpdates((current) => current
+      ? {
+        ...current,
+        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
+      }
+      : current)
+  }
+
+  const applyPendingVoucherUpdates = async () => {
+    if (!pendingVoucherUpdates || pendingVoucherUpdates.status === 'APPLIED') return
+    const selected = pendingVoucherUpdates.changes.filter((change) => change.selected && !change.applied)
+    if (!selected.length) {
+      notify('info', 'Keine Buchungsänderungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      const needsBudgetLookup = selected.some((change) => change.newBudgetId == null && !!change.newBudgetLabel)
+      const budgetLookup = needsBudgetLookup ? await buildBudgetLookup() : new Map<string, number>()
+      for (const change of selected) {
+        const hasBudgetChange = change.newBudgetId !== undefined || !!change.newBudgetLabel
+        const resolvedBudgetId = hasBudgetChange && change.newBudgetId == null && change.newBudgetLabel
+          ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
+          : change.newBudgetId
+        if (hasBudgetChange && resolvedBudgetId == null && change.newBudgetLabel) {
+          throw new Error(`Budget "${change.newBudgetLabel}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`)
+        }
+        const payload: TVoucherMetaUpdateInput = {
+          id: change.voucherId,
+          ...(hasBudgetChange ? { budgetId: resolvedBudgetId ?? null, budgetAmount: Math.abs(Number(change.grossAmount || 0)) || undefined } : {}),
+          ...(change.newEarmarkId !== undefined ? { earmarkId: change.newEarmarkId, earmarkAmount: Math.abs(Number(change.grossAmount || 0)) || undefined } : {}),
+          ...(change.newTags ? { tags: change.newTags } : {})
+        }
+        await window.api.vouchers.updateMeta(payload)
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      setPendingVoucherUpdates({
+        ...pendingVoucherUpdates,
+        status: 'APPLIED',
+        changes: pendingVoucherUpdates.changes.map((change) => {
+          if (!appliedIds.has(change.id)) return change
+          const resolvedBudgetId = change.newBudgetId == null && change.newBudgetLabel
+            ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
+            : change.newBudgetId
+          return { ...change, newBudgetId: resolvedBudgetId ?? change.newBudgetId, applied: true }
+        })
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Buchungen aktualisiert',
+        body: `${selected.length} Buchung(en) wurden aus dem Agent-Review übernommen.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      onBooked?.()
+      notify('success', `${selected.length} Buchungsänderungen übernommen.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingVoucherReverse = async () => {
+    if (!pendingVoucherReverse || pendingVoucherReverse.status === 'APPLIED') return
+    setBusy(true)
+    const reversed: Array<{ id: number; voucherNo?: string | null; reversedVoucherNo: string }> = []
+    const failures: string[] = []
+    try {
+      for (const voucher of pendingVoucherReverse.vouchers) {
+        try {
+          const res = await window.api.vouchers.reverse({
+            originalId: voucher.id,
+            reason: pendingVoucherReverse.reason || 'Storno per VereinO KI-Agent'
+          })
+          reversed.push({ id: voucher.id, voucherNo: voucher.voucherNo, reversedVoucherNo: res.voucherNo })
+        } catch (error: any) {
+          failures.push(`${voucher.voucherNo || `#${voucher.id}`}: ${error?.message || String(error)}`)
+        }
+      }
+      const reversedById = new Map(reversed.map((item) => [item.id, item.reversedVoucherNo]))
+      const nextState: AiVoucherReverseState = {
+        ...pendingVoucherReverse,
+        status: failures.length ? 'DRAFT' : 'APPLIED',
+        vouchers: pendingVoucherReverse.vouchers.map((voucher) => ({
+          ...voucher,
+          reversedVoucherNo: reversedById.get(voucher.id) || voucher.reversedVoucherNo || null
+        }))
+      }
+      setPendingVoucherReverse(nextState)
+      if (reversed.length) {
+        window.dispatchEvent(new Event('data-changed'))
+        onBooked?.()
+      }
+      pushMessage({
+        role: 'assistant',
+        title: failures.length ? 'Storno teilweise erstellt' : 'Storno erstellt',
+        body: [
+          reversed.length ? `Storniert: ${reversed.map((item) => `${item.voucherNo || `#${item.id}`} -> ${item.reversedVoucherNo}`).join(', ')}` : 'Keine Buchung wurde storniert.',
+          failures.length ? `Fehler:\n${failures.join('\n')}` : ''
+        ].filter(Boolean).join('\n'),
+        meta: reversed.length ? 'VereinO-Daten geändert' : 'Keine Änderung'
+      })
+      if (failures.length) notify('error', `Storno teilweise fehlgeschlagen: ${failures[0]}`)
+      else notify('success', `${reversed.length} Storno(s) erstellt.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingVoucherRebook = async () => {
+    if (!pendingVoucherRebook || pendingVoucherRebook.status === 'APPLIED') return
+    setBusy(true)
+    try {
+      const reversal = await window.api.vouchers.reverse({
+        originalId: pendingVoucherRebook.original.id,
+        reason: pendingVoucherRebook.reason || 'Korrektur per VereinO KI-Agent'
+      })
+      const replacement = pendingVoucherRebook.replacement
+      const payload: TVoucherCreateInput = {
+        date: replacement.date,
+        type: replacement.type,
+        sphere: replacement.sphere,
+        description: replacement.description,
+        note: replacement.note || `Ersatzbuchung nach Storno ${reversal.voucherNo}.`,
+        grossAmount: Number(replacement.grossAmount || 0),
+        vatRate: Number(replacement.vatRate || 0),
+        paymentMethod: replacement.paymentMethod || undefined,
+        paymentAccountId: replacement.paymentAccountId ?? undefined,
+        budgets: replacement.budgets || undefined,
+        earmarks: replacement.earmarks || undefined,
+        tags: replacement.tags || [],
+        bankTransactionId: replacement.bankTransactionId || undefined
+      }
+      const created = await window.api.vouchers.create(payload)
+      setPendingVoucherRebook({
+        ...pendingVoucherRebook,
+        status: 'APPLIED',
+        reversalVoucherNo: reversal.voucherNo,
+        newVoucherNo: created.voucherNo
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Buchung korrigiert',
+        body: `Beleg ${pendingVoucherRebook.original.voucherNo || `#${pendingVoucherRebook.original.id}`} wurde storniert (${reversal.voucherNo}) und als ${replacement.type} neu angelegt (${created.voucherNo}).`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      onBooked?.()
+      notify('success', `Korrektur erstellt: ${reversal.voucherNo} + ${created.voucherNo}.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({
+        role: 'assistant',
+        title: 'Storno/Ersatzbuchung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -3386,48 +4578,44 @@ export default function AIView({ notify, onBooked }: Props) {
     return /(report|bericht|controlling|reports export|jahresergebnis|kpi|kennzahl|pdf controllingbericht)/.test(text)
   })
 
-  const currentBookingReviewContext = () => {
-    if (!selectedJob || !analysis) return ''
-    const openCandidates = analysis.candidates
-      .map((item, idx) => ({ item, idx }))
-      .filter(({ item }) => !isCandidateApproved(item, selectedJob))
-    if (!openCandidates.length) return ''
-    return [
-      'Aktiver Buchungsreview:',
-      JSON.stringify({
-        jobId: selectedJob.id,
-        title: selectedJob.title,
-        fileCount: selectedJob.fileCount,
-        status: selectedJob.status,
-        openCandidateCount: openCandidates.length,
-        candidates: openCandidates.slice(0, 50).map(({ item, idx }) => ({
-          index: idx,
-          date: item.date,
-          type: item.type,
-          sphere: item.sphere,
-          grossAmount: item.grossAmount,
-          vatRate: item.vatRate,
-          paymentMethod: item.paymentMethod,
-          paymentAccountId: item.paymentAccountId,
-          description: item.description,
-          tags: item.tags || [],
-          warnings: item.warnings || []
-        }))
-      })
-    ].join('\n')
-  }
-
   const executeAiActionPlan = async (userPrompt: string) => {
+    if (!files.length && await applyPaymentAccountFollowup(userPrompt)) {
+      return true
+    }
+    if (!files.length && pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED' && wantsApplyPendingVoucherActions(userPrompt)) {
+      await applyPendingVoucherUpdates()
+      return true
+    }
+    if (!files.length && pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+      await applyPendingBudgetActions()
+      return true
+    }
+    if (!files.length && pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+      await applyPendingEarmarkActions()
+      return true
+    }
+    if (shouldUseAgentRuntime(userPrompt)) {
+      await runAgentRuntime(userPrompt)
+      return true
+    }
     const mentionHint = buildMentionPlannerHint(userPrompt, mentionOptions)
     const plannerPrompt = files.length
       ? [
         userPrompt || 'Bitte die angehängten Dateien prüfen.',
         mentionHint,
         '',
+        'Aktueller VereinO-KI-Kontext:',
+        JSON.stringify(agentUiContext, null, 2),
+        '',
         'Angehängte Dateien:',
         ...files.map((file) => `- ${file.name} (${file.type || 'unbekannter MIME-Typ'}, ${file.size} Bytes)`)
       ].filter(Boolean).join('\n')
-      : [userPrompt, mentionHint, currentBookingReviewContext()].filter(Boolean).join('\n\n')
+      : [
+        userPrompt,
+        mentionHint,
+        'Aktueller VereinO-KI-Kontext:',
+        JSON.stringify(agentUiContext, null, 2)
+      ].filter(Boolean).join('\n\n')
     const planned = await window.api.ai.actions.plan({
       prompt: plannerPrompt,
       conversation: planConversation()
@@ -3650,6 +4838,75 @@ export default function AIView({ notify, onBooked }: Props) {
       } catch (error: any) {
         notify('error', error?.message || String(error))
         pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    if (!files.length && pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED') {
+      setBusy(true)
+      pushMessage({ role: 'user', body: userPrompt })
+      try {
+        if (wantsApplyPendingVoucherActions(userPrompt)) await applyPendingVoucherUpdates()
+        else if (!settings.hasApiKey) {
+          pushMessage({
+            role: 'assistant',
+            title: 'Buchungsreview offen',
+            body: 'Der Agent-Review ist noch offen. Bitte bestätige die Übernahme oder wähle die Änderungen unten aus.'
+          })
+        } else {
+          await processText(userPrompt)
+        }
+        setPrompt('')
+      } catch (error: any) {
+        notify('error', error?.message || String(error))
+        pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    if (!files.length && pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED') {
+      setBusy(true)
+      pushMessage({ role: 'user', body: userPrompt })
+      try {
+        if (wantsApplyPendingTagActions(userPrompt)) await applyPendingBudgetActions()
+        else if (!settings.hasApiKey) {
+          pushMessage({
+            role: 'assistant',
+            title: 'Budget-Review offen',
+            body: 'Der Budget-Review ist noch offen. Bitte bestätige die Übernahme oder wähle die Änderungen unten aus.'
+          })
+        } else {
+          await processText(userPrompt)
+        }
+        setPrompt('')
+      } catch (error: any) {
+        notify('error', error?.message || String(error))
+        pushMessage({ role: 'assistant', title: 'Budget-Änderung fehlgeschlagen', body: error?.message || String(error) })
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    if (!files.length && pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED') {
+      setBusy(true)
+      pushMessage({ role: 'user', body: userPrompt })
+      try {
+        if (wantsApplyPendingTagActions(userPrompt)) await applyPendingEarmarkActions()
+        else if (!settings.hasApiKey) {
+          pushMessage({
+            role: 'assistant',
+            title: 'Zweckbindungs-Review offen',
+            body: 'Der Zweckbindungs-Review ist noch offen. Bitte bestätige die Übernahme oder wähle die Änderungen unten aus.'
+          })
+        } else {
+          await processText(userPrompt)
+        }
+        setPrompt('')
+      } catch (error: any) {
+        notify('error', error?.message || String(error))
+        pushMessage({ role: 'assistant', title: 'Zweckbindungs-Änderung fehlgeschlagen', body: error?.message || String(error) })
       } finally {
         setBusy(false)
       }
@@ -4033,6 +5290,33 @@ export default function AIView({ notify, onBooked }: Props) {
     }
   }
 
+  const renderHistoryJobButton = (
+    job: TAiJobsListOutput['rows'][number],
+    tone: 'open' | 'done' | 'task',
+    metaItems?: Array<string | null | undefined>
+  ) => {
+    const fallbackTitle = job.type === 'BOOKING_FROM_DOCUMENTS' ? `Buchungsvorschlag #${job.id}` : `KI-Aufgabe #${job.id}`
+    const defaultMeta = [
+      job.type === 'BOOKING_FROM_DOCUMENTS' ? bookingProgress(job) : typeLabel(job.type),
+      statusLabel(job.status),
+      job.createdAt?.slice(0, 10),
+      formatAiUsage(job.usage)
+    ]
+    return (
+      <button
+        key={`${tone}-${job.id}`}
+        className={`ai-history-item ai-history-item--${tone} ${selectedJob?.id === job.id ? 'active' : ''}`}
+        onClick={() => { void openJob(job.id); setShowHistory(false) }}
+      >
+        <span className="ai-history-item-icon" aria-hidden="true" />
+        <span className="ai-history-item-copy">
+          <strong>{job.title || fallbackTitle}</strong>
+          <small>{(metaItems || defaultMeta).filter(Boolean).join(' · ')}</small>
+        </span>
+      </button>
+    )
+  }
+
   const renderBankSuggestionActions = (suggestion: AiBankReviewSuggestion) => {
     if (suggestion.resolved) {
       return <span className="ai-bank-resolved">{suggestion.resolvedVoucherNo ? `Erledigt · ${suggestion.resolvedVoucherNo}` : 'Erledigt'}</span>
@@ -4177,9 +5461,52 @@ export default function AIView({ notify, onBooked }: Props) {
           <h1>KI</h1>
         </div>
         <div className="ai-header-actions">
+          {chatStarted && (
+            <button className="btn ai-header-new-chat" type="button" onClick={startNewChat}>
+              + Neuer Chat
+            </button>
+          )}
           <span className={`ai-key-state ${settings.hasApiKey ? 'is-ready' : 'is-missing'}`}>{settings.hasApiKey ? 'API-Key aktiv' : 'API-Key fehlt'}</span>
-          <button className="btn ai-icon-btn" type="button" onClick={() => setShowHistory((open) => !open)} aria-label="KI-Verlauf">☰</button>
-          <button className="btn ai-icon-btn" type="button" onClick={() => setShowSettings((open) => !open)} aria-label="KI-Einstellungen">⚙</button>
+          <button
+            ref={historyButtonRef}
+            className="btn ai-icon-btn"
+            type="button"
+            onClick={() => {
+              setShowHistory((open) => !open)
+              setShowAgentContext(false)
+              setShowSettings(false)
+            }}
+            aria-label="KI-Verlauf"
+          >
+            ☰
+          </button>
+          <button
+            ref={agentContextButtonRef}
+            className="btn ai-icon-btn ai-agent-context-toggle"
+            type="button"
+            onClick={() => {
+              setShowAgentContext((open) => !open)
+              setShowHistory(false)
+              setShowSettings(false)
+            }}
+            aria-label="Agent-Kontext"
+            title="Agent-Kontext"
+          >
+            ◈
+          </button>
+          <button
+            ref={settingsButtonRef}
+            className="btn ai-icon-btn"
+            type="button"
+            onClick={() => {
+              setShowSettings((open) => !open)
+              setShowHistory(false)
+              setShowAgentContext(false)
+            }}
+            aria-label="KI-Einstellungen"
+          >
+            ⚙
+          </button>
         </div>
       </header>
 
@@ -4205,7 +5532,6 @@ export default function AIView({ notify, onBooked }: Props) {
             <section className="card ai-conversation-card">
               <div className="ai-conversation-toolbar">
                 <span>Unterhaltung</span>
-                <button className="btn ghost ai-new-chat-btn" type="button" onClick={startNewChat}>+ Neuer Chat</button>
               </div>
               <div className="ai-message-list">
                 {messages.map((message) => (
@@ -4215,9 +5541,19 @@ export default function AIView({ notify, onBooked }: Props) {
                       {message.meta && <span>{message.meta}</span>}
                     </div>
                     {message.role === 'assistant'
-                      ? <AiMarkdown text={message.body} />
+                      ? <AiMarkdown text={message.body} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
                       : <p>{message.body}</p>}
-                    {message.jobId && message.reviewable && <button className="btn" type="button" onClick={() => void openJob(message.jobId!)}>Review öffnen</button>}
+                    {message.jobId && message.reviewable && (
+                      <>
+                        <button className="btn" type="button" onClick={() => void openJob(message.jobId!)}>Review öffnen</button>
+                        <button className="btn" type="button" onClick={() => void openBookingDraftFromJobId(message.jobId!)}>Buchungsentwurf</button>
+                      </>
+                    )}
+                    {message.bookingDraft && (
+                      <button className="btn" type="button" onClick={() => openMessageBookingDraft(message.bookingDraft!)}>
+                        Buchungsentwurf öffnen
+                      </button>
+                    )}
                     {message.filePath && (
                       <button className="btn" type="button" onClick={() => void window.api.shell.showItemInFolder(message.filePath!)}>
                         Im Ordner anzeigen
@@ -4229,8 +5565,10 @@ export default function AIView({ notify, onBooked }: Props) {
             </section>
           )}
 
+          <AgentReviewQueue items={agentReviewQueueItems} onOpen={openAgentReviewQueueItem} />
+
           {pendingPlannerQuestion?.status === 'OPEN' && (
-            <section className="card ai-planner-question-card">
+            <section id="ai-review-planner-question" className="card ai-planner-question-card">
               <div className="ai-section-head">
                 <strong>{pendingPlannerQuestion.question}</strong>
                 <span>Planer</span>
@@ -4254,7 +5592,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {pendingMembers && (
-            <section className="card ai-member-review-card">
+            <section id="ai-review-members" className="card ai-member-review-card">
               <div className="ai-section-head">
                 <strong>Mitgliederanlage</strong>
                 <span>{pendingMembers.status === 'CREATED' ? 'angelegt' : `${pendingMembers.members.length} vorbereitet`}</span>
@@ -4285,7 +5623,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {pendingMemberUpdates && (
-            <section className="card ai-member-review-card ai-member-update-card">
+            <section id="ai-review-member-updates" className="card ai-member-review-card ai-member-update-card">
               <div className="ai-section-head">
                 <strong>Mitgliederänderungen</strong>
                 <span>{pendingMemberUpdates.status === 'APPLIED' ? 'übernommen' : `${pendingMemberUpdates.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
@@ -4329,7 +5667,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {pendingContributionPayment && (
-            <section className="card ai-contribution-payment-card">
+            <section id="ai-review-contribution-payment" className="card ai-contribution-payment-card">
               <div className="ai-section-head">
                 <strong>Beitragsbuchung</strong>
                 <span>{pendingContributionPayment.status === 'CREATED' ? 'gebucht' : 'Review erforderlich'}</span>
@@ -4349,7 +5687,7 @@ export default function AIView({ notify, onBooked }: Props) {
                 </dl>
                 {pendingContributionPayment.warnings.length ? (
                   <div className="ai-evidence">
-                    {pendingContributionPayment.warnings.map((warning, idx) => <span key={idx} className="ai-warning">{warning}</span>)}
+                    {pendingContributionPayment.warnings.map((warning, idx) => <span key={idx} className={warningClassName(warning)}>{warning}</span>)}
                   </div>
                 ) : null}
               </div>
@@ -4372,7 +5710,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {pendingTagActions && (
-            <section className="card ai-tag-action-card">
+            <section id="ai-review-tag-actions" className="card ai-tag-action-card">
               <div className="ai-section-head">
                 <strong>Tag-Änderungen</strong>
                 <span>{pendingTagActions.status === 'APPLIED' ? 'übernommen' : `${pendingTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
@@ -4414,7 +5752,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {pendingVoucherTagActions && (
-            <section className="card ai-voucher-action-card">
+            <section id="ai-review-voucher-tags" className="card ai-voucher-action-card">
               <div className="ai-section-head">
                 <strong>Buchungsänderungen</strong>
                 <span>{pendingVoucherTagActions.status === 'APPLIED' ? 'übernommen' : `${pendingVoucherTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
@@ -4462,8 +5800,60 @@ export default function AIView({ notify, onBooked }: Props) {
             </section>
           )}
 
+          {pendingVoucherUpdates && (
+            <AgentVoucherUpdateCard
+              anchorId="ai-review-voucher-updates"
+              state={pendingVoucherUpdates}
+              busy={busy}
+              onToggle={toggleVoucherUpdate}
+              onApply={() => void applyPendingVoucherUpdates()}
+            />
+          )}
+
+          {pendingVoucherReverse && (
+            <AgentVoucherReverseCard
+              anchorId="ai-review-voucher-reverse"
+              state={pendingVoucherReverse}
+              busy={busy}
+              onApply={() => void applyPendingVoucherReverse()}
+            />
+          )}
+
+          {pendingVoucherRebook && (
+            <AgentVoucherRebookCard
+              anchorId="ai-review-voucher-rebook"
+              state={pendingVoucherRebook}
+              busy={busy}
+              onApply={() => void applyPendingVoucherRebook()}
+            />
+          )}
+
+          {pendingBudgetActions && (
+            <AgentMasterDataChangeCard
+              anchorId="ai-review-budget-actions"
+              title="Budget-Stammdaten"
+              entityLabel="Budget-Änderungen"
+              state={pendingBudgetActions}
+              busy={busy}
+              onToggle={toggleBudgetAction}
+              onApply={() => void applyPendingBudgetActions()}
+            />
+          )}
+
+          {pendingEarmarkActions && (
+            <AgentMasterDataChangeCard
+              anchorId="ai-review-earmark-actions"
+              title="Zweckbindungen"
+              entityLabel="Zweckbindungs-Änderungen"
+              state={pendingEarmarkActions}
+              busy={busy}
+              onToggle={toggleEarmarkAction}
+              onApply={() => void applyPendingEarmarkActions()}
+            />
+          )}
+
           {bankReview && (
-            <section className="card ai-bank-review-card">
+            <section id="ai-review-bank" className="card ai-bank-review-card">
               <div className="ai-section-head">
                 <strong>Bankimport-Vorschläge</strong>
                 <span>{bankReview.suggestions.filter((suggestion) => !suggestion.resolved).length} offen{bankReview.sourceTotal ? ` · ${bankReview.sourceTotal} geprüft` : ''}</span>
@@ -4477,7 +5867,7 @@ export default function AIView({ notify, onBooked }: Props) {
           )}
 
           {selectedJob && analysis && candidate && (
-            <section className="card ai-review-card">
+            <section id="ai-review-booking" className="card ai-review-card">
               {selectedJob.usage && (
                 <div className="ai-usage-row" title={selectedJob.usage.pricingNote || undefined}>
                   <span>KI-Nutzung</span>
@@ -4501,7 +5891,16 @@ export default function AIView({ notify, onBooked }: Props) {
                   })}
                 </div>
               )}
-              <CandidateEditor job={selectedJob} candidate={candidate} candidateIndex={selectedCandidate} paymentAccounts={paymentAccounts} busy={busy} onChange={updateCandidate} onApprove={approveCandidate} />
+              <CandidateEditor
+                job={selectedJob}
+                candidate={candidate}
+                candidateIndex={selectedCandidate}
+                paymentAccounts={paymentAccounts}
+                busy={busy}
+                onChange={updateCandidate}
+                onApprove={approveCandidate}
+                onOpenDraft={() => openBookingDraftForCandidate(selectedJob, candidate, selectedCandidate)}
+              />
             </section>
           )}
 
@@ -4512,56 +5911,71 @@ export default function AIView({ notify, onBooked }: Props) {
       </div>
 
       {showHistory && (
-        <section className="card ai-assistant-sidebar ai-history-drawer">
-          <div className="ai-section-head">
-            <strong>Verlauf</strong>
-            <button className="btn ghost" onClick={() => setShowHistory(false)} aria-label="Schließen">×</button>
-          </div>
-          <div className="ai-history-group">
-            <div className="ai-history-group-title">
-              <strong>Buchungsvorschläge</strong>
-              <span>{openBookingJobs.length} offen</span>
+        <section ref={historyDrawerRef} className="card ai-assistant-sidebar ai-history-drawer" role="dialog" aria-label="KI-Verlauf">
+          <div className="ai-history-drawer-head">
+            <div>
+              <strong>Verlauf</strong>
+              <span>Schneller zurück in Reviews, gebuchte Vorschläge und alte Agent-Läufe.</span>
             </div>
-            {openBookingJobs.map((job) => (
-              <button key={job.id} className={selectedJob?.id === job.id ? 'active' : ''} onClick={() => { void openJob(job.id); setShowHistory(false) }}>
-                <span>{job.title || `Buchungsvorschlag #${job.id}`}</span>
-                <small>{[bookingProgress(job), statusLabel(job.status), job.createdAt?.slice(0, 10), formatAiUsage(job.usage)].filter(Boolean).join(' · ')}</small>
-              </button>
-            ))}
-            {!openBookingJobs.length && <div className="ai-empty">Keine offenen Buchungsvorschläge.</div>}
+            <button className="btn ghost ai-history-close" type="button" onClick={() => setShowHistory(false)} aria-label="Schließen">×</button>
           </div>
-          {completedBookingJobs.length > 0 && (
-            <div className="ai-history-group">
-              <div className="ai-history-group-title">
-                <strong>Gebuchte Vorschläge</strong>
-                <span>{completedBookingJobs.length}</span>
+          <div className="ai-history-stats">
+            <span><strong>{openBookingJobs.length}</strong> offen</span>
+            <span><strong>{completedBookingJobs.length}</strong> gebucht</span>
+            <span><strong>{jobs.length}</strong> Aufgaben</span>
+          </div>
+          <div className="ai-history-layout">
+            <div className="ai-history-column ai-history-column--reviews">
+              <div className="ai-history-group ai-history-group--open">
+                <div className="ai-history-group-title">
+                  <strong>Offene Buchungsreviews</strong>
+                  <span>{openBookingJobs.length}</span>
+                </div>
+                <div className="ai-history-list">
+                  {openBookingJobs.map((job) => renderHistoryJobButton(job, 'open'))}
+                  {!openBookingJobs.length && <div className="ai-empty">Keine offenen Buchungsvorschläge.</div>}
+                </div>
               </div>
-              {completedBookingJobs.slice(0, 8).map((job) => (
-                <button key={job.id} className={selectedJob?.id === job.id ? 'active' : ''} onClick={() => { void openJob(job.id); setShowHistory(false) }}>
-                  <span>{job.title || `Buchungsvorschlag #${job.id}`}</span>
-                  <small>{[bookingProgress(job), statusLabel(job.status), job.createdAt?.slice(0, 10), job.voucherId ? `zuletzt #${job.voucherId}` : null].filter(Boolean).join(' · ')}</small>
-                </button>
-              ))}
+              <div className="ai-history-group ai-history-group--done">
+                <div className="ai-history-group-title">
+                  <strong>Gebuchte Vorschläge</strong>
+                  <span>{completedBookingJobs.length}</span>
+                </div>
+                <div className="ai-history-list ai-history-list--compact">
+                  {completedBookingJobs.slice(0, 10).map((job) => renderHistoryJobButton(job, 'done', [
+                    bookingProgress(job),
+                    statusLabel(job.status),
+                    job.createdAt?.slice(0, 10),
+                    job.voucherId ? `Buchung #${job.voucherId}` : null
+                  ]))}
+                  {!completedBookingJobs.length && <div className="ai-empty">Noch keine gebuchten Vorschläge.</div>}
+                </div>
+              </div>
             </div>
-          )}
-          <div className="ai-history-group">
-            <div className="ai-history-group-title">
-              <strong>Alle KI-Aufgaben</strong>
-              <span>{jobs.length}</span>
+            <div className="ai-history-column">
+              <div className="ai-history-group ai-history-group--all">
+                <div className="ai-history-group-title">
+                  <strong>Alle KI-Aufgaben</strong>
+                  <span>{jobs.length}</span>
+                </div>
+                <div className="ai-history-list">
+                  {jobs.map((job) => renderHistoryJobButton(job, 'task'))}
+                  {!jobs.length && <div className="ai-empty">Noch keine gespeicherten KI-Aufgaben.</div>}
+                </div>
+              </div>
             </div>
-          {jobs.map((job) => (
-            <button key={job.id} className={selectedJob?.id === job.id ? 'active' : ''} onClick={() => { void openJob(job.id); setShowHistory(false) }}>
-              <span>{job.title || `KI-Aufgabe #${job.id}`}</span>
-              <small>{[typeLabel(job.type), job.type === 'BOOKING_FROM_DOCUMENTS' ? bookingProgress(job) : null, statusLabel(job.status), job.createdAt?.slice(0, 10), formatAiUsage(job.usage)].filter(Boolean).join(' · ')}</small>
-            </button>
-          ))}
-          {!jobs.length && <div className="ai-empty">Noch keine gespeicherten KI-Aufgaben.</div>}
           </div>
         </section>
       )}
 
+      {showAgentContext && (
+        <section ref={agentContextDrawerRef} className="ai-agent-context-drawer" role="dialog" aria-label="Agent-Kontext">
+          <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules} />
+        </section>
+      )}
+
       {showSettings && (
-        <section className="card ai-settings-card ai-settings-drawer">
+        <section ref={settingsDrawerRef} className="card ai-settings-card ai-settings-drawer">
           <div className="ai-section-head">
             <strong>Einstellungen</strong>
             <button className="btn ghost" onClick={() => setShowSettings(false)} aria-label="Schließen">×</button>

@@ -1067,6 +1067,7 @@ export default function JournalView({
                     tooltip="Batch-Zuweisung auf gefilterte Buchungen"
                     currentFilters={{
                         paymentMethod: activeFilterPM || undefined,
+                        paymentAccountId: activeFilterPaymentAccountId ?? undefined,
                         sphere: activeFilterSphere || undefined,
                         type: activeFilterType || undefined,
                         from: activeFrom || undefined,

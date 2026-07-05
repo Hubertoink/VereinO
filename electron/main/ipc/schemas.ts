@@ -734,11 +734,15 @@ export type TPaymentAccountDeleteOutput = z.infer<typeof PaymentAccountDeleteOut
 export const VouchersBatchAssignEarmarkInput = z.object({
     earmarkId: z.number(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     q: z.string().optional(),
+    tag: z.string().optional(),
+    filterEarmarkId: z.number().nullable().optional(),
+    filterBudgetId: z.number().nullable().optional(),
     onlyWithout: z.boolean().optional()
 })
 export const VouchersBatchAssignEarmarkOutput = z.object({ updated: z.number() })
@@ -749,11 +753,15 @@ export type TVouchersBatchAssignEarmarkOutput = z.infer<typeof VouchersBatchAssi
 export const VouchersBatchAssignBudgetInput = z.object({
     budgetId: z.number(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     q: z.string().optional(),
+    tag: z.string().optional(),
+    filterEarmarkId: z.number().nullable().optional(),
+    filterBudgetId: z.number().nullable().optional(),
     onlyWithout: z.boolean().optional()
 })
 export const VouchersBatchAssignBudgetOutput = z.object({ updated: z.number() })
@@ -764,11 +772,15 @@ export type TVouchersBatchAssignBudgetOutput = z.infer<typeof VouchersBatchAssig
 export const VouchersBatchAssignTagsInput = z.object({
     tags: z.array(z.string()).nonempty(),
     paymentMethod: PaymentMethod.optional(),
+    paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
-    q: z.string().optional()
+    q: z.string().optional(),
+    tag: z.string().optional(),
+    filterEarmarkId: z.number().nullable().optional(),
+    filterBudgetId: z.number().nullable().optional()
 })
 export const VouchersBatchAssignTagsOutput = z.object({ updated: z.number() })
 export type TVouchersBatchAssignTagsInput = z.infer<typeof VouchersBatchAssignTagsInput>
@@ -1680,6 +1692,99 @@ export const AiUsageSchema = z.object({
     pricingNote: z.string().optional()
 })
 
+export const AiAgentDraft = z.object({
+    kind: z.enum(['booking', 'voucherUpdate', 'voucherReverse', 'voucherRebook', 'memberCreate', 'memberUpdate', 'tagChange', 'budgetChange', 'earmarkChange', 'bankLink', 'invoiceAction', 'reportExport']),
+    title: z.string(),
+    payload: z.any(),
+    autoApproval: z.object({
+        action: z.enum(['AUTO_PRESELECT', 'AUTO_APPLY_SAFE']),
+        ruleIds: z.array(z.number()),
+        ruleNames: z.array(z.string())
+    }).nullable().optional()
+})
+export const AiAgentToolCall = z.object({
+    name: z.string(),
+    args: z.any().optional(),
+    ok: z.boolean(),
+    summary: z.string().nullable().optional()
+})
+export const AiAgentTraceEvent = z.object({
+    id: z.string(),
+    kind: z.enum(['tool_call', 'tool_result', 'draft', 'memory', 'rule', 'message']),
+    title: z.string(),
+    detail: z.string().nullable().optional(),
+    ok: z.boolean().optional(),
+    payload: z.any().optional()
+})
+export const AiAgentRunInput = z.object({
+    sessionId: z.string().min(1).nullable().optional(),
+    prompt: z.string().min(1),
+    uiContext: z.any().optional(),
+    model: z.string().optional(),
+    maxSteps: z.number().int().min(1).max(8).optional()
+})
+export const AiAgentRunOutput = z.object({
+    sessionId: z.string(),
+    title: z.string().nullable().optional(),
+    answer: z.string(),
+    model: z.string(),
+    toolCalls: z.array(AiAgentToolCall).default([]),
+    trace: z.array(AiAgentTraceEvent).default([]),
+    drafts: z.array(AiAgentDraft).default([]),
+    usage: AiUsageSchema
+})
+
+export const AiAgentMemorySchema = z.object({
+    id: z.number(),
+    scope: z.enum(['ORG', 'USER', 'SESSION']),
+    key: z.string(),
+    value: z.string(),
+    source: z.string().nullable().optional(),
+    confidence: z.number(),
+    isActive: z.number(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+})
+export const AiAgentMemoryListInput = z.object({
+    activeOnly: z.boolean().optional(),
+    scope: z.enum(['ORG', 'USER', 'SESSION']).optional(),
+    limit: z.number().optional()
+}).optional()
+export const AiAgentMemoryListOutput = z.object({ rows: z.array(AiAgentMemorySchema) })
+export const AiAgentMemoryUpsertInput = z.object({
+    scope: z.enum(['ORG', 'USER', 'SESSION']).optional(),
+    key: z.string().min(1),
+    value: z.string().min(1),
+    source: z.string().nullable().optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    isActive: z.boolean().optional()
+})
+
+export const AiAgentAutoRuleSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    draftKind: z.string(),
+    conditions: z.record(z.string(), z.any()),
+    action: z.enum(['AUTO_PRESELECT', 'AUTO_APPLY_SAFE']),
+    enabled: z.number(),
+    createdAt: z.string(),
+    updatedAt: z.string()
+})
+export const AiAgentAutoRulesListInput = z.object({
+    enabledOnly: z.boolean().optional(),
+    draftKind: z.string().optional(),
+    limit: z.number().optional()
+}).optional()
+export const AiAgentAutoRulesListOutput = z.object({ rows: z.array(AiAgentAutoRuleSchema) })
+export const AiAgentAutoRuleUpsertInput = z.object({
+    id: z.number().optional(),
+    name: z.string().min(1),
+    draftKind: z.string().min(1),
+    conditions: z.record(z.string(), z.any()).optional(),
+    action: z.enum(['AUTO_PRESELECT', 'AUTO_APPLY_SAFE']).optional(),
+    enabled: z.boolean().optional()
+})
+
 export const AiJobSchema = z.object({
     id: z.number(),
     type: AiJobType,
@@ -1797,6 +1902,16 @@ export type TAiTextDraftResult = z.infer<typeof AiTextDraftResult>
 export type TAiActionPlan = z.infer<typeof AiActionPlan>
 export type TAiBankImportReviewSuggestion = z.infer<typeof AiBankImportReviewSuggestion>
 export type TAiBankImportReviewResult = z.infer<typeof AiBankImportReviewResult>
+export type TAiAgentDraft = z.infer<typeof AiAgentDraft>
+export type TAiAgentTraceEvent = z.infer<typeof AiAgentTraceEvent>
+export type TAiAgentRunInput = z.infer<typeof AiAgentRunInput>
+export type TAiAgentRunOutput = z.infer<typeof AiAgentRunOutput>
+export type TAiAgentMemoryListInput = z.infer<typeof AiAgentMemoryListInput>
+export type TAiAgentMemoryListOutput = z.infer<typeof AiAgentMemoryListOutput>
+export type TAiAgentMemoryUpsertInput = z.infer<typeof AiAgentMemoryUpsertInput>
+export type TAiAgentAutoRulesListInput = z.infer<typeof AiAgentAutoRulesListInput>
+export type TAiAgentAutoRulesListOutput = z.infer<typeof AiAgentAutoRulesListOutput>
+export type TAiAgentAutoRuleUpsertInput = z.infer<typeof AiAgentAutoRuleUpsertInput>
 export type TAiUsage = z.infer<typeof AiUsageSchema>
 export type TAiSettingsGetOutput = z.infer<typeof AiSettingsGetOutput>
 export type TAiSettingsSetInput = z.infer<typeof AiSettingsSetInput>

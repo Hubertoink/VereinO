@@ -13,13 +13,15 @@ interface TopNavProps {
   dueMembershipFeesCount?: number
   showBadges?: boolean
   items?: NavItem[]
+  aiBusy?: boolean
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
       {items.map((item, idx) => {
         const isActive = activePage === item.key
+        const isAiRunning = aiBusy && item.key === 'KI'
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         const showDividerBefore = idx > 0 && item.group !== items[idx - 1]?.group
         
@@ -39,10 +41,10 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
               <span className="divider-v" aria-hidden="true" />
             )}
             <button
-              className={`btn ghost nav-btn has-tooltip ${isActive ? 'active' : ''}`}
+              className={`btn ghost nav-btn has-tooltip ${isActive ? 'active' : ''} ${isAiRunning ? 'ai-nav-running' : ''}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
-              aria-label={item.label}
+              aria-label={isAiRunning ? `${item.label}: Anfrage läuft` : item.label}
               data-tooltip={item.label}
             >
               <span className={`icon-wrapper ${colorClass}`.trim()}>

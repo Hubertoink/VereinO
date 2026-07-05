@@ -7,6 +7,7 @@ export interface BatchAssignDropdownProps {
   budgets: Array<{ id: number; label: string }>
   currentFilters: {
     paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
@@ -89,6 +90,19 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
     return null
   }
 
+  const batchFilters = () => ({
+    paymentMethod: currentFilters.paymentMethod,
+    paymentAccountId: currentFilters.paymentAccountId ?? undefined,
+    sphere: currentFilters.sphere,
+    type: currentFilters.type,
+    from: currentFilters.from,
+    to: currentFilters.to,
+    q: currentFilters.q,
+    tag: currentFilters.tag,
+    filterEarmarkId: currentFilters.earmarkId,
+    filterBudgetId: currentFilters.budgetId
+  })
+
   const run = async () => {
     const err = validate()
     if (err) {
@@ -100,7 +114,7 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
       setBusy(true)
 
       if (mode === 'EARMARK') {
-        const payload: any = { ...currentFilters, earmarkId: Number(earmarkId) }
+        const payload: any = { ...batchFilters(), earmarkId: Number(earmarkId) }
         if (onlyWithout) payload.onlyWithout = true
         const res = await (window as any).api?.vouchers?.batchAssignEarmark?.(payload)
         const n = res?.updated ?? 0
@@ -109,14 +123,14 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
       }
 
       if (mode === 'TAGS') {
-        const res = await (window as any).api?.vouchers?.batchAssignTags?.({ tags: tagsToApply, ...currentFilters })
+        const res = await (window as any).api?.vouchers?.batchAssignTags?.({ tags: tagsToApply, ...batchFilters() })
         const n = res?.updated ?? 0
         notify('success', `${n} Buchung(en) aktualisiert`)
         onApplied(n)
       }
 
       if (mode === 'BUDGET') {
-        const payload: any = { ...currentFilters, budgetId: Number(budgetId) }
+        const payload: any = { ...batchFilters(), budgetId: Number(budgetId) }
         if (onlyWithout) payload.onlyWithout = true
         const res = await (window as any).api?.vouchers?.batchAssignBudget?.(payload)
         const n = res?.updated ?? 0

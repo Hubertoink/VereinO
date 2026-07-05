@@ -15,13 +15,15 @@ interface SideNavProps {
   dueMembershipFeesCount?: number
   showBadges?: boolean
   items?: NavItem[]
+  aiBusy?: boolean
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems, aiBusy = false }: SideNavProps) {
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
       {items.map((item, idx) => {
         const isActive = activePage === item.key
+        const isAiRunning = aiBusy && item.key === 'KI'
         const colorClass = navIconColorMode === 'color' ? `icon-color-${item.key}` : ''
         
         // Determine badge count based on nav item
@@ -40,10 +42,10 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
               <div className="nav-divider" aria-hidden="true" />
             )}
             <button
-              className={`btn ghost nav-btn has-tooltip tooltip-right ${isActive ? 'active' : ''}`}
+              className={`btn ghost nav-btn has-tooltip tooltip-right ${isActive ? 'active' : ''} ${isAiRunning ? 'ai-nav-running' : ''}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
-              aria-label={item.label}
+              aria-label={isAiRunning ? `${item.label}: Anfrage läuft` : item.label}
               data-tooltip={item.label}
             >
               <span className={`icon-wrapper ${colorClass}`}>

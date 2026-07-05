@@ -174,11 +174,11 @@ function getApiKey() {
   return key
 }
 
-function createClient() {
+export function createClient() {
   return new OpenAI({ apiKey: getApiKey() })
 }
 
-function extractOutputText(response: any) {
+export function extractOutputText(response: any) {
   if (typeof response?.output_text === 'string') return response.output_text
   const parts: string[] = []
   for (const item of response?.output || []) {
@@ -197,7 +197,7 @@ function parseStructured<T>(response: any, schema: { parse: (value: unknown) => 
   return schema.parse(JSON.parse(text))
 }
 
-function normalizeUsage(response: any, model: string): AiUsage {
+export function normalizeUsage(response: any, model: string): AiUsage {
   const usage = response?.usage || {}
   const inputTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? 0)
   const outputTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? 0)
@@ -230,7 +230,7 @@ function normalizeUsage(response: any, model: string): AiUsage {
   }
 }
 
-function compactContext(context: AiContext) {
+export function compactContext(context: AiContext) {
   return {
     organization: context.organization,
     generatedAt: context.generatedAt,

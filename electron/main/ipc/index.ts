@@ -1,6 +1,6 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherMetaUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportAnalyzeInput, ImportAnalyzeOutput, ImportCommitDraftInput, ImportCreateMissingInput, ImportCreateMissingOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, ImportEditableExportInput, ImportEditableExportOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, TagUsageInput, TagUsageOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, PaymentsDueSummaryOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput, SubmissionsExportCatalogOutput, DonationsExportMoneyReceiptInput, DonationsExportMoneyReceiptOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsOutput } from './schemas'
-import { AiActionPlanInput, AiActionPlanOutput, AiBankImportReviewInput, AiBankImportReviewOutput, AiBookingAnalysisResult, AiJobIdInput, AiJobsApproveCandidateInput, AiJobsApproveCandidateOutput, AiJobsCreateInput, AiJobsCreateOutput, AiJobsDeleteOutput, AiJobsGetOutput, AiJobsListInput, AiJobsListOutput, AiJobsProcessOutput, AiJobsRejectInput, AiJobsUpdateCandidateInput, AiSettingsGetOutput, AiSettingsSetInput, AiSettingsSetOutput, AiSettingsTestOutput, AiTextGenerateInput, AiTextGenerateOutput } from './schemas'
+import { AiActionPlanInput, AiActionPlanOutput, AiAgentAutoRuleUpsertInput, AiAgentAutoRulesListInput, AiAgentAutoRulesListOutput, AiAgentMemoryListInput, AiAgentMemoryListOutput, AiAgentMemoryUpsertInput, AiAgentRunInput, AiAgentRunOutput, AiBankImportReviewInput, AiBankImportReviewOutput, AiBookingAnalysisResult, AiJobIdInput, AiJobsApproveCandidateInput, AiJobsApproveCandidateOutput, AiJobsCreateInput, AiJobsCreateOutput, AiJobsDeleteOutput, AiJobsGetOutput, AiJobsListInput, AiJobsListOutput, AiJobsProcessOutput, AiJobsRejectInput, AiJobsUpdateCandidateInput, AiSettingsGetOutput, AiSettingsSetInput, AiSettingsSetOutput, AiSettingsTestOutput, AiTextGenerateInput, AiTextGenerateOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
 import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, updateVoucherMeta, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
@@ -67,6 +67,8 @@ import {
 } from '../repositories/bankTransactions'
 import { createAiJob, deleteAiJob, getAiJob, listAiJobs, rejectAiJob, saveAiJobResult, setAiJobStatus, updateAiJobCandidate } from '../repositories/aiJobs'
 import { analyzeBookingDocuments, generateAiText, getAiSettings, planAiAction, reviewBankImportTransactions, setAiSettings, testAiConnection } from '../services/ai'
+import { runAiAgent } from '../services/aiAgent'
+import { listAiAgentAutoRules, listAiAgentMemory, upsertAiAgentAutoRule, upsertAiAgentMemory } from '../repositories/aiAgentKnowledge'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
     const message = String((error as any)?.message ?? '')
@@ -694,6 +696,27 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const parsed = AiActionPlanInput.parse(payload)
         const planned = await planAiAction({ ...parsed, context: buildAiContext() })
         return AiActionPlanOutput.parse(planned)
+    })
+    ipcMain.handle('ai.agent.run', async (_e, payload) => {
+        const parsed = AiAgentRunInput.parse(payload)
+        const result = await runAiAgent({ ...parsed, context: buildAiContext() })
+        return AiAgentRunOutput.parse(result)
+    })
+    ipcMain.handle('ai.agent.memory.list', async (_e, payload) => {
+        const parsed = AiAgentMemoryListInput.parse(payload)
+        return AiAgentMemoryListOutput.parse({ rows: listAiAgentMemory(parsed || {}) })
+    })
+    ipcMain.handle('ai.agent.memory.upsert', async (_e, payload) => {
+        const parsed = AiAgentMemoryUpsertInput.parse(payload)
+        return upsertAiAgentMemory(parsed)
+    })
+    ipcMain.handle('ai.agent.autoRules.list', async (_e, payload) => {
+        const parsed = AiAgentAutoRulesListInput.parse(payload)
+        return AiAgentAutoRulesListOutput.parse({ rows: listAiAgentAutoRules(parsed || {}) })
+    })
+    ipcMain.handle('ai.agent.autoRules.upsert', async (_e, payload) => {
+        const parsed = AiAgentAutoRuleUpsertInput.parse(payload)
+        return upsertAiAgentAutoRule(parsed)
     })
     ipcMain.handle('vouchers.create', async (_e, payload) => {
         const parsed = VoucherCreateInput.parse(payload)

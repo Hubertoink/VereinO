@@ -5616,6 +5616,36 @@ textarea:focus {
 .side-nav { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
 .nav-btn { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 10px; position: relative; }
 .nav-btn.active { background: color-mix(in oklab, var(--accent) 15%, transparent); }
+.nav-btn.ai-nav-running {
+    background:
+        radial-gradient(circle at 24% 20%, rgba(255, 214, 0, 0.28), transparent 38%),
+        linear-gradient(135deg, rgba(41, 98, 255, 0.22), rgba(0, 200, 83, 0.22) 48%, rgba(255, 145, 0, 0.24));
+    box-shadow:
+        0 0 0 1px rgba(255, 214, 0, 0.28),
+        0 0 16px rgba(255, 214, 0, 0.34),
+        0 0 30px rgba(0, 184, 212, 0.20);
+    animation: ai-nav-running-pulse 1.55s ease-in-out infinite;
+}
+.nav-btn.ai-nav-running > .icon-wrapper {
+    color: #ffdf6e;
+    filter: drop-shadow(0 0 7px rgba(255, 214, 0, 0.55));
+}
+@keyframes ai-nav-running-pulse {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow:
+            0 0 0 1px rgba(255, 214, 0, 0.24),
+            0 0 12px rgba(255, 214, 0, 0.26),
+            0 0 24px rgba(0, 184, 212, 0.16);
+    }
+    50% {
+        transform: translateY(-1px);
+        box-shadow:
+            0 0 0 1px rgba(255, 214, 0, 0.42),
+            0 0 22px rgba(255, 214, 0, 0.44),
+            0 0 38px rgba(0, 184, 212, 0.28);
+    }
+}
 .nav-badge {
     position: absolute;
     top: -4px;
@@ -5682,6 +5712,10 @@ textarea:focus {
     .sidebar-nav .btn.ghost:hover .sidebar-button__icon,
     .nav-btn:hover .icon-wrapper {
         transform: none;
+    }
+
+    .nav-btn.ai-nav-running {
+        animation: none;
     }
 }
 .app-sidebar { grid-area: side; display: flex; flex-direction: column; padding: 8px 4px; border-right: 1px solid var(--border); overflow: visible; }
@@ -8886,18 +8920,18 @@ html[data-glass-modals="true"] .flyout-arrow {
     background: color-mix(in oklab, var(--surface) 85%, transparent);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 12px 16px;
-    margin-bottom: 12px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 /* Visual Flow Bar */
 .filter-totals-flow {
     display: flex;
-    height: 6px;
-    border-radius: 3px;
+    height: 4px;
+    border-radius: 999px;
     overflow: hidden;
     background: var(--surface-alt);
 }
@@ -8917,7 +8951,7 @@ html[data-glass-modals="true"] .flyout-arrow {
 /* Stats Grid */
 .filter-totals-stats {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: stretch;
     flex-wrap: wrap;
 }
@@ -8925,9 +8959,9 @@ html[data-glass-modals="true"] .flyout-arrow {
 .filter-totals-stat {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 10px;
+    gap: 9px;
+    padding: 7px 12px;
+    border-radius: 8px;
     background: var(--surface-alt);
     border: 1px solid var(--border);
     min-width: 140px;
@@ -8942,13 +8976,13 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .filter-totals-stat__icon {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -8986,15 +9020,15 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .filter-totals-stat__label {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.35px;
     font-weight: 500;
 }
 
 .filter-totals-stat__value {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
@@ -9031,21 +9065,21 @@ html[data-glass-modals="true"] .flyout-arrow {
 /* Sphere badges */
 .filter-totals-spheres {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    padding-top: 4px;
+    padding-top: 2px;
     border-top: 1px solid var(--border);
 }
 
 .filter-totals-sphere-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 5px;
+    padding: 3px 9px;
     border-radius: 20px;
     background: color-mix(in oklab, var(--sphere-color, var(--muted)) 12%, transparent);
     border: 1px solid color-mix(in oklab, var(--sphere-color, var(--muted)) 30%, transparent);
-    font-size: 11px;
+    font-size: 10.5px;
     cursor: default;
     transition: all 0.15s ease;
 }
@@ -9055,8 +9089,8 @@ html[data-glass-modals="true"] .flyout-arrow {
 }
 
 .filter-totals-sphere-badge__dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--sphere-color, var(--muted));
 }

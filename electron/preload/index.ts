@@ -141,6 +141,17 @@ const rendererApi = {
         actions: {
             plan: (payload) => cleanInvoke('ai.actions.plan', payload)
         },
+        agent: {
+            run: (payload) => cleanInvoke('ai.agent.run', payload),
+            memory: {
+                list: (payload) => invoke('ai.agent.memory.list', payload),
+                upsert: (payload) => cleanInvoke('ai.agent.memory.upsert', payload)
+            },
+            autoRules: {
+                list: (payload) => invoke('ai.agent.autoRules.list', payload),
+                upsert: (payload) => cleanInvoke('ai.agent.autoRules.upsert', payload)
+            }
+        },
         bankImports: {
             reviewOpen: (payload) => cleanInvoke('ai.bankImports.reviewOpen', payload)
         }
