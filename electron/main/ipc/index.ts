@@ -852,6 +852,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 ORDER BY month ASC
             `).all(...p2) as any[]
             const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
+            const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
             const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
 
             // Prepare data for sphere chart
@@ -904,6 +905,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; color: #222; }
     h1 { margin: 0 0 4px; }
     .muted { color: #666; font-size: 12px; }
+    .report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 12px; }
+    .report-title { min-width: 0; }
+    .report-logo { max-width: 150px; max-height: 72px; object-fit: contain; flex: 0 0 auto; }
     .kpis { display: flex; gap: 16px; margin: 12px 0 18px; }
     .kpi { padding: 10px 12px; border-radius: 8px; background: #f3f6fb; min-width: 140px; }
     .kpi .label { font-size: 12px; color: #555; }
@@ -940,11 +944,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     .voucher-status-storniert { background:#eeeeee; color:#555; border:1px solid #d6d6d6; }
     .nowrap { white-space: nowrap; }
     .muted { color: #666; font-size: 12px; }
-    @media print { .card { break-inside: avoid; } tr { break-inside: avoid; } }
+    @media print { .card { break-inside: avoid; } tr { break-inside: avoid; } .report-logo { max-width: 140px; max-height: 64px; } }
 </style>
 </head><body>
-    <h1>Controlling-Bericht</h1>
-    <div class="muted">${orgName} · Zeitraum: ${(parsed.from ?? '')} – ${(parsed.to ?? '')} · Erstellt: ${new Date().toLocaleString('de-DE')}</div>
+    <div class="report-header">
+        <div class="report-title">
+            <h1>Controlling-Bericht</h1>
+            <div class="muted">${orgName} · Zeitraum: ${(parsed.from ?? '')} – ${(parsed.to ?? '')} · Erstellt: ${new Date().toLocaleString('de-DE')}</div>
+        </div>
+        ${orgLogoDataUrl ? `<img class="report-logo" src="${esc(orgLogoDataUrl)}" alt="Organisationslogo" />` : ''}
+    </div>
     <div class="kpis">
         <div class="kpi"><div class="label">Einnahmen (Brutto)</div><div class="value">${totalIn.toFixed(2)} €</div></div>
         <div class="kpi"><div class="label">Ausgaben (Brutto)</div><div class="value">${totalOut.toFixed(2)} €</div></div>

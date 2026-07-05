@@ -52,6 +52,7 @@ export async function generateCashCheckPDF(options: {
   if (!cashCheck) throw new Error('Kassenprüfung nicht gefunden')
 
   const orgName = (getSetting<string>('org.name') || 'VereinO').trim() || 'VereinO'
+  const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
 
   const auditorsFromDb = {
     pr1: cashCheck.inspector1Name && cashCheck.inspector1Name.trim() ? cashCheck.inspector1Name.trim() : undefined,
@@ -84,6 +85,9 @@ export async function generateCashCheckPDF(options: {
     }
     h1 { margin: 0 0 6px; font-size: 18pt; }
     .sub { color: #666; font-size: 10pt; margin-bottom: 18px; }
+    .report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+    .report-title { min-width: 0; flex: 1; }
+    .report-logo { max-width: 140px; max-height: 64px; object-fit: contain; flex: 0 0 auto; }
     .box { border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
     .row { display: flex; justify-content: space-between; gap: 18px; padding: 6px 0; border-bottom: 1px solid #eee; }
     .row:last-child { border-bottom: none; }
@@ -98,8 +102,13 @@ export async function generateCashCheckPDF(options: {
   </style>
 </head>
 <body>
-  <h1>Kassenprüfer-Bericht (Kassenprüfung)</h1>
-  <div class="sub">${esc(orgName)} · Jahr ${esc(cashCheck.year)} · Stichtag ${esc(cashCheck.date)}</div>
+  <div class="report-header">
+    <div class="report-title">
+      <h1>Kassenprüfer-Bericht (Kassenprüfung)</h1>
+      <div class="sub">${esc(orgName)} · Jahr ${esc(cashCheck.year)} · Stichtag ${esc(cashCheck.date)}</div>
+    </div>
+    ${orgLogoDataUrl ? `<img class="report-logo" src="${esc(orgLogoDataUrl)}" alt="Organisationslogo" />` : ''}
+  </div>
 
   <div class="box">
     <div class="row"><div class="label">Soll-Bestand (BAR)</div><div class="val">${esc(euro(cashCheck.soll))}</div></div>

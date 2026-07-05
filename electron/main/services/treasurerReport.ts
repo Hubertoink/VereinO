@@ -88,6 +88,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
 
   const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
   const cashierName = getSetting<string>('org.cashier') || ''
+  const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
 
   // Create export directory
   const when = new Date()
@@ -321,6 +322,23 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
       font-size: 22pt;
       font-weight: 700;
     }
+    .report-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+    .report-title {
+      min-width: 0;
+      flex: 1;
+    }
+    .report-logo {
+      max-width: 150px;
+      max-height: 72px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
     h2 {
       font-size: 13pt;
       font-weight: 700;
@@ -485,6 +503,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     }
     @media print {
       .page-break { page-break-before: always; }
+      .report-logo { max-width: 140px; max-height: 64px; }
       h2 { page-break-after: avoid; break-after: avoid; }
       .kpi-grid, .check-box, .member-grid, .invoice-grid, .section-block, .sig-grid {
         page-break-inside: avoid;
@@ -495,13 +514,18 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   </style>
 </head>
 <body>
-  <h1>Kassierbericht</h1>
-  <div class="sub">
-    <strong>${esc(orgName)}</strong><br>
-    Berichtszeitraum: ${fmtDate(from)} – ${fmtDate(to)} (Geschäftsjahr ${fiscalYear})<br>
-    Kassenstand zum Stichtag: ${fmtDate(cashBalanceAsOf)}<br>
-    ${cashierName ? `Kassier: ${esc(cashierName)}<br>` : ''}
-    Erstellt am ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+  <div class="report-header">
+    <div class="report-title">
+      <h1>Kassierbericht</h1>
+      <div class="sub">
+        <strong>${esc(orgName)}</strong><br>
+        Berichtszeitraum: ${fmtDate(from)} – ${fmtDate(to)} (Geschäftsjahr ${fiscalYear})<br>
+        Kassenstand zum Stichtag: ${fmtDate(cashBalanceAsOf)}<br>
+        ${cashierName ? `Kassier: ${esc(cashierName)}<br>` : ''}
+        Erstellt am ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+    ${orgLogoDataUrl ? `<img class="report-logo" src="${esc(orgLogoDataUrl)}" alt="Organisationslogo" />` : ''}
   </div>
 
   <div class="section-block">

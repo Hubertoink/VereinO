@@ -1,5 +1,7 @@
 import React from 'react'
 import { OrgPaneProps } from '../types'
+import ConfirmSwitchOrgModal from '../../../components/modals/ConfirmSwitchOrgModal'
+import NewOrgModal from '../../../components/modals/NewOrgModal'
 import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
 
@@ -24,6 +26,9 @@ export function OrgPane({ notify }: OrgPaneProps) {
   const [activeOrg, setActiveOrg] = React.useState<ActiveOrg | null>(null)
   const [activeOrgName, setActiveOrgName] = React.useState<string>('')
   const [savingOrg, setSavingOrg] = React.useState(false)
+  const [showNewOrgModal, setShowNewOrgModal] = React.useState(false)
+  const [showConfirmSwitch, setShowConfirmSwitch] = React.useState<null | { id: string; name: string }>(null)
+  const [switchingOrg, setSwitchingOrg] = React.useState(false)
   
   // Organization display settings
   const [orgName, setOrgName] = React.useState<string>('')
@@ -93,6 +98,27 @@ export function OrgPane({ notify }: OrgPaneProps) {
     } finally { setSavingOrg(false) }
   }
 
+  async function handleOrgCreated(org: { id: string; name: string }) {
+    setShowNewOrgModal(false)
+    window.dispatchEvent(new Event('data-changed'))
+    await loadActiveOrg()
+    setShowConfirmSwitch(org)
+  }
+
+  async function switchToCreatedOrg() {
+    if (!showConfirmSwitch || switchingOrg) return
+    setSwitchingOrg(true)
+    try {
+      await (window as any).api?.organizations?.switch?.({ orgId: showConfirmSwitch.id })
+      notify('info', `Wechsle zu "${showConfirmSwitch.name}"...`)
+      setTimeout(() => window.location.reload(), 500)
+    } catch (e: any) {
+      notify('error', e?.message || 'Wechsel fehlgeschlagen')
+      setSwitchingOrg(false)
+      setShowConfirmSwitch(null)
+    }
+  }
+
   async function save() {
     setBusy(true)
     setError('')
@@ -141,9 +167,14 @@ export function OrgPane({ notify }: OrgPaneProps) {
       {/* Active Organization Name (for switcher) */}
       {activeOrg && (
         <div style={{ marginBottom: 12, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-          <div style={{ marginBottom: 8 }}>
-            <strong>🏢 Aktive Organisation</strong>
-            <div className="helper">Name der Organisation im Organisations-Wechsler</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+            <div>
+              <strong>🏢 Aktive Organisation</strong>
+              <div className="helper">Name der Organisation im Organisations-Wechsler</div>
+            </div>
+            <button className="btn" type="button" onClick={() => setShowNewOrgModal(true)}>
+              + Neue Organisation
+            </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: 400 }}>
             <div className="field" style={{ flex: 1 }}>
@@ -211,7 +242,35 @@ export function OrgPane({ notify }: OrgPaneProps) {
             ) : null}
           </div>
           {orgLogoDataUrl ? (
-            <div className="helper" style={{ marginTop: 6 }}>Logo hinterlegt</div>
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 112,
+                  height: 88,
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  backgroundColor: 'color-mix(in oklab, var(--surface) 78%, transparent)',
+                  backgroundImage: `
+                    linear-gradient(45deg, color-mix(in oklab, var(--text) 10%, transparent) 25%, transparent 25%),
+                    linear-gradient(-45deg, color-mix(in oklab, var(--text) 10%, transparent) 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, color-mix(in oklab, var(--text) 10%, transparent) 75%),
+                    linear-gradient(-45deg, transparent 75%, color-mix(in oklab, var(--text) 10%, transparent) 75%)
+                  `,
+                  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0',
+                  backgroundSize: '16px 16px',
+                  display: 'grid',
+                  placeItems: 'center',
+                  padding: 10
+                }}
+              >
+                <img
+                  src={orgLogoDataUrl}
+                  alt="Hinterlegtes Organisationslogo"
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              </div>
+              <div className="helper">Logo hinterlegt</div>
+            </div>
           ) : (
             <div className="helper" style={{ marginTop: 6 }}>Kein Logo hinterlegt</div>
           )}
@@ -290,6 +349,24 @@ export function OrgPane({ notify }: OrgPaneProps) {
           onSaved={() => {
             loadTaxCertificate()
             notify('success', 'Steuerbefreiungsbescheid aktualisiert')
+          }}
+        />
+      )}
+
+      {showNewOrgModal && (
+        <NewOrgModal
+          onClose={() => setShowNewOrgModal(false)}
+          onCreated={handleOrgCreated}
+          notify={notify}
+        />
+      )}
+
+      {showConfirmSwitch && (
+        <ConfirmSwitchOrgModal
+          orgName={showConfirmSwitch.name}
+          onConfirm={switchToCreatedOrg}
+          onCancel={() => {
+            if (!switchingOrg) setShowConfirmSwitch(null)
           }}
         />
       )}

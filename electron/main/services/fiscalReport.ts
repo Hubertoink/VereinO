@@ -61,6 +61,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     budgetIds
   } = options
   const orgName = (options.orgName && options.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO')
+  const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
 
   // Create export directory
   const when = new Date()
@@ -239,6 +240,23 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
       border-bottom: 3px solid #2e7d32;
       padding-bottom: 8px;
     }
+    .report-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 6px;
+    }
+    .report-title {
+      min-width: 0;
+      flex: 1;
+    }
+    .report-logo {
+      max-width: 150px;
+      max-height: 72px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
     h2 { 
       font-size: 14pt; 
       font-weight: 700; 
@@ -376,16 +394,22 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     @media print { 
       body { padding: 16px; }
       .page-break { page-break-before: always; }
+      .report-logo { max-width: 140px; max-height: 64px; }
       tr { break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-  <h1>Jahresabschluss für das Finanzamt</h1>
-  <div class="header-info">
-    <strong>${esc(orgName)}</strong><br>
-    Wirtschaftsjahr: ${fiscalYear} (${from} bis ${to})<br>
-    Erstellt: ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+  <div class="report-header">
+    <div class="report-title">
+      <h1>Jahresabschluss für das Finanzamt</h1>
+      <div class="header-info">
+        <strong>${esc(orgName)}</strong><br>
+        Wirtschaftsjahr: ${fiscalYear} (${from} bis ${to})<br>
+        Erstellt: ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+    ${orgLogoDataUrl ? `<img class="report-logo" src="${esc(orgLogoDataUrl)}" alt="Organisationslogo" />` : ''}
   </div>
 
   <div class="summary-box">

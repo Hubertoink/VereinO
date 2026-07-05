@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useToast } from '../../context/useToast'
 import { notifyDataChanged } from '../../utils/refresh'
 import { base64ToUint8Array, bufferToBase64Safe } from '../../utils/fileEncoding'
 
@@ -75,6 +76,7 @@ export default function AttachmentsModal({
     onClose: () => void
     onChanged?: () => void
 }) {
+    const { notify } = useToast()
     const [files, setFiles] = useState<Array<{ id: number; fileName: string; mimeType?: string | null }>>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string>('')
@@ -307,7 +309,7 @@ export default function AttachmentsModal({
             try { onChanged?.() } catch { }
             try { notifyDataChanged((window as any).api) } catch { }
         } catch (e: any) {
-            alert('Upload fehlgeschlagen: ' + (e?.message || String(e)))
+            notify('error', 'Upload fehlgeschlagen: ' + (e?.message || String(e)))
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
@@ -317,11 +319,11 @@ export default function AttachmentsModal({
         if (!selected) return
         try {
             const r = await (window as any).api?.attachments.saveAs?.({ fileId: selected.id })
-            if (r) alert('Gespeichert: ' + r.filePath)
+            if (r?.filePath) notify('success', 'Gespeichert: ' + r.filePath)
         } catch (e: any) {
             const m = e?.message || String(e)
             if (/Abbruch/i.test(m)) return
-            alert('Speichern fehlgeschlagen: ' + m)
+            notify('error', 'Speichern fehlgeschlagen: ' + m)
         }
     }
 
@@ -341,7 +343,7 @@ export default function AttachmentsModal({
             try { onChanged?.() } catch { }
             try { notifyDataChanged((window as any).api) } catch { }
         } catch (e: any) {
-            alert('Löschen fehlgeschlagen: ' + (e?.message || String(e)))
+            notify('error', 'Löschen fehlgeschlagen: ' + (e?.message || String(e)))
         }
     }
 
