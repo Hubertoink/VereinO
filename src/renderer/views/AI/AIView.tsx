@@ -1241,6 +1241,7 @@ function bookingProgress(job: BookingJobLike) {
 }
 
 function hasOpenBookingCandidates(job: BookingJobLike) {
+  if (job.status === 'APPROVED' || job.status === 'REJECTED') return false
   const analysis = bookingAnalysisFromJob(job)
   if (!analysis) return job.status !== 'APPROVED'
   return analysis.candidates.some((candidate) => !isCandidateApproved(candidate, job))
@@ -2256,11 +2257,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const analysis = useMemo(() => bookingAnalysis(selectedJob), [selectedJob])
   const candidate = analysis?.candidates?.[selectedCandidate] || null
   const openBookingJobs = useMemo(
-    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && hasOpenBookingCandidates(job)),
+    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && job.status !== 'REJECTED' && hasOpenBookingCandidates(job)),
     [jobs]
   )
   const completedBookingJobs = useMemo(
-    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && !hasOpenBookingCandidates(job)),
+    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && job.status === 'APPROVED' && !hasOpenBookingCandidates(job)),
     [jobs]
   )
   const bankSuggestionGroups = useMemo(() => {
@@ -5290,6 +5291,36 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
   }
 
+  const markHistoryJobDone = async (event: React.MouseEvent, job: TAiJobsListOutput['rows'][number]) => {
+    event.stopPropagation()
+    setBusy(true)
+    try {
+      await window.api.ai.jobs.reject({ id: job.id, reason: 'Im KI-Verlauf als erledigt markiert.' })
+      if (selectedJob?.id === job.id) selectJob(null)
+      await loadJobs()
+      notify('success', 'Buchungsreview als erledigt markiert.')
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteHistoryJob = async (event: React.MouseEvent, job: TAiJobsListOutput['rows'][number]) => {
+    event.stopPropagation()
+    setBusy(true)
+    try {
+      await window.api.ai.jobs.delete({ id: job.id })
+      if (selectedJob?.id === job.id) selectJob(null)
+      await loadJobs()
+      notify('success', 'KI-Auftrag gelöscht.')
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const renderHistoryJobButton = (
     job: TAiJobsListOutput['rows'][number],
     tone: 'open' | 'done' | 'task',
@@ -5302,18 +5333,48 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       job.createdAt?.slice(0, 10),
       formatAiUsage(job.usage)
     ]
+    const canResolve = tone === 'open' && job.type === 'BOOKING_FROM_DOCUMENTS'
     return (
-      <button
+      <article
         key={`${tone}-${job.id}`}
-        className={`ai-history-item ai-history-item--${tone} ${selectedJob?.id === job.id ? 'active' : ''}`}
-        onClick={() => { void openJob(job.id); setShowHistory(false) }}
+        className={`ai-history-item ai-history-item--${tone} ${selectedJob?.id === job.id ? 'active' : ''} ${canResolve ? 'ai-history-item--actionable' : ''}`}
       >
-        <span className="ai-history-item-icon" aria-hidden="true" />
-        <span className="ai-history-item-copy">
-          <strong>{job.title || fallbackTitle}</strong>
-          <small>{(metaItems || defaultMeta).filter(Boolean).join(' · ')}</small>
-        </span>
-      </button>
+        <button
+          className="ai-history-item-main"
+          type="button"
+          onClick={() => { void openJob(job.id); setShowHistory(false) }}
+        >
+          <span className="ai-history-item-icon" aria-hidden="true" />
+          <span className="ai-history-item-copy">
+            <strong>{job.title || fallbackTitle}</strong>
+            <small>{(metaItems || defaultMeta).filter(Boolean).join(' · ')}</small>
+          </span>
+        </button>
+        {canResolve && (
+          <span className="ai-history-item-actions" aria-label="Buchungsreview Aktionen">
+            <button
+              type="button"
+              className="ai-history-item-action ai-history-item-action--done"
+              disabled={busy}
+              onClick={(event) => void markHistoryJobDone(event, job)}
+              aria-label="Buchungsreview als erledigt markieren"
+              title="Als erledigt markieren"
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              className="ai-history-item-action ai-history-item-action--delete"
+              disabled={busy}
+              onClick={(event) => void deleteHistoryJob(event, job)}
+              aria-label="Buchungsreview löschen"
+              title="Löschen"
+            >
+              ×
+            </button>
+          </span>
+        )}
+      </article>
     )
   }
 

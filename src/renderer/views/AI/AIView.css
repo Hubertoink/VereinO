@@ -1197,30 +1197,102 @@
 }
 
 .ai-history-item {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  text-align: left;
+  position: relative;
   border: 1px solid color-mix(in oklab, var(--border) 86%, var(--text) 14%);
   border-radius: 11px;
   background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
   color: var(--text);
-  padding: 9px;
-  cursor: pointer;
+  padding: 0;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .ai-history-item:hover,
-.ai-history-item:focus-visible {
+.ai-history-item:focus-within {
   transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--accent) 56%, var(--border));
+}
+
+.ai-history-item-main {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-history-item-main:focus-visible {
   outline: none;
 }
 
 .ai-history-item.active {
   border-color: var(--accent);
   background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.ai-history-item-actions {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: inline-flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.ai-history-item--actionable:hover .ai-history-item-actions,
+.ai-history-item--actionable:focus-within .ai-history-item-actions {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.ai-history-item-action {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in oklab, var(--border) 76%, var(--text) 24%);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 78%, var(--bg) 22%);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 22%);
+}
+
+.ai-history-item-action:hover,
+.ai-history-item-action:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.ai-history-item-action--done {
+  border-color: color-mix(in oklab, var(--success) 52%, var(--border));
+  background: color-mix(in oklab, var(--success) 22%, var(--surface));
+  color: color-mix(in oklab, var(--success) 84%, var(--text) 16%);
+}
+
+.ai-history-item-action--delete {
+  border-color: color-mix(in oklab, var(--danger) 48%, var(--border));
+  background: color-mix(in oklab, var(--danger) 18%, var(--surface));
+  color: color-mix(in oklab, var(--danger) 78%, var(--text) 22%);
+}
+
+.ai-history-item-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .ai-history-item-icon {
