@@ -3,6 +3,7 @@ import './AIView.css'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
 import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
+import { AgentInvoiceActionCard, type AiInvoiceActionChange, type AiInvoiceActionState } from './AgentInvoiceActionCard'
 import { AgentVoucherReverseCard, type AiVoucherReverseState } from './AgentVoucherReverseCard'
 import { AgentVoucherRebookCard, type AiVoucherRebookState } from './AgentVoucherRebookCard'
 import { AgentVoucherUpdateCard, type AiVoucherUpdateChange, type AiVoucherUpdateState } from './AgentVoucherUpdateCard'
@@ -28,11 +29,23 @@ import type {
   TMemberUpdateInput,
   TMembersListOutput,
   TPaymentsListDueOutput,
+  TInvoiceCreateInput,
   TVoucherMetaUpdateInput,
   TVoucherCreateInput,
   TVouchersListOutput,
   TReportsExportInput
 } from '../../../../electron/main/ipc/schemas'
+
+const VEREINI_DEFAULT_SRC = new URL('../../../../assets/VereinI/VereinI-Default.png', import.meta.url).href
+const VEREINI_BLINK_SRC = new URL('../../../../assets/VereinI/Vereini_Blink.png', import.meta.url).href
+const VEREINI_SMIRK_SRC = new URL('../../../../assets/VereinI/Vereini_Smirk.png', import.meta.url).href
+const VEREINI_SUCCESS_SRC = new URL('../../../../assets/VereinI/Vereini_Sucess.png', import.meta.url).href
+const VEREINI_THINKING_SRC = new URL('../../../../assets/VereinI/Vereini_Thinking.png', import.meta.url).href
+const VEREINI_TALK1_SRC = new URL('../../../../assets/VereinI/VereinI-Talk1.png', import.meta.url).href
+const VEREINI_TALK2_SRC = new URL('../../../../assets/VereinI/Vereini_Talk2.png', import.meta.url).href
+const AI_AVATAR_CROSSFADE_MS = 220
+
+type AiAvatarFrame = 'default' | 'blink' | 'smirk' | 'success' | 'thinking' | 'talk1' | 'talk2'
 
 type Notify = (
   type: 'success' | 'error' | 'info',
@@ -111,6 +124,7 @@ type AiChatSnapshot = {
   pendingVoucherUpdates?: AiVoucherUpdateState | null
   pendingVoucherReverse?: AiVoucherReverseState | null
   pendingVoucherRebook?: AiVoucherRebookState | null
+  pendingInvoiceActions?: AiInvoiceActionState | null
   pendingBudgetActions?: AiBudgetActionState | null
   pendingEarmarkActions?: AiEarmarkActionState | null
   pendingPlannerQuestion?: AiPlannerQuestionState | null
@@ -1314,6 +1328,13 @@ function wantsApplyPendingVoucherActions(prompt: string) {
     && !/(nicht|abbrechen|stop)/.test(normalized)
 }
 
+function wantsModifyPendingReview(prompt: string) {
+  const normalized = normalizeLookup(prompt)
+  return /(aender|ander|korrigier|korrekt|setze|setz|fueg|fug|hinzufueg|hinzufug|hinzufügen|ergaenz|erganz|ergänz|tausch|wechsel|statt|auf)/.test(normalized)
+    && /(sphaere|sphare|zweck|ideell|vermoegen|wgb|rechnungsnummer|nummer|datum|faellig|fallig|betrag|beschreibung|partei|stadt|budget|zweckbindung|tag|tags|konto|zahlungskonto)/.test(normalized)
+    && !/(nicht|abbrechen|stop)/.test(normalized)
+}
+
 function tagColorForName(name: string) {
   let hash = 0
   for (let idx = 0; idx < name.length; idx += 1) hash = ((hash << 5) - hash + name.charCodeAt(idx)) | 0
@@ -1783,6 +1804,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [pendingVoucherUpdates, setPendingVoucherUpdates] = useState<AiVoucherUpdateState | null>(initialChat.pendingVoucherUpdates || null)
   const [pendingVoucherReverse, setPendingVoucherReverse] = useState<AiVoucherReverseState | null>(initialChat.pendingVoucherReverse || null)
   const [pendingVoucherRebook, setPendingVoucherRebook] = useState<AiVoucherRebookState | null>(initialChat.pendingVoucherRebook || null)
+  const [pendingInvoiceActions, setPendingInvoiceActions] = useState<AiInvoiceActionState | null>(initialChat.pendingInvoiceActions || null)
   const [pendingBudgetActions, setPendingBudgetActions] = useState<AiBudgetActionState | null>(initialChat.pendingBudgetActions || null)
   const [pendingEarmarkActions, setPendingEarmarkActions] = useState<AiEarmarkActionState | null>(initialChat.pendingEarmarkActions || null)
   const [pendingPlannerQuestion, setPendingPlannerQuestion] = useState<AiPlannerQuestionState | null>(initialChat.pendingPlannerQuestion || null)
@@ -1793,6 +1815,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [showAgentContext, setShowAgentContext] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [avatarFrame, setAvatarFrame] = useState<AiAvatarFrame>('default')
+  const [assistantReactionUntil, setAssistantReactionUntil] = useState(0)
+  const lastAssistantMessageIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     onBusyChange?.(busy)
@@ -1812,6 +1837,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     || (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED')
     || (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED')
     || (!!pendingVoucherRebook && pendingVoucherRebook.status !== 'APPLIED')
+    || (!!pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED')
     || (!!pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED')
     || (!!pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED')
     || (!!pendingPlannerQuestion && pendingPlannerQuestion.status === 'OPEN')
@@ -1882,6 +1908,31 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         role: 'assistant',
         title: 'Mitgliederänderungen vorbereitet',
         body: `${changes.length} Mitgliederänderung(en) wurden als Review vorbereitet.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'invoiceAction') {
+      const rawChanges = Array.isArray(payload?.changes) ? payload.changes : payload?.invoice ? [{ action: payload.action || 'CREATE', invoice: payload.invoice }] : []
+      const changes: AiInvoiceActionChange[] = rawChanges
+        .filter((change: any) => change?.action === 'CREATE' && change?.invoice)
+        .map((change: any, index: number) => ({
+          id: change.id || `invoice-action-${Date.now()}-${index}`,
+          action: 'CREATE',
+          invoice: change.invoice as TInvoiceCreateInput,
+          selected: change.selected !== false
+        }))
+      if (!changes.length) return
+      setPendingInvoiceActions({
+        changes,
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Forderung/Verbindlichkeit vorbereitet',
+        body: `${changes.length} offene(r) Posten wurde als Review vorbereitet. Bitte prüfe die Vorschau unten.`,
         meta: `Agent-Review${autoMeta}`
       })
       return
@@ -2030,6 +2081,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         } : null,
         voucherReverse: pendingVoucherReverse ? { status: pendingVoucherReverse.status, count: pendingVoucherReverse.vouchers.length } : null,
         voucherRebook: pendingVoucherRebook ? { status: pendingVoucherRebook.status, original: pendingVoucherRebook.original.voucherNo || pendingVoucherRebook.original.id } : null,
+        invoiceActions: pendingInvoiceActions ? {
+          status: pendingInvoiceActions.status,
+          reason: pendingInvoiceActions.reason || null,
+          count: pendingInvoiceActions.changes.length,
+          sample: pendingInvoiceActions.changes.slice(0, 20).map((change) => ({
+            action: change.action,
+            selected: change.selected,
+            applied: !!change.applied,
+            createdId: change.createdId ?? null,
+            invoice: change.invoice
+          }))
+        } : null,
         budgetActions: pendingBudgetActions ? {
           status: pendingBudgetActions.status,
           count: pendingBudgetActions.changes.length,
@@ -2061,7 +2124,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         }))
       } : null
     }
-  }, [bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
+  }, [bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
 
   const {
     agentSessionId,
@@ -2232,12 +2295,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingVoucherUpdates,
       pendingVoucherReverse,
       pendingVoucherRebook,
+      pendingInvoiceActions,
       pendingBudgetActions,
       pendingEarmarkActions,
       pendingPlannerQuestion,
       agentTrace
     })
-  }, [agentSessionId, agentTrace, bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJobId])
+  }, [agentSessionId, agentTrace, bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJobId])
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -2365,6 +2429,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         anchorId: 'ai-review-voucher-rebook'
       })
     }
+    if (pendingInvoiceActions) {
+      items.push({
+        id: 'invoice-actions',
+        title: 'Forderungen & Verbindlichkeiten',
+        summary: pendingInvoiceActions.reason || 'Offene Posten warten auf Freigabe.',
+        status: pendingInvoiceActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingInvoiceActions.changes.length,
+        anchorId: 'ai-review-invoice-actions'
+      })
+    }
     if (pendingBudgetActions) {
       items.push({
         id: 'budget-actions',
@@ -2408,7 +2482,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
     }
     return items
-  }, [analysis, bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedJob])
+  }, [analysis, bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedJob])
   const activeMention = useMemo(() => activeMentionTrigger(prompt, promptCursor), [prompt, promptCursor])
   const visibleMentions = useMemo(() => {
     if (!activeMention) return []
@@ -2420,7 +2494,63 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
       .slice(0, 9)
   }, [activeMention, mentionOptions])
-  const chatStarted = messages.length > 0 || !!selectedJob || !!bankReview || !!pendingMembers || !!pendingMemberUpdates || !!pendingContributionPayment || !!pendingTagActions || !!pendingVoucherTagActions || !!pendingVoucherUpdates || !!pendingVoucherReverse || !!pendingVoucherRebook || !!pendingBudgetActions || !!pendingEarmarkActions || !!pendingPlannerQuestion
+  const chatStarted = messages.length > 0 || !!selectedJob || !!bankReview || !!pendingMembers || !!pendingMemberUpdates || !!pendingContributionPayment || !!pendingTagActions || !!pendingVoucherTagActions || !!pendingVoucherUpdates || !!pendingVoucherReverse || !!pendingVoucherRebook || !!pendingInvoiceActions || !!pendingBudgetActions || !!pendingEarmarkActions || !!pendingPlannerQuestion
+  const hasPendingReview = hasOpenReviewWorkflow()
+  const hasPlannerQuestionOpen = pendingPlannerQuestion?.status === 'OPEN'
+  const isComposingPrompt = prompt.trim().length > 0 || files.length > 0 || visibleMentions.length > 0
+  const latestMessage = messages.at(-1) || null
+
+  useEffect(() => {
+    if (!latestMessage || latestMessage.role !== 'assistant') return
+    if (lastAssistantMessageIdRef.current === latestMessage.id) return
+    lastAssistantMessageIdRef.current = latestMessage.id
+    setAssistantReactionUntil(Date.now() + 2200)
+  }, [latestMessage])
+
+  useEffect(() => {
+    let blinkTimeoutId: number | null = null
+    let reactionTimeoutId: number | null = null
+    const isAssistantReacting = assistantReactionUntil > Date.now()
+
+    if (busy) {
+      setAvatarFrame('thinking')
+      return () => {
+        if (reactionTimeoutId != null) window.clearTimeout(reactionTimeoutId)
+      }
+    }
+
+    if (isAssistantReacting) {
+      setAvatarFrame('success')
+
+      reactionTimeoutId = window.setTimeout(() => {
+        setAssistantReactionUntil(0)
+      }, Math.max(0, assistantReactionUntil - Date.now()))
+
+      return () => {
+        if (reactionTimeoutId != null) window.clearTimeout(reactionTimeoutId)
+      }
+    }
+
+    const restingFrame: AiAvatarFrame = isComposingPrompt
+      ? 'thinking'
+      : hasPlannerQuestionOpen || hasPendingReview
+      ? 'smirk'
+      : 'default'
+    setAvatarFrame(restingFrame)
+
+    const blinkIntervalId = window.setInterval(() => {
+      setAvatarFrame('blink')
+      blinkTimeoutId = window.setTimeout(() => {
+        setAvatarFrame(restingFrame)
+      }, 160)
+    }, hasPlannerQuestionOpen ? 3200 : chatStarted ? 4200 : 5200)
+
+    return () => {
+      window.clearInterval(blinkIntervalId)
+      if (blinkTimeoutId != null) window.clearTimeout(blinkTimeoutId)
+      if (reactionTimeoutId != null) window.clearTimeout(reactionTimeoutId)
+    }
+  }, [assistantReactionUntil, busy, chatStarted, hasPendingReview, hasPlannerQuestionOpen, isComposingPrompt])
 
   const removeFile = (key: string) => {
     setFiles((current) => current.filter((file) => filePreviewKey(file) !== key))
@@ -2525,6 +2655,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setPendingVoucherUpdates(null)
     setPendingVoucherReverse(null)
     setPendingVoucherRebook(null)
+    setPendingInvoiceActions(null)
     setPendingBudgetActions(null)
     setPendingEarmarkActions(null)
     setPendingPlannerQuestion(null)
@@ -3633,6 +3764,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       : current)
   }
 
+  const toggleInvoiceAction = (id: string) => {
+    setPendingInvoiceActions((current) => current
+      ? {
+        ...current,
+        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
+      }
+      : current)
+  }
+
   const applyPendingTagActions = async () => {
     if (!pendingTagActions || pendingTagActions.status === 'APPLIED') return
     const selected = pendingTagActions.changes.filter((change) => change.selected && !change.applied)
@@ -3758,6 +3898,42 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     } catch (error: any) {
       notify('error', error?.message || String(error))
       pushMessage({ role: 'assistant', title: 'Zweckbindungs-Änderung fehlgeschlagen', body: error?.message || String(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingInvoiceActions = async () => {
+    if (!pendingInvoiceActions || pendingInvoiceActions.status === 'APPLIED') return
+    const selected = pendingInvoiceActions.changes.filter((change) => change.selected && !change.applied)
+    if (!selected.length) {
+      notify('info', 'Keine Forderung oder Verbindlichkeit ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      const created = new Map<string, number>()
+      for (const change of selected) {
+        const result = await window.api.invoices.create(change.invoice)
+        if (result?.id) created.set(change.id, result.id)
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      setPendingInvoiceActions({
+        ...pendingInvoiceActions,
+        status: 'APPLIED',
+        changes: pendingInvoiceActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true, createdId: created.get(change.id) ?? change.createdId ?? null } : change)
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Offene Posten angelegt',
+        body: `${selected.length} Forderung(en)/Verbindlichkeit(en) angelegt.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      notify('success', `${selected.length} offene Posten angelegt.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({ role: 'assistant', title: 'Offene Posten fehlgeschlagen', body: error?.message || String(error) })
     } finally {
       setBusy(false)
     }
@@ -4580,19 +4756,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   })
 
   const executeAiActionPlan = async (userPrompt: string) => {
+    const modifiesPendingReview = hasOpenReviewWorkflow() && wantsModifyPendingReview(userPrompt)
     if (!files.length && await applyPaymentAccountFollowup(userPrompt)) {
       return true
     }
-    if (!files.length && pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED' && wantsApplyPendingVoucherActions(userPrompt)) {
+    if (!modifiesPendingReview && !files.length && pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED' && wantsApplyPendingVoucherActions(userPrompt)) {
       await applyPendingVoucherUpdates()
       return true
     }
-    if (!files.length && pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+    if (!modifiesPendingReview && !files.length && pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
       await applyPendingBudgetActions()
       return true
     }
-    if (!files.length && pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+    if (!modifiesPendingReview && !files.length && pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
       await applyPendingEarmarkActions()
+      return true
+    }
+    if (!modifiesPendingReview && !files.length && pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+      await applyPendingInvoiceActions()
       return true
     }
     if (shouldUseAgentRuntime(userPrompt)) {
@@ -5515,11 +5696,47 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     </section>
   )
 
+  const renderAvatar = () => (
+    <div
+      className={`ai-header-avatar ${busy ? 'is-busy' : ''} ${hasPendingReview ? 'is-reviewing' : ''} ${(avatarFrame === 'thinking' || avatarFrame === 'success') ? 'is-replacement-state' : ''}`}
+      aria-hidden="true"
+    >
+      <img
+        src={VEREINI_DEFAULT_SRC}
+        alt=""
+        className="ai-header-avatar__layer ai-header-avatar__layer--base"
+      />
+      <img
+        src={VEREINI_BLINK_SRC}
+        alt=""
+        className={`ai-header-avatar__layer ai-header-avatar__layer--overlay ${avatarFrame === 'blink' ? 'is-active' : ''}`}
+      />
+      <img
+        src={VEREINI_SMIRK_SRC}
+        alt=""
+        className={`ai-header-avatar__layer ai-header-avatar__layer--overlay ${avatarFrame === 'smirk' ? 'is-active' : ''}`}
+      />
+      <img
+        src={VEREINI_THINKING_SRC}
+        alt=""
+        className={`ai-header-avatar__layer ai-header-avatar__layer--replacement ${avatarFrame === 'thinking' ? 'is-active' : ''}`}
+      />
+      <img
+        src={VEREINI_SUCCESS_SRC}
+        alt=""
+        className={`ai-header-avatar__layer ai-header-avatar__layer--replacement ${avatarFrame === 'success' ? 'is-active' : ''}`}
+      />
+    </div>
+  )
+
   return (
     <div className="page-content ai-page ai-assistant-page">
       <header className="ai-header ai-assistant-header">
-        <div>
-          <h1>KI</h1>
+        <div className="ai-header-brand">
+          {renderAvatar()}
+          <div className="ai-header-title">
+            <h1>KI</h1>
+          </div>
         </div>
         <div className="ai-header-actions">
           {chatStarted && (
@@ -5886,6 +6103,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               state={pendingVoucherRebook}
               busy={busy}
               onApply={() => void applyPendingVoucherRebook()}
+            />
+          )}
+
+          {pendingInvoiceActions && (
+            <AgentInvoiceActionCard
+              anchorId="ai-review-invoice-actions"
+              state={pendingInvoiceActions}
+              busy={busy}
+              onToggle={toggleInvoiceAction}
+              onApply={() => void applyPendingInvoiceActions()}
             />
           )}
 

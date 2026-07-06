@@ -1391,7 +1391,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'invoices_search',
-      description: 'Sucht Rechnungen und offene Posten.',
+      description: 'Sucht Rechnungen, Forderungen, Verbindlichkeiten und offene Posten.',
       readOnly: true,
       parameters: toolParameters({
         status: { type: ['string', 'null'], enum: ['OPEN', 'PAID', 'PARTIAL', 'OVERDUE', 'ALL', null] },
@@ -1416,6 +1416,78 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           data: {
             summary: summarizeInvoices({ status: args.status && args.status !== 'ALL' ? args.status : undefined } as any),
             rows: result.rows || []
+          }
+        }
+      }
+    },
+    {
+      name: 'invoice_action_draft_prepare',
+      description: 'Bereitet einen Review-Entwurf zum Anlegen einer Forderung (IN) oder Verbindlichkeit/Rechnung (OUT) vor. Speichert nichts direkt.',
+      readOnly: false,
+      parameters: toolParameters({
+        voucherType: { type: 'string', enum: ['IN', 'OUT'], description: 'IN = Forderung, OUT = Verbindlichkeit/Rechnung.' },
+        date: { type: 'string', description: 'Beleg-/Rechnungsdatum im ISO-Format YYYY-MM-DD.' },
+        dueDate: nullableString,
+        invoiceNo: nullableString,
+        party: { type: 'string', description: 'Debitor/Kreditor bzw. Gegenpartei.' },
+        description: nullableString,
+        grossAmount: { type: 'number', description: 'Bruttobetrag positiv in EUR.' },
+        sphere: { type: 'string', enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] },
+        paymentMethod: nullableString,
+        paymentAccountId: nullableNumber,
+        budgetId: nullableNumber,
+        earmarkId: nullableNumber,
+        tags: { type: 'array', items: { type: 'string' } },
+        reason: nullableString
+      }, ['voucherType', 'date', 'party', 'grossAmount', 'sphere']),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          voucherType: z.enum(['IN', 'OUT']),
+          date: z.string().min(1),
+          dueDate: z.string().nullable().optional(),
+          invoiceNo: z.string().nullable().optional(),
+          party: z.string().min(1),
+          description: z.string().nullable().optional(),
+          grossAmount: z.number().positive(),
+          sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']),
+          paymentMethod: z.string().nullable().optional(),
+          paymentAccountId: z.number().nullable().optional(),
+          budgetId: z.number().nullable().optional(),
+          earmarkId: z.number().nullable().optional(),
+          tags: z.array(z.string()).optional(),
+          reason: z.string().nullable().optional()
+        }), rawArgs)
+        const payload = {
+          action: 'CREATE',
+          invoice: {
+            date: args.date,
+            dueDate: args.dueDate || null,
+            invoiceNo: args.invoiceNo || null,
+            party: args.party,
+            description: args.description || null,
+            grossAmount: roundMoney(args.grossAmount),
+            paymentMethod: args.paymentMethod || null,
+            paymentAccountId: args.paymentAccountId ?? null,
+            sphere: args.sphere,
+            earmarkId: args.earmarkId ?? null,
+            budgetId: args.budgetId ?? null,
+            autoPost: true,
+            voucherType: args.voucherType,
+            tags: args.tags || []
+          },
+          reason: args.reason || null
+        }
+        const label = args.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'
+        return {
+          ok: true,
+          draft: {
+            kind: 'invoiceAction',
+            title: `${label} für ${args.party}`,
+            payload
+          },
+          data: {
+            message: `${label} wurde als Review-Entwurf vorbereitet.`,
+            invoice: payload.invoice
           }
         }
       }
