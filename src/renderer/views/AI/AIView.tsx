@@ -65,6 +65,8 @@ type AiMessage = {
   role: 'user' | 'assistant'
   title?: string
   body: string
+  displayBody?: string
+  isStreaming?: boolean
   meta?: string
   jobId?: number
   reviewable?: boolean
@@ -442,7 +444,8 @@ function readAiChatSnapshot(): AiChatSnapshot {
 function writeAiChatSnapshot(snapshot: AiChatSnapshot) {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(snapshot))
+    const persistedMessages = (snapshot.messages || []).map(({ displayBody, isStreaming, ...message }) => message)
+    window.localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify({ ...snapshot, messages: persistedMessages }))
   } catch {
     // The chat should keep working even if local storage is unavailable.
   }
@@ -1818,13 +1821,54 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [avatarFrame, setAvatarFrame] = useState<AiAvatarFrame>('default')
   const [assistantReactionUntil, setAssistantReactionUntil] = useState(0)
   const lastAssistantMessageIdRef = useRef<string | null>(null)
+  const streamingMessageTimersRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     onBusyChange?.(busy)
   }, [busy, onBusyChange])
 
-  const pushMessage = (message: Omit<AiMessage, 'id'>) => {
-    setMessages((current) => [...current, { ...message, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` }])
+  useEffect(() => () => {
+    Object.values(streamingMessageTimersRef.current).forEach((timer) => window.clearTimeout(timer))
+    streamingMessageTimersRef.current = {}
+  }, [])
+
+  const pushMessage = (message: Omit<AiMessage, 'id' | 'displayBody' | 'isStreaming'>) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const hasAssistantBody = message.role === 'assistant' && Boolean(message.body)
+    setMessages((current) => [
+      ...current,
+      {
+        ...message,
+        id,
+        displayBody: hasAssistantBody ? '' : message.body,
+        isStreaming: hasAssistantBody
+      }
+    ])
+
+    if (!hasAssistantBody) return
+
+    const fullBody = message.body
+    let streamedLength = 0
+    const step = () => {
+      streamedLength += 1
+      setMessages((current) => current.map((item) => item.id === id
+        ? {
+            ...item,
+            displayBody: fullBody.slice(0, streamedLength),
+            isStreaming: streamedLength < fullBody.length
+          }
+        : item))
+
+      if (streamedLength < fullBody.length) {
+        const timer = window.setTimeout(step, Math.max(12, Math.min(24, Math.round(fullBody.length / 80))))
+        streamingMessageTimersRef.current[id] = timer
+      } else {
+        delete streamingMessageTimersRef.current[id]
+      }
+    }
+
+    const initialTimer = window.setTimeout(step, 22)
+    streamingMessageTimersRef.current[id] = initialTimer
   }
 
   const hasOpenReviewWorkflow = () => !!selectedJob
@@ -5812,33 +5856,36 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 <span>Unterhaltung</span>
               </div>
               <div className="ai-message-list">
-                {messages.map((message) => (
-                  <article key={message.id} className={`ai-message ai-message--${message.role}`}>
-                    <div className="ai-message-head">
-                      <strong>{message.title || (message.role === 'user' ? 'Du' : 'VereinO KI')}</strong>
-                      {message.meta && <span>{message.meta}</span>}
-                    </div>
-                    {message.role === 'assistant'
-                      ? <AiMarkdown text={message.body} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
-                      : <p>{message.body}</p>}
-                    {message.jobId && message.reviewable && (
-                      <>
-                        <button className="btn" type="button" onClick={() => void openJob(message.jobId!)}>Review öffnen</button>
-                        <button className="btn" type="button" onClick={() => void openBookingDraftFromJobId(message.jobId!)}>Buchungsentwurf</button>
-                      </>
-                    )}
-                    {message.bookingDraft && (
-                      <button className="btn" type="button" onClick={() => openMessageBookingDraft(message.bookingDraft!)}>
-                        Buchungsentwurf öffnen
-                      </button>
-                    )}
-                    {message.filePath && (
-                      <button className="btn" type="button" onClick={() => void window.api.shell.showItemInFolder(message.filePath!)}>
-                        Im Ordner anzeigen
-                      </button>
-                    )}
-                  </article>
-                ))}
+                {messages.map((message) => {
+                  const messageBody = message.displayBody ?? message.body
+                  return (
+                    <article key={message.id} className={`ai-message ai-message--${message.role} ${message.role === 'assistant' && message.isStreaming ? 'is-streaming' : ''}`}>
+                      <div className="ai-message-head">
+                        <strong>{message.title || (message.role === 'user' ? 'Du' : 'VereinO KI')}</strong>
+                        {message.meta && <span>{message.meta}</span>}
+                      </div>
+                      {message.role === 'assistant'
+                        ? <AiMarkdown text={messageBody} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
+                        : <p>{message.body}</p>}
+                      {message.jobId && message.reviewable && (
+                        <>
+                          <button className="btn" type="button" onClick={() => void openJob(message.jobId!)}>Review öffnen</button>
+                          <button className="btn" type="button" onClick={() => void openBookingDraftFromJobId(message.jobId!)}>Buchungsentwurf</button>
+                        </>
+                      )}
+                      {message.bookingDraft && (
+                        <button className="btn" type="button" onClick={() => openMessageBookingDraft(message.bookingDraft!)}>
+                          Buchungsentwurf öffnen
+                        </button>
+                      )}
+                      {message.filePath && (
+                        <button className="btn" type="button" onClick={() => void window.api.shell.showItemInFolder(message.filePath!)}>
+                          Im Ordner anzeigen
+                        </button>
+                      )}
+                    </article>
+                  )
+                })}
               </div>
             </section>
           )}

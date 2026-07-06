@@ -998,6 +998,10 @@
   overflow-wrap: anywhere;
 }
 
+.ai-message.is-streaming {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 24%, transparent);
+}
+
 .ai-message--user {
   justify-self: end;
   background: color-mix(in oklab, var(--accent) 14%, var(--surface));
@@ -1043,6 +1047,25 @@
 .ai-markdown p {
   margin: 0;
   white-space: normal;
+}
+
+.ai-message.is-streaming .ai-markdown p:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.65em;
+  margin-left: 0.2em;
+  border-right: 2px solid color-mix(in oklab, var(--accent) 78%, var(--text) 22%);
+  animation: ai-cursor-blink 0.95s steps(1) infinite;
+}
+
+@keyframes ai-cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+
+  50%, 100% {
+    opacity: 0;
+  }
 }
 
 .ai-markdown ul,
