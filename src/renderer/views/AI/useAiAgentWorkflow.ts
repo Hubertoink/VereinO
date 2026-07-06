@@ -104,13 +104,14 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
     const wantsRebook = /(storn|korrekt|falsch|statt).*(buchung|beleg|in|out)|(?:in|out).*(statt|sollte|muss).*(in|out)|neu buchen|neu anlegen/.test(normalized)
     const wantsWrite = /(leg|erstell|erstelle|aender|ander|aktualisier|setze|setz|ordne|zuord|buche|buchen|verbuch|uebernehm|ubernehm|speicher|loesch|losch|markier|verknuepf|verknupf|importier|storn|korrekt|korrigier|eintrag|eintragen|trag ein|hinterleg|hinterlegen|fueg|fug|füge|hinzufueg|hinzufug|hinzufügen|ergänz|ergaenz)/.test(normalized)
     const wantsReportExport = /(export|exportier|speicher|erstelle|erzeuge|download).*(report|bericht|controlling|journal|auswertung|finanz|kassier|jahresabschluss|pdf|csv|xlsx|excel)|(report|bericht|controlling|journal|auswertung|finanz|kassier|jahresabschluss).*(export|pdf|csv|xlsx|excel|datei)/.test(normalized)
+    const wantsContentPdfExport = /\bpdf\b|als datei|datei geben|speicher/.test(normalized) && /(diese|diesen|dieses|tabelle|antwort|liste|inhalt|oben|vorherig|vorige|chat)/.test(normalized)
     const wantsExploration = /(zeig|zeige|liste|list|such|find|pruef|pruf|analysier|auswert|welche|welcher|welches|wie viele|status|offen|faellig|fallig|report|bericht|saldo|kontostand|uebersicht|ubersicht|warum|was|wer)/.test(normalized)
     const wantsVereinoData = /(buchung|buchungen|beleg|belege|journal|budget|tag|tags|zweck|zweckbindung|konto|zahlungskonto|bank|mitglied|mitglieder|beitrag|beitraege|rechnung|rechnungen|rechnungsnummer|forderung|forderungen|verbindlichkeit|verbindlichkeiten|offener posten|offene posten|zahlung|zahlungen|sphaere|sphare|out|in|report|bericht|controlling|auswertung|pdf|csv|xlsx|excel)/.test(normalized)
     const wantsSpecificAgentTask = (wantsWrite || wantsReportExport) && wantsVereinoData && /(mitglied|mitglieder|budget|budgets|zweck|zweckbindung|tag|tags|buchung|buchungen|bank|bankimport|zahlungskonto|konto|beitrag|beitraege|rechnung|rechnungen|rechnungsnummer|forderung|forderungen|verbindlichkeit|verbindlichkeiten|offener posten|offene posten|sphaere|sphare|report|bericht|controlling|journal|auswertung|pdf|csv|xlsx|excel)/.test(normalized)
     const hasOpenReview = input.hasOpenReviewWorkflow()
     const wantsOpenReviewFollowup = hasOpenReview && !!agentSessionId && (wantsWrite || wantsVereinoData || (normalized.length > 0 && normalized.length <= 80))
     if (hasOpenReview && !wantsRebook && !wantsSpecificAgentTask && !wantsOpenReviewFollowup) return false
-    return wantsReportExport || wantsExploration || (wantsWrite && wantsVereinoData) || (!!agentSessionId && wantsVereinoData) || wantsOpenReviewFollowup
+    return wantsReportExport || wantsContentPdfExport || wantsExploration || (wantsWrite && wantsVereinoData) || (!!agentSessionId && wantsVereinoData) || wantsOpenReviewFollowup
   }
 
   const openAgentDrafts = (drafts: TAiAgentRunOutput['drafts'], userPrompt: string) => {

@@ -1049,7 +1049,7 @@
   white-space: normal;
 }
 
-.ai-message.is-streaming .ai-markdown p:last-child::after {
+.ai-message-stream-text::after {
   content: '';
   display: inline-block;
   width: 0.65em;

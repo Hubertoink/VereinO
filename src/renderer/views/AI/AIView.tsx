@@ -301,6 +301,8 @@ type BookingJobLike = {
 }
 
 const AI_CHAT_STORAGE_KEY = 'vereino.ai.chat.v1'
+const AI_MESSAGE_STREAM_TICK_MS = 18
+const AI_MESSAGE_STREAM_TARGET_TICKS = 180
 
 const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const usd = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 })
@@ -1832,6 +1834,39 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     streamingMessageTimersRef.current = {}
   }, [])
 
+  const streamAssistantMessage = useCallback((id: string, fullBody: string, initialLength = 0) => {
+    if (streamingMessageTimersRef.current[id]) return
+    const charsPerTick = Math.max(1, Math.ceil(fullBody.length / AI_MESSAGE_STREAM_TARGET_TICKS))
+    let streamedLength = Math.min(fullBody.length, initialLength)
+    const step = () => {
+      streamedLength = Math.min(fullBody.length, streamedLength + charsPerTick)
+      setMessages((current) => current.map((item) => item.id === id
+        ? {
+            ...item,
+            displayBody: fullBody.slice(0, streamedLength),
+            isStreaming: streamedLength < fullBody.length
+          }
+        : item))
+
+      if (streamedLength < fullBody.length) {
+        const timer = window.setTimeout(step, AI_MESSAGE_STREAM_TICK_MS)
+        streamingMessageTimersRef.current[id] = timer
+      } else {
+        delete streamingMessageTimersRef.current[id]
+      }
+    }
+
+    const timer = window.setTimeout(step, AI_MESSAGE_STREAM_TICK_MS)
+    streamingMessageTimersRef.current[id] = timer
+  }, [])
+
+  useEffect(() => {
+    messages.forEach((message) => {
+      if (message.role !== 'assistant' || !message.isStreaming || !message.body) return
+      streamAssistantMessage(message.id, message.body, message.displayBody?.length || 0)
+    })
+  }, [messages, streamAssistantMessage])
+
   const pushMessage = (message: Omit<AiMessage, 'id' | 'displayBody' | 'isStreaming'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const hasAssistantBody = message.role === 'assistant' && Boolean(message.body)
@@ -1847,28 +1882,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
     if (!hasAssistantBody) return
 
-    const fullBody = message.body
-    let streamedLength = 0
-    const step = () => {
-      streamedLength += 1
-      setMessages((current) => current.map((item) => item.id === id
-        ? {
-            ...item,
-            displayBody: fullBody.slice(0, streamedLength),
-            isStreaming: streamedLength < fullBody.length
-          }
-        : item))
-
-      if (streamedLength < fullBody.length) {
-        const timer = window.setTimeout(step, Math.max(12, Math.min(24, Math.round(fullBody.length / 80))))
-        streamingMessageTimersRef.current[id] = timer
-      } else {
-        delete streamingMessageTimersRef.current[id]
-      }
-    }
-
-    const initialTimer = window.setTimeout(step, 22)
-    streamingMessageTimersRef.current[id] = initialTimer
+    streamAssistantMessage(id, message.body)
   }
 
   const hasOpenReviewWorkflow = () => !!selectedJob
@@ -2033,12 +2047,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     if (draft.kind === 'reportExport') {
       if (!payload?.filePath) return
+      const isContentPdf = payload?.type === 'CONTENT'
       pushMessage({
         role: 'assistant',
-        title: 'Report exportiert',
+        title: isContentPdf ? 'PDF erstellt' : 'Report exportiert',
         body: [
           `${draft.title} wurde erstellt.`,
-          payload.rowCount != null ? `${payload.rowCount} Buchung(en) im Export.` : null,
+          !isContentPdf && payload.rowCount != null ? `${payload.rowCount} Buchung(en) im Export.` : null,
           payload.filePath
         ].filter(Boolean).join('\n'),
         meta: 'Agent-Export',
@@ -2166,9 +2181,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           tags: item.tags || [],
           warnings: item.warnings || []
         }))
-      } : null
+      } : null,
+      recentMessages: messages.slice(-8).map((message) => ({
+        role: message.role,
+        title: message.title || null,
+        meta: message.meta || null,
+        body: message.body.slice(0, 12000)
+      }))
     }
-  }, [bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
+  }, [bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
 
   const {
     agentSessionId,
@@ -2325,6 +2346,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }, [showAgentContext, showHistory, showSettings])
 
   useEffect(() => {
+    if (messages.some((message) => message.isStreaming)) return
     writeAiChatSnapshot({
       messages,
       agentSessionId,
@@ -5865,7 +5887,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                         {message.meta && <span>{message.meta}</span>}
                       </div>
                       {message.role === 'assistant'
-                        ? <AiMarkdown text={messageBody} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
+                        ? message.isStreaming
+                          ? <p className="ai-message-stream-text">{messageBody}</p>
+                          : <AiMarkdown text={messageBody} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
                         : <p>{message.body}</p>}
                       {message.jobId && message.reviewable && (
                         <>

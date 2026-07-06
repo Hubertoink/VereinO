@@ -254,6 +254,12 @@ type AgentReportExportInput = {
   includeVoucherList?: boolean | null
 }
 
+type AgentContentPdfExportInput = {
+  title: string
+  body: string
+  fileName?: string | null
+}
+
 const reportFieldLabels: Record<string, string> = {
   date: 'Datum',
   voucherNo: 'Nr.',
@@ -277,6 +283,123 @@ function ensureReportExportDir() {
 function reportStamp() {
   const when = new Date()
   return `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[char])
+}
+
+function safeFilePart(value: unknown, fallback: string) {
+  const cleaned = String(value || fallback)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+  return cleaned || fallback
+}
+
+function isMarkdownTableLine(line: string) {
+  return /^\s*\|?.+\|.+\|?\s*$/.test(line)
+}
+
+function isMarkdownTableSeparator(line: string) {
+  return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)
+}
+
+function splitMarkdownTableRow(line: string) {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
+}
+
+function renderInlineContent(value: string) {
+  return escapeHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+}
+
+function renderAgentContentHtml(markdown: string) {
+  const lines = String(markdown || '').split(/\r?\n/)
+  const blocks: string[] = []
+  let idx = 0
+  while (idx < lines.length) {
+    const line = lines[idx].trim()
+    if (!line) {
+      idx += 1
+      continue
+    }
+    const heading = line.match(/^(#{1,3})\s+(.+)$/) || line.match(/^\*\*([^*]+)\*\*$/)
+    if (heading) {
+      const content = heading[2] || heading[1]
+      blocks.push(`<h2>${renderInlineContent(content)}</h2>`)
+      idx += 1
+      continue
+    }
+    if (isMarkdownTableLine(line) && idx + 1 < lines.length && isMarkdownTableSeparator(lines[idx + 1])) {
+      const headers = splitMarkdownTableRow(line)
+      idx += 2
+      const rows: string[][] = []
+      while (idx < lines.length && isMarkdownTableLine(lines[idx]) && !isMarkdownTableSeparator(lines[idx])) {
+        const row = splitMarkdownTableRow(lines[idx])
+        rows.push(headers.map((_, cellIdx) => row[cellIdx] || ''))
+        idx += 1
+      }
+      blocks.push(`<table><thead><tr>${headers.map((header) => `<th>${renderInlineContent(header)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${renderInlineContent(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`)
+      continue
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = []
+      while (idx < lines.length && /^[-*]\s+/.test(lines[idx].trim())) {
+        items.push(lines[idx].trim().replace(/^[-*]\s+/, ''))
+        idx += 1
+      }
+      blocks.push(`<ul>${items.map((item) => `<li>${renderInlineContent(item)}</li>`).join('')}</ul>`)
+      continue
+    }
+    const paragraph: string[] = []
+    while (
+      idx < lines.length
+      && lines[idx].trim()
+      && !/^(#{1,3})\s+/.test(lines[idx].trim())
+      && !/^\*\*[^*]+\*\*$/.test(lines[idx].trim())
+      && !(isMarkdownTableLine(lines[idx].trim()) && idx + 1 < lines.length && isMarkdownTableSeparator(lines[idx + 1]))
+      && !/^[-*]\s+/.test(lines[idx].trim())
+    ) {
+      paragraph.push(lines[idx].trim())
+      idx += 1
+    }
+    blocks.push(`<p>${renderInlineContent(paragraph.join(' '))}</p>`)
+  }
+  return blocks.join('\n') || '<p>Keine Inhalte.</p>'
+}
+
+async function exportAgentContentPdf(args: AgentContentPdfExportInput) {
+  const dir = ensureReportExportDir()
+  const filePath = path.join(dir, `${safeFilePart(args.fileName || args.title, 'VereinO-Agent-PDF')}_${reportStamp()}.pdf`)
+  const title = args.title || 'VereinO Agent PDF'
+  const html = `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;margin:30px;color:#20231f;line-height:1.45}
+h1{margin:0 0 6px;font-size:26px}h2{font-size:17px;margin:20px 0 8px}.muted{color:#697064;font-size:12px;margin-bottom:18px}
+p{margin:0 0 12px}ul{margin:0 0 14px 22px;padding:0}li{margin:4px 0}code{background:#eef2ea;border-radius:4px;padding:1px 4px}
+table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:12px;break-inside:auto}tr{break-inside:avoid}th,td{border-bottom:1px solid #e0e5dc;padding:7px 8px;text-align:left;vertical-align:top}th{background:#edf3e6;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#364030}tbody tr:nth-child(even){background:#f7f8f4}
+.footer{margin-top:22px;color:#777f72;font-size:11px}
+</style></head><body>
+<h1>${escapeHtml(title)}</h1>
+<div class="muted">Erstellt durch VereinO Agent · ${new Date().toLocaleString('de-DE')}</div>
+${renderAgentContentHtml(args.body)}
+<div class="footer">VereinO Export · ${escapeHtml(filePath)}</div>
+</body></html>`
+
+  const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } })
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+    const pdf = await win.webContents.printToPDF({ printBackground: true })
+    fs.writeFileSync(filePath, pdf)
+  } finally {
+    win.destroy()
+  }
+  return { filePath }
 }
 
 function reportRows(args: AgentReportExportInput) {
@@ -1259,6 +1382,41 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
               from: args.from,
               to: args.to,
               summary: exported.summary
+            }
+          }
+        }
+      }
+    },
+    {
+      name: 'content_pdf_export',
+      description: 'Exportiert eine vom Agenten formulierte Antwort, Tabelle, Liste oder den relevanten Inhalt aus dem aktuellen Chat-/UI-Kontext als PDF und gibt den Dateipfad zurück. Nutze dies bei Folgeaufträgen wie "diese Tabelle als PDF", "Antwort als PDF", "Liste speichern" oder "als Datei geben", wenn kein standardisierter Controlling-, Finanzamt- oder Kassierbericht gemeint ist.',
+      readOnly: false,
+      parameters: toolParameters({
+        title: { type: 'string', description: 'PDF-Titel.' },
+        body: { type: 'string', description: 'Der komplette PDF-Inhalt als Markdown. Tabellen sollen als Markdown-Tabelle uebergeben werden.' },
+        fileName: nullableString
+      }, ['title', 'body']),
+      run: async (rawArgs) => {
+        const args = parseArgs(z.object({
+          title: z.string().min(1),
+          body: z.string().min(1),
+          fileName: z.string().nullable().optional()
+        }), rawArgs)
+        const exported = await exportAgentContentPdf(args)
+        return {
+          ok: true,
+          data: {
+            message: 'PDF exportiert.',
+            filePath: exported.filePath
+          },
+          draft: {
+            kind: 'reportExport',
+            title: args.title,
+            payload: {
+              filePath: exported.filePath,
+              format: 'PDF',
+              type: 'CONTENT',
+              source: 'agent-content'
             }
           }
         }
