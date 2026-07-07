@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.6.1] - 2026-07-07
+
+### Geändert
+
+- KI: Bereits vorhandene Buchungen können jetzt als Review gesammelt mit Mitgliedsbeiträgen verknüpft werden, statt nur neue Beitragsbuchungen vorzuschlagen.
+- KI: Geöffnete Agent-Buchungsentwürfe zeigen nach dem Speichern im Chat jetzt sichtbar an, dass die Buchung bereits erstellt wurde.
+
+### Behoben
+
+- Updates: Der Sprung aus dem Update-Hinweis öffnet nun zuverlässig die Einstellungen direkt im Bereich `Updates` statt gelegentlich in `Darstellung` zu landen.
+
 ## [2.4.0] - 2026-07-05
 
 ### Hinzugefügt

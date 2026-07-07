@@ -2173,6 +2173,7 @@ export const AiAgentDraft = z.object({
     'voucherRebook',
     'memberCreate',
     'memberUpdate',
+    'contributionPaymentLink',
     'tagChange',
     'budgetChange',
     'earmarkChange',

@@ -320,6 +320,9 @@ export function useQuickAdd(
             note: activeDraft.qa.note?.trim() ? activeDraft.qa.note.trim() : null,
             vatRate: activeDraft.qa.vatRate
         }
+        if (typeof (activeDraft.qa as any).agentDraftId === 'string') {
+            payload.agentDraftId = (activeDraft.qa as any).agentDraftId
+        }
         
         if (activeDraft.qa.type === 'TRANSFER') {
             delete payload.paymentMethod

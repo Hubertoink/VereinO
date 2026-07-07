@@ -93,9 +93,13 @@ type AiMessage = {
   reviewable?: boolean
   filePath?: string
   bookingDraft?: {
+    agentDraftId?: string
     title?: string
     qa: Record<string, unknown>
     files?: unknown[]
+    status?: 'OPEN' | 'SAVED'
+    voucherId?: number | null
+    voucherNo?: string | null
   }
 }
 
@@ -142,6 +146,7 @@ type AiChatSnapshot = {
   pendingMembers?: AiMemberImportState | null
   pendingMemberUpdates?: AiMemberUpdateState | null
   pendingContributionPayment?: AiContributionPaymentState | null
+  pendingContributionLinks?: AiContributionLinkState | null
   pendingTagActions?: AiTagActionState | null
   pendingVoucherTagActions?: AiVoucherTagActionState | null
   pendingVoucherUpdates?: AiVoucherUpdateState | null
@@ -228,6 +233,31 @@ type AiContributionPaymentState = {
   status: 'DRAFT' | 'CREATED'
   voucherId?: number | null
   voucherNo?: string | null
+}
+
+type AiContributionLinkChange = {
+  id: string
+  memberId: number
+  memberName: string
+  periodKey: string
+  interval: TMemberCreateInput['contribution_interval']
+  amount: number
+  voucherId: number
+  voucherNo?: string | null
+  voucherDate?: string | null
+  voucherDescription?: string | null
+  voucherGrossAmount?: number | null
+  datePaid: string
+  selected: boolean
+  applied?: boolean
+  warnings: string[]
+}
+
+type AiContributionLinkState = {
+  changes: AiContributionLinkChange[]
+  reason?: string | null
+  sourcePrompt: string
+  status: 'DRAFT' | 'APPLIED'
 }
 
 type TagRow = TTagsListOutput['rows'][number]
@@ -2507,6 +2537,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   )
   const [pendingContributionPayment, setPendingContributionPayment] =
     useState<AiContributionPaymentState | null>(initialChat.pendingContributionPayment || null)
+  const [pendingContributionLinks, setPendingContributionLinks] =
+    useState<AiContributionLinkState | null>(initialChat.pendingContributionLinks || null)
   const [pendingTagActions, setPendingTagActions] = useState<AiTagActionState | null>(
     initialChat.pendingTagActions || null
   )
@@ -2619,6 +2651,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     (!!pendingMembers && pendingMembers.status !== 'CREATED') ||
     (!!pendingMemberUpdates && pendingMemberUpdates.status !== 'APPLIED') ||
     (!!pendingContributionPayment && pendingContributionPayment.status !== 'CREATED') ||
+    (!!pendingContributionLinks && pendingContributionLinks.status !== 'APPLIED') ||
     (!!pendingTagActions && pendingTagActions.status !== 'APPLIED') ||
     (!!pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED') ||
     (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED') ||
@@ -2697,6 +2730,27 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         role: 'assistant',
         title: 'Mitgliederänderungen vorbereitet',
         body: `${changes.length} Mitgliederänderung(en) wurden als Review vorbereitet.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'contributionPaymentLink') {
+      const changes = (payload?.changes || []) as AiContributionLinkChange[]
+      if (!changes.length) return
+      setPendingContributionLinks({
+        changes: changes.map((change) => ({
+          ...change,
+          selected: change.selected !== false,
+          warnings: change.warnings || []
+        })),
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Beitrags-Verknüpfung vorbereitet',
+        body: `${changes.length} vorhandene Buchung(en) wurden zur Verknüpfung mit Mitgliedsbeiträgen vorbereitet. Bitte prüfe die Vorschau unten.`,
         meta: `Agent-Review${autoMeta}`
       })
       return
@@ -2870,6 +2924,21 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               amount: pendingContributionPayment.amount
             }
           : null,
+        contributionLinks: pendingContributionLinks
+          ? {
+              status: pendingContributionLinks.status,
+              count: pendingContributionLinks.changes.length,
+              sample: pendingContributionLinks.changes.slice(0, 20).map((change) => ({
+                memberId: change.memberId,
+                memberName: change.memberName,
+                periodKey: change.periodKey,
+                voucherId: change.voucherId,
+                voucherNo: change.voucherNo,
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
         tagActions: pendingTagActions
           ? { status: pendingTagActions.status, count: pendingTagActions.changes.length }
           : null,
@@ -2977,6 +3046,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     messages,
     pendingBudgetActions,
     pendingContributionPayment,
+    pendingContributionLinks,
     pendingEarmarkActions,
     pendingInvoiceActions,
     pendingMembers,
@@ -3214,6 +3284,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingMembers,
       pendingMemberUpdates,
       pendingContributionPayment,
+      pendingContributionLinks,
       pendingTagActions,
       pendingVoucherTagActions,
       pendingVoucherUpdates,
@@ -3232,6 +3303,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     messages,
     pendingBudgetActions,
     pendingContributionPayment,
+    pendingContributionLinks,
     pendingEarmarkActions,
     pendingInvoiceActions,
     pendingMembers,
@@ -3346,6 +3418,22 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         status: pendingContributionPayment.status === 'CREATED' ? 'DONE' : 'OPEN',
         count: 1,
         anchorId: 'ai-review-contribution-payment'
+      })
+    }
+    if (pendingContributionLinks) {
+      const openLinks = pendingContributionLinks.changes.filter(
+        (change) => change.selected && !change.applied
+      ).length
+      items.push({
+        id: 'contribution-links',
+        title: 'Beitrags-Verknüpfungen',
+        summary:
+          pendingContributionLinks.status === 'APPLIED'
+            ? 'Beitragszeiträume wurden verknüpft.'
+            : 'Vorhandene Buchungen warten auf Verknüpfung.',
+        status: pendingContributionLinks.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: openLinks || pendingContributionLinks.changes.length,
+        anchorId: 'ai-review-contribution-links'
       })
     }
     if (pendingTagActions) {
@@ -3467,6 +3555,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     bankReview,
     pendingBudgetActions,
     pendingContributionPayment,
+    pendingContributionLinks,
     pendingEarmarkActions,
     pendingInvoiceActions,
     pendingMembers,
@@ -3500,6 +3589,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     !!pendingMembers ||
     !!pendingMemberUpdates ||
     !!pendingContributionPayment ||
+    !!pendingContributionLinks ||
     !!pendingTagActions ||
     !!pendingVoucherTagActions ||
     !!pendingVoucherUpdates ||
@@ -3609,15 +3699,51 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const openMessageBookingDraft = (draft: NonNullable<AiMessage['bookingDraft']>) => {
+    if (draft.status === 'SAVED') return
     window.dispatchEvent(
       new CustomEvent('ai:open-booking-draft', {
         detail: {
           qa: draft.qa,
-          files: draft.files || []
+          files: draft.files || [],
+          agentDraftId: draft.agentDraftId
         }
       })
     )
   }
+
+  useEffect(() => {
+    const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
+      const agentDraftId =
+        typeof payload?.agentDraftId === 'string' ? payload.agentDraftId : ''
+      if (!agentDraftId) return
+      const voucherNo = payload?.voucherNo ? String(payload.voucherNo) : null
+      const voucherId = typeof payload?.id === 'number' ? payload.id : null
+      setMessages((current) =>
+        current.map((message) => {
+          const bookingDraft = message.bookingDraft
+          if (!bookingDraft || bookingDraft.agentDraftId !== agentDraftId) return message
+          return {
+            ...message,
+            title: 'Buchungsentwurf erstellt',
+            body: voucherNo
+              ? `Der geöffnete Agent-Buchungsentwurf wurde als Buchung ${voucherNo} erstellt.`
+              : 'Der geöffnete Agent-Buchungsentwurf wurde als Buchung erstellt.',
+            displayBody: undefined,
+            meta: 'Agent-Draft · erstellt',
+            bookingDraft: {
+              ...bookingDraft,
+              status: 'SAVED',
+              voucherId,
+              voucherNo
+            }
+          }
+        })
+      )
+    })
+    return () => {
+      if (typeof off === 'function') off()
+    }
+  }, [])
 
   const openVoucherMention = async (mention: AiVoucherMention) => {
     try {
@@ -3685,6 +3811,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setPendingMembers(null)
     setPendingMemberUpdates(null)
     setPendingContributionPayment(null)
+    setPendingContributionLinks(null)
     setPendingTagActions(null)
     setPendingVoucherTagActions(null)
     setPendingVoucherUpdates(null)
@@ -4766,6 +4893,72 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pushMessage({
         role: 'assistant',
         title: 'Beitragsbuchung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggleContributionLink = (id: string) => {
+    setPendingContributionLinks((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
+  }
+
+  const applyContributionLinks = async () => {
+    if (!pendingContributionLinks || pendingContributionLinks.status === 'APPLIED') return
+    const selected = pendingContributionLinks.changes.filter(
+      (change) => change.selected && !change.applied
+    )
+    if (!selected.length) {
+      notify('info', 'Keine Beitrags-Verknüpfungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      for (const change of selected) {
+        await window.api.payments.markPaid({
+          memberId: change.memberId,
+          periodKey: change.periodKey,
+          interval: change.interval || 'YEARLY',
+          amount: change.amount,
+          voucherId: change.voucherId,
+          datePaid: change.datePaid || change.voucherDate || null
+        })
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      const nextState: AiContributionLinkState = {
+        ...pendingContributionLinks,
+        status: 'APPLIED',
+        changes: pendingContributionLinks.changes.map((change) =>
+          appliedIds.has(change.id) ? { ...change, applied: true } : change
+        )
+      }
+      setPendingContributionLinks(nextState)
+      pushMessage({
+        role: 'assistant',
+        title: 'Beiträge verknüpft',
+        body: `${selected.length} Beitragszeitraum/-zeiträume wurden mit vorhandenen Buchungen verknüpft und als bezahlt markiert.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      window.dispatchEvent(new Event('data-changed'))
+      onBooked?.()
+      notify('success', `${selected.length} Beitrags-Verknüpfung(en) übernommen.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({
+        role: 'assistant',
+        title: 'Beitrags-Verknüpfung fehlgeschlagen',
         body: error?.message || String(error)
       })
     } finally {
@@ -7694,9 +7887,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                         <button
                           className="btn"
                           type="button"
+                          disabled={message.bookingDraft.status === 'SAVED'}
                           onClick={() => openMessageBookingDraft(message.bookingDraft!)}
                         >
-                          Buchungsentwurf öffnen
+                          {message.bookingDraft.status === 'SAVED'
+                            ? message.bookingDraft.voucherNo
+                              ? `Erstellt · ${message.bookingDraft.voucherNo}`
+                              : 'Erstellt'
+                            : 'Buchungsentwurf öffnen'}
                         </button>
                       )}
                       {message.filePath && (
@@ -7958,6 +8156,81 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                   {pendingContributionPayment.status === 'CREATED'
                     ? 'Gebucht'
                     : 'Buchung erstellen & verknüpfen'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {pendingContributionLinks && (
+            <section id="ai-review-contribution-links" className="card ai-contribution-payment-card">
+              <div className="ai-section-head">
+                <strong>Beitrags-Verknüpfungen</strong>
+                <span>
+                  {pendingContributionLinks.status === 'APPLIED'
+                    ? 'übernommen'
+                    : `${pendingContributionLinks.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}
+                </span>
+              </div>
+              <div className="ai-member-update-list">
+                {pendingContributionLinks.changes.map((change) => (
+                  <article
+                    key={change.id}
+                    className={`ai-member-update-row ${change.applied ? 'is-created' : ''}`}
+                  >
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={change.selected || !!change.applied}
+                        disabled={
+                          busy || change.applied || pendingContributionLinks.status === 'APPLIED'
+                        }
+                        onChange={() => toggleContributionLink(change.id)}
+                      />
+                      <span>
+                        <strong>{change.memberName}</strong>
+                        <em>{change.periodKey}</em>
+                      </span>
+                    </label>
+                    <div className="ai-member-update-values">
+                      <span>{change.voucherNo || `#${change.voucherId}`}</span>
+                      <b aria-hidden="true">→</b>
+                      <strong>{euro.format(change.amount)}</strong>
+                    </div>
+                    {change.voucherDate && <small>{formatIsoDate(change.voucherDate)}</small>}
+                    {change.applied && <small>verknüpft</small>}
+                    {change.warnings.length ? (
+                      <div className="ai-evidence">
+                        {change.warnings.map((warning, idx) => (
+                          <span key={idx} className={warningClassName(warning)}>
+                            {warning}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+              <div className="ai-review-actions">
+                <span className="helper">
+                  {pendingContributionLinks.status === 'APPLIED'
+                    ? 'Diese Beitragszeiträume wurden bereits verknüpft.'
+                    : 'Markiert die ausgewählten Beitragszeiträume mit vorhandenen Buchungen als bezahlt.'}
+                </span>
+                <button
+                  className="btn primary"
+                  type="button"
+                  disabled={
+                    busy ||
+                    pendingContributionLinks.status === 'APPLIED' ||
+                    !pendingContributionLinks.changes.some(
+                      (change) => change.selected && !change.applied
+                    )
+                  }
+                  onClick={() => void applyContributionLinks()}
+                >
+                  {pendingContributionLinks.status === 'APPLIED'
+                    ? 'Verknüpft'
+                    : 'Verknüpfungen übernehmen'}
                 </button>
               </div>
             </section>

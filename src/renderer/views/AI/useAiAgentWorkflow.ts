@@ -7,9 +7,13 @@ type AgentMessage = {
   body: string
   meta?: string
   bookingDraft?: {
+    agentDraftId?: string
     title?: string
     qa: Record<string, unknown>
     files?: unknown[]
+    status?: 'OPEN' | 'SAVED'
+    voucherId?: number | null
+    voucherNo?: string | null
   }
 }
 
@@ -38,7 +42,7 @@ function normalizeLookup(value: unknown) {
 
 function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
   const merged: TAiAgentRunOutput['drafts'] = []
-  const mergeableKinds = new Set(['memberUpdate', 'tagChange', 'voucherUpdate', 'budgetChange', 'earmarkChange'])
+  const mergeableKinds = new Set(['memberUpdate', 'contributionPaymentLink', 'tagChange', 'voucherUpdate', 'budgetChange', 'earmarkChange'])
   const byKind = new Map<string, TAiAgentRunOutput['drafts'][number]>()
 
   for (const draft of drafts) {
@@ -65,6 +69,7 @@ function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
     const seen = new Set(existingChanges.map((change: any) => [
       change.memberId,
       change.voucherId,
+      change.periodKey,
       change.tagId,
       change.budgetId,
       change.earmarkId,
@@ -76,6 +81,7 @@ function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
       const key = [
         change.memberId,
         change.voucherId,
+        change.periodKey,
         change.tagId,
         change.budgetId,
         change.earmarkId,
@@ -123,8 +129,10 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
       }
       const qa = payload?.qa || payload
       if (!qa) continue
+      const agentDraftId = `agent-booking-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const qaWithAgentDraft = { ...qa, agentDraftId }
       window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
-        detail: { qa, files: payload?.files || [] }
+        detail: { qa: qaWithAgentDraft, files: payload?.files || [], agentDraftId }
       }))
       input.pushMessage({
         role: 'assistant',
@@ -132,9 +140,11 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
         body: `Der Agent hat "${draft.title}" als bearbeitbaren Buchungsentwurf geöffnet.`,
         meta: 'Agent-Draft',
         bookingDraft: {
+          agentDraftId,
           title: draft.title,
-          qa,
-          files: payload?.files || []
+          qa: qaWithAgentDraft,
+          files: payload?.files || [],
+          status: 'OPEN'
         }
       })
     }

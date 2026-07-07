@@ -17,7 +17,7 @@ import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVo
 import type { AiContext } from './ai'
 
 export type AiAgentDraft = {
-  kind: 'booking' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
+  kind: 'booking' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
   title: string
   payload: unknown
   autoApproval?: {
@@ -852,6 +852,118 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           data: {
             summary: mp.dueSummary(),
             rows
+          }
+        }
+      }
+    },
+    {
+      name: 'contribution_payment_link_draft_prepare',
+      description: 'Bereitet einen Review-Entwurf vor, um bestehende Buchungen mit Mitgliedsbeitrags-Zeiträumen zu verknüpfen und diese nach Freigabe als bezahlt zu markieren. Nutze dies, wenn die Buchungen bereits existieren; nicht stattdessen neue Buchungen erstellen.',
+      readOnly: false,
+      parameters: toolParameters({
+        links: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              memberId: { type: 'number' },
+              periodKey: { type: 'string' },
+              voucherId: { type: 'number' },
+              interval: { type: ['string', 'null'], enum: ['MONTHLY', 'QUARTERLY', 'YEARLY', null] },
+              amount: nullableNumber,
+              datePaid: nullableString
+            },
+            required: ['memberId', 'periodKey', 'voucherId']
+          }
+        },
+        reason: nullableString
+      }, ['links']),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          links: z.array(z.object({
+            memberId: z.number().int().positive(),
+            periodKey: z.string().min(1),
+            voucherId: z.number().int().positive(),
+            interval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).nullable().optional(),
+            amount: z.number().nullable().optional(),
+            datePaid: z.string().nullable().optional()
+          })).min(1).max(50),
+          reason: z.string().nullable().optional()
+        }), rawArgs)
+        const membersResult = listMembers({ status: 'ALL', limit: 5000 } as any)
+        const memberById = new Map((membersResult.rows || []).map((member: any) => [Number(member.id), member]))
+        const voucherIds = Array.from(new Set(args.links.map((link) => Number(link.voucherId))))
+        const voucherResult = listVouchersAdvancedPaged({
+          voucherIds,
+          limit: voucherIds.length,
+          sort: 'ASC',
+          sortBy: 'date'
+        } as any)
+        const voucherById = new Map((voucherResult.rows || []).map((voucher: any) => [Number(voucher.id), voucher]))
+        const missingVouchers = voucherIds.filter((id) => !voucherById.has(id))
+        if (missingVouchers.length) {
+          return { ok: false, warning: `Diese Buchungen wurden nicht gefunden: ${missingVouchers.join(', ')}.` }
+        }
+
+        const changes = args.links.map((link, idx) => {
+          const member = memberById.get(Number(link.memberId)) as any
+          const voucher = voucherById.get(Number(link.voucherId)) as any
+          const interval = link.interval || member?.contribution_interval || (link.periodKey.includes('-Q') ? 'QUARTERLY' : link.periodKey.includes('-') ? 'MONTHLY' : 'YEARLY')
+          const dueResult = member
+            ? mp.listDue({
+                interval,
+                memberId: Number(link.memberId),
+                periodKey: link.periodKey,
+                includePaid: true
+              } as any)
+            : { rows: [] }
+          const due = (dueResult.rows || [])[0] as any
+          const amount = roundMoney(link.amount ?? due?.amount ?? voucher?.grossAmount ?? voucher?.gross ?? member?.contribution_amount ?? 0)
+          const warnings = [
+            !member ? `Mitglied #${link.memberId} wurde nicht gefunden.` : null,
+            !due ? `Beitragszeitraum ${link.periodKey} wurde fuer ${member?.name || `Mitglied #${link.memberId}`} nicht gefunden.` : null,
+            due?.paid && Number(due.voucherId || 0) !== Number(link.voucherId)
+              ? `Zeitraum ${link.periodKey} ist bereits mit Buchung #${due.voucherId || 'ohne Beleg'} als bezahlt markiert.`
+              : null,
+            Math.abs(Number(voucher?.grossAmount ?? voucher?.gross ?? amount) - amount) > 0.01
+              ? `Buchungsbetrag ${roundMoney(voucher?.grossAmount ?? voucher?.gross)} EUR weicht vom Beitragsbetrag ${amount} EUR ab.`
+              : null
+          ].filter(Boolean)
+          return {
+            id: `contribution-link-${link.memberId}-${link.periodKey}-${link.voucherId}-${idx}`,
+            memberId: Number(link.memberId),
+            memberName: member?.name || `Mitglied #${link.memberId}`,
+            periodKey: link.periodKey,
+            interval,
+            amount,
+            voucherId: Number(link.voucherId),
+            voucherNo: voucher?.voucherNo || null,
+            voucherDate: voucher?.date || null,
+            voucherDescription: voucher?.description || null,
+            voucherGrossAmount: roundMoney(voucher?.grossAmount ?? voucher?.gross ?? amount),
+            datePaid: link.datePaid || voucher?.date || new Date().toISOString().slice(0, 10),
+            selected: !warnings.some((warning) => /bereits mit Buchung|nicht gefunden/i.test(String(warning))),
+            applied: !!(due?.paid && Number(due.voucherId || 0) === Number(link.voucherId)),
+            warnings
+          }
+        })
+
+        const valid = changes.filter((change) => !change.applied && change.selected)
+        return {
+          ok: true,
+          data: {
+            message: `${valid.length} Beitrags-Verknuepfung(en) als Review-Entwurf vorbereitet.`,
+            changes,
+            reason: args.reason || null
+          },
+          draft: {
+            kind: 'contributionPaymentLink',
+            title: args.reason || `${changes.length} Mitgliedsbeitrag-Verknuepfung(en)`,
+            payload: {
+              changes,
+              reason: args.reason || null
+            }
           }
         }
       }

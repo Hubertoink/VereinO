@@ -67,6 +67,13 @@ jobs:
     needs: package
 
     steps:
+      - name: Compute release metadata
+        id: meta
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
@@ -75,10 +82,10 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: VereinO ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: VereinO ${{ steps.meta.outputs.version }}
           generate_release_notes: true
-          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'preview') }}
+          prerelease: ${{ contains(steps.meta.outputs.tag, 'preview') }}
           files: |
             release-artifacts/**/*
         env:

@@ -486,7 +486,11 @@ function DetachedQuickAddWindow() {
           notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
           const warnings = res?.warnings
           if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
-          await window.api?.quickAdd?.notifySaved?.({ ...res, draftId: detachedDraftIdRef.current })
+          await window.api?.quickAdd?.notifySaved?.({
+            ...res,
+            draftId: detachedDraftIdRef.current,
+            agentDraftId: payload?.agentDraftId
+          })
         }
         return res
       } catch (e: any) {
@@ -1424,6 +1428,18 @@ function AppInner() {
   const autoUpdateCheckInFlight = useRef(false)
   const startupUpdateNoticeShown = useRef(false)
 
+  const openSettingsTile = useCallback((tile: string) => {
+    try {
+      sessionStorage.setItem('settingsActiveTile', tile)
+    } catch {
+      /* ignore */
+    }
+    setActivePage('Einstellungen')
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile } }))
+    }, 100)
+  }, [])
+
   useEffect(() => {
     updatePromptRef.current = updatePrompt
   }, [updatePrompt])
@@ -1515,17 +1531,12 @@ function AppInner() {
         {
           label: 'Einstellungen öffnen',
           onClick: () => {
-            setActivePage('Einstellungen')
-            window.setTimeout(() => {
-              window.dispatchEvent(
-                new CustomEvent('settings:selectTile', { detail: { tile: 'updates' } })
-              )
-            }, 0)
+            openSettingsTile('updates')
           }
         }
       )
     },
-    [notify]
+    [notify, openSettingsTile]
   )
 
   useEffect(() => {
@@ -1840,6 +1851,10 @@ function AppInner() {
           // JournalView handles reload via refreshKey dependency; bump version to trigger it
           bumpDataVersion()
           if (p?.bankTransactionId) window.dispatchEvent(new Event('data-changed'))
+          await window.api?.quickAdd?.notifySaved?.({
+            ...res,
+            agentDraftId: p?.agentDraftId
+          })
         }
         return res
       } catch (e: any) {
@@ -2120,18 +2135,6 @@ function AppInner() {
       const input = document.querySelector(selector) as HTMLInputElement | null
       input?.focus()
       input?.select()
-    }, 100)
-  }, [])
-
-  const openSettingsTile = useCallback((tile: string) => {
-    try {
-      sessionStorage.setItem('settingsActiveTile', tile)
-    } catch {
-      /* ignore */
-    }
-    setActivePage('Einstellungen')
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile } }))
     }, 100)
   }, [])
 
