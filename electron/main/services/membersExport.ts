@@ -80,6 +80,13 @@ const INTERVAL_LABELS: Record<string, string> = {
   QUARTERLY: 'Quartal',
   YEARLY: 'Jährlich'
 }
+const BRAND_COLOR_ARGB = 'FF26A69A'
+const DATE_FIELDS = new Set<MemberExportField>(['join_date', 'leave_date', 'mandate_date'])
+
+function toDate(value: unknown) {
+  const date = new Date(String(value || ''))
+  return isNaN(date.getTime()) ? null : date
+}
 
 /**
  * Load all members matching the filter criteria
@@ -134,14 +141,7 @@ function formatFieldValue(member: MemberRow, field: MemberExportField): string {
     case 'join_date':
     case 'leave_date':
     case 'mandate_date':
-      // Format date to German locale
-      try {
-        const d = new Date(value)
-        if (!isNaN(d.getTime())) {
-          return d.toLocaleDateString('de-DE')
-        }
-      } catch {}
-      return value
+      return toDate(value)?.toLocaleDateString('de-DE') || value
     default:
       return String(value)
   }
@@ -156,127 +156,48 @@ function prepareExportPath(format: 'XLSX' | 'PDF'): string {
   return createExportPath(`Mitglieder_${stamp}.${ext}`)
 }
 
-/**
- * Export members to Excel (XLSX) format
- */
-export async function exportMembersXLSX(options: MembersExportOptions): Promise<{ filePath: string; count: number }> {
-  const members = loadMembersForExport(options)
-  const filePath = prepareExportPath('XLSX')
-  const orgName = getSetting<string>('org.name') || 'VereinO'
+function writeXlsxMemberCell(
+  cell: ExcelJS.Cell,
+  member: MemberRow,
+  field: MemberExportField,
+  rowIdx: number
+) {
+  const rawValue = (member as any)[field]
 
-  const workbook = new ExcelJS.Workbook()
-  workbook.creator = 'VereinO'
-  workbook.created = new Date()
-
-  const sheet = workbook.addWorksheet('Mitglieder', {
-    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }]
-  })
-
-  // Title row
-  const titleRow = sheet.getRow(1)
-  titleRow.getCell(1).value = `${orgName} – Mitgliederliste (${members.length} Mitglieder)`
-  titleRow.getCell(1).font = { bold: true, size: 14 }
-  titleRow.height = 24
-
-  // Merge title cells across all columns
-  if (options.fields.length > 1) {
-    sheet.mergeCells(1, 1, 1, options.fields.length)
+  if (field === 'contribution_amount' && typeof rawValue === 'number') {
+    cell.value = rawValue
+    cell.numFmt = '#,##0.00 €'
+  } else if (DATE_FIELDS.has(field) && rawValue) {
+    const date = toDate(rawValue)
+    cell.value = date || rawValue || '—'
+    if (date) cell.numFmt = 'DD.MM.YYYY'
+  } else {
+    cell.value = formatFieldValue(member, field)
   }
 
-  // Header row
-  const headerRow = sheet.getRow(2)
-  options.fields.forEach((field, idx) => {
-    const cell = headerRow.getCell(idx + 1)
-    cell.value = FIELD_META[field].label
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  cell.alignment = { vertical: 'middle' }
+  if (rowIdx % 2 === 1) {
     cell.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FF26A69A' } // Teal color matching the app
-    }
-    cell.alignment = { horizontal: 'left', vertical: 'middle' }
-    cell.border = {
-      bottom: { style: 'thin', color: { argb: 'FF000000' } }
-    }
-  })
-  headerRow.height = 22
-
-  // Set column widths
-  options.fields.forEach((field, idx) => {
-    sheet.getColumn(idx + 1).width = FIELD_META[field].width
-  })
-
-  // Data rows
-  members.forEach((member, rowIdx) => {
-    const row = sheet.getRow(rowIdx + 3)
-    options.fields.forEach((field, colIdx) => {
-      const cell = row.getCell(colIdx + 1)
-      const rawValue = (member as any)[field]
-
-      // Use raw values for Excel, not formatted strings (for numbers/dates)
-      if (field === 'contribution_amount' && typeof rawValue === 'number') {
-        cell.value = rawValue
-        cell.numFmt = '#,##0.00 €'
-      } else if ((field === 'join_date' || field === 'leave_date' || field === 'mandate_date') && rawValue) {
-        try {
-          const d = new Date(rawValue)
-          if (!isNaN(d.getTime())) {
-            cell.value = d
-            cell.numFmt = 'DD.MM.YYYY'
-          } else {
-            cell.value = rawValue || '—'
-          }
-        } catch {
-          cell.value = rawValue || '—'
-        }
-      } else {
-        cell.value = formatFieldValue(member, field)
-      }
-
-      cell.alignment = { vertical: 'middle' }
-
-      // Alternate row background
-      if (rowIdx % 2 === 1) {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFF5F5F5' }
-        }
-      }
-    })
-    row.height = 18
-  })
-
-  // Add filter
-  if (members.length > 0) {
-    sheet.autoFilter = {
-      from: { row: 2, column: 1 },
-      to: { row: members.length + 2, column: options.fields.length }
+      fgColor: { argb: 'FFF5F5F5' }
     }
   }
-
-  // Summary row
-  const summaryRow = sheet.getRow(members.length + 4)
-  summaryRow.getCell(1).value = `Export: ${new Date().toLocaleString('de-DE')}`
-  summaryRow.getCell(1).font = { italic: true, size: 10 }
-
-  await workbook.xlsx.writeFile(filePath)
-
-  return { filePath, count: members.length }
 }
 
-/**
- * Export members to PDF format using Electron's print-to-PDF
- */
-export async function exportMembersPDF(options: MembersExportOptions): Promise<{ filePath: string; count: number }> {
-  const members = loadMembersForExport(options)
-  const filePath = prepareExportPath('PDF')
-  const orgName = getSetting<string>('org.name') || 'VereinO'
+function memberPdfCell(member: MemberRow, field: MemberExportField) {
+  const value = formatFieldValue(member, field)
+  const status = field === 'status' ? String((member as any).status || '').toLowerCase() : ''
+  const className = status ? `status-${status}` : ''
+  return `<td class="${className}">${escapeHtml(value)}</td>`
+}
 
-  // Build HTML content
-  const statusFilterLabel = options.status === 'ALL' ? 'Alle' : STATUS_LABELS[options.status || 'ALL'] || options.status || 'Alle'
-
-  const html = `
+function buildMembersPdfHtml(options: MembersExportOptions, members: MemberRow[], orgName: string) {
+  const statusFilterLabel =
+    options.status === 'ALL'
+      ? 'Alle'
+      : STATUS_LABELS[options.status || 'ALL'] || options.status || 'Alle'
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -350,23 +271,11 @@ export async function exportMembersPDF(options: MembersExportOptions): Promise<{
   <table>
     <thead>
       <tr>
-        ${options.fields.map(f => `<th>${escapeHtml(FIELD_META[f].label)}</th>`).join('')}
+        ${options.fields.map((field) => `<th>${escapeHtml(FIELD_META[field].label)}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
-      ${members.map(member => `
-        <tr>
-          ${options.fields.map(f => {
-            const value = formatFieldValue(member, f)
-            let className = ''
-            if (f === 'status') {
-              const status = (member as any).status?.toUpperCase()
-              className = `status-${status?.toLowerCase() || ''}`
-            }
-            return `<td class="${className}">${escapeHtml(value)}</td>`
-          }).join('')}
-        </tr>
-      `).join('')}
+      ${members.map((member) => `<tr>${options.fields.map((field) => memberPdfCell(member, field)).join('')}</tr>`).join('')}
     </tbody>
   </table>
 
@@ -376,8 +285,9 @@ export async function exportMembersPDF(options: MembersExportOptions): Promise<{
 </body>
 </html>
 `
+}
 
-  // Create a hidden browser window to render and print the PDF
+async function printMembersPdf(html: string, filePath: string, landscape: boolean) {
   const win = new BrowserWindow({
     show: false,
     width: 1200,
@@ -390,12 +300,9 @@ export async function exportMembersPDF(options: MembersExportOptions): Promise<{
 
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-
-    // Wait a bit for rendering
-    await new Promise(resolve => setTimeout(resolve, 500))
-
+    await new Promise((resolve) => setTimeout(resolve, 500))
     const pdfData = await win.webContents.printToPDF({
-      landscape: options.fields.length > 6, // Landscape for many columns
+      landscape,
       printBackground: true,
       pageSize: 'A4',
       margins: {
@@ -405,19 +312,114 @@ export async function exportMembersPDF(options: MembersExportOptions): Promise<{
         right: 0.5
       }
     })
-
     fs.writeFileSync(filePath, pdfData)
-
-    return { filePath, count: members.length }
   } finally {
     win.destroy()
   }
 }
 
 /**
+ * Export members to Excel (XLSX) format
+ */
+export async function exportMembersXLSX(
+  options: MembersExportOptions
+): Promise<{ filePath: string; count: number }> {
+  const members = loadMembersForExport(options)
+  const filePath = prepareExportPath('XLSX')
+  const orgName = getSetting<string>('org.name') || 'VereinO'
+
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'VereinO'
+  workbook.created = new Date()
+
+  const sheet = workbook.addWorksheet('Mitglieder', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }]
+  })
+
+  // Title row
+  const titleRow = sheet.getRow(1)
+  titleRow.getCell(1).value = `${orgName} – Mitgliederliste (${members.length} Mitglieder)`
+  titleRow.getCell(1).font = { bold: true, size: 14 }
+  titleRow.height = 24
+
+  // Merge title cells across all columns
+  if (options.fields.length > 1) {
+    sheet.mergeCells(1, 1, 1, options.fields.length)
+  }
+
+  // Header row
+  const headerRow = sheet.getRow(2)
+  options.fields.forEach((field, idx) => {
+    const cell = headerRow.getCell(idx + 1)
+    cell.value = FIELD_META[field].label
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: BRAND_COLOR_ARGB } // Teal color matching the app
+    }
+    cell.alignment = { horizontal: 'left', vertical: 'middle' }
+    cell.border = {
+      bottom: { style: 'thin', color: { argb: 'FF000000' } }
+    }
+  })
+  headerRow.height = 22
+
+  // Set column widths
+  options.fields.forEach((field, idx) => {
+    sheet.getColumn(idx + 1).width = FIELD_META[field].width
+  })
+
+  // Data rows
+  members.forEach((member, rowIdx) => {
+    const row = sheet.getRow(rowIdx + 3)
+    options.fields.forEach((field, colIdx) => {
+      writeXlsxMemberCell(row.getCell(colIdx + 1), member, field, rowIdx)
+    })
+    row.height = 18
+  })
+
+  // Add filter
+  if (members.length > 0) {
+    sheet.autoFilter = {
+      from: { row: 2, column: 1 },
+      to: { row: members.length + 2, column: options.fields.length }
+    }
+  }
+
+  // Summary row
+  const summaryRow = sheet.getRow(members.length + 4)
+  summaryRow.getCell(1).value = `Export: ${new Date().toLocaleString('de-DE')}`
+  summaryRow.getCell(1).font = { italic: true, size: 10 }
+
+  await workbook.xlsx.writeFile(filePath)
+
+  return { filePath, count: members.length }
+}
+
+/**
+ * Export members to PDF format using Electron's print-to-PDF
+ */
+export async function exportMembersPDF(
+  options: MembersExportOptions
+): Promise<{ filePath: string; count: number }> {
+  const members = loadMembersForExport(options)
+  const filePath = prepareExportPath('PDF')
+  const orgName = getSetting<string>('org.name') || 'VereinO'
+  await printMembersPdf(
+    buildMembersPdfHtml(options, members, orgName),
+    filePath,
+    options.fields.length > 6
+  )
+  return { filePath, count: members.length }
+}
+
+/**
  * Main export function
  */
-export async function exportMembers(options: MembersExportOptions): Promise<{ filePath: string; count: number }> {
+export async function exportMembers(
+  options: MembersExportOptions
+): Promise<{ filePath: string; count: number }> {
   if (options.format === 'PDF') {
     return exportMembersPDF(options)
   } else {

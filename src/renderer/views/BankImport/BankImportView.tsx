@@ -39,7 +39,13 @@ type BankTransaction = {
 type BankImportStatus = {
   lastBookingDate: string | null
   total: number
-  accounts: Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; total: number }>
+  accounts: Array<{
+    id: number
+    name: string
+    color?: string | null
+    lastBookingDate?: string | null
+    total: number
+  }>
 }
 
 type CsvMapping = {
@@ -173,7 +179,8 @@ function getBankImportReminder(status: BankImportStatus | null) {
     return {
       title: 'Bankdaten importieren',
       summary: 'Erster Import offen',
-      detail: 'Es wurden noch keine Bankbelege importiert. Starte mit dem ersten Kontoauszug deines Zahlkontos.'
+      detail:
+        'Es wurden noch keine Bankbelege importiert. Starte mit dem ersten Kontoauszug deines Zahlkontos.'
     }
   }
   const lastDate = parseLocalDate(status.lastBookingDate)
@@ -205,7 +212,12 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-function MappingSelect({ label, value, headers, onChange }: {
+function MappingSelect({
+  label,
+  value,
+  headers,
+  onChange
+}: {
   label: string
   value?: string | null
   headers: string[]
@@ -214,16 +226,26 @@ function MappingSelect({ label, value, headers, onChange }: {
   return (
     <label className="field">
       <span>{label}</span>
-      <select className="input" value={value ?? ''} onChange={(event) => onChange(event.target.value || null)}>
+      <select
+        className="input"
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value || null)}
+      >
         <option value="">Nicht zugeordnet</option>
-        {headers.map((header) => <option key={header} value={header}>{header}</option>)}
+        {headers.map((header) => (
+          <option key={header} value={header}>
+            {header}
+          </option>
+        ))}
       </select>
     </label>
   )
 }
 
 function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
-  return reason === 'REFERENCE' ? 'Bankreferenz / End-to-End-ID' : 'Fingerprint aus Konto, Datum, Betrag und Text'
+  return reason === 'REFERENCE'
+    ? 'Bankreferenz / End-to-End-ID'
+    : 'Fingerprint aus Konto, Datum, Betrag und Text'
 }
 
 function DuplicateRecordCard({
@@ -293,37 +315,57 @@ function DuplicateRecordCard({
   )
 }
 
-function BankMatchRow({ match, busy, onLink }: {
+function BankMatchRow({
+  match,
+  busy,
+  onLink
+}: {
   match: BankTransactionMatch
   busy: boolean
   onLink: (voucherId: number) => void
 }) {
   const scoreValue = Number(match.score || 0)
   const scoreLevel = scoreValue >= 60 ? 'high' : scoreValue >= 30 ? 'medium' : 'low'
-  const scoreLabel = scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
+  const scoreLabel =
+    scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
 
   return (
     <div className="bank-match-row">
       <div>
         <strong>{match.voucherNo}</strong>
-        <span>{formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}</span>
+        <span>
+          {formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}
+        </span>
         {!match.paymentAccountMismatch && match.paymentAccountName ? (
-          <span style={{ color: match.paymentAccountColor || undefined }}>Zahlkonto: {match.paymentAccountName}</span>
+          <span style={{ color: match.paymentAccountColor || undefined }}>
+            Zahlkonto: {match.paymentAccountName}
+          </span>
         ) : null}
         {match.paymentAccountMismatch && (
           <span className="bank-match-warning">
-            {match.paymentAccountWarning || `Zahlkonto abweichend: ${match.paymentAccountName || 'ohne Konto'}`}
+            {match.paymentAccountWarning ||
+              `Zahlkonto abweichend: ${match.paymentAccountName || 'ohne Konto'}`}
           </span>
         )}
       </div>
       <span
         className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}
-        title={scoreValue >= 15 ? `Übereinstimmung: ${Math.round(scoreValue)} %` : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`}
-        aria-label={scoreValue >= 15 ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung` : 'Sehr schwacher Treffer'}
+        title={
+          scoreValue >= 15
+            ? `Übereinstimmung: ${Math.round(scoreValue)} %`
+            : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`
+        }
+        aria-label={
+          scoreValue >= 15
+            ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung`
+            : 'Sehr schwacher Treffer'
+        }
       >
         {scoreLabel}
       </span>
-      <button className="btn" disabled={busy} onClick={() => onLink(match.id)}>Zuordnen</button>
+      <button className="btn" disabled={busy} onClick={() => onLink(match.id)}>
+        Zuordnen
+      </button>
     </div>
   )
 }
@@ -366,23 +408,37 @@ function ManualAssignmentModal({
   }, [includeAllDates, notify, query, transaction.id])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { void loadResults() }, 160)
+    const timer = window.setTimeout(() => {
+      void loadResults()
+    }, 160)
     return () => window.clearTimeout(timer)
   }, [loadResults])
 
   useEffect(() => {
-    setSelectedVoucherId((current) => (current && results.some((row) => row.id === current) ? current : null))
+    setSelectedVoucherId((current) =>
+      current && results.some((row) => row.id === current) ? current : null
+    )
   }, [results])
 
   return createPortal(
-    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="modal-overlay bank-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div className="modal bank-manual-assign-modal">
         <header className="bank-modal-header">
           <div>
             <h2>Manuelle Zuweisung</h2>
-            <p>{transaction.counterparty || 'Ohne Gegenpartei'} · {euro.format(transaction.amount)} · {transaction.direction}</p>
+            <p>
+              {transaction.counterparty || 'Ohne Gegenpartei'} · {euro.format(transaction.amount)} ·{' '}
+              {transaction.direction}
+            </p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
+            ×
+          </button>
         </header>
 
         <section className="bank-review-section">
@@ -394,7 +450,10 @@ function ManualAssignmentModal({
               placeholder="Buchungsnummer oder Text suchen …"
               autoFocus
             />
-            <span className="helper">Hier siehst du alle Buchungen rund um den Zeitraum. Die Entscheidung triffst du manuell.</span>
+            <span className="helper">
+              Hier siehst du alle Buchungen rund um den Zeitraum. Die Entscheidung triffst du
+              manuell.
+            </span>
           </div>
           <div className="bank-manual-assign-table-wrap">
             <table className="bank-manual-assign-table">
@@ -410,45 +469,60 @@ function ManualAssignmentModal({
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={5}><div className="bank-empty-small">Buchungen werden gesucht …</div></td>
+                    <td colSpan={5}>
+                      <div className="bank-empty-small">Buchungen werden gesucht …</div>
+                    </td>
                   </tr>
                 )}
-                {!loading && results.map((match) => (
-                  <tr
-                    key={match.id}
-                    className={selectedVoucherId === match.id ? 'is-selected' : undefined}
-                    onClick={() => setSelectedVoucherId(match.id)}
-                  >
-                    <td>
-                      <input
-                        type="radio"
-                        name={`manual-assign-${transaction.id}`}
-                        checked={selectedVoucherId === match.id}
-                        onChange={() => setSelectedVoucherId(match.id)}
-                        aria-label={`Buchung ${match.voucherNo || match.id} auswählen`}
-                      />
-                    </td>
-                    <td>{formatDate(match.date)}</td>
-                    <td>
-                      <div className="bank-manual-assign-description">
-                        <strong>{match.voucherNo || `#${match.id}`}</strong>
-                        <span>{match.description || 'Ohne Beschreibung'}</span>
-                      </div>
-                    </td>
-                    <td>{euro.format(Number(match.grossAmount ?? transaction.amount ?? 0))}</td>
-                    <td>
-                      <span
-                        className={match.paymentAccountMismatch ? 'bank-match-warning' : 'bank-manual-assign-account'}
-                        style={!match.paymentAccountMismatch ? { color: match.paymentAccountColor || undefined } : undefined}
-                      >
-                        {match.paymentAccountName || '–'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {!loading &&
+                  results.map((match) => (
+                    <tr
+                      key={match.id}
+                      className={selectedVoucherId === match.id ? 'is-selected' : undefined}
+                      onClick={() => setSelectedVoucherId(match.id)}
+                    >
+                      <td>
+                        <input
+                          type="radio"
+                          name={`manual-assign-${transaction.id}`}
+                          checked={selectedVoucherId === match.id}
+                          onChange={() => setSelectedVoucherId(match.id)}
+                          aria-label={`Buchung ${match.voucherNo || match.id} auswählen`}
+                        />
+                      </td>
+                      <td>{formatDate(match.date)}</td>
+                      <td>
+                        <div className="bank-manual-assign-description">
+                          <strong>{match.voucherNo || `#${match.id}`}</strong>
+                          <span>{match.description || 'Ohne Beschreibung'}</span>
+                        </div>
+                      </td>
+                      <td>{euro.format(Number(match.grossAmount ?? transaction.amount ?? 0))}</td>
+                      <td>
+                        <span
+                          className={
+                            match.paymentAccountMismatch
+                              ? 'bank-match-warning'
+                              : 'bank-manual-assign-account'
+                          }
+                          style={
+                            !match.paymentAccountMismatch
+                              ? { color: match.paymentAccountColor || undefined }
+                              : undefined
+                          }
+                        >
+                          {match.paymentAccountName || '–'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 {!loading && results.length === 0 && (
                   <tr>
-                    <td colSpan={5}><div className="bank-empty-small">Keine passende Buchung für die manuelle Zuweisung gefunden.</div></td>
+                    <td colSpan={5}>
+                      <div className="bank-empty-small">
+                        Keine passende Buchung für die manuelle Zuweisung gefunden.
+                      </div>
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -457,8 +531,16 @@ function ManualAssignmentModal({
         </section>
 
         <footer className="bank-modal-footer">
-          <button className="btn primary" disabled={busy || !selectedVoucherId} onClick={() => selectedVoucherId && onLink(selectedVoucherId)}>Ausgewählte Buchung zuweisen</button>
-          <button className="btn" onClick={onClose}>Schließen</button>
+          <button
+            className="btn primary"
+            disabled={busy || !selectedVoucherId}
+            onClick={() => selectedVoucherId && onLink(selectedVoucherId)}
+          >
+            Ausgewählte Buchung zuweisen
+          </button>
+          <button className="btn" onClick={onClose}>
+            Schließen
+          </button>
         </footer>
       </div>
     </div>,
@@ -484,14 +566,24 @@ function BankImportResultModal({
   const selectedCount = selectedRows.length
 
   return createPortal(
-    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="modal-overlay bank-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div className="modal bank-import-result-modal">
         <header className="bank-modal-header">
           <div>
             <h2>Import geprüft</h2>
-            <p>{result.imported} importiert, {result.duplicates} als Duplikat erkannt, {result.errors.length} fehlerhaft.</p>
+            <p>
+              {result.imported} importiert, {result.duplicates} als Duplikat erkannt,{' '}
+              {result.errors.length} fehlerhaft.
+            </p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
+            ×
+          </button>
         </header>
 
         {result.duplicateRows.length > 0 && (
@@ -499,35 +591,62 @@ function BankImportResultModal({
             <div className="bank-section-title">
               <div>
                 <strong>Erkannte Duplikate</strong>
-                <span className="helper">Hier siehst du, warum eine Zeile übersprungen wurde und auf welchen bestehenden Bankbeleg sie gematcht hat.</span>
+                <span className="helper">
+                  Hier siehst du, warum eine Zeile übersprungen wurde und auf welchen bestehenden
+                  Bankbeleg sie gematcht hat.
+                </span>
               </div>
             </div>
             <div className="bank-duplicate-list">
               {result.duplicateRows.map((row) => {
                 const selected = selectedRows.includes(row.sourceRow)
                 return (
-                  <label key={row.sourceRow} className={`bank-duplicate-row ${selected ? 'active' : ''}`}>
-                    <input type="checkbox" checked={selected} onChange={() => onToggleRow(row.sourceRow)} />
+                  <label
+                    key={row.sourceRow}
+                    className={`bank-duplicate-row ${selected ? 'active' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => onToggleRow(row.sourceRow)}
+                    />
                     <div className="bank-duplicate-row__content">
                       <div className="bank-duplicate-row__head">
-                        <strong>Zeile {row.sourceRow}: {formatDate(row.bookingDate)} · {row.direction} · {euro.format(row.amount)}</strong>
-                        <span className="bank-duplicate-pill">{duplicateReasonLabel(row.duplicateBy)}</span>
+                        <strong>
+                          Zeile {row.sourceRow}: {formatDate(row.bookingDate)} · {row.direction} ·{' '}
+                          {euro.format(row.amount)}
+                        </strong>
+                        <span className="bank-duplicate-pill">
+                          {duplicateReasonLabel(row.duplicateBy)}
+                        </span>
                       </div>
                       <div className="bank-duplicate-compact">
                         <div className="bank-duplicate-compact__card">
                           <span>Importzeile</span>
                           <strong>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</strong>
-                          <small>{formatDate(row.bookingDate)} · {row.direction} · {euro.format(row.amount)}</small>
+                          <small>
+                            {formatDate(row.bookingDate)} · {row.direction} ·{' '}
+                            {euro.format(row.amount)}
+                          </small>
                         </div>
                         <div className="bank-duplicate-compact__equals">=</div>
                         <div className="bank-duplicate-compact__card">
                           <span>Bestehender Bankbeleg</span>
-                          <strong>{row.existing.counterparty || row.existing.purpose || `#${row.existing.id}`}</strong>
-                          <small>#{row.existing.id} · {formatDate(row.existing.bookingDate)} · {row.existing.direction} · {euro.format(row.existing.amount)}</small>
+                          <strong>
+                            {row.existing.counterparty ||
+                              row.existing.purpose ||
+                              `#${row.existing.id}`}
+                          </strong>
+                          <small>
+                            #{row.existing.id} · {formatDate(row.existing.bookingDate)} ·{' '}
+                            {row.existing.direction} · {euro.format(row.existing.amount)}
+                          </small>
                         </div>
                       </div>
                       <details className="bank-duplicate-details">
-                        <summary className="bank-duplicate-details__summary">Mehr Vergleich anzeigen</summary>
+                        <summary className="bank-duplicate-details__summary">
+                          Mehr Vergleich anzeigen
+                        </summary>
                         <div className="bank-duplicate-grid">
                           <DuplicateRecordCard
                             title="Importzeile"
@@ -579,18 +698,28 @@ function BankImportResultModal({
               <strong>Fehlerhafte Zeilen</strong>
             </div>
             <div className="bank-error-list">
-              {result.errors.map((entry) => <div key={`${entry.row}-${entry.message}`}>Zeile {entry.row}: {entry.message}</div>)}
+              {result.errors.map((entry) => (
+                <div key={`${entry.row}-${entry.message}`}>
+                  Zeile {entry.row}: {entry.message}
+                </div>
+              ))}
             </div>
           </section>
         )}
 
         <footer className="bank-modal-footer">
           {result.duplicateRows.length > 0 && (
-            <button className="btn" disabled={busy || selectedCount === 0} onClick={onImportSelected}>
+            <button
+              className="btn"
+              disabled={busy || selectedCount === 0}
+              onClick={onImportSelected}
+            >
               {busy ? 'Importiere …' : `${selectedCount} Duplikat(e) trotzdem importieren`}
             </button>
           )}
-          <button className="btn primary" onClick={onClose}>Fertig</button>
+          <button className="btn primary" onClick={onClose}>
+            Fertig
+          </button>
         </footer>
       </div>
     </div>,
@@ -598,7 +727,12 @@ function BankImportResultModal({
   )
 }
 
-function BankImportModal({ accounts, onClose, onImported, notify }: {
+function BankImportModal({
+  accounts,
+  onClose,
+  onImported,
+  notify
+}: {
   accounts: PaymentAccount[]
   onClose: () => void
   onImported: () => void
@@ -620,11 +754,11 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
     setBusy(true)
     setError('')
     try {
-      const result = await window.api.bankImports.preview({
+      const result = (await window.api.bankImports.preview({
         fileBase64: nextBase64,
         fileName: nextFile.name,
         mapping: nextMapping
-      }) as ImportPreview
+      })) as ImportPreview
       setPreview(result)
       if (!nextMapping) setMapping(result.suggestedMapping)
       if (result.detectedPaymentAccountId) {
@@ -661,14 +795,18 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
     setBusy(true)
     setError('')
     try {
-      const result = await window.api.bankImports.commit({
+      const result = (await window.api.bankImports.commit({
         fileBase64,
         fileName: file.name,
         paymentAccountId,
         mapping: preview?.format === 'CSV' ? mapping : undefined
-      }) as ImportCommitResult
-      notify('success', `${result.imported} Bankbeleg(e) importiert${result.duplicates ? `, ${result.duplicates} Duplikat(e) übersprungen` : ''}.`)
-      if (result.errors.length) notify('info', `${result.errors.length} fehlerhafte Zeile(n) wurden nicht übernommen.`)
+      })) as ImportCommitResult
+      notify(
+        'success',
+        `${result.imported} Bankbeleg(e) importiert${result.duplicates ? `, ${result.duplicates} Duplikat(e) übersprungen` : ''}.`
+      )
+      if (result.errors.length)
+        notify('info', `${result.errors.length} fehlerhafte Zeile(n) wurden nicht übernommen.`)
       setCommitResult(result)
       setSelectedDuplicateRows([])
       onImported()
@@ -684,20 +822,26 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
     setBusy(true)
     setError('')
     try {
-      const result = await window.api.bankImports.commit({
+      const result = (await window.api.bankImports.commit({
         fileBase64,
         fileName: file.name,
         paymentAccountId,
         mapping: preview?.format === 'CSV' ? mapping : undefined,
         forceImportSourceRows: selectedDuplicateRows
-      }) as ImportCommitResult
+      })) as ImportCommitResult
       notify('success', `${result.imported} Duplikat(e) bewusst importiert.`)
-      setCommitResult((current) => current ? {
-        ...current,
-        imported: current.imported + result.imported,
-        duplicates: Math.max(0, current.duplicates - result.imported),
-        duplicateRows: current.duplicateRows.filter((row) => !selectedDuplicateRows.includes(row.sourceRow))
-      } : current)
+      setCommitResult((current) =>
+        current
+          ? {
+              ...current,
+              imported: current.imported + result.imported,
+              duplicates: Math.max(0, current.duplicates - result.imported),
+              duplicateRows: current.duplicateRows.filter(
+                (row) => !selectedDuplicateRows.includes(row.sourceRow)
+              )
+            }
+          : current
+      )
       setSelectedDuplicateRows([])
       onImported()
     } catch (reason: any) {
@@ -707,28 +851,46 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
     }
   }
 
-  const setMap = (key: keyof CsvMapping, value: string | null) => setMapping((current) => ({ ...current, [key]: value }))
-  const activeAccounts = accounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH')
+  const setMap = (key: keyof CsvMapping, value: string | null) =>
+    setMapping((current) => ({ ...current, [key]: value }))
+  const activeAccounts = accounts.filter(
+    (account) => account.isActive !== 0 && account.kind !== 'CASH'
+  )
   const paymentAccountsById = new Map(activeAccounts.map((account) => [account.id, account]))
-  const selectedPaymentAccountColor = paymentAccountsById.get(Number(paymentAccountId || 0))?.color || undefined
+  const selectedPaymentAccountColor =
+    paymentAccountsById.get(Number(paymentAccountId || 0))?.color || undefined
 
   return createPortal(
-    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="modal-overlay bank-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div className="modal bank-import-modal">
         <header className="bank-modal-header">
           <div>
             <h2>Bankdaten importieren</h2>
             <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
+            ×
+          </button>
         </header>
 
         <div className="bank-import-drop">
           <strong>{file?.name || 'Kontoauszug auswählen'}</strong>
-          <span className="helper">XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.</span>
+          <span className="helper">
+            XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.
+          </span>
           <label className="btn">
             Datei wählen
-            <input type="file" accept=".xml,.csv,text/csv,application/xml,text/xml" hidden onChange={(event) => void chooseFile(event.target.files?.[0])} />
+            <input
+              type="file"
+              accept=".xml,.csv,text/csv,application/xml,text/xml"
+              hidden
+              onChange={(event) => void chooseFile(event.target.files?.[0])}
+            />
           </label>
         </div>
 
@@ -738,16 +900,31 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
         {preview && (
           <>
             <div className="bank-import-summary">
-              <span><strong>{preview.format}</strong> erkannt</span>
+              <span>
+                <strong>{preview.format}</strong> erkannt
+              </span>
               <span>{preview.summary.total} Zeilen</span>
               <span className="text-success">{preview.summary.valid} gültig</span>
-              <span className={preview.summary.errors ? 'text-danger' : ''}>{preview.summary.errors} fehlerhaft</span>
+              <span className={preview.summary.errors ? 'text-danger' : ''}>
+                {preview.summary.errors} fehlerhaft
+              </span>
             </div>
 
             <label className="field">
               <span>
-                Zahlkonto <span className="req-asterisk" aria-hidden="true">*</span>
-                {paymentAccountError && <span className="booking-field-error has-tooltip" data-tooltip="Bitte ein Zahlkonto für den Import auswählen." tabIndex={0}>!</span>}
+                Zahlkonto{' '}
+                <span className="req-asterisk" aria-hidden="true">
+                  *
+                </span>
+                {paymentAccountError && (
+                  <span
+                    className="booking-field-error has-tooltip"
+                    data-tooltip="Bitte ein Zahlkonto für den Import auswählen."
+                    tabIndex={0}
+                  >
+                    !
+                  </span>
+                )}
               </span>
               <select
                 ref={paymentAccountRef}
@@ -763,34 +940,101 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
               >
                 <option value="">Zahlkonto wählen</option>
                 {activeAccounts.map((account) => (
-                  <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}{account.iban ? ` · ${account.iban}` : ''}</option>
+                  <option
+                    key={account.id}
+                    value={account.id}
+                    style={{ color: account.color || undefined }}
+                  >
+                    {account.name}
+                    {account.iban ? ` · ${account.iban}` : ''}
+                  </option>
                 ))}
               </select>
-              {paymentAccountError && <span className="helper text-danger">Bitte wähle ein Zahlkonto aus.</span>}
-              {preview.accountIbans.length > 0 && <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>}
+              {paymentAccountError && (
+                <span className="helper text-danger">Bitte wähle ein Zahlkonto aus.</span>
+              )}
+              {preview.accountIbans.length > 0 && (
+                <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>
+              )}
             </label>
 
             {preview.format === 'CSV' && (
               <section className="bank-mapping-card">
                 <div className="bank-section-title">
                   <strong>Spaltenzuordnung</strong>
-                  <button className="btn" disabled={busy} onClick={() => file && void loadPreview(file, fileBase64, mapping)}>Vorschau aktualisieren</button>
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    onClick={() => file && void loadPreview(file, fileBase64, mapping)}
+                  >
+                    Vorschau aktualisieren
+                  </button>
                 </div>
                 <div className="bank-mapping-grid">
-                  <MappingSelect label="Buchungsdatum *" value={mapping.bookingDate} headers={preview.headers} onChange={(value) => setMap('bookingDate', value)} />
-                  <MappingSelect label="Betrag mit Vorzeichen" value={mapping.amount} headers={preview.headers} onChange={(value) => setMap('amount', value)} />
-                  <MappingSelect label="Soll / Belastung" value={mapping.debit} headers={preview.headers} onChange={(value) => setMap('debit', value)} />
-                  <MappingSelect label="Haben / Gutschrift" value={mapping.credit} headers={preview.headers} onChange={(value) => setMap('credit', value)} />
-                  <MappingSelect label="Verwendungszweck" value={mapping.purpose} headers={preview.headers} onChange={(value) => setMap('purpose', value)} />
+                  <MappingSelect
+                    label="Buchungsdatum *"
+                    value={mapping.bookingDate}
+                    headers={preview.headers}
+                    onChange={(value) => setMap('bookingDate', value)}
+                  />
+                  <MappingSelect
+                    label="Betrag mit Vorzeichen"
+                    value={mapping.amount}
+                    headers={preview.headers}
+                    onChange={(value) => setMap('amount', value)}
+                  />
+                  <MappingSelect
+                    label="Soll / Belastung"
+                    value={mapping.debit}
+                    headers={preview.headers}
+                    onChange={(value) => setMap('debit', value)}
+                  />
+                  <MappingSelect
+                    label="Haben / Gutschrift"
+                    value={mapping.credit}
+                    headers={preview.headers}
+                    onChange={(value) => setMap('credit', value)}
+                  />
+                  <MappingSelect
+                    label="Verwendungszweck"
+                    value={mapping.purpose}
+                    headers={preview.headers}
+                    onChange={(value) => setMap('purpose', value)}
+                  />
                 </div>
                 <details className="bank-more-options">
                   <summary className="btn">... Weitere Spalten</summary>
                   <div className="bank-mapping-grid">
-                    <MappingSelect label="Wertstellung" value={mapping.valueDate} headers={preview.headers} onChange={(value) => setMap('valueDate', value)} />
-                    <MappingSelect label="Währung" value={mapping.currency} headers={preview.headers} onChange={(value) => setMap('currency', value)} />
-                    <MappingSelect label="Gegenpartei" value={mapping.counterparty} headers={preview.headers} onChange={(value) => setMap('counterparty', value)} />
-                    <MappingSelect label="IBAN Gegenkonto" value={mapping.counterpartyIban} headers={preview.headers} onChange={(value) => setMap('counterpartyIban', value)} />
-                    <MappingSelect label="Bankreferenz" value={mapping.reference} headers={preview.headers} onChange={(value) => setMap('reference', value)} />
+                    <MappingSelect
+                      label="Wertstellung"
+                      value={mapping.valueDate}
+                      headers={preview.headers}
+                      onChange={(value) => setMap('valueDate', value)}
+                    />
+                    <MappingSelect
+                      label="Währung"
+                      value={mapping.currency}
+                      headers={preview.headers}
+                      onChange={(value) => setMap('currency', value)}
+                    />
+                    <MappingSelect
+                      label="Gegenpartei"
+                      value={mapping.counterparty}
+                      headers={preview.headers}
+                      onChange={(value) => setMap('counterparty', value)}
+                    />
+                    <MappingSelect
+                      label="IBAN Gegenkonto"
+                      value={mapping.counterpartyIban}
+                      headers={preview.headers}
+                      onChange={(value) => setMap('counterpartyIban', value)}
+                    />
+                    <MappingSelect
+                      label="Bankreferenz"
+                      value={mapping.reference}
+                      headers={preview.headers}
+                      onChange={(value) => setMap('reference', value)}
+                    />
                   </div>
                 </details>
               </section>
@@ -798,7 +1042,16 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
 
             <div className="bank-preview-table-wrap">
               <table className="bank-table bank-preview-table">
-                <thead><tr><th>Zeile</th><th>Datum</th><th>Gegenpartei / Zweck</th><th>Typ</th><th className="number">Summe</th><th>Prüfung</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Zeile</th>
+                    <th>Datum</th>
+                    <th>Gegenpartei / Zweck</th>
+                    <th>Typ</th>
+                    <th className="number">Summe</th>
+                    <th>Prüfung</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {preview.rows.slice(0, 30).map((row) => (
                     <tr key={row.sourceRow} className={row.errors.length ? 'bank-row-error' : ''}>
@@ -817,8 +1070,14 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
         )}
 
         <footer className="bank-modal-footer">
-          <button className="btn" onClick={onClose}>Abbrechen</button>
-          <button className="btn primary" disabled={busy || !preview || preview.summary.valid === 0} onClick={() => void commit()}>
+          <button className="btn" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button
+            className="btn primary"
+            disabled={busy || !preview || preview.summary.valid === 0}
+            onClick={() => void commit()}
+          >
             {busy ? 'Importiere …' : `${preview?.summary.valid ?? 0} Beleg(e) importieren`}
           </button>
         </footer>
@@ -827,10 +1086,17 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
         <BankImportResultModal
           result={commitResult}
           selectedRows={selectedDuplicateRows}
-          onToggleRow={(row) => setSelectedDuplicateRows((current) => current.includes(row) ? current.filter((entry) => entry !== row) : [...current, row])}
+          onToggleRow={(row) =>
+            setSelectedDuplicateRows((current) =>
+              current.includes(row) ? current.filter((entry) => entry !== row) : [...current, row]
+            )
+          }
           onImportSelected={() => void importSelectedDuplicates()}
           onClose={() => {
-            if ((commitResult.duplicateRows.length === 0 || selectedDuplicateRows.length === 0) && commitResult.errors.length === 0) {
+            if (
+              (commitResult.duplicateRows.length === 0 || selectedDuplicateRows.length === 0) &&
+              commitResult.errors.length === 0
+            ) {
               onClose()
               return
             }
@@ -844,7 +1110,14 @@ function BankImportModal({ accounts, onClose, onImported, notify }: {
   )
 }
 
-function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onOpenVoucher, notify }: {
+function BankReviewModal({
+  transaction,
+  onClose,
+  onChanged,
+  onCreateBooking,
+  onOpenVoucher,
+  notify
+}: {
   transaction: BankTransaction
   onClose: () => void
   onChanged: () => void
@@ -866,7 +1139,10 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
     if (transaction.status !== 'OPEN') return
     setLoading(true)
     try {
-      const result = await window.api.bankTransactions.matches({ id: transaction.id, includeAllDates })
+      const result = await window.api.bankTransactions.matches({
+        id: transaction.id,
+        includeAllDates
+      })
       setMatches(result.rows as BankTransactionMatch[])
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
@@ -875,7 +1151,9 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
     }
   }, [includeAllDates, notify, transaction.id, transaction.status])
 
-  useEffect(() => { void loadMatches() }, [loadMatches])
+  useEffect(() => {
+    void loadMatches()
+  }, [loadMatches])
 
   useEffect(() => {
     if (!actionMenuOpen) return
@@ -928,8 +1206,19 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
     }
   }
 
+  const openLinkedVoucher = () => {
+    if (!transaction.voucherId) return
+    onOpenVoucher(transaction.voucherId, transaction.voucherNo, transaction.bookingDate)
+    onClose()
+  }
+
   return createPortal(
-    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      className="modal-overlay bank-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <div className="modal bank-review-modal">
         <header className="bank-modal-header">
           <div>
@@ -937,41 +1226,120 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
             <p>{transaction.counterparty || 'Ohne Gegenpartei'}</p>
           </div>
           <div className="bank-header-actions">
-            <span className={`bank-status bank-status--${transaction.status.toLowerCase()}`}>{statusLabel(transaction.status)}</span>
+            <span className={`bank-status bank-status--${transaction.status.toLowerCase()}`}>
+              {statusLabel(transaction.status)}
+            </span>
             <div className="bank-action-menu" ref={actionMenuRef}>
-              <button className="btn bank-action-menu__trigger" onClick={() => setActionMenuOpen((open) => !open)} aria-label="Aktionen" aria-expanded={actionMenuOpen}>...</button>
+              <button
+                className="btn bank-action-menu__trigger"
+                onClick={() => setActionMenuOpen((open) => !open)}
+                aria-label="Aktionen"
+                aria-expanded={actionMenuOpen}
+              >
+                ...
+              </button>
               {actionMenuOpen && (
                 <div className="bank-action-menu__popover">
                   {transaction.status === 'OPEN' && (
                     <>
-                      <button className="btn" onClick={() => { setActionMenuOpen(false); onCreateBooking(transaction); onClose() }}>Buchung anlegen</button>
-                      <button className="btn" onClick={() => { setActionMenuOpen(false); setShowCheckForm(true) }}>Ohne Buchung erledigen</button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setActionMenuOpen(false)
+                          onCreateBooking(transaction)
+                          onClose()
+                        }}
+                      >
+                        Buchung anlegen
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setActionMenuOpen(false)
+                          setShowCheckForm(true)
+                        }}
+                      >
+                        Ohne Buchung erledigen
+                      </button>
                     </>
                   )}
                   {transaction.status === 'LINKED' && transaction.voucherId && (
-                    <button className="btn" onClick={() => { setActionMenuOpen(false); onOpenVoucher(transaction.voucherId!, transaction.voucherNo, transaction.bookingDate) }}>Buchung öffnen</button>
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        setActionMenuOpen(false)
+                        openLinkedVoucher()
+                      }}
+                    >
+                      Buchung öffnen
+                    </button>
                   )}
                   {transaction.status !== 'OPEN' && (
-                    <button className="btn" disabled={busy} onClick={() => { setActionMenuOpen(false); void reopen() }}>Wieder öffnen</button>
+                    <button
+                      className="btn"
+                      disabled={busy}
+                      onClick={() => {
+                        setActionMenuOpen(false)
+                        void reopen()
+                      }}
+                    >
+                      Wieder öffnen
+                    </button>
                   )}
                 </div>
               )}
             </div>
-            <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+            <button className="btn ghost" onClick={onClose} aria-label="Schließen">
+              ×
+            </button>
           </div>
         </header>
 
         <section className="bank-detail-card">
-          <div><span>Datum</span><strong>{formatDate(transaction.bookingDate)}</strong></div>
-          <div><span>Wertstellung</span><strong>{formatDate(transaction.valueDate)}</strong></div>
-          <div><span>Typ</span><strong className={transaction.direction === 'IN' ? 'text-success' : 'text-danger'}>{transaction.direction}</strong></div>
-          <div><span>Summe</span><strong>{euro.format(transaction.amount)}</strong></div>
-          <div><span>Zahlkonto</span><strong style={{ color: transaction.paymentAccountColor || undefined }}>{transaction.paymentAccountName}</strong></div>
-          <div><span>IBAN Gegenkonto</span><strong>{transaction.counterpartyIban || '–'}</strong></div>
-          <div className="bank-detail-wide"><span>Verwendungszweck</span><strong>{transaction.purpose || '–'}</strong></div>
-          <div><span>End-to-End-ID</span><strong>{transaction.endToEndId || '–'}</strong></div>
-          <div><span>Bankreferenz</span><strong>{transaction.bankReference || '–'}</strong></div>
-          <div className="bank-detail-wide"><span>Quelldatei</span><strong title={transaction.sourceFileName}>{transaction.sourceFileName}</strong></div>
+          <div>
+            <span>Datum</span>
+            <strong>{formatDate(transaction.bookingDate)}</strong>
+          </div>
+          <div>
+            <span>Wertstellung</span>
+            <strong>{formatDate(transaction.valueDate)}</strong>
+          </div>
+          <div>
+            <span>Typ</span>
+            <strong className={transaction.direction === 'IN' ? 'text-success' : 'text-danger'}>
+              {transaction.direction}
+            </strong>
+          </div>
+          <div>
+            <span>Summe</span>
+            <strong>{euro.format(transaction.amount)}</strong>
+          </div>
+          <div>
+            <span>Zahlkonto</span>
+            <strong style={{ color: transaction.paymentAccountColor || undefined }}>
+              {transaction.paymentAccountName}
+            </strong>
+          </div>
+          <div>
+            <span>IBAN Gegenkonto</span>
+            <strong>{transaction.counterpartyIban || '–'}</strong>
+          </div>
+          <div className="bank-detail-wide">
+            <span>Verwendungszweck</span>
+            <strong>{transaction.purpose || '–'}</strong>
+          </div>
+          <div>
+            <span>End-to-End-ID</span>
+            <strong>{transaction.endToEndId || '–'}</strong>
+          </div>
+          <div>
+            <span>Bankreferenz</span>
+            <strong>{transaction.bankReference || '–'}</strong>
+          </div>
+          <div className="bank-detail-wide">
+            <span>Quelldatei</span>
+            <strong title={transaction.sourceFileName}>{transaction.sourceFileName}</strong>
+          </div>
         </section>
 
         {transaction.status === 'OPEN' ? (
@@ -982,18 +1350,37 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
                   <strong>Passende Buchungen</strong>
                 </div>
                 <div className="bank-match-toolbar">
-                  <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>Manuell zuweisen</button>
+                  <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>
+                    Manuell zuweisen
+                  </button>
                   <div className="bank-check-toggle">
-                    <label className="bank-check-label"><input type="checkbox" checked={includeAllDates} onChange={(event) => setIncludeAllDates(event.target.checked)} /> Alle Daten</label>
+                    <label className="bank-check-label">
+                      <input
+                        type="checkbox"
+                        checked={includeAllDates}
+                        onChange={(event) => setIncludeAllDates(event.target.checked)}
+                      />{' '}
+                      Alle Daten
+                    </label>
                   </div>
                 </div>
               </div>
               <div className="bank-match-list">
                 {loading && <div className="helper">Treffer werden gesucht …</div>}
-                {!loading && matches.map((match) => (
-                  <BankMatchRow key={match.id} match={match} busy={busy} onLink={(voucherId) => { void link(voucherId) }} />
-                ))}
-                {!loading && matches.length === 0 && <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>}
+                {!loading &&
+                  matches.map((match) => (
+                    <BankMatchRow
+                      key={match.id}
+                      match={match}
+                      busy={busy}
+                      onLink={(voucherId) => {
+                        void link(voucherId)
+                      }}
+                    />
+                  ))}
+                {!loading && matches.length === 0 && (
+                  <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>
+                )}
               </div>
             </section>
 
@@ -1004,9 +1391,18 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
                   <span>Nicht buchungsrelevante oder bereits extern geprüfte Bewegung.</span>
                 </div>
                 <div className="bank-check-panel__controls">
-                  <textarea className="input booking-note-textarea" value={checkedNote} onChange={(event) => setCheckedNote(event.target.value)} placeholder="Optionaler Prüfhinweis …" />
-                  <button className="btn" onClick={() => setShowCheckForm(false)}>Abbrechen</button>
-                  <button className="btn primary" disabled={busy} onClick={() => void check()}>Als geprüft markieren</button>
+                  <textarea
+                    className="input booking-note-textarea"
+                    value={checkedNote}
+                    onChange={(event) => setCheckedNote(event.target.value)}
+                    placeholder="Optionaler Prüfhinweis …"
+                  />
+                  <button className="btn" onClick={() => setShowCheckForm(false)}>
+                    Abbrechen
+                  </button>
+                  <button className="btn primary" disabled={busy} onClick={() => void check()}>
+                    Als geprüft markieren
+                  </button>
                 </div>
               </section>
             )}
@@ -1017,8 +1413,20 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
               <>
                 <div>
                   <span>Zugeordnete Buchung</span>
-                  <strong>{transaction.voucherNo || `#${transaction.voucherId}`}{transaction.voucherReversedById ? ' · storniert' : ''}</strong>
-                  <small>{transaction.linkOrigin === 'CREATED' ? 'Aus diesem Bankbeleg angelegt' : 'Bestehender Buchung zugeordnet'}</small>
+                  <button
+                    type="button"
+                    className="bank-voucher-link"
+                    onClick={openLinkedVoucher}
+                    title="Buchung öffnen"
+                  >
+                    {transaction.voucherNo || `#${transaction.voucherId}`}
+                    {transaction.voucherReversedById ? ' · storniert' : ''}
+                  </button>
+                  <small>
+                    {transaction.linkOrigin === 'CREATED'
+                      ? 'Aus diesem Bankbeleg angelegt'
+                      : 'Bestehender Buchung zugeordnet'}
+                  </small>
                 </div>
               </>
             ) : (
@@ -1036,19 +1444,30 @@ function BankReviewModal({ transaction, onClose, onChanged, onCreateBooking, onO
             includeAllDates={includeAllDates}
             busy={busy}
             onClose={() => setShowManualAssign(false)}
-            onLink={(voucherId) => { void link(voucherId) }}
+            onLink={(voucherId) => {
+              void link(voucherId)
+            }}
             notify={notify}
           />
         )}
 
-        <footer className="bank-modal-footer"><button className="btn" onClick={onClose}>Schließen</button></footer>
+        <footer className="bank-modal-footer">
+          <button className="btn" onClick={onClose}>
+            Schließen
+          </button>
+        </footer>
       </div>
     </div>,
     document.body
   )
 }
 
-export default function BankImportView({ paymentAccounts, notify, onCreateBooking, onOpenVoucher }: Props) {
+export default function BankImportView({
+  paymentAccounts,
+  notify,
+  onCreateBooking,
+  onOpenVoucher
+}: Props) {
   const [rows, setRows] = useState<BankTransaction[]>([])
   const [stats, setStats] = useState({ total: 0, open: 0, linked: 0, checked: 0 })
   const [total, setTotal] = useState(0)
@@ -1057,14 +1476,18 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'ALL' | BankTransaction['status']>('OPEN')
   const [accountId, setAccountId] = useState<number | null>(null)
-  const [sortBy, setSortBy] = useState<'status' | 'date' | 'description' | 'account' | 'type' | 'amount'>('date')
+  const [sortBy, setSortBy] = useState<
+    'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
+  >('date')
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(false)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const limit = 50
 
-  const toggleSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
+  const toggleSort = (
+    column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
+  ) => {
     if (sortBy === column) {
       setSortDir((dir) => (dir === 'DESC' ? 'ASC' : 'DESC'))
     } else {
@@ -1074,10 +1497,16 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
     setPage(1)
   }
 
-  const renderSort = (column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount') => {
+  const renderSort = (
+    column: 'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
+  ) => {
     const active = sortBy === column
     const symbol = active ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'
-    return <span className={`bank-sort-icon ${active ? 'active' : ''}`} aria-hidden="true">{symbol}</span>
+    return (
+      <span className={`bank-sort-icon ${active ? 'active' : ''}`} aria-hidden="true">
+        {symbol}
+      </span>
+    )
   }
 
   const load = useCallback(async () => {
@@ -1116,16 +1545,27 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
     return () => window.clearTimeout(timer)
   }, [load])
 
-  useEffect(() => { void loadImportStatus() }, [loadImportStatus])
+  useEffect(() => {
+    void loadImportStatus()
+  }, [loadImportStatus])
 
   useEffect(() => {
-    const refresh = () => { void load(); void loadImportStatus() }
+    const refresh = () => {
+      void load()
+      void loadImportStatus()
+    }
     window.addEventListener('data-changed', refresh)
     return () => window.removeEventListener('data-changed', refresh)
   }, [load, loadImportStatus])
 
-  const activeAccounts = useMemo(() => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'), [paymentAccounts])
-  const paymentAccountsById = useMemo(() => new Map(activeAccounts.map((account) => [account.id, account])), [activeAccounts])
+  const activeAccounts = useMemo(
+    () => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'),
+    [paymentAccounts]
+  )
+  const paymentAccountsById = useMemo(
+    () => new Map(activeAccounts.map((account) => [account.id, account])),
+    [activeAccounts]
+  )
   const pageCount = Math.max(1, Math.ceil(total / limit))
   const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
 
@@ -1135,15 +1575,55 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
         <h1>Bankimport</h1>
         <div className="bank-page-tools">
           <div className="bank-search-wrap">
-            <input className="input bank-import-search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Suche Bankbelege (Text, Referenz, Gegenpartei)..." aria-label="Bankbelege durchsuchen" />
-            {query && <button className="btn ghost bank-search-clear" type="button" aria-label="Suche leeren" onClick={() => { setQuery(''); setPage(1) }}>×</button>}
+            <input
+              className="input bank-import-search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setPage(1)
+              }}
+              placeholder="Suche Bankbelege (Text, Referenz, Gegenpartei)..."
+              aria-label="Bankbelege durchsuchen"
+            />
+            {query && (
+              <button
+                className="btn ghost bank-search-clear"
+                type="button"
+                aria-label="Suche leeren"
+                onClick={() => {
+                  setQuery('')
+                  setPage(1)
+                }}
+              >
+                ×
+              </button>
+            )}
           </div>
-          <select className="input bank-account-filter" value={accountId ?? ''} style={{ color: paymentAccountsById.get(Number(accountId || 0))?.color || undefined }} onChange={(event) => { setAccountId(event.target.value ? Number(event.target.value) : null); setPage(1) }} aria-label="Nach Zahlkonto filtern">
+          <select
+            className="input bank-account-filter"
+            value={accountId ?? ''}
+            style={{ color: paymentAccountsById.get(Number(accountId || 0))?.color || undefined }}
+            onChange={(event) => {
+              setAccountId(event.target.value ? Number(event.target.value) : null)
+              setPage(1)
+            }}
+            aria-label="Nach Zahlkonto filtern"
+          >
             <option value="">Alle Zahlkonten</option>
-            {activeAccounts.map((account) => <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
+            {activeAccounts.map((account) => (
+              <option
+                key={account.id}
+                value={account.id}
+                style={{ color: account.color || undefined }}
+              >
+                {account.name}
+              </option>
+            ))}
           </select>
           <div className="filter-divider" />
-          <button className="btn primary" onClick={() => setShowImport(true)}>+ Import</button>
+          <button className="btn primary" onClick={() => setShowImport(true)}>
+            + Import
+          </button>
         </div>
       </div>
 
@@ -1153,8 +1633,14 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
           ({stats.total} gesamt; Zugeordnet: {stats.linked}, Geprüft: {stats.checked})
         </span>
         {importReminder && (
-          <span className="bank-import-reminder" tabIndex={0} aria-label={`${importReminder.title}: ${importReminder.detail}`}>
-            <span className="bank-import-reminder__icon" aria-hidden="true">!</span>
+          <span
+            className="bank-import-reminder"
+            tabIndex={0}
+            aria-label={`${importReminder.title}: ${importReminder.detail}`}
+          >
+            <span className="bank-import-reminder__icon" aria-hidden="true">
+              !
+            </span>
             <span className="bank-import-reminder__summary">{importReminder.summary}</span>
             <span className="bank-import-reminder__popover" role="tooltip">
               <strong>{importReminder.title}</strong>
@@ -1165,14 +1651,24 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
       </div>
 
       <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
-        {([
-          ['ALL', 'Gesamt', stats.total],
-          ['OPEN', 'Offen', stats.open],
-          ['LINKED', 'Zugeordnet', stats.linked],
-          ['CHECKED', 'Geprüft', stats.checked]
-        ] as const).map(([key, label, count]) => (
-          <button key={key} className={status === key ? 'active' : ''} onClick={() => { setStatus(key); setPage(1) }}>
-            <span>{label}</span><strong>{count}</strong>
+        {(
+          [
+            ['ALL', 'Gesamt', stats.total],
+            ['OPEN', 'Offen', stats.open],
+            ['LINKED', 'Zugeordnet', stats.linked],
+            ['CHECKED', 'Geprüft', stats.checked]
+          ] as const
+        ).map(([key, label, count]) => (
+          <button
+            key={key}
+            className={status === key ? 'active' : ''}
+            onClick={() => {
+              setStatus(key)
+              setPage(1)
+            }}
+          >
+            <span>{label}</span>
+            <strong>{count}</strong>
           </button>
         ))}
       </div>
@@ -1181,18 +1677,45 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
         <table className="bank-table">
           <thead>
             <tr>
-              <th className="sortable" onClick={() => toggleSort('status')}>Status {renderSort('status')}</th>
-              <th className="sortable" onClick={() => toggleSort('date')}>Datum {renderSort('date')}</th>
-              <th className="sortable" onClick={() => toggleSort('description')}>Beschreibung {renderSort('description')}</th>
-              <th className="sortable" onClick={() => toggleSort('account')}>Zahlkonto {renderSort('account')}</th>
-              <th className="sortable" onClick={() => toggleSort('type')}>Typ {renderSort('type')}</th>
-              <th className="number sortable" onClick={() => toggleSort('amount')}>Summe {renderSort('amount')}</th>
+              <th className="sortable" onClick={() => toggleSort('status')}>
+                Status {renderSort('status')}
+              </th>
+              <th className="sortable" onClick={() => toggleSort('date')}>
+                Datum {renderSort('date')}
+              </th>
+              <th className="sortable" onClick={() => toggleSort('description')}>
+                Beschreibung {renderSort('description')}
+              </th>
+              <th className="sortable" onClick={() => toggleSort('account')}>
+                Zahlkonto {renderSort('account')}
+              </th>
+              <th className="sortable" onClick={() => toggleSort('type')}>
+                Typ {renderSort('type')}
+              </th>
+              <th className="number sortable" onClick={() => toggleSort('amount')}>
+                Summe {renderSort('amount')}
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} tabIndex={0} onClick={() => setSelected(row)} onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && setSelected(row)}>
-                <td><span className={`bank-status bank-status--${row.status.toLowerCase()}`} title={statusLabel(row.status)}><i />{statusLabel(row.status)}</span></td>
+              <tr
+                key={row.id}
+                tabIndex={0}
+                onClick={() => setSelected(row)}
+                onKeyDown={(event) =>
+                  (event.key === 'Enter' || event.key === ' ') && setSelected(row)
+                }
+              >
+                <td>
+                  <span
+                    className={`bank-status bank-status--${row.status.toLowerCase()}`}
+                    title={statusLabel(row.status)}
+                  >
+                    <i />
+                    {statusLabel(row.status)}
+                  </span>
+                </td>
                 <td>{formatDate(row.bookingDate)}</td>
                 <td>
                   <div className="bank-description-cell">
@@ -1200,25 +1723,89 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
                     {row.counterparty && row.purpose && <span>{row.purpose}</span>}
                   </div>
                 </td>
-                <td style={{ color: row.paymentAccountColor || undefined }}><span className="bank-account-dot" style={{ background: row.paymentAccountColor || 'var(--accent)' }} />{row.paymentAccountName}</td>
-                <td><span className={`badge ${row.direction === 'IN' ? 'in' : 'out'}`}>{row.direction}</span></td>
-                <td className={`number bank-amount bank-amount--${row.direction.toLowerCase()}`}>{row.direction === 'OUT' ? '−' : '+'}{euro.format(row.amount)}</td>
+                <td style={{ color: row.paymentAccountColor || undefined }}>
+                  <span
+                    className="bank-account-dot"
+                    style={{ background: row.paymentAccountColor || 'var(--accent)' }}
+                  />
+                  {row.paymentAccountName}
+                </td>
+                <td>
+                  <span className={`badge ${row.direction === 'IN' ? 'in' : 'out'}`}>
+                    {row.direction}
+                  </span>
+                </td>
+                <td className={`number bank-amount bank-amount--${row.direction.toLowerCase()}`}>
+                  {row.direction === 'OUT' ? '−' : '+'}
+                  {euro.format(row.amount)}
+                </td>
               </tr>
             ))}
-            {!loading && rows.length === 0 && <tr><td colSpan={6}><div className="bank-empty">Keine Bankbelege für diesen Filter gefunden.</div></td></tr>}
-            {loading && <tr><td colSpan={6}><div className="bank-empty">Bankbelege werden geladen …</div></td></tr>}
+            {!loading && rows.length === 0 && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="bank-empty">Keine Bankbelege für diesen Filter gefunden.</div>
+                </td>
+              </tr>
+            )}
+            {loading && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="bank-empty">Bankbelege werden geladen …</div>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       <footer className="bank-pagination">
-        <span>{total} Einträge · Seite {page} / {pageCount}</span>
-        <div><button className="btn" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>‹</button><button className="btn" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>›</button></div>
+        <span>
+          {total} Einträge · Seite {page} / {pageCount}
+        </span>
+        <div>
+          <button
+            className="btn"
+            disabled={page <= 1}
+            onClick={() => setPage((value) => value - 1)}
+          >
+            ‹
+          </button>
+          <button
+            className="btn"
+            disabled={page >= pageCount}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            ›
+          </button>
+        </div>
       </footer>
 
-      {showImport && <BankImportModal accounts={paymentAccounts} notify={notify} onClose={() => setShowImport(false)} onImported={() => { setPage(1); void load(); void loadImportStatus() }} />}
-      {selected && <BankReviewModal transaction={selected} notify={notify} onClose={() => setSelected(null)} onChanged={() => { window.dispatchEvent(new Event('data-changed')); void load() }} onCreateBooking={onCreateBooking} onOpenVoucher={onOpenVoucher} />}
+      {showImport && (
+        <BankImportModal
+          accounts={paymentAccounts}
+          notify={notify}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setPage(1)
+            void load()
+            void loadImportStatus()
+          }}
+        />
+      )}
+      {selected && (
+        <BankReviewModal
+          transaction={selected}
+          notify={notify}
+          onClose={() => setSelected(null)}
+          onChanged={() => {
+            window.dispatchEvent(new Event('data-changed'))
+            void load()
+          }}
+          onCreateBooking={onCreateBooking}
+          onOpenVoucher={onOpenVoucher}
+        />
+      )}
     </div>
   )
 }
-

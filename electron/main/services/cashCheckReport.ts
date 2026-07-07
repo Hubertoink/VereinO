@@ -6,11 +6,16 @@ import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 
 function esc(s: any) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
+  return String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => (({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }) as any)[c]
+  )
 }
 
 function euro(n: number) {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0)
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(
+    Number(n) || 0
+  )
 }
 
 function prepareExportPath(prefix: string, dateISO: string): string {
@@ -37,23 +42,31 @@ function getAuditorsFromMembers(): { pr1?: string; pr2?: string } {
   }
 }
 
-export async function generateCashCheckPDF(options: {
-  cashCheckId: number
-}): Promise<{ filePath: string }> {
-  const cashCheck = getCashCheckById(options.cashCheckId)
+function cashCheckAuditors(cashCheck: any) {
+  const auditorsFromDb = {
+    pr1:
+      cashCheck.inspector1Name && cashCheck.inspector1Name.trim()
+        ? cashCheck.inspector1Name.trim()
+        : undefined,
+    pr2:
+      cashCheck.inspector2Name && cashCheck.inspector2Name.trim()
+        ? cashCheck.inspector2Name.trim()
+        : undefined
+  }
+  const auditorsFromMembers = getAuditorsFromMembers()
+  return {
+    pr1: auditorsFromDb.pr1 ?? auditorsFromMembers.pr1,
+    pr2: auditorsFromDb.pr2 ?? auditorsFromMembers.pr2
+  }
+}
+
+function requireCashCheckReportData(cashCheckId: number) {
+  const cashCheck = getCashCheckById(cashCheckId)
   if (!cashCheck) throw new Error('Kassenprüfung nicht gefunden')
 
   const orgName = (getSetting<string>('org.name') || 'VereinO').trim() || 'VereinO'
   const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
-
-  const auditorsFromDb = {
-    pr1: cashCheck.inspector1Name && cashCheck.inspector1Name.trim() ? cashCheck.inspector1Name.trim() : undefined,
-    pr2: cashCheck.inspector2Name && cashCheck.inspector2Name.trim() ? cashCheck.inspector2Name.trim() : undefined
-  }
-
-  const auditorsFromMembers = getAuditorsFromMembers()
-  const pr1 = auditorsFromDb.pr1 ?? auditorsFromMembers.pr1
-  const pr2 = auditorsFromDb.pr2 ?? auditorsFromMembers.pr2
+  const { pr1, pr2 } = cashCheckAuditors(cashCheck)
 
   if (!pr1 && !pr2) {
     const err: any = new Error('KASSENPRUEFER_REQUIRED')
@@ -61,9 +74,12 @@ export async function generateCashCheckPDF(options: {
     throw err
   }
 
-  const filePath = prepareExportPath('Kassenpruefung', cashCheck.date)
+  return { cashCheck, orgName, orgLogoDataUrl, pr1, pr2 }
+}
 
-  const html = `<!DOCTYPE html>
+function buildCashCheckReportHtml(data: ReturnType<typeof requireCashCheckReportData>) {
+  const { cashCheck, orgName, orgLogoDataUrl, pr1, pr2 } = data
+  return `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
@@ -105,7 +121,7 @@ export async function generateCashCheckPDF(options: {
   <div class="box">
     <div class="row"><div class="label">Soll-Bestand (BAR)</div><div class="val">${esc(euro(cashCheck.soll))}</div></div>
     <div class="row"><div class="label">Ist-Bestand (gezählt)</div><div class="val">${esc(euro(cashCheck.ist))}</div></div>
-    <div class="row"><div class="label">Differenz (Ist − Soll)</div><div class="val ${cashCheck.diff === 0 ? 'ok' : (cashCheck.diff > 0 ? 'ok' : 'bad')}">${esc(euro(cashCheck.diff))}</div></div>
+    <div class="row"><div class="label">Differenz (Ist − Soll)</div><div class="val ${cashCheck.diff === 0 ? 'ok' : cashCheck.diff > 0 ? 'ok' : 'bad'}">${esc(euro(cashCheck.diff))}</div></div>
   </div>
 
   <div class="box">
@@ -129,7 +145,9 @@ export async function generateCashCheckPDF(options: {
   </div>
 </body>
 </html>`
+}
 
+async function printHtmlToPdf(html: string, filePath: string) {
   const win = new BrowserWindow({
     show: false,
     width: 900,
@@ -152,6 +170,14 @@ export async function generateCashCheckPDF(options: {
       // ignore
     }
   }
+}
+
+export async function generateCashCheckPDF(options: {
+  cashCheckId: number
+}): Promise<{ filePath: string }> {
+  const data = requireCashCheckReportData(options.cashCheckId)
+  const filePath = prepareExportPath('Kassenpruefung', data.cashCheck.date)
+  await printHtmlToPdf(buildCashCheckReportHtml(data), filePath)
 
   return { filePath }
 }

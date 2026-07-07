@@ -3,10 +3,18 @@ import './AIView.css'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
 import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
-import { AgentInvoiceActionCard, type AiInvoiceActionChange, type AiInvoiceActionState } from './AgentInvoiceActionCard'
+import {
+  AgentInvoiceActionCard,
+  type AiInvoiceActionChange,
+  type AiInvoiceActionState
+} from './AgentInvoiceActionCard'
 import { AgentVoucherReverseCard, type AiVoucherReverseState } from './AgentVoucherReverseCard'
 import { AgentVoucherRebookCard, type AiVoucherRebookState } from './AgentVoucherRebookCard'
-import { AgentVoucherUpdateCard, type AiVoucherUpdateChange, type AiVoucherUpdateState } from './AgentVoucherUpdateCard'
+import {
+  AgentVoucherUpdateCard,
+  type AiVoucherUpdateChange,
+  type AiVoucherUpdateState
+} from './AgentVoucherUpdateCard'
 import { useAiAgentWorkflow } from './useAiAgentWorkflow'
 import type {
   TAiActionPlan,
@@ -36,13 +44,26 @@ import type {
   TReportsExportInput
 } from '../../../../electron/main/ipc/schemas'
 
-const VEREINI_DEFAULT_SRC = new URL('../../../../assets/VereinI/VereinI-Default.png', import.meta.url).href
-const VEREINI_BLINK_SRC = new URL('../../../../assets/VereinI/Vereini_Blink.png', import.meta.url).href
-const VEREINI_SMIRK_SRC = new URL('../../../../assets/VereinI/Vereini_Smirk.png', import.meta.url).href
-const VEREINI_SUCCESS_SRC = new URL('../../../../assets/VereinI/Vereini_Sucess.png', import.meta.url).href
-const VEREINI_THINKING_SRC = new URL('../../../../assets/VereinI/Vereini_Thinking.png', import.meta.url).href
-const VEREINI_TALK1_SRC = new URL('../../../../assets/VereinI/VereinI-Talk1.png', import.meta.url).href
-const VEREINI_TALK2_SRC = new URL('../../../../assets/VereinI/Vereini_Talk2.png', import.meta.url).href
+const VEREINI_DEFAULT_SRC = new URL(
+  '../../../../assets/VereinI/VereinI-Default.png',
+  import.meta.url
+).href
+const VEREINI_BLINK_SRC = new URL('../../../../assets/VereinI/Vereini_Blink.png', import.meta.url)
+  .href
+const VEREINI_SMIRK_SRC = new URL('../../../../assets/VereinI/Vereini_Smirk.png', import.meta.url)
+  .href
+const VEREINI_SUCCESS_SRC = new URL(
+  '../../../../assets/VereinI/Vereini_Sucess.png',
+  import.meta.url
+).href
+const VEREINI_THINKING_SRC = new URL(
+  '../../../../assets/VereinI/Vereini_Thinking.png',
+  import.meta.url
+).href
+const VEREINI_TALK1_SRC = new URL('../../../../assets/VereinI/VereinI-Talk1.png', import.meta.url)
+  .href
+const VEREINI_TALK2_SRC = new URL('../../../../assets/VereinI/Vereini_Talk2.png', import.meta.url)
+  .href
 const AI_AVATAR_CROSSFADE_MS = 220
 
 type AiAvatarFrame = 'default' | 'blink' | 'smirk' | 'success' | 'thinking' | 'talk1' | 'talk2'
@@ -305,7 +326,11 @@ const AI_MESSAGE_STREAM_TICK_MS = 18
 const AI_MESSAGE_STREAM_TARGET_TICKS = 180
 
 const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
-const usd = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 })
+const usd = new Intl.NumberFormat('de-DE', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 4
+})
 
 const DEFAULT_AI_SETTINGS: TAiSettingsGetOutput = {
   hasApiKey: false,
@@ -337,7 +362,11 @@ const AI_PROVIDER_CONFIG = {
     modelOptions: [
       { value: 'MiniMax-M3', label: 'MiniMax-M3', hint: 'Aktuelles Agent- und Reasoning-Modell' },
       { value: 'MiniMax-M1', label: 'MiniMax-M1', hint: 'Starkes Reasoning für längere Aufgaben' },
-      { value: 'MiniMax-Text-01', label: 'MiniMax-Text-01', hint: 'Klassisches Textmodell für Standardaufgaben' }
+      {
+        value: 'MiniMax-Text-01',
+        label: 'MiniMax-Text-01',
+        hint: 'Klassisches Textmodell für Standardaufgaben'
+      }
     ]
   }
 } as const
@@ -353,12 +382,14 @@ function getAiProviderConfig(provider: TAiSettingsGetOutput['provider']) {
 
 function normalizeAiSettings(settings: TAiSettingsGetOutput): TAiSettingsGetOutput {
   const providerConfig = getAiProviderConfig(settings.provider)
-  const allowedModels = new Set(providerConfig.modelOptions.map((option) => option.value))
+  const allowedModels = new Set<string>(providerConfig.modelOptions.map((option) => option.value))
   return {
     ...settings,
     apiBaseUrl: providerConfig.apiBaseUrl,
     model: allowedModels.has(settings.model) ? settings.model : providerConfig.defaultModel,
-    textModel: allowedModels.has(settings.textModel) ? settings.textModel : providerConfig.defaultTextModel
+    textModel: allowedModels.has(settings.textModel)
+      ? settings.textModel
+      : providerConfig.defaultTextModel
   }
 }
 
@@ -374,23 +405,132 @@ const PROMPT_EXAMPLES = [
   'Erstelle eine freundliche Mitgliederinfo zum nächsten Arbeitseinsatz.'
 ]
 
-const TAG_ACTION_COLORS = ['#2962FF', '#00B8D4', '#26A69A', '#00C853', '#FFD600', '#FF9100', '#FF7043', '#F50057', '#9C27B0', '#7C4DFF']
+const TAG_ACTION_COLORS = [
+  '#2962FF',
+  '#00B8D4',
+  '#26A69A',
+  '#00C853',
+  '#FFD600',
+  '#FF9100',
+  '#FF7043',
+  '#F50057',
+  '#9C27B0',
+  '#7C4DFF'
+]
 
 const STATIC_AI_MENTIONS: AiMentionOption[] = [
-  { id: 'area-bankimport', label: 'Bankimport', insert: 'Bankimport', scope: 'Bereich', description: 'Offene Bankbelege prüfen, verknüpfen oder als Buchung vorbereiten', plannerHint: 'entity bankImport; nutze Bankimport-Tools und offene Banktransaktionen.' },
-  { id: 'area-buchungen', label: 'Buchungen', insert: 'Buchungen', scope: 'Bereich', description: 'Journal, Belege, Tags und Buchungsvorschläge', plannerHint: 'entity vouchers; nutze Buchungs-/Journal-Tools.' },
-  { id: 'area-rechnungen', label: 'Rechnungen', insert: 'Rechnungen', scope: 'Bereich', description: 'Belege oder Rechnungen auslesen und Buchungsvorschläge erstellen', plannerHint: 'entity vouchers; bei Anhängen Beleganalyse verwenden.' },
-  { id: 'area-mitglieder', label: 'Mitglieder', insert: 'Mitglieder', scope: 'Bereich', description: 'Mitglieder lesen, anlegen, bearbeiten und Beiträge prüfen', plannerHint: 'entity members/payments; nutze Mitglieder- und Beitragsdaten.' },
-  { id: 'area-beitraege', label: 'Beiträge', insert: 'Beiträge', scope: 'Bereich', description: 'Offene Mitgliedsbeiträge, Zahlungen und Verknüpfungen', plannerHint: 'entity payments; nutze Beitragsstatus und Zahlungsvorschläge.' },
-  { id: 'area-reports', label: 'Reports', insert: 'Reports', scope: 'Bereich', description: 'Controlling, KPIs und PDF/CSV/XLSX-Exporte', plannerHint: 'entity reports; nutze Reporting- und Export-Tools.' },
-  { id: 'area-tags', label: 'Tags', insert: 'Tags', scope: 'Bereich', description: 'Tags anzeigen, anlegen, ändern oder Buchungen taggen', plannerHint: 'entity tags oder vouchers.update tags; nutze Tag-Kontext.' },
-  { id: 'area-budgets', label: 'Budgets', insert: 'Budgets', scope: 'Bereich', description: 'Budgets, Kategorien und Plan/Ist-Auswertungen', plannerHint: 'entity budgets/reports; nutze Budget- und Kategorie-Kontext.' },
-  { id: 'area-zweckbindungen', label: 'Zweckbindungen', insert: 'Zweckbindungen', scope: 'Bereich', description: 'Zweckbindungen und Mittelverwendung', plannerHint: 'entity earmarks/reports; nutze Zweckbindungs-Kontext.' },
-  { id: 'area-zahlungskonten', label: 'Zahlungskonten', insert: 'Zahlungskonten', scope: 'Bereich', description: 'Bank, Kasse und Kontosalden', plannerHint: 'nutze Zahlungskonten, Kontosalden und paymentAccountId.' },
-  { id: 'sphere-ideell', label: 'IDEELL', insert: 'IDEELL', scope: 'Sphäre', description: 'Ideeller Bereich', plannerHint: 'filter/set sphere IDEELL.' },
-  { id: 'sphere-zweck', label: 'ZWECK', insert: 'ZWECK', scope: 'Sphäre', description: 'Zweckbetrieb', plannerHint: 'filter/set sphere ZWECK.' },
-  { id: 'sphere-vermoegen', label: 'VERMÖGEN', insert: 'VERMÖGEN', scope: 'Sphäre', description: 'Vermögensverwaltung', plannerHint: 'filter/set sphere VERMOEGEN.' },
-  { id: 'sphere-wgb', label: 'WGB', insert: 'WGB', scope: 'Sphäre', description: 'Wirtschaftlicher Geschäftsbetrieb', plannerHint: 'filter/set sphere WGB.' }
+  {
+    id: 'area-bankimport',
+    label: 'Bankimport',
+    insert: 'Bankimport',
+    scope: 'Bereich',
+    description: 'Offene Bankbelege prüfen, verknüpfen oder als Buchung vorbereiten',
+    plannerHint: 'entity bankImport; nutze Bankimport-Tools und offene Banktransaktionen.'
+  },
+  {
+    id: 'area-buchungen',
+    label: 'Buchungen',
+    insert: 'Buchungen',
+    scope: 'Bereich',
+    description: 'Journal, Belege, Tags und Buchungsvorschläge',
+    plannerHint: 'entity vouchers; nutze Buchungs-/Journal-Tools.'
+  },
+  {
+    id: 'area-rechnungen',
+    label: 'Rechnungen',
+    insert: 'Rechnungen',
+    scope: 'Bereich',
+    description: 'Belege oder Rechnungen auslesen und Buchungsvorschläge erstellen',
+    plannerHint: 'entity vouchers; bei Anhängen Beleganalyse verwenden.'
+  },
+  {
+    id: 'area-mitglieder',
+    label: 'Mitglieder',
+    insert: 'Mitglieder',
+    scope: 'Bereich',
+    description: 'Mitglieder lesen, anlegen, bearbeiten und Beiträge prüfen',
+    plannerHint: 'entity members/payments; nutze Mitglieder- und Beitragsdaten.'
+  },
+  {
+    id: 'area-beitraege',
+    label: 'Beiträge',
+    insert: 'Beiträge',
+    scope: 'Bereich',
+    description: 'Offene Mitgliedsbeiträge, Zahlungen und Verknüpfungen',
+    plannerHint: 'entity payments; nutze Beitragsstatus und Zahlungsvorschläge.'
+  },
+  {
+    id: 'area-reports',
+    label: 'Reports',
+    insert: 'Reports',
+    scope: 'Bereich',
+    description: 'Controlling, KPIs und PDF/CSV/XLSX-Exporte',
+    plannerHint: 'entity reports; nutze Reporting- und Export-Tools.'
+  },
+  {
+    id: 'area-tags',
+    label: 'Tags',
+    insert: 'Tags',
+    scope: 'Bereich',
+    description: 'Tags anzeigen, anlegen, ändern oder Buchungen taggen',
+    plannerHint: 'entity tags oder vouchers.update tags; nutze Tag-Kontext.'
+  },
+  {
+    id: 'area-budgets',
+    label: 'Budgets',
+    insert: 'Budgets',
+    scope: 'Bereich',
+    description: 'Budgets, Kategorien und Plan/Ist-Auswertungen',
+    plannerHint: 'entity budgets/reports; nutze Budget- und Kategorie-Kontext.'
+  },
+  {
+    id: 'area-zweckbindungen',
+    label: 'Zweckbindungen',
+    insert: 'Zweckbindungen',
+    scope: 'Bereich',
+    description: 'Zweckbindungen und Mittelverwendung',
+    plannerHint: 'entity earmarks/reports; nutze Zweckbindungs-Kontext.'
+  },
+  {
+    id: 'area-zahlungskonten',
+    label: 'Zahlungskonten',
+    insert: 'Zahlungskonten',
+    scope: 'Bereich',
+    description: 'Bank, Kasse und Kontosalden',
+    plannerHint: 'nutze Zahlungskonten, Kontosalden und paymentAccountId.'
+  },
+  {
+    id: 'sphere-ideell',
+    label: 'IDEELL',
+    insert: 'IDEELL',
+    scope: 'Sphäre',
+    description: 'Ideeller Bereich',
+    plannerHint: 'filter/set sphere IDEELL.'
+  },
+  {
+    id: 'sphere-zweck',
+    label: 'ZWECK',
+    insert: 'ZWECK',
+    scope: 'Sphäre',
+    description: 'Zweckbetrieb',
+    plannerHint: 'filter/set sphere ZWECK.'
+  },
+  {
+    id: 'sphere-vermoegen',
+    label: 'VERMÖGEN',
+    insert: 'VERMÖGEN',
+    scope: 'Sphäre',
+    description: 'Vermögensverwaltung',
+    plannerHint: 'filter/set sphere VERMOEGEN.'
+  },
+  {
+    id: 'sphere-wgb',
+    label: 'WGB',
+    insert: 'WGB',
+    scope: 'Sphäre',
+    description: 'Wirtschaftlicher Geschäftsbetrieb',
+    plannerHint: 'filter/set sphere WGB.'
+  }
 ]
 
 function mentionInsertToken(option: AiMentionOption) {
@@ -406,20 +546,26 @@ function activeMentionTrigger(text: string, cursor: number) {
 }
 
 function extractMentionTokens(text: string) {
-  return Array.from(String(text || '').matchAll(/@([^\s,.;!?]+)/g)).map((match) => match[1]).filter(Boolean)
+  return Array.from(String(text || '').matchAll(/@([^\s,.;!?]+)/g))
+    .map((match) => match[1])
+    .filter(Boolean)
 }
 
 function buildMentionPlannerHint(prompt: string, options: AiMentionOption[]) {
   const tokens = extractMentionTokens(prompt)
   if (!tokens.length) return ''
-  const optionByInsert = new Map(options.map((option) => [normalizeLookup(option.insert.replace(/\s+/g, '-')), option]))
+  const optionByInsert = new Map(
+    options.map((option) => [normalizeLookup(option.insert.replace(/\s+/g, '-')), option])
+  )
   const matched = tokens
     .map((token) => optionByInsert.get(normalizeLookup(token)))
     .filter(Boolean) as AiMentionOption[]
   if (!matched.length) return ''
   return [
     'Explizite @-Kontexthinweise des Nutzers:',
-    ...matched.map((option) => `- @${option.insert}: ${option.scope} ${option.label}. ${option.plannerHint}`)
+    ...matched.map(
+      (option) => `- @${option.insert}: ${option.scope} ${option.label}. ${option.plannerHint}`
+    )
   ].join('\n')
 }
 
@@ -473,7 +619,9 @@ function typeLabel(type: string) {
 }
 
 function warningClassName(warning: string) {
-  const duplicate = /(doppelt|duplikat|bereits.*buchung|bereits.*vorhanden|double|duplicate)/i.test(String(warning || ''))
+  const duplicate = /(doppelt|duplikat|bereits.*buchung|bereits.*vorhanden|double|duplicate)/i.test(
+    String(warning || '')
+  )
   return duplicate ? 'ai-warning ai-warning--duplicate' : 'ai-warning'
 }
 
@@ -490,8 +638,13 @@ function readAiChatSnapshot(): AiChatSnapshot {
 function writeAiChatSnapshot(snapshot: AiChatSnapshot) {
   if (typeof window === 'undefined') return
   try {
-    const persistedMessages = (snapshot.messages || []).map(({ displayBody, isStreaming, ...message }) => message)
-    window.localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify({ ...snapshot, messages: persistedMessages }))
+    const persistedMessages = (snapshot.messages || []).map(
+      ({ displayBody, isStreaming, ...message }) => message
+    )
+    window.localStorage.setItem(
+      AI_CHAT_STORAGE_KEY,
+      JSON.stringify({ ...snapshot, messages: persistedMessages })
+    )
   } catch {
     // The chat should keep working even if local storage is unavailable.
   }
@@ -544,11 +697,20 @@ function isoDate(value: Date) {
 }
 
 function stripMarkdownInline(value: string) {
-  return String(value || '').replace(/\*\*/g, '').trim()
+  return String(value || '')
+    .replace(/\*\*/g, '')
+    .trim()
 }
 
-function voucherMentionFromContext(id: number | null, voucherNo: string | null, text: string, start: number): AiVoucherMention {
-  const context = cleanVoucherMentionText(text.slice(Math.max(0, start - 80), Math.min(text.length, start + 140)))
+function voucherMentionFromContext(
+  id: number | null,
+  voucherNo: string | null,
+  text: string,
+  start: number
+): AiVoucherMention {
+  const context = cleanVoucherMentionText(
+    text.slice(Math.max(0, start - 80), Math.min(text.length, start + 140))
+  )
   const date = context.match(/\b20\d{2}-\d{2}-\d{2}\b/)?.[0]
   const amount = context.match(/[+-]?\d{1,3}(?:\.\d{3})*,\d{2}\s*€/)?.[0]
   const type = context.match(/\b(IN|OUT)\b/)?.[1] as AiVoucherMention['type'] | undefined
@@ -574,12 +736,26 @@ function voucherMentionFromContext(id: number | null, voucherNo: string | null, 
 function shouldSkipInlineVoucherReference(text: string, start: number, label?: string) {
   const before = normalizeLookup(text.slice(Math.max(0, start - 32), start))
   const after = normalizeLookup(text.slice(start, start + 48))
-  if (/(budget|bankimport|banktransaktion|bankbeleg|zahlungskonto|konto)$/.test(before)) return true
-  if (/(budget id|bankimport id|banktransaktion id|bankbeleg id|paymentaccount id)/.test(`${before} ${after}`)) return true
-  return normalizeLookup(label) === 'id' && /(budget|bankimport|banktransaktion|bankbeleg)/.test(before)
+  const context = `${before} ${after}`
+  const nonVoucherPrefix =
+    /(budget|bank\s*import|bankimport|bank\s*transaktion|banktransaktion|bank\s*beleg|bankbeleg|transaktion|transaction|zahlungskonto|konto)$/
+  const nonVoucherId =
+    /(budget id|bank\s*import id|bankimport id|bank\s*transaktion id|banktransaktion id|bank\s*beleg id|bankbeleg id|transaktion id|transaction id|paymentaccount id)/
+  if (nonVoucherPrefix.test(before)) return true
+  if (nonVoucherId.test(context)) return true
+  return (
+    normalizeLookup(label) === 'id' &&
+    /(budget|bank\s*import|bankimport|bank\s*transaktion|banktransaktion|bank\s*beleg|bankbeleg|transaktion|transaction)/.test(
+      before
+    )
+  )
 }
 
-function renderVoucherReference(mention: AiVoucherMention, onOpenVoucher: (mention: AiVoucherMention) => void, key: string) {
+function renderVoucherReference(
+  mention: AiVoucherMention,
+  onOpenVoucher: (mention: AiVoucherMention) => void,
+  key: string
+) {
   return (
     <button
       key={key}
@@ -593,10 +769,14 @@ function renderVoucherReference(mention: AiVoucherMention, onOpenVoucher: (menti
   )
 }
 
-function renderInlineVoucherReferences(text: string, onOpenVoucher?: (mention: AiVoucherMention) => void) {
+function renderInlineVoucherReferences(
+  text: string,
+  onOpenVoucher?: (mention: AiVoucherMention) => void
+) {
   if (!onOpenVoucher) return [text]
   const nodes: React.ReactNode[] = []
-  const regex = /\b(Buchungen|Buchung|Belege|Beleg|Voucher|ID)\s*#?\s*((?:\d+\s*(?:\/\s*)?)+)|\b(20\d{2}-\d{2}-\d{2}_\d{5})\b/gi
+  const regex =
+    /\b(Buchungen|Buchung|Belege|Beleg|Voucher|ID)\s*#?\s*((?:\d+\s*(?:\/\s*)?)+)|\b(20\d{2}-\d{2}-\d{2}_\d{5})\b/gi
   let lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = regex.exec(text))) {
@@ -609,11 +789,19 @@ function renderInlineVoucherReferences(text: string, onOpenVoucher?: (mention: A
     } else if (shouldSkipInlineVoucherReference(text, start, match[1])) {
       nodes.push(match[0])
     } else {
-      const ids = Array.from(match[2].matchAll(/\d+/g)).map((item) => Number(item[0])).filter((id) => Number.isInteger(id) && id > 0)
+      const ids = Array.from(match[2].matchAll(/\d+/g))
+        .map((item) => Number(item[0]))
+        .filter((id) => Number.isInteger(id) && id > 0)
       nodes.push(`${match[1]} `)
       ids.forEach((id, idx) => {
         if (idx > 0) nodes.push(' / ')
-        nodes.push(renderVoucherReference(voucherMentionFromContext(id, null, text, start), onOpenVoucher, `voucher-id-${id}-${start}-${idx}`))
+        nodes.push(
+          renderVoucherReference(
+            voucherMentionFromContext(id, null, text, start),
+            onOpenVoucher,
+            `voucher-id-${id}-${start}-${idx}`
+          )
+        )
       })
     }
     lastIndex = regex.lastIndex
@@ -626,14 +814,21 @@ function renderInlineMarkdown(text: string, onOpenVoucher?: (mention: AiVoucherM
   const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, idx) => {
     const strong = part.match(/^\*\*([^*]+)\*\*$/)
-    return strong
-      ? <strong key={idx}>{renderInlineVoucherReferences(strong[1], onOpenVoucher)}</strong>
-      : <React.Fragment key={idx}>{renderInlineVoucherReferences(part, onOpenVoucher)}</React.Fragment>
+    return strong ? (
+      <strong key={idx}>{renderInlineVoucherReferences(strong[1], onOpenVoucher)}</strong>
+    ) : (
+      <React.Fragment key={idx}>
+        {renderInlineVoucherReferences(part, onOpenVoucher)}
+      </React.Fragment>
+    )
   })
 }
 
 function splitMarkdownTableRow(line: string) {
-  const trimmed = String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '')
+  const trimmed = String(line || '')
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
   return trimmed.split('|').map((cell) => cell.trim())
 }
 
@@ -670,9 +865,16 @@ function renderMarkdownTable(
   key: string,
   onOpenVoucher?: (mention: AiVoucherMention) => void
 ) {
+  const shouldRenderVoucherLinksInColumn = (header: string) => {
+    const normalized = normalizeLookup(header)
+    return !/\b(bank\s*transaktion|banktransaktion|bank\s*beleg|bankbeleg|transaktion|transaction)\b/.test(
+      normalized
+    )
+  }
   const columnClassName = (header: string) => {
     const normalized = normalizeLookup(header)
-    if (/(betrag|summe|saldo|einnahm|ausgab|brutto|netto|mwst|ust|preis|kosten)/.test(normalized)) return 'is-number'
+    if (/(betrag|summe|saldo|einnahm|ausgab|brutto|netto|mwst|ust|preis|kosten)/.test(normalized))
+      return 'is-number'
     if (/(datum|faellig|fallig|zeitraum)/.test(normalized)) return 'is-date'
     return undefined
   }
@@ -682,16 +884,25 @@ function renderMarkdownTable(
         <thead>
           <tr>
             {headers.map((header, headerIdx) => (
-              <th key={headerIdx} className={columnClassName(header)}>{renderInlineMarkdown(header, onOpenVoucher)}</th>
+              <th key={headerIdx} className={columnClassName(header)}>
+                {renderInlineMarkdown(header, onOpenVoucher)}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, rowIdx) => (
             <tr key={rowIdx}>
-              {headers.map((_, cellIdx) => (
-                <td key={cellIdx} className={columnClassName(headers[cellIdx] || '')}>{renderInlineMarkdown(row[cellIdx] || '', onOpenVoucher)}</td>
-              ))}
+              {headers.map((header, cellIdx) => {
+                const cellOpenVoucher = shouldRenderVoucherLinksInColumn(header)
+                  ? onOpenVoucher
+                  : undefined
+                return (
+                  <td key={cellIdx} className={columnClassName(header || '')}>
+                    {renderInlineMarkdown(row[cellIdx] || '', cellOpenVoucher)}
+                  </td>
+                )
+              })}
             </tr>
           ))}
         </tbody>
@@ -700,7 +911,13 @@ function renderMarkdownTable(
   )
 }
 
-function AiMarkdown({ text, onOpenVoucher }: { text: string; onOpenVoucher?: (mention: AiVoucherMention) => void }) {
+function AiMarkdown({
+  text,
+  onOpenVoucher
+}: {
+  text: string
+  onOpenVoucher?: (mention: AiVoucherMention) => void
+}) {
   const blocks: React.ReactNode[] = []
   const lines = String(text || '').split(/\r?\n/)
   let idx = 0
@@ -722,7 +939,14 @@ function AiMarkdown({ text, onOpenVoucher }: { text: string; onOpenVoucher?: (me
     if (isMarkdownTableLine(line)) {
       const compactTable = parseCompactMarkdownTable(line)
       if (compactTable) {
-        blocks.push(renderMarkdownTable(compactTable.headers, compactTable.rows, `table-${idx}`, onOpenVoucher))
+        blocks.push(
+          renderMarkdownTable(
+            compactTable.headers,
+            compactTable.rows,
+            `table-${idx}`,
+            onOpenVoucher
+          )
+        )
         idx += 1
         continue
       }
@@ -747,7 +971,13 @@ function AiMarkdown({ text, onOpenVoucher }: { text: string; onOpenVoucher?: (me
         items.push(lines[idx].trim().replace(/^[-*]\s+/, ''))
         idx += 1
       }
-      blocks.push(<ul key={`ul-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>)}</ul>)
+      blocks.push(
+        <ul key={`ul-${idx}`}>
+          {items.map((item, itemIdx) => (
+            <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>
+          ))}
+        </ul>
+      )
       continue
     }
 
@@ -757,19 +987,25 @@ function AiMarkdown({ text, onOpenVoucher }: { text: string; onOpenVoucher?: (me
         items.push(lines[idx].trim().replace(/^\d+[.)]\s+/, ''))
         idx += 1
       }
-      blocks.push(<ol key={`ol-${idx}`}>{items.map((item, itemIdx) => <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>)}</ol>)
+      blocks.push(
+        <ol key={`ol-${idx}`}>
+          {items.map((item, itemIdx) => (
+            <li key={itemIdx}>{renderInlineMarkdown(item, onOpenVoucher)}</li>
+          ))}
+        </ol>
+      )
       continue
     }
 
     const paragraph: string[] = []
     while (
-      idx < lines.length
-      && lines[idx].trim()
-      && !/^(#{1,3})\s+/.test(lines[idx].trim())
-      && !/^\*\*[^*]+\*\*$/.test(lines[idx].trim())
-      && !isMarkdownTableLine(lines[idx].trim())
-      && !/^[-*]\s+/.test(lines[idx].trim())
-      && !/^\d+[.)]\s+/.test(lines[idx].trim())
+      idx < lines.length &&
+      lines[idx].trim() &&
+      !/^(#{1,3})\s+/.test(lines[idx].trim()) &&
+      !/^\*\*[^*]+\*\*$/.test(lines[idx].trim()) &&
+      !isMarkdownTableLine(lines[idx].trim()) &&
+      !/^[-*]\s+/.test(lines[idx].trim()) &&
+      !/^\d+[.)]\s+/.test(lines[idx].trim())
     ) {
       paragraph.push(lines[idx].trim())
       idx += 1
@@ -802,15 +1038,18 @@ function parseMemberContributionAmount(prompt: string) {
   if (explicitAmount != null) return explicitAmount
 
   const contributionNearAmount =
-    prompt.match(/(?:mitgliedsbeitrag|beitrag|betrag)[^\n\r]{0,80}?(?:von|ueber|über|=|:)\s*(\d{1,4})(?:\s*[,.]\s*(\d{1,2}|-))?/i)
-    || prompt.match(/(?:mitgliedsbeitrag|beitrag|betrag)\s+(\d{1,4})(?:\s*[,.]\s*(\d{1,2}|-))?/i)
+    prompt.match(
+      /(?:mitgliedsbeitrag|beitrag|betrag)[^\n\r]{0,80}?(?:von|ueber|über|=|:)\s*(\d{1,4})(?:\s*[,.]\s*(\d{1,2}|-))?/i
+    ) || prompt.match(/(?:mitgliedsbeitrag|beitrag|betrag)\s+(\d{1,4})(?:\s*[,.]\s*(\d{1,2}|-))?/i)
   return toAmount(contributionNearAmount?.[1], contributionNearAmount?.[2])
 }
 
 function parseContributionHint(prompt: string) {
   const normalized = normalizeLookup(prompt)
   const amount = parseMemberContributionAmount(prompt)
-  const interval: TMemberCreateInput['contribution_interval'] | null = /(jahr|jaehr|jähr)/.test(normalized)
+  const interval: TMemberCreateInput['contribution_interval'] | null = /(jahr|jaehr|jähr)/.test(
+    normalized
+  )
     ? 'YEARLY'
     : /(quartal|viertel)/.test(normalized)
       ? 'QUARTERLY'
@@ -821,10 +1060,18 @@ function parseContributionHint(prompt: string) {
 }
 
 function isLikelyMemberName(name: string) {
-  const cleaned = String(name || '').replace(/^[\d.)\-\s]+/, '').replace(/[,;:]$/, '').trim()
+  const cleaned = String(name || '')
+    .replace(/^[\d.)\-\s]+/, '')
+    .replace(/[,;:]$/, '')
+    .trim()
   const normalized = normalizeLookup(cleaned)
   if (!cleaned || !/[A-Za-zÄÖÜäöüß]{2,}\s+[A-Za-zÄÖÜäöüß]{2,}/.test(cleaned)) return false
-  if (/^(erste zahlungsfrist|zahlungsfrist|faelligkeit|falligkeit|geburt|geburtsdatum|eintritt|beitrag|mitgliedsbeitrag|betrag|rolle|hinweis|mitglied|mitglieder|mitgliederanlage|beitragspflicht)$/.test(normalized)) return false
+  if (
+    /^(erste zahlungsfrist|zahlungsfrist|faelligkeit|falligkeit|geburt|geburtsdatum|eintritt|beitrag|mitgliedsbeitrag|betrag|rolle|hinweis|mitglied|mitglieder|mitgliederanlage|beitragspflicht)$/.test(
+      normalized
+    )
+  )
+    return false
   return true
 }
 
@@ -838,9 +1085,12 @@ function sanitizeMemberDrafts(members: AiMemberDraft[]) {
     seen.add(key)
     sanitized.push({
       ...member,
-      contributionAmount: member.contributionAmount && member.contributionAmount > 0 && member.contributionAmount <= 1000
-        ? member.contributionAmount
-        : null
+      contributionAmount:
+        member.contributionAmount &&
+        member.contributionAmount > 0 &&
+        member.contributionAmount <= 1000
+          ? member.contributionAmount
+          : null
     })
   }
   return sanitized
@@ -922,65 +1172,105 @@ function memberFieldLabel(field: AiMemberUpdateField) {
 function displayMemberValue(field: AiMemberUpdateField, value: unknown) {
   if (value == null || value === '') return '-'
   if (field === 'contribution_amount') return euro.format(Number(value))
-  if (field === 'contribution_interval') return intervalLabel(value as TMemberCreateInput['contribution_interval'])
+  if (field === 'contribution_interval')
+    return intervalLabel(value as TMemberCreateInput['contribution_interval'])
   if (field === 'boardRole') return boardRoleLabel(value as TMemberCreateInput['boardRole'])
   if (field === 'status') return memberStatusLabel(value as TMemberUpdateInput['status'])
-  if (field === 'join_date' || field === 'leave_date' || field === 'mandate_date' || field === 'next_due_date') return formatIsoDate(String(value))
+  if (
+    field === 'join_date' ||
+    field === 'leave_date' ||
+    field === 'mandate_date' ||
+    field === 'next_due_date'
+  )
+    return formatIsoDate(String(value))
   return String(value)
 }
 
 function wantsMemberCreation(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(mitglied|mitglieder|mitgliedsanlage)/.test(normalized)
-    && /(anleg|anlage|erstell|aufnehm|importier|vorbereit|uebernehm|ubernehm)/.test(normalized)
+  return (
+    /(mitglied|mitglieder|mitgliedsanlage)/.test(normalized) &&
+    /(anleg|anlage|erstell|aufnehm|importier|vorbereit|uebernehm|ubernehm)/.test(normalized)
+  )
 }
 
 function wantsCreatePendingMembers(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(leg|lege|anleg|speicher|erstell|uebernehm|ubernehm)/.test(normalized)
-    && /(diese|diesen|alle|drei|3|nur)/.test(normalized)
+  return (
+    /(leg|lege|anleg|speicher|erstell|uebernehm|ubernehm)/.test(normalized) &&
+    /(diese|diesen|alle|drei|3|nur)/.test(normalized)
+  )
 }
 
 function wantsMemberRead(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(mitglied|mitglieder|vorstand|rolle|rollen|beitrag|beitraege|beitrage)/.test(normalized)
-    && /(zeig|zeige|liste|list|welche|wer|wie viele|ausles|uebersicht|ubersicht|status|haben wir)/.test(normalized)
+  return (
+    /(mitglied|mitglieder|vorstand|rolle|rollen|beitrag|beitraege|beitrage)/.test(normalized) &&
+    /(zeig|zeige|liste|list|welche|wer|wie viele|ausles|uebersicht|ubersicht|status|haben wir)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsMemberUpdate(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(mitglied|mitglieder|beitrag|beitraege|beitrage|rolle|vorstand|status|eintritt|austritt|zahlungsfrist|faelligkeit|falligkeit)/.test(normalized)
-    && /(setz|setze|aender|ander|ändere|bearbeit|update|mach|stelle|korrigier|monatlich|jaehrlich|jahrlich|jährlich|paus|aktiv|ausgetreten|vorsitz|kassier)/.test(normalized)
+  return (
+    /(mitglied|mitglieder|beitrag|beitraege|beitrage|rolle|vorstand|status|eintritt|austritt|zahlungsfrist|faelligkeit|falligkeit)/.test(
+      normalized
+    ) &&
+    /(setz|setze|aender|ander|ändere|bearbeit|update|mach|stelle|korrigier|monatlich|jaehrlich|jahrlich|jährlich|paus|aktiv|ausgetreten|vorsitz|kassier)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsContributionPaymentAction(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(mitgliedsbeitrag|beitrag|beitraege|beitrage|beitragszahlung|zahlung)/.test(normalized)
-    && /(buchung|buche|buchen|erstell|anleg|verbuch|verknuepf|verknupf|link|bezahlt|zahlungseingang)/.test(normalized)
+  return (
+    /(mitgliedsbeitrag|beitrag|beitraege|beitrage|beitragszahlung|zahlung)/.test(normalized) &&
+    /(buchung|buche|buchen|erstell|anleg|verbuch|verknuepf|verknupf|link|bezahlt|zahlungseingang)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsContextualBookingLink(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(hierzu|dazu|dafuer|dafur|diese|den|das|offene|ausstehende)/.test(normalized)
-    && /(buchung|buche|buchen|erstell|anleg|verbuch|verknuepf|verknupf|link|bezahlt|zahlungseingang)/.test(normalized)
+  return (
+    /(hierzu|dazu|dafuer|dafur|diese|den|das|offene|ausstehende)/.test(normalized) &&
+    /(buchung|buche|buchen|erstell|anleg|verbuch|verknuepf|verknupf|link|bezahlt|zahlungseingang)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsContributionDueRead(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(mitgliedsbeitrag|beitrag|beitraege|beitrage|beitragszahlung|beitragszahlungen|zahlung|zahlungen)/.test(normalized)
-    && /(offen|aussteh|faellig|fallig|rueckstand|ruckstand|ueberfaellig|uberfallig|nicht bezahlt|noch|check|pruef|pruf|welche|wer|bei welchem)/.test(normalized)
+  return (
+    /(mitgliedsbeitrag|beitrag|beitraege|beitrage|beitragszahlung|beitragszahlungen|zahlung|zahlungen)/.test(
+      normalized
+    ) &&
+    /(offen|aussteh|faellig|fallig|rueckstand|ruckstand|ueberfaellig|uberfallig|nicht bezahlt|noch|check|pruef|pruf|welche|wer|bei welchem)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsApplyPendingMemberUpdates(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(uebernehm|ubernehm|anwenden|speicher|ausfuehr|ausfuhr|durchfuehr|durchfuhr|aendern|andern)/.test(normalized)
-    && /(diese|alle|vorschlaege|vorschlage|aenderungen|anderungen|so|passt)/.test(normalized)
+  return (
+    /(uebernehm|ubernehm|anwenden|speicher|ausfuehr|ausfuhr|durchfuehr|durchfuhr|aendern|andern)/.test(
+      normalized
+    ) && /(diese|alle|vorschlaege|vorschlage|aenderungen|anderungen|so|passt)/.test(normalized)
+  )
 }
 
 function parseMemberDraftsFromText(prompt: string): AiMemberImportState | null {
   const contribution = parseContributionHint(prompt)
   const globalNextDue = (() => {
-    const dueMatch = prompt.match(/(?:zahlungsfrist|fälligkeit|faelligkeit|frist)[^\n\r]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)
+    const dueMatch = prompt.match(
+      /(?:zahlungsfrist|fälligkeit|faelligkeit|frist)[^\n\r]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i
+    )
     return dueMatch ? parseGermanDate(dueMatch[1]) : null
   })()
   const lines = prompt
@@ -990,14 +1280,21 @@ function parseMemberDraftsFromText(prompt: string): AiMemberImportState | null {
   const members: AiMemberDraft[] = []
   const pushDraft = (draft: AiMemberDraft) => {
     const key = normalizeLookup(`${draft.name}-${draft.joinDate}`)
-    if (members.some((member) => normalizeLookup(`${member.name}-${member.joinDate}`) === key)) return
+    if (members.some((member) => normalizeLookup(`${member.name}-${member.joinDate}`) === key))
+      return
     members.push(draft)
   }
   for (const line of lines) {
-    const dates = Array.from(line.matchAll(/\b\d{1,2}\.\d{1,2}\.(?:20|19)\d{2}\b/g)).map((match) => match[0])
+    const dates = Array.from(line.matchAll(/\b\d{1,2}\.\d{1,2}\.(?:20|19)\d{2}\b/g)).map(
+      (match) => match[0]
+    )
     if (!dates.length) continue
     const firstDateIndex = line.search(/\b\d{1,2}\.\d{1,2}\.(?:20|19)\d{2}\b/)
-    const rawName = line.slice(0, firstDateIndex).replace(/^[\d.)\-\s]+/, '').replace(/[,;:]$/, '').trim()
+    const rawName = line
+      .slice(0, firstDateIndex)
+      .replace(/^[\d.)\-\s]+/, '')
+      .replace(/[,;:]$/, '')
+      .trim()
     const name = rawName || line.split(',')[0]?.trim()
     if (!name || !isLikelyMemberName(name)) continue
     const entryMatch = line.match(/eintritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)
@@ -1028,11 +1325,20 @@ function parseMemberDraftsFromText(prompt: string): AiMemberImportState | null {
   for (const block of blocks) {
     if (!isLikelyMemberName(block.name)) continue
     const text = block.lines.join('\n')
-    const birthDate = parseGermanDate(text.match(/geburtsdatum[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '')
-    const joinDate = parseGermanDate(text.match(/eintritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '')
+    const birthDate = parseGermanDate(
+      text.match(/geburtsdatum[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || ''
+    )
+    const joinDate = parseGermanDate(
+      text.match(/eintritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || ''
+    )
     if (!joinDate) continue
     const blockContribution = parseContributionHint(text)
-    const blockDue = parseGermanDate(text.match(/(?:zahlungsfrist|beitragspflicht|fälligkeit|faelligkeit)[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '') || globalNextDue
+    const blockDue =
+      parseGermanDate(
+        text.match(
+          /(?:zahlungsfrist|beitragspflicht|fälligkeit|faelligkeit)[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i
+        )?.[1] || ''
+      ) || globalNextDue
     pushDraft({
       name: block.name,
       birthDate,
@@ -1052,7 +1358,9 @@ function filterMembersForPrompt(prompt: string, members: MemberRow[]) {
   const activeRows = members.filter((member) => member.status !== 'LEFT')
   const strictlyActiveRows = members.filter((member) => member.status === 'ACTIVE')
   const batchAll = /(alle|allen|jede|jeden|saemtliche|samtliche)/.test(normalized)
-  const withoutContribution = /(ohne beitrag|beitrag fehlt|fehlender beitrag|keinen beitrag)/.test(normalized)
+  const withoutContribution = /(ohne beitrag|beitrag fehlt|fehlender beitrag|keinen beitrag)/.test(
+    normalized
+  )
   if (batchAll) {
     const base = /(aktive|aktiven|active)/.test(normalized)
       ? strictlyActiveRows
@@ -1068,10 +1376,14 @@ function filterMembersForPrompt(prompt: string, members: MemberRow[]) {
     const parts = memberName.split(' ').filter((part) => part.length >= 3)
     return parts.length >= 2 && parts.every((part) => normalized.includes(part))
   })
-  const uniquePartial = named.length ? [] : activeRows.filter((member) => {
-    const parts = normalizeLookup(member.name).split(' ').filter((part) => part.length >= 4)
-    return parts.some((part) => normalized.includes(part))
-  })
+  const uniquePartial = named.length
+    ? []
+    : activeRows.filter((member) => {
+        const parts = normalizeLookup(member.name)
+          .split(' ')
+          .filter((part) => part.length >= 4)
+        return parts.some((part) => normalized.includes(part))
+      })
   const selected = named.length ? named : uniquePartial.length === 1 ? uniquePartial : []
   return withoutContribution ? selected.filter((member) => !member.contribution_amount) : selected
 }
@@ -1082,7 +1394,10 @@ function addMemberUpdateChange(
   field: AiMemberUpdateField,
   newValue: TMemberUpdateInput[AiMemberUpdateField] | null | undefined
 ) {
-  const oldValue = member[field as keyof MemberRow] as TMemberUpdateInput[AiMemberUpdateField] | null | undefined
+  const oldValue = member[field as keyof MemberRow] as
+    | TMemberUpdateInput[AiMemberUpdateField]
+    | null
+    | undefined
   const oldDisplay = displayMemberValue(field, oldValue)
   const newDisplay = displayMemberValue(field, newValue)
   if (oldDisplay === newDisplay) return
@@ -1107,19 +1422,36 @@ function buildMemberUpdateDraft(prompt: string, members: MemberRow[]): AiMemberU
   const contribution = parseContributionHint(prompt)
   const role = boardRoleFromText(prompt)
   const status = memberStatusFromText(prompt)
-  const joinDate = parseGermanDate(prompt.match(/eintritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '')
-  const leaveDate = parseGermanDate(prompt.match(/austritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '')
-  const nextDue = parseGermanDate(prompt.match(/(?:zahlungsfrist|beitragspflicht|fälligkeit|faelligkeit|frist)[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || '')
+  const joinDate = parseGermanDate(
+    prompt.match(/eintritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || ''
+  )
+  const leaveDate = parseGermanDate(
+    prompt.match(/austritt[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i)?.[1] || ''
+  )
+  const nextDue = parseGermanDate(
+    prompt.match(
+      /(?:zahlungsfrist|beitragspflicht|fälligkeit|faelligkeit|frist)[^\d]*(\d{1,2}\.\d{1,2}\.(?:20|19)\d{2})/i
+    )?.[1] || ''
+  )
   const changes: AiMemberUpdateChange[] = []
   if (role && targets.length === 1) {
-    const currentRoleHolder = members.find((member) => member.boardRole === role && member.id !== targets[0].id)
+    const currentRoleHolder = members.find(
+      (member) => member.boardRole === role && member.id !== targets[0].id
+    )
     if (currentRoleHolder) addMemberUpdateChange(changes, currentRoleHolder, 'boardRole', null)
   }
 
   for (const member of targets) {
-    if (contribution.amount != null) addMemberUpdateChange(changes, member, 'contribution_amount', contribution.amount)
-    if (contribution.interval) addMemberUpdateChange(changes, member, 'contribution_interval', contribution.interval)
-    if (role && targets.length === 1 && !/(alle|allen|jede|jeden|saemtliche|samtliche)/.test(normalized)) addMemberUpdateChange(changes, member, 'boardRole', role)
+    if (contribution.amount != null)
+      addMemberUpdateChange(changes, member, 'contribution_amount', contribution.amount)
+    if (contribution.interval)
+      addMemberUpdateChange(changes, member, 'contribution_interval', contribution.interval)
+    if (
+      role &&
+      targets.length === 1 &&
+      !/(alle|allen|jede|jeden|saemtliche|samtliche)/.test(normalized)
+    )
+      addMemberUpdateChange(changes, member, 'boardRole', role)
     if (status) addMemberUpdateChange(changes, member, 'status', status)
     if (joinDate) addMemberUpdateChange(changes, member, 'join_date', joinDate)
     if (leaveDate) addMemberUpdateChange(changes, member, 'leave_date', leaveDate)
@@ -1132,31 +1464,49 @@ function buildMemberUpdateDraft(prompt: string, members: MemberRow[]): AiMemberU
 function findPaymentAccountHint(prompt: string, accounts: PaymentAccountOption[]) {
   const normalizedPrompt = normalizeLookup(prompt)
   if (!normalizedPrompt) return null
-  const genericTokens = new Set(['bank', 'konto', 'konten', 'kasse', 'cash', 'paypal', 'card', 'karte'])
-  return accounts
-    .filter((account) => account.isActive !== 0)
-    .map((account) => {
-      const normalizedName = normalizeLookup(account.name)
-      const tokens = normalizedName.split(' ').filter((token) => token.length >= 4 && !genericTokens.has(token))
-      let score = 0
-      if (normalizedName && normalizedPrompt.includes(normalizedName)) score += 1000 + normalizedName.length
-      for (const token of tokens) {
-        if (normalizedPrompt.includes(token)) score += token.length
-      }
-      return { account, normalizedName, score }
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || b.normalizedName.length - a.normalizedName.length)[0]?.account || null
+  const genericTokens = new Set([
+    'bank',
+    'konto',
+    'konten',
+    'kasse',
+    'cash',
+    'paypal',
+    'card',
+    'karte'
+  ])
+  return (
+    accounts
+      .filter((account) => account.isActive !== 0)
+      .map((account) => {
+        const normalizedName = normalizeLookup(account.name)
+        const tokens = normalizedName
+          .split(' ')
+          .filter((token) => token.length >= 4 && !genericTokens.has(token))
+        let score = 0
+        if (normalizedName && normalizedPrompt.includes(normalizedName))
+          score += 1000 + normalizedName.length
+        for (const token of tokens) {
+          if (normalizedPrompt.includes(token)) score += token.length
+        }
+        return { account, normalizedName, score }
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || b.normalizedName.length - a.normalizedName.length)[0]
+      ?.account || null
+  )
 }
 
 function shouldApplyAccountHintToAll(prompt: string) {
-  return /(alle|allen|jede|jeden|saemtliche|samtliche|immer|standard|default|grundsaetzlich|grundsatzlich|nicht anders angegeben|gehen diese auf|sollen auf|soll bei allen)/.test(normalizeLookup(prompt))
+  return /(alle|allen|jede|jeden|saemtliche|samtliche|immer|standard|default|grundsaetzlich|grundsatzlich|nicht anders angegeben|gehen diese auf|sollen auf|soll bei allen)/.test(
+    normalizeLookup(prompt)
+  )
 }
 
 function formatAiUsage(usage?: TAiJobsGetOutput['usage'] | null) {
   if (!usage) return ''
   const tokens = Number(usage.totalTokens || 0).toLocaleString('de-DE')
-  const cost = usage.estimatedCostUsd == null ? 'Kosten n/a' : usd.format(Number(usage.estimatedCostUsd || 0))
+  const cost =
+    usage.estimatedCostUsd == null ? 'Kosten n/a' : usd.format(Number(usage.estimatedCostUsd || 0))
   return `${tokens} Tokens · ${cost}`
 }
 
@@ -1184,7 +1534,11 @@ function findPlanFilter(plan: TAiActionPlan, fields: string[]) {
 function findPlanChange(plan: TAiActionPlan, fields: string[], modes?: string[]) {
   const wanted = new Set(fields.map(normalizePlanKey))
   const allowedModes = modes ? new Set(modes.map(normalizePlanKey)) : null
-  return plan.changes.find((change) => wanted.has(normalizePlanKey(change.field)) && (!allowedModes || allowedModes.has(normalizePlanKey(change.mode))))?.value
+  return plan.changes.find(
+    (change) =>
+      wanted.has(normalizePlanKey(change.field)) &&
+      (!allowedModes || allowedModes.has(normalizePlanKey(change.mode)))
+  )?.value
 }
 
 function findPlanArg(plan: TAiActionPlan, keys: string[]) {
@@ -1213,7 +1567,9 @@ function parsePlanAmount(value: AiPlanValue | undefined) {
   return parsed != null ? parsed : null
 }
 
-function parsePlanInterval(value: AiPlanValue | undefined): TMemberCreateInput['contribution_interval'] | null {
+function parsePlanInterval(
+  value: AiPlanValue | undefined
+): TMemberCreateInput['contribution_interval'] | null {
   const normalized = normalizeLookup(planValueString(value))
   if (!normalized) return null
   if (/yearly|jahr|jaehr|jahrlich|jährlich/.test(normalized)) return 'YEARLY'
@@ -1222,30 +1578,91 @@ function parsePlanInterval(value: AiPlanValue | undefined): TMemberCreateInput['
   return null
 }
 
-function parsePlanBoardRole(value: AiPlanValue | undefined): TMemberCreateInput['boardRole'] | null {
+function parsePlanBoardRole(
+  value: AiPlanValue | undefined
+): TMemberCreateInput['boardRole'] | null {
   const raw = planValueString(value)
   if (!raw) return null
-  if (/^(V1|V2|KASSIER|SCHRIFT|KASSENPR1|KASSENPR2)$/.test(raw)) return raw as TMemberCreateInput['boardRole']
+  if (/^(V1|V2|KASSIER|SCHRIFT|KASSENPR1|KASSENPR2)$/.test(raw))
+    return raw as TMemberCreateInput['boardRole']
   return boardRoleFromText(raw)
 }
 
-function memberStateFromPlan(plan: TAiActionPlan, sourcePrompt: string): AiMemberImportState | null {
-  const globalAmount = parsePlanAmount(findPlanChange(plan, ['contributionAmount', 'contribution_amount', 'beitrag', 'mitgliedsbeitrag']))
-  const globalInterval = parsePlanInterval(findPlanChange(plan, ['contributionInterval', 'contribution_interval', 'intervall', 'beitragsintervall']))
-  const globalNextDue = parsePlanDate(findPlanChange(plan, ['nextDueDate', 'next_due_date', 'ersteZahlungsfrist', 'zahlungsfrist', 'frist']))
+function memberStateFromPlan(
+  plan: TAiActionPlan,
+  sourcePrompt: string
+): AiMemberImportState | null {
+  const globalAmount = parsePlanAmount(
+    findPlanChange(plan, [
+      'contributionAmount',
+      'contribution_amount',
+      'beitrag',
+      'mitgliedsbeitrag'
+    ])
+  )
+  const globalInterval = parsePlanInterval(
+    findPlanChange(plan, [
+      'contributionInterval',
+      'contribution_interval',
+      'intervall',
+      'beitragsintervall'
+    ])
+  )
+  const globalNextDue = parsePlanDate(
+    findPlanChange(plan, [
+      'nextDueDate',
+      'next_due_date',
+      'ersteZahlungsfrist',
+      'zahlungsfrist',
+      'frist'
+    ])
+  )
 
   const members = plan.items.map((item) => {
-    const name = planValueString(planItemValue(item, ['name', 'memberName', 'mitglied', 'vollerName']))
-    const birthDate = parsePlanDate(planItemValue(item, ['birthDate', 'birth_date', 'geburtsdatum', 'geburt']))
-    const joinDate = parsePlanDate(planItemValue(item, ['joinDate', 'join_date', 'eintritt', 'eintrittsdatum']))
-    const contributionAmount = parsePlanAmount(planItemValue(item, ['contributionAmount', 'contribution_amount', 'beitrag', 'mitgliedsbeitrag'])) ?? globalAmount
-    const contributionInterval = parsePlanInterval(planItemValue(item, ['contributionInterval', 'contribution_interval', 'intervall', 'beitragsintervall'])) || globalInterval
-    const nextDueDate = parsePlanDate(planItemValue(item, ['nextDueDate', 'next_due_date', 'ersteZahlungsfrist', 'zahlungsfrist', 'frist'])) || globalNextDue
+    const name = planValueString(
+      planItemValue(item, ['name', 'memberName', 'mitglied', 'vollerName'])
+    )
+    const birthDate = parsePlanDate(
+      planItemValue(item, ['birthDate', 'birth_date', 'geburtsdatum', 'geburt'])
+    )
+    const joinDate = parsePlanDate(
+      planItemValue(item, ['joinDate', 'join_date', 'eintritt', 'eintrittsdatum'])
+    )
+    const contributionAmount =
+      parsePlanAmount(
+        planItemValue(item, [
+          'contributionAmount',
+          'contribution_amount',
+          'beitrag',
+          'mitgliedsbeitrag'
+        ])
+      ) ?? globalAmount
+    const contributionInterval =
+      parsePlanInterval(
+        planItemValue(item, [
+          'contributionInterval',
+          'contribution_interval',
+          'intervall',
+          'beitragsintervall'
+        ])
+      ) || globalInterval
+    const nextDueDate =
+      parsePlanDate(
+        planItemValue(item, [
+          'nextDueDate',
+          'next_due_date',
+          'ersteZahlungsfrist',
+          'zahlungsfrist',
+          'frist'
+        ])
+      ) || globalNextDue
     return {
       name,
       birthDate,
       joinDate: joinDate || '',
-      boardRole: parsePlanBoardRole(planItemValue(item, ['boardRole', 'board_role', 'rolle', 'vorstandsrolle'])),
+      boardRole: parsePlanBoardRole(
+        planItemValue(item, ['boardRole', 'board_role', 'rolle', 'vorstandsrolle'])
+      ),
       contributionAmount,
       contributionInterval,
       nextDueDate
@@ -1258,19 +1675,28 @@ function memberStateFromPlan(plan: TAiActionPlan, sourcePrompt: string): AiMembe
 
 function tagPromptFromPlan(plan: TAiActionPlan, fallbackPrompt: string) {
   const names = [
-    ...planValueList(findPlanChange(plan, ['name', 'names', 'tag', 'tags'], ['add', 'set', 'append'])),
+    ...planValueList(
+      findPlanChange(plan, ['name', 'names', 'tag', 'tags'], ['add', 'set', 'append'])
+    ),
     ...plan.items.flatMap((item) => planValueList(planItemValue(item, ['name', 'tag', 'tags'])))
   ]
     .map(cleanTagCandidateName)
     .filter(isLikelyTagName)
-    .filter((name, idx, list) => list.findIndex((item) => normalizeLookup(item) === normalizeLookup(name)) === idx)
+    .filter(
+      (name, idx, list) =>
+        list.findIndex((item) => normalizeLookup(item) === normalizeLookup(name)) === idx
+    )
   if (names.length) return `Lege Tags ${names.join(', ')} an.`
   return fallbackPrompt
 }
 
 function voucherTagPromptFromPlan(plan: TAiActionPlan, fallbackPrompt: string) {
-  const sourceTag = cleanTagCandidateName(planValueString(findPlanFilter(plan, ['tag', 'tags', 'sourceTag', 'source_tag'])))
-  const addedTags = planValueList(findPlanChange(plan, ['tags', 'tag', 'addedTags', 'added_tags'], ['add', 'append']))
+  const sourceTag = cleanTagCandidateName(
+    planValueString(findPlanFilter(plan, ['tag', 'tags', 'sourceTag', 'source_tag']))
+  )
+  const addedTags = planValueList(
+    findPlanChange(plan, ['tags', 'tag', 'addedTags', 'added_tags'], ['add', 'append'])
+  )
     .map(cleanTagCandidateName)
     .filter(isLikelyTagName)
   if (sourceTag && addedTags.length) {
@@ -1299,7 +1725,9 @@ function isCandidateApproved(candidate?: TAiBookingCandidate | null, job?: Booki
 function bookingProgress(job: BookingJobLike) {
   const analysis = bookingAnalysisFromJob(job)
   if (!analysis) return ''
-  const approved = analysis.candidates.filter((candidate) => isCandidateApproved(candidate, job)).length
+  const approved = analysis.candidates.filter((candidate) =>
+    isCandidateApproved(candidate, job)
+  ).length
   return `${approved}/${analysis.candidates.length} gebucht`
 }
 
@@ -1319,7 +1747,12 @@ function firstOpenCandidateIndex(job: BookingJobLike) {
 
 function routeTextType(prompt: string): TAiTextGenerateInput['type'] {
   const normalized = prompt.toLowerCase()
-  if (/(bericht|report|kassier|jahres|finanz|auswertung|einnahm|ausgab|saldo|bilanz|umsatz|gewinn|verlust|tag|tags|kategorie|kategorien|stammdaten|konto|konten|budget|budgets)/.test(normalized)) return 'REPORT_TEXT'
+  if (
+    /(bericht|report|kassier|jahres|finanz|auswertung|einnahm|ausgab|saldo|bilanz|umsatz|gewinn|verlust|tag|tags|kategorie|kategorien|stammdaten|konto|konten|budget|budgets)/.test(
+      normalized
+    )
+  )
+    return 'REPORT_TEXT'
   if (/(mitglied|info|nachricht|mail|email|einladung|veranstaltung|fest)/.test(normalized)) {
     return normalized.includes('einladung') ? 'INVITATION' : 'MEMBER_MESSAGE'
   }
@@ -1327,7 +1760,9 @@ function routeTextType(prompt: string): TAiTextGenerateInput['type'] {
 }
 
 function isVereinRelevantPrompt(prompt: string) {
-  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/i.test(prompt)
+  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/i.test(
+    prompt
+  )
 }
 
 function wantsBankImportReview(prompt: string) {
@@ -1336,57 +1771,86 @@ function wantsBankImportReview(prompt: string) {
 
 function wantsReportExport(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(export|exportier|erstelle|erzeuge|speicher|download)/.test(normalized)
-    && /(bericht|report|controlling|journal|auswertung|buchungen|finanz|kassier|jahresabschluss)/.test(normalized)
+  return (
+    /(export|exportier|erstelle|erzeuge|speicher|download)/.test(normalized) &&
+    /(bericht|report|controlling|journal|auswertung|buchungen|finanz|kassier|jahresabschluss)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsReportFollowup(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(bericht|report|controlling|kpi|kennzahl|auswertung|saldo|salden|einnahm|ausgab|jahresergebnis|spendenanteil|top|zeitraum|monat|monate|quartal|auffaellig|auffallig|heraussticht|raussticht)/.test(normalized)
+  return /(bericht|report|controlling|kpi|kennzahl|auswertung|saldo|salden|einnahm|ausgab|jahresergebnis|spendenanteil|top|zeitraum|monat|monate|quartal|auffaellig|auffallig|heraussticht|raussticht)/.test(
+    normalized
+  )
 }
 
 function wantsTagRead(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(tag|tags|kategorie|kategorien|stammdaten)/.test(normalized)
-    && /(welche|zeige|zeig|liste|uebersicht|ubersicht|haben wir|angelegt|gibt es)/.test(normalized)
+  return (
+    /(tag|tags|kategorie|kategorien|stammdaten)/.test(normalized) &&
+    /(welche|zeige|zeig|liste|uebersicht|ubersicht|haben wir|angelegt|gibt es)/.test(normalized)
+  )
 }
 
 function wantsTagAction(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return !wantsTagRead(prompt)
-    && /(tag|tags)/.test(normalized)
-    && /(anleg|erstell|speicher|uebernehm|ubernehm|loesch|losch|entfern|benenn|umbenenn|aender|ander|farbe|color)/.test(normalized)
+  return (
+    !wantsTagRead(prompt) &&
+    /(tag|tags)/.test(normalized) &&
+    /(anleg|erstell|speicher|uebernehm|ubernehm|loesch|losch|entfern|benenn|umbenenn|aender|ander|farbe|color)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsVoucherTagAction(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(buchung|buchungen|beleg|belege|journal|voucher)/.test(normalized)
-    && /(tag|tags)/.test(normalized)
-    && /(ergaenz|erganz|hinzufueg|hinzufug|setze|setz|versehen|markier|markiere|entfern|loesch|losch)/.test(normalized)
+  return (
+    /(buchung|buchungen|beleg|belege|journal|voucher)/.test(normalized) &&
+    /(tag|tags)/.test(normalized) &&
+    /(ergaenz|erganz|hinzufueg|hinzufug|setze|setz|versehen|markier|markiere|entfern|loesch|losch)/.test(
+      normalized
+    )
+  )
 }
 
 function wantsApplyPendingTagActions(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(ja|mach|bitte|ok|okay|passt|uebernehm|ubernehm|anwenden|speicher|anlegen|erstellen|ausfuehr|ausfuhr)/.test(normalized)
-    && !/(nicht|abbrechen|stop)/.test(normalized)
+  return (
+    /(ja|mach|bitte|ok|okay|passt|uebernehm|ubernehm|anwenden|speicher|anlegen|erstellen|ausfuehr|ausfuhr)/.test(
+      normalized
+    ) && !/(nicht|abbrechen|stop)/.test(normalized)
+  )
 }
 
 function wantsApplyPendingVoucherActions(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(ja|mach|bitte|ok|okay|passt|uebernehm|ubernehm|anwenden|speicher|aendern|andern|ausfuehr|ausfuhr)/.test(normalized)
-    && !/(nicht|abbrechen|stop)/.test(normalized)
+  return (
+    /(ja|mach|bitte|ok|okay|passt|uebernehm|ubernehm|anwenden|speicher|aendern|andern|ausfuehr|ausfuhr)/.test(
+      normalized
+    ) && !/(nicht|abbrechen|stop)/.test(normalized)
+  )
 }
 
 function wantsModifyPendingReview(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(aender|ander|korrigier|korrekt|setze|setz|fueg|fug|hinzufueg|hinzufug|hinzufügen|ergaenz|erganz|ergänz|tausch|wechsel|statt|auf)/.test(normalized)
-    && /(sphaere|sphare|zweck|ideell|vermoegen|wgb|rechnungsnummer|nummer|datum|faellig|fallig|betrag|beschreibung|partei|stadt|budget|zweckbindung|tag|tags|konto|zahlungskonto)/.test(normalized)
-    && !/(nicht|abbrechen|stop)/.test(normalized)
+  return (
+    /(aender|ander|korrigier|korrekt|setze|setz|fueg|fug|hinzufueg|hinzufug|hinzufügen|ergaenz|erganz|ergänz|tausch|wechsel|statt|auf)/.test(
+      normalized
+    ) &&
+    /(sphaere|sphare|zweck|ideell|vermoegen|wgb|rechnungsnummer|nummer|datum|faellig|fallig|betrag|beschreibung|partei|stadt|budget|zweckbindung|tag|tags|konto|zahlungskonto)/.test(
+      normalized
+    ) &&
+    !/(nicht|abbrechen|stop)/.test(normalized)
+  )
 }
 
 function tagColorForName(name: string) {
   let hash = 0
-  for (let idx = 0; idx < name.length; idx += 1) hash = ((hash << 5) - hash + name.charCodeAt(idx)) | 0
+  for (let idx = 0; idx < name.length; idx += 1)
+    hash = ((hash << 5) - hash + name.charCodeAt(idx)) | 0
   return TAG_ACTION_COLORS[Math.abs(hash) % TAG_ACTION_COLORS.length]
 }
 
@@ -1405,7 +1869,12 @@ function isLikelyTagName(value: string) {
   const normalized = normalizeLookup(name)
   if (!name || name.length > 36 || name.length < 2) return false
   if (!/[A-Za-zÄÖÜäöüß0-9]/.test(name)) return false
-  if (/(bereits|vorhanden|empfehlung|wenn du|moechtest|mochtest|sinnvoll|folgende|angelegt|kategorie|kategorien|budget|budgets|zweckbindung|bericht|tabelle|verein|kontext|tags?)/.test(normalized)) return false
+  if (
+    /(bereits|vorhanden|empfehlung|wenn du|moechtest|mochtest|sinnvoll|folgende|angelegt|kategorie|kategorien|budget|budgets|zweckbindung|bericht|tabelle|verein|kontext|tags?)/.test(
+      normalized
+    )
+  )
+    return false
   if (/[.!?]/.test(name)) return false
   return true
 }
@@ -1415,7 +1884,8 @@ function extractTagNamesFromText(text: string) {
   const push = (raw: string) => {
     const name = cleanTagCandidateName(raw)
     if (!isLikelyTagName(name)) return
-    if (!names.some((existing) => normalizeLookup(existing) === normalizeLookup(name))) names.push(name)
+    if (!names.some((existing) => normalizeLookup(existing) === normalizeLookup(name)))
+      names.push(name)
   }
 
   for (const match of text.matchAll(/[„"']([^„“"']{2,36})[“"']/g)) push(match[1])
@@ -1424,12 +1894,19 @@ function extractTagNamesFromText(text: string) {
     const trimmed = line.trim()
     if (!trimmed) continue
     const normalized = normalizeLookup(trimmed)
-    if (/(bereits|empfehlung|wenn du|vorhanden|angelegt|budget|zweckbindung|kategorie)/.test(normalized)) continue
+    if (
+      /(bereits|empfehlung|wenn du|vorhanden|angelegt|budget|zweckbindung|kategorie)/.test(
+        normalized
+      )
+    )
+      continue
     const listed = trimmed.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/)
     if (listed) push(listed[1])
   }
 
-  const explicit = text.match(/(?:tags?\s*(?:anlegen|erstellen|speichern)?|lege\s+(?:die\s+)?tags?|erstelle\s+(?:die\s+)?tags?)[^:\n\r]*:?\s*([^\n\r]+)/i)
+  const explicit = text.match(
+    /(?:tags?\s*(?:anlegen|erstellen|speichern)?|lege\s+(?:die\s+)?tags?|erstelle\s+(?:die\s+)?tags?)[^:\n\r]*:?\s*([^\n\r]+)/i
+  )
   if (explicit) explicit[1].split(/[,;/]| und /i).forEach(push)
 
   return names
@@ -1440,16 +1917,21 @@ function extractVoucherTagAppendRequest(prompt: string) {
   const push = (value: string) => {
     const name = cleanTagCandidateName(value)
     if (!isLikelyTagName(name)) return
-    if (!names.some((existing) => normalizeLookup(existing) === normalizeLookup(name))) names.push(name)
+    if (!names.some((existing) => normalizeLookup(existing) === normalizeLookup(name)))
+      names.push(name)
   }
 
-  const pair = prompt.match(/(?:buchungen|belege|journal)[\s\S]*?(?:mit\s+(?:dem\s+)?)tag\s+(.+?)(?:,|\s+noch|\s+zusätzlich|\s+zusaetzlich|\s+und)[\s\S]*?(?:mit\s+(?:dem\s+)?)tag\s+(.+?)(?:\s+(?:ergänz|ergaenz|erganz|hinzufüg|hinzufueg|hinzufug|versehen|setzen|setze|markier|markiere)|[.?!]|$)/i)
+  const pair = prompt.match(
+    /(?:buchungen|belege|journal)[\s\S]*?(?:mit\s+(?:dem\s+)?)tag\s+(.+?)(?:,|\s+noch|\s+zusätzlich|\s+zusaetzlich|\s+und)[\s\S]*?(?:mit\s+(?:dem\s+)?)tag\s+(.+?)(?:\s+(?:ergänz|ergaenz|erganz|hinzufüg|hinzufueg|hinzufug|versehen|setzen|setze|markier|markiere)|[.?!]|$)/i
+  )
   if (pair) {
     push(pair[1])
     push(pair[2])
   }
 
-  for (const match of prompt.matchAll(/(?:mit\s+(?:dem\s+)?|vom\s+)?tag\s+[„"']?([^,.;\n\r]+?)[“"']?(?=\s+(?:noch|zusätzlich|zusaetzlich|ergänz|ergaenz|erganz|hinzufüg|hinzufueg|hinzufug|setzen|setze|versehen|markier|markiere)|[,.;\n\r]|$)/gi)) {
+  for (const match of prompt.matchAll(
+    /(?:mit\s+(?:dem\s+)?|vom\s+)?tag\s+[„"']?([^,.;\n\r]+?)[“"']?(?=\s+(?:noch|zusätzlich|zusaetzlich|ergänz|ergaenz|erganz|hinzufüg|hinzufueg|hinzufug|setzen|setze|versehen|markier|markiere)|[,.;\n\r]|$)/gi
+  )) {
     push(match[1])
   }
 
@@ -1470,8 +1952,15 @@ function resolveExistingTagName(candidate: string, tags: TagRow[]) {
     })
     .sort((a, b) => normalizeLookup(b.name).length - normalizeLookup(a.name).length)[0]
   if (contained) return contained.name
-  const withoutTrailingVerb = raw.replace(/\s+(haben|hat|habe|bekommen|ergaenzen|ergänzen|hinzufuegen|hinzufügen|setzen|setze)$/i, '').trim()
-  const fallback = tags.find((tag) => normalizeLookup(tag.name) === normalizeLookup(withoutTrailingVerb))
+  const withoutTrailingVerb = raw
+    .replace(
+      /\s+(haben|hat|habe|bekommen|ergaenzen|ergänzen|hinzufuegen|hinzufügen|setzen|setze)$/i,
+      ''
+    )
+    .trim()
+  const fallback = tags.find(
+    (tag) => normalizeLookup(tag.name) === normalizeLookup(withoutTrailingVerb)
+  )
   return fallback?.name || withoutTrailingVerb || raw
 }
 
@@ -1484,17 +1973,21 @@ function parseReportExportRequest(prompt: string): { payload: TReportsExportInpu
   const normalized = normalizeLookup(prompt)
   const yearMatch = normalized.match(/\b(20\d{2})\b/)
   const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear()
-  const isoDates = Array.from(prompt.matchAll(/\b(20\d{2})-(\d{2})-(\d{2})\b/g)).map((match) => match[0])
+  const isoDates = Array.from(prompt.matchAll(/\b(20\d{2})-(\d{2})-(\d{2})\b/g)).map(
+    (match) => match[0]
+  )
   const relativeMonths = normalized.match(/letzte(?:n|r|s)?\s+(\d{1,2})\s+monat/)
   const today = new Date()
   const to = isoDates[1] || (relativeMonths ? isoDate(today) : `${year}-12-31`)
-  const from = isoDates[0] || (relativeMonths
-    ? (() => {
-      const start = new Date(today)
-      start.setMonth(start.getMonth() - Number(relativeMonths[1]))
-      return isoDate(start)
-    })()
-    : `${year}-01-01`)
+  const from =
+    isoDates[0] ||
+    (relativeMonths
+      ? (() => {
+          const start = new Date(today)
+          start.setMonth(start.getMonth() - Number(relativeMonths[1]))
+          return isoDate(start)
+        })()
+      : `${year}-01-01`)
   const format: TReportsExportInput['format'] = /\b(csv)\b/.test(normalized)
     ? 'CSV'
     : /\b(xlsx|excel)\b/.test(normalized)
@@ -1514,7 +2007,19 @@ function parseReportExportRequest(prompt: string): { payload: TReportsExportInpu
       format,
       from,
       to,
-      fields: ['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount', 'tags'],
+      fields: [
+        'date',
+        'voucherNo',
+        'type',
+        'sphere',
+        'description',
+        'status',
+        'paymentMethod',
+        'netAmount',
+        'vatAmount',
+        'grossAmount',
+        'tags'
+      ],
       amountMode: 'OUT_NEGATIVE',
       sort: 'ASC',
       sortBy: 'date'
@@ -1525,8 +2030,19 @@ function parseReportExportRequest(prompt: string): { payload: TReportsExportInpu
 function wantsBookingFromFiles(prompt: string, attachedFiles: File[]) {
   const normalized = prompt.toLowerCase()
   const hasSpreadsheet = attachedFiles.some((file) => /\.(xlsx|xls|csv|tsv)$/i.test(file.name))
-  if (/(buchung|buchungen|buchungsvorschlag|buchungsvorschläge|buche|buchen|verbuch|anlegen|lege.*buch|erstelle.*buch|rechnung|beleg|quittung|zahlung|ausgabe|ausgaben|einnahme|einnahmen|kassenzettel)/i.test(normalized)) return true
-  if (hasSpreadsheet && /(import|stammdaten|tag|tags|kategorie|kategorien|mitglied|mitglieder|tabelle|spalten|zuordnung)/i.test(normalized)) return false
+  if (
+    /(buchung|buchungen|buchungsvorschlag|buchungsvorschläge|buche|buchen|verbuch|anlegen|lege.*buch|erstelle.*buch|rechnung|beleg|quittung|zahlung|ausgabe|ausgaben|einnahme|einnahmen|kassenzettel)/i.test(
+      normalized
+    )
+  )
+    return true
+  if (
+    hasSpreadsheet &&
+    /(import|stammdaten|tag|tags|kategorie|kategorien|mitglied|mitglieder|tabelle|spalten|zuordnung)/i.test(
+      normalized
+    )
+  )
+    return false
   return !hasSpreadsheet
 }
 
@@ -1580,7 +2096,9 @@ function bankSuggestionTitle(suggestion: AiBankReviewSuggestion) {
   const transaction = suggestion.transaction || {}
   const counterparty = transaction.counterparty || suggestion.bookingCandidate?.counterparty || null
   const purpose = transaction.purpose || suggestion.bookingCandidate?.description || null
-  return [counterparty, purpose].filter(Boolean).join(' · ') || `Bankbeleg #${suggestion.transactionId}`
+  return (
+    [counterparty, purpose].filter(Boolean).join(' · ') || `Bankbeleg #${suggestion.transactionId}`
+  )
 }
 
 function bankSuggestionAmount(suggestion: AiBankReviewSuggestion) {
@@ -1593,13 +2111,17 @@ function bankSuggestionAmount(suggestion: AiBankReviewSuggestion) {
 
 function isRestrictiveBankImportPrompt(prompt: string) {
   const normalized = normalizeLookup(prompt)
-  return /(nur|ausschliesslich|lediglich|bestimmte|passende|zutun|bezug|mit .*tag|mit .*kategorie|getraenk|spende|mitgliedsbeitrag|miete|webhosting|kasse)/.test(normalized)
+  return /(nur|ausschliesslich|lediglich|bestimmte|passende|zutun|bezug|mit .*tag|mit .*kategorie|getraenk|spende|mitgliedsbeitrag|miete|webhosting|kasse)/.test(
+    normalized
+  )
 }
 
 function extractBankSuggestionIdsFromAiText(text: string, availableIds: number[]) {
   const available = new Set(availableIds.map(Number))
   const ids = new Set<number>()
-  for (const match of String(text || '').matchAll(/(?:bankbeleg|bankimport|transaktion|beleg)\s*#?\s*(\d+)/gi)) {
+  for (const match of String(text || '').matchAll(
+    /(?:bankbeleg|bankimport|transaktion|beleg)\s*#?\s*(\d+)/gi
+  )) {
     const id = Number(match[1])
     if (available.has(id)) ids.add(id)
   }
@@ -1608,23 +2130,29 @@ function extractBankSuggestionIdsFromAiText(text: string, availableIds: number[]
 
 function bankSuggestionSearchText(suggestion: AiBankReviewSuggestion) {
   const transaction = suggestion.transaction || {}
-  const candidate = (suggestion.bookingCandidate || {}) as Partial<NonNullable<AiBankReviewSuggestion['bookingCandidate']>>
-  return normalizeLookup([
-    suggestion.transactionId,
-    transaction.bookingDate,
-    transaction.valueDate,
-    transaction.counterparty,
-    transaction.purpose,
-    transaction.reference,
-    transaction.amount,
-    candidate.date,
-    candidate.description,
-    candidate.counterparty,
-    candidate.grossAmount,
-    (candidate.tags || []).join(' '),
-    suggestion.reason,
-    (suggestion.warnings || []).join(' ')
-  ].filter(Boolean).join(' '))
+  const candidate = (suggestion.bookingCandidate || {}) as Partial<
+    NonNullable<AiBankReviewSuggestion['bookingCandidate']>
+  >
+  return normalizeLookup(
+    [
+      suggestion.transactionId,
+      transaction.bookingDate,
+      transaction.valueDate,
+      transaction.counterparty,
+      transaction.purpose,
+      transaction.reference,
+      transaction.amount,
+      candidate.date,
+      candidate.description,
+      candidate.counterparty,
+      candidate.grossAmount,
+      (candidate.tags || []).join(' '),
+      suggestion.reason,
+      (suggestion.warnings || []).join(' ')
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
 }
 
 function bankSuggestionScoreFromText(suggestion: AiBankReviewSuggestion, text: string) {
@@ -1632,7 +2160,9 @@ function bankSuggestionScoreFromText(suggestion: AiBankReviewSuggestion, text: s
   const normalizedText = normalizeLookup(text)
   let score = 0
   const transaction = suggestion.transaction || {}
-  const candidate = (suggestion.bookingCandidate || {}) as Partial<NonNullable<AiBankReviewSuggestion['bookingCandidate']>>
+  const candidate = (suggestion.bookingCandidate || {}) as Partial<
+    NonNullable<AiBankReviewSuggestion['bookingCandidate']>
+  >
   const important = [
     transaction.counterparty,
     transaction.purpose,
@@ -1640,9 +2170,12 @@ function bankSuggestionScoreFromText(suggestion: AiBankReviewSuggestion, text: s
     candidate.description,
     candidate.counterparty,
     ...(candidate.tags || [])
-  ].filter(Boolean).map((value) => normalizeLookup(value))
+  ]
+    .filter(Boolean)
+    .map((value) => normalizeLookup(value))
   for (const token of important) {
-    if (token && token.length >= 4 && normalizedText.includes(token)) score += Math.min(80, token.length * 4)
+    if (token && token.length >= 4 && normalizedText.includes(token))
+      score += Math.min(80, token.length * 4)
   }
   const words = normalizedText.split(/\s+/).filter((word) => word.length >= 4)
   for (const word of words) {
@@ -1655,38 +2188,52 @@ function bankSuggestionScoreFromText(suggestion: AiBankReviewSuggestion, text: s
 
 function extractBankSuggestionsFromAiText(result: TAiBankImportReviewOutput, text: string) {
   const allSuggestions = (result.suggestions || []) as AiBankReviewSuggestion[]
-  const ids = extractBankSuggestionIdsFromAiText(text, allSuggestions.map((suggestion) => suggestion.transactionId))
-  if (ids.length) return allSuggestions.filter((suggestion) => ids.includes(Number(suggestion.transactionId)))
+  const ids = extractBankSuggestionIdsFromAiText(
+    text,
+    allSuggestions.map((suggestion) => suggestion.transactionId)
+  )
+  if (ids.length)
+    return allSuggestions.filter((suggestion) => ids.includes(Number(suggestion.transactionId)))
   const scored = allSuggestions
     .map((suggestion) => ({ suggestion, score: bankSuggestionScoreFromText(suggestion, text) }))
     .filter((item) => item.score >= 18)
     .sort((a, b) => b.score - a.score)
   if (!scored.length) return []
   const bestScore = scored[0].score
-  return scored.filter((item) => item.score >= Math.max(18, bestScore - 12)).map((item) => item.suggestion)
+  return scored
+    .filter((item) => item.score >= Math.max(18, bestScore - 12))
+    .map((item) => item.suggestion)
 }
 
-function filterBankReviewByAiText(result: TAiBankImportReviewOutput, userPrompt: string, aiText: string): AiBankReviewState {
+function filterBankReviewByAiText(
+  result: TAiBankImportReviewOutput,
+  userPrompt: string,
+  aiText: string
+): AiBankReviewState {
   const allSuggestions = (result.suggestions || []) as AiBankReviewSuggestion[]
   if (!isRestrictiveBankImportPrompt(userPrompt)) {
-    return { ...(result as AiBankReviewState), suggestions: allSuggestions, allSuggestions, sourceTotal: allSuggestions.length }
+    return {
+      ...(result as AiBankReviewState),
+      suggestions: allSuggestions,
+      allSuggestions,
+      sourceTotal: allSuggestions.length
+    }
   }
   const matched = extractBankSuggestionsFromAiText(result, aiText)
   const normalizedAiText = normalizeLookup(aiText)
-  const saysNone = /(keine|kein|keinen).{0,80}(passend|relevant|treffer|bezug|vorschlag)/.test(normalizedAiText)
-  const visible = matched.length
-    ? matched
-    : saysNone
-      ? []
-      : allSuggestions
+  const saysNone = /(keine|kein|keinen).{0,80}(passend|relevant|treffer|bezug|vorschlag)/.test(
+    normalizedAiText
+  )
+  const visible = matched.length ? matched : saysNone ? [] : allSuggestions
   return {
     ...(result as AiBankReviewState),
     suggestions: visible,
     allSuggestions,
     sourceTotal: allSuggestions.length,
-    filterSummary: visible.length === allSuggestions.length
-      ? null
-      : `${visible.length} von ${allSuggestions.length} KI-Vorschlägen für diese Anfrage ausgewählt.`
+    filterSummary:
+      visible.length === allSuggestions.length
+        ? null
+        : `${visible.length} von ${allSuggestions.length} KI-Vorschlägen für diese Anfrage ausgewählt.`
   }
 }
 
@@ -1742,18 +2289,29 @@ function CandidateEditor({
           <strong>Quelle</strong>
           <span>{sourceLabel ? 'Aktive Quelle' : `${job.files.length} Datei(en)`}</span>
         </div>
-        {sourceLabel ? <p className="helper ai-source-callout">Dieser Vorschlag stammt aus <strong>{sourceLabel}</strong>.</p> : null}
+        {sourceLabel ? (
+          <p className="helper ai-source-callout">
+            Dieser Vorschlag stammt aus <strong>{sourceLabel}</strong>.
+          </p>
+        ) : null}
         {isImage && previewSrc ? (
           <img className="ai-file-preview" src={previewSrc} alt={sourceFile?.fileName || 'Beleg'} />
         ) : (
           <div className="ai-file-list">
             {job.files.map((file) => (
-              <div key={file.id} className={`ai-file-row ${file.fileName === candidate.source?.fileName ? 'is-source' : ''}`}>
+              <div
+                key={file.id}
+                className={`ai-file-row ${file.fileName === candidate.source?.fileName ? 'is-source' : ''}`}
+              >
                 <strong>
                   {file.fileName}
-                  {file.fileName === candidate.source?.fileName ? <span className="ai-file-source-badge">Aktive Quelle</span> : null}
+                  {file.fileName === candidate.source?.fileName ? (
+                    <span className="ai-file-source-badge">Aktive Quelle</span>
+                  ) : null}
                 </strong>
-                <span>{file.mimeType || 'Datei'} · {Math.round(file.size / 1024)} KB</span>
+                <span>
+                  {file.mimeType || 'Datei'} · {Math.round(file.size / 1024)} KB
+                </span>
               </div>
             ))}
           </div>
@@ -1768,18 +2326,38 @@ function CandidateEditor({
         <div className="ai-form-grid">
           <label className="field">
             <span>Datum</span>
-            <input className="input" type="date" disabled={isApproved} value={candidate.date || ''} onChange={(event) => update('date', event.target.value)} />
+            <input
+              className="input"
+              type="date"
+              disabled={isApproved}
+              value={candidate.date || ''}
+              onChange={(event) => update('date', event.target.value)}
+            />
           </label>
           <label className="field">
             <span>Art</span>
-            <select className="input" disabled={isApproved} value={candidate.type} onChange={(event) => update('type', event.target.value as TAiBookingCandidate['type'])}>
+            <select
+              className="input"
+              disabled={isApproved}
+              value={candidate.type}
+              onChange={(event) =>
+                update('type', event.target.value as TAiBookingCandidate['type'])
+              }
+            >
               <option value="OUT">Ausgabe</option>
               <option value="IN">Einnahme</option>
             </select>
           </label>
           <label className="field">
             <span>Sphäre</span>
-            <select className="input" disabled={isApproved} value={candidate.sphere} onChange={(event) => update('sphere', event.target.value as TAiBookingCandidate['sphere'])}>
+            <select
+              className="input"
+              disabled={isApproved}
+              value={candidate.sphere}
+              onChange={(event) =>
+                update('sphere', event.target.value as TAiBookingCandidate['sphere'])
+              }
+            >
               <option value="IDEELL">IDEELL</option>
               <option value="ZWECK">ZWECK</option>
               <option value="VERMOEGEN">VERMÖGEN</option>
@@ -1788,11 +2366,27 @@ function CandidateEditor({
           </label>
           <label className="field">
             <span>Betrag</span>
-            <input className="input" type="number" step="0.01" min="0" disabled={isApproved} value={candidate.grossAmount || 0} onChange={(event) => update('grossAmount', Number(event.target.value || 0))} />
+            <input
+              className="input"
+              type="number"
+              step="0.01"
+              min="0"
+              disabled={isApproved}
+              value={candidate.grossAmount || 0}
+              onChange={(event) => update('grossAmount', Number(event.target.value || 0))}
+            />
           </label>
           <label className="field">
             <span>MwSt %</span>
-            <input className="input" type="number" step="0.01" min="0" disabled={isApproved} value={candidate.vatRate || 0} onChange={(event) => update('vatRate', Number(event.target.value || 0))} />
+            <input
+              className="input"
+              type="number"
+              step="0.01"
+              min="0"
+              disabled={isApproved}
+              value={candidate.vatRate || 0}
+              onChange={(event) => update('vatRate', Number(event.target.value || 0))}
+            />
           </label>
           <label className="field ai-field-wide">
             <span>Zahlungskonto</span>
@@ -1800,39 +2394,74 @@ function CandidateEditor({
               className="input"
               disabled={isApproved}
               value={candidate.paymentAccountId ? String(candidate.paymentAccountId) : ''}
-              style={{ color: accountById.get(Number(candidate.paymentAccountId || 0))?.color || undefined }}
+              style={{
+                color: accountById.get(Number(candidate.paymentAccountId || 0))?.color || undefined
+              }}
               onChange={(event) => updatePaymentAccount(event.target.value)}
             >
               <option value="">Kein Konto ausgewählt</option>
               {activePaymentAccounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name} · {account.kind}</option>
+                <option key={account.id} value={account.id}>
+                  {account.name} · {account.kind}
+                </option>
               ))}
             </select>
           </label>
           <label className="field ai-field-wide">
             <span>Beschreibung</span>
-            <input className="input" disabled={isApproved} value={candidate.description || ''} onChange={(event) => update('description', event.target.value)} />
+            <input
+              className="input"
+              disabled={isApproved}
+              value={candidate.description || ''}
+              onChange={(event) => update('description', event.target.value)}
+            />
           </label>
           <label className="field ai-field-wide">
             <span>Tags</span>
-            <input className="input" disabled={isApproved} value={(candidate.tags || []).join(', ')} onChange={(event) => update('tags', event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean))} />
+            <input
+              className="input"
+              disabled={isApproved}
+              value={(candidate.tags || []).join(', ')}
+              onChange={(event) =>
+                update(
+                  'tags',
+                  event.target.value
+                    .split(',')
+                    .map((tag) => tag.trim())
+                    .filter(Boolean)
+                )
+              }
+            />
           </label>
         </div>
 
-        {(candidate.warnings?.length || candidate.evidence?.length) ? (
+        {candidate.warnings?.length || candidate.evidence?.length ? (
           <div className="ai-evidence">
-            {candidate.warnings?.map((warning, idx) => <span key={`w-${idx}`} className={warningClassName(warning)}>{warning}</span>)}
-            {candidate.evidence?.map((item, idx) => <span key={`e-${idx}`}>{item}</span>)}
+            {candidate.warnings?.map((warning, idx) => (
+              <span key={`w-${idx}`} className={warningClassName(warning)}>
+                {warning}
+              </span>
+            ))}
+            {candidate.evidence?.map((item, idx) => (
+              <span key={`e-${idx}`}>{item}</span>
+            ))}
           </div>
         ) : null}
 
         <footer className="ai-review-actions">
-          <span className="ai-amount-preview">{candidate.type === 'OUT' ? '-' : '+'}{euro.format(Number(candidate.grossAmount || 0))}</span>
+          <span className="ai-amount-preview">
+            {candidate.type === 'OUT' ? '-' : '+'}
+            {euro.format(Number(candidate.grossAmount || 0))}
+          </span>
           <button className="btn" disabled={busy || isApproved} onClick={onOpenDraft}>
             {isApproved ? 'Bereits gebucht' : 'Buchungsentwurf'}
           </button>
           <button className="btn primary" disabled={busy || isApproved} onClick={onApprove}>
-            {isApproved ? `Gebucht${candidate.review?.voucherNo ? ` · ${candidate.review.voucherNo}` : ''}` : busy ? 'Buche...' : 'Jetzt buchen'}
+            {isApproved
+              ? `Gebucht${candidate.review?.voucherNo ? ` · ${candidate.review.voucherNo}` : ''}`
+              : busy
+                ? 'Buche...'
+                : 'Jetzt buchen'}
           </button>
         </footer>
       </section>
@@ -1855,7 +2484,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [apiKey, setApiKey] = useState('')
   const [jobs, setJobs] = useState<TAiJobsListOutput['rows']>([])
   const [selectedJob, setSelectedJob] = useState<TAiJobsGetOutput | null>(null)
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(initialChat.selectedJobId || null)
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(
+    initialChat.selectedJobId || null
+  )
   const [selectedCandidate, setSelectedCandidate] = useState(initialChat.selectedCandidate || 0)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccountOption[]>([])
   const [mentionOptions, setMentionOptions] = useState<AiMentionOption[]>(STATIC_AI_MENTIONS)
@@ -1865,19 +2496,42 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [messages, setMessages] = useState<AiMessage[]>(initialChat.messages || [])
-  const [bankReview, setBankReview] = useState<AiBankReviewState | null>(initialChat.bankReview || null)
-  const [pendingMembers, setPendingMembers] = useState<AiMemberImportState | null>(() => sanitizeMemberState(initialChat.pendingMembers))
-  const [pendingMemberUpdates, setPendingMemberUpdates] = useState<AiMemberUpdateState | null>(initialChat.pendingMemberUpdates || null)
-  const [pendingContributionPayment, setPendingContributionPayment] = useState<AiContributionPaymentState | null>(initialChat.pendingContributionPayment || null)
-  const [pendingTagActions, setPendingTagActions] = useState<AiTagActionState | null>(initialChat.pendingTagActions || null)
-  const [pendingVoucherTagActions, setPendingVoucherTagActions] = useState<AiVoucherTagActionState | null>(initialChat.pendingVoucherTagActions || null)
-  const [pendingVoucherUpdates, setPendingVoucherUpdates] = useState<AiVoucherUpdateState | null>(initialChat.pendingVoucherUpdates || null)
-  const [pendingVoucherReverse, setPendingVoucherReverse] = useState<AiVoucherReverseState | null>(initialChat.pendingVoucherReverse || null)
-  const [pendingVoucherRebook, setPendingVoucherRebook] = useState<AiVoucherRebookState | null>(initialChat.pendingVoucherRebook || null)
-  const [pendingInvoiceActions, setPendingInvoiceActions] = useState<AiInvoiceActionState | null>(initialChat.pendingInvoiceActions || null)
-  const [pendingBudgetActions, setPendingBudgetActions] = useState<AiBudgetActionState | null>(initialChat.pendingBudgetActions || null)
-  const [pendingEarmarkActions, setPendingEarmarkActions] = useState<AiEarmarkActionState | null>(initialChat.pendingEarmarkActions || null)
-  const [pendingPlannerQuestion, setPendingPlannerQuestion] = useState<AiPlannerQuestionState | null>(initialChat.pendingPlannerQuestion || null)
+  const [bankReview, setBankReview] = useState<AiBankReviewState | null>(
+    initialChat.bankReview || null
+  )
+  const [pendingMembers, setPendingMembers] = useState<AiMemberImportState | null>(() =>
+    sanitizeMemberState(initialChat.pendingMembers)
+  )
+  const [pendingMemberUpdates, setPendingMemberUpdates] = useState<AiMemberUpdateState | null>(
+    initialChat.pendingMemberUpdates || null
+  )
+  const [pendingContributionPayment, setPendingContributionPayment] =
+    useState<AiContributionPaymentState | null>(initialChat.pendingContributionPayment || null)
+  const [pendingTagActions, setPendingTagActions] = useState<AiTagActionState | null>(
+    initialChat.pendingTagActions || null
+  )
+  const [pendingVoucherTagActions, setPendingVoucherTagActions] =
+    useState<AiVoucherTagActionState | null>(initialChat.pendingVoucherTagActions || null)
+  const [pendingVoucherUpdates, setPendingVoucherUpdates] = useState<AiVoucherUpdateState | null>(
+    initialChat.pendingVoucherUpdates || null
+  )
+  const [pendingVoucherReverse, setPendingVoucherReverse] = useState<AiVoucherReverseState | null>(
+    initialChat.pendingVoucherReverse || null
+  )
+  const [pendingVoucherRebook, setPendingVoucherRebook] = useState<AiVoucherRebookState | null>(
+    initialChat.pendingVoucherRebook || null
+  )
+  const [pendingInvoiceActions, setPendingInvoiceActions] = useState<AiInvoiceActionState | null>(
+    initialChat.pendingInvoiceActions || null
+  )
+  const [pendingBudgetActions, setPendingBudgetActions] = useState<AiBudgetActionState | null>(
+    initialChat.pendingBudgetActions || null
+  )
+  const [pendingEarmarkActions, setPendingEarmarkActions] = useState<AiEarmarkActionState | null>(
+    initialChat.pendingEarmarkActions || null
+  )
+  const [pendingPlannerQuestion, setPendingPlannerQuestion] =
+    useState<AiPlannerQuestionState | null>(initialChat.pendingPlannerQuestion || null)
   const [agentTrace, setAgentTrace] = useState<TAiAgentTraceEvent[]>(initialChat.agentTrace || [])
   const [agentMemory, setAgentMemory] = useState<TAiAgentMemoryListOutput['rows']>([])
   const [agentAutoRules, setAgentAutoRules] = useState<TAiAgentAutoRulesListOutput['rows']>([])
@@ -1894,10 +2548,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     onBusyChange?.(busy)
   }, [busy, onBusyChange])
 
-  useEffect(() => () => {
-    Object.values(streamingMessageTimersRef.current).forEach((timer) => window.clearTimeout(timer))
-    streamingMessageTimersRef.current = {}
-  }, [])
+  useEffect(
+    () => () => {
+      Object.values(streamingMessageTimersRef.current).forEach((timer) =>
+        window.clearTimeout(timer)
+      )
+      streamingMessageTimersRef.current = {}
+    },
+    []
+  )
 
   const streamAssistantMessage = useCallback((id: string, fullBody: string, initialLength = 0) => {
     if (streamingMessageTimersRef.current[id]) return
@@ -1905,13 +2564,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     let streamedLength = Math.min(fullBody.length, initialLength)
     const step = () => {
       streamedLength = Math.min(fullBody.length, streamedLength + charsPerTick)
-      setMessages((current) => current.map((item) => item.id === id
-        ? {
-            ...item,
-            displayBody: fullBody.slice(0, streamedLength),
-            isStreaming: streamedLength < fullBody.length
-          }
-        : item))
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                displayBody: fullBody.slice(0, streamedLength),
+                isStreaming: streamedLength < fullBody.length
+              }
+            : item
+        )
+      )
 
       if (streamedLength < fullBody.length) {
         const timer = window.setTimeout(step, AI_MESSAGE_STREAM_TICK_MS)
@@ -1950,24 +2613,27 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     streamAssistantMessage(id, message.body)
   }
 
-  const hasOpenReviewWorkflow = () => !!selectedJob
-    || !!bankReview
-    || (!!pendingMembers && pendingMembers.status !== 'CREATED')
-    || (!!pendingMemberUpdates && pendingMemberUpdates.status !== 'APPLIED')
-    || (!!pendingContributionPayment && pendingContributionPayment.status !== 'CREATED')
-    || (!!pendingTagActions && pendingTagActions.status !== 'APPLIED')
-    || (!!pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED')
-    || (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED')
-    || (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED')
-    || (!!pendingVoucherRebook && pendingVoucherRebook.status !== 'APPLIED')
-    || (!!pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED')
-    || (!!pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED')
-    || (!!pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED')
-    || (!!pendingPlannerQuestion && pendingPlannerQuestion.status === 'OPEN')
+  const hasOpenReviewWorkflow = () =>
+    !!selectedJob ||
+    !!bankReview ||
+    (!!pendingMembers && pendingMembers.status !== 'CREATED') ||
+    (!!pendingMemberUpdates && pendingMemberUpdates.status !== 'APPLIED') ||
+    (!!pendingContributionPayment && pendingContributionPayment.status !== 'CREATED') ||
+    (!!pendingTagActions && pendingTagActions.status !== 'APPLIED') ||
+    (!!pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED') ||
+    (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED') ||
+    (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED') ||
+    (!!pendingVoucherRebook && pendingVoucherRebook.status !== 'APPLIED') ||
+    (!!pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED') ||
+    (!!pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED') ||
+    (!!pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED') ||
+    (!!pendingPlannerQuestion && pendingPlannerQuestion.status === 'OPEN')
 
   const prepareAgentDraft = (draft: TAiAgentRunOutput['drafts'][number], userPrompt: string) => {
     const payload = draft.payload as any
-    const autoMeta = draft.autoApproval ? ` · Auto-Regel: ${draft.autoApproval.ruleNames.join(', ')}` : ''
+    const autoMeta = draft.autoApproval
+      ? ` · Auto-Regel: ${draft.autoApproval.ruleNames.join(', ')}`
+      : ''
     if (draft.kind === 'voucherReverse') {
       const vouchers = payload?.vouchers || []
       if (!vouchers.length) return
@@ -2036,7 +2702,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return
     }
     if (draft.kind === 'invoiceAction') {
-      const rawChanges = Array.isArray(payload?.changes) ? payload.changes : payload?.invoice ? [{ action: payload.action || 'CREATE', invoice: payload.invoice }] : []
+      const rawChanges = Array.isArray(payload?.changes)
+        ? payload.changes
+        : payload?.invoice
+          ? [{ action: payload.action || 'CREATE', invoice: payload.invoice }]
+          : []
       const changes: AiInvoiceActionChange[] = rawChanges
         .filter((change: any) => change?.action === 'CREATE' && change?.invoice)
         .map((change: any, index: number) => ({
@@ -2118,9 +2788,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         title: isContentPdf ? 'PDF erstellt' : 'Report exportiert',
         body: [
           `${draft.title} wurde erstellt.`,
-          !isContentPdf && payload.rowCount != null ? `${payload.rowCount} Buchung(en) im Export.` : null,
+          !isContentPdf && payload.rowCount != null
+            ? `${payload.rowCount} Buchung(en) im Export.`
+            : null,
           payload.filePath
-        ].filter(Boolean).join('\n'),
+        ]
+          .filter(Boolean)
+          .join('\n'),
         meta: 'Agent-Export',
         filePath: payload.filePath
       })
@@ -2155,98 +2829,142 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const agentUiContext = useMemo(() => {
     const jobAnalysis = bookingAnalysis(selectedJob)
-    const openBookingCandidates = selectedJob && jobAnalysis
-      ? jobAnalysis.candidates
-        .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => !isCandidateApproved(item, selectedJob))
-      : []
+    const openBookingCandidates =
+      selectedJob && jobAnalysis
+        ? jobAnalysis.candidates
+            .map((item, idx) => ({ item, idx }))
+            .filter(({ item }) => !isCandidateApproved(item, selectedJob))
+        : []
     return {
       openReviewSummary: {
         selectedJobId,
         selectedCandidate,
         bookingCandidates: openBookingCandidates.length,
-        bankSuggestions: bankReview?.suggestions.filter((suggestion) => !suggestion.resolved).length || 0,
-        memberCreate: pendingMembers ? { status: pendingMembers.status, count: pendingMembers.members.length } : null,
-        memberUpdate: pendingMemberUpdates ? {
-          status: pendingMemberUpdates.status,
-          count: pendingMemberUpdates.changes.length,
-          fields: Array.from(new Set(pendingMemberUpdates.changes.map((change) => change.field))),
-          sample: pendingMemberUpdates.changes.slice(0, 30).map((change) => ({
-            memberId: change.memberId,
-            memberName: change.memberName,
-            field: change.field,
-            oldDisplay: change.oldDisplay,
-            newDisplay: change.newDisplay,
-            selected: change.selected,
-            applied: !!change.applied
-          }))
-        } : null,
-        contributionPayment: pendingContributionPayment ? { status: pendingContributionPayment.status, memberName: pendingContributionPayment.memberName, amount: pendingContributionPayment.amount } : null,
-        tagActions: pendingTagActions ? { status: pendingTagActions.status, count: pendingTagActions.changes.length } : null,
-        voucherTagActions: pendingVoucherTagActions ? { status: pendingVoucherTagActions.status, count: pendingVoucherTagActions.changes.length } : null,
-        voucherUpdates: pendingVoucherUpdates ? {
-          status: pendingVoucherUpdates.status,
-          count: pendingVoucherUpdates.changes.length,
-          sample: pendingVoucherUpdates.changes.slice(0, 40).map((change) => ({
-            voucherId: change.voucherId,
-            voucherNo: change.voucherNo,
-            date: change.date,
-            description: change.description,
-            grossAmount: change.grossAmount,
-            oldBudgetId: change.oldBudgetId,
-            oldBudgetLabel: change.oldBudgetLabel,
-            newBudgetId: change.newBudgetId,
-            newBudgetLabel: change.newBudgetLabel,
-            oldTags: change.oldTags || [],
-            newTags: change.newTags || [],
-            selected: change.selected,
-            applied: !!change.applied
-          }))
-        } : null,
-        voucherReverse: pendingVoucherReverse ? { status: pendingVoucherReverse.status, count: pendingVoucherReverse.vouchers.length } : null,
-        voucherRebook: pendingVoucherRebook ? { status: pendingVoucherRebook.status, original: pendingVoucherRebook.original.voucherNo || pendingVoucherRebook.original.id } : null,
-        invoiceActions: pendingInvoiceActions ? {
-          status: pendingInvoiceActions.status,
-          reason: pendingInvoiceActions.reason || null,
-          count: pendingInvoiceActions.changes.length,
-          sample: pendingInvoiceActions.changes.slice(0, 20).map((change) => ({
-            action: change.action,
-            selected: change.selected,
-            applied: !!change.applied,
-            createdId: change.createdId ?? null,
-            invoice: change.invoice
-          }))
-        } : null,
-        budgetActions: pendingBudgetActions ? {
-          status: pendingBudgetActions.status,
-          count: pendingBudgetActions.changes.length,
-          sample: pendingBudgetActions.changes.slice(0, 30).map((change) => ({
-            action: change.action,
-            budgetId: change.budgetId,
-            name: budgetLabelFromChange(change),
-            selected: change.selected,
-            applied: !!change.applied
-          }))
-        } : null,
-        earmarkActions: pendingEarmarkActions ? { status: pendingEarmarkActions.status, count: pendingEarmarkActions.changes.length } : null,
-        plannerQuestion: pendingPlannerQuestion?.status === 'OPEN' ? { question: pendingPlannerQuestion.question, missingTags: pendingPlannerQuestion.missingTags } : null
+        bankSuggestions:
+          bankReview?.suggestions.filter((suggestion) => !suggestion.resolved).length || 0,
+        memberCreate: pendingMembers
+          ? { status: pendingMembers.status, count: pendingMembers.members.length }
+          : null,
+        memberUpdate: pendingMemberUpdates
+          ? {
+              status: pendingMemberUpdates.status,
+              count: pendingMemberUpdates.changes.length,
+              fields: Array.from(
+                new Set(pendingMemberUpdates.changes.map((change) => change.field))
+              ),
+              sample: pendingMemberUpdates.changes.slice(0, 30).map((change) => ({
+                memberId: change.memberId,
+                memberName: change.memberName,
+                field: change.field,
+                oldDisplay: change.oldDisplay,
+                newDisplay: change.newDisplay,
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
+        contributionPayment: pendingContributionPayment
+          ? {
+              status: pendingContributionPayment.status,
+              memberName: pendingContributionPayment.memberName,
+              amount: pendingContributionPayment.amount
+            }
+          : null,
+        tagActions: pendingTagActions
+          ? { status: pendingTagActions.status, count: pendingTagActions.changes.length }
+          : null,
+        voucherTagActions: pendingVoucherTagActions
+          ? {
+              status: pendingVoucherTagActions.status,
+              count: pendingVoucherTagActions.changes.length
+            }
+          : null,
+        voucherUpdates: pendingVoucherUpdates
+          ? {
+              status: pendingVoucherUpdates.status,
+              count: pendingVoucherUpdates.changes.length,
+              sample: pendingVoucherUpdates.changes.slice(0, 40).map((change) => ({
+                voucherId: change.voucherId,
+                voucherNo: change.voucherNo,
+                date: change.date,
+                description: change.description,
+                grossAmount: change.grossAmount,
+                oldBudgetId: change.oldBudgetId,
+                oldBudgetLabel: change.oldBudgetLabel,
+                newBudgetId: change.newBudgetId,
+                newBudgetLabel: change.newBudgetLabel,
+                oldTags: change.oldTags || [],
+                newTags: change.newTags || [],
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
+        voucherReverse: pendingVoucherReverse
+          ? { status: pendingVoucherReverse.status, count: pendingVoucherReverse.vouchers.length }
+          : null,
+        voucherRebook: pendingVoucherRebook
+          ? {
+              status: pendingVoucherRebook.status,
+              original: pendingVoucherRebook.original.voucherNo || pendingVoucherRebook.original.id
+            }
+          : null,
+        invoiceActions: pendingInvoiceActions
+          ? {
+              status: pendingInvoiceActions.status,
+              reason: pendingInvoiceActions.reason || null,
+              count: pendingInvoiceActions.changes.length,
+              sample: pendingInvoiceActions.changes.slice(0, 20).map((change) => ({
+                action: change.action,
+                selected: change.selected,
+                applied: !!change.applied,
+                createdId: change.createdId ?? null,
+                invoice: change.invoice
+              }))
+            }
+          : null,
+        budgetActions: pendingBudgetActions
+          ? {
+              status: pendingBudgetActions.status,
+              count: pendingBudgetActions.changes.length,
+              sample: pendingBudgetActions.changes.slice(0, 30).map((change) => ({
+                action: change.action,
+                budgetId: change.budgetId,
+                name: budgetLabelFromChange(change),
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
+        earmarkActions: pendingEarmarkActions
+          ? { status: pendingEarmarkActions.status, count: pendingEarmarkActions.changes.length }
+          : null,
+        plannerQuestion:
+          pendingPlannerQuestion?.status === 'OPEN'
+            ? {
+                question: pendingPlannerQuestion.question,
+                missingTags: pendingPlannerQuestion.missingTags
+              }
+            : null
       },
-      activeBookingReview: openBookingCandidates.length ? {
-        jobId: selectedJob?.id,
-        title: selectedJob?.title,
-        openCandidateCount: openBookingCandidates.length,
-        candidates: openBookingCandidates.slice(0, 20).map(({ item, idx }) => ({
-          index: idx,
-          date: item.date,
-          type: item.type,
-          sphere: item.sphere,
-          grossAmount: item.grossAmount,
-          paymentAccountId: item.paymentAccountId,
-          description: item.description,
-          tags: item.tags || [],
-          warnings: item.warnings || []
-        }))
-      } : null,
+      activeBookingReview: openBookingCandidates.length
+        ? {
+            jobId: selectedJob?.id,
+            title: selectedJob?.title,
+            openCandidateCount: openBookingCandidates.length,
+            candidates: openBookingCandidates.slice(0, 20).map(({ item, idx }) => ({
+              index: idx,
+              date: item.date,
+              type: item.type,
+              sphere: item.sphere,
+              grossAmount: item.grossAmount,
+              paymentAccountId: item.paymentAccountId,
+              description: item.description,
+              tags: item.tags || [],
+              warnings: item.warnings || []
+            }))
+          }
+        : null,
       recentMessages: messages.slice(-8).map((message) => ({
         role: message.role,
         title: message.title || null,
@@ -2254,25 +2972,39 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: message.body.slice(0, 12000)
       }))
     }
-  }, [bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJob, selectedJobId])
-
-  const {
-    agentSessionId,
-    resetAgentSession,
-    shouldUseAgentRuntime,
-    runAgentRuntime
-  } = useAiAgentWorkflow({
-    initialSessionId: initialChat.agentSessionId || null,
-    filesLength: files.length,
-    hasOpenReviewWorkflow,
-    selectedJobId,
+  }, [
+    bankReview,
+    messages,
+    pendingBudgetActions,
+    pendingContributionPayment,
+    pendingEarmarkActions,
+    pendingInvoiceActions,
+    pendingMembers,
+    pendingMemberUpdates,
+    pendingPlannerQuestion,
+    pendingTagActions,
+    pendingVoucherRebook,
+    pendingVoucherReverse,
+    pendingVoucherTagActions,
+    pendingVoucherUpdates,
     selectedCandidate,
-    formatUsage: formatAiUsage,
-    pushMessage,
-    prepareAgentDraft,
-    onTrace: updateAgentTrace,
-    getUiContext: () => agentUiContext
-  })
+    selectedJob,
+    selectedJobId
+  ])
+
+  const { agentSessionId, resetAgentSession, shouldUseAgentRuntime, runAgentRuntime } =
+    useAiAgentWorkflow({
+      initialSessionId: initialChat.agentSessionId || null,
+      filesLength: files.length,
+      hasOpenReviewWorkflow,
+      selectedJobId,
+      selectedCandidate,
+      formatUsage: formatAiUsage,
+      pushMessage,
+      prepareAgentDraft,
+      onTrace: updateAgentTrace,
+      getUiContext: () => agentUiContext
+    })
 
   const loadSettings = useCallback(async () => {
     try {
@@ -2319,7 +3051,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           plannerHint: `Tag "${tag.name}" gezielt als Filter oder Änderung verwenden.`
         })),
         ...(budgets.rows || []).slice(0, 80).map((budget: any) => {
-          const label = budget.categoryName || budget.projectName || budget.name || `Budget ${budget.id}`
+          const label =
+            budget.categoryName || budget.projectName || budget.name || `Budget ${budget.id}`
           return {
             id: `budget-${budget.id}`,
             label,
@@ -2360,21 +3093,27 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     else setSelectedCandidate(0)
   }, [])
 
-  const appendFiles = useCallback((incoming: FileList | File[] | null) => {
-    const nextFiles = Array.from(incoming || [])
-    if (!nextFiles.length) return
-    const accepted = nextFiles.filter(isAiAttachmentFile)
-    const skipped = nextFiles.length - accepted.length
-    if (skipped > 0) {
-      notify('info', `${skipped} Datei(en) wurden übersprungen. Erlaubt sind PDF, PNG, JPG, XLSX, XLS, CSV und TSV.`)
-    }
-    if (!accepted.length) return
-    setFiles((current) => {
-      const existingKeys = new Set(current.map(filePreviewKey))
-      const additions = accepted.filter((file) => !existingKeys.has(filePreviewKey(file)))
-      return additions.length ? [...current, ...additions] : current
-    })
-  }, [notify])
+  const appendFiles = useCallback(
+    (incoming: FileList | File[] | null) => {
+      const nextFiles = Array.from(incoming || [])
+      if (!nextFiles.length) return
+      const accepted = nextFiles.filter(isAiAttachmentFile)
+      const skipped = nextFiles.length - accepted.length
+      if (skipped > 0) {
+        notify(
+          'info',
+          `${skipped} Datei(en) wurden übersprungen. Erlaubt sind PDF, PNG, JPG, XLSX, XLS, CSV und TSV.`
+        )
+      }
+      if (!accepted.length) return
+      setFiles((current) => {
+        const existingKeys = new Set(current.map(filePreviewKey))
+        const additions = accepted.filter((file) => !existingKeys.has(filePreviewKey(file)))
+        return additions.length ? [...current, ...additions] : current
+      })
+    },
+    [notify]
+  )
 
   const handleComposerDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer?.types?.includes('Files')) return
@@ -2397,13 +3136,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (dragDepthRef.current === 0) setIsDraggingFiles(false)
   }, [])
 
-  const handleComposerDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    if (!event.dataTransfer?.files?.length) return
-    event.preventDefault()
-    dragDepthRef.current = 0
-    setIsDraggingFiles(false)
-    appendFiles(event.dataTransfer.files)
-  }, [appendFiles])
+  const handleComposerDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer?.files?.length) return
+      event.preventDefault()
+      dragDepthRef.current = 0
+      setIsDraggingFiles(false)
+      appendFiles(event.dataTransfer.files)
+    },
+    [appendFiles]
+  )
 
   useEffect(() => {
     void loadSettings()
@@ -2416,7 +3158,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   useEffect(() => {
     if (!selectedJobId || selectedJob?.id === selectedJobId) return
     let cancelled = false
-    window.api.ai.jobs.get({ id: selectedJobId })
+    window.api.ai.jobs
+      .get({ id: selectedJobId })
       .then((job) => {
         if (!cancelled) setSelectedJob(job)
       })
@@ -2433,9 +3176,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null
       if (!target) return
-      const inHistory = !!historyDrawerRef.current?.contains(target) || !!historyButtonRef.current?.contains(target)
-      const inAgentContext = !!agentContextDrawerRef.current?.contains(target) || !!agentContextButtonRef.current?.contains(target)
-      const inSettings = !!settingsDrawerRef.current?.contains(target) || !!settingsButtonRef.current?.contains(target)
+      const inHistory =
+        !!historyDrawerRef.current?.contains(target) || !!historyButtonRef.current?.contains(target)
+      const inAgentContext =
+        !!agentContextDrawerRef.current?.contains(target) ||
+        !!agentContextButtonRef.current?.contains(target)
+      const inSettings =
+        !!settingsDrawerRef.current?.contains(target) ||
+        !!settingsButtonRef.current?.contains(target)
       if (showHistory && !inHistory) setShowHistory(false)
       if (showAgentContext && !inAgentContext) setShowAgentContext(false)
       if (showSettings && !inSettings) setShowSettings(false)
@@ -2477,7 +3225,26 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingPlannerQuestion,
       agentTrace
     })
-  }, [agentSessionId, agentTrace, bankReview, messages, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedCandidate, selectedJobId])
+  }, [
+    agentSessionId,
+    agentTrace,
+    bankReview,
+    messages,
+    pendingBudgetActions,
+    pendingContributionPayment,
+    pendingEarmarkActions,
+    pendingInvoiceActions,
+    pendingMembers,
+    pendingMemberUpdates,
+    pendingPlannerQuestion,
+    pendingTagActions,
+    pendingVoucherRebook,
+    pendingVoucherReverse,
+    pendingVoucherTagActions,
+    pendingVoucherUpdates,
+    selectedCandidate,
+    selectedJobId
+  ])
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -2497,19 +3264,39 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const analysis = useMemo(() => bookingAnalysis(selectedJob), [selectedJob])
   const candidate = analysis?.candidates?.[selectedCandidate] || null
   const openBookingJobs = useMemo(
-    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && job.status !== 'REJECTED' && hasOpenBookingCandidates(job)),
+    () =>
+      jobs.filter(
+        (job) =>
+          job.type === 'BOOKING_FROM_DOCUMENTS' &&
+          job.status !== 'REJECTED' &&
+          hasOpenBookingCandidates(job)
+      ),
     [jobs]
   )
   const completedBookingJobs = useMemo(
-    () => jobs.filter((job) => job.type === 'BOOKING_FROM_DOCUMENTS' && job.status === 'APPROVED' && !hasOpenBookingCandidates(job)),
+    () =>
+      jobs.filter(
+        (job) =>
+          job.type === 'BOOKING_FROM_DOCUMENTS' &&
+          job.status === 'APPROVED' &&
+          !hasOpenBookingCandidates(job)
+      ),
     [jobs]
   )
   const bankSuggestionGroups = useMemo(() => {
     const suggestions = bankReview?.suggestions || []
     return {
-      matches: suggestions.filter((suggestion) => !suggestion.resolved && suggestion.action === 'LINK_EXISTING'),
-      create: suggestions.filter((suggestion) => !suggestion.resolved && suggestion.action === 'CREATE_BOOKING'),
-      manual: suggestions.filter((suggestion) => !suggestion.resolved && (suggestion.action === 'NEEDS_MANUAL_REVIEW' || suggestion.action === 'MARK_CHECKED')),
+      matches: suggestions.filter(
+        (suggestion) => !suggestion.resolved && suggestion.action === 'LINK_EXISTING'
+      ),
+      create: suggestions.filter(
+        (suggestion) => !suggestion.resolved && suggestion.action === 'CREATE_BOOKING'
+      ),
+      manual: suggestions.filter(
+        (suggestion) =>
+          !suggestion.resolved &&
+          (suggestion.action === 'NEEDS_MANUAL_REVIEW' || suggestion.action === 'MARK_CHECKED')
+      ),
       done: suggestions.filter((suggestion) => !!suggestion.resolved)
     }
   }, [bankReview])
@@ -2529,7 +3316,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       items.push({
         id: 'member-create',
         title: 'Mitgliederanlage',
-        summary: pendingMembers.status === 'CREATED' ? 'Mitglieder wurden angelegt.' : 'Neue Mitglieder warten auf Freigabe.',
+        summary:
+          pendingMembers.status === 'CREATED'
+            ? 'Mitglieder wurden angelegt.'
+            : 'Neue Mitglieder warten auf Freigabe.',
         status: pendingMembers.status === 'CREATED' ? 'DONE' : 'OPEN',
         count: pendingMembers.members.length,
         anchorId: 'ai-review-members'
@@ -2539,7 +3329,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       items.push({
         id: 'member-update',
         title: 'Mitgliederänderungen',
-        summary: pendingMemberUpdates.status === 'APPLIED' ? 'Änderungen wurden übernommen.' : 'Mitgliedsdaten warten auf Review.',
+        summary:
+          pendingMemberUpdates.status === 'APPLIED'
+            ? 'Änderungen wurden übernommen.'
+            : 'Mitgliedsdaten warten auf Review.',
         status: pendingMemberUpdates.status === 'APPLIED' ? 'DONE' : 'OPEN',
         count: pendingMemberUpdates.changes.length,
         anchorId: 'ai-review-member-updates'
@@ -2559,7 +3352,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       items.push({
         id: 'tag-actions',
         title: 'Tag-Änderungen',
-        summary: pendingTagActions.status === 'APPLIED' ? 'Tag-Änderungen wurden übernommen.' : 'Tags warten auf Freigabe.',
+        summary:
+          pendingTagActions.status === 'APPLIED'
+            ? 'Tag-Änderungen wurden übernommen.'
+            : 'Tags warten auf Freigabe.',
         status: pendingTagActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
         count: pendingTagActions.changes.length,
         anchorId: 'ai-review-tag-actions'
@@ -2599,7 +3395,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       items.push({
         id: 'voucher-rebook',
         title: 'Storno & Ersatzbuchung',
-        summary: pendingVoucherRebook.reason || `${pendingVoucherRebook.original.voucherNo || `#${pendingVoucherRebook.original.id}`} wird korrigiert neu angelegt.`,
+        summary:
+          pendingVoucherRebook.reason ||
+          `${pendingVoucherRebook.original.voucherNo || `#${pendingVoucherRebook.original.id}`} wird korrigiert neu angelegt.`,
         status: pendingVoucherRebook.status === 'APPLIED' ? 'DONE' : 'OPEN',
         count: 1,
         anchorId: 'ai-review-voucher-rebook'
@@ -2636,7 +3434,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
     }
     if (bankReview) {
-      const openBankReviews = bankReview.suggestions.filter((suggestion) => !suggestion.resolved).length
+      const openBankReviews = bankReview.suggestions.filter(
+        (suggestion) => !suggestion.resolved
+      ).length
       items.push({
         id: 'bank-review',
         title: 'Bankimport-Vorschläge',
@@ -2647,19 +3447,42 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
     }
     if (selectedJob && analysis) {
-      const openCandidates = analysis.candidates.filter((item) => !isCandidateApproved(item, selectedJob)).length
+      const openCandidates = analysis.candidates.filter(
+        (item) => !isCandidateApproved(item, selectedJob)
+      ).length
       items.push({
         id: `booking-review-${selectedJob.id}`,
         title: selectedJob.title || `Buchungsvorschlag #${selectedJob.id}`,
-        summary: openCandidates ? 'Buchungsvorschläge warten auf Review.' : 'Alle Vorschläge wurden verarbeitet.',
+        summary: openCandidates
+          ? 'Buchungsvorschläge warten auf Review.'
+          : 'Alle Vorschläge wurden verarbeitet.',
         status: openCandidates ? 'OPEN' : 'DONE',
         count: openCandidates || analysis.candidates.length,
         anchorId: 'ai-review-booking'
       })
     }
     return items
-  }, [analysis, bankReview, pendingBudgetActions, pendingContributionPayment, pendingEarmarkActions, pendingInvoiceActions, pendingMembers, pendingMemberUpdates, pendingPlannerQuestion, pendingTagActions, pendingVoucherRebook, pendingVoucherReverse, pendingVoucherTagActions, pendingVoucherUpdates, selectedJob])
-  const activeMention = useMemo(() => activeMentionTrigger(prompt, promptCursor), [prompt, promptCursor])
+  }, [
+    analysis,
+    bankReview,
+    pendingBudgetActions,
+    pendingContributionPayment,
+    pendingEarmarkActions,
+    pendingInvoiceActions,
+    pendingMembers,
+    pendingMemberUpdates,
+    pendingPlannerQuestion,
+    pendingTagActions,
+    pendingVoucherRebook,
+    pendingVoucherReverse,
+    pendingVoucherTagActions,
+    pendingVoucherUpdates,
+    selectedJob
+  ])
+  const activeMention = useMemo(
+    () => activeMentionTrigger(prompt, promptCursor),
+    [prompt, promptCursor]
+  )
   const visibleMentions = useMemo(() => {
     if (!activeMention) return []
     const query = normalizeLookup(activeMention.query)
@@ -2670,10 +3493,26 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
       .slice(0, 9)
   }, [activeMention, mentionOptions])
-  const chatStarted = messages.length > 0 || !!selectedJob || !!bankReview || !!pendingMembers || !!pendingMemberUpdates || !!pendingContributionPayment || !!pendingTagActions || !!pendingVoucherTagActions || !!pendingVoucherUpdates || !!pendingVoucherReverse || !!pendingVoucherRebook || !!pendingInvoiceActions || !!pendingBudgetActions || !!pendingEarmarkActions || !!pendingPlannerQuestion
+  const chatStarted =
+    messages.length > 0 ||
+    !!selectedJob ||
+    !!bankReview ||
+    !!pendingMembers ||
+    !!pendingMemberUpdates ||
+    !!pendingContributionPayment ||
+    !!pendingTagActions ||
+    !!pendingVoucherTagActions ||
+    !!pendingVoucherUpdates ||
+    !!pendingVoucherReverse ||
+    !!pendingVoucherRebook ||
+    !!pendingInvoiceActions ||
+    !!pendingBudgetActions ||
+    !!pendingEarmarkActions ||
+    !!pendingPlannerQuestion
   const hasPendingReview = hasOpenReviewWorkflow()
   const hasPlannerQuestionOpen = pendingPlannerQuestion?.status === 'OPEN'
-  const isComposingPrompt = prompt.trim().length > 0 || files.length > 0 || visibleMentions.length > 0
+  const isComposingPrompt =
+    prompt.trim().length > 0 || files.length > 0 || visibleMentions.length > 0
   const latestMessage = messages.at(-1) || null
 
   useEffect(() => {
@@ -2698,9 +3537,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (isAssistantReacting) {
       setAvatarFrame('success')
 
-      reactionTimeoutId = window.setTimeout(() => {
-        setAssistantReactionUntil(0)
-      }, Math.max(0, assistantReactionUntil - Date.now()))
+      reactionTimeoutId = window.setTimeout(
+        () => {
+          setAssistantReactionUntil(0)
+        },
+        Math.max(0, assistantReactionUntil - Date.now())
+      )
 
       return () => {
         if (reactionTimeoutId != null) window.clearTimeout(reactionTimeoutId)
@@ -2710,23 +3552,33 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const restingFrame: AiAvatarFrame = isComposingPrompt
       ? 'thinking'
       : hasPlannerQuestionOpen || hasPendingReview
-      ? 'smirk'
-      : 'default'
+        ? 'smirk'
+        : 'default'
     setAvatarFrame(restingFrame)
 
-    const blinkIntervalId = window.setInterval(() => {
-      setAvatarFrame('blink')
-      blinkTimeoutId = window.setTimeout(() => {
-        setAvatarFrame(restingFrame)
-      }, 160)
-    }, hasPlannerQuestionOpen ? 3200 : chatStarted ? 4200 : 5200)
+    const blinkIntervalId = window.setInterval(
+      () => {
+        setAvatarFrame('blink')
+        blinkTimeoutId = window.setTimeout(() => {
+          setAvatarFrame(restingFrame)
+        }, 160)
+      },
+      hasPlannerQuestionOpen ? 3200 : chatStarted ? 4200 : 5200
+    )
 
     return () => {
       window.clearInterval(blinkIntervalId)
       if (blinkTimeoutId != null) window.clearTimeout(blinkTimeoutId)
       if (reactionTimeoutId != null) window.clearTimeout(reactionTimeoutId)
     }
-  }, [assistantReactionUntil, busy, chatStarted, hasPendingReview, hasPlannerQuestionOpen, isComposingPrompt])
+  }, [
+    assistantReactionUntil,
+    busy,
+    chatStarted,
+    hasPendingReview,
+    hasPlannerQuestionOpen,
+    isComposingPrompt
+  ])
 
   const removeFile = (key: string) => {
     setFiles((current) => current.filter((file) => filePreviewKey(file) !== key))
@@ -2757,12 +3609,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const openMessageBookingDraft = (draft: NonNullable<AiMessage['bookingDraft']>) => {
-    window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
-      detail: {
-        qa: draft.qa,
-        files: draft.files || []
-      }
-    }))
+    window.dispatchEvent(
+      new CustomEvent('ai:open-booking-draft', {
+        detail: {
+          qa: draft.qa,
+          files: draft.files || []
+        }
+      })
+    )
   }
 
   const openVoucherMention = async (mention: AiVoucherMention) => {
@@ -2782,14 +3636,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         })
         if (detached?.ok) return
       }
-      window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
-        detail: {
-          voucherId: mention.id,
-          voucherNo: mention.voucherNo,
-          date: mention.date,
-          q: mention.voucherNo || (mention.id ? String(mention.id) : undefined)
-        }
-      }))
+      window.dispatchEvent(
+        new CustomEvent('apply-voucher-jump', {
+          detail: {
+            voucherId: mention.id,
+            voucherNo: mention.voucherNo,
+            date: mention.date,
+            q: mention.voucherNo || (mention.id ? String(mention.id) : undefined)
+          }
+        })
+      )
     } catch (error: any) {
       notify('error', error?.message || 'Buchung konnte nicht geöffnet werden.')
     }
@@ -2798,10 +3654,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const buildConversationPrompt = (userPrompt: string) => {
     const aiContext = JSON.stringify(agentUiContext, null, 2)
     if (!messages.length && !chatStarted) return userPrompt
-    const history = messages.slice(-8).map((message) => {
-      const speaker = message.role === 'user' ? 'Nutzer' : 'VereinO KI'
-      return `${speaker}${message.title ? ` (${message.title})` : ''}: ${message.body}`
-    }).join('\n\n')
+    const history = messages
+      .slice(-8)
+      .map((message) => {
+        const speaker = message.role === 'user' ? 'Nutzer' : 'VereinO KI'
+        return `${speaker}${message.title ? ` (${message.title})` : ''}: ${message.body}`
+      })
+      .join('\n\n')
     return [
       'Dies ist eine Folgefrage in der VereinO-KI. Beziehe dich auf die bisherige Unterhaltung und bleibe im VereinO-Kontext.',
       '',
@@ -2845,17 +3704,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const updateBankSuggestion = (transactionId: number, patch: Partial<AiBankReviewSuggestion>) => {
-    setBankReview((current) => current
-      ? {
-        ...current,
-        suggestions: current.suggestions.map((suggestion) => Number(suggestion.transactionId) === Number(transactionId)
-          ? { ...suggestion, ...patch }
-          : suggestion),
-        allSuggestions: current.allSuggestions?.map((suggestion) => Number(suggestion.transactionId) === Number(transactionId)
-          ? { ...suggestion, ...patch }
-          : suggestion)
-      }
-      : current)
+    setBankReview((current) =>
+      current
+        ? {
+            ...current,
+            suggestions: current.suggestions.map((suggestion) =>
+              Number(suggestion.transactionId) === Number(transactionId)
+                ? { ...suggestion, ...patch }
+                : suggestion
+            ),
+            allSuggestions: current.allSuggestions?.map((suggestion) =>
+              Number(suggestion.transactionId) === Number(transactionId)
+                ? { ...suggestion, ...patch }
+                : suggestion
+            )
+          }
+        : current
+    )
   }
 
   const decodeBase64ToBytes = (dataBase64: string) => {
@@ -2865,38 +3730,54 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     return bytes
   }
 
-  const openBookingDraftForCandidate = (job: TAiJobsGetOutput, reviewCandidate: TAiBookingCandidate, candidateIndex: number) => {
+  const openBookingDraftForCandidate = (
+    job: TAiJobsGetOutput,
+    reviewCandidate: TAiBookingCandidate,
+    candidateIndex: number
+  ) => {
     const paymentAccountName = reviewCandidate.paymentAccountId
-      ? paymentAccounts.find((account) => account.id === reviewCandidate.paymentAccountId)?.name || null
+      ? paymentAccounts.find((account) => account.id === reviewCandidate.paymentAccountId)?.name ||
+        null
       : null
     const draftFiles = (job.files || [])
       .filter((file) => !!file.dataBase64)
-      .map((file) => new File(
-        [decodeBase64ToBytes(file.dataBase64!)],
-        file.fileName,
-        { type: file.mimeType || 'application/octet-stream' }
-      ))
-    window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
-      detail: {
-        qa: {
-          date: reviewCandidate.date,
-          type: reviewCandidate.type,
-          sphere: reviewCandidate.sphere,
-          mode: 'GROSS',
-          grossAmount: reviewCandidate.grossAmount,
-          vatRate: reviewCandidate.vatRate ?? 0,
-          description: reviewCandidate.description,
-          note: ['Aus KI-Buchungsvorschlag vorbereitet.', ...(reviewCandidate.warnings || [])].filter(Boolean).join('\n'),
-          paymentMethod: reviewCandidate.paymentMethod ?? null,
-          paymentAccountId: reviewCandidate.paymentAccountId ?? null,
-          paymentAccountName,
-          budgets: (reviewCandidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
-          earmarksAssigned: (reviewCandidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
-          tags: reviewCandidate.tags || []
-        },
-        files: draftFiles
-      }
-    }))
+      .map(
+        (file) =>
+          new File([decodeBase64ToBytes(file.dataBase64!)], file.fileName, {
+            type: file.mimeType || 'application/octet-stream'
+          })
+      )
+    window.dispatchEvent(
+      new CustomEvent('ai:open-booking-draft', {
+        detail: {
+          qa: {
+            date: reviewCandidate.date,
+            type: reviewCandidate.type,
+            sphere: reviewCandidate.sphere,
+            mode: 'GROSS',
+            grossAmount: reviewCandidate.grossAmount,
+            vatRate: reviewCandidate.vatRate ?? 0,
+            description: reviewCandidate.description,
+            note: ['Aus KI-Buchungsvorschlag vorbereitet.', ...(reviewCandidate.warnings || [])]
+              .filter(Boolean)
+              .join('\n'),
+            paymentMethod: reviewCandidate.paymentMethod ?? null,
+            paymentAccountId: reviewCandidate.paymentAccountId ?? null,
+            paymentAccountName,
+            budgets: (reviewCandidate.budgets || []).map((budget) => ({
+              budgetId: budget.id,
+              amount: budget.amount
+            })),
+            earmarksAssigned: (reviewCandidate.earmarks || []).map((earmark) => ({
+              earmarkId: earmark.id,
+              amount: earmark.amount
+            })),
+            tags: reviewCandidate.tags || []
+          },
+          files: draftFiles
+        }
+      })
+    )
     pushMessage({
       role: 'assistant',
       title: 'Buchungsentwurf geöffnet',
@@ -2906,7 +3787,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const openBookingDraftFromJobId = async (jobId: number) => {
-    const job = selectedJob?.id === jobId ? selectedJob : await window.api.ai.jobs.get({ id: jobId })
+    const job =
+      selectedJob?.id === jobId ? selectedJob : await window.api.ai.jobs.get({ id: jobId })
     const jobAnalysis = bookingAnalysis(job)
     if (!jobAnalysis) {
       notify('error', 'Für diesen KI-Auftrag fehlt ein Buchungsvorschlag.')
@@ -2924,11 +3806,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const processDocuments = async (userPrompt: string) => {
     if (!files.length) throw new Error('Bitte mindestens eine Datei anhängen.')
-    const encoded = await Promise.all(files.map(async (file) => ({
-      fileName: file.name,
-      mimeType: file.type || undefined,
-      dataBase64: await fileToBase64(file)
-    })))
+    const encoded = await Promise.all(
+      files.map(async (file) => ({
+        fileName: file.name,
+        mimeType: file.type || undefined,
+        dataBase64: await fileToBase64(file)
+      }))
+    )
     const job = await window.api.ai.jobs.create({
       type: 'BOOKING_FROM_DOCUMENTS',
       title: userPrompt.trim() || (files.length === 1 ? files[0].name : `${files.length} Belege`),
@@ -2944,14 +3828,25 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     selectJob(processed)
     const processedAnalysis = processed.result as TAiBookingAnalysisResult | undefined
-    const sourceUnitCount = new Set((processedAnalysis?.candidates || []).map((item) => candidateSourceLabel(item) || `candidate-${item.description}`)).size
+    const sourceUnitCount = new Set(
+      (processedAnalysis?.candidates || []).map(
+        (item) => candidateSourceLabel(item) || `candidate-${item.description}`
+      )
+    ).size
     pushMessage({
       role: 'assistant',
       title: sourceUnitCount > 1 ? 'Stapel-Review vorbereitet' : 'Buchungsvorschlag vorbereitet',
-      body: sourceUnitCount > 1
-        ? 'Ich habe die Anhänge bzw. PDF-Seiten getrennt ausgewertet und einen Sammel-Review mit einzelnen Buchungsvorschlägen erstellt. Prüfe die Felder unten und buche erst danach.'
-        : 'Ich habe aus den Anhängen einen Review-Vorschlag erstellt. Prüfe die Felder unten und buche erst danach.',
-      meta: [ `${processed.fileCount} Datei(en)`, sourceUnitCount > 1 ? `${sourceUnitCount} Quellen` : null, formatAiUsage(processed.usage) ].filter(Boolean).join(' · '),
+      body:
+        sourceUnitCount > 1
+          ? 'Ich habe die Anhänge bzw. PDF-Seiten getrennt ausgewertet und einen Sammel-Review mit einzelnen Buchungsvorschlägen erstellt. Prüfe die Felder unten und buche erst danach.'
+          : 'Ich habe aus den Anhängen einen Review-Vorschlag erstellt. Prüfe die Felder unten und buche erst danach.',
+      meta: [
+        `${processed.fileCount} Datei(en)`,
+        sourceUnitCount > 1 ? `${sourceUnitCount} Quellen` : null,
+        formatAiUsage(processed.usage)
+      ]
+        .filter(Boolean)
+        .join(' · '),
       jobId: processed.id,
       reviewable: true
     })
@@ -2959,16 +3854,20 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const processFileTextTask = async (userPrompt: string) => {
     if (!files.length) throw new Error('Bitte mindestens eine Datei anhängen.')
-    const encoded = await Promise.all(files.map(async (file) => ({
-      fileName: file.name,
-      mimeType: file.type || undefined,
-      dataBase64: await fileToBase64(file)
-    })))
+    const encoded = await Promise.all(
+      files.map(async (file) => ({
+        fileName: file.name,
+        mimeType: file.type || undefined,
+        dataBase64: await fileToBase64(file)
+      }))
+    )
     const type = routeTextType(userPrompt || 'Analysiere die angehängten Dateien für VereinO.')
     const job = await window.api.ai.jobs.create({
       type: type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_TEXT',
       title: userPrompt.trim() || (files.length === 1 ? files[0].name : `${files.length} Dateien`),
-      prompt: userPrompt || 'Analysiere die angehängten Dateien für VereinO und schlage die nächsten Schritte vor.',
+      prompt:
+        userPrompt ||
+        'Analysiere die angehängten Dateien für VereinO und schlage die nächsten Schritte vor.',
       files: encoded
     })
     const processed = await window.api.ai.jobs.process({ id: job.id })
@@ -2982,7 +3881,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       role: 'assistant',
       title: draft.title,
       body: draft.body,
-      meta: [`${processed.fileCount} Datei(en)`, formatAiUsage(processed.usage)].filter(Boolean).join(' · '),
+      meta: [`${processed.fileCount} Datei(en)`, formatAiUsage(processed.usage)]
+        .filter(Boolean)
+        .join(' · '),
       jobId: processed.id,
       reviewable: false
     })
@@ -2998,7 +3899,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         data: result,
         type: 'REPORT_TEXT'
       })
-      setBankReview(filterBankReviewByAiText(result, userPrompt, `${aiResult?.draft?.title || ''}\n${aiResult?.draft?.body || ''}`))
+      setBankReview(
+        filterBankReviewByAiText(
+          result,
+          userPrompt,
+          `${aiResult?.draft?.title || ''}\n${aiResult?.draft?.body || ''}`
+        )
+      )
       return
     }
     setBankReview(result as AiBankReviewState)
@@ -3015,7 +3922,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     let offset = 0
     const limit = 100
     while (true) {
-      const result = await window.api.vouchers.list({ from, to, limit, offset, sortBy: 'date', sort: 'ASC' })
+      const result = await window.api.vouchers.list({
+        from,
+        to,
+        limit,
+        offset,
+        sortBy: 'date',
+        sort: 'ASC'
+      })
       rows.push(...(result.rows || []))
       if ((result.rows || []).length < limit) break
       offset += limit
@@ -3023,7 +3937,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     return rows
   }
 
-  const buildReportKpiData = async (request: ReturnType<typeof parseReportExportRequest>, filePath: string) => {
+  const buildReportKpiData = async (
+    request: ReturnType<typeof parseReportExportRequest>,
+    filePath: string
+  ) => {
     const [summary, monthly, cashBalance, vouchers, tags, contributionData] = await Promise.all([
       window.api.reports.summary({ from: request.payload.from, to: request.payload.to }),
       window.api.reports.monthly({ from: request.payload.from, to: request.payload.to }),
@@ -3034,11 +3951,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     ])
 
     const incomeGross = Number(summary.byType.find((row) => row.key === 'IN')?.gross || 0)
-    const expenseGross = Math.abs(Number(summary.byType.find((row) => row.key === 'OUT')?.gross || 0))
+    const expenseGross = Math.abs(
+      Number(summary.byType.find((row) => row.key === 'OUT')?.gross || 0)
+    )
     const resultGross = incomeGross - expenseGross
     const donationGross = vouchers
       .filter((voucher) => voucher.type === 'IN')
-      .filter((voucher) => (voucher.tags || []).some((tag) => /spende/i.test(tag)) || /spende|zuwendung|donation/i.test(voucher.description || ''))
+      .filter(
+        (voucher) =>
+          (voucher.tags || []).some((tag) => /spende/i.test(tag)) ||
+          /spende|zuwendung|donation/i.test(voucher.description || '')
+      )
       .reduce((sum, voucher) => sum + Math.abs(Number(voucher.grossAmount || 0)), 0)
 
     const expenseTagTotals = new Map<string, { tag: string; gross: number; count: number }>()
@@ -3096,7 +4019,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       await answerToolResultWithAi({
         userPrompt,
         title: 'Controllingbericht exportiert',
-        toolName: 'reports.export + reports.summary + reports.monthly + reports.cashBalance + vouchers.list + payments.status',
+        toolName:
+          'reports.export + reports.summary + reports.monthly + reports.cashBalance + vouchers.list + payments.status',
         data: reportData,
         type: 'REPORT_TEXT',
         filePath: result.filePath
@@ -3124,7 +4048,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const parsed = parseMemberDraftsFromText(userPrompt)
     if (!parsed) return false
     setPendingMembers(parsed)
-    const missingContribution = parsed.members.some((member) => !member.contributionAmount || !member.contributionInterval)
+    const missingContribution = parsed.members.some(
+      (member) => !member.contributionAmount || !member.contributionInterval
+    )
     pushMessage({
       role: 'assistant',
       title: 'Mitgliederanlage vorbereitet',
@@ -3174,7 +4100,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const createPendingMembers = async (stateOverride?: AiMemberImportState) => {
     const memberState = stateOverride || pendingMembers
     if (!memberState || memberState.status === 'CREATED') return
-    const missing = memberState.members.filter((member) => !member.name || !member.joinDate || !member.contributionAmount || !member.contributionInterval)
+    const missing = memberState.members.filter(
+      (member) =>
+        !member.name ||
+        !member.joinDate ||
+        !member.contributionAmount ||
+        !member.contributionInterval
+    )
     if (missing.length) {
       pushMessage({
         role: 'assistant',
@@ -3229,7 +4161,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     let offset = 0
     const limit = 200
     while (true) {
-      const result = await window.api.members.list({ limit, offset, status: 'ALL', sortBy: 'name', sort: 'ASC' })
+      const result = await window.api.members.list({
+        limit,
+        offset,
+        status: 'ALL',
+        sortBy: 'name',
+        sort: 'ASC'
+      })
       rows.push(...(result.rows || []))
       if ((result.rows || []).length < limit) break
       offset += limit
@@ -3238,34 +4176,48 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const loadDueRowsForMember = async (member: MemberRow) => {
-    const intervals: Array<NonNullable<TMemberCreateInput['contribution_interval']>> = member.contribution_interval
-      ? [member.contribution_interval]
-      : ['MONTHLY', 'QUARTERLY', 'YEARLY']
+    const intervals: Array<NonNullable<TMemberCreateInput['contribution_interval']>> =
+      member.contribution_interval
+        ? [member.contribution_interval]
+        : ['MONTHLY', 'QUARTERLY', 'YEARLY']
     const rows: PaymentDueRow[] = []
     for (const interval of intervals) {
-      const result = await window.api.payments.listDue({ interval, memberId: member.id, includePaid: false })
+      const result = await window.api.payments.listDue({
+        interval,
+        memberId: member.id,
+        includePaid: false
+      })
       rows.push(...(result.rows || []))
     }
     return rows
   }
 
   const memberNameFromPlan = (plan: TAiActionPlan) => {
-    return planValueString(findPlanFilter(plan, ['memberName', 'member_name', 'name', 'mitglied']))
-      || planValueString(findPlanArg(plan, ['memberName', 'member_name', 'name', 'mitglied']))
-      || planValueString(plan.items[0] ? planItemValue(plan.items[0], ['memberName', 'member_name', 'name', 'mitglied']) : undefined)
+    return (
+      planValueString(findPlanFilter(plan, ['memberName', 'member_name', 'name', 'mitglied'])) ||
+      planValueString(findPlanArg(plan, ['memberName', 'member_name', 'name', 'mitglied'])) ||
+      planValueString(
+        plan.items[0]
+          ? planItemValue(plan.items[0], ['memberName', 'member_name', 'name', 'mitglied'])
+          : undefined
+      )
+    )
   }
 
   const amountFromPaymentPlan = (plan: TAiActionPlan, userPrompt: string) => {
-    const planned = parsePlanAmount(findPlanChange(plan, ['amount', 'betrag', 'grossAmount', 'gross_amount']))
-      ?? parsePlanAmount(findPlanArg(plan, ['amount', 'betrag', 'grossAmount', 'gross_amount']))
+    const planned =
+      parsePlanAmount(findPlanChange(plan, ['amount', 'betrag', 'grossAmount', 'gross_amount'])) ??
+      parsePlanAmount(findPlanArg(plan, ['amount', 'betrag', 'grossAmount', 'gross_amount']))
     if (planned != null) return planned
     return parseMemberContributionAmount(userPrompt)
   }
 
   const dateFromPaymentPlan = (plan: TAiActionPlan) => {
-    return parsePlanDate(findPlanChange(plan, ['date', 'datum', 'datePaid', 'date_paid']))
-      || parsePlanDate(findPlanArg(plan, ['date', 'datum', 'datePaid', 'date_paid']))
-      || new Date().toISOString().slice(0, 10)
+    return (
+      parsePlanDate(findPlanChange(plan, ['date', 'datum', 'datePaid', 'date_paid'])) ||
+      parsePlanDate(findPlanArg(plan, ['date', 'datum', 'datePaid', 'date_paid'])) ||
+      new Date().toISOString().slice(0, 10)
+    )
   }
 
   const answerToolResultWithAi = async (input: {
@@ -3284,7 +4236,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       'Wenn ein Report exportiert wurde, nenne den Export klar und liefere zusätzlich die vom Nutzer gewünschten Kennzahlen, Erkenntnisse und offenen Annahmen aus den bereitgestellten Tool-Daten.',
       '',
       'Bisherige Unterhaltung:',
-      planConversation().map((message) => `${message.role === 'user' ? 'Nutzer' : 'VereinO KI'}${message.title ? ` (${message.title})` : ''}: ${message.body}`).join('\n\n') || '-',
+      planConversation()
+        .map(
+          (message) =>
+            `${message.role === 'user' ? 'Nutzer' : 'VereinO KI'}${message.title ? ` (${message.title})` : ''}: ${message.body}`
+        )
+        .join('\n\n') || '-',
       '',
       `Tool: ${input.toolName}`,
       'Tool-Ergebnis:',
@@ -3299,14 +4256,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       prompt: promptForModel
     })
     const processed = await window.api.ai.jobs.process({ id: job.id })
-    if (processed.status === 'FAILED') throw new Error(processed.error || 'KI-Antwort aus Tool-Ergebnis fehlgeschlagen.')
+    if (processed.status === 'FAILED')
+      throw new Error(processed.error || 'KI-Antwort aus Tool-Ergebnis fehlgeschlagen.')
     await loadJobs()
     const draft = processed.result as { title: string; body: string }
     pushMessage({
       role: 'assistant',
       title: draft.title || input.title,
       body: draft.body,
-      meta: ['KI-Antwort', input.toolName, formatAiUsage(processed.usage)].filter(Boolean).join(' · '),
+      meta: ['KI-Antwort', input.toolName, formatAiUsage(processed.usage)]
+        .filter(Boolean)
+        .join(' · '),
       jobId: processed.id,
       reviewable: false,
       filePath: input.filePath
@@ -3316,38 +4276,45 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const buildContributionDueData = async () => {
     const members = await loadAllMembers()
-    const rows = await Promise.all(members
-      .filter((member) => member.status !== 'LEFT' && member.contribution_amount && member.contribution_interval)
-      .map(async (member) => {
-        const status = await window.api.payments.status({ memberId: member.id })
-        const overdue = Number(status.overdue || 0)
-        const periodKey = status.firstOverdue || (status.nextDue ? String(new Date(status.nextDue).getUTCFullYear()) : null)
-        const suggestions = periodKey
-          ? await window.api.payments.suggestVouchers({
-            memberId: member.id,
-            name: member.name,
+    const rows = await Promise.all(
+      members
+        .filter(
+          (member) =>
+            member.status !== 'LEFT' && member.contribution_amount && member.contribution_interval
+        )
+        .map(async (member) => {
+          const status = await window.api.payments.status({ memberId: member.id })
+          const overdue = Number(status.overdue || 0)
+          const periodKey =
+            status.firstOverdue ||
+            (status.nextDue ? String(new Date(status.nextDue).getUTCFullYear()) : null)
+          const suggestions = periodKey
+            ? await window.api.payments.suggestVouchers({
+                memberId: member.id,
+                name: member.name,
+                amount: Number(status.amount || member.contribution_amount || 0),
+                periodKey
+              })
+            : { rows: [] }
+          return {
+            member: {
+              id: member.id,
+              memberNo: member.memberNo,
+              name: member.name,
+              status: member.status,
+              contributionAmount: member.contribution_amount,
+              contributionInterval: member.contribution_interval
+            },
+            status,
+            overdue,
             amount: Number(status.amount || member.contribution_amount || 0),
-            periodKey
-          })
-          : { rows: [] }
-        return {
-          member: {
-            id: member.id,
-            memberNo: member.memberNo,
-            name: member.name,
-            status: member.status,
-            contributionAmount: member.contribution_amount,
-            contributionInterval: member.contribution_interval
-          },
-          status,
-          overdue,
-          amount: Number(status.amount || member.contribution_amount || 0),
-          interval: status.interval || member.contribution_interval || 'YEARLY',
-          firstOverdue: status.firstOverdue || null,
-          nextDue: status.nextDue || member.next_due_date || null,
-          existingVoucherSuggestions: suggestions.rows || []
-        }
-      }))
+            interval: status.interval || member.contribution_interval || 'YEARLY',
+            firstOverdue: status.firstOverdue || null,
+            nextDue: status.nextDue || member.next_due_date || null,
+            existingVoucherSuggestions: suggestions.rows || []
+          }
+        })
+    )
     const openRows = rows.filter((row) => row.status.hasPlan && row.overdue > 0)
     const total = openRows.reduce((sum, row) => sum + row.amount * row.overdue, 0)
     return {
@@ -3376,17 +4343,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const total = data.summary.openAmount
     const body = openRows.length
       ? [
-        `Es gibt ${openRows.length} Mitglied(er) mit fälligen/offenen Beiträgen.`,
-        `Offener Betrag rechnerisch: ${euro.format(total)}`,
-        '',
-        ...openRows.map((row) => [
-          `- ${row.member.name}`,
-          row.member.memberNo ? `#${row.member.memberNo}` : null,
-          `${euro.format(row.amount)} ${intervalLabel(row.interval)}`,
-          row.overdue > 1 ? `${row.overdue} Zeiträume offen` : `Zeitraum ${row.firstOverdue || row.nextDue || '-'}`,
-          row.nextDue ? `nächste Fälligkeit ${formatIsoDate(row.nextDue)}` : null
-        ].filter(Boolean).join(' · '))
-      ].join('\n')
+          `Es gibt ${openRows.length} Mitglied(er) mit fälligen/offenen Beiträgen.`,
+          `Offener Betrag rechnerisch: ${euro.format(total)}`,
+          '',
+          ...openRows.map((row) =>
+            [
+              `- ${row.member.name}`,
+              row.member.memberNo ? `#${row.member.memberNo}` : null,
+              `${euro.format(row.amount)} ${intervalLabel(row.interval)}`,
+              row.overdue > 1
+                ? `${row.overdue} Zeiträume offen`
+                : `Zeitraum ${row.firstOverdue || row.nextDue || '-'}`,
+              row.nextDue ? `nächste Fälligkeit ${formatIsoDate(row.nextDue)}` : null
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          )
+        ].join('\n')
       : 'Aktuell sind nach den hinterlegten Beitragsplänen keine fälligen/offenen Mitgliedsbeiträge vorhanden.'
     pushMessage({
       role: 'assistant',
@@ -3408,17 +4381,22 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         if (plannedName && normalizeLookup(plannedName) === normalizedName) score += 100
         if (normalizedName && normalizedPrompt.includes(normalizedName)) score += 80
         score += nameParts.filter((part) => normalizedPrompt.includes(part)).length * 15
-        if (member.memberNo && normalizedPrompt.includes(normalizeLookup(member.memberNo))) score += 20
+        if (member.memberNo && normalizedPrompt.includes(normalizeLookup(member.memberNo)))
+          score += 20
         return { member, score }
       })
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
     if (scored[0]) return scored[0].member
 
-    const allDue = (await Promise.all(members.map(async (member) => ({
-      member,
-      due: await loadDueRowsForMember(member)
-    })))).filter((item) => item.due.length)
+    const allDue = (
+      await Promise.all(
+        members.map(async (member) => ({
+          member,
+          due: await loadDueRowsForMember(member)
+        }))
+      )
+    ).filter((item) => item.due.length)
     return allDue.length === 1 ? allDue[0].member : null
   }
 
@@ -3434,9 +4412,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
 
     const dueRows = await loadDueRowsForMember(member)
-    const plannedPeriod = planValueString(findPlanFilter(plan, ['periodKey', 'period_key', 'zeitraum']))
-      || planValueString(findPlanArg(plan, ['periodKey', 'period_key', 'zeitraum']))
-    const due = (plannedPeriod ? dueRows.find((row) => row.periodKey === plannedPeriod) : null) || dueRows[0]
+    const plannedPeriod =
+      planValueString(findPlanFilter(plan, ['periodKey', 'period_key', 'zeitraum'])) ||
+      planValueString(findPlanArg(plan, ['periodKey', 'period_key', 'zeitraum']))
+    const due =
+      (plannedPeriod ? dueRows.find((row) => row.periodKey === plannedPeriod) : null) || dueRows[0]
     if (!due) {
       pushMessage({
         role: 'assistant',
@@ -3448,8 +4428,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
     const amount = amountFromPaymentPlan(plan, userPrompt) ?? Number(due.amount || 0)
     const date = dateFromPaymentPlan(plan)
-    const accountName = planValueString(findPlanChange(plan, ['paymentAccountName', 'payment_account_name', 'zahlungskonto', 'konto']))
-      || planValueString(findPlanArg(plan, ['paymentAccountName', 'payment_account_name', 'zahlungskonto', 'konto']))
+    const accountName =
+      planValueString(
+        findPlanChange(plan, [
+          'paymentAccountName',
+          'payment_account_name',
+          'zahlungskonto',
+          'konto'
+        ])
+      ) ||
+      planValueString(
+        findPlanArg(plan, ['paymentAccountName', 'payment_account_name', 'zahlungskonto', 'konto'])
+      )
     const account = accountName
       ? findPaymentAccountHint(accountName, paymentAccounts)
       : findPaymentAccountHint(userPrompt, paymentAccounts)
@@ -3457,9 +4447,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const tags = ['Mitgliedsbeitrag']
     const warnings = []
     if (Math.abs(amount - Number(due.amount || 0)) > 0.01) {
-      warnings.push(`Buchungsbetrag ${euro.format(amount)} weicht vom offenen Beitragsbetrag ${euro.format(Number(due.amount || 0))} ab. VereinO markiert den Zeitraum nach Freigabe als bezahlt.`)
+      warnings.push(
+        `Buchungsbetrag ${euro.format(amount)} weicht vom offenen Beitragsbetrag ${euro.format(Number(due.amount || 0))} ab. VereinO markiert den Zeitraum nach Freigabe als bezahlt.`
+      )
     }
-    if (!account) warnings.push('Kein Zahlungskonto angegeben; die Buchung wird ohne konkretes Zahlungskonto vorbereitet.')
+    if (!account)
+      warnings.push(
+        'Kein Zahlungskonto angegeben; die Buchung wird ohne konkretes Zahlungskonto vorbereitet.'
+      )
 
     const draft: AiContributionPaymentState = {
       memberId: member.id,
@@ -3535,12 +4530,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           member.name,
           member.status !== 'ACTIVE' ? memberStatusLabel(member.status) : null,
           member.boardRole ? boardRoleLabel(member.boardRole) : null,
-          member.contribution_amount ? `${euro.format(member.contribution_amount)} ${intervalLabel(member.contribution_interval)}` : null
+          member.contribution_amount
+            ? `${euro.format(member.contribution_amount)} ${intervalLabel(member.contribution_interval)}`
+            : null
         ].filter(Boolean)
         return `- ${parts.join(' · ')}`
       }),
       rows.length > limited.length ? `... ${rows.length - limited.length} weitere` : ''
-    ].filter((line) => line !== '').join('\n')
+    ]
+      .filter((line) => line !== '')
+      .join('\n')
     pushMessage({
       role: 'assistant',
       title: 'Mitgliederübersicht',
@@ -3579,27 +4578,39 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const normalized = normalizeLookup(userPrompt)
     const wantsLowercase = /(klein|kleinschreib|lowercase|lower case|minuskel)/.test(normalized)
     const wantsUppercase = /(gross|groß|uppercase|upper case|majusk)/.test(normalized)
-    const wantsEmailTransform = /(email|e mail|mail|adresse|adressen)/.test(normalized)
-      || pendingMemberUpdates.changes.some((change) => change.field === 'email' && change.selected && !change.applied)
+    const wantsEmailTransform =
+      /(email|e mail|mail|adresse|adressen)/.test(normalized) ||
+      pendingMemberUpdates.changes.some(
+        (change) => change.field === 'email' && change.selected && !change.applied
+      )
     if ((wantsLowercase || wantsUppercase) && wantsEmailTransform) {
       let changed = 0
-      setPendingMemberUpdates((current) => current
-        ? {
-          ...current,
-          changes: current.changes.map((change) => {
-            if (change.applied || change.field !== 'email' || typeof change.newValue !== 'string') return change
-            const nextValue = wantsLowercase ? change.newValue.toLowerCase() : change.newValue.toUpperCase()
-            if (nextValue === change.newValue) return change
-            changed += 1
-            return {
-              ...change,
-              newValue: nextValue,
-              newDisplay: displayMemberValue(change.field, nextValue),
-              selected: true
+      setPendingMemberUpdates((current) =>
+        current
+          ? {
+              ...current,
+              changes: current.changes.map((change) => {
+                if (
+                  change.applied ||
+                  change.field !== 'email' ||
+                  typeof change.newValue !== 'string'
+                )
+                  return change
+                const nextValue = wantsLowercase
+                  ? change.newValue.toLowerCase()
+                  : change.newValue.toUpperCase()
+                if (nextValue === change.newValue) return change
+                changed += 1
+                return {
+                  ...change,
+                  newValue: nextValue,
+                  newDisplay: displayMemberValue(change.field, nextValue),
+                  selected: true
+                }
+              })
             }
-          })
-        }
-        : current)
+          : current
+      )
       pushMessage({
         role: 'assistant',
         title: 'Mitgliederänderung angepasst',
@@ -3611,21 +4622,33 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     const contribution = parseContributionHint(userPrompt)
     if (!contribution.amount && !contribution.interval) return false
-    setPendingMemberUpdates((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => {
-          if (change.applied) return change
-          if (change.field === 'contribution_amount' && contribution.amount != null) {
-            return { ...change, newValue: contribution.amount, newDisplay: displayMemberValue(change.field, contribution.amount), selected: true }
+    setPendingMemberUpdates((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) => {
+              if (change.applied) return change
+              if (change.field === 'contribution_amount' && contribution.amount != null) {
+                return {
+                  ...change,
+                  newValue: contribution.amount,
+                  newDisplay: displayMemberValue(change.field, contribution.amount),
+                  selected: true
+                }
+              }
+              if (change.field === 'contribution_interval' && contribution.interval) {
+                return {
+                  ...change,
+                  newValue: contribution.interval,
+                  newDisplay: displayMemberValue(change.field, contribution.interval),
+                  selected: true
+                }
+              }
+              return change
+            })
           }
-          if (change.field === 'contribution_interval' && contribution.interval) {
-            return { ...change, newValue: contribution.interval, newDisplay: displayMemberValue(change.field, contribution.interval), selected: true }
-          }
-          return change
-        })
-      }
-      : current)
+        : current
+    )
     pushMessage({
       role: 'assistant',
       title: 'Mitgliederänderung angepasst',
@@ -3635,17 +4658,25 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const toggleMemberUpdateChange = (id: string) => {
-    setPendingMemberUpdates((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingMemberUpdates((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const applyPendingMemberUpdates = async () => {
     if (!pendingMemberUpdates || pendingMemberUpdates.status === 'APPLIED') return
-    const selected = pendingMemberUpdates.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingMemberUpdates.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Mitgliederänderungen ausgewählt.')
       return
@@ -3665,7 +4696,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       const nextState: AiMemberUpdateState = {
         ...pendingMemberUpdates,
         status: 'APPLIED',
-        changes: pendingMemberUpdates.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true } : change)
+        changes: pendingMemberUpdates.changes.map((change) =>
+          appliedIds.has(change.id) ? { ...change, applied: true } : change
+        )
       }
       setPendingMemberUpdates(nextState)
       pushMessage({
@@ -3678,7 +4711,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Mitgliederänderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Mitgliederänderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Mitgliederänderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -3726,7 +4763,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `Beitragsbuchung ${voucher.voucherNo} erstellt.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Beitragsbuchung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Beitragsbuchung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -3738,12 +4779,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   function budgetLabelFromRow(budget: any) {
-    return budget?.categoryName || budget?.projectName || budget?.name || (budget?.id ? `Budget #${budget.id}` : '')
+    return (
+      budget?.categoryName ||
+      budget?.projectName ||
+      budget?.name ||
+      (budget?.id ? `Budget #${budget.id}` : '')
+    )
   }
 
   function budgetLabelFromChange(change: AiBudgetActionChange) {
     const payload = (change.payload || {}) as Partial<TBudgetUpsertInput>
-    return payload.categoryName || payload.projectName || payload.name || change.name || (change.budgetId ? `Budget #${change.budgetId}` : '')
+    return (
+      payload.categoryName ||
+      payload.projectName ||
+      payload.name ||
+      change.name ||
+      (change.budgetId ? `Budget #${change.budgetId}` : '')
+    )
   }
 
   const buildBudgetLookup = async (knownBudgets: Array<{ id: number; label: string }> = []) => {
@@ -3765,7 +4817,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     return lookup
   }
 
-  const resolvePendingVoucherBudgetTargets = async (knownBudgets: Array<{ id: number; label: string }> = []) => {
+  const resolvePendingVoucherBudgetTargets = async (
+    knownBudgets: Array<{ id: number; label: string }> = []
+  ) => {
     const lookup = await buildBudgetLookup(knownBudgets)
     setPendingVoucherUpdates((current) => {
       if (!current) return current
@@ -3781,7 +4835,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     })
   }
 
-  const processTagRead = async (userPrompt = 'Tags, Kategorien, Budgets und Zweckbindungen abfragen') => {
+  const processTagRead = async (
+    userPrompt = 'Tags, Kategorien, Budgets und Zweckbindungen abfragen'
+  ) => {
     const [tags, budgets, bindings] = await Promise.all([
       loadTags(),
       window.api.budgets.list({ includeArchived: true }),
@@ -3792,7 +4848,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const budgetLabels = budgetRows
       .map((budget) => budget.categoryName || budget.projectName || budget.name)
       .filter(Boolean)
-      .filter((name, idx, list) => list.findIndex((item) => normalizeLookup(item) === normalizeLookup(name)) === idx)
+      .filter(
+        (name, idx, list) =>
+          list.findIndex((item) => normalizeLookup(item) === normalizeLookup(name)) === idx
+      )
     if (settings.hasApiKey) {
       await answerToolResultWithAi({
         userPrompt,
@@ -3813,25 +4872,45 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       title: 'Angelegte Tags und Kategorien',
       body: [
         'Tags:',
-        tags.length ? tags.map((tag) => `- ${tag.name}${tag.usage != null ? ` · ${tag.usage} Nutzung(en)` : ''}`).join('\n') : '- keine Tags angelegt',
+        tags.length
+          ? tags
+              .map(
+                (tag) => `- ${tag.name}${tag.usage != null ? ` · ${tag.usage} Nutzung(en)` : ''}`
+              )
+              .join('\n')
+          : '- keine Tags angelegt',
         '',
         'Budgets/Kategorien:',
-        budgetLabels.length ? budgetLabels.map((name) => `- ${name}`).join('\n') : '- keine Budgets oder Kategorien angelegt',
+        budgetLabels.length
+          ? budgetLabels.map((name) => `- ${name}`).join('\n')
+          : '- keine Budgets oder Kategorien angelegt',
         '',
         'Zweckbindungen:',
-        bindingRows.length ? bindingRows.map((binding) => `- ${binding.code} · ${binding.name}${binding.isActive ? '' : ' · inaktiv'}`).join('\n') : '- keine Zweckbindungen angelegt'
+        bindingRows.length
+          ? bindingRows
+              .map(
+                (binding) =>
+                  `- ${binding.code} · ${binding.name}${binding.isActive ? '' : ' · inaktiv'}`
+              )
+              .join('\n')
+          : '- keine Zweckbindungen angelegt'
       ].join('\n'),
       meta: 'VereinO-Daten'
     })
   }
 
-  const buildTagActionDraft = async (userPrompt: string, fallbackText?: string): Promise<AiTagActionState | null> => {
+  const buildTagActionDraft = async (
+    userPrompt: string,
+    fallbackText?: string
+  ): Promise<AiTagActionState | null> => {
     const existingTags = await loadTags()
     const existingByName = new Map(existingTags.map((tag) => [normalizeLookup(tag.name), tag]))
     const normalizedPrompt = normalizeLookup(userPrompt)
     const changes: AiTagActionChange[] = []
 
-    const renameMatch = userPrompt.match(/(?:benenne|nenn|umbenenne|ändere|aendere)[^\n\r]*tag\s+(.+?)\s+(?:in|zu|auf)\s+(.+)$/i)
+    const renameMatch = userPrompt.match(
+      /(?:benenne|nenn|umbenenne|ändere|aendere)[^\n\r]*tag\s+(.+?)\s+(?:in|zu|auf)\s+(.+)$/i
+    )
     if (renameMatch) {
       const oldName = cleanTagCandidateName(renameMatch[1])
       const newName = cleanTagCandidateName(renameMatch[2])
@@ -3903,9 +4982,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const recoverTagActionsFromConversation = async (userPrompt: string) => {
-    const lastAssistant = [...messages].reverse().find((message) => message.role === 'assistant' && /(tag|tags)/i.test(`${message.title || ''}\n${message.body}`))
+    const lastAssistant = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === 'assistant' &&
+          /(tag|tags)/i.test(`${message.title || ''}\n${message.body}`)
+      )
     if (!lastAssistant) return false
-    const draft = await buildTagActionDraft(userPrompt, `${lastAssistant.title || ''}\n${lastAssistant.body}`)
+    const draft = await buildTagActionDraft(
+      userPrompt,
+      `${lastAssistant.title || ''}\n${lastAssistant.body}`
+    )
     if (!draft) return false
     setPendingTagActions(draft)
     pushMessage({
@@ -3918,44 +5006,70 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const toggleTagAction = (id: string) => {
-    setPendingTagActions((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingTagActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const toggleBudgetAction = (id: string) => {
-    setPendingBudgetActions((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingBudgetActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const toggleEarmarkAction = (id: string) => {
-    setPendingEarmarkActions((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingEarmarkActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const toggleInvoiceAction = (id: string) => {
-    setPendingInvoiceActions((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingInvoiceActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const applyPendingTagActions = async () => {
     if (!pendingTagActions || pendingTagActions.status === 'APPLIED') return
-    const selected = pendingTagActions.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingTagActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Tag-Änderungen ausgewählt.')
       return
@@ -3978,7 +5092,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       setPendingTagActions({
         ...pendingTagActions,
         status: 'APPLIED',
-        changes: pendingTagActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true } : change)
+        changes: pendingTagActions.changes.map((change) =>
+          appliedIds.has(change.id) ? { ...change, applied: true } : change
+        )
       })
       pushMessage({
         role: 'assistant',
@@ -3990,7 +5106,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Tag-Änderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Tag-Änderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Tag-Änderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -3998,7 +5118,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const applyPendingBudgetActions = async () => {
     if (!pendingBudgetActions || pendingBudgetActions.status === 'APPLIED') return
-    const selected = pendingBudgetActions.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingBudgetActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Budget-Änderungen ausgewählt.')
       return
@@ -4008,11 +5130,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       const resolvedBudgets: Array<{ id: number; label: string }> = []
       for (const change of selected) {
         if (change.action === 'DELETE') {
-          if (!change.budgetId) throw new Error(`Budget "${change.name}" kann ohne ID nicht gelöscht werden.`)
+          if (!change.budgetId)
+            throw new Error(`Budget "${change.name}" kann ohne ID nicht gelöscht werden.`)
           await window.api.budgets.delete({ id: change.budgetId })
         } else if (change.payload) {
           const result = await window.api.budgets.upsert(change.payload)
-          if (result?.id) resolvedBudgets.push({ id: result.id, label: budgetLabelFromChange(change) })
+          if (result?.id)
+            resolvedBudgets.push({ id: result.id, label: budgetLabelFromChange(change) })
         }
       }
       const appliedIds = new Set(selected.map((change) => change.id))
@@ -4021,7 +5145,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         status: 'APPLIED',
         changes: pendingBudgetActions.changes.map((change) => {
           if (!appliedIds.has(change.id)) return change
-          const resolved = resolvedBudgets.find((budget) => normalizeLookup(budget.label) === normalizeLookup(budgetLabelFromChange(change)))
+          const resolved = resolvedBudgets.find(
+            (budget) =>
+              normalizeLookup(budget.label) === normalizeLookup(budgetLabelFromChange(change))
+          )
           return { ...change, budgetId: resolved?.id ?? change.budgetId, applied: true }
         })
       })
@@ -4037,7 +5164,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Budget-Änderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Budget-Änderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Budget-Änderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -4045,7 +5176,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const applyPendingEarmarkActions = async () => {
     if (!pendingEarmarkActions || pendingEarmarkActions.status === 'APPLIED') return
-    const selected = pendingEarmarkActions.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingEarmarkActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Zweckbindungs-Änderungen ausgewählt.')
       return
@@ -4054,7 +5187,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     try {
       for (const change of selected) {
         if (change.action === 'DELETE') {
-          if (!change.earmarkId) throw new Error(`Zweckbindung "${change.name}" kann ohne ID nicht gelöscht werden.`)
+          if (!change.earmarkId)
+            throw new Error(`Zweckbindung "${change.name}" kann ohne ID nicht gelöscht werden.`)
           await window.api.bindings.delete({ id: change.earmarkId })
         } else if (change.payload) {
           await window.api.bindings.upsert(change.payload)
@@ -4064,7 +5198,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       setPendingEarmarkActions({
         ...pendingEarmarkActions,
         status: 'APPLIED',
-        changes: pendingEarmarkActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true } : change)
+        changes: pendingEarmarkActions.changes.map((change) =>
+          appliedIds.has(change.id) ? { ...change, applied: true } : change
+        )
       })
       pushMessage({
         role: 'assistant',
@@ -4077,7 +5213,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Zweckbindungs-Änderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Zweckbindungs-Änderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Zweckbindungs-Änderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -4085,7 +5225,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const applyPendingInvoiceActions = async () => {
     if (!pendingInvoiceActions || pendingInvoiceActions.status === 'APPLIED') return
-    const selected = pendingInvoiceActions.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingInvoiceActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Forderung oder Verbindlichkeit ausgewählt.')
       return
@@ -4101,7 +5243,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       setPendingInvoiceActions({
         ...pendingInvoiceActions,
         status: 'APPLIED',
-        changes: pendingInvoiceActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true, createdId: created.get(change.id) ?? change.createdId ?? null } : change)
+        changes: pendingInvoiceActions.changes.map((change) =>
+          appliedIds.has(change.id)
+            ? {
+                ...change,
+                applied: true,
+                createdId: created.get(change.id) ?? change.createdId ?? null
+              }
+            : change
+        )
       })
       pushMessage({
         role: 'assistant',
@@ -4113,7 +5263,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} offene Posten angelegt.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Offene Posten fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Offene Posten fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -4124,7 +5278,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     let offset = 0
     const limit = 100
     while (true) {
-      const result = await window.api.vouchers.list({ tag, limit, offset, sortBy: 'date', sort: 'DESC' })
+      const result = await window.api.vouchers.list({
+        tag,
+        limit,
+        offset,
+        sortBy: 'date',
+        sort: 'DESC'
+      })
       rows.push(...(result.rows || []))
       if ((result.rows || []).length < limit) break
       offset += limit
@@ -4143,13 +5303,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const addedTags = request.addedTags
       .map((tag) => resolveExistingTagName(tag, tags))
       .filter((tag) => normalizeLookup(tag) !== normalizeLookup(sourceTag))
-      .filter((tag, idx, list) => list.findIndex((item) => normalizeLookup(item) === normalizeLookup(tag)) === idx)
+      .filter(
+        (tag, idx, list) =>
+          list.findIndex((item) => normalizeLookup(item) === normalizeLookup(tag)) === idx
+      )
     if (!sourceTag || !addedTags.length) return null
     const vouchers = await loadVouchersByTag(sourceTag)
     const changes = vouchers
       .map((voucher) => {
         const currentTags = voucher.tags || []
-        const missingTags = addedTags.filter((tag) => !currentTags.some((existing) => normalizeLookup(existing) === normalizeLookup(tag)))
+        const missingTags = addedTags.filter(
+          (tag) =>
+            !currentTags.some((existing) => normalizeLookup(existing) === normalizeLookup(tag))
+        )
         if (!missingTags.length) return null
         const newTags = [...currentTags, ...missingTags]
         return {
@@ -4218,17 +5384,25 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }
 
   const toggleVoucherTagAction = (id: string) => {
-    setPendingVoucherTagActions((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingVoucherTagActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const applyPendingVoucherTagActions = async () => {
     if (!pendingVoucherTagActions || pendingVoucherTagActions.status === 'APPLIED') return
-    const selected = pendingVoucherTagActions.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingVoucherTagActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Buchungsänderungen ausgewählt.')
       return
@@ -4243,7 +5417,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       setPendingVoucherTagActions({
         ...pendingVoucherTagActions,
         status: 'APPLIED',
-        changes: pendingVoucherTagActions.changes.map((change) => appliedIds.has(change.id) ? { ...change, applied: true } : change)
+        changes: pendingVoucherTagActions.changes.map((change) =>
+          appliedIds.has(change.id) ? { ...change, applied: true } : change
+        )
       })
       pushMessage({
         role: 'assistant',
@@ -4256,44 +5432,71 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Buchungen aktualisiert.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Buchungsänderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
   }
 
   const toggleVoucherUpdate = (id: string) => {
-    setPendingVoucherUpdates((current) => current
-      ? {
-        ...current,
-        changes: current.changes.map((change) => change.id === id && !change.applied ? { ...change, selected: !change.selected } : change)
-      }
-      : current)
+    setPendingVoucherUpdates((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
   }
 
   const applyPendingVoucherUpdates = async () => {
     if (!pendingVoucherUpdates || pendingVoucherUpdates.status === 'APPLIED') return
-    const selected = pendingVoucherUpdates.changes.filter((change) => change.selected && !change.applied)
+    const selected = pendingVoucherUpdates.changes.filter(
+      (change) => change.selected && !change.applied
+    )
     if (!selected.length) {
       notify('info', 'Keine Buchungsänderungen ausgewählt.')
       return
     }
     setBusy(true)
     try {
-      const needsBudgetLookup = selected.some((change) => change.newBudgetId == null && !!change.newBudgetLabel)
+      const needsBudgetLookup = selected.some(
+        (change) => change.newBudgetId == null && !!change.newBudgetLabel
+      )
       const budgetLookup = needsBudgetLookup ? await buildBudgetLookup() : new Map<string, number>()
       for (const change of selected) {
         const hasBudgetChange = change.newBudgetId !== undefined || !!change.newBudgetLabel
-        const resolvedBudgetId = hasBudgetChange && change.newBudgetId == null && change.newBudgetLabel
-          ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
-          : change.newBudgetId
+        const resolvedBudgetId =
+          hasBudgetChange && change.newBudgetId == null && change.newBudgetLabel
+            ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
+            : change.newBudgetId
         if (hasBudgetChange && resolvedBudgetId == null && change.newBudgetLabel) {
-          throw new Error(`Budget "${change.newBudgetLabel}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`)
+          throw new Error(
+            `Budget "${change.newBudgetLabel}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`
+          )
         }
         const payload: TVoucherMetaUpdateInput = {
           id: change.voucherId,
-          ...(hasBudgetChange ? { budgetId: resolvedBudgetId ?? null, budgetAmount: Math.abs(Number(change.grossAmount || 0)) || undefined } : {}),
-          ...(change.newEarmarkId !== undefined ? { earmarkId: change.newEarmarkId, earmarkAmount: Math.abs(Number(change.grossAmount || 0)) || undefined } : {}),
+          ...(hasBudgetChange
+            ? {
+                budgetId: resolvedBudgetId ?? null,
+                budgetAmount: Math.abs(Number(change.grossAmount || 0)) || undefined
+              }
+            : {}),
+          ...(change.newEarmarkId !== undefined
+            ? {
+                earmarkId: change.newEarmarkId,
+                earmarkAmount: Math.abs(Number(change.grossAmount || 0)) || undefined
+              }
+            : {}),
           ...(change.newTags ? { tags: change.newTags } : {})
         }
         await window.api.vouchers.updateMeta(payload)
@@ -4304,9 +5507,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         status: 'APPLIED',
         changes: pendingVoucherUpdates.changes.map((change) => {
           if (!appliedIds.has(change.id)) return change
-          const resolvedBudgetId = change.newBudgetId == null && change.newBudgetLabel
-            ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
-            : change.newBudgetId
+          const resolvedBudgetId =
+            change.newBudgetId == null && change.newBudgetLabel
+              ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
+              : change.newBudgetId
           return { ...change, newBudgetId: resolvedBudgetId ?? change.newBudgetId, applied: true }
         })
       })
@@ -4321,7 +5525,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       notify('success', `${selected.length} Buchungsänderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Buchungsänderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
@@ -4339,9 +5547,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             originalId: voucher.id,
             reason: pendingVoucherReverse.reason || 'Storno per VereinO KI-Agent'
           })
-          reversed.push({ id: voucher.id, voucherNo: voucher.voucherNo, reversedVoucherNo: res.voucherNo })
+          reversed.push({
+            id: voucher.id,
+            voucherNo: voucher.voucherNo,
+            reversedVoucherNo: res.voucherNo
+          })
         } catch (error: any) {
-          failures.push(`${voucher.voucherNo || `#${voucher.id}`}: ${error?.message || String(error)}`)
+          failures.push(
+            `${voucher.voucherNo || `#${voucher.id}`}: ${error?.message || String(error)}`
+          )
         }
       }
       const reversedById = new Map(reversed.map((item) => [item.id, item.reversedVoucherNo]))
@@ -4362,9 +5576,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         role: 'assistant',
         title: failures.length ? 'Storno teilweise erstellt' : 'Storno erstellt',
         body: [
-          reversed.length ? `Storniert: ${reversed.map((item) => `${item.voucherNo || `#${item.id}`} -> ${item.reversedVoucherNo}`).join(', ')}` : 'Keine Buchung wurde storniert.',
+          reversed.length
+            ? `Storniert: ${reversed.map((item) => `${item.voucherNo || `#${item.id}`} -> ${item.reversedVoucherNo}`).join(', ')}`
+            : 'Keine Buchung wurde storniert.',
           failures.length ? `Fehler:\n${failures.join('\n')}` : ''
-        ].filter(Boolean).join('\n'),
+        ]
+          .filter(Boolean)
+          .join('\n'),
         meta: reversed.length ? 'VereinO-Daten geändert' : 'Keine Änderung'
       })
       if (failures.length) notify('error', `Storno teilweise fehlgeschlagen: ${failures[0]}`)
@@ -4433,7 +5651,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     setBusy(true)
     try {
-      const linked = await window.api.bankTransactions.link({ id: suggestion.transactionId, voucherId: suggestion.voucherId })
+      const linked = await window.api.bankTransactions.link({
+        id: suggestion.transactionId,
+        voucherId: suggestion.voucherId
+      })
       updateBankSuggestion(suggestion.transactionId, {
         resolved: 'LINKED',
         resolvedVoucherId: suggestion.voucherId,
@@ -4462,13 +5683,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         type: candidate.type,
         sphere: candidate.sphere,
         description: candidate.description,
-        note: ['Aus KI-Bankimport-Vorschlag erstellt.', suggestion.reason].filter(Boolean).join('\n'),
+        note: ['Aus KI-Bankimport-Vorschlag erstellt.', suggestion.reason]
+          .filter(Boolean)
+          .join('\n'),
         grossAmount: candidate.grossAmount,
         vatRate: candidate.vatRate ?? 0,
-        paymentMethod: candidate.paymentMethod ?? paymentMethodForAccount(transaction.paymentAccountKind) ?? 'BANK',
+        paymentMethod:
+          candidate.paymentMethod ??
+          paymentMethodForAccount(transaction.paymentAccountKind) ??
+          'BANK',
         paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId ?? undefined,
-        budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
-        earmarks: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
+        budgets: (candidate.budgets || []).map((budget) => ({
+          budgetId: budget.id,
+          amount: budget.amount
+        })),
+        earmarks: (candidate.earmarks || []).map((earmark) => ({
+          earmarkId: earmark.id,
+          amount: earmark.amount
+        })),
         tags: candidate.tags || [],
         bankTransactionId: suggestion.transactionId
       })
@@ -4493,27 +5725,40 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return
     }
     const transaction = suggestion.transaction || {}
-    window.dispatchEvent(new CustomEvent('ai:open-booking-draft', {
-      detail: {
-        qa: {
-          date: candidate.date,
-          type: candidate.type,
-          sphere: candidate.sphere,
-          mode: 'GROSS',
-          grossAmount: candidate.grossAmount,
-          vatRate: candidate.vatRate ?? 0,
-          description: candidate.description,
-          note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason].filter(Boolean).join('\n'),
-          paymentMethod: candidate.paymentMethod ?? paymentMethodForAccount(transaction.paymentAccountKind) ?? 'BANK',
-          paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId ?? null,
-          paymentAccountName: transaction.paymentAccountName ?? null,
-          budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
-          earmarksAssigned: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
-          tags: candidate.tags || [],
-          bankTransactionId: suggestion.transactionId
+    window.dispatchEvent(
+      new CustomEvent('ai:open-booking-draft', {
+        detail: {
+          qa: {
+            date: candidate.date,
+            type: candidate.type,
+            sphere: candidate.sphere,
+            mode: 'GROSS',
+            grossAmount: candidate.grossAmount,
+            vatRate: candidate.vatRate ?? 0,
+            description: candidate.description,
+            note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason]
+              .filter(Boolean)
+              .join('\n'),
+            paymentMethod:
+              candidate.paymentMethod ??
+              paymentMethodForAccount(transaction.paymentAccountKind) ??
+              'BANK',
+            paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId ?? null,
+            paymentAccountName: transaction.paymentAccountName ?? null,
+            budgets: (candidate.budgets || []).map((budget) => ({
+              budgetId: budget.id,
+              amount: budget.amount
+            })),
+            earmarksAssigned: (candidate.earmarks || []).map((earmark) => ({
+              earmarkId: earmark.id,
+              amount: earmark.amount
+            })),
+            tags: candidate.tags || [],
+            bankTransactionId: suggestion.transactionId
+          }
         }
-      }
-    }))
+      })
+    )
     pushMessage({
       role: 'assistant',
       title: 'Buchungsmodal geöffnet',
@@ -4525,7 +5770,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const checkBankSuggestion = async (suggestion: AiBankReviewSuggestion) => {
     setBusy(true)
     try {
-      await window.api.bankTransactions.check({ id: suggestion.transactionId, note: suggestion.reason || 'Per VereinO KI geprüft.' })
+      await window.api.bankTransactions.check({
+        id: suggestion.transactionId,
+        note: suggestion.reason || 'Per VereinO KI geprüft.'
+      })
       updateBankSuggestion(suggestion.transactionId, { resolved: 'CHECKED' })
       notify('success', `Bankbeleg #${suggestion.transactionId} wurde als geprüft markiert.`)
       onBooked?.()
@@ -4538,12 +5786,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const applyBankReviewFollowup = async (userPrompt: string) => {
     if (!bankReview) return false
-    const pool = (bankReview.allSuggestions?.length ? bankReview.allSuggestions : bankReview.suggestions) || []
+    const pool =
+      (bankReview.allSuggestions?.length ? bankReview.allSuggestions : bankReview.suggestions) || []
     if (!pool.length) return false
     const normalized = normalizeLookup(userPrompt)
-    const wantsBankAction = /(bankimport|bankbeleg|beleg|transaktion|diesen|diese|der|sommerfest|getraenk|getrank|verpflegung|grillgut|buchung|buche|buchen|anleg|erstell|verknuepf|verknupf)/.test(normalized)
+    const wantsBankAction =
+      /(bankimport|bankbeleg|beleg|transaktion|diesen|diese|der|sommerfest|getraenk|getrank|verpflegung|grillgut|buchung|buche|buchen|anleg|erstell|verknuepf|verknupf)/.test(
+        normalized
+      )
     if (!wantsBankAction) return false
-    const matched = extractBankSuggestionsFromAiText({ ...(bankReview as TAiBankImportReviewOutput), suggestions: pool }, userPrompt)
+    const matched = extractBankSuggestionsFromAiText(
+      { ...(bankReview as TAiBankImportReviewOutput), suggestions: pool },
+      userPrompt
+    )
     const selected = matched.length
       ? matched
       : bankReview.suggestions.length === 1
@@ -4555,10 +5810,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       suggestions: selected,
       allSuggestions: pool,
       sourceTotal: bankReview.sourceTotal || pool.length,
-      filterSummary: selected.length === pool.length ? null : `${selected.length} von ${pool.length} KI-Vorschlägen für diese Anfrage ausgewählt.`
+      filterSummary:
+        selected.length === pool.length
+          ? null
+          : `${selected.length} von ${pool.length} KI-Vorschlägen für diese Anfrage ausgewählt.`
     })
-    const shouldCreate = /(buchung|buche|buchen|anleg|erstell|verbuch|uebernehm|ubernehm)/.test(normalized)
-    const wantsDirectBooking = /(direkt|sofort|ohne review|ohne pruefung|ohne prufung|endgueltig|endgultig)/.test(normalized)
+    const shouldCreate = /(buchung|buche|buchen|anleg|erstell|verbuch|uebernehm|ubernehm)/.test(
+      normalized
+    )
+    const wantsDirectBooking =
+      /(direkt|sofort|ohne review|ohne pruefung|ohne prufung|endgueltig|endgultig)/.test(normalized)
     const suggestion = selected[0]
     if (shouldCreate && selected.length === 1) {
       if (suggestion.action === 'LINK_EXISTING' && suggestion.voucherId) {
@@ -4592,9 +5853,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     pushMessage({
       role: 'assistant',
       title: selected.length === 1 ? 'Bankbeleg ausgewählt' : 'Bankbelege gefiltert',
-      body: selected.length === 1
-        ? `Ich habe den passenden Bankbeleg #${selected[0].transactionId} ausgewählt. Du kannst ihn unten buchen oder verknüpfen.`
-        : `${selected.length} passende Bankbelege wurden ausgewählt. Bitte prüfe die Vorschläge unten.`,
+      body:
+        selected.length === 1
+          ? `Ich habe den passenden Bankbeleg #${selected[0].transactionId} ausgewählt. Du kannst ihn unten buchen oder verknüpfen.`
+          : `${selected.length} passende Bankbelege wurden ausgewählt. Bitte prüfe die Vorschläge unten.`,
       meta: 'Review aktualisiert'
     })
     return true
@@ -4614,8 +5876,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     const draft = processed.result as { title: string; body: string; notes?: string[] }
     await loadJobs()
-    const recoveredMembers = parseMemberDraftsFromText([promptForModel, draft.title, draft.body].join('\n'))
-    if (recoveredMembers && (wantsMemberCreation(userPrompt) || wantsMemberCreation(`${draft.title}\n${draft.body}`))) {
+    const recoveredMembers = parseMemberDraftsFromText(
+      [promptForModel, draft.title, draft.body].join('\n')
+    )
+    if (
+      recoveredMembers &&
+      (wantsMemberCreation(userPrompt) || wantsMemberCreation(`${draft.title}\n${draft.body}`))
+    ) {
       setPendingMembers(recoveredMembers)
       pushMessage({
         role: 'assistant',
@@ -4638,8 +5905,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         return
       }
     }
-    const voucherTagDraft = await buildVoucherTagActionDraft(`${userPrompt}\n${draft.title}\n${draft.body}`)
-    if (voucherTagDraft && (wantsVoucherTagAction(userPrompt) || wantsVoucherTagAction(draft.body) || /review-vorschlag/i.test(draft.body))) {
+    const voucherTagDraft = await buildVoucherTagActionDraft(
+      `${userPrompt}\n${draft.title}\n${draft.body}`
+    )
+    if (
+      voucherTagDraft &&
+      (wantsVoucherTagAction(userPrompt) ||
+        wantsVoucherTagAction(draft.body) ||
+        /review-vorschlag/i.test(draft.body))
+    ) {
       setPendingVoucherTagActions(voucherTagDraft)
       pushMessage({
         role: 'assistant',
@@ -4647,7 +5921,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: voucherTagDraft.changes.length
           ? `${voucherTagDraft.changes.length} Buchung(en) mit Tag „${voucherTagDraft.sourceTag}“ bekommen zusätzlich: ${voucherTagDraft.addedTags.join(', ')}. Bitte prüfe die Vorschau unten.`
           : `Keine offenen Änderungen: Alle Buchungen mit Tag „${voucherTagDraft.sourceTag}“ haben die gewünschten Tags bereits.`,
-        meta: ['Aus KI-Antwort in Review umgewandelt', formatAiUsage(processed.usage)].filter(Boolean).join(' · ')
+        meta: ['Aus KI-Antwort in Review umgewandelt', formatAiUsage(processed.usage)]
+          .filter(Boolean)
+          .join(' · ')
       })
       return
     }
@@ -4655,7 +5931,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       role: 'assistant',
       title: draft.title,
       body: draft.body,
-      meta: [typeLabel(type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_TEXT'), formatAiUsage(processed.usage)].filter(Boolean).join(' · '),
+      meta: [
+        typeLabel(type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_TEXT'),
+        formatAiUsage(processed.usage)
+      ]
+        .filter(Boolean)
+        .join(' · '),
       jobId: processed.id,
       reviewable: false
     })
@@ -4663,7 +5944,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const applyPaymentAccountFollowup = async (userPrompt: string) => {
     if (!selectedJob || !analysis) return false
-    if (selectedJob.type !== 'BOOKING_FROM_DOCUMENTS' || selectedJob.status !== 'NEEDS_REVIEW') return false
+    if (selectedJob.type !== 'BOOKING_FROM_DOCUMENTS' || selectedJob.status !== 'NEEDS_REVIEW')
+      return false
     const account = findPaymentAccountHint(userPrompt, paymentAccounts)
     if (!account) return false
     const applyAll = shouldApplyAccountHintToAll(userPrompt)
@@ -4679,12 +5961,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           ...item,
           paymentAccountId: account.id,
           paymentMethod,
-          warnings: (item.warnings || []).filter((warning) => !/kein konto|kein zahlungsweg|zahlung.*platzhalter/i.test(String(warning)))
+          warnings: (item.warnings || []).filter(
+            (warning) => !/kein konto|kein zahlungsweg|zahlung.*platzhalter/i.test(String(warning))
+          )
         }
       })
     }
     if (!changed) return false
-    const saved = await window.api.ai.jobs.updateCandidate({ id: selectedJob.id, result: nextResult })
+    const saved = await window.api.ai.jobs.updateCandidate({
+      id: selectedJob.id,
+      result: nextResult
+    })
     selectJob(saved, selectedCandidate)
     pushMessage({
       role: 'assistant',
@@ -4700,8 +5987,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (!selectedJob || !analysis || selectedJob.type !== 'BOOKING_FROM_DOCUMENTS') return false
     const normalized = normalizeLookup(userPrompt)
     if (plan.entity === 'vouchers' && ['create', 'update'].includes(plan.operation)) return true
-    if (/(diese|diesen|alle|vorschlaege|vorschlage|review|import|buchungen|kandidaten|hierzu)/.test(normalized)
-      && /(buch|buche|buchen|verbuch|uebernehm|ubernehm|freig|freigabe|tag|tags|stammdaten|brutto|netto)/.test(normalized)) return true
+    if (
+      /(diese|diesen|alle|vorschlaege|vorschlage|review|import|buchungen|kandidaten|hierzu)/.test(
+        normalized
+      ) &&
+      /(buch|buche|buchen|verbuch|uebernehm|ubernehm|freig|freigabe|tag|tags|stammdaten|brutto|netto)/.test(
+        normalized
+      )
+    )
+      return true
     return false
   }
 
@@ -4734,7 +6028,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     return missing
   }
 
-  const askMissingTagsBeforeBooking = (userPrompt: string, plan: TAiActionPlan, missingTags: string[]) => {
+  const askMissingTagsBeforeBooking = (
+    userPrompt: string,
+    plan: TAiActionPlan,
+    missingTags: string[]
+  ) => {
     const question: AiPlannerQuestionState = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       kind: 'BOOKING_REVIEW_MISSING_TAGS',
@@ -4748,12 +6046,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         {
           id: 'CREATE_TAGS_AND_BOOK_ALL',
           label: 'Tags anlegen & buchen',
-          description: 'Fehlende Tags werden angelegt, danach werden alle offenen Vorschläge gebucht.'
+          description:
+            'Fehlende Tags werden angelegt, danach werden alle offenen Vorschläge gebucht.'
         },
         {
           id: 'BOOK_ALL_WITHOUT_NEW_TAGS',
           label: 'Ohne neue Tags buchen',
-          description: 'Nicht vorhandene Tags werden aus den Vorschlägen entfernt, danach wird gebucht.'
+          description:
+            'Nicht vorhandene Tags werden aus den Vorschlägen entfernt, danach wird gebucht.'
         },
         {
           id: 'CREATE_TAGS_ONLY',
@@ -4788,16 +6088,22 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   ) => {
     if (!selectedJob || !analysis) return false
     const normalized = normalizeLookup(userPrompt)
-    const shouldBookAll = /(alle|saemtliche|samtliche|diese|diesen)/.test(normalized)
-      && /(buch|buche|buchen|verbuch|uebernehm|ubernehm|freig|freigabe)/.test(normalized)
-    const shouldCreateMissingTags = /(tag|tags|stammdaten|nicht exist|fehlen|fehlende|anleg|erstell)/.test(normalized)
-      || plan.changes.some((change) => normalizePlanKey(change.field).includes('tag'))
-      || shouldBookAll
+    const shouldBookAll =
+      /(alle|saemtliche|samtliche|diese|diesen)/.test(normalized) &&
+      /(buch|buche|buchen|verbuch|uebernehm|ubernehm|freig|freigabe)/.test(normalized)
+    const shouldCreateMissingTags =
+      /(tag|tags|stammdaten|nicht exist|fehlen|fehlende|anleg|erstell)/.test(normalized) ||
+      plan.changes.some((change) => normalizePlanKey(change.field).includes('tag')) ||
+      shouldBookAll
     const openIndexes = analysis.candidates
       .map((candidate, idx) => ({ candidate, idx }))
       .filter(({ candidate }) => !isCandidateApproved(candidate, selectedJob))
     if (!openIndexes.length) {
-      pushMessage({ role: 'assistant', title: 'Keine offenen Buchungsvorschläge', body: 'Alle Buchungsvorschläge in diesem Review sind bereits gebucht.' })
+      pushMessage({
+        role: 'assistant',
+        title: 'Keine offenen Buchungsvorschläge',
+        body: 'Alle Buchungsvorschläge in diesem Review sind bereits gebucht.'
+      })
       return true
     }
 
@@ -4815,21 +6121,28 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       createdTags = await ensureCandidateTags(candidateTags)
     }
 
-    const nextAnalysis: TAiBookingAnalysisResult = options.dropMissingTags && missingTags.length
-      ? {
-        ...analysis,
-        candidates: analysis.candidates.map((candidate) => ({
-          ...candidate,
-          tags: (candidate.tags || []).filter((tag) => !missingTags.some((missing) => normalizeLookup(missing) === normalizeLookup(tag))),
-          warnings: [
-            ...(candidate.warnings || []),
-            'Nicht vorhandene Tags wurden auf Wunsch vor dem Buchen entfernt.'
-          ]
-        }))
-      }
-      : analysis
+    const nextAnalysis: TAiBookingAnalysisResult =
+      options.dropMissingTags && missingTags.length
+        ? {
+            ...analysis,
+            candidates: analysis.candidates.map((candidate) => ({
+              ...candidate,
+              tags: (candidate.tags || []).filter(
+                (tag) =>
+                  !missingTags.some((missing) => normalizeLookup(missing) === normalizeLookup(tag))
+              ),
+              warnings: [
+                ...(candidate.warnings || []),
+                'Nicht vorhandene Tags wurden auf Wunsch vor dem Buchen entfernt.'
+              ]
+            }))
+          }
+        : analysis
 
-    const saved = await window.api.ai.jobs.updateCandidate({ id: selectedJob.id, result: nextAnalysis })
+    const saved = await window.api.ai.jobs.updateCandidate({
+      id: selectedJob.id,
+      result: nextAnalysis
+    })
     selectJob(saved, selectedCandidate)
 
     if (!bookAll) {
@@ -4837,7 +6150,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         role: 'assistant',
         title: 'Buchungsreview vorbereitet',
         body: [
-          createdTags.length ? `Ich habe ${createdTags.length} fehlende Tag(s) angelegt: ${createdTags.join(', ')}.` : 'Die Tags im aktuellen Review sind vorbereitet.',
+          createdTags.length
+            ? `Ich habe ${createdTags.length} fehlende Tag(s) angelegt: ${createdTags.join(', ')}.`
+            : 'Die Tags im aktuellen Review sind vorbereitet.',
           'Die Buchungen sind noch nicht übernommen. Bitte bestätige, wenn ich sie buchen soll.'
         ].join('\n'),
         meta: 'Review aktualisiert'
@@ -4850,7 +6165,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const failed: string[] = []
     for (const { idx } of openIndexes) {
       try {
-        const res = await window.api.ai.jobs.approveCandidate({ id: selectedJob.id, candidateIndex: idx })
+        const res = await window.api.ai.jobs.approveCandidate({
+          id: selectedJob.id,
+          candidateIndex: idx
+        })
         booked.push(res.voucherNo)
       } catch (error: any) {
         failed.push(`Vorschlag ${idx + 1}: ${error?.message || String(error)}`)
@@ -4864,10 +6182,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       role: 'assistant',
       title: failed.length ? 'Buchungsreview teilweise gebucht' : 'Buchungsreview gebucht',
       body: [
-        createdTags.length ? `Angelegte Tags: ${createdTags.join(', ')}` : 'Keine fehlenden Tags mussten angelegt werden.',
+        createdTags.length
+          ? `Angelegte Tags: ${createdTags.join(', ')}`
+          : 'Keine fehlenden Tags mussten angelegt werden.',
         booked.length ? `Gebucht: ${booked.join(', ')}` : 'Keine Buchung wurde erstellt.',
         failed.length ? `Fehler:\n${failed.join('\n')}` : ''
-      ].filter(Boolean).join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
       meta: 'VereinO-Daten geändert'
     })
     return true
@@ -4892,67 +6214,118 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setBusy(true)
     try {
       if (option.id === 'CREATE_TAGS_ONLY') {
-        await applyCurrentBookingReviewAction(pendingPlannerQuestion.sourcePrompt, pendingPlannerQuestion.plan, {
-          skipClarification: true,
-          bookAll: false,
-          createMissingTags: true
-        })
+        await applyCurrentBookingReviewAction(
+          pendingPlannerQuestion.sourcePrompt,
+          pendingPlannerQuestion.plan,
+          {
+            skipClarification: true,
+            bookAll: false,
+            createMissingTags: true
+          }
+        )
       } else if (option.id === 'BOOK_ALL_WITHOUT_NEW_TAGS') {
-        await applyCurrentBookingReviewAction(pendingPlannerQuestion.sourcePrompt, pendingPlannerQuestion.plan, {
-          skipClarification: true,
-          bookAll: true,
-          createMissingTags: false,
-          dropMissingTags: true
-        })
+        await applyCurrentBookingReviewAction(
+          pendingPlannerQuestion.sourcePrompt,
+          pendingPlannerQuestion.plan,
+          {
+            skipClarification: true,
+            bookAll: true,
+            createMissingTags: false,
+            dropMissingTags: true
+          }
+        )
       } else {
-        await applyCurrentBookingReviewAction(pendingPlannerQuestion.sourcePrompt, pendingPlannerQuestion.plan, {
-          skipClarification: true,
-          bookAll: true,
-          createMissingTags: true
-        })
+        await applyCurrentBookingReviewAction(
+          pendingPlannerQuestion.sourcePrompt,
+          pendingPlannerQuestion.plan,
+          {
+            skipClarification: true,
+            bookAll: true,
+            createMissingTags: true
+          }
+        )
       }
     } catch (error: any) {
       notify('error', error?.message || String(error))
-      pushMessage({ role: 'assistant', title: 'Ausführung fehlgeschlagen', body: error?.message || String(error) })
+      pushMessage({
+        role: 'assistant',
+        title: 'Ausführung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
     } finally {
       setBusy(false)
     }
   }
 
-  const planConversation = () => messages.slice(-10).map((message) => ({
-    role: message.role,
-    title: message.title,
-    body: message.body
-  }))
+  const planConversation = () =>
+    messages.slice(-10).map((message) => ({
+      role: message.role,
+      title: message.title,
+      body: message.body
+    }))
 
-  const hasRecentContributionContext = () => messages.slice(-6).some((message) => {
-    const text = normalizeLookup(`${message.title || ''}\n${message.body || ''}\n${message.meta || ''}`)
-    return /(offene mitgliedsbeitraege|beitragsstatus|faellige offene beitraege|mitgliedsbeitrag|beitragszahlung)/.test(text)
-  })
+  const hasRecentContributionContext = () =>
+    messages.slice(-6).some((message) => {
+      const text = normalizeLookup(
+        `${message.title || ''}\n${message.body || ''}\n${message.meta || ''}`
+      )
+      return /(offene mitgliedsbeitraege|beitragsstatus|faellige offene beitraege|mitgliedsbeitrag|beitragszahlung)/.test(
+        text
+      )
+    })
 
-  const hasRecentReportContext = () => messages.slice(-8).some((message) => {
-    const text = normalizeLookup(`${message.title || ''}\n${message.body || ''}\n${message.meta || ''}`)
-    return /(report|bericht|controlling|reports export|jahresergebnis|kpi|kennzahl|pdf controllingbericht)/.test(text)
-  })
+  const hasRecentReportContext = () =>
+    messages.slice(-8).some((message) => {
+      const text = normalizeLookup(
+        `${message.title || ''}\n${message.body || ''}\n${message.meta || ''}`
+      )
+      return /(report|bericht|controlling|reports export|jahresergebnis|kpi|kennzahl|pdf controllingbericht)/.test(
+        text
+      )
+    })
 
   const executeAiActionPlan = async (userPrompt: string) => {
     const modifiesPendingReview = hasOpenReviewWorkflow() && wantsModifyPendingReview(userPrompt)
-    if (!files.length && await applyPaymentAccountFollowup(userPrompt)) {
+    if (!files.length && (await applyPaymentAccountFollowup(userPrompt))) {
       return true
     }
-    if (!modifiesPendingReview && !files.length && pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED' && wantsApplyPendingVoucherActions(userPrompt)) {
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
+      pendingVoucherUpdates &&
+      pendingVoucherUpdates.status !== 'APPLIED' &&
+      wantsApplyPendingVoucherActions(userPrompt)
+    ) {
       await applyPendingVoucherUpdates()
       return true
     }
-    if (!modifiesPendingReview && !files.length && pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
+      pendingBudgetActions &&
+      pendingBudgetActions.status !== 'APPLIED' &&
+      wantsApplyPendingTagActions(userPrompt)
+    ) {
       await applyPendingBudgetActions()
       return true
     }
-    if (!modifiesPendingReview && !files.length && pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
+      pendingEarmarkActions &&
+      pendingEarmarkActions.status !== 'APPLIED' &&
+      wantsApplyPendingTagActions(userPrompt)
+    ) {
       await applyPendingEarmarkActions()
       return true
     }
-    if (!modifiesPendingReview && !files.length && pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED' && wantsApplyPendingTagActions(userPrompt)) {
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
+      pendingInvoiceActions &&
+      pendingInvoiceActions.status !== 'APPLIED' &&
+      wantsApplyPendingTagActions(userPrompt)
+    ) {
       await applyPendingInvoiceActions()
       return true
     }
@@ -4963,21 +6336,27 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const mentionHint = buildMentionPlannerHint(userPrompt, mentionOptions)
     const plannerPrompt = files.length
       ? [
-        userPrompt || 'Bitte die angehängten Dateien prüfen.',
-        mentionHint,
-        '',
-        'Aktueller VereinO-KI-Kontext:',
-        JSON.stringify(agentUiContext, null, 2),
-        '',
-        'Angehängte Dateien:',
-        ...files.map((file) => `- ${file.name} (${file.type || 'unbekannter MIME-Typ'}, ${file.size} Bytes)`)
-      ].filter(Boolean).join('\n')
+          userPrompt || 'Bitte die angehängten Dateien prüfen.',
+          mentionHint,
+          '',
+          'Aktueller VereinO-KI-Kontext:',
+          JSON.stringify(agentUiContext, null, 2),
+          '',
+          'Angehängte Dateien:',
+          ...files.map(
+            (file) => `- ${file.name} (${file.type || 'unbekannter MIME-Typ'}, ${file.size} Bytes)`
+          )
+        ]
+          .filter(Boolean)
+          .join('\n')
       : [
-        userPrompt,
-        mentionHint,
-        'Aktueller VereinO-KI-Kontext:',
-        JSON.stringify(agentUiContext, null, 2)
-      ].filter(Boolean).join('\n\n')
+          userPrompt,
+          mentionHint,
+          'Aktueller VereinO-KI-Kontext:',
+          JSON.stringify(agentUiContext, null, 2)
+        ]
+          .filter(Boolean)
+          .join('\n\n')
     const planned = await window.api.ai.actions.plan({
       prompt: plannerPrompt,
       conversation: planConversation()
@@ -4987,10 +6366,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
     if (files.length) {
       if (
-        plan.entity === 'vouchers'
-        || plan.entity === 'payments'
-        || plan.operation === 'create'
-        || shouldProcessFilesAsBookingDocuments(userPrompt, files)
+        plan.entity === 'vouchers' ||
+        plan.entity === 'payments' ||
+        plan.operation === 'create' ||
+        shouldProcessFilesAsBookingDocuments(userPrompt, files)
       ) {
         await processDocuments(userPrompt)
       } else {
@@ -5013,14 +6392,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return applyCurrentBookingReviewAction(userPrompt, plan)
     }
 
-    if (bankReview && await applyBankReviewFollowup(userPrompt)) {
+    if (bankReview && (await applyBankReviewFollowup(userPrompt))) {
       return true
     }
 
     if (
-      (plan.entity === 'reports' && plan.operation === 'export')
-      || wantsReportExport(userPrompt)
-      || (hasRecentReportContext() && wantsReportFollowup(userPrompt))
+      (plan.entity === 'reports' && plan.operation === 'export') ||
+      wantsReportExport(userPrompt) ||
+      (hasRecentReportContext() && wantsReportFollowup(userPrompt))
     ) {
       await processReportExport(userPrompt)
       return true
@@ -5031,7 +6410,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return true
     }
 
-    if ((wantsContributionPaymentAction(userPrompt) || (hasRecentContributionContext() && wantsContextualBookingLink(userPrompt))) && plan.operation !== 'read') {
+    if (
+      (wantsContributionPaymentAction(userPrompt) ||
+        (hasRecentContributionContext() && wantsContextualBookingLink(userPrompt))) &&
+      plan.operation !== 'read'
+    ) {
       return prepareContributionPayment(userPrompt, plan)
     }
 
@@ -5039,7 +6422,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       const state = memberStateFromPlan(plan, userPrompt) || parseMemberDraftsFromText(userPrompt)
       if (!state) return false
       setPendingMembers(state)
-      const missingContribution = state.members.some((member) => !member.contributionAmount || !member.contributionInterval)
+      const missingContribution = state.members.some(
+        (member) => !member.contributionAmount || !member.contributionInterval
+      )
       pushMessage({
         role: 'assistant',
         title: 'Mitgliederanlage vorbereitet',
@@ -5054,7 +6439,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return true
     }
 
-    if (wantsContributionDueRead(userPrompt) || (plan.entity === 'payments' && plan.operation === 'read')) {
+    if (
+      wantsContributionDueRead(userPrompt) ||
+      (plan.entity === 'payments' && plan.operation === 'read')
+    ) {
       await processContributionDueRead(userPrompt)
       return true
     }
@@ -5064,7 +6452,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return true
     }
 
-    if (plan.entity === 'payments' && (plan.operation === 'create' || plan.operation === 'update')) {
+    if (
+      plan.entity === 'payments' &&
+      (plan.operation === 'create' || plan.operation === 'update')
+    ) {
       return prepareContributionPayment(userPrompt, plan)
     }
 
@@ -5073,8 +6464,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return true
     }
 
-    if (plan.entity === 'tags' && (plan.operation === 'create' || plan.operation === 'update' || plan.operation === 'delete')) {
-      const handled = await prepareTagActions(tagPromptFromPlan(plan, userPrompt), plan.answer || plan.summary)
+    if (
+      plan.entity === 'tags' &&
+      (plan.operation === 'create' || plan.operation === 'update' || plan.operation === 'delete')
+    ) {
+      const handled = await prepareTagActions(
+        tagPromptFromPlan(plan, userPrompt),
+        plan.answer || plan.summary
+      )
       return handled
     }
 
@@ -5104,7 +6501,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return
     }
     const hasConversationContext = chatStarted || messages.length > 0
-    if (!files.length && !settings.hasApiKey && !isVereinRelevantPrompt(userPrompt) && !hasConversationContext) {
+    if (
+      !files.length &&
+      !settings.hasApiKey &&
+      !isVereinRelevantPrompt(userPrompt) &&
+      !hasConversationContext
+    ) {
       pushMessage({
         role: 'user',
         body: userPrompt
@@ -5130,18 +6532,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         const planned = await executeAiActionPlan(userPrompt)
         if (!planned) {
           if (files.length) {
-            if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
+            if (shouldProcessFilesAsBookingDocuments(userPrompt, files))
+              await processDocuments(userPrompt)
             else await processFileTextTask(userPrompt)
-          }
-          else await processText(userPrompt)
+          } else await processText(userPrompt)
         }
       } catch (error: any) {
         try {
           if (files.length) {
-            if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
+            if (shouldProcessFilesAsBookingDocuments(userPrompt, files))
+              await processDocuments(userPrompt)
             else await processFileTextTask(userPrompt)
-          }
-          else await processText(userPrompt)
+          } else await processText(userPrompt)
         } catch (fallbackError: any) {
           notify('error', fallbackError?.message || error?.message || String(error))
           pushMessage({
@@ -5156,7 +6558,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       return
     }
     if (!files.length && !pendingMembers && wantsCreatePendingMembers(userPrompt)) {
-      const recovered = parseMemberDraftsFromText(messages.map((message) => `${message.title || ''}\n${message.body}`).join('\n\n'))
+      const recovered = parseMemberDraftsFromText(
+        messages.map((message) => `${message.title || ''}\n${message.body}`).join('\n\n')
+      )
       if (recovered) {
         pushMessage({ role: 'user', body: userPrompt })
         setPendingMembers(recovered)
@@ -5165,15 +6569,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         return
       }
     }
-    if (!files.length && pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED') {
+    if (
+      !files.length &&
+      pendingVoucherTagActions &&
+      pendingVoucherTagActions.status !== 'APPLIED'
+    ) {
       setBusy(true)
       pushMessage({ role: 'user', body: userPrompt })
       try {
         if (wantsApplyPendingVoucherActions(userPrompt)) await applyPendingVoucherTagActions()
         else if (await applyVoucherTagCorrection(userPrompt)) {
           // Review was updated from the follow-up correction.
-        }
-        else if (wantsVoucherTagAction(userPrompt)) await prepareVoucherTagActions(userPrompt)
+        } else if (wantsVoucherTagAction(userPrompt)) await prepareVoucherTagActions(userPrompt)
         else if (!settings.hasApiKey) {
           notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
@@ -5183,7 +6590,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Buchungsauftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Buchungsauftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5196,7 +6607,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         const handled = await prepareVoucherTagActions(userPrompt)
         if (!handled) {
           if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5205,7 +6619,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Buchungsänderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5228,7 +6646,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Buchungsänderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Buchungsänderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5251,7 +6673,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Budget-Änderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Budget-Änderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5274,7 +6700,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Zweckbindungs-Änderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Zweckbindungs-Änderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5288,8 +6718,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         else if (wantsTagAction(userPrompt)) {
           const handled = await prepareTagActions(userPrompt)
           if (!handled && settings.hasApiKey) await processText(userPrompt)
-        }
-        else if (wantsTagRead(userPrompt)) await processTagRead(userPrompt)
+        } else if (wantsTagRead(userPrompt)) await processTagRead(userPrompt)
         else if (!settings.hasApiKey) {
           notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
@@ -5299,20 +6728,36 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Tag-Auftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Tag-Auftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
       return
     }
-    if (!files.length && !pendingTagActions && wantsApplyPendingTagActions(userPrompt) && messages.some((message) => message.role === 'assistant' && /(tag|tags)/i.test(`${message.title || ''}\n${message.body}`))) {
+    if (
+      !files.length &&
+      !pendingTagActions &&
+      wantsApplyPendingTagActions(userPrompt) &&
+      messages.some(
+        (message) =>
+          message.role === 'assistant' &&
+          /(tag|tags)/i.test(`${message.title || ''}\n${message.body}`)
+      )
+    ) {
       setBusy(true)
       pushMessage({ role: 'user', body: userPrompt })
       try {
         const handled = await recoverTagActionsFromConversation(userPrompt)
         if (!handled) {
           if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5321,7 +6766,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Tag-Auftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Tag-Auftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5331,11 +6780,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       setBusy(true)
       pushMessage({ role: 'user', body: userPrompt })
       try {
-        const shouldAskModelForSuggestions = extractTagNamesFromText(userPrompt).length === 0 && /(vorschlag|vorschlaeg|vorschläge|sinnvoll|empfehl)/i.test(userPrompt)
+        const shouldAskModelForSuggestions =
+          extractTagNamesFromText(userPrompt).length === 0 &&
+          /(vorschlag|vorschlaeg|vorschläge|sinnvoll|empfehl)/i.test(userPrompt)
         const handled = shouldAskModelForSuggestions ? false : await prepareTagActions(userPrompt)
         if (!handled) {
           if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5344,7 +6798,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Tag-Änderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Tag-Änderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5358,7 +6816,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Tag-Abfrage fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Tag-Abfrage fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5371,7 +6833,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         const handled = await applyMemberFollowup(userPrompt)
         if (!handled) {
           if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5380,7 +6845,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Auftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Auftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5395,7 +6864,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (wantsMemberUpdate(userPrompt)) await prepareMemberUpdate(userPrompt)
           else if (wantsMemberRead(userPrompt)) await processMemberRead(userPrompt)
           else if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5404,17 +6876,29 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Mitgliederauftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Mitgliederauftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
       return
     }
-    if (!files.length && pendingContributionPayment && pendingContributionPayment.status !== 'CREATED') {
+    if (
+      !files.length &&
+      pendingContributionPayment &&
+      pendingContributionPayment.status !== 'CREATED'
+    ) {
       setBusy(true)
       pushMessage({ role: 'user', body: userPrompt })
       try {
-        if (wantsCreatePendingMembers(userPrompt) || wantsApplyPendingMemberUpdates(userPrompt) || wantsContributionPaymentAction(userPrompt)) {
+        if (
+          wantsCreatePendingMembers(userPrompt) ||
+          wantsApplyPendingMemberUpdates(userPrompt) ||
+          wantsContributionPaymentAction(userPrompt)
+        ) {
           await createContributionPayment()
         } else if (!settings.hasApiKey) {
           notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
@@ -5425,13 +6909,22 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Beitragsauftrag fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Beitragsauftrag fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
       return
     }
-    if (!files.length && selectedJob && analysis && findPaymentAccountHint(userPrompt, paymentAccounts)) {
+    if (
+      !files.length &&
+      selectedJob &&
+      analysis &&
+      findPaymentAccountHint(userPrompt, paymentAccounts)
+    ) {
       setBusy(true)
       pushMessage({ role: 'user', body: userPrompt })
       try {
@@ -5440,7 +6933,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Zahlungskonto konnte nicht gesetzt werden', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Zahlungskonto konnte nicht gesetzt werden',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5453,7 +6950,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         const handled = await prepareMemberCreation(userPrompt)
         if (!handled) {
           if (!settings.hasApiKey) {
-            notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+            notify(
+              'error',
+              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+            )
             setShowSettings(true)
           } else {
             await processText(userPrompt)
@@ -5462,7 +6962,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Mitgliederanlage fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Mitgliederanlage fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5476,7 +6980,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Mitgliederänderung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Mitgliederänderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5490,7 +6998,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Beitragsprüfung fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Beitragsprüfung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5504,7 +7016,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
       } catch (error: any) {
         notify('error', error?.message || String(error))
-        pushMessage({ role: 'assistant', title: 'Mitgliederabfrage fehlgeschlagen', body: error?.message || String(error) })
+        pushMessage({
+          role: 'assistant',
+          title: 'Mitgliederabfrage fehlgeschlagen',
+          body: error?.message || String(error)
+        })
       } finally {
         setBusy(false)
       }
@@ -5543,10 +7059,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       meta: files.length ? `${files.length} Anhang/Anhänge` : undefined
     })
     try {
-      if (!files.length && await applyPaymentAccountFollowup(userPrompt)) {
+      if (!files.length && (await applyPaymentAccountFollowup(userPrompt))) {
         setPrompt('')
       } else if (files.length) {
-        if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
+        if (shouldProcessFilesAsBookingDocuments(userPrompt, files))
+          await processDocuments(userPrompt)
         else await processFileTextTask(userPrompt)
       } else if (wantsBankImportReview(userPrompt)) {
         await processBankImport(userPrompt)
@@ -5570,7 +7087,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (!selectedJob || !analysis) return
     const nextResult = {
       ...analysis,
-      candidates: analysis.candidates.map((item, idx) => idx === selectedCandidate ? next : item)
+      candidates: analysis.candidates.map((item, idx) => (idx === selectedCandidate ? next : item))
     }
     selectJob({ ...selectedJob, result: nextResult }, selectedCandidate)
   }
@@ -5590,7 +7107,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setBusy(true)
     try {
       await saveCandidate()
-      const res = await window.api.ai.jobs.approveCandidate({ id: selectedJob.id, candidateIndex: selectedCandidate })
+      const res = await window.api.ai.jobs.approveCandidate({
+        id: selectedJob.id,
+        candidateIndex: selectedCandidate
+      })
       notify('success', `Buchung ${res.voucherNo} erstellt.`)
       const refreshed = await window.api.ai.jobs.get({ id: selectedJob.id })
       selectJob(refreshed, selectedCandidate)
@@ -5633,14 +7153,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         defaultReasoningEffort: settings.defaultReasoningEffort,
         provider: settings.provider
       })
-      setSettings(normalizeAiSettings({
-        hasApiKey: next.hasApiKey,
-        model: next.model,
-        textModel: next.textModel,
-        defaultReasoningEffort: next.defaultReasoningEffort,
-        provider: next.provider,
-        apiBaseUrl: next.apiBaseUrl
-      }))
+      setSettings(
+        normalizeAiSettings({
+          hasApiKey: next.hasApiKey,
+          model: next.model,
+          textModel: next.textModel,
+          defaultReasoningEffort: next.defaultReasoningEffort,
+          provider: next.provider,
+          apiBaseUrl: next.apiBaseUrl
+        })
+      )
       setApiKey('')
       notify('success', 'KI-Einstellungen gespeichert.')
     } catch (error: any) {
@@ -5664,21 +7186,29 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const providerConfig = getAiProviderConfig(settings.provider)
   const handleProviderChange = (provider: TAiSettingsGetOutput['provider']) => {
     const nextConfig = getAiProviderConfig(provider)
-    const allowedModels = new Set(nextConfig.modelOptions.map((option) => option.value))
+    const allowedModels = new Set<string>(nextConfig.modelOptions.map((option) => option.value))
     setSettings((current) => ({
       ...current,
       provider,
       apiBaseUrl: nextConfig.apiBaseUrl,
       model: allowedModels.has(current.model) ? current.model : nextConfig.defaultModel,
-      textModel: allowedModels.has(current.textModel) ? current.textModel : nextConfig.defaultTextModel
+      textModel: allowedModels.has(current.textModel)
+        ? current.textModel
+        : nextConfig.defaultTextModel
     }))
   }
 
-  const markHistoryJobDone = async (event: React.MouseEvent, job: TAiJobsListOutput['rows'][number]) => {
+  const markHistoryJobDone = async (
+    event: React.MouseEvent,
+    job: TAiJobsListOutput['rows'][number]
+  ) => {
     event.stopPropagation()
     setBusy(true)
     try {
-      await window.api.ai.jobs.reject({ id: job.id, reason: 'Im KI-Verlauf als erledigt markiert.' })
+      await window.api.ai.jobs.reject({
+        id: job.id,
+        reason: 'Im KI-Verlauf als erledigt markiert.'
+      })
       if (selectedJob?.id === job.id) selectJob(null)
       await loadJobs()
       notify('success', 'Buchungsreview als erledigt markiert.')
@@ -5689,7 +7219,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
   }
 
-  const deleteHistoryJob = async (event: React.MouseEvent, job: TAiJobsListOutput['rows'][number]) => {
+  const deleteHistoryJob = async (
+    event: React.MouseEvent,
+    job: TAiJobsListOutput['rows'][number]
+  ) => {
     event.stopPropagation()
     setBusy(true)
     try {
@@ -5709,7 +7242,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     tone: 'open' | 'done' | 'task',
     metaItems?: Array<string | null | undefined>
   ) => {
-    const fallbackTitle = job.type === 'BOOKING_FROM_DOCUMENTS' ? `Buchungsvorschlag #${job.id}` : `KI-Aufgabe #${job.id}`
+    const fallbackTitle =
+      job.type === 'BOOKING_FROM_DOCUMENTS'
+        ? `Buchungsvorschlag #${job.id}`
+        : `KI-Aufgabe #${job.id}`
     const defaultMeta = [
       job.type === 'BOOKING_FROM_DOCUMENTS' ? bookingProgress(job) : typeLabel(job.type),
       statusLabel(job.status),
@@ -5725,7 +7261,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         <button
           className="ai-history-item-main"
           type="button"
-          onClick={() => { void openJob(job.id); setShowHistory(false) }}
+          onClick={() => {
+            void openJob(job.id)
+            setShowHistory(false)
+          }}
         >
           <span className="ai-history-item-icon" aria-hidden="true" />
           <span className="ai-history-item-copy">
@@ -5763,11 +7302,20 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const renderBankSuggestionActions = (suggestion: AiBankReviewSuggestion) => {
     if (suggestion.resolved) {
-      return <span className="ai-bank-resolved">{suggestion.resolvedVoucherNo ? `Erledigt · ${suggestion.resolvedVoucherNo}` : 'Erledigt'}</span>
+      return (
+        <span className="ai-bank-resolved">
+          {suggestion.resolvedVoucherNo ? `Erledigt · ${suggestion.resolvedVoucherNo}` : 'Erledigt'}
+        </span>
+      )
     }
     if (suggestion.action === 'LINK_EXISTING') {
       return (
-        <button className="btn primary" type="button" disabled={busy || !suggestion.voucherId} onClick={() => void linkBankSuggestion(suggestion)}>
+        <button
+          className="btn primary"
+          type="button"
+          disabled={busy || !suggestion.voucherId}
+          onClick={() => void linkBankSuggestion(suggestion)}
+        >
           Treffer verknüpfen
         </button>
       )
@@ -5775,10 +7323,20 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (suggestion.action === 'CREATE_BOOKING') {
       return (
         <>
-          <button className="btn" type="button" disabled={busy || !suggestion.bookingCandidate} onClick={() => openBankSuggestionBookingModal(suggestion)}>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy || !suggestion.bookingCandidate}
+            onClick={() => openBankSuggestionBookingModal(suggestion)}
+          >
             Im Modal prüfen
           </button>
-          <button className="btn primary" type="button" disabled={busy || !suggestion.bookingCandidate} onClick={() => void createBankSuggestionBooking(suggestion)}>
+          <button
+            className="btn primary"
+            type="button"
+            disabled={busy || !suggestion.bookingCandidate}
+            onClick={() => void createBankSuggestionBooking(suggestion)}
+          >
             Direkt buchen
           </button>
         </>
@@ -5786,19 +7344,34 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     if (suggestion.action === 'MARK_CHECKED') {
       return (
-        <button className="btn" type="button" disabled={busy} onClick={() => void checkBankSuggestion(suggestion)}>
+        <button
+          className="btn"
+          type="button"
+          disabled={busy}
+          onClick={() => void checkBankSuggestion(suggestion)}
+        >
           Als geprüft markieren
         </button>
       )
     }
-    return <span className="ai-bank-resolved ai-bank-resolved--muted">Bitte im Bankimport manuell prüfen</span>
+    return (
+      <span className="ai-bank-resolved ai-bank-resolved--muted">
+        Bitte im Bankimport manuell prüfen
+      </span>
+    )
   }
 
   const renderBankSuggestion = (suggestion: AiBankReviewSuggestion) => {
     const transaction = suggestion.transaction || {}
-    const voucherLabel = suggestion.voucherNo || suggestion.resolvedVoucherNo || (suggestion.voucherId ? `#${suggestion.voucherId}` : '')
+    const voucherLabel =
+      suggestion.voucherNo ||
+      suggestion.resolvedVoucherNo ||
+      (suggestion.voucherId ? `#${suggestion.voucherId}` : '')
     return (
-      <article key={suggestion.transactionId} className={`ai-bank-suggestion ai-bank-suggestion--${bankSuggestionTone(suggestion)}`}>
+      <article
+        key={suggestion.transactionId}
+        className={`ai-bank-suggestion ai-bank-suggestion--${bankSuggestionTone(suggestion)}`}
+      >
         <div className="ai-bank-suggestion-main">
           <div className="ai-bank-suggestion-title">
             <span className="ai-bank-suggestion-badge">{bankSuggestionLabel(suggestion)}</span>
@@ -5806,20 +7379,25 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             {bankSuggestionAmount(suggestion) && <em>{bankSuggestionAmount(suggestion)}</em>}
           </div>
           <p>{bankSuggestionTitle(suggestion)}</p>
-          <small>{transaction.bookingDate || ''}{voucherLabel ? ` · Buchung ${voucherLabel}` : ''}</small>
+          <small>
+            {transaction.bookingDate || ''}
+            {voucherLabel ? ` · Buchung ${voucherLabel}` : ''}
+          </small>
         </div>
         <div className="ai-bank-suggestion-detail">
           <span>{suggestion.reason}</span>
           {suggestion.warnings?.length ? <small>{suggestion.warnings.join(' · ')}</small> : null}
         </div>
-        <div className="ai-bank-suggestion-actions">
-          {renderBankSuggestionActions(suggestion)}
-        </div>
+        <div className="ai-bank-suggestion-actions">{renderBankSuggestionActions(suggestion)}</div>
       </article>
     )
   }
 
-  const renderBankSuggestionGroup = (title: string, subtitle: string, suggestions: AiBankReviewSuggestion[]) => {
+  const renderBankSuggestionGroup = (
+    title: string,
+    subtitle: string,
+    suggestions: AiBankReviewSuggestion[]
+  ) => {
     if (!suggestions.length) return null
     return (
       <section className="ai-bank-group">
@@ -5827,23 +7405,32 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           <strong>{title}</strong>
           <span>{subtitle}</span>
         </div>
-        <div className="ai-bank-suggestion-list">
-          {suggestions.map(renderBankSuggestion)}
-        </div>
+        <div className="ai-bank-suggestion-list">{suggestions.map(renderBankSuggestion)}</div>
       </section>
     )
   }
 
   const renderComposer = (placement: 'initial' | 'followup') => (
-    <section className={`card ai-composer-card ${placement === 'followup' ? 'ai-composer-card--followup' : ''}`}>
+    <section
+      className={`card ai-composer-card ${placement === 'followup' ? 'ai-composer-card--followup' : ''}`}
+    >
       {filePreviews.length > 0 && (
         <div className="ai-attachment-strip">
           {filePreviews.map((file) => (
             <span key={file.key} className="ai-attachment-preview">
-              <button className="ai-attachment-remove" type="button" onClick={() => removeFile(file.key)} aria-label={`${file.name} entfernen`}>
+              <button
+                className="ai-attachment-remove"
+                type="button"
+                onClick={() => removeFile(file.key)}
+                aria-label={`${file.name} entfernen`}
+              >
                 ×
               </button>
-              {file.url ? <img src={file.url} alt={file.name} /> : <i aria-hidden="true">{file.badge}</i>}
+              {file.url ? (
+                <img src={file.url} alt={file.name} />
+              ) : (
+                <i aria-hidden="true">{file.badge}</i>
+              )}
               <strong>{file.name}</strong>
             </span>
           ))}
@@ -5858,7 +7445,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         onDragLeave={handleComposerDragLeave}
         onDrop={handleComposerDrop}
       >
-        {!busy && <button className="btn ai-icon-btn" type="button" onClick={() => fileInputRef.current?.click()} aria-label="Anhänge hinzufügen">+</button>}
+        {!busy && (
+          <button
+            className="btn ai-icon-btn"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Anhänge hinzufügen"
+          >
+            +
+          </button>
+        )}
         <textarea
           ref={promptInputRef}
           className="input ai-prompt-input"
@@ -5871,9 +7467,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           onClick={syncPromptCursor}
           onKeyUp={syncPromptCursor}
           onSelect={syncPromptCursor}
-          placeholder={placement === 'followup' ? 'Nachfrage oder nächste Aufgabe...' : 'Was möchtest du erledigen?'}
+          placeholder={
+            placement === 'followup'
+              ? 'Nachfrage oder nächste Aufgabe...'
+              : 'Was möchtest du erledigen?'
+          }
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !(event.nativeEvent as any).isComposing) {
+            if (
+              event.key === 'Enter' &&
+              !event.shiftKey &&
+              !(event.nativeEvent as any).isComposing
+            ) {
               event.preventDefault()
               void submitPrompt()
             }
@@ -5882,7 +7486,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         {!busy && visibleMentions.length > 0 && (
           <div className="ai-mention-menu">
             {visibleMentions.map((option) => (
-              <button key={option.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertMention(option)}>
+              <button
+                key={option.id}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insertMention(option)}
+              >
                 <span>{option.scope}</span>
                 <strong>@{option.insert}</strong>
                 <small>{option.description}</small>
@@ -5895,7 +7504,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             Dateien hier ablegen, um sie an die Anfrage anzuhängen
           </div>
         )}
-        <button className="btn primary ai-send-btn" type="button" disabled={busy || (!prompt.trim() && !files.length)} onClick={() => void submitPrompt()}>
+        <button
+          className="btn primary ai-send-btn"
+          type="button"
+          disabled={busy || (!prompt.trim() && !files.length)}
+          onClick={() => void submitPrompt()}
+        >
           {busy ? <span className="ai-send-spinner" aria-hidden="true" /> : 'Senden'}
         </button>
         <input
@@ -5915,7 +7529,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   const renderAvatar = () => (
     <div
-      className={`ai-header-avatar ${busy ? 'is-busy' : ''} ${hasPendingReview ? 'is-reviewing' : ''} ${(avatarFrame === 'thinking' || avatarFrame === 'success') ? 'is-replacement-state' : ''}`}
+      className={`ai-header-avatar ${busy ? 'is-busy' : ''} ${hasPendingReview ? 'is-reviewing' : ''} ${avatarFrame === 'thinking' || avatarFrame === 'success' ? 'is-replacement-state' : ''}`}
       aria-hidden="true"
     >
       <img
@@ -5961,7 +7575,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               + Neuer Chat
             </button>
           )}
-          <span className={`ai-key-state ${settings.hasApiKey ? 'is-ready' : 'is-missing'}`}>{settings.hasApiKey ? 'API-Key aktiv' : 'API-Key fehlt'}</span>
+          <span className={`ai-key-state ${settings.hasApiKey ? 'is-ready' : 'is-missing'}`}>
+            {settings.hasApiKey ? 'API-Key aktiv' : 'API-Key fehlt'}
+          </span>
           <button
             ref={historyButtonRef}
             className="btn ai-icon-btn"
@@ -6018,7 +7634,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           {!chatStarted && (
             <div className="ai-prompt-examples">
               {PROMPT_EXAMPLES.map((example) => (
-                <button key={example} type="button" onClick={() => setPrompt(example)}>{example}</button>
+                <button key={example} type="button" onClick={() => setPrompt(example)}>
+                  {example}
+                </button>
               ))}
             </div>
           )}
@@ -6032,29 +7650,61 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 {messages.map((message) => {
                   const messageBody = message.displayBody ?? message.body
                   return (
-                    <article key={message.id} className={`ai-message ai-message--${message.role} ${message.role === 'assistant' && message.isStreaming ? 'is-streaming' : ''}`}>
+                    <article
+                      key={message.id}
+                      className={`ai-message ai-message--${message.role} ${message.role === 'assistant' && message.isStreaming ? 'is-streaming' : ''}`}
+                    >
                       <div className="ai-message-head">
-                        <strong>{message.title || (message.role === 'user' ? 'Du' : 'VereinO KI')}</strong>
+                        <strong>
+                          {message.title || (message.role === 'user' ? 'Du' : 'VereinO KI')}
+                        </strong>
                         {message.meta && <span>{message.meta}</span>}
                       </div>
-                      {message.role === 'assistant'
-                        ? message.isStreaming
-                          ? <p className="ai-message-stream-text">{messageBody}</p>
-                          : <AiMarkdown text={messageBody} onOpenVoucher={(mention) => void openVoucherMention(mention)} />
-                        : <p>{message.body}</p>}
+                      {message.role === 'assistant' ? (
+                        message.isStreaming ? (
+                          <p className="ai-message-stream-text">{messageBody}</p>
+                        ) : (
+                          <AiMarkdown
+                            text={messageBody}
+                            onOpenVoucher={(mention) => void openVoucherMention(mention)}
+                          />
+                        )
+                      ) : (
+                        <p>{message.body}</p>
+                      )}
                       {message.jobId && message.reviewable && (
                         <>
-                          <button className="btn" type="button" onClick={() => void openJob(message.jobId!)}>Review öffnen</button>
-                          <button className="btn" type="button" onClick={() => void openBookingDraftFromJobId(message.jobId!)}>Buchungsentwurf</button>
+                          <button
+                            className="btn"
+                            type="button"
+                            onClick={() => void openJob(message.jobId!)}
+                          >
+                            Review öffnen
+                          </button>
+                          <button
+                            className="btn"
+                            type="button"
+                            onClick={() => void openBookingDraftFromJobId(message.jobId!)}
+                          >
+                            Buchungsentwurf
+                          </button>
                         </>
                       )}
                       {message.bookingDraft && (
-                        <button className="btn" type="button" onClick={() => openMessageBookingDraft(message.bookingDraft!)}>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => openMessageBookingDraft(message.bookingDraft!)}
+                        >
                           Buchungsentwurf öffnen
                         </button>
                       )}
                       {message.filePath && (
-                        <button className="btn" type="button" onClick={() => void window.api.shell.showItemInFolder(message.filePath!)}>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => void window.api.shell.showItemInFolder(message.filePath!)}
+                        >
                           Im Ordner anzeigen
                         </button>
                       )}
@@ -6095,27 +7745,69 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             <section id="ai-review-members" className="card ai-member-review-card">
               <div className="ai-section-head">
                 <strong>Mitgliederanlage</strong>
-                <span>{pendingMembers.status === 'CREATED' ? 'angelegt' : `${pendingMembers.members.length} vorbereitet`}</span>
+                <span>
+                  {pendingMembers.status === 'CREATED'
+                    ? 'angelegt'
+                    : `${pendingMembers.members.length} vorbereitet`}
+                </span>
               </div>
               <div className="ai-member-review-list">
                 {pendingMembers.members.map((member, idx) => (
-                  <article key={`${member.name}-${idx}`} className={`ai-member-review-row ${member.createdId ? 'is-created' : ''}`}>
+                  <article
+                    key={`${member.name}-${idx}`}
+                    className={`ai-member-review-row ${member.createdId ? 'is-created' : ''}`}
+                  >
                     <div>
-                      <strong>{member.createdMemberNo ? `${member.createdMemberNo} · ` : ''}{member.name}</strong>
-                      <span>{member.boardRole === 'V1' ? 'Vorsitzender' : member.boardRole || 'Mitglied'}</span>
+                      <strong>
+                        {member.createdMemberNo ? `${member.createdMemberNo} · ` : ''}
+                        {member.name}
+                      </strong>
+                      <span>
+                        {member.boardRole === 'V1'
+                          ? 'Vorsitzender'
+                          : member.boardRole || 'Mitglied'}
+                      </span>
                     </div>
                     <dl>
-                      <div><dt>Geburt</dt><dd>{formatIsoDate(member.birthDate)}</dd></div>
-                      <div><dt>Eintritt</dt><dd>{formatIsoDate(member.joinDate)}</dd></div>
-                      <div><dt>Beitrag</dt><dd>{member.contributionAmount ? euro.format(member.contributionAmount) : 'fehlt'} {member.contributionInterval === 'YEARLY' ? 'jährlich' : member.contributionInterval || ''}</dd></div>
-                      <div><dt>Erste Frist</dt><dd>{formatIsoDate(member.nextDueDate)}</dd></div>
+                      <div>
+                        <dt>Geburt</dt>
+                        <dd>{formatIsoDate(member.birthDate)}</dd>
+                      </div>
+                      <div>
+                        <dt>Eintritt</dt>
+                        <dd>{formatIsoDate(member.joinDate)}</dd>
+                      </div>
+                      <div>
+                        <dt>Beitrag</dt>
+                        <dd>
+                          {member.contributionAmount
+                            ? euro.format(member.contributionAmount)
+                            : 'fehlt'}{' '}
+                          {member.contributionInterval === 'YEARLY'
+                            ? 'jährlich'
+                            : member.contributionInterval || ''}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Erste Frist</dt>
+                        <dd>{formatIsoDate(member.nextDueDate)}</dd>
+                      </div>
                     </dl>
                   </article>
                 ))}
               </div>
               <div className="ai-review-actions">
-                <span className="helper">{pendingMembers.status === 'CREATED' ? 'Diese Mitglieder wurden bereits angelegt.' : 'Bitte vor dem Anlegen prüfen.'}</span>
-                <button className="btn primary" type="button" disabled={busy || pendingMembers.status === 'CREATED'} onClick={() => void createPendingMembers()}>
+                <span className="helper">
+                  {pendingMembers.status === 'CREATED'
+                    ? 'Diese Mitglieder wurden bereits angelegt.'
+                    : 'Bitte vor dem Anlegen prüfen.'}
+                </span>
+                <button
+                  className="btn primary"
+                  type="button"
+                  disabled={busy || pendingMembers.status === 'CREATED'}
+                  onClick={() => void createPendingMembers()}
+                >
                   {pendingMembers.status === 'CREATED' ? 'Angelegt' : 'Mitglieder anlegen'}
                 </button>
               </div>
@@ -6123,19 +7815,31 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           )}
 
           {pendingMemberUpdates && (
-            <section id="ai-review-member-updates" className="card ai-member-review-card ai-member-update-card">
+            <section
+              id="ai-review-member-updates"
+              className="card ai-member-review-card ai-member-update-card"
+            >
               <div className="ai-section-head">
                 <strong>Mitgliederänderungen</strong>
-                <span>{pendingMemberUpdates.status === 'APPLIED' ? 'übernommen' : `${pendingMemberUpdates.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
+                <span>
+                  {pendingMemberUpdates.status === 'APPLIED'
+                    ? 'übernommen'
+                    : `${pendingMemberUpdates.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}
+                </span>
               </div>
               <div className="ai-member-update-list">
                 {pendingMemberUpdates.changes.map((change) => (
-                  <article key={change.id} className={`ai-member-update-row ${change.applied ? 'is-created' : ''}`}>
+                  <article
+                    key={change.id}
+                    className={`ai-member-update-row ${change.applied ? 'is-created' : ''}`}
+                  >
                     <label>
                       <input
                         type="checkbox"
                         checked={change.selected || change.applied}
-                        disabled={busy || change.applied || pendingMemberUpdates.status === 'APPLIED'}
+                        disabled={
+                          busy || change.applied || pendingMemberUpdates.status === 'APPLIED'
+                        }
                         onChange={() => toggleMemberUpdateChange(change.id)}
                       />
                       <span>
@@ -6153,41 +7857,89 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 ))}
               </div>
               <div className="ai-review-actions">
-                <span className="helper">{pendingMemberUpdates.status === 'APPLIED' ? 'Diese Änderungen wurden bereits übernommen.' : 'Bitte vor dem Übernehmen prüfen.'}</span>
+                <span className="helper">
+                  {pendingMemberUpdates.status === 'APPLIED'
+                    ? 'Diese Änderungen wurden bereits übernommen.'
+                    : 'Bitte vor dem Übernehmen prüfen.'}
+                </span>
                 <button
                   className="btn primary"
                   type="button"
-                  disabled={busy || pendingMemberUpdates.status === 'APPLIED' || !pendingMemberUpdates.changes.some((change) => change.selected && !change.applied)}
+                  disabled={
+                    busy ||
+                    pendingMemberUpdates.status === 'APPLIED' ||
+                    !pendingMemberUpdates.changes.some(
+                      (change) => change.selected && !change.applied
+                    )
+                  }
                   onClick={() => void applyPendingMemberUpdates()}
                 >
-                  {pendingMemberUpdates.status === 'APPLIED' ? 'Übernommen' : 'Änderungen übernehmen'}
+                  {pendingMemberUpdates.status === 'APPLIED'
+                    ? 'Übernommen'
+                    : 'Änderungen übernehmen'}
                 </button>
               </div>
             </section>
           )}
 
           {pendingContributionPayment && (
-            <section id="ai-review-contribution-payment" className="card ai-contribution-payment-card">
+            <section
+              id="ai-review-contribution-payment"
+              className="card ai-contribution-payment-card"
+            >
               <div className="ai-section-head">
                 <strong>Beitragsbuchung</strong>
-                <span>{pendingContributionPayment.status === 'CREATED' ? 'gebucht' : 'Review erforderlich'}</span>
+                <span>
+                  {pendingContributionPayment.status === 'CREATED'
+                    ? 'gebucht'
+                    : 'Review erforderlich'}
+                </span>
               </div>
-              <div className={`ai-contribution-payment-row ${pendingContributionPayment.status === 'CREATED' ? 'is-created' : ''}`}>
+              <div
+                className={`ai-contribution-payment-row ${pendingContributionPayment.status === 'CREATED' ? 'is-created' : ''}`}
+              >
                 <div>
                   <strong>{pendingContributionPayment.description}</strong>
-                  <span>{pendingContributionPayment.status === 'CREATED' && pendingContributionPayment.voucherNo ? `Buchung ${pendingContributionPayment.voucherNo}` : 'Wird nach Freigabe erstellt und verknüpft'}</span>
+                  <span>
+                    {pendingContributionPayment.status === 'CREATED' &&
+                    pendingContributionPayment.voucherNo
+                      ? `Buchung ${pendingContributionPayment.voucherNo}`
+                      : 'Wird nach Freigabe erstellt und verknüpft'}
+                  </span>
                 </div>
                 <dl>
-                  <div><dt>Mitglied</dt><dd>{pendingContributionPayment.memberName}</dd></div>
-                  <div><dt>Zeitraum</dt><dd>{pendingContributionPayment.periodKey}</dd></div>
-                  <div><dt>Betrag</dt><dd>{euro.format(pendingContributionPayment.amount)}</dd></div>
-                  <div><dt>Offen</dt><dd>{euro.format(pendingContributionPayment.dueAmount)}</dd></div>
-                  <div><dt>Datum</dt><dd>{formatIsoDate(pendingContributionPayment.date)}</dd></div>
-                  <div><dt>Konto</dt><dd>{pendingContributionPayment.paymentAccountName || 'kein Konto'}</dd></div>
+                  <div>
+                    <dt>Mitglied</dt>
+                    <dd>{pendingContributionPayment.memberName}</dd>
+                  </div>
+                  <div>
+                    <dt>Zeitraum</dt>
+                    <dd>{pendingContributionPayment.periodKey}</dd>
+                  </div>
+                  <div>
+                    <dt>Betrag</dt>
+                    <dd>{euro.format(pendingContributionPayment.amount)}</dd>
+                  </div>
+                  <div>
+                    <dt>Offen</dt>
+                    <dd>{euro.format(pendingContributionPayment.dueAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt>Datum</dt>
+                    <dd>{formatIsoDate(pendingContributionPayment.date)}</dd>
+                  </div>
+                  <div>
+                    <dt>Konto</dt>
+                    <dd>{pendingContributionPayment.paymentAccountName || 'kein Konto'}</dd>
+                  </div>
                 </dl>
                 {pendingContributionPayment.warnings.length ? (
                   <div className="ai-evidence">
-                    {pendingContributionPayment.warnings.map((warning, idx) => <span key={idx} className={warningClassName(warning)}>{warning}</span>)}
+                    {pendingContributionPayment.warnings.map((warning, idx) => (
+                      <span key={idx} className={warningClassName(warning)}>
+                        {warning}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -6203,7 +7955,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                   disabled={busy || pendingContributionPayment.status === 'CREATED'}
                   onClick={() => void createContributionPayment()}
                 >
-                  {pendingContributionPayment.status === 'CREATED' ? 'Gebucht' : 'Buchung erstellen & verknüpfen'}
+                  {pendingContributionPayment.status === 'CREATED'
+                    ? 'Gebucht'
+                    : 'Buchung erstellen & verknüpfen'}
                 </button>
               </div>
             </section>
@@ -6213,11 +7967,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             <section id="ai-review-tag-actions" className="card ai-tag-action-card">
               <div className="ai-section-head">
                 <strong>Tag-Änderungen</strong>
-                <span>{pendingTagActions.status === 'APPLIED' ? 'übernommen' : `${pendingTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
+                <span>
+                  {pendingTagActions.status === 'APPLIED'
+                    ? 'übernommen'
+                    : `${pendingTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}
+                </span>
               </div>
               <div className="ai-tag-action-list">
                 {pendingTagActions.changes.map((change) => (
-                  <article key={change.id} className={`ai-tag-action-row ${change.applied ? 'is-created' : ''}`}>
+                  <article
+                    key={change.id}
+                    className={`ai-tag-action-row ${change.applied ? 'is-created' : ''}`}
+                  >
                     <label>
                       <input
                         type="checkbox"
@@ -6225,7 +7986,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                         disabled={busy || change.applied || pendingTagActions.status === 'APPLIED'}
                         onChange={() => toggleTagAction(change.id)}
                       />
-                      <span className={`ai-tag-action-kind ai-tag-action-kind--${change.action.toLowerCase()}`}>{change.action === 'CREATE' ? 'Neu' : change.action === 'UPDATE' ? 'Ändern' : 'Löschen'}</span>
+                      <span
+                        className={`ai-tag-action-kind ai-tag-action-kind--${change.action.toLowerCase()}`}
+                      >
+                        {change.action === 'CREATE'
+                          ? 'Neu'
+                          : change.action === 'UPDATE'
+                            ? 'Ändern'
+                            : 'Löschen'}
+                      </span>
                       <strong>{change.name}</strong>
                     </label>
                     <div className="ai-tag-action-values">
@@ -6238,14 +8007,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 ))}
               </div>
               <div className="ai-review-actions">
-                <span className="helper">{pendingTagActions.status === 'APPLIED' ? 'Diese Tag-Änderungen wurden bereits übernommen.' : 'Bitte vor dem Übernehmen prüfen.'}</span>
+                <span className="helper">
+                  {pendingTagActions.status === 'APPLIED'
+                    ? 'Diese Tag-Änderungen wurden bereits übernommen.'
+                    : 'Bitte vor dem Übernehmen prüfen.'}
+                </span>
                 <button
                   className="btn primary"
                   type="button"
-                  disabled={busy || pendingTagActions.status === 'APPLIED' || !pendingTagActions.changes.some((change) => change.selected && !change.applied)}
+                  disabled={
+                    busy ||
+                    pendingTagActions.status === 'APPLIED' ||
+                    !pendingTagActions.changes.some((change) => change.selected && !change.applied)
+                  }
                   onClick={() => void applyPendingTagActions()}
                 >
-                  {pendingTagActions.status === 'APPLIED' ? 'Übernommen' : 'Tag-Änderungen übernehmen'}
+                  {pendingTagActions.status === 'APPLIED'
+                    ? 'Übernommen'
+                    : 'Tag-Änderungen übernehmen'}
                 </button>
               </div>
             </section>
@@ -6255,46 +8034,74 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             <section id="ai-review-voucher-tags" className="card ai-voucher-action-card">
               <div className="ai-section-head">
                 <strong>Buchungsänderungen</strong>
-                <span>{pendingVoucherTagActions.status === 'APPLIED' ? 'übernommen' : `${pendingVoucherTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}</span>
+                <span>
+                  {pendingVoucherTagActions.status === 'APPLIED'
+                    ? 'übernommen'
+                    : `${pendingVoucherTagActions.changes.filter((change) => change.selected && !change.applied).length} ausgewählt`}
+                </span>
               </div>
               <div className="ai-voucher-action-summary">
                 <span>Filter: Tag „{pendingVoucherTagActions.sourceTag}“</span>
                 <strong>Ergänzen: {pendingVoucherTagActions.addedTags.join(', ')}</strong>
               </div>
               <div className="ai-voucher-action-list">
-                {pendingVoucherTagActions.changes.length ? pendingVoucherTagActions.changes.map((change) => (
-                  <article key={change.id} className={`ai-voucher-action-row ${change.applied ? 'is-created' : ''}`}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={change.selected || change.applied}
-                        disabled={busy || change.applied || pendingVoucherTagActions.status === 'APPLIED'}
-                        onChange={() => toggleVoucherTagAction(change.id)}
-                      />
-                      <span>
-                        <strong>{change.voucherNo}</strong>
-                        <em>{formatIsoDate(change.date)} · {change.description || 'ohne Beschreibung'}</em>
-                      </span>
-                    </label>
-                    <div className="ai-voucher-tag-diff">
-                      <span>{change.oldTags.length ? change.oldTags.join(', ') : 'keine Tags'}</span>
-                      <b aria-hidden="true">→</b>
-                      <strong>{change.newTags.join(', ')}</strong>
-                    </div>
-                  </article>
-                )) : (
+                {pendingVoucherTagActions.changes.length ? (
+                  pendingVoucherTagActions.changes.map((change) => (
+                    <article
+                      key={change.id}
+                      className={`ai-voucher-action-row ${change.applied ? 'is-created' : ''}`}
+                    >
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={change.selected || change.applied}
+                          disabled={
+                            busy || change.applied || pendingVoucherTagActions.status === 'APPLIED'
+                          }
+                          onChange={() => toggleVoucherTagAction(change.id)}
+                        />
+                        <span>
+                          <strong>{change.voucherNo}</strong>
+                          <em>
+                            {formatIsoDate(change.date)} ·{' '}
+                            {change.description || 'ohne Beschreibung'}
+                          </em>
+                        </span>
+                      </label>
+                      <div className="ai-voucher-tag-diff">
+                        <span>
+                          {change.oldTags.length ? change.oldTags.join(', ') : 'keine Tags'}
+                        </span>
+                        <b aria-hidden="true">→</b>
+                        <strong>{change.newTags.join(', ')}</strong>
+                      </div>
+                    </article>
+                  ))
+                ) : (
                   <div className="ai-empty">Keine Buchung benötigt eine Änderung.</div>
                 )}
               </div>
               <div className="ai-review-actions">
-                <span className="helper">{pendingVoucherTagActions.status === 'APPLIED' ? 'Diese Buchungsänderungen wurden bereits übernommen.' : 'Bitte vor dem Übernehmen prüfen.'}</span>
+                <span className="helper">
+                  {pendingVoucherTagActions.status === 'APPLIED'
+                    ? 'Diese Buchungsänderungen wurden bereits übernommen.'
+                    : 'Bitte vor dem Übernehmen prüfen.'}
+                </span>
                 <button
                   className="btn primary"
                   type="button"
-                  disabled={busy || pendingVoucherTagActions.status === 'APPLIED' || !pendingVoucherTagActions.changes.some((change) => change.selected && !change.applied)}
+                  disabled={
+                    busy ||
+                    pendingVoucherTagActions.status === 'APPLIED' ||
+                    !pendingVoucherTagActions.changes.some(
+                      (change) => change.selected && !change.applied
+                    )
+                  }
                   onClick={() => void applyPendingVoucherTagActions()}
                 >
-                  {pendingVoucherTagActions.status === 'APPLIED' ? 'Übernommen' : 'Buchungen aktualisieren'}
+                  {pendingVoucherTagActions.status === 'APPLIED'
+                    ? 'Übernommen'
+                    : 'Buchungen aktualisieren'}
                 </button>
               </div>
             </section>
@@ -6366,13 +8173,34 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             <section id="ai-review-bank" className="card ai-bank-review-card">
               <div className="ai-section-head">
                 <strong>Bankimport-Vorschläge</strong>
-                <span>{bankReview.suggestions.filter((suggestion) => !suggestion.resolved).length} offen{bankReview.sourceTotal ? ` · ${bankReview.sourceTotal} geprüft` : ''}</span>
+                <span>
+                  {bankReview.suggestions.filter((suggestion) => !suggestion.resolved).length} offen
+                  {bankReview.sourceTotal ? ` · ${bankReview.sourceTotal} geprüft` : ''}
+                </span>
               </div>
-              {bankReview.filterSummary && <div className="ai-bank-filter-note">{bankReview.filterSummary}</div>}
-              {renderBankSuggestionGroup('Sichere Treffer', 'Bestehende Buchungen verknüpfen', bankSuggestionGroups.matches)}
-              {renderBankSuggestionGroup('Neue Buchungen vorbereiten', 'Kein Treffer gefunden', bankSuggestionGroups.create)}
-              {renderBankSuggestionGroup('Manuell klären', 'Unklare oder nicht buchungsrelevante Belege', bankSuggestionGroups.manual)}
-              {renderBankSuggestionGroup('Erledigt', 'Bereits aus dieser Prüfung übernommen', bankSuggestionGroups.done)}
+              {bankReview.filterSummary && (
+                <div className="ai-bank-filter-note">{bankReview.filterSummary}</div>
+              )}
+              {renderBankSuggestionGroup(
+                'Sichere Treffer',
+                'Bestehende Buchungen verknüpfen',
+                bankSuggestionGroups.matches
+              )}
+              {renderBankSuggestionGroup(
+                'Neue Buchungen vorbereiten',
+                'Kein Treffer gefunden',
+                bankSuggestionGroups.create
+              )}
+              {renderBankSuggestionGroup(
+                'Manuell klären',
+                'Unklare oder nicht buchungsrelevante Belege',
+                bankSuggestionGroups.manual
+              )}
+              {renderBankSuggestionGroup(
+                'Erledigt',
+                'Bereits aus dieser Prüfung übernommen',
+                bankSuggestionGroups.done
+              )}
             </section>
           )}
 
@@ -6389,14 +8217,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                   {analysis.candidates.map((item, idx) => {
                     const booked = isCandidateApproved(item, selectedJob)
                     return (
-                    <button
-                      key={idx}
-                      className={[idx === selectedCandidate ? 'active' : '', booked ? 'is-booked' : 'is-open'].filter(Boolean).join(' ')}
-                      onClick={() => setSelectedCandidate(idx)}
-                    >
-                      <span>{candidateSourceLabel(item) || `Vorschlag ${idx + 1}`}</span>
-                      <small>{booked ? 'Gebucht' : 'Offen'}</small>
-                    </button>
+                      <button
+                        key={idx}
+                        className={[
+                          idx === selectedCandidate ? 'active' : '',
+                          booked ? 'is-booked' : 'is-open'
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        onClick={() => setSelectedCandidate(idx)}
+                      >
+                        <span>{candidateSourceLabel(item) || `Vorschlag ${idx + 1}`}</span>
+                        <small>{booked ? 'Gebucht' : 'Offen'}</small>
+                      </button>
                     )
                   })}
                 </div>
@@ -6409,30 +8242,48 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 busy={busy}
                 onChange={updateCandidate}
                 onApprove={approveCandidate}
-                onOpenDraft={() => openBookingDraftForCandidate(selectedJob, candidate, selectedCandidate)}
+                onOpenDraft={() =>
+                  openBookingDraftForCandidate(selectedJob, candidate, selectedCandidate)
+                }
               />
             </section>
           )}
 
           {chatStarted && renderComposer('followup')}
-
         </main>
-
       </div>
 
       {showHistory && (
-        <section ref={historyDrawerRef} className="card ai-assistant-sidebar ai-history-drawer" role="dialog" aria-label="KI-Verlauf">
+        <section
+          ref={historyDrawerRef}
+          className="card ai-assistant-sidebar ai-history-drawer"
+          role="dialog"
+          aria-label="KI-Verlauf"
+        >
           <div className="ai-history-drawer-head">
             <div>
               <strong>Verlauf</strong>
               <span>Schneller zurück in Reviews, gebuchte Vorschläge und alte Agent-Läufe.</span>
             </div>
-            <button className="btn ghost ai-history-close" type="button" onClick={() => setShowHistory(false)} aria-label="Schließen">×</button>
+            <button
+              className="btn ghost ai-history-close"
+              type="button"
+              onClick={() => setShowHistory(false)}
+              aria-label="Schließen"
+            >
+              ×
+            </button>
           </div>
           <div className="ai-history-stats">
-            <span><strong>{openBookingJobs.length}</strong> offen</span>
-            <span><strong>{completedBookingJobs.length}</strong> gebucht</span>
-            <span><strong>{jobs.length}</strong> Aufgaben</span>
+            <span>
+              <strong>{openBookingJobs.length}</strong> offen
+            </span>
+            <span>
+              <strong>{completedBookingJobs.length}</strong> gebucht
+            </span>
+            <span>
+              <strong>{jobs.length}</strong> Aufgaben
+            </span>
           </div>
           <div className="ai-history-layout">
             <div className="ai-history-column ai-history-column--reviews">
@@ -6443,7 +8294,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 </div>
                 <div className="ai-history-list">
                   {openBookingJobs.map((job) => renderHistoryJobButton(job, 'open'))}
-                  {!openBookingJobs.length && <div className="ai-empty">Keine offenen Buchungsvorschläge.</div>}
+                  {!openBookingJobs.length && (
+                    <div className="ai-empty">Keine offenen Buchungsvorschläge.</div>
+                  )}
                 </div>
               </div>
               <div className="ai-history-group ai-history-group--done">
@@ -6452,13 +8305,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                   <span>{completedBookingJobs.length}</span>
                 </div>
                 <div className="ai-history-list ai-history-list--compact">
-                  {completedBookingJobs.slice(0, 10).map((job) => renderHistoryJobButton(job, 'done', [
-                    bookingProgress(job),
-                    statusLabel(job.status),
-                    job.createdAt?.slice(0, 10),
-                    job.voucherId ? `Buchung #${job.voucherId}` : null
-                  ]))}
-                  {!completedBookingJobs.length && <div className="ai-empty">Noch keine gebuchten Vorschläge.</div>}
+                  {completedBookingJobs
+                    .slice(0, 10)
+                    .map((job) =>
+                      renderHistoryJobButton(job, 'done', [
+                        bookingProgress(job),
+                        statusLabel(job.status),
+                        job.createdAt?.slice(0, 10),
+                        job.voucherId ? `Buchung #${job.voucherId}` : null
+                      ])
+                    )}
+                  {!completedBookingJobs.length && (
+                    <div className="ai-empty">Noch keine gebuchten Vorschläge.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -6470,7 +8329,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 </div>
                 <div className="ai-history-list">
                   {jobs.map((job) => renderHistoryJobButton(job, 'task'))}
-                  {!jobs.length && <div className="ai-empty">Noch keine gespeicherten KI-Aufgaben.</div>}
+                  {!jobs.length && (
+                    <div className="ai-empty">Noch keine gespeicherten KI-Aufgaben.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -6479,7 +8340,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       )}
 
       {showAgentContext && (
-        <section ref={agentContextDrawerRef} className="ai-agent-context-drawer" role="dialog" aria-label="Agent-Kontext">
+        <section
+          ref={agentContextDrawerRef}
+          className="ai-agent-context-drawer"
+          role="dialog"
+          aria-label="Agent-Kontext"
+        >
           <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules} />
         </section>
       )}
@@ -6488,50 +8354,102 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         <section ref={settingsDrawerRef} className="card ai-settings-card ai-settings-drawer">
           <div className="ai-section-head">
             <strong>Einstellungen</strong>
-            <button className="btn ghost" onClick={() => setShowSettings(false)} aria-label="Schließen">×</button>
+            <button
+              className="btn ghost"
+              onClick={() => setShowSettings(false)}
+              aria-label="Schließen"
+            >
+              ×
+            </button>
           </div>
           <div className="ai-form-grid">
             <label className="field ai-field-wide">
               <span>API-Key</span>
-              <input className="input" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'sk-...'} />
+              <input
+                className="input"
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder={
+                  settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'sk-...'
+                }
+              />
             </label>
             <label className="field">
               <span>Anbieter</span>
-              <select className="input" value={settings.provider} onChange={(event) => handleProviderChange(event.target.value as typeof settings.provider)}>
+              <select
+                className="input"
+                value={settings.provider}
+                onChange={(event) =>
+                  handleProviderChange(event.target.value as typeof settings.provider)
+                }
+              >
                 {AI_PROVIDER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="field">
               <span>Beleganalyse-Modell</span>
-              <select className="input" value={settings.model} onChange={(event) => setSettings({ ...settings, model: event.target.value })}>
+              <select
+                className="input"
+                value={settings.model}
+                onChange={(event) => setSettings({ ...settings, model: event.target.value })}
+              >
                 {providerConfig.modelOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label} - {option.hint}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="field">
               <span>Textmodell</span>
-              <select className="input" value={settings.textModel} onChange={(event) => setSettings({ ...settings, textModel: event.target.value })}>
+              <select
+                className="input"
+                value={settings.textModel}
+                onChange={(event) => setSettings({ ...settings, textModel: event.target.value })}
+              >
                 {providerConfig.modelOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label} - {option.hint}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="field">
               <span>Reasoning</span>
-              <select className="input" value={settings.defaultReasoningEffort} onChange={(event) => setSettings({ ...settings, defaultReasoningEffort: event.target.value as typeof settings.defaultReasoningEffort })}>
+              <select
+                className="input"
+                value={settings.defaultReasoningEffort}
+                onChange={(event) =>
+                  setSettings({
+                    ...settings,
+                    defaultReasoningEffort: event.target
+                      .value as typeof settings.defaultReasoningEffort
+                  })
+                }
+              >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>
             </label>
-            <p className="helper ai-settings-note">VereinO setzt den passenden API-Endpunkt für den gewählten Anbieter automatisch und zeigt nur die dafür freigegebenen Modelle an. Für Minimax ist MiniMax-M3 direkt auswählbar.</p>
+            <p className="helper ai-settings-note">
+              VereinO setzt den passenden API-Endpunkt für den gewählten Anbieter automatisch und
+              zeigt nur die dafür freigegebenen Modelle an. Für Minimax ist MiniMax-M3 direkt
+              auswählbar.
+            </p>
           </div>
           <div className="ai-settings-actions">
-            <button className="btn primary" disabled={busy} onClick={saveSettings}>Speichern</button>
-            <button className="btn" disabled={busy || !settings.hasApiKey} onClick={testConnection}>Verbindung testen</button>
+            <button className="btn primary" disabled={busy} onClick={saveSettings}>
+              Speichern
+            </button>
+            <button className="btn" disabled={busy || !settings.hasApiKey} onClick={testConnection}>
+              Verbindung testen
+            </button>
           </div>
         </section>
       )}

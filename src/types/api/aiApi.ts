@@ -21,6 +21,9 @@ import type {
   TAiJobsProcessOutput,
   TAiJobsRejectInput,
   TAiJobsUpdateCandidateInput,
+  TAiMcpConfigureInput,
+  TAiMcpConfigureOutput,
+  TAiMcpStatusOutput,
   TAiBankImportReviewInput,
   TAiBankImportReviewOutput,
   TAiSettingsGetOutput,
@@ -44,7 +47,9 @@ export interface AiApi {
       get: (payload: TAiJobIdInput) => Promise<TAiJobsGetOutput>
       process: (payload: TAiJobIdInput) => Promise<TAiJobsProcessOutput>
       updateCandidate: (payload: TAiJobsUpdateCandidateInput) => Promise<TAiJobsGetOutput>
-      approveCandidate: (payload: TAiJobsApproveCandidateInput) => Promise<TAiJobsApproveCandidateOutput>
+      approveCandidate: (
+        payload: TAiJobsApproveCandidateInput
+      ) => Promise<TAiJobsApproveCandidateOutput>
       reject: (payload: TAiJobsRejectInput) => Promise<TAiJobsGetOutput>
       delete: (payload: TAiJobIdInput) => Promise<TAiJobsDeleteOutput>
     }
@@ -54,15 +59,23 @@ export interface AiApi {
     actions: {
       plan: (payload: TAiActionPlanInput) => Promise<TAiActionPlanOutput>
     }
+    mcp: {
+      status: () => Promise<TAiMcpStatusOutput>
+      configure: (payload: TAiMcpConfigureInput) => Promise<TAiMcpConfigureOutput>
+    }
     agent: {
       run: (payload: TAiAgentRunInput) => Promise<TAiAgentRunOutput>
       memory: {
         list: (payload?: TAiAgentMemoryListInput) => Promise<TAiAgentMemoryListOutput>
-        upsert: (payload: TAiAgentMemoryUpsertInput) => Promise<TAiAgentMemoryListOutput['rows'][number]>
+        upsert: (
+          payload: TAiAgentMemoryUpsertInput
+        ) => Promise<TAiAgentMemoryListOutput['rows'][number]>
       }
       autoRules: {
         list: (payload?: TAiAgentAutoRulesListInput) => Promise<TAiAgentAutoRulesListOutput>
-        upsert: (payload: TAiAgentAutoRuleUpsertInput) => Promise<TAiAgentAutoRulesListOutput['rows'][number]>
+        upsert: (
+          payload: TAiAgentAutoRuleUpsertInput
+        ) => Promise<TAiAgentAutoRulesListOutput['rows'][number]>
       }
     }
     bankImports: {

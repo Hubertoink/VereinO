@@ -1,933 +1,1275 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherReverseOutput, ReportsExportInput, ReportsExportOutput, FiscalReportInput, FiscalReportOutput, VouchersListInput, VouchersListOutput, VoucherUpdateInput, VoucherMetaUpdateInput, VoucherUpdateOutput, VoucherDeleteInput, VoucherDeleteOutput, ReportsSummaryInput, ReportsSummaryOutput, ReportsMonthlyInput, ReportsMonthlyOutput, ReportsCashBalanceInput, ReportsCashBalanceOutput, BindingUpsertInput, BindingUpsertOutput, BindingListInput, BindingListOutput, BindingDeleteInput, BindingDeleteOutput, BindingUsageInput, BindingUsageOutput, BudgetUpsertInput, BudgetUpsertOutput, BudgetListInput, BudgetListOutput, BudgetDeleteInput, BudgetDeleteOutput, QuoteWeeklyInput, QuoteWeeklyOutput, ImportPreviewInput, ImportPreviewOutput, ImportExecuteInput, ImportExecuteOutput, ImportAnalyzeInput, ImportAnalyzeOutput, ImportCommitDraftInput, ImportCreateMissingInput, ImportCreateMissingOutput, ImportTemplateInput, ImportTemplateOutput, ImportTestDataInput, ImportTestDataOutput, ImportEditableExportInput, ImportEditableExportOutput, AttachmentsListInput, AttachmentsListOutput, AttachmentOpenInput, AttachmentOpenOutput, AttachmentSaveAsInput, AttachmentSaveAsOutput, AttachmentReadInput, AttachmentReadOutput, AttachmentAddInput, AttachmentAddOutput, AttachmentDeleteInput, AttachmentDeleteOutput, VouchersClearAllInput, VouchersClearAllOutput, TagsListInput, TagsListOutput, TagUpsertInput, TagUpsertOutput, TagDeleteInput, TagDeleteOutput, TagUsageInput, TagUsageOutput, ReportsYearsOutput, BudgetUsageInput, BudgetUsageOutput, SettingsGetInput, SettingsGetOutput, SettingsSetInput, SettingsSetOutput, VouchersRecentInput, VouchersRecentOutput, VouchersBatchAssignEarmarkInput, VouchersBatchAssignEarmarkOutput, VouchersBatchAssignBudgetInput, VouchersBatchAssignBudgetOutput, VouchersBatchAssignTagsInput, VouchersBatchAssignTagsOutput, InvoiceCreateInput, InvoiceCreateOutput, InvoiceUpdateInput, InvoiceUpdateOutput, InvoiceDeleteInput, InvoiceDeleteOutput, InvoicesListInput, InvoicesListOutput, InvoiceByIdInput, InvoiceByIdOutput, InvoiceAddPaymentInput, InvoiceAddPaymentOutput, InvoicePostToVoucherInput, InvoicePostToVoucherOutput, InvoiceFilesListInput, InvoiceFilesListOutput, InvoiceFileAddInput, InvoiceFileAddOutput, InvoiceFileDeleteInput, InvoiceFileDeleteOutput, YearEndPreviewInput, YearEndPreviewOutput, YearEndExportInput, YearEndExportOutput, YearEndCloseInput, YearEndCloseOutput, YearEndReopenInput, YearEndReopenOutput, YearEndStatusOutput, InvoicesSummaryInput, InvoicesSummaryOutput, MembersListInput, MembersListOutput, MemberCreateInput, MemberCreateOutput, MemberUpdateInput, MemberUpdateOutput, MemberDeleteInput, MemberDeleteOutput, MemberGetInput, MemberGetOutput, PaymentsListDueInput, PaymentsListDueOutput, PaymentsMarkPaidInput, PaymentsMarkPaidOutput, PaymentsUnmarkInput, PaymentsUnmarkOutput, PaymentsSuggestVouchersInput, PaymentsSuggestVouchersOutput, PaymentsDueSummaryOutput, TaxExemptionGetOutput, TaxExemptionSaveInput, TaxExemptionSaveOutput, TaxExemptionDeleteOutput, TaxExemptionUpdateValidityInput, TaxExemptionUpdateValidityOutput, SubmissionsListInput, SubmissionsListOutput, SubmissionGetInput, SubmissionGetOutput, SubmissionsImportInput, SubmissionsImportOutput, SubmissionApproveInput, SubmissionApproveOutput, SubmissionRejectInput, SubmissionRejectOutput, SubmissionDeleteInput, SubmissionDeleteOutput, SubmissionConvertInput, SubmissionConvertOutput, SubmissionsSummaryOutput, SubmissionAttachmentReadInput, SubmissionAttachmentReadOutput, SubmissionsExportCatalogOutput, DonationsExportMoneyReceiptInput, DonationsExportMoneyReceiptOutput, CashChecksListInput, CashChecksListOutput, CashChecksCreateInput, CashChecksCreateOutput, CashChecksSetInspectorsInput, CashChecksSetInspectorsOutput, CashChecksExportPdfInput, CashChecksExportPdfOutput, CashChecksGetInspectorDefaultsOutput } from './schemas'
-import { AiActionPlanInput, AiActionPlanOutput, AiAgentAutoRuleUpsertInput, AiAgentAutoRulesListInput, AiAgentAutoRulesListOutput, AiAgentMemoryListInput, AiAgentMemoryListOutput, AiAgentMemoryUpsertInput, AiAgentRunInput, AiAgentRunOutput, AiBankImportReviewInput, AiBankImportReviewOutput, AiBookingAnalysisResult, AiJobIdInput, AiJobsApproveCandidateInput, AiJobsApproveCandidateOutput, AiJobsCreateInput, AiJobsCreateOutput, AiJobsDeleteOutput, AiJobsGetOutput, AiJobsListInput, AiJobsListOutput, AiJobsProcessOutput, AiJobsRejectInput, AiJobsUpdateCandidateInput, AiSettingsGetOutput, AiSettingsSetInput, AiSettingsSetOutput, AiSettingsTestOutput, AiTextGenerateInput, AiTextGenerateOutput } from './schemas'
-import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
+import {
+  VoucherCreateInput,
+  VoucherCreateOutput,
+  VoucherReverseInput,
+  VoucherReverseOutput,
+  ReportsExportInput,
+  ReportsExportOutput,
+  FiscalReportInput,
+  FiscalReportOutput,
+  VouchersListInput,
+  VouchersListOutput,
+  VoucherUpdateInput,
+  VoucherMetaUpdateInput,
+  VoucherUpdateOutput,
+  VoucherDeleteInput,
+  VoucherDeleteOutput,
+  ReportsSummaryInput,
+  ReportsSummaryOutput,
+  ReportsMonthlyInput,
+  ReportsMonthlyOutput,
+  ReportsCashBalanceInput,
+  ReportsCashBalanceOutput,
+  BindingUpsertInput,
+  BindingUpsertOutput,
+  BindingListInput,
+  BindingListOutput,
+  BindingDeleteInput,
+  BindingDeleteOutput,
+  BindingUsageInput,
+  BindingUsageOutput,
+  BudgetUpsertInput,
+  BudgetUpsertOutput,
+  BudgetListInput,
+  BudgetListOutput,
+  BudgetDeleteInput,
+  BudgetDeleteOutput,
+  QuoteWeeklyInput,
+  QuoteWeeklyOutput,
+  ImportPreviewInput,
+  ImportPreviewOutput,
+  ImportExecuteInput,
+  ImportExecuteOutput,
+  ImportAnalyzeInput,
+  ImportAnalyzeOutput,
+  ImportCommitDraftInput,
+  ImportCreateMissingInput,
+  ImportCreateMissingOutput,
+  ImportTemplateInput,
+  ImportTemplateOutput,
+  ImportTestDataInput,
+  ImportTestDataOutput,
+  ImportEditableExportInput,
+  ImportEditableExportOutput,
+  AttachmentsListInput,
+  AttachmentsListOutput,
+  AttachmentOpenInput,
+  AttachmentOpenOutput,
+  AttachmentSaveAsInput,
+  AttachmentSaveAsOutput,
+  AttachmentReadInput,
+  AttachmentReadOutput,
+  AttachmentAddInput,
+  AttachmentAddOutput,
+  AttachmentDeleteInput,
+  AttachmentDeleteOutput,
+  VouchersClearAllInput,
+  VouchersClearAllOutput,
+  TagsListInput,
+  TagsListOutput,
+  TagUpsertInput,
+  TagUpsertOutput,
+  TagDeleteInput,
+  TagDeleteOutput,
+  TagUsageInput,
+  TagUsageOutput,
+  ReportsYearsOutput,
+  BudgetUsageInput,
+  BudgetUsageOutput,
+  SettingsGetInput,
+  SettingsGetOutput,
+  SettingsSetInput,
+  SettingsSetOutput,
+  VouchersRecentInput,
+  VouchersRecentOutput,
+  VouchersBatchAssignEarmarkInput,
+  VouchersBatchAssignEarmarkOutput,
+  VouchersBatchAssignBudgetInput,
+  VouchersBatchAssignBudgetOutput,
+  VouchersBatchAssignTagsInput,
+  VouchersBatchAssignTagsOutput,
+  InvoiceCreateInput,
+  InvoiceCreateOutput,
+  InvoiceUpdateInput,
+  InvoiceUpdateOutput,
+  InvoiceDeleteInput,
+  InvoiceDeleteOutput,
+  InvoicesListInput,
+  InvoicesListOutput,
+  InvoiceByIdInput,
+  InvoiceByIdOutput,
+  InvoiceAddPaymentInput,
+  InvoiceAddPaymentOutput,
+  InvoicePostToVoucherInput,
+  InvoicePostToVoucherOutput,
+  InvoiceFilesListInput,
+  InvoiceFilesListOutput,
+  InvoiceFileAddInput,
+  InvoiceFileAddOutput,
+  InvoiceFileDeleteInput,
+  InvoiceFileDeleteOutput,
+  YearEndPreviewInput,
+  YearEndPreviewOutput,
+  YearEndExportInput,
+  YearEndExportOutput,
+  YearEndCloseInput,
+  YearEndCloseOutput,
+  YearEndReopenInput,
+  YearEndReopenOutput,
+  YearEndStatusOutput,
+  InvoicesSummaryInput,
+  InvoicesSummaryOutput,
+  MembersListInput,
+  MembersListOutput,
+  MemberCreateInput,
+  MemberCreateOutput,
+  MemberUpdateInput,
+  MemberUpdateOutput,
+  MemberDeleteInput,
+  MemberDeleteOutput,
+  MemberGetInput,
+  MemberGetOutput,
+  PaymentsListDueInput,
+  PaymentsListDueOutput,
+  PaymentsMarkPaidInput,
+  PaymentsMarkPaidOutput,
+  PaymentsUnmarkInput,
+  PaymentsUnmarkOutput,
+  PaymentsSuggestVouchersInput,
+  PaymentsSuggestVouchersOutput,
+  PaymentsDueSummaryOutput,
+  TaxExemptionGetOutput,
+  TaxExemptionSaveInput,
+  TaxExemptionSaveOutput,
+  TaxExemptionDeleteOutput,
+  TaxExemptionUpdateValidityInput,
+  TaxExemptionUpdateValidityOutput,
+  SubmissionsListInput,
+  SubmissionsListOutput,
+  SubmissionGetInput,
+  SubmissionGetOutput,
+  SubmissionsImportInput,
+  SubmissionsImportOutput,
+  SubmissionApproveInput,
+  SubmissionApproveOutput,
+  SubmissionRejectInput,
+  SubmissionRejectOutput,
+  SubmissionDeleteInput,
+  SubmissionDeleteOutput,
+  SubmissionConvertInput,
+  SubmissionConvertOutput,
+  SubmissionsSummaryOutput,
+  SubmissionAttachmentReadInput,
+  SubmissionAttachmentReadOutput,
+  SubmissionsExportCatalogOutput,
+  DonationsExportMoneyReceiptInput,
+  DonationsExportMoneyReceiptOutput,
+  CashChecksListInput,
+  CashChecksListOutput,
+  CashChecksCreateInput,
+  CashChecksCreateOutput,
+  CashChecksSetInspectorsInput,
+  CashChecksSetInspectorsOutput,
+  CashChecksExportPdfInput,
+  CashChecksExportPdfOutput,
+  CashChecksGetInspectorDefaultsOutput
+} from './schemas'
+import {
+  AiActionPlanInput,
+  AiActionPlanOutput,
+  AiAgentAutoRuleUpsertInput,
+  AiAgentAutoRulesListInput,
+  AiAgentAutoRulesListOutput,
+  AiAgentMemoryListInput,
+  AiAgentMemoryListOutput,
+  AiAgentMemoryUpsertInput,
+  AiAgentRunInput,
+  AiAgentRunOutput,
+  AiBankImportReviewInput,
+  AiBankImportReviewOutput,
+  AiBookingAnalysisResult,
+  AiJobIdInput,
+  AiJobsApproveCandidateInput,
+  AiJobsApproveCandidateOutput,
+  AiJobsCreateInput,
+  AiJobsCreateOutput,
+  AiJobsDeleteOutput,
+  AiJobsGetOutput,
+  AiJobsListInput,
+  AiJobsListOutput,
+  AiJobsProcessOutput,
+  AiJobsRejectInput,
+  AiJobsUpdateCandidateInput,
+  AiMcpConfigureInput,
+  AiMcpConfigureOutput,
+  AiMcpStatusOutput,
+  AiSettingsGetOutput,
+  AiSettingsSetInput,
+  AiSettingsSetOutput,
+  AiSettingsTestOutput,
+  AiTextGenerateInput,
+  AiTextGenerateOutput
+} from './schemas'
+import {
+  getDb,
+  getAppDataDir,
+  closeDb,
+  getCurrentDbInfo,
+  migrateToRoot,
+  readAppConfig,
+  writeAppConfig,
+  listOrganizations,
+  getActiveOrganization,
+  createOrganization,
+  switchOrganization,
+  renameOrganization,
+  deleteOrganization,
+  getOrganizationAppearance,
+  setOrganizationAppearance,
+  getActiveOrganizationAppearance
+} from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
-import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, updateVoucherMeta, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
-import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, postInvoiceToVoucher, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
+import {
+  createVoucher,
+  reverseVoucher,
+  listRecentVouchers,
+  listVouchersAdvanced,
+  listVouchersAdvancedPaged,
+  updateVoucher,
+  updateVoucherMeta,
+  deleteVoucher,
+  summarizeVouchers,
+  monthlyVouchers,
+  dailyVouchers,
+  cashBalance,
+  listFilesForVoucher,
+  getFileById,
+  addFileToVoucher,
+  deleteVoucherFile,
+  clearAllVouchers,
+  listVoucherYears,
+  batchAssignEarmark,
+  batchAssignBudget,
+  batchAssignTags,
+  getVoucherBudgets,
+  getVoucherEarmarks,
+  setVoucherBudgets,
+  setVoucherEarmarks
+} from '../repositories/vouchers'
+import {
+  createInvoice,
+  updateInvoice,
+  deleteInvoice,
+  listInvoicesPaged,
+  summarizeInvoices,
+  getInvoiceById,
+  addPayment,
+  markPaid,
+  postInvoiceToVoucher,
+  getInvoiceFileById,
+  listFilesForInvoice,
+  addFileToInvoice,
+  deleteInvoiceFile
+} from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag, tagUsage } from '../repositories/tags'
-import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
+import {
+  listMembers,
+  createMember,
+  updateMember,
+  deleteMember,
+  getMemberById
+} from '../repositories/members'
 import { exportMembers, MembersExportOptions } from '../services/membersExport'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
-import { listAdvances, createAdvance, getAdvanceById, settleAdvance, deleteAdvance, addAdvancePurchase, deleteAdvancePurchase, updateAdvancePurchase, resolveAdvance } from '../repositories/advances'
-import { listCashChecks, createCashCheck, setCashCheckInspectors, getCashCheckInspectorDefaults } from '../repositories/cashChecks'
+import {
+  listAdvances,
+  createAdvance,
+  getAdvanceById,
+  settleAdvance,
+  deleteAdvance,
+  addAdvancePurchase,
+  deleteAdvancePurchase,
+  updateAdvancePurchase,
+  resolveAdvance
+} from '../repositories/advances'
+import {
+  listCashChecks,
+  createCashCheck,
+  setCashCheckInspectors,
+  getCashCheckInspectorDefaults
+} from '../repositories/cashChecks'
 import { generateCashCheckPDF } from '../services/cashCheckReport'
 import { createSubmissionsRepository } from '../repositories/submissions'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { getSetting, setSetting } from '../services/settings'
-import { getTaxExemptionCertificate, saveTaxExemptionCertificate, deleteTaxExemptionCertificate, updateTaxExemptionValidity } from '../services/taxExemption'
+import {
+  getTaxExemptionCertificate,
+  saveTaxExemptionCertificate,
+  deleteTaxExemptionCertificate,
+  updateTaxExemptionValidity
+} from '../services/taxExemption'
 import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
-import { previewFile, executeFile, analyzeFile, commitImportDraft, createMissingImportMasterData, generateImportTemplate, generateImportTestData, exportEditableVouchersWorkbook } from '../services/imports'
-import { DbExportInput, DbExportOutput, DbImportInput, DbImportOutput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas'
-import { PaymentAccountsListInput, PaymentAccountsListOutput, PaymentAccountUpsertInput, PaymentAccountUpsertOutput, PaymentAccountDeleteInput, PaymentAccountDeleteOutput } from './schemas'
-import { applyMigrations, ensureAdvanceTables, ensureAiTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherForeignKeyTargets } from '../db/migrations'
+import {
+  previewFile,
+  executeFile,
+  analyzeFile,
+  commitImportDraft,
+  createMissingImportMasterData,
+  generateImportTemplate,
+  generateImportTestData,
+  exportEditableVouchersWorkbook
+} from '../services/imports'
+import {
+  DbExportInput,
+  DbExportOutput,
+  DbImportInput,
+  DbImportOutput,
+  DbImportFromPathInput,
+  DbImportFromPathOutput
+} from './schemas'
+import {
+  PaymentAccountsListInput,
+  PaymentAccountsListOutput,
+  PaymentAccountUpsertInput,
+  PaymentAccountUpsertOutput,
+  PaymentAccountDeleteInput,
+  PaymentAccountDeleteOutput
+} from './schemas'
+import {
+  applyMigrations,
+  ensureAdvanceTables,
+  ensureAiTables,
+  ensureInvoiceTables,
+  ensureVoucherColumns,
+  ensureVoucherForeignKeyTargets
+} from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
-import { AuditRecentInput, AuditRecentOutput, DbSmartRestorePreviewOutput, DbSmartRestoreApplyInput, DbSmartRestoreApplyOutput } from './schemas'
+import {
+  AuditRecentInput,
+  AuditRecentOutput,
+  DbSmartRestorePreviewOutput,
+  DbSmartRestoreApplyInput,
+  DbSmartRestoreApplyOutput
+} from './schemas'
 import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
-import { AdvancesListInput, AdvancesListOutput, AdvanceCreateInput, AdvanceCreateOutput, AdvanceGetInput, AdvanceGetOutput, AdvanceSettleInput, AdvanceSettleOutput, AdvanceDeleteInput, AdvanceDeleteOutput, AdvancePurchaseCreateInput, AdvancePurchaseCreateOutput, AdvancePurchaseDeleteInput, AdvancePurchaseDeleteOutput, AdvancePurchaseUpdateInput, AdvancePurchaseUpdateOutput, AdvanceResolveInput, AdvanceResolveOutput } from './schemas'
-import { ActivityReportDeleteInput, ActivityReportDeleteOutput, ActivityReportGetInput, ActivityReportGetOutput, ActivityReportListInput, ActivityReportListOutput, ActivityReportSaveInput, ActivityReportSaveOutput } from './schemas'
-import { deleteActivityReport, getActivityReport, listActivityReports, saveActivityReport, validateActivityReport } from '../repositories/activityReports'
-import { checkForAppUpdates, downloadAppUpdate, getUpdateState, installAppUpdate } from '../updateManager'
-import { deletePaymentAccount, listPaymentAccounts, upsertPaymentAccount } from '../repositories/paymentAccounts'
+import {
+  AdvancesListInput,
+  AdvancesListOutput,
+  AdvanceCreateInput,
+  AdvanceCreateOutput,
+  AdvanceGetInput,
+  AdvanceGetOutput,
+  AdvanceSettleInput,
+  AdvanceSettleOutput,
+  AdvanceDeleteInput,
+  AdvanceDeleteOutput,
+  AdvancePurchaseCreateInput,
+  AdvancePurchaseCreateOutput,
+  AdvancePurchaseDeleteInput,
+  AdvancePurchaseDeleteOutput,
+  AdvancePurchaseUpdateInput,
+  AdvancePurchaseUpdateOutput,
+  AdvanceResolveInput,
+  AdvanceResolveOutput
+} from './schemas'
+import {
+  ActivityReportDeleteInput,
+  ActivityReportDeleteOutput,
+  ActivityReportGetInput,
+  ActivityReportGetOutput,
+  ActivityReportListInput,
+  ActivityReportListOutput,
+  ActivityReportSaveInput,
+  ActivityReportSaveOutput
+} from './schemas'
+import {
+  deleteActivityReport,
+  getActivityReport,
+  listActivityReports,
+  saveActivityReport,
+  validateActivityReport
+} from '../repositories/activityReports'
+import {
+  checkForAppUpdates,
+  downloadAppUpdate,
+  getUpdateState,
+  installAppUpdate
+} from '../updateManager'
+import {
+  deletePaymentAccount,
+  listPaymentAccounts,
+  upsertPaymentAccount
+} from '../repositories/paymentAccounts'
 import { requireSafetyBackup } from '../services/safetyBackup'
 import { registerBackupAndShellHandlers } from './backupAndShellHandlers'
 import {
-    BankImportCommitInput,
-    BankImportCommitOutput,
-    BankImportPreviewInput,
-    BankImportPreviewOutput,
-    BankImportStatusOutput,
-    BankTransactionCheckInput,
-    BankTransactionIdInput,
-    BankTransactionLinkInput,
-    BankTransactionMatchesInput,
-    BankTransactionMatchesOutput,
-    BankTransactionOutput,
-    BankTransactionsListInput,
-    BankTransactionsListOutput
+  BankImportCommitInput,
+  BankImportCommitOutput,
+  BankImportPreviewInput,
+  BankImportPreviewOutput,
+  BankImportStatusOutput,
+  BankTransactionCheckInput,
+  BankTransactionIdInput,
+  BankTransactionLinkInput,
+  BankTransactionMatchesInput,
+  BankTransactionMatchesOutput,
+  BankTransactionOutput,
+  BankTransactionsListInput,
+  BankTransactionsListOutput
 } from './schemas'
 import {
-    commitBankImport,
-    findBankTransactionMatches,
-    getBankImportStatus,
-    getBankTransaction,
-    linkBankTransaction,
-    listBankTransactions,
-    markBankTransactionChecked,
-    previewBankImport,
-    reopenBankTransaction
+  commitBankImport,
+  findBankTransactionMatches,
+  getBankImportStatus,
+  getBankTransaction,
+  linkBankTransaction,
+  listBankTransactions,
+  markBankTransactionChecked,
+  previewBankImport,
+  reopenBankTransaction
 } from '../repositories/bankTransactions'
-import { createAiJob, deleteAiJob, getAiJob, listAiJobs, rejectAiJob, saveAiJobResult, setAiJobStatus, updateAiJobCandidate } from '../repositories/aiJobs'
-import { analyzeBookingDocuments, generateAiText, getAiSettings, planAiAction, reviewBankImportTransactions, setAiSettings, testAiConnection } from '../services/ai'
+import {
+  createAiJob,
+  deleteAiJob,
+  getAiJob,
+  listAiJobs,
+  rejectAiJob,
+  saveAiJobResult,
+  setAiJobStatus,
+  updateAiJobCandidate
+} from '../repositories/aiJobs'
+import {
+  analyzeBookingDocuments,
+  generateAiText,
+  getAiSettings,
+  planAiAction,
+  reviewBankImportTransactions,
+  setAiSettings,
+  testAiConnection
+} from '../services/ai'
+import { buildAiContext } from '../services/aiContext'
 import { runAiAgent } from '../services/aiAgent'
-import { listAiAgentAutoRules, listAiAgentMemory, upsertAiAgentAutoRule, upsertAiAgentMemory } from '../repositories/aiAgentKnowledge'
+import { configureAiMcpEndpoint, getAiMcpStatus } from '../services/aiMcp'
+import {
+  listAiAgentAutoRules,
+  listAiAgentMemory,
+  upsertAiAgentAutoRule,
+  upsertAiAgentMemory
+} from '../repositories/aiAgentKnowledge'
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
-    const message = String((error as any)?.message ?? '')
-    if (message.includes('no such table:')) {
-        return identifiers.some((identifier) => message.includes(`no such table: ${identifier}`))
-    }
-    if (message.includes('no such column:')) {
-        return identifiers.some((identifier) => {
-            const bareIdentifier = identifier.includes('.') ? identifier.split('.').pop() ?? identifier : identifier
-            return message.includes(`no such column: ${identifier}`)
-                || message.includes(`no such column: ${bareIdentifier}`)
-                || message.includes(`no such column: v.${bareIdentifier}`)
-        })
-    }
-    return false
+  const message = String((error as any)?.message ?? '')
+  if (message.includes('no such table:')) {
+    return identifiers.some((identifier) => message.includes(`no such table: ${identifier}`))
+  }
+  if (message.includes('no such column:')) {
+    return identifiers.some((identifier) => {
+      const bareIdentifier = identifier.includes('.')
+        ? (identifier.split('.').pop() ?? identifier)
+        : identifier
+      return (
+        message.includes(`no such column: ${identifier}`) ||
+        message.includes(`no such column: ${bareIdentifier}`) ||
+        message.includes(`no such column: v.${bareIdentifier}`)
+      )
+    })
+  }
+  return false
 }
 
 async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[]): Promise<T> {
+  try {
+    return run()
+  } catch (error) {
+    if (!isMissingSchemaError(error, schemaIdentifiers)) throw error
     try {
-        return run()
-    } catch (error) {
-        if (!isMissingSchemaError(error, schemaIdentifiers)) throw error
-        try {
-            const db = getDb()
-            ensureVoucherColumns(db as any)
-            ensureAdvanceTables(db as any)
-            ensureAiTables(db as any)
-            ensureInvoiceTables(db as any)
-            applyMigrations(db as any)
-        } catch {
-        }
+      const db = getDb()
+      ensureVoucherColumns(db as any)
+      ensureAdvanceTables(db as any)
+      ensureAiTables(db as any)
+      ensureInvoiceTables(db as any)
+      applyMigrations(db as any)
+    } catch {}
 
-        try {
-            return run()
-        } catch (retryError) {
-            if (isMissingSchemaError(retryError, schemaIdentifiers)) {
-                throw new Error('Die Datenbankstruktur war unvollständig und konnte nicht automatisch repariert werden. Bitte App neu starten und erneut versuchen.')
-            }
-            throw retryError
-        }
+    try {
+      return run()
+    } catch (retryError) {
+      if (isMissingSchemaError(retryError, schemaIdentifiers)) {
+        throw new Error(
+          'Die Datenbankstruktur war unvollständig und konnte nicht automatisch repariert werden. Bitte App neu starten und erneut versuchen.'
+        )
+      }
+      throw retryError
     }
+  }
 }
 
 function normalizeAiSourceLookup(value: string) {
-    return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
 }
 
 function extractCandidateSourceIndex(candidate: any) {
-    const candidates = [candidate?.source?.fileName, candidate?.source?.label]
-    for (const value of candidates) {
-        const match = String(value || '').match(/\bquelle\s*(\d+)\b/i)
-        if (match) {
-            const index = Number(match[1]) - 1
-            if (Number.isInteger(index) && index >= 0) return index
+  const candidates = [candidate?.source?.fileName, candidate?.source?.label]
+  for (const value of candidates) {
+    const match = String(value || '').match(/\bquelle\s*(\d+)\b/i)
+    if (match) {
+      const index = Number(match[1]) - 1
+      if (Number.isInteger(index) && index >= 0) return index
+    }
+  }
+  return null
+}
+
+function resolveAiSourceFile(
+  jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>,
+  candidate: any,
+  candidateIndex?: number
+) {
+  const sourceFileName = String(candidate?.source?.fileName || '').trim()
+  if (sourceFileName) {
+    const exact = jobFiles.find((file) => file.fileName === sourceFileName)
+    if (exact) return exact
+    const normalized = normalizeAiSourceLookup(sourceFileName)
+    const fuzzy = normalized
+      ? jobFiles.find((file) => normalizeAiSourceLookup(file.fileName) === normalized)
+      : null
+    if (fuzzy) return fuzzy
+  }
+  const sourceIndex = extractCandidateSourceIndex(candidate)
+  if (sourceIndex != null && jobFiles[sourceIndex]) return jobFiles[sourceIndex]
+  if (!candidate?.source?.fileName && !candidate?.source?.label && jobFiles.length === 1)
+    return jobFiles[0]
+  if (
+    !candidate?.source?.fileName &&
+    !candidate?.source?.label &&
+    candidateIndex != null &&
+    jobFiles.length > candidateIndex
+  )
+    return jobFiles[candidateIndex]
+  return null
+}
+
+function normalizeAiCandidateSources(
+  jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>,
+  result: any
+) {
+  if (!Array.isArray(result?.candidates)) return result
+  return {
+    ...result,
+    candidates: result.candidates.map((candidate: any, candidateIndex: number) => {
+      const matchedFile = resolveAiSourceFile(jobFiles, candidate, candidateIndex)
+      if (!matchedFile) return candidate
+      const pageNumber = candidate?.source?.pageNumber ?? null
+      const pageCount = candidate?.source?.pageCount ?? null
+      return {
+        ...candidate,
+        source: {
+          fileName: matchedFile.fileName,
+          pageNumber,
+          pageCount,
+          label:
+            pageNumber && pageCount
+              ? `${matchedFile.fileName} · Seite ${pageNumber} von ${pageCount}`
+              : matchedFile.fileName
         }
-    }
-    return null
+      }
+    })
+  }
 }
 
-function resolveAiSourceFile(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, candidate: any, candidateIndex?: number) {
-    const sourceFileName = String(candidate?.source?.fileName || '').trim()
-    if (sourceFileName) {
-        const exact = jobFiles.find((file) => file.fileName === sourceFileName)
-        if (exact) return exact
-        const normalized = normalizeAiSourceLookup(sourceFileName)
-        const fuzzy = normalized ? jobFiles.find((file) => normalizeAiSourceLookup(file.fileName) === normalized) : null
-        if (fuzzy) return fuzzy
-    }
-    const sourceIndex = extractCandidateSourceIndex(candidate)
-    if (sourceIndex != null && jobFiles[sourceIndex]) return jobFiles[sourceIndex]
-    if ((!candidate?.source?.fileName && !candidate?.source?.label) && jobFiles.length === 1) return jobFiles[0]
-    if ((!candidate?.source?.fileName && !candidate?.source?.label) && candidateIndex != null && jobFiles.length > candidateIndex) return jobFiles[candidateIndex]
-    return null
-}
-
-function normalizeAiCandidateSources(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, result: any) {
-    if (!Array.isArray(result?.candidates)) return result
-    return {
-        ...result,
-        candidates: result.candidates.map((candidate: any, candidateIndex: number) => {
-            const matchedFile = resolveAiSourceFile(jobFiles, candidate, candidateIndex)
-            if (!matchedFile) return candidate
-            const pageNumber = candidate?.source?.pageNumber ?? null
-            const pageCount = candidate?.source?.pageCount ?? null
-            return {
-                ...candidate,
-                source: {
-                    fileName: matchedFile.fileName,
-                    pageNumber,
-                    pageCount,
-                    label: pageNumber && pageCount
-                        ? `${matchedFile.fileName} · Seite ${pageNumber} von ${pageCount}`
-                        : matchedFile.fileName
-                }
-            }
-        })
-    }
-}
-
-function filesForAiCandidate(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, candidate: any) {
-    const matchedFile = resolveAiSourceFile(jobFiles, candidate)
-    return matchedFile ? [matchedFile] : jobFiles
+function filesForAiCandidate(
+  jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>,
+  candidate: any
+) {
+  const matchedFile = resolveAiSourceFile(jobFiles, candidate)
+  return matchedFile ? [matchedFile] : jobFiles
 }
 
 type RegisterIpcHandlersOptions = {
-    openDetachedQuickAdd?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
-    focusDetachedQuickAdd?: (draftId: string) => { ok: boolean }
-    closeDetachedQuickAdd?: (draftId: string) => { ok: boolean }
-    hasDetachedQuickAdds?: () => boolean
-    requestCloseDetachedQuickAdds?: (mainWindow?: BrowserWindow | null, confirmed?: boolean) => { ok: boolean; count: number }
-    cancelPendingMainClose?: () => { ok: boolean }
-    getDetachedQuickAddInitial?: (token: string) => any
-    notifyQuickAddSaved?: (payload?: any) => void
-}
-
-function budgetLabelForAi(budget: any) {
-    if (budget.label) return budget.label
-    if (budget.name) return budget.name
-    if (budget.categoryName) return `${budget.year} - ${budget.categoryName}`
-    if (budget.projectName) return `${budget.year} - ${budget.projectName}`
-    return `Budget #${budget.id}`
-}
-
-function roundMoney(value: unknown) {
-    return Math.round(Number(value || 0) * 100) / 100
-}
-
-function dateRangeForYear(year: number, today: string) {
-    return {
-        from: `${year}-01-01`,
-        to: year === Number(today.slice(0, 4)) ? today : `${year}-12-31`
-    }
-}
-
-function compactReportSummary(filters: any = {}) {
-    const summary = summarizeVouchers(filters)
-    return {
-        totals: {
-            net: roundMoney(summary.totals?.net),
-            vat: roundMoney(summary.totals?.vat),
-            gross: roundMoney(summary.totals?.gross)
-        },
-        byType: (summary.byType || []).map((row: any) => ({
-            type: row.key,
-            net: roundMoney(row.net),
-            vat: roundMoney(row.vat),
-            gross: roundMoney(row.gross)
-        })),
-        bySphere: (summary.bySphere || []).map((row: any) => ({
-            sphere: row.key,
-            gross: roundMoney(row.gross)
-        })),
-        byPaymentAccount: (summary.byPaymentAccount || []).map((row: any) => ({
-            accountId: row.accountId,
-            name: row.key,
-            kind: row.kind,
-            gross: roundMoney(row.gross)
-        }))
-    }
-}
-
-function compactVoucherForAi(row: any) {
-    return {
-        id: row.id,
-        voucherNo: row.voucherNo,
-        date: row.date,
-        type: row.type,
-        sphere: row.sphere,
-        description: row.description,
-        counterparty: row.counterparty,
-        grossAmount: roundMoney(row.grossAmount),
-        paymentMethod: row.paymentMethod,
-        paymentAccountId: row.paymentAccountId,
-        paymentAccountName: row.paymentAccountName,
-        budgetId: row.budgetId,
-        budgetLabel: row.budgetLabel,
-        earmarkId: row.earmarkId,
-        earmarkCode: row.earmarkCode,
-        tags: row.tags || []
-    }
+  openDetachedQuickAdd?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
+  focusDetachedQuickAdd?: (draftId: string) => { ok: boolean }
+  closeDetachedQuickAdd?: (draftId: string) => { ok: boolean }
+  hasDetachedQuickAdds?: () => boolean
+  requestCloseDetachedQuickAdds?: (
+    mainWindow?: BrowserWindow | null,
+    confirmed?: boolean
+  ) => { ok: boolean; count: number }
+  cancelPendingMainClose?: () => { ok: boolean }
+  getDetachedQuickAddInitial?: (token: string) => any
+  notifyQuickAddSaved?: (payload?: any) => void
 }
 
 function normalizeAiLookup(value: unknown) {
-    return String(value || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/ß/g, 'ss')
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim()
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 function paymentMethodForAiAccountKind(kind?: string | null): 'BAR' | 'BANK' | null {
-    if (kind === 'CASH') return 'BAR'
-    if (kind === 'BANK' || kind === 'PAYPAL' || kind === 'CARD' || kind === 'OTHER') return 'BANK'
-    return null
+  if (kind === 'CASH') return 'BAR'
+  if (kind === 'BANK' || kind === 'PAYPAL' || kind === 'CARD' || kind === 'OTHER') return 'BANK'
+  return null
 }
 
 function findAiPaymentAccountHint(prompt: string, paymentAccounts: any[]) {
-    const normalizedPrompt = normalizeAiLookup(prompt)
-    if (!normalizedPrompt) return null
-    const candidates = (paymentAccounts || [])
-        .filter((account) => account?.isActive !== 0)
-        .map((account) => ({ account, normalizedName: normalizeAiLookup(account.name) }))
-        .filter((item) => item.normalizedName && normalizedPrompt.includes(item.normalizedName))
-        .sort((a, b) => b.normalizedName.length - a.normalizedName.length)
-    return candidates[0]?.account || null
+  const normalizedPrompt = normalizeAiLookup(prompt)
+  if (!normalizedPrompt) return null
+  const candidates = (paymentAccounts || [])
+    .filter((account) => account?.isActive !== 0)
+    .map((account) => ({ account, normalizedName: normalizeAiLookup(account.name) }))
+    .filter((item) => item.normalizedName && normalizedPrompt.includes(item.normalizedName))
+    .sort((a, b) => b.normalizedName.length - a.normalizedName.length)
+  return candidates[0]?.account || null
 }
 
 function shouldApplyPaymentHintToAll(prompt: string) {
-    const normalizedPrompt = normalizeAiLookup(prompt)
-    return /(alle|allen|jede|jeden|saemtliche|samtliche|immer|standard|default|grundsaetzlich|grundsatzlich|nicht anders angegeben|gehen diese auf|sollen auf|soll bei allen)/.test(normalizedPrompt)
+  const normalizedPrompt = normalizeAiLookup(prompt)
+  return /(alle|allen|jede|jeden|saemtliche|samtliche|immer|standard|default|grundsaetzlich|grundsatzlich|nicht anders angegeben|gehen diese auf|sollen auf|soll bei allen)/.test(
+    normalizedPrompt
+  )
 }
 
 function applyPaymentAccountHintToAiAnalysis(result: any, prompt: string, paymentAccounts: any[]) {
-    const account = findAiPaymentAccountHint(prompt, paymentAccounts)
-    if (!account || !Array.isArray(result?.candidates)) return result
-    const paymentMethod = paymentMethodForAiAccountKind(account.kind)
-    const applyAll = shouldApplyPaymentHintToAll(prompt)
-    let changed = false
-    const nextCandidates = result.candidates.map((candidate: any) => {
-        if (!applyAll && candidate.paymentAccountId) return candidate
-        changed = true
-        return {
-            ...candidate,
-            paymentAccountId: Number(account.id),
-            paymentMethod,
-            warnings: (candidate.warnings || []).filter((warning: string) => !/kein konto|kein zahlungsweg|zahlung.*platzhalter/i.test(String(warning)))
-        }
-    })
-    if (!changed) return result
+  const account = findAiPaymentAccountHint(prompt, paymentAccounts)
+  if (!account || !Array.isArray(result?.candidates)) return result
+  const paymentMethod = paymentMethodForAiAccountKind(account.kind)
+  const applyAll = shouldApplyPaymentHintToAll(prompt)
+  let changed = false
+  const nextCandidates = result.candidates.map((candidate: any) => {
+    if (!applyAll && candidate.paymentAccountId) return candidate
+    changed = true
     return {
-        ...result,
-        candidates: nextCandidates,
-        warnings: [...(result.warnings || []), `Zahlungskonto aus Nutzerhinweis gesetzt: ${account.name}.`]
+      ...candidate,
+      paymentAccountId: Number(account.id),
+      paymentMethod,
+      warnings: (candidate.warnings || []).filter(
+        (warning: string) =>
+          !/kein konto|kein zahlungsweg|zahlung.*platzhalter/i.test(String(warning))
+      )
     }
-}
-
-function buildAiContext() {
-    const today = new Date().toISOString().slice(0, 10)
-    const currentYear = Number(today.slice(0, 4))
-    const organization = (() => {
-        try {
-            const active = getActiveOrganization() as any
-            return {
-                name: active?.name ?? active?.displayName ?? null,
-                activeName: active?.name ?? active?.displayName ?? null
-            }
-        } catch {
-            return undefined
-        }
-    })()
-    const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
-    const budgets = listBudgets({ includeArchived: true } as any) || []
-    const earmarks = listBindings({} as any) || []
-    const tags = listTags({ includeUsage: true } as any) || []
-    const members = listMembers({ status: 'ALL', limit: 2000, sortBy: 'name', sort: 'ASC' } as any)
-    const memberStatusCounts = members.rows.reduce<Record<string, number>>((acc, member: any) => {
-        acc[member.status] = (acc[member.status] || 0) + 1
-        return acc
-    }, {})
-    const years = Array.from(new Set([currentYear, ...listVoucherYears()]))
-        .filter((year) => Number.isFinite(Number(year)))
-        .map(Number)
-        .sort((a, b) => b - a)
-        .slice(0, 8)
-    const currentRange = dateRangeForYear(currentYear, today)
-    const currentYearIncome = summarizeVouchers({ ...currentRange, type: 'IN' } as any).totals
-    const currentYearExpenses = summarizeVouchers({ ...currentRange, type: 'OUT' } as any).totals
-    const latestVouchers = listVouchersAdvanced({ limit: 500, sort: 'DESC' } as any).map(compactVoucherForAi)
-    const currentYearVouchers = listVouchersAdvanced({ ...currentRange, limit: 1000, sort: 'DESC' } as any).map(compactVoucherForAi)
-    const invoiceSummary = summarizeInvoices({} as any)
-    const openInvoiceSummary = summarizeInvoices({ status: 'OPEN' } as any)
-    const openInvoices = listInvoicesPaged({ status: 'OPEN', limit: 200, sortBy: 'due', sort: 'ASC' } as any).rows.map((invoice: any) => ({
-        id: invoice.id,
-        invoiceNo: invoice.invoiceNo,
-        date: invoice.date,
-        dueDate: invoice.dueDate,
-        party: invoice.party,
-        description: invoice.description,
-        grossAmount: roundMoney(invoice.grossAmount),
-        paidSum: roundMoney(invoice.paidSum),
-        status: invoice.status,
-        voucherType: invoice.voucherType,
-        sphere: invoice.sphere,
-        budgetId: invoice.budgetId,
-        tags: invoice.tags || []
-    }))
-    return {
-        organization,
-        generatedAt: today,
-        paymentAccounts: paymentAccounts.map((account: any) => ({
-            id: account.id,
-            name: account.name,
-            kind: account.kind,
-            ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
-            color: account.color,
-            sortOrder: account.sortOrder,
-            isActive: account.isActive
-        })),
-        budgets: budgets.map((budget: any) => ({
-            id: budget.id,
-            label: budgetLabelForAi(budget),
-            year: budget.year,
-            sphere: budget.sphere,
-            categoryName: budget.categoryName,
-            projectName: budget.projectName,
-            amountPlanned: budget.amountPlanned,
-            isArchived: budget.isArchived
-        })),
-        earmarks: earmarks.map((earmark: any) => ({
-            id: earmark.id,
-            code: earmark.code,
-            name: earmark.name,
-            isActive: earmark.isActive
-        })),
-        tags: tags.map((tag: any) => ({ id: tag.id, name: tag.name, color: tag.color, usage: Number(tag.usage || 0) })),
-        members: {
-            total: members.total,
-            byStatus: memberStatusCounts,
-            contributionDue: mp.dueSummary(),
-            rows: members.rows.map((member: any) => ({
-                id: member.id,
-                memberNo: member.memberNo,
-                name: member.name,
-                email: member.email,
-                phone: member.phone,
-                status: member.status,
-                boardRole: member.boardRole,
-                tags: member.tags || [],
-                contributionAmount: member.contribution_amount,
-                contributionInterval: member.contribution_interval,
-                joinDate: member.join_date,
-                leaveDate: member.leave_date,
-                nextDueDate: member.next_due_date,
-                notes: member.notes,
-                hasIban: !!member.iban,
-                hasMandate: !!member.mandate_ref
-            }))
-        },
-        reports: {
-            currentDate: today,
-            currentYear,
-            allTime: compactReportSummary({ includeInternalVouchers: true }),
-            currentYearToDate: compactReportSummary(currentRange),
-            currentYearIncomeGross: roundMoney(currentYearIncome?.gross),
-            currentYearExpenseGross: roundMoney(currentYearExpenses?.gross),
-            cashBalance: cashBalance({ to: today } as any),
-            monthlyCurrentYearNet: monthlyVouchers(currentRange as any),
-            monthlyCurrentYearIncome: monthlyVouchers({ ...currentRange, type: 'IN' } as any),
-            monthlyCurrentYearExpenses: monthlyVouchers({ ...currentRange, type: 'OUT' } as any),
-            yearly: years.map((year) => {
-                const range = dateRangeForYear(year, today)
-                const income = summarizeVouchers({ ...range, type: 'IN' } as any).totals
-                const expenses = summarizeVouchers({ ...range, type: 'OUT' } as any).totals
-                return {
-                    year,
-                    range,
-                    summary: compactReportSummary(range),
-                    incomeGross: roundMoney(income?.gross),
-                    expenseGross: roundMoney(expenses?.gross)
-                }
-            }),
-            latestVouchers,
-            currentYearVouchers
-        },
-        invoices: {
-            summary: {
-                count: invoiceSummary.count,
-                gross: roundMoney(invoiceSummary.gross),
-                paid: roundMoney(invoiceSummary.paid),
-                remaining: roundMoney(invoiceSummary.remaining),
-                grossIn: roundMoney(invoiceSummary.grossIn),
-                grossOut: roundMoney(invoiceSummary.grossOut)
-            },
-            openSummary: {
-                count: openInvoiceSummary.count,
-                gross: roundMoney(openInvoiceSummary.gross),
-                paid: roundMoney(openInvoiceSummary.paid),
-                remaining: roundMoney(openInvoiceSummary.remaining),
-                grossIn: roundMoney(openInvoiceSummary.grossIn),
-                grossOut: roundMoney(openInvoiceSummary.grossOut)
-            },
-            openRows: openInvoices
-        }
-    }
+  })
+  if (!changed) return result
+  return {
+    ...result,
+    candidates: nextCandidates,
+    warnings: [
+      ...(result.warnings || []),
+      `Zahlungskonto aus Nutzerhinweis gesetzt: ${account.name}.`
+    ]
+  }
 }
 
 function notifyDataChanged() {
-    for (const win of BrowserWindow.getAllWindows()) {
-        try { win.webContents.send('app:data-changed') } catch { }
-    }
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      win.webContents.send('app:data-changed')
+    } catch {}
+  }
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
-    registerBackupAndShellHandlers()
-    const getCurrentWindow = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+  registerBackupAndShellHandlers()
+  const getCurrentWindow = () =>
+    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 
-    // App info
-    ipcMain.handle('app.version', async () => {
-        try { return { version: app.getVersion(), name: app.getName() } } catch { return { version: '0.0.0', name: 'VereinO' } }
+  // App info
+  ipcMain.handle('app.version', async () => {
+    try {
+      return { version: app.getVersion(), name: app.getName() }
+    } catch {
+      return { version: '0.0.0', name: 'VereinO' }
+    }
+  })
+  ipcMain.handle('updates.getState', async () => getUpdateState())
+  ipcMain.handle('updates.check', async () => checkForAppUpdates())
+  ipcMain.handle('updates.download', async () => downloadAppUpdate())
+  ipcMain.handle('updates.install', async () => installAppUpdate())
+  // Window controls (frameless)
+  ipcMain.handle('window.minimize', async () => {
+    const win = getCurrentWindow()
+    win?.minimize()
+    return { ok: true }
+  })
+  ipcMain.handle('window.toggleMaximize', async () => {
+    const win = getCurrentWindow()
+    if (win) {
+      if (win.isMaximized()) win.unmaximize()
+      else win.maximize()
+      return { ok: true, isMaximized: win.isMaximized() }
+    }
+    return { ok: false }
+  })
+  ipcMain.handle('window.close', async () => {
+    const win = getCurrentWindow()
+    win?.close()
+    return { ok: true }
+  })
+  ipcMain.handle('window.confirmClose', async () => {
+    const win = getCurrentWindow()
+    if (!win) return { ok: false }
+    if (!(win as any).__isDetachedQuickAddWindow && options.hasDetachedQuickAdds?.()) {
+      const requested = options.requestCloseDetachedQuickAdds?.(win, true)
+      if (requested?.count) return { ok: true, pendingDetached: requested.count }
+    }
+    try {
+      ;(win as any).__allowRendererClose?.()
+    } catch {}
+    win.close()
+    return { ok: true }
+  })
+  ipcMain.handle('window.cancelClose', async () => {
+    return options.cancelPendingMainClose?.() ?? { ok: true }
+  })
+  ipcMain.handle('window.isMaximized', async () => {
+    const win = getCurrentWindow()
+    return { isMaximized: !!win?.isMaximized() }
+  })
+  ipcMain.handle('quickAdd.openDetached', async (_e, payload) => {
+    if (!options.openDetachedQuickAdd) return { ok: false, error: 'Abdocken ist nicht verfügbar.' }
+    return options.openDetachedQuickAdd(payload || null)
+  })
+  ipcMain.handle('quickAdd.detachedInitial', async (_e, payload: { token?: string }) => {
+    const token = String(payload?.token || '')
+    return {
+      initial:
+        token && options.getDetachedQuickAddInitial
+          ? options.getDetachedQuickAddInitial(token)
+          : null
+    }
+  })
+  ipcMain.handle('quickAdd.focusDetached', async (_e, payload: { draftId?: string }) => {
+    const draftId = String(payload?.draftId || '')
+    return draftId && options.focusDetachedQuickAdd
+      ? options.focusDetachedQuickAdd(draftId)
+      : { ok: false }
+  })
+  ipcMain.handle('quickAdd.closeDetached', async (_e, payload: { draftId?: string }) => {
+    const draftId = String(payload?.draftId || '')
+    return draftId && options.closeDetachedQuickAdd
+      ? options.closeDetachedQuickAdd(draftId)
+      : { ok: false }
+  })
+  ipcMain.handle('quickAdd.notifySaved', async (_e, payload) => {
+    try {
+      options.notifyQuickAddSaved?.(payload || {})
+    } catch {}
+    return { ok: true }
+  })
+  ipcMain.handle('quickAdd.syncDraft', async (_e, payload) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        win.webContents.send('quickAdd:detachedDraftSync', payload || {})
+      } catch {}
+    }
+    return { ok: true }
+  })
+  ipcMain.on('app.notifyDataChanged', async () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        win.webContents.send('app:data-changed')
+      } catch {}
+    }
+  })
+  ipcMain.handle('ai.settings.get', async () => AiSettingsGetOutput.parse(getAiSettings()))
+  ipcMain.handle('ai.settings.set', async (_e, payload) => {
+    const parsed = AiSettingsSetInput.parse(payload)
+    return AiSettingsSetOutput.parse(setAiSettings(parsed))
+  })
+  ipcMain.handle('ai.settings.testConnection', async () =>
+    AiSettingsTestOutput.parse(await testAiConnection())
+  )
+  ipcMain.handle('ai.mcp.status', async () => AiMcpStatusOutput.parse(await getAiMcpStatus()))
+  ipcMain.handle('ai.mcp.configure', async (_e, payload) => {
+    const parsed = AiMcpConfigureInput.parse(payload)
+    return AiMcpConfigureOutput.parse(await configureAiMcpEndpoint(parsed))
+  })
+  ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
+    const parsed = AiBankImportReviewInput.parse(payload)
+    const limit = Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
+    const openRows = (
+      listBankTransactions({
+        status: 'OPEN',
+        sortBy: 'date',
+        sortDir: 'DESC',
+        page: 1,
+        limit
+      }) as any
+    ).rows as any[]
+    const transactions = openRows.map((transaction) => {
+      const matches = findBankTransactionMatches({ id: transaction.id, includeAllDates: false })
+        .filter((match: any) => Number(match.score || 0) > 0)
+        .slice(0, 5)
+      return {
+        id: transaction.id,
+        bookingDate: transaction.bookingDate,
+        direction: transaction.direction,
+        amount: Number(transaction.amount),
+        currency: transaction.currency,
+        counterparty: transaction.counterparty,
+        purpose: transaction.purpose,
+        endToEndId: transaction.endToEndId,
+        bankReference: transaction.bankReference,
+        paymentAccountId: transaction.paymentAccountId,
+        paymentAccountName: transaction.paymentAccountName,
+        matches
+      }
     })
-    ipcMain.handle('updates.getState', async () => getUpdateState())
-    ipcMain.handle('updates.check', async () => checkForAppUpdates())
-    ipcMain.handle('updates.download', async () => downloadAppUpdate())
-    ipcMain.handle('updates.install', async () => installAppUpdate())
-    // Window controls (frameless)
-    ipcMain.handle('window.minimize', async () => {
-        const win = getCurrentWindow()
-        win?.minimize()
-        return { ok: true }
+    const reviewed = await reviewBankImportTransactions({
+      transactions,
+      context: buildAiContext()
     })
-    ipcMain.handle('window.toggleMaximize', async () => {
-        const win = getCurrentWindow()
-        if (win) {
-            if (win.isMaximized()) win.unmaximize(); else win.maximize()
-            return { ok: true, isMaximized: win.isMaximized() }
-        }
-        return { ok: false }
-    })
-    ipcMain.handle('window.close', async () => {
-        const win = getCurrentWindow()
-        win?.close()
-        return { ok: true }
-    })
-    ipcMain.handle('window.confirmClose', async () => {
-        const win = getCurrentWindow()
-        if (!win) return { ok: false }
-        if (!(win as any).__isDetachedQuickAddWindow && options.hasDetachedQuickAdds?.()) {
-            const requested = options.requestCloseDetachedQuickAdds?.(win, true)
-            if (requested?.count) return { ok: true, pendingDetached: requested.count }
-        }
-        try {
-            ;(win as any).__allowRendererClose?.()
-        } catch {
-        }
-        win.close()
-        return { ok: true }
-    })
-    ipcMain.handle('window.cancelClose', async () => {
-        return options.cancelPendingMainClose?.() ?? { ok: true }
-    })
-    ipcMain.handle('window.isMaximized', async () => {
-        const win = getCurrentWindow()
-        return { isMaximized: !!win?.isMaximized() }
-    })
-    ipcMain.handle('quickAdd.openDetached', async (_e, payload) => {
-        if (!options.openDetachedQuickAdd) return { ok: false, error: 'Abdocken ist nicht verfügbar.' }
-        return options.openDetachedQuickAdd(payload || null)
-    })
-    ipcMain.handle('quickAdd.detachedInitial', async (_e, payload: { token?: string }) => {
-        const token = String(payload?.token || '')
-        return { initial: token && options.getDetachedQuickAddInitial ? options.getDetachedQuickAddInitial(token) : null }
-    })
-    ipcMain.handle('quickAdd.focusDetached', async (_e, payload: { draftId?: string }) => {
-        const draftId = String(payload?.draftId || '')
-        return draftId && options.focusDetachedQuickAdd ? options.focusDetachedQuickAdd(draftId) : { ok: false }
-    })
-    ipcMain.handle('quickAdd.closeDetached', async (_e, payload: { draftId?: string }) => {
-        const draftId = String(payload?.draftId || '')
-        return draftId && options.closeDetachedQuickAdd ? options.closeDetachedQuickAdd(draftId) : { ok: false }
-    })
-    ipcMain.handle('quickAdd.notifySaved', async (_e, payload) => {
-        try { options.notifyQuickAddSaved?.(payload || {}) } catch { }
-        return { ok: true }
-    })
-    ipcMain.handle('quickAdd.syncDraft', async (_e, payload) => {
-        for (const win of BrowserWindow.getAllWindows()) {
-            try { win.webContents.send('quickAdd:detachedDraftSync', payload || {}) } catch { }
-        }
-        return { ok: true }
-    })
-    ipcMain.on('app.notifyDataChanged', async () => {
-        for (const win of BrowserWindow.getAllWindows()) {
-            try { win.webContents.send('app:data-changed') } catch { }
-        }
-    })
-    ipcMain.handle('ai.settings.get', async () => AiSettingsGetOutput.parse(getAiSettings()))
-    ipcMain.handle('ai.settings.set', async (_e, payload) => {
-        const parsed = AiSettingsSetInput.parse(payload)
-        return AiSettingsSetOutput.parse(setAiSettings(parsed))
-    })
-    ipcMain.handle('ai.settings.testConnection', async () => AiSettingsTestOutput.parse(await testAiConnection()))
-    ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
-        const parsed = AiBankImportReviewInput.parse(payload)
-        const limit = Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
-        const openRows = (listBankTransactions({
-            status: 'OPEN',
-            sortBy: 'date',
-            sortDir: 'DESC',
-            page: 1,
-            limit
-        }) as any).rows as any[]
-        const transactions = openRows.map((transaction) => {
-            const matches = findBankTransactionMatches({ id: transaction.id, includeAllDates: false })
-                .filter((match: any) => Number(match.score || 0) > 0)
-                .slice(0, 5)
+    const transactionById = new Map(openRows.map((row) => [Number(row.id), row]))
+    const matchesByTransactionId = new Map(
+      transactions.map((row) => [Number(row.id), row.matches || []])
+    )
+    const suggestions = reviewed.result.suggestions
+      .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
+      .map((suggestion) => {
+        const transaction = transactionById.get(Number(suggestion.transactionId))
+        const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
+        if (suggestion.action === 'LINK_EXISTING') {
+          const match = matches.find(
+            (item: any) => Number(item.id) === Number(suggestion.voucherId)
+          )
+          if (!match) {
             return {
-                id: transaction.id,
-                bookingDate: transaction.bookingDate,
-                direction: transaction.direction,
-                amount: Number(transaction.amount),
-                currency: transaction.currency,
-                counterparty: transaction.counterparty,
-                purpose: transaction.purpose,
-                endToEndId: transaction.endToEndId,
-                bankReference: transaction.bankReference,
-                paymentAccountId: transaction.paymentAccountId,
-                paymentAccountName: transaction.paymentAccountName,
-                matches
+              ...suggestion,
+              action: 'NEEDS_MANUAL_REVIEW' as const,
+              voucherId: null,
+              voucherNo: null,
+              reason: `${suggestion.reason} Lokaler Treffer konnte nicht sicher validiert werden.`,
+              transaction
             }
+          }
+          return {
+            ...suggestion,
+            voucherNo: suggestion.voucherNo || match.voucherNo || null,
+            transaction
+          }
+        }
+        return { ...suggestion, transaction }
+      })
+    const seen = new Set(suggestions.map((suggestion) => Number(suggestion.transactionId)))
+    for (const transaction of openRows) {
+      if (!seen.has(Number(transaction.id))) {
+        suggestions.push({
+          transactionId: Number(transaction.id),
+          action: 'NEEDS_MANUAL_REVIEW',
+          confidence: 0.2,
+          reason: 'Die KI hat fuer diesen Bankbeleg keinen belastbaren Vorschlag geliefert.',
+          warnings: ['Manuelle Pruefung empfohlen.'],
+          evidence: [],
+          transaction
         })
-        const reviewed = await reviewBankImportTransactions({
-            transactions,
-            context: buildAiContext()
+      }
+    }
+    return AiBankImportReviewOutput.parse({
+      ...reviewed.result,
+      suggestions
+    })
+  })
+  ipcMain.handle('ai.jobs.create', async (_e, payload) => {
+    const parsed = AiJobsCreateInput.parse(payload)
+    const job = createAiJob(parsed)
+    return AiJobsCreateOutput.parse(job)
+  })
+  ipcMain.handle('ai.jobs.list', async (_e, payload) => {
+    const parsed = AiJobsListInput.parse(payload)
+    return AiJobsListOutput.parse(listAiJobs(parsed as any))
+  })
+  ipcMain.handle('ai.jobs.get', async (_e, payload) => {
+    const parsed = AiJobIdInput.parse(payload)
+    return AiJobsGetOutput.parse(getAiJob(parsed.id))
+  })
+  ipcMain.handle('ai.jobs.process', async (_e, payload) => {
+    const parsed = AiJobIdInput.parse(payload)
+    const initial = setAiJobStatus(parsed.id, 'PROCESSING')
+    try {
+      if (initial.type === 'BOOKING_FROM_DOCUMENTS') {
+        const context = buildAiContext()
+        const analyzed = await analyzeBookingDocuments({
+          files: initial.files.map((file) => ({
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            dataBase64: file.dataBase64 || ''
+          })),
+          context,
+          model: initial.model
         })
-        const transactionById = new Map(openRows.map((row) => [Number(row.id), row]))
-        const matchesByTransactionId = new Map(transactions.map((row) => [Number(row.id), row.matches || []]))
-        const suggestions = reviewed.result.suggestions
-            .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
-            .map((suggestion) => {
-                const transaction = transactionById.get(Number(suggestion.transactionId))
-                const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
-                if (suggestion.action === 'LINK_EXISTING') {
-                    const match = matches.find((item: any) => Number(item.id) === Number(suggestion.voucherId))
-                    if (!match) {
-                        return {
-                            ...suggestion,
-                            action: 'NEEDS_MANUAL_REVIEW' as const,
-                            voucherId: null,
-                            voucherNo: null,
-                            reason: `${suggestion.reason} Lokaler Treffer konnte nicht sicher validiert werden.`,
-                            transaction
-                        }
-                    }
-                    return {
-                        ...suggestion,
-                        voucherNo: suggestion.voucherNo || match.voucherNo || null,
-                        transaction
-                    }
-                }
-                return { ...suggestion, transaction }
-            })
-        const seen = new Set(suggestions.map((suggestion) => Number(suggestion.transactionId)))
-        for (const transaction of openRows) {
-            if (!seen.has(Number(transaction.id))) {
-                suggestions.push({
-                    transactionId: Number(transaction.id),
-                    action: 'NEEDS_MANUAL_REVIEW',
-                    confidence: 0.2,
-                    reason: 'Die KI hat fuer diesen Bankbeleg keinen belastbaren Vorschlag geliefert.',
-                    warnings: ['Manuelle Pruefung empfohlen.'],
-                    evidence: [],
-                    transaction
-                })
+        const sourceNormalizedResult = normalizeAiCandidateSources(initial.files, analyzed.result)
+        const hardenedResult = applyPaymentAccountHintToAiAnalysis(
+          sourceNormalizedResult,
+          initial.prompt || initial.title || '',
+          context.paymentAccounts || []
+        )
+        saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', hardenedResult)
+        const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', {
+          model: analyzed.model,
+          usage: analyzed.usage
+        })
+        return AiJobsProcessOutput.parse(processed)
+      }
+      const generated = await generateAiText({
+        type: initial.type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_MESSAGE',
+        prompt: initial.prompt || initial.title || '',
+        model: initial.model || undefined,
+        context: buildAiContext(),
+        files: initial.files.map((file) => ({
+          fileName: file.fileName,
+          mimeType: file.mimeType,
+          dataBase64: file.dataBase64 || ''
+        }))
+      })
+      saveAiJobResult(parsed.id, 'TEXT_DRAFT', generated.result)
+      const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', {
+        model: generated.model,
+        usage: generated.usage
+      })
+      return AiJobsProcessOutput.parse(processed)
+    } catch (error: any) {
+      const failed = setAiJobStatus(parsed.id, 'FAILED', { error: error?.message || String(error) })
+      return AiJobsProcessOutput.parse(failed)
+    }
+  })
+  ipcMain.handle('ai.jobs.updateCandidate', async (_e, payload) => {
+    const parsed = AiJobsUpdateCandidateInput.parse(payload)
+    const job = updateAiJobCandidate(parsed.id, parsed.result)
+    return AiJobsGetOutput.parse(job)
+  })
+  ipcMain.handle('ai.jobs.approveCandidate', async (_e, payload) => {
+    const parsed = AiJobsApproveCandidateInput.parse(payload)
+    const job = getAiJob(parsed.id)
+    const analysis = AiBookingAnalysisResult.parse(job.result)
+    const candidate = analysis.candidates[parsed.candidateIndex]
+    if (!candidate) throw new Error('KI-Buchungsvorschlag nicht gefunden.')
+    const hasCandidateReviewState = analysis.candidates.some(
+      (item) => item.review?.status === 'APPROVED' || item.review?.voucherId
+    )
+    if (job.status === 'APPROVED' && !hasCandidateReviewState) {
+      throw new Error(
+        'Dieser ältere KI-Vorschlag wurde bereits als gebucht markiert und kann nicht erneut gebucht werden.'
+      )
+    }
+    if (candidate.review?.status === 'APPROVED' || candidate.review?.voucherId) {
+      throw new Error('Dieser KI-Buchungsvorschlag wurde bereits gebucht.')
+    }
+    const voucherPayload = VoucherCreateInput.parse({
+      date: candidate.date,
+      type: candidate.type,
+      sphere: candidate.sphere,
+      description: candidate.description,
+      grossAmount: candidate.grossAmount,
+      vatRate: candidate.vatRate ?? 0,
+      paymentMethod: candidate.paymentMethod ?? undefined,
+      paymentAccountId: candidate.paymentAccountId ?? undefined,
+      budgets: (candidate.budgets || []).map((budget) => ({
+        budgetId: budget.id,
+        amount: budget.amount
+      })),
+      earmarks: (candidate.earmarks || []).map((earmark) => ({
+        earmarkId: earmark.id,
+        amount: earmark.amount
+      })),
+      tags: candidate.tags || [],
+      files: filesForAiCandidate(job.files, candidate).map((file) => ({
+        name: file.fileName,
+        dataBase64: file.dataBase64 || '',
+        mime: file.mimeType || undefined
+      }))
+    })
+    const voucher = createVoucher(voucherPayload)
+    const nextAnalysis = {
+      ...analysis,
+      candidates: analysis.candidates.map((item, idx) =>
+        idx === parsed.candidateIndex
+          ? {
+              ...item,
+              review: {
+                status: 'APPROVED' as const,
+                voucherId: voucher.id,
+                voucherNo: voucher.voucherNo,
+                approvedAt: new Date().toISOString()
+              }
             }
-        }
-        return AiBankImportReviewOutput.parse({
-            ...reviewed.result,
-            suggestions
-        })
+          : item
+      )
+    }
+    saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', nextAnalysis)
+    const allCandidatesApproved = nextAnalysis.candidates.every(
+      (item) => item.review?.status === 'APPROVED' || item.review?.voucherId
+    )
+    setAiJobStatus(parsed.id, allCandidatesApproved ? 'APPROVED' : 'NEEDS_REVIEW', {
+      voucherId: voucher.id
     })
-    ipcMain.handle('ai.jobs.create', async (_e, payload) => {
-        const parsed = AiJobsCreateInput.parse(payload)
-        const job = createAiJob(parsed)
-        return AiJobsCreateOutput.parse(job)
+    notifyDataChanged()
+    return AiJobsApproveCandidateOutput.parse({
+      ok: true,
+      voucherId: voucher.id,
+      voucherNo: voucher.voucherNo
     })
-    ipcMain.handle('ai.jobs.list', async (_e, payload) => {
-        const parsed = AiJobsListInput.parse(payload)
-        return AiJobsListOutput.parse(listAiJobs(parsed as any))
+  })
+  ipcMain.handle('ai.jobs.reject', async (_e, payload) => {
+    const parsed = AiJobsRejectInput.parse(payload)
+    return AiJobsGetOutput.parse(rejectAiJob(parsed.id, parsed.reason))
+  })
+  ipcMain.handle('ai.jobs.delete', async (_e, payload) => {
+    const parsed = AiJobIdInput.parse(payload)
+    return AiJobsDeleteOutput.parse(deleteAiJob(parsed.id))
+  })
+  ipcMain.handle('ai.text.generate', async (_e, payload) => {
+    const parsed = AiTextGenerateInput.parse(payload)
+    const generated = await generateAiText({ ...parsed, context: buildAiContext() })
+    return AiTextGenerateOutput.parse(generated.result)
+  })
+  ipcMain.handle('ai.actions.plan', async (_e, payload) => {
+    const parsed = AiActionPlanInput.parse(payload)
+    const planned = await planAiAction({ ...parsed, context: buildAiContext() })
+    return AiActionPlanOutput.parse(planned)
+  })
+  ipcMain.handle('ai.agent.run', async (_e, payload) => {
+    const parsed = AiAgentRunInput.parse(payload)
+    const result = await runAiAgent({ ...parsed, context: buildAiContext() })
+    return AiAgentRunOutput.parse(result)
+  })
+  ipcMain.handle('ai.agent.memory.list', async (_e, payload) => {
+    const parsed = AiAgentMemoryListInput.parse(payload)
+    return AiAgentMemoryListOutput.parse({ rows: listAiAgentMemory(parsed || {}) })
+  })
+  ipcMain.handle('ai.agent.memory.upsert', async (_e, payload) => {
+    const parsed = AiAgentMemoryUpsertInput.parse(payload)
+    return upsertAiAgentMemory(parsed)
+  })
+  ipcMain.handle('ai.agent.autoRules.list', async (_e, payload) => {
+    const parsed = AiAgentAutoRulesListInput.parse(payload)
+    return AiAgentAutoRulesListOutput.parse({ rows: listAiAgentAutoRules(parsed || {}) })
+  })
+  ipcMain.handle('ai.agent.autoRules.upsert', async (_e, payload) => {
+    const parsed = AiAgentAutoRuleUpsertInput.parse(payload)
+    return upsertAiAgentAutoRule(parsed)
+  })
+  ipcMain.handle('vouchers.create', async (_e, payload) => {
+    const parsed = VoucherCreateInput.parse(payload)
+    const res = createVoucher(parsed)
+    return VoucherCreateOutput.parse(res)
+  })
+
+  ipcMain.handle('vouchers.reverse', async (_e, payload) => {
+    const parsed = VoucherReverseInput.parse(payload)
+    const res = reverseVoucher(parsed.originalId, null)
+    return VoucherReverseOutput.parse(res)
+  })
+
+  ipcMain.handle('reports.summary', async (_e, payload) => {
+    const parsed = ReportsSummaryInput.parse(payload)
+    const summary = summarizeVouchers({
+      paymentMethod: parsed.paymentMethod as any,
+      paymentAccountId: parsed.paymentAccountId ?? undefined,
+      sphere: parsed.sphere as any,
+      type: parsed.type as any,
+      from: parsed.from,
+      to: parsed.to,
+      // extend filters with optional earmarkId
+      ...(parsed.earmarkId != null ? ({ earmarkId: parsed.earmarkId } as any) : {}),
+      ...(parsed.budgetId != null ? ({ budgetId: parsed.budgetId } as any) : {}),
+      q: (parsed as any).q,
+      tag: (parsed as any).tag
+    } as any)
+    return ReportsSummaryOutput.parse(summary)
+  })
+
+  ipcMain.handle('reports.monthly', async (_e, payload) => {
+    const parsed = ReportsMonthlyInput.parse(payload)
+    const buckets = monthlyVouchers({
+      from: parsed.from,
+      to: parsed.to,
+      paymentMethod: parsed.paymentMethod as any,
+      sphere: parsed.sphere as any,
+      type: parsed.type as any,
+      earmarkId: (parsed as any).earmarkId,
+      budgetId: (parsed as any).budgetId
     })
-    ipcMain.handle('ai.jobs.get', async (_e, payload) => {
-        const parsed = AiJobIdInput.parse(payload)
-        return AiJobsGetOutput.parse(getAiJob(parsed.id))
+    return ReportsMonthlyOutput.parse({ buckets })
+  })
+
+  ipcMain.handle('reports.daily', async (_e, payload) => {
+    const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
+    const buckets = dailyVouchers({
+      from: parsed.from,
+      to: parsed.to,
+      paymentMethod: parsed.paymentMethod as any,
+      sphere: parsed.sphere as any,
+      type: parsed.type as any,
+      earmarkId: (parsed as any).earmarkId,
+      budgetId: (parsed as any).budgetId
     })
-    ipcMain.handle('ai.jobs.process', async (_e, payload) => {
-        const parsed = AiJobIdInput.parse(payload)
-        const initial = setAiJobStatus(parsed.id, 'PROCESSING')
-        try {
-            if (initial.type === 'BOOKING_FROM_DOCUMENTS') {
-                const context = buildAiContext()
-                const analyzed = await analyzeBookingDocuments({
-                    files: initial.files.map((file) => ({
-                        fileName: file.fileName,
-                        mimeType: file.mimeType,
-                        dataBase64: file.dataBase64 || ''
-                    })),
-                    context,
-                    model: initial.model
-                })
-                const sourceNormalizedResult = normalizeAiCandidateSources(initial.files, analyzed.result)
-                const hardenedResult = applyPaymentAccountHintToAiAnalysis(sourceNormalizedResult, initial.prompt || initial.title || '', context.paymentAccounts || [])
-                saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', hardenedResult)
-                const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
-                return AiJobsProcessOutput.parse(processed)
-            }
-            const generated = await generateAiText({
-                type: initial.type === 'REPORT_TEXT' ? 'REPORT_TEXT' : 'MEMBER_MESSAGE',
-                prompt: initial.prompt || initial.title || '',
-                model: initial.model || undefined,
-                context: buildAiContext(),
-                files: initial.files.map((file) => ({
-                    fileName: file.fileName,
-                    mimeType: file.mimeType,
-                    dataBase64: file.dataBase64 || ''
-                }))
-            })
-            saveAiJobResult(parsed.id, 'TEXT_DRAFT', generated.result)
-            const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', { model: generated.model, usage: generated.usage })
-            return AiJobsProcessOutput.parse(processed)
-        } catch (error: any) {
-            const failed = setAiJobStatus(parsed.id, 'FAILED', { error: error?.message || String(error) })
-            return AiJobsProcessOutput.parse(failed)
-        }
+    return { buckets } // Same output format, just date instead of month
+  })
+
+  ipcMain.handle('reports.cashBalance', async (_e, payload) => {
+    const parsed = ReportsCashBalanceInput.parse(payload)
+    const res = cashBalance({
+      from: parsed.from,
+      to: parsed.to,
+      sphere: parsed.sphere as any,
+      budgetId: parsed.budgetId,
+      paymentAccountId: parsed.paymentAccountId ?? undefined
     })
-    ipcMain.handle('ai.jobs.updateCandidate', async (_e, payload) => {
-        const parsed = AiJobsUpdateCandidateInput.parse(payload)
-        const job = updateAiJobCandidate(parsed.id, parsed.result)
-        return AiJobsGetOutput.parse(job)
-    })
-    ipcMain.handle('ai.jobs.approveCandidate', async (_e, payload) => {
-        const parsed = AiJobsApproveCandidateInput.parse(payload)
-        const job = getAiJob(parsed.id)
-        const analysis = AiBookingAnalysisResult.parse(job.result)
-        const candidate = analysis.candidates[parsed.candidateIndex]
-        if (!candidate) throw new Error('KI-Buchungsvorschlag nicht gefunden.')
-        const hasCandidateReviewState = analysis.candidates.some((item) => item.review?.status === 'APPROVED' || item.review?.voucherId)
-        if (job.status === 'APPROVED' && !hasCandidateReviewState) {
-            throw new Error('Dieser ältere KI-Vorschlag wurde bereits als gebucht markiert und kann nicht erneut gebucht werden.')
-        }
-        if (candidate.review?.status === 'APPROVED' || candidate.review?.voucherId) {
-            throw new Error('Dieser KI-Buchungsvorschlag wurde bereits gebucht.')
-        }
-        const voucherPayload = VoucherCreateInput.parse({
-            date: candidate.date,
-            type: candidate.type,
-            sphere: candidate.sphere,
-            description: candidate.description,
-            grossAmount: candidate.grossAmount,
-            vatRate: candidate.vatRate ?? 0,
-            paymentMethod: candidate.paymentMethod ?? undefined,
-            paymentAccountId: candidate.paymentAccountId ?? undefined,
-            budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
-            earmarks: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
-            tags: candidate.tags || [],
-            files: filesForAiCandidate(job.files, candidate).map((file) => ({
-                name: file.fileName,
-                dataBase64: file.dataBase64 || '',
-                mime: file.mimeType || undefined
-            }))
-        })
-        const voucher = createVoucher(voucherPayload)
-        const nextAnalysis = {
-            ...analysis,
-            candidates: analysis.candidates.map((item, idx) => idx === parsed.candidateIndex
-                ? {
-                    ...item,
-                    review: {
-                        status: 'APPROVED' as const,
-                        voucherId: voucher.id,
-                        voucherNo: voucher.voucherNo,
-                        approvedAt: new Date().toISOString()
-                    }
-                }
-                : item)
-        }
-        saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', nextAnalysis)
-        const allCandidatesApproved = nextAnalysis.candidates.every((item) => item.review?.status === 'APPROVED' || item.review?.voucherId)
-        setAiJobStatus(parsed.id, allCandidatesApproved ? 'APPROVED' : 'NEEDS_REVIEW', { voucherId: voucher.id })
-        notifyDataChanged()
-        return AiJobsApproveCandidateOutput.parse({ ok: true, voucherId: voucher.id, voucherNo: voucher.voucherNo })
-    })
-    ipcMain.handle('ai.jobs.reject', async (_e, payload) => {
-        const parsed = AiJobsRejectInput.parse(payload)
-        return AiJobsGetOutput.parse(rejectAiJob(parsed.id, parsed.reason))
-    })
-    ipcMain.handle('ai.jobs.delete', async (_e, payload) => {
-        const parsed = AiJobIdInput.parse(payload)
-        return AiJobsDeleteOutput.parse(deleteAiJob(parsed.id))
-    })
-    ipcMain.handle('ai.text.generate', async (_e, payload) => {
-        const parsed = AiTextGenerateInput.parse(payload)
-        const generated = await generateAiText({ ...parsed, context: buildAiContext() })
-        return AiTextGenerateOutput.parse(generated.result)
-    })
-    ipcMain.handle('ai.actions.plan', async (_e, payload) => {
-        const parsed = AiActionPlanInput.parse(payload)
-        const planned = await planAiAction({ ...parsed, context: buildAiContext() })
-        return AiActionPlanOutput.parse(planned)
-    })
-    ipcMain.handle('ai.agent.run', async (_e, payload) => {
-        const parsed = AiAgentRunInput.parse(payload)
-        const result = await runAiAgent({ ...parsed, context: buildAiContext() })
-        return AiAgentRunOutput.parse(result)
-    })
-    ipcMain.handle('ai.agent.memory.list', async (_e, payload) => {
-        const parsed = AiAgentMemoryListInput.parse(payload)
-        return AiAgentMemoryListOutput.parse({ rows: listAiAgentMemory(parsed || {}) })
-    })
-    ipcMain.handle('ai.agent.memory.upsert', async (_e, payload) => {
-        const parsed = AiAgentMemoryUpsertInput.parse(payload)
-        return upsertAiAgentMemory(parsed)
-    })
-    ipcMain.handle('ai.agent.autoRules.list', async (_e, payload) => {
-        const parsed = AiAgentAutoRulesListInput.parse(payload)
-        return AiAgentAutoRulesListOutput.parse({ rows: listAiAgentAutoRules(parsed || {}) })
-    })
-    ipcMain.handle('ai.agent.autoRules.upsert', async (_e, payload) => {
-        const parsed = AiAgentAutoRuleUpsertInput.parse(payload)
-        return upsertAiAgentAutoRule(parsed)
-    })
-    ipcMain.handle('vouchers.create', async (_e, payload) => {
-        const parsed = VoucherCreateInput.parse(payload)
-        const res = createVoucher(parsed)
-        return VoucherCreateOutput.parse(res)
+    return ReportsCashBalanceOutput.parse(res)
+  })
+
+  // Distinct voucher years
+  ipcMain.handle('reports.years', async () => {
+    const years = listVoucherYears()
+    return ReportsYearsOutput.parse({ years })
+  })
+
+  ipcMain.handle('reports.export', async (_e, payload) => {
+    const parsed = ReportsExportInput.parse(payload)
+    const rows = listVouchersAdvanced({
+      limit: 100000,
+      paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+      sphere: (parsed.filters?.sphere as any) || undefined,
+      type: (parsed.filters?.type as any) || undefined,
+      from: parsed.from,
+      to: parsed.to,
+      earmarkId: (parsed.filters as any)?.earmarkId,
+      budgetId: (parsed.filters as any)?.budgetId,
+      q: (parsed.filters as any)?.q,
+      tag: (parsed.filters as any)?.tag,
+      // Apply sort from export payload; default to DESC if not provided
+      sort: (parsed as any).sort || 'DESC',
+      sortBy: (parsed as any).sortBy || 'date'
     })
 
-    ipcMain.handle('vouchers.reverse', async (_e, payload) => {
-        const parsed = VoucherReverseInput.parse(payload)
-        const res = reverseVoucher(parsed.originalId, null)
-        return VoucherReverseOutput.parse(res)
-    })
+    const when = new Date()
+    const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
+    const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
+    try {
+      fs.mkdirSync(baseDir, { recursive: true })
+    } catch {}
 
-    ipcMain.handle('reports.summary', async (_e, payload) => {
-        const parsed = ReportsSummaryInput.parse(payload)
-        const summary = summarizeVouchers({
-            paymentMethod: parsed.paymentMethod as any,
-            paymentAccountId: parsed.paymentAccountId ?? undefined,
-            sphere: parsed.sphere as any,
-            type: parsed.type as any,
-            from: parsed.from,
-            to: parsed.to,
-            // extend filters with optional earmarkId
-            ...(parsed.earmarkId != null ? { earmarkId: parsed.earmarkId } as any : {}),
-            ...(parsed.budgetId != null ? { budgetId: parsed.budgetId } as any : {}),
-            q: (parsed as any).q,
-            tag: (parsed as any).tag
-        } as any)
-        return ReportsSummaryOutput.parse(summary)
-    })
-
-    ipcMain.handle('reports.monthly', async (_e, payload) => {
-        const parsed = ReportsMonthlyInput.parse(payload)
-        const buckets = monthlyVouchers({
-            from: parsed.from,
-            to: parsed.to,
-            paymentMethod: parsed.paymentMethod as any,
-            sphere: parsed.sphere as any,
-            type: parsed.type as any,
-            earmarkId: (parsed as any).earmarkId,
-            budgetId: (parsed as any).budgetId
-        })
-        return ReportsMonthlyOutput.parse({ buckets })
-    })
-
-    ipcMain.handle('reports.daily', async (_e, payload) => {
-        const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
-        const buckets = dailyVouchers({
-            from: parsed.from,
-            to: parsed.to,
-            paymentMethod: parsed.paymentMethod as any,
-            sphere: parsed.sphere as any,
-            type: parsed.type as any,
-            earmarkId: (parsed as any).earmarkId,
-            budgetId: (parsed as any).budgetId
-        })
-        return { buckets } // Same output format, just date instead of month
-    })
-
-    ipcMain.handle('reports.cashBalance', async (_e, payload) => {
-        const parsed = ReportsCashBalanceInput.parse(payload)
-        const res = cashBalance({ from: parsed.from, to: parsed.to, sphere: parsed.sphere as any, budgetId: parsed.budgetId, paymentAccountId: parsed.paymentAccountId ?? undefined })
-        return ReportsCashBalanceOutput.parse(res)
-    })
-
-    // Distinct voucher years
-    ipcMain.handle('reports.years', async () => {
-        const years = listVoucherYears()
-        return ReportsYearsOutput.parse({ years })
-    })
-
-    ipcMain.handle('reports.export', async (_e, payload) => {
-        const parsed = ReportsExportInput.parse(payload)
-        const rows = listVouchersAdvanced({
-            limit: 100000,
-            paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
-            sphere: (parsed.filters?.sphere as any) || undefined,
-            type: (parsed.filters?.type as any) || undefined,
-            from: parsed.from,
-            to: parsed.to,
-            earmarkId: (parsed.filters as any)?.earmarkId,
-            budgetId: (parsed.filters as any)?.budgetId,
-            q: (parsed.filters as any)?.q,
-            tag: (parsed.filters as any)?.tag,
-            // Apply sort from export payload; default to DESC if not provided
-            sort: (parsed as any).sort || 'DESC',
-            sortBy: (parsed as any).sortBy || 'date'
-        })
-
-        const when = new Date()
-        const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-
-        const defaultCols = ['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount'] as const
-        const colsSel = (parsed.fields && parsed.fields.length ? parsed.fields : defaultCols) as string[]
-        const headerMap: Record<string, string> = {
-            date: 'Datum', voucherNo: 'Nr.', type: 'Typ', sphere: 'Sphäre', description: 'Beschreibung', status: 'Status', paymentMethod: 'Zahlweg', netAmount: 'Netto', vatAmount: 'MwSt', grossAmount: 'Brutto', tags: 'Tags'
-        }
-        const paymentAccountLabel = (row: any) => {
-            if (row?.type === 'TRANSFER') {
-                const from = row.transferFromAccountName || (row.transferFrom === 'BAR' ? 'Bar' : row.transferFrom === 'BANK' ? 'Bank' : '')
-                const to = row.transferToAccountName || (row.transferTo === 'BAR' ? 'Bar' : row.transferTo === 'BANK' ? 'Bank' : '')
-                return from && to ? `${from} -> ${to}` : 'Transfer'
-            }
-            return row?.paymentAccountName || (row?.paymentMethod === 'BAR' ? 'Bar' : row?.paymentMethod === 'BANK' ? 'Bank' : '')
-        }
-        const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
-        const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
+    const defaultCols = [
+      'date',
+      'voucherNo',
+      'type',
+      'sphere',
+      'description',
+      'status',
+      'paymentMethod',
+      'netAmount',
+      'vatAmount',
+      'grossAmount'
+    ] as const
+    const colsSel = (
+      parsed.fields && parsed.fields.length ? parsed.fields : defaultCols
+    ) as string[]
+    const headerMap: Record<string, string> = {
+      date: 'Datum',
+      voucherNo: 'Nr.',
+      type: 'Typ',
+      sphere: 'Sphäre',
+      description: 'Beschreibung',
+      status: 'Status',
+      paymentMethod: 'Zahlweg',
+      netAmount: 'Netto',
+      vatAmount: 'MwSt',
+      grossAmount: 'Brutto',
+      tags: 'Tags'
+    }
+    const paymentAccountLabel = (row: any) => {
+      if (row?.type === 'TRANSFER') {
+        const from =
+          row.transferFromAccountName ||
+          (row.transferFrom === 'BAR' ? 'Bar' : row.transferFrom === 'BANK' ? 'Bank' : '')
+        const to =
+          row.transferToAccountName ||
+          (row.transferTo === 'BAR' ? 'Bar' : row.transferTo === 'BANK' ? 'Bank' : '')
+        return from && to ? `${from} -> ${to}` : 'Transfer'
+      }
+      return (
+        row?.paymentAccountName ||
+        (row?.paymentMethod === 'BAR' ? 'Bar' : row?.paymentMethod === 'BANK' ? 'Bank' : '')
+      )
+    }
+    const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
+    const reportBase = parsed.type === 'JOURNAL' ? 'Journal' : `Report_${parsed.type}`
 
     if (parsed.format === 'PDF') {
-            // Phase 1 PDF: simple summary page rendered in an offscreen BrowserWindow and printed to PDF
-            const when = new Date()
-            const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-            const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-            try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-            const filePath = path.join(baseDir, `Controlling_${stamp}.pdf`)
+      // Phase 1 PDF: simple summary page rendered in an offscreen BrowserWindow and printed to PDF
+      const when = new Date()
+      const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
+      const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
+      try {
+        fs.mkdirSync(baseDir, { recursive: true })
+      } catch {}
+      const filePath = path.join(baseDir, `Controlling_${stamp}.pdf`)
 
-            // Gather summary data for the report
-            const summary = summarizeVouchers({
-                paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
-                sphere: (parsed.filters?.sphere as any) || undefined,
-                type: (parsed.filters?.type as any) || undefined,
-                from: parsed.from,
-                to: parsed.to,
-                earmarkId: (parsed.filters as any)?.earmarkId,
-                budgetId: (parsed.filters as any)?.budgetId
-            } as any)
-            const buckets = monthlyVouchers({
-                from: parsed.from,
-                to: parsed.to,
-                paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
-                sphere: (parsed.filters?.sphere as any) || undefined,
-                type: (parsed.filters?.type as any) || undefined,
-                earmarkId: (parsed.filters as any)?.earmarkId,
-                budgetId: (parsed.filters as any)?.budgetId
-            })
-            // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
-            const d2 = getDb()
-            const p2: any[] = []
-            const wh2: string[] = []
-            if (parsed.from) { wh2.push('date >= ?'); p2.push(parsed.from) }
-            if (parsed.to) { wh2.push('date <= ?'); p2.push(parsed.to) }
-            if (parsed.filters?.paymentMethod) { wh2.push('payment_method = ?'); p2.push(parsed.filters.paymentMethod) }
-            if (parsed.filters?.sphere) { wh2.push('sphere = ?'); p2.push(parsed.filters.sphere) }
-            if ((parsed.filters as any)?.earmarkId != null) { wh2.push('earmark_id = ?'); p2.push((parsed.filters as any).earmarkId) }
-            if ((parsed.filters as any)?.budgetId != null) { wh2.push('budget_id = ?'); p2.push((parsed.filters as any).budgetId) }
-            const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
-            const detailed = d2.prepare(`
+      // Gather summary data for the report
+      const summary = summarizeVouchers({
+        paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+        sphere: (parsed.filters?.sphere as any) || undefined,
+        type: (parsed.filters?.type as any) || undefined,
+        from: parsed.from,
+        to: parsed.to,
+        earmarkId: (parsed.filters as any)?.earmarkId,
+        budgetId: (parsed.filters as any)?.budgetId
+      } as any)
+      const buckets = monthlyVouchers({
+        from: parsed.from,
+        to: parsed.to,
+        paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
+        sphere: (parsed.filters?.sphere as any) || undefined,
+        type: (parsed.filters?.type as any) || undefined,
+        earmarkId: (parsed.filters as any)?.earmarkId,
+        budgetId: (parsed.filters as any)?.budgetId
+      })
+      // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
+      const d2 = getDb()
+      const p2: any[] = []
+      const wh2: string[] = []
+      if (parsed.from) {
+        wh2.push('date >= ?')
+        p2.push(parsed.from)
+      }
+      if (parsed.to) {
+        wh2.push('date <= ?')
+        p2.push(parsed.to)
+      }
+      if (parsed.filters?.paymentMethod) {
+        wh2.push('payment_method = ?')
+        p2.push(parsed.filters.paymentMethod)
+      }
+      if (parsed.filters?.sphere) {
+        wh2.push('sphere = ?')
+        p2.push(parsed.filters.sphere)
+      }
+      if ((parsed.filters as any)?.earmarkId != null) {
+        wh2.push('earmark_id = ?')
+        p2.push((parsed.filters as any).earmarkId)
+      }
+      if ((parsed.filters as any)?.budgetId != null) {
+        wh2.push('budget_id = ?')
+        p2.push((parsed.filters as any).budgetId)
+      }
+      const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
+      const detailed = d2
+        .prepare(
+          `
                 SELECT strftime('%Y-%m', date) as month,
                        IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END), 0) as inGross,
                        IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END), 0) as outGross,
@@ -935,56 +1277,89 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 FROM vouchers${where2}
                 GROUP BY strftime('%Y-%m', date)
                 ORDER BY month ASC
-            `).all(...p2) as any[]
-            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
-            const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
-            const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
+            `
+        )
+        .all(...p2) as any[]
+      const orgName =
+        (parsed.orgName && parsed.orgName.trim()) ||
+        ((getSetting<string>('org.name') || 'VereinO') as string)
+      const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
+      const outNegative = parsed.amountMode === 'OUT_NEGATIVE'
 
-            // Prepare data for sphere chart
-            const sphereAgg = (summary.bySphere as any[]).map(s => ({ key: s.key as string, gross: Number(s.gross) }))
-            const totalSphere = Math.max(0.0001, sphereAgg.reduce((a, b) => a + Math.abs(b.gross), 0))
-            const colors: Record<string, string> = { IDEELL: '#6AA6FF', ZWECK: '#00C853', VERMOEGEN: '#FFC107', WGB: '#9C27B0' }
-            function arcPath(cx: number, cy: number, r: number, r2: number, start: number, end: number) {
-                const toXY = (ang: number, rad: number) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)]
-                const [x1, y1] = toXY(start, r)
-                const [x2, y2] = toXY(end, r)
-                const [x3, y3] = toXY(end, r2)
-                const [x4, y4] = toXY(start, r2)
-                const large = end - start > Math.PI ? 1 : 0
-                return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${r2} ${r2} 0 ${large} 0 ${x4} ${y4} Z`
-            }
-            function sphereDonutSVG(size = 160) {
-                const cx = size / 2, cy = size / 2, r = size / 2 - 4, r2 = r * 0.62
-                let a0 = -Math.PI / 2
-                const parts = sphereAgg.map(s => {
-                    const frac = Math.abs(s.gross) / totalSphere
-                    const a1 = a0 + frac * Math.PI * 2
-                    const d = arcPath(cx, cy, r, r2, a0, a1)
-                    const seg = `<path d="${d}" fill="${colors[s.key] || '#888'}" />`
-                    a0 = a1
-                    return seg
-                }).join('')
-                return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Sphären-Donut">${parts}</svg>`
-            }
+      // Prepare data for sphere chart
+      const sphereAgg = (summary.bySphere as any[]).map((s) => ({
+        key: s.key as string,
+        gross: Number(s.gross)
+      }))
+      const totalSphere = Math.max(
+        0.0001,
+        sphereAgg.reduce((a, b) => a + Math.abs(b.gross), 0)
+      )
+      const colors: Record<string, string> = {
+        IDEELL: '#6AA6FF',
+        ZWECK: '#00C853',
+        VERMOEGEN: '#FFC107',
+        WGB: '#9C27B0'
+      }
+      function arcPath(cx: number, cy: number, r: number, r2: number, start: number, end: number) {
+        const toXY = (ang: number, rad: number) => [
+          cx + rad * Math.cos(ang),
+          cy + rad * Math.sin(ang)
+        ]
+        const [x1, y1] = toXY(start, r)
+        const [x2, y2] = toXY(end, r)
+        const [x3, y3] = toXY(end, r2)
+        const [x4, y4] = toXY(start, r2)
+        const large = end - start > Math.PI ? 1 : 0
+        return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${r2} ${r2} 0 ${large} 0 ${x4} ${y4} Z`
+      }
+      function sphereDonutSVG(size = 160) {
+        const cx = size / 2,
+          cy = size / 2,
+          r = size / 2 - 4,
+          r2 = r * 0.62
+        let a0 = -Math.PI / 2
+        const parts = sphereAgg
+          .map((s) => {
+            const frac = Math.abs(s.gross) / totalSphere
+            const a1 = a0 + frac * Math.PI * 2
+            const d = arcPath(cx, cy, r, r2, a0, a1)
+            const seg = `<path d="${d}" fill="${colors[s.key] || '#888'}" />`
+            a0 = a1
+            return seg
+          })
+          .join('')
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Sphären-Donut">${parts}</svg>`
+      }
 
-            // Helpers
-            const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
-            const euro = (n: number) => `${(n).toFixed(2)} €`
-            const voucherDescriptionHtml = (row: any) => {
-                const description = String(row?.description || '').trim() || '—'
-                const status = voucherStatusText(row)
-                const kind = voucherStatusKind(row)
-                return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
-            }
-            const paymentAccountRows = Array.isArray((summary as any).byPaymentAccount) && (summary as any).byPaymentAccount.length
-                ? (summary as any).byPaymentAccount
-                : (summary.byPaymentMethod as any[]).map(p => ({ key: p.key === 'BAR' ? 'Bar' : p.key === 'BANK' ? 'Bank' : 'Ohne Konto', color: null, gross: p.gross }))
+      // Helpers
+      const esc = (s: any) =>
+        String(s ?? '').replace(
+          /[&<>"']/g,
+          (c) =>
+            (({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }) as any)[c]
+        )
+      const euro = (n: number) => `${n.toFixed(2)} €`
+      const voucherDescriptionHtml = (row: any) => {
+        const description = String(row?.description || '').trim() || '—'
+        const status = voucherStatusText(row)
+        const kind = voucherStatusKind(row)
+        return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
+      }
+      const paymentAccountRows =
+        Array.isArray((summary as any).byPaymentAccount) && (summary as any).byPaymentAccount.length
+          ? (summary as any).byPaymentAccount
+          : (summary.byPaymentMethod as any[]).map((p) => ({
+              key: p.key === 'BAR' ? 'Bar' : p.key === 'BANK' ? 'Bank' : 'Ohne Konto',
+              color: null,
+              gross: p.gross
+            }))
 
-            const totalIn = (summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0)
-            const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
-            const saldo = Math.round((totalIn - totalOut) * 100) / 100
+      const totalIn = summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0
+      const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
+      const saldo = Math.round((totalIn - totalOut) * 100) / 100
 
-            const html = `<!doctype html>
+      const html = `<!doctype html>
 <!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Controlling-Bericht</title>
 <style>
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; color: #222; }
@@ -1035,7 +1410,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     <div class="report-header">
         <div class="report-title">
             <h1>Controlling-Bericht</h1>
-            <div class="muted">${orgName} · Zeitraum: ${(parsed.from ?? '')} – ${(parsed.to ?? '')} · Erstellt: ${new Date().toLocaleString('de-DE')}</div>
+            <div class="muted">${orgName} · Zeitraum: ${parsed.from ?? ''} – ${parsed.to ?? ''} · Erstellt: ${new Date().toLocaleString('de-DE')}</div>
         </div>
         ${orgLogoDataUrl ? `<img class="report-logo" src="${esc(orgLogoDataUrl)}" alt="Organisationslogo" />` : ''}
     </div>
@@ -1050,7 +1425,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             <div style="display:flex; gap:16px; align-items:center;">
                 <div>${sphereDonutSVG(160)}</div>
                 <div class="legend">
-                    ${(summary.bySphere as any[]).map(s => `<span class="legend-item"><span class="sw" style="background:${colors[(s as any).key] || '#888'}"></span>${esc((s as any).key)} · ${euro(Number((s as any).gross))}</span>`).join('')}
+                    ${(summary.bySphere as any[]).map((s) => `<span class="legend-item"><span class="sw" style="background:${colors[(s as any).key] || '#888'}"></span>${esc((s as any).key)} · ${euro(Number((s as any).gross))}</span>`).join('')}
                 </div>
             </div>
         </div>
@@ -1068,91 +1443,124 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         <div class="title">Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</div>
         <div style="height:240px;">
             ${(() => {
-                // Dashboard-style chart with IN/OUT bars and cumulative saldo line
-                const W = 760, H = 220, P = 100
-                const baseY = H - 28
-                const maxH = baseY - 24
-                const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                
-                // Build cumulative saldo
-                const cumSaldo: number[] = []
-                let run = 0
-                for (const b of detailed) { run += (Number(b.saldo) || 0); cumSaldo.push(run) }
-                
-                // Scale by max of bars and cumulative line
-                const maxBar = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
-                const minLine = Math.min(0, ...cumSaldo)
-                const maxLine = Math.max(0, ...cumSaldo)
-                const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
-                
-                const xs = (i: number, n: number) => {
-                    const usable = W - 2 * P
-                    const seg = usable / Math.max(1, n)
-                    return P + seg / 2 + i * seg
-                }
-                const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
-                const yLine = (v: number) => {
-                    const range = maxValue - (-maxValue)
-                    return 16 + ((maxValue - v) / range) * (baseY - 16)
-                }
-                
-                const barW = 12, gap = 8
-                
-                // Y-axis ticks
-                function niceStep(max: number) {
-                    if (max <= 0) return 1
-                    const exp = Math.floor(Math.log10(max))
-                    const base = Math.pow(10, exp)
-                    const m = max / base
-                    let step = base
-                    if (m <= 2) step = base / 5
-                    else if (m <= 5) step = base / 2
-                    const target = Math.max(1, Math.round(max / step))
-                    if (target > 8) step *= 2
-                    return step
-                }
-                const yStep = niceStep(maxValue)
-                const yTicks: number[] = []
-                for (let v = 0; v <= maxValue + 1e-9; v += yStep) yTicks.push(Math.round(v))
-                
-                const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
-                
-                // Bars
-                const bars = detailed.map((b: any, i: number) => {
-                    const xCenter = xs(i, detailed.length)
-                    const inV = Number(b.inGross) || 0
-                    const outV = Number(b.outGross) || 0
-                    const hIn = inV ? (baseY - yBar(inV)) : 0
-                    const hOut = outV ? (baseY - yBar(outV)) : 0
-                    return `<rect x="${xCenter - barW - gap/2}" y="${yBar(inV)}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
-                            <rect x="${xCenter + gap/2}" y="${yBar(outV)}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
-                }).join('')
-                
-                // Cumulative line
-                const linePts = cumSaldo.map((v, i) => `${xs(i, detailed.length)},${yLine(v)}`).join(' ')
-                
-                // X labels (thinned out for readability)
-                let tickEvery = 1
-                const total = detailed.length
-                if (total > 48) tickEvery = 12
-                else if (total > 24) tickEvery = 6
-                else if (total > 12) tickEvery = 3
-                
-                const xLabels = detailed.map((b: any, i: number) => {
-                    if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
-                    const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
-                    const mon = m[monIdx] || String(b.month).slice(5)
-                    return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
-                }).join('')
-                
-                // Y grid + labels
-                const yGrid = yTicks.map(v => {
-                    return `<line x1="${P}" x2="${W-P/2}" y1="${yBar(v)}" y2="${yBar(v)}" stroke="#ddd" opacity="0.5"/>
-                            <text x="${P-6}" y="${yBar(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
-                }).join('')
-                
-                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
-                    <line x1="${P}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
+              // Dashboard-style chart with IN/OUT bars and cumulative saldo line
+              const W = 760,
+                H = 220,
+                P = 100
+              const baseY = H - 28
+              const maxH = baseY - 24
+              const m = [
+                'Jan',
+                'Feb',
+                'Mär',
+                'Apr',
+                'Mai',
+                'Jun',
+                'Jul',
+                'Aug',
+                'Sep',
+                'Okt',
+                'Nov',
+                'Dez'
+              ]
+
+              // Build cumulative saldo
+              const cumSaldo: number[] = []
+              let run = 0
+              for (const b of detailed) {
+                run += Number(b.saldo) || 0
+                cumSaldo.push(run)
+              }
+
+              // Scale by max of bars and cumulative line
+              const maxBar = Math.max(
+                1,
+                ...detailed.map((b: any) =>
+                  Math.max(Number(b.inGross) || 0, Number(b.outGross) || 0)
+                )
+              )
+              const minLine = Math.min(0, ...cumSaldo)
+              const maxLine = Math.max(0, ...cumSaldo)
+              const maxValue = Math.max(maxBar, Math.abs(minLine), Math.abs(maxLine))
+
+              const xs = (i: number, n: number) => {
+                const usable = W - 2 * P
+                const seg = usable / Math.max(1, n)
+                return P + seg / 2 + i * seg
+              }
+              const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
+              const yLine = (v: number) => {
+                const range = maxValue - -maxValue
+                return 16 + ((maxValue - v) / range) * (baseY - 16)
+              }
+
+              const barW = 12,
+                gap = 8
+
+              // Y-axis ticks
+              function niceStep(max: number) {
+                if (max <= 0) return 1
+                const exp = Math.floor(Math.log10(max))
+                const base = Math.pow(10, exp)
+                const m = max / base
+                let step = base
+                if (m <= 2) step = base / 5
+                else if (m <= 5) step = base / 2
+                const target = Math.max(1, Math.round(max / step))
+                if (target > 8) step *= 2
+                return step
+              }
+              const yStep = niceStep(maxValue)
+              const yTicks: number[] = []
+              for (let v = 0; v <= maxValue + 1e-9; v += yStep) yTicks.push(Math.round(v))
+
+              const formatEuro = (v: number) =>
+                v >= 1000 ? `${(v / 1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
+
+              // Bars
+              const bars = detailed
+                .map((b: any, i: number) => {
+                  const xCenter = xs(i, detailed.length)
+                  const inV = Number(b.inGross) || 0
+                  const outV = Number(b.outGross) || 0
+                  const hIn = inV ? baseY - yBar(inV) : 0
+                  const hOut = outV ? baseY - yBar(outV) : 0
+                  return `<rect x="${xCenter - barW - gap / 2}" y="${yBar(inV)}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
+                            <rect x="${xCenter + gap / 2}" y="${yBar(outV)}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
+                })
+                .join('')
+
+              // Cumulative line
+              const linePts = cumSaldo
+                .map((v, i) => `${xs(i, detailed.length)},${yLine(v)}`)
+                .join(' ')
+
+              // X labels (thinned out for readability)
+              let tickEvery = 1
+              const total = detailed.length
+              if (total > 48) tickEvery = 12
+              else if (total > 24) tickEvery = 6
+              else if (total > 12) tickEvery = 3
+
+              const xLabels = detailed
+                .map((b: any, i: number) => {
+                  if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
+                  const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
+                  const mon = m[monIdx] || String(b.month).slice(5)
+                  return `<text x="${xs(i, detailed.length)}" y="${H - 6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
+                })
+                .join('')
+
+              // Y grid + labels
+              const yGrid = yTicks
+                .map((v) => {
+                  return `<line x1="${P}" x2="${W - P / 2}" y1="${yBar(v)}" y2="${yBar(v)}" stroke="#ddd" opacity="0.5"/>
+                            <text x="${P - 6}" y="${yBar(v) + 4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
+                })
+                .join('')
+
+              return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+                    <line x1="${P}" x2="${W - P / 2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
                     <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
                     ${yGrid}
                     ${bars}
@@ -1167,75 +1575,103 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         <div class="title">Einnahmen vs. Ausgaben</div>
         <div style="height:220px;">
             ${(() => {
-                // Dashboard-style Income vs Expense chart
-                const W = 760, H = 200, P = 100
-                const baseY = H - 28
-                const maxH = baseY - 16
-                const m = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-                
-                const maxVal = Math.max(1, ...detailed.map((b: any) => Math.max(Number(b.inGross)||0, Number(b.outGross)||0)))
-                
-                const xs = (i: number, n: number) => {
-                    const usable = W - 2 * P
-                    const seg = usable / Math.max(1, n)
-                    return P + seg / 2 + i * seg
-                }
-                const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
-                
-                const barW = 10, gap = 5
-                
-                // Y-axis ticks
-                function niceStep(max: number) {
-                    if (max <= 0) return 1
-                    const exp = Math.floor(Math.log10(max))
-                    const base = Math.pow(10, exp)
-                    const m = max / base
-                    let step = base
-                    if (m <= 2) step = base / 5
-                    else if (m <= 5) step = base / 2
-                    const target = Math.max(1, Math.round(max / step))
-                    if (target > 8) step *= 2
-                    return step
-                }
-                const yStep = niceStep(maxVal)
-                const yTicks: number[] = []
-                for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
-                
-                const formatEuro = (v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
-                
-                // Bars
-                const bars = detailed.map((b: any, i: number) => {
-                    const xCenter = xs(i, detailed.length)
-                    const inV = Number(b.inGross) || 0
-                    const outV = Number(b.outGross) || 0
-                    const hIn = Math.round((inV / maxVal) * maxH)
-                    const hOut = Math.round((outV / maxVal) * maxH)
-                    return `<rect x="${xCenter - barW * 1.5 - gap}" y="${baseY - hIn}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
+              // Dashboard-style Income vs Expense chart
+              const W = 760,
+                H = 200,
+                P = 100
+              const baseY = H - 28
+              const maxH = baseY - 16
+              const m = [
+                'Jan',
+                'Feb',
+                'Mär',
+                'Apr',
+                'Mai',
+                'Jun',
+                'Jul',
+                'Aug',
+                'Sep',
+                'Okt',
+                'Nov',
+                'Dez'
+              ]
+
+              const maxVal = Math.max(
+                1,
+                ...detailed.map((b: any) =>
+                  Math.max(Number(b.inGross) || 0, Number(b.outGross) || 0)
+                )
+              )
+
+              const xs = (i: number, n: number) => {
+                const usable = W - 2 * P
+                const seg = usable / Math.max(1, n)
+                return P + seg / 2 + i * seg
+              }
+              const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
+
+              const barW = 10,
+                gap = 5
+
+              // Y-axis ticks
+              function niceStep(max: number) {
+                if (max <= 0) return 1
+                const exp = Math.floor(Math.log10(max))
+                const base = Math.pow(10, exp)
+                const m = max / base
+                let step = base
+                if (m <= 2) step = base / 5
+                else if (m <= 5) step = base / 2
+                const target = Math.max(1, Math.round(max / step))
+                if (target > 8) step *= 2
+                return step
+              }
+              const yStep = niceStep(maxVal)
+              const yTicks: number[] = []
+              for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
+
+              const formatEuro = (v: number) =>
+                v >= 1000 ? `${(v / 1000).toFixed(0)}k€` : `${v.toFixed(0)}€`
+
+              // Bars
+              const bars = detailed
+                .map((b: any, i: number) => {
+                  const xCenter = xs(i, detailed.length)
+                  const inV = Number(b.inGross) || 0
+                  const outV = Number(b.outGross) || 0
+                  const hIn = Math.round((inV / maxVal) * maxH)
+                  const hOut = Math.round((outV / maxVal) * maxH)
+                  return `<rect x="${xCenter - barW * 1.5 - gap}" y="${baseY - hIn}" width="${barW}" height="${hIn}" fill="#2e7d32" rx="2"/>
                             <rect x="${xCenter - barW / 2}" y="${baseY - hOut}" width="${barW}" height="${hOut}" fill="#c62828" rx="2"/>`
-                }).join('')
-                
-                // X labels (thinned out for readability)
-                let tickEvery = 1
-                const total = detailed.length
-                if (total > 48) tickEvery = 12
-                else if (total > 24) tickEvery = 6
-                else if (total > 12) tickEvery = 3
-                
-                const xLabels = detailed.map((b: any, i: number) => {
-                    if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
-                    const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
-                    const mon = m[monIdx] || String(b.month).slice(5)
-                    return `<text x="${xs(i, detailed.length)}" y="${H-6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
-                }).join('')
-                
-                // Y grid + labels
-                const yGrid = yTicks.map(v => {
-                    return `<line x1="${P}" x2="${W-P/2}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#ddd" opacity="0.5"/>
-                            <text x="${P-6}" y="${yFor(v)+4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
-                }).join('')
-                
-                return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
-                    <line x1="${P/2}" x2="${W-P/2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
+                })
+                .join('')
+
+              // X labels (thinned out for readability)
+              let tickEvery = 1
+              const total = detailed.length
+              if (total > 48) tickEvery = 12
+              else if (total > 24) tickEvery = 6
+              else if (total > 12) tickEvery = 3
+
+              const xLabels = detailed
+                .map((b: any, i: number) => {
+                  if (i % tickEvery !== 0 && i !== detailed.length - 1) return ''
+                  const monIdx = Math.max(0, Math.min(11, Number(String(b.month).slice(5)) - 1))
+                  const mon = m[monIdx] || String(b.month).slice(5)
+                  return `<text x="${xs(i, detailed.length)}" y="${H - 6}" fill="#666" font-size="10" text-anchor="middle">${mon}</text>`
+                })
+                .join('')
+
+              // Y grid + labels
+              const yGrid = yTicks
+                .map((v) => {
+                  return `<line x1="${P}" x2="${W - P / 2}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#ddd" opacity="0.5"/>
+                            <text x="${P - 6}" y="${yFor(v) + 4}" fill="#666" font-size="10" text-anchor="end">${formatEuro(v)}</text>`
+                })
+                .join('')
+
+              return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+                    <line x1="${P / 2}" x2="${W - P / 2}" y1="${baseY}" y2="${baseY}" stroke="#ccc"/>
                     <line x1="${P}" x2="${P}" y1="16" y2="${baseY}" stroke="#ccc"/>
                     ${yGrid}
                     ${bars}
@@ -1264,8 +1700,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                 </tr>
             </thead>
             <tbody>
-                ${rows.map((r: any) => {
-                    const g = (r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount
+                ${rows
+                  .map((r: any) => {
+                    const g = r.type === 'OUT' && outNegative ? -r.grossAmount : r.grossAmount
                     const kind = voucherStatusKind(r)
                     return `<tr class="${kind ? `voucher-row-${kind}` : ''}">
                         <td class="nowrap">${esc(r.date)}</td>
@@ -1276,7 +1713,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                         <td class="nowrap">${esc(paymentAccountLabel(r))}</td>
                         <td class="right nowrap">${euro(Number(g))}</td>
                     </tr>`
-                }).join('')}
+                  })
+                  .join('')}
             </tbody>
         </table>
         <div class="muted">Insgesamt ${rows.length} Beleg(e).</div>
@@ -1284,1592 +1722,1881 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     <div class="footer">VereinO · Automatisch erstellt</div>
 </body></html>`
 
-            const win = new BrowserWindow({ show: false, width: 900, height: 1200 })
-            await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-            const buff = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
-            fs.writeFileSync(filePath, buff)
-            try { win.destroy() } catch { }
-            return ReportsExportOutput.parse({ filePath })
-        } else if (parsed.format === 'XLSX') {
-            const orgName = (parsed.orgName && parsed.orgName.trim()) || (getSetting<string>('org.name') || 'VereinO') as string
-            const filePath = path.join(baseDir, `${reportBase}_${stamp}.xlsx`)
-            const wb = new ExcelJS.Workbook()
-            const ws = wb.addWorksheet('Export')
-            // Header block
-            ws.addRow([`${reportBase} Export`])
-            ws.addRow([`Organisation: ${orgName}`])
-            ws.addRow([`Zeitraum: ${parsed.from ?? ''} – ${parsed.to ?? ''}`])
-            ws.addRow([])
-            // Table header
-            ws.addRow(colsSel.map(c => headerMap[c] || c))
-            for (const r of rows) {
-                const values = colsSel.map((c) => {
-                    if (c === 'grossAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount).toFixed(2))
-                    if (c === 'netAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2))
-                    if (c === 'vatAmount') return Number(((r.type === 'OUT' && outNegative) ? -r.vatAmount : r.vatAmount).toFixed(2))
-                    if (c === 'description') return r.description ?? ''
-                    if (c === 'status') return voucherStatusText(r)
-                    if (c === 'paymentMethod') return paymentAccountLabel(r)
-                    if (c === 'tags') return (r.tags || []).join(', ')
-                    return (r as any)[c]
-                })
-                const row = ws.addRow(values)
-                const kind = voucherStatusKind(r)
-                if (kind === 'storno') {
-                    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F1' } }
-                } else if (kind === 'storniert') {
-                    row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } }
-                    row.font = { color: { argb: 'FF555555' } }
-                }
-            }
-            // Simple formatting
-            ws.getRow(1).font = { bold: true, size: 14 }
-            ws.getRow(5).font = { bold: true }
-            // Column widths
-            ws.columns = colsSel.map((c) => ({ width: c === 'description' ? 40 : c === 'status' ? 28 : 12 })) as any
-
-            // Currency formatting for Brutto (grossAmount) with colors
-            const grossIdx = colsSel.indexOf('grossAmount') + 1
-            if (grossIdx > 0) {
-                const col = ws.getColumn(grossIdx)
-                // Positive green, negative red, zero default
-                col.numFmt = '[Green]#,##0.00" \u20AC";[Red]-#,##0.00" \u20AC";#,##0.00" \u20AC"'
-                col.alignment = { horizontal: 'right' }
-            }
-
-            await wb.xlsx.writeFile(filePath)
-            return ReportsExportOutput.parse({ filePath })
-        } else {
-            const filePath = path.join(baseDir, `${reportBase}_${stamp}.csv`)
-            const lines: string[] = []
-            lines.push(colsSel.map(c => headerMap[c] || c).join(';'))
-            for (const r of rows) {
-                const vals = colsSel.map((c) => {
-                    if (c === 'description') return (r.description ?? '').replace(/\n|\r|;/g, ' ')
-                    if (c === 'status') return voucherStatusText(r)
-                    if (c === 'paymentMethod') return paymentAccountLabel(r)
-                    if (c === 'tags') return (r.tags || []).join(', ')
-                    if (c === 'grossAmount') return ((r.type === 'OUT' && outNegative) ? -r.grossAmount : r.grossAmount).toFixed(2)
-                    if (c === 'netAmount') return ((r.type === 'OUT' && outNegative) ? -r.netAmount : r.netAmount).toFixed(2)
-                    if (c === 'vatAmount') return ((r.type === 'OUT' && outNegative) ? -r.vatAmount : r.vatAmount).toFixed(2)
-                    return String((r as any)[c] ?? '')
-                })
-                lines.push(vals.join(';'))
-            }
-            fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
-            return ReportsExportOutput.parse({ filePath })
-        }
-    })
-
-    ipcMain.handle('reports.exportFiscal', async (_e, payload) => {
-        const parsed = FiscalReportInput.parse(payload)
-        const { generateFiscalReportPDF } = await import('../services/fiscalReport')
-        const from = `${parsed.fiscalYear}-01-01`
-        const to = `${parsed.fiscalYear}-12-31`
-        const result = await generateFiscalReportPDF({
-            fiscalYear: parsed.fiscalYear,
-            from,
-            to,
-            includeBindings: parsed.includeBindings ?? false,
-            includeVoucherList: parsed.includeVoucherList ?? false,
-            includeBudgets: parsed.includeBudgets ?? false,
-            includeActivityReport: parsed.includeActivityReport ?? false,
-            includeInactiveBindings: parsed.includeInactiveBindings ?? false,
-            includeArchivedBudgets: parsed.includeArchivedBudgets ?? false,
-            includeInternalVouchers: parsed.includeInternalVouchers ?? false,
-            bindingIds: parsed.bindingIds,
-            budgetIds: parsed.budgetIds,
-            orgName: parsed.orgName
+      const win = new BrowserWindow({ show: false, width: 900, height: 1200 })
+      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+      const buff = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
+      fs.writeFileSync(filePath, buff)
+      try {
+        win.destroy()
+      } catch {}
+      return ReportsExportOutput.parse({ filePath })
+    } else if (parsed.format === 'XLSX') {
+      const orgName =
+        (parsed.orgName && parsed.orgName.trim()) ||
+        ((getSetting<string>('org.name') || 'VereinO') as string)
+      const filePath = path.join(baseDir, `${reportBase}_${stamp}.xlsx`)
+      const wb = new ExcelJS.Workbook()
+      const ws = wb.addWorksheet('Export')
+      // Header block
+      ws.addRow([`${reportBase} Export`])
+      ws.addRow([`Organisation: ${orgName}`])
+      ws.addRow([`Zeitraum: ${parsed.from ?? ''} – ${parsed.to ?? ''}`])
+      ws.addRow([])
+      // Table header
+      ws.addRow(colsSel.map((c) => headerMap[c] || c))
+      for (const r of rows) {
+        const values = colsSel.map((c) => {
+          if (c === 'grossAmount')
+            return Number(
+              (r.type === 'OUT' && outNegative ? -r.grossAmount : r.grossAmount).toFixed(2)
+            )
+          if (c === 'netAmount')
+            return Number((r.type === 'OUT' && outNegative ? -r.netAmount : r.netAmount).toFixed(2))
+          if (c === 'vatAmount')
+            return Number((r.type === 'OUT' && outNegative ? -r.vatAmount : r.vatAmount).toFixed(2))
+          if (c === 'description') return r.description ?? ''
+          if (c === 'status') return voucherStatusText(r)
+          if (c === 'paymentMethod') return paymentAccountLabel(r)
+          if (c === 'tags') return (r.tags || []).join(', ')
+          return (r as any)[c]
         })
-        return FiscalReportOutput.parse(result)
-    })
+        const row = ws.addRow(values)
+        const kind = voucherStatusKind(r)
+        if (kind === 'storno') {
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F1' } }
+        } else if (kind === 'storniert') {
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F1F1' } }
+          row.font = { color: { argb: 'FF555555' } }
+        }
+      }
+      // Simple formatting
+      ws.getRow(1).font = { bold: true, size: 14 }
+      ws.getRow(5).font = { bold: true }
+      // Column widths
+      ws.columns = colsSel.map((c) => ({
+        width: c === 'description' ? 40 : c === 'status' ? 28 : 12
+      })) as any
 
-    ipcMain.handle('activityReports.get', async (_e, payload) => {
-        const parsed = ActivityReportGetInput.parse(payload)
-        const report = await withSchemaHealRetry(() => getActivityReport(parsed.fiscalYear), ['activity_reports'])
-        return ActivityReportGetOutput.parse({ ...report, missingFields: validateActivityReport(report) })
-    })
+      // Currency formatting for Brutto (grossAmount) with colors
+      const grossIdx = colsSel.indexOf('grossAmount') + 1
+      if (grossIdx > 0) {
+        const col = ws.getColumn(grossIdx)
+        // Positive green, negative red, zero default
+        col.numFmt = '[Green]#,##0.00" \u20AC";[Red]-#,##0.00" \u20AC";#,##0.00" \u20AC"'
+        col.alignment = { horizontal: 'right' }
+      }
 
-    ipcMain.handle('activityReports.list', async (_e, payload) => {
-        ActivityReportListInput.parse(payload)
-        const rows = await withSchemaHealRetry(() => listActivityReports(), ['activity_reports'])
-        return ActivityReportListOutput.parse({ rows })
-    })
-
-    ipcMain.handle('activityReports.save', async (_e, payload) => {
-        const parsed = ActivityReportSaveInput.parse(payload)
-        const report = await withSchemaHealRetry(() => saveActivityReport(parsed), ['activity_reports'])
-        return ActivityReportSaveOutput.parse({ ...report, missingFields: validateActivityReport(report) })
-    })
-
-    ipcMain.handle('activityReports.delete', async (_e, payload) => {
-        const parsed = ActivityReportDeleteInput.parse(payload)
-        const result = await withSchemaHealRetry(() => deleteActivityReport(parsed.fiscalYear), ['activity_reports'])
-        return ActivityReportDeleteOutput.parse(result)
-    })
-
-    ipcMain.handle('reports.exportTreasurer', async (_e, payload) => {
-        const { TreasurerReportInput, TreasurerReportOutput } = await import('./schemas')
-        const parsed = TreasurerReportInput.parse(payload)
-        const { generateTreasurerReportPDF } = await import('../services/treasurerReport')
-        const from = `${parsed.fiscalYear}-01-01`
-        const to = `${parsed.fiscalYear}-12-31`
-        const result = await generateTreasurerReportPDF({
-            fiscalYear: parsed.fiscalYear,
-            from,
-            to,
-            orgName: parsed.orgName,
-            cashBalanceDate: parsed.cashBalanceDate,
-            includeMembers: parsed.includeMembers ?? true,
-            includeInvoices: parsed.includeInvoices ?? true,
-            includeBindings: parsed.includeBindings ?? true,
-            includeBudgets: parsed.includeBudgets ?? true,
-            includeTagSummary: parsed.includeTagSummary ?? false,
-            includeVoucherList: parsed.includeVoucherList ?? false,
-            includeTags: parsed.includeTags ?? false,
-            includeInternalVouchers: parsed.includeInternalVouchers ?? false,
-            voucherListFrom: parsed.voucherListFrom,
-            voucherListTo: parsed.voucherListTo,
-            voucherListSort: parsed.voucherListSort ?? 'ASC'
+      await wb.xlsx.writeFile(filePath)
+      return ReportsExportOutput.parse({ filePath })
+    } else {
+      const filePath = path.join(baseDir, `${reportBase}_${stamp}.csv`)
+      const lines: string[] = []
+      lines.push(colsSel.map((c) => headerMap[c] || c).join(';'))
+      for (const r of rows) {
+        const vals = colsSel.map((c) => {
+          if (c === 'description') return (r.description ?? '').replace(/\n|\r|;/g, ' ')
+          if (c === 'status') return voucherStatusText(r)
+          if (c === 'paymentMethod') return paymentAccountLabel(r)
+          if (c === 'tags') return (r.tags || []).join(', ')
+          if (c === 'grossAmount')
+            return (r.type === 'OUT' && outNegative ? -r.grossAmount : r.grossAmount).toFixed(2)
+          if (c === 'netAmount')
+            return (r.type === 'OUT' && outNegative ? -r.netAmount : r.netAmount).toFixed(2)
+          if (c === 'vatAmount')
+            return (r.type === 'OUT' && outNegative ? -r.vatAmount : r.vatAmount).toFixed(2)
+          return String((r as any)[c] ?? '')
         })
-        return TreasurerReportOutput.parse(result)
-    })
+        lines.push(vals.join(';'))
+      }
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+      return ReportsExportOutput.parse({ filePath })
+    }
+  })
 
-    const voucherListSchemaIdentifiers = ['cash_checks', 'member_advances', 'amount_mode', 'budget_id', 'budget_amount', 'earmark_amount', 'transfer_from', 'transfer_to']
+  ipcMain.handle('reports.exportFiscal', async (_e, payload) => {
+    const parsed = FiscalReportInput.parse(payload)
+    const { generateFiscalReportPDF } = await import('../services/fiscalReport')
+    const from = `${parsed.fiscalYear}-01-01`
+    const to = `${parsed.fiscalYear}-12-31`
+    const result = await generateFiscalReportPDF({
+      fiscalYear: parsed.fiscalYear,
+      from,
+      to,
+      includeBindings: parsed.includeBindings ?? false,
+      includeVoucherList: parsed.includeVoucherList ?? false,
+      includeBudgets: parsed.includeBudgets ?? false,
+      includeActivityReport: parsed.includeActivityReport ?? false,
+      includeInactiveBindings: parsed.includeInactiveBindings ?? false,
+      includeArchivedBudgets: parsed.includeArchivedBudgets ?? false,
+      includeInternalVouchers: parsed.includeInternalVouchers ?? false,
+      bindingIds: parsed.bindingIds,
+      budgetIds: parsed.budgetIds,
+      orgName: parsed.orgName
+    })
+    return FiscalReportOutput.parse(result)
+  })
 
-    ipcMain.handle('vouchers.list', async (_e, payload) => {
-        return withSchemaHealRetry(() => {
-            const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
-            const { rows, total } = listVouchersAdvancedPaged({
-                limit: parsed.limit,
-                offset: parsed.offset ?? 0,
-                sort: (parsed.sort as any) || 'DESC',
-                sortBy: (parsed as any).sortBy,
-                paymentMethod: parsed.paymentMethod as any,
-                paymentAccountId: parsed.paymentAccountId ?? undefined,
-                sphere: parsed.sphere as any,
-                type: parsed.type as any,
-                from: parsed.from,
-                to: parsed.to,
-                earmarkId: parsed.earmarkId,
-                budgetId: (parsed as any).budgetId,
-                voucherIds: parsed.voucherIds,
-                q: parsed.q,
-                tag: (parsed as any).tag
-            })
-            const enrichedRows = rows.map((r: any) => ({
-                ...r,
-                budgets: getVoucherBudgets(r.id),
-                earmarksAssigned: getVoucherEarmarks(r.id)
-            }))
-            return VouchersListOutput.parse({ rows: enrichedRows, total })
-        }, voucherListSchemaIdentifiers)
+  ipcMain.handle('activityReports.get', async (_e, payload) => {
+    const parsed = ActivityReportGetInput.parse(payload)
+    const report = await withSchemaHealRetry(
+      () => getActivityReport(parsed.fiscalYear),
+      ['activity_reports']
+    )
+    return ActivityReportGetOutput.parse({
+      ...report,
+      missingFields: validateActivityReport(report)
     })
+  })
 
-    ipcMain.handle('vouchers.update', async (_e, payload) => {
-        const parsed = VoucherUpdateInput.parse(payload)
-        const res = updateVoucher(parsed as any)
-        // Handle multiple budget/earmark assignments if provided
-        if (parsed.budgets !== undefined) {
-            setVoucherBudgets(parsed.id, parsed.budgets)
-        }
-        if (parsed.earmarks !== undefined) {
-            setVoucherEarmarks(parsed.id, parsed.earmarks)
-        }
-        return VoucherUpdateOutput.parse(res)
-    })
+  ipcMain.handle('activityReports.list', async (_e, payload) => {
+    ActivityReportListInput.parse(payload)
+    const rows = await withSchemaHealRetry(() => listActivityReports(), ['activity_reports'])
+    return ActivityReportListOutput.parse({ rows })
+  })
 
-    ipcMain.handle('vouchers.updateMeta', async (_e, payload) => {
-        const parsed = VoucherMetaUpdateInput.parse(payload)
-        return VoucherUpdateOutput.parse(updateVoucherMeta(parsed as any))
+  ipcMain.handle('activityReports.save', async (_e, payload) => {
+    const parsed = ActivityReportSaveInput.parse(payload)
+    const report = await withSchemaHealRetry(() => saveActivityReport(parsed), ['activity_reports'])
+    return ActivityReportSaveOutput.parse({
+      ...report,
+      missingFields: validateActivityReport(report)
     })
+  })
 
-    ipcMain.handle('paymentAccounts.list', async (_e, payload) => {
-        const parsed = PaymentAccountsListInput.parse(payload)
-        return PaymentAccountsListOutput.parse({ rows: listPaymentAccounts(parsed ?? undefined) })
-    })
-    ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
-        const parsed = PaymentAccountUpsertInput.parse(payload)
-        return PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
-    })
-    ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
-        const parsed = PaymentAccountDeleteInput.parse(payload)
-        return PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
-    })
+  ipcMain.handle('activityReports.delete', async (_e, payload) => {
+    const parsed = ActivityReportDeleteInput.parse(payload)
+    const result = await withSchemaHealRetry(
+      () => deleteActivityReport(parsed.fiscalYear),
+      ['activity_reports']
+    )
+    return ActivityReportDeleteOutput.parse(result)
+  })
 
-    ipcMain.handle('vouchers.delete', async (_e, payload) => {
-        const parsed = VoucherDeleteInput.parse(payload)
-        const res = deleteVoucher(parsed.id)
-        return VoucherDeleteOutput.parse(res)
+  ipcMain.handle('reports.exportTreasurer', async (_e, payload) => {
+    const { TreasurerReportInput, TreasurerReportOutput } = await import('./schemas')
+    const parsed = TreasurerReportInput.parse(payload)
+    const { generateTreasurerReportPDF } = await import('../services/treasurerReport')
+    const from = `${parsed.fiscalYear}-01-01`
+    const to = `${parsed.fiscalYear}-12-31`
+    const result = await generateTreasurerReportPDF({
+      fiscalYear: parsed.fiscalYear,
+      from,
+      to,
+      orgName: parsed.orgName,
+      cashBalanceDate: parsed.cashBalanceDate,
+      includeMembers: parsed.includeMembers ?? true,
+      includeInvoices: parsed.includeInvoices ?? true,
+      includeBindings: parsed.includeBindings ?? true,
+      includeBudgets: parsed.includeBudgets ?? true,
+      includeTagSummary: parsed.includeTagSummary ?? false,
+      includeVoucherList: parsed.includeVoucherList ?? false,
+      includeTags: parsed.includeTags ?? false,
+      includeInternalVouchers: parsed.includeInternalVouchers ?? false,
+      voucherListFrom: parsed.voucherListFrom,
+      voucherListTo: parsed.voucherListTo,
+      voucherListSort: parsed.voucherListSort ?? 'ASC'
     })
-    ipcMain.handle('vouchers.batchAssignEarmark', async (_e, payload) => {
-        const parsed = VouchersBatchAssignEarmarkInput.parse(payload)
-        const res = batchAssignEarmark(parsed as any)
-        return VouchersBatchAssignEarmarkOutput.parse(res)
-    })
-    ipcMain.handle('vouchers.batchAssignBudget', async (_e, payload) => {
-        const parsed = VouchersBatchAssignBudgetInput.parse(payload)
-        const res = batchAssignBudget(parsed as any)
-        return VouchersBatchAssignBudgetOutput.parse(res)
-    })
-    ipcMain.handle('vouchers.batchAssignTags', async (_e, payload) => {
-        const parsed = VouchersBatchAssignTagsInput.parse(payload)
-        const res = batchAssignTags(parsed as any)
-        return VouchersBatchAssignTagsOutput.parse(res)
-    })
-    // Recent vouchers (simple list)
-    ipcMain.handle('vouchers.recent', async (_e, payload) => {
-        const parsed = VouchersRecentInput.parse(payload) ?? { limit: 10 }
-        const rows = listRecentVouchers(parsed.limit)
-        return VouchersRecentOutput.parse({ rows })
-    })
-    ipcMain.handle('vouchers.clearAll', async (_e, payload) => {
-        const parsed = VouchersClearAllInput.parse(payload)
-        if (!parsed.confirm) throw new Error('Nicht bestätigt')
-        // Safety: backup before destructive action
-        await requireSafetyBackup(backup.makeBackup, 'preClearAll', 'Alle Buchungen löschen')
-        const res = clearAllVouchers()
-        return VouchersClearAllOutput.parse(res)
-    })
+    return TreasurerReportOutput.parse(result)
+  })
 
-    // Zweckbindungen (bindings)
-    ipcMain.handle('bindings.list', async (_e, payload) => {
-        const parsed = BindingListInput.parse(payload)
-        const rows = listBindings(parsed ?? undefined)
-        return BindingListOutput.parse({ rows })
-    })
-    ipcMain.handle('bindings.upsert', async (_e, payload) => {
-        const parsed = BindingUpsertInput.parse(payload)
-        const res = upsertBinding(parsed as any)
-        return BindingUpsertOutput.parse({ id: res.id })
-    })
-    ipcMain.handle('bindings.delete', async (_e, payload) => {
-        const parsed = BindingDeleteInput.parse(payload)
-        const res = deleteBinding(parsed.id)
-        return BindingDeleteOutput.parse(res)
-    })
-    ipcMain.handle('bindings.usage', async (_e, payload) => {
-        const parsed = BindingUsageInput.parse(payload)
-        const res = bindingUsage(parsed.earmarkId, { from: parsed.from, to: parsed.to, sphere: parsed.sphere as any })
-        return BindingUsageOutput.parse(res)
-    })
+  const voucherListSchemaIdentifiers = [
+    'cash_checks',
+    'member_advances',
+    'amount_mode',
+    'budget_id',
+    'budget_amount',
+    'earmark_amount',
+    'transfer_from',
+    'transfer_to'
+  ]
 
-    // Budgets
-    ipcMain.handle('budgets.upsert', async (_e, payload) => {
-        const parsed = BudgetUpsertInput.parse(payload)
-        const res = upsertBudget(parsed as any)
-        return BudgetUpsertOutput.parse({ id: res.id })
-    })
-    ipcMain.handle('budgets.list', async (_e, payload) => {
-        const parsed = BudgetListInput.parse(payload)
-        const rows = listBudgets(parsed ?? {})
-        return BudgetListOutput.parse({ rows })
-    })
-    ipcMain.handle('budgets.delete', async (_e, payload) => {
-        const parsed = BudgetDeleteInput.parse(payload)
-        const res = deleteBudget(parsed.id)
-        return BudgetDeleteOutput.parse(res)
-    })
-    ipcMain.handle('budgets.usage', async (_e, payload) => {
-        const parsed = BudgetUsageInput.parse(payload)
-        const res = budgetUsage({ budgetId: parsed.budgetId, from: parsed.from, to: parsed.to })
-        return BudgetUsageOutput.parse(res)
-    })
+  ipcMain.handle('vouchers.list', async (_e, payload) => {
+    return withSchemaHealRetry(() => {
+      const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
+      const { rows, total } = listVouchersAdvancedPaged({
+        limit: parsed.limit,
+        offset: parsed.offset ?? 0,
+        sort: (parsed.sort as any) || 'DESC',
+        sortBy: (parsed as any).sortBy,
+        paymentMethod: parsed.paymentMethod as any,
+        paymentAccountId: parsed.paymentAccountId ?? undefined,
+        sphere: parsed.sphere as any,
+        type: parsed.type as any,
+        from: parsed.from,
+        to: parsed.to,
+        earmarkId: parsed.earmarkId,
+        budgetId: (parsed as any).budgetId,
+        voucherIds: parsed.voucherIds,
+        q: parsed.q,
+        tag: (parsed as any).tag
+      })
+      const enrichedRows = rows.map((r: any) => ({
+        ...r,
+        budgets: getVoucherBudgets(r.id),
+        earmarksAssigned: getVoucherEarmarks(r.id)
+      }))
+      return VouchersListOutput.parse({ rows: enrichedRows, total })
+    }, voucherListSchemaIdentifiers)
+  })
 
-    // Vorschüsse
-    const advanceSchemaTables = ['member_advances', 'member_advance_purchases', 'member_advance_settlements']
+  ipcMain.handle('vouchers.update', async (_e, payload) => {
+    const parsed = VoucherUpdateInput.parse(payload)
+    const res = updateVoucher(parsed as any)
+    // Handle multiple budget/earmark assignments if provided
+    if (parsed.budgets !== undefined) {
+      setVoucherBudgets(parsed.id, parsed.budgets)
+    }
+    if (parsed.earmarks !== undefined) {
+      setVoucherEarmarks(parsed.id, parsed.earmarks)
+    }
+    return VoucherUpdateOutput.parse(res)
+  })
 
-    ipcMain.handle('advances.list', async (_e, payload) => {
-        return withSchemaHealRetry(() => {
-            const parsed = AdvancesListInput.parse(payload)
-            const res = listAdvances(parsed ?? undefined)
-            return AdvancesListOutput.parse(res)
-        }, advanceSchemaTables)
-    })
-    ipcMain.handle('advances.create', async (_e, payload) => {
-        return withSchemaHealRetry(() => {
-            const parsed = AdvanceCreateInput.parse(payload)
-            const res = createAdvance(parsed as any)
-            return AdvanceCreateOutput.parse(res)
-        }, advanceSchemaTables)
-    })
-    ipcMain.handle('advances.get', async (_e, payload) => {
-        return withSchemaHealRetry(() => {
-            const parsed = AdvanceGetInput.parse(payload)
-            const res = getAdvanceById({ id: parsed.id })
-            return AdvanceGetOutput.parse(res)
-        }, advanceSchemaTables)
-    })
-    ipcMain.handle('advances.settle', async (_e, payload) => {
-        return withSchemaHealRetry(() => {
-            const parsed = AdvanceSettleInput.parse(payload)
-            const res = settleAdvance(parsed as any)
-            return AdvanceSettleOutput.parse(res)
-        }, advanceSchemaTables)
-    })
-    ipcMain.handle('advances.delete', async (_e, payload) => {
-        const parsed = AdvanceDeleteInput.parse(payload)
-        const res = deleteAdvance({ id: parsed.id })
-        return AdvanceDeleteOutput.parse(res)
-    })
+  ipcMain.handle('vouchers.updateMeta', async (_e, payload) => {
+    const parsed = VoucherMetaUpdateInput.parse(payload)
+    return VoucherUpdateOutput.parse(updateVoucherMeta(parsed as any))
+  })
 
-    ipcMain.handle('advances.purchases.create', async (_e, payload) => {
-        const parsed = AdvancePurchaseCreateInput.parse(payload)
-        const res = addAdvancePurchase(parsed as any)
-        return AdvancePurchaseCreateOutput.parse(res)
-    })
+  ipcMain.handle('paymentAccounts.list', async (_e, payload) => {
+    const parsed = PaymentAccountsListInput.parse(payload)
+    return PaymentAccountsListOutput.parse({ rows: listPaymentAccounts(parsed ?? undefined) })
+  })
+  ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
+    const parsed = PaymentAccountUpsertInput.parse(payload)
+    return PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
+  })
+  ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
+    const parsed = PaymentAccountDeleteInput.parse(payload)
+    return PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
+  })
 
-    ipcMain.handle('advances.purchases.delete', async (_e, payload) => {
-        const parsed = AdvancePurchaseDeleteInput.parse(payload)
-        const res = deleteAdvancePurchase(parsed)
-        return AdvancePurchaseDeleteOutput.parse(res)
-    })
+  ipcMain.handle('vouchers.delete', async (_e, payload) => {
+    const parsed = VoucherDeleteInput.parse(payload)
+    const res = deleteVoucher(parsed.id)
+    return VoucherDeleteOutput.parse(res)
+  })
+  ipcMain.handle('vouchers.batchAssignEarmark', async (_e, payload) => {
+    const parsed = VouchersBatchAssignEarmarkInput.parse(payload)
+    const res = batchAssignEarmark(parsed as any)
+    return VouchersBatchAssignEarmarkOutput.parse(res)
+  })
+  ipcMain.handle('vouchers.batchAssignBudget', async (_e, payload) => {
+    const parsed = VouchersBatchAssignBudgetInput.parse(payload)
+    const res = batchAssignBudget(parsed as any)
+    return VouchersBatchAssignBudgetOutput.parse(res)
+  })
+  ipcMain.handle('vouchers.batchAssignTags', async (_e, payload) => {
+    const parsed = VouchersBatchAssignTagsInput.parse(payload)
+    const res = batchAssignTags(parsed as any)
+    return VouchersBatchAssignTagsOutput.parse(res)
+  })
+  // Recent vouchers (simple list)
+  ipcMain.handle('vouchers.recent', async (_e, payload) => {
+    const parsed = VouchersRecentInput.parse(payload) ?? { limit: 10 }
+    const rows = listRecentVouchers(parsed.limit)
+    return VouchersRecentOutput.parse({ rows })
+  })
+  ipcMain.handle('vouchers.clearAll', async (_e, payload) => {
+    const parsed = VouchersClearAllInput.parse(payload)
+    if (!parsed.confirm) throw new Error('Nicht bestätigt')
+    // Safety: backup before destructive action
+    await requireSafetyBackup(backup.makeBackup, 'preClearAll', 'Alle Buchungen löschen')
+    const res = clearAllVouchers()
+    return VouchersClearAllOutput.parse(res)
+  })
 
-    ipcMain.handle('advances.purchases.update', async (_e, payload) => {
-        const parsed = AdvancePurchaseUpdateInput.parse(payload)
-        const res = updateAdvancePurchase(parsed as any)
-        return AdvancePurchaseUpdateOutput.parse(res)
+  // Zweckbindungen (bindings)
+  ipcMain.handle('bindings.list', async (_e, payload) => {
+    const parsed = BindingListInput.parse(payload)
+    const rows = listBindings(parsed ?? undefined)
+    return BindingListOutput.parse({ rows })
+  })
+  ipcMain.handle('bindings.upsert', async (_e, payload) => {
+    const parsed = BindingUpsertInput.parse(payload)
+    const res = upsertBinding(parsed as any)
+    return BindingUpsertOutput.parse({ id: res.id })
+  })
+  ipcMain.handle('bindings.delete', async (_e, payload) => {
+    const parsed = BindingDeleteInput.parse(payload)
+    const res = deleteBinding(parsed.id)
+    return BindingDeleteOutput.parse(res)
+  })
+  ipcMain.handle('bindings.usage', async (_e, payload) => {
+    const parsed = BindingUsageInput.parse(payload)
+    const res = bindingUsage(parsed.earmarkId, {
+      from: parsed.from,
+      to: parsed.to,
+      sphere: parsed.sphere as any
     })
+    return BindingUsageOutput.parse(res)
+  })
 
-    ipcMain.handle('advances.resolve', async (_e, payload) => {
-        const parsed = AdvanceResolveInput.parse(payload)
-        const res = resolveAdvance({ id: parsed.id })
-        return AdvanceResolveOutput.parse(res)
-    })
+  // Budgets
+  ipcMain.handle('budgets.upsert', async (_e, payload) => {
+    const parsed = BudgetUpsertInput.parse(payload)
+    const res = upsertBudget(parsed as any)
+    return BudgetUpsertOutput.parse({ id: res.id })
+  })
+  ipcMain.handle('budgets.list', async (_e, payload) => {
+    const parsed = BudgetListInput.parse(payload)
+    const rows = listBudgets(parsed ?? {})
+    return BudgetListOutput.parse({ rows })
+  })
+  ipcMain.handle('budgets.delete', async (_e, payload) => {
+    const parsed = BudgetDeleteInput.parse(payload)
+    const res = deleteBudget(parsed.id)
+    return BudgetDeleteOutput.parse(res)
+  })
+  ipcMain.handle('budgets.usage', async (_e, payload) => {
+    const parsed = BudgetUsageInput.parse(payload)
+    const res = budgetUsage({ budgetId: parsed.budgetId, from: parsed.from, to: parsed.to })
+    return BudgetUsageOutput.parse(res)
+  })
 
-    // Quotes
-    ipcMain.handle('quotes.weekly', async (_e, payload) => {
-        const parsed = QuoteWeeklyInput.parse(payload)
-        const q = getWeeklyQuote(parsed?.date)
-        return QuoteWeeklyOutput.parse(q)
-    })
+  // Vorschüsse
+  const advanceSchemaTables = [
+    'member_advances',
+    'member_advance_purchases',
+    'member_advance_settlements'
+  ]
 
-    // Imports
-    ipcMain.handle('imports.preview', async (_e, payload) => {
-        const parsed = ImportPreviewInput.parse(payload)
-        const res = await previewFile(parsed.fileBase64)
-        return ImportPreviewOutput.parse(res as any)
-    })
-    ipcMain.handle('imports.execute', async (_e, payload) => {
-        const parsed = ImportExecuteInput.parse(payload)
-        // Safety: backup before potentially large data modification
-        await requireSafetyBackup(backup.makeBackup, 'preImportRows', 'Import ausführen')
-        try { ensureVoucherForeignKeyTargets(getDb() as any) } catch { /* ignore */ }
-        const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
-        return ImportExecuteOutput.parse(res as any)
-    })
-    ipcMain.handle('imports.analyze', async (_e, payload) => {
-        const parsed = ImportAnalyzeInput.parse(payload)
-        const res = await analyzeFile(parsed.fileBase64, parsed.mapping as any, parsed.rules as any)
-        return ImportAnalyzeOutput.parse(res as any)
-    })
-    ipcMain.handle('imports.commitDraft', async (_e, payload) => {
-        const parsed = ImportCommitDraftInput.parse(payload)
-        await requireSafetyBackup(backup.makeBackup, 'preImportDraft', 'Importentwurf übernehmen')
-        try { ensureVoucherForeignKeyTargets(getDb() as any) } catch { /* ignore */ }
-        const res = await commitImportDraft(parsed.rows as any)
-        return ImportExecuteOutput.parse(res as any)
-    })
-    ipcMain.handle('imports.createMissing', async (_e, payload) => {
-        const parsed = ImportCreateMissingInput.parse(payload)
-        const res = createMissingImportMasterData(parsed as any)
-        return ImportCreateMissingOutput.parse(res)
-    })
-    ipcMain.handle('imports.template', async (_e, payload) => {
-        ImportTemplateInput.parse(payload)
-        const res = await generateImportTemplate()
-        return ImportTemplateOutput.parse(res)
-    })
+  ipcMain.handle('advances.list', async (_e, payload) => {
+    return withSchemaHealRetry(() => {
+      const parsed = AdvancesListInput.parse(payload)
+      const res = listAdvances(parsed ?? undefined)
+      return AdvancesListOutput.parse(res)
+    }, advanceSchemaTables)
+  })
+  ipcMain.handle('advances.create', async (_e, payload) => {
+    return withSchemaHealRetry(() => {
+      const parsed = AdvanceCreateInput.parse(payload)
+      const res = createAdvance(parsed as any)
+      return AdvanceCreateOutput.parse(res)
+    }, advanceSchemaTables)
+  })
+  ipcMain.handle('advances.get', async (_e, payload) => {
+    return withSchemaHealRetry(() => {
+      const parsed = AdvanceGetInput.parse(payload)
+      const res = getAdvanceById({ id: parsed.id })
+      return AdvanceGetOutput.parse(res)
+    }, advanceSchemaTables)
+  })
+  ipcMain.handle('advances.settle', async (_e, payload) => {
+    return withSchemaHealRetry(() => {
+      const parsed = AdvanceSettleInput.parse(payload)
+      const res = settleAdvance(parsed as any)
+      return AdvanceSettleOutput.parse(res)
+    }, advanceSchemaTables)
+  })
+  ipcMain.handle('advances.delete', async (_e, payload) => {
+    const parsed = AdvanceDeleteInput.parse(payload)
+    const res = deleteAdvance({ id: parsed.id })
+    return AdvanceDeleteOutput.parse(res)
+  })
 
-    ipcMain.handle('imports.testdata', async (_e, payload) => {
-        ImportTestDataInput.parse(payload)
-        const res = await generateImportTestData()
-        return ImportTestDataOutput.parse(res)
-    })
-    ipcMain.handle('imports.editableExport', async (_e, payload) => {
-        ImportEditableExportInput.parse(payload)
-        const res = await exportEditableVouchersWorkbook()
-        return ImportEditableExportOutput.parse(res)
-    })
+  ipcMain.handle('advances.purchases.create', async (_e, payload) => {
+    const parsed = AdvancePurchaseCreateInput.parse(payload)
+    const res = addAdvancePurchase(parsed as any)
+    return AdvancePurchaseCreateOutput.parse(res)
+  })
 
-    // Bank statement imports are staged for review before they become vouchers.
-    ipcMain.handle('bankImports.preview', async (_e, payload) => {
-        const parsed = BankImportPreviewInput.parse(payload)
-        return BankImportPreviewOutput.parse(previewBankImport(parsed as any))
-    })
-    ipcMain.handle('bankImports.commit', async (_e, payload) => {
-        const parsed = BankImportCommitInput.parse(payload)
-        await requireSafetyBackup(backup.makeBackup, 'preBankImport', 'Bankdaten importieren')
-        return BankImportCommitOutput.parse(commitBankImport(parsed as any))
-    })
-    ipcMain.handle('bankTransactions.list', async (_e, payload) => {
-        const parsed = BankTransactionsListInput.parse(payload ?? {})
-        return BankTransactionsListOutput.parse(listBankTransactions(parsed as any))
-    })
-    ipcMain.handle('bankTransactions.importStatus', async () => {
-        return BankImportStatusOutput.parse(getBankImportStatus())
-    })
-    ipcMain.handle('bankTransactions.get', async (_e, payload) => {
-        const parsed = BankTransactionIdInput.parse(payload)
-        return BankTransactionOutput.parse(getBankTransaction(parsed.id))
-    })
-    ipcMain.handle('bankTransactions.matches', async (_e, payload) => {
-        const parsed = BankTransactionMatchesInput.parse(payload)
-        return BankTransactionMatchesOutput.parse({ rows: findBankTransactionMatches(parsed) })
-    })
-    ipcMain.handle('bankTransactions.link', async (_e, payload) => {
-        const parsed = BankTransactionLinkInput.parse(payload)
-        return BankTransactionOutput.parse(await withSchemaHealRetry(
-            () => linkBankTransaction({ ...parsed, origin: 'EXISTING' }),
-            ['bank_transactions', 'bank_import_batches']
-        ))
-    })
-    ipcMain.handle('bankTransactions.check', async (_e, payload) => {
-        const parsed = BankTransactionCheckInput.parse(payload)
-        return BankTransactionOutput.parse(markBankTransactionChecked(parsed))
-    })
-    ipcMain.handle('bankTransactions.reopen', async (_e, payload) => {
-        const parsed = BankTransactionIdInput.parse(payload)
-        return BankTransactionOutput.parse(reopenBankTransaction(parsed.id))
-    })
+  ipcMain.handle('advances.purchases.delete', async (_e, payload) => {
+    const parsed = AdvancePurchaseDeleteInput.parse(payload)
+    const res = deleteAdvancePurchase(parsed)
+    return AdvancePurchaseDeleteOutput.parse(res)
+  })
 
-    // Attachments
-    ipcMain.handle('attachments.list', async (_e, payload) => {
-        const parsed = AttachmentsListInput.parse(payload)
-        const files = listFilesForVoucher(parsed.voucherId)
-        return AttachmentsListOutput.parse({
-            files: files.map(f => ({ id: f.id, fileName: f.fileName, mimeType: f.mimeType ?? null, size: f.size ?? null, createdAt: f.createdAt }))
-        })
-    })
-    ipcMain.handle('attachments.open', async (_e, payload) => {
-        const parsed = AttachmentOpenInput.parse(payload)
-        const f = getFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
-        const res = await shell.openPath(src)
-        const ok = !res
-        return AttachmentOpenOutput.parse({ ok })
-    })
-    ipcMain.handle('attachments.saveAs', async (_e, payload) => {
-        const parsed = AttachmentSaveAsInput.parse(payload)
-        const f = getFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
-        if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        if (!src || !fs.existsSync(src)) {
-            const alt = path.join(getAppDataDir().filesDir, pathBase)
-            if (fs.existsSync(alt)) src = alt
-        }
-        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-        fs.copyFileSync(src, save.filePath)
-        return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
-    })
-    ipcMain.handle('attachments.read', async (_e, payload) => {
-        const parsed = AttachmentReadInput.parse(payload)
-        const f = getFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        if (!src || !fs.existsSync(src)) {
-            const alt = path.join(getAppDataDir().filesDir, pathBase)
-            if (fs.existsSync(alt)) src = alt
-        }
-        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-        const buff = fs.readFileSync(src)
-        const dataBase64 = Buffer.from(buff).toString('base64')
-        return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
-    })
-    ipcMain.handle('attachments.add', async (_e, payload) => {
-        const parsed = AttachmentAddInput.parse(payload)
-        const res = addFileToVoucher(parsed.voucherId, parsed.fileName, parsed.dataBase64, parsed.mimeType)
-        return AttachmentAddOutput.parse(res)
-    })
-    ipcMain.handle('attachments.delete', async (_e, payload) => {
-        const parsed = AttachmentDeleteInput.parse(payload)
-        const res = deleteVoucherFile(parsed.fileId)
-        return AttachmentDeleteOutput.parse(res)
-    })
+  ipcMain.handle('advances.purchases.update', async (_e, payload) => {
+    const parsed = AdvancePurchaseUpdateInput.parse(payload)
+    const res = updateAdvancePurchase(parsed as any)
+    return AdvancePurchaseUpdateOutput.parse(res)
+  })
 
-    // Database: Export (save current database.sqlite)
-    ipcMain.handle('db.export', async () => {
-        DbExportInput.parse({})
-        const { root } = getAppDataDir()
-        const dbPath = path.join(root, 'database.sqlite')
-        if (!fs.existsSync(dbPath)) throw new Error('Datenbankdatei nicht gefunden')
-        const now = new Date()
-        const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-        const defaultName = `VereinO_database_${stamp}.sqlite`
-        const save = await dialog.showSaveDialog({ title: 'Datenbank exportieren …', defaultPath: defaultName, filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }] })
-        // Graceful cancel: return empty path instead of throwing
-        if (save.canceled || !save.filePath) return DbExportOutput.parse({ filePath: '' as any })
-        fs.copyFileSync(dbPath, save.filePath)
-        return DbExportOutput.parse({ filePath: save.filePath })
-    })
+  ipcMain.handle('advances.resolve', async (_e, payload) => {
+    const parsed = AdvanceResolveInput.parse(payload)
+    const res = resolveAdvance({ id: parsed.id })
+    return AdvanceResolveOutput.parse(res)
+  })
 
-    // Database: Import (file picker only, returns chosen file meta for comparison modal)
-    ipcMain.handle('db.import.pick', async () => {
-        DbImportInput.parse({})
-        const open = await dialog.showOpenDialog({ title: 'Datenbank wählen …', filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }], properties: ['openFile'] })
-        if (open.canceled || !open.filePaths?.[0]) return { ok: false }
-        const importPath = open.filePaths[0]
-        // Basic stats for comparison
+  // Quotes
+  ipcMain.handle('quotes.weekly', async (_e, payload) => {
+    const parsed = QuoteWeeklyInput.parse(payload)
+    const q = getWeeklyQuote(parsed?.date)
+    return QuoteWeeklyOutput.parse(q)
+  })
+
+  // Imports
+  ipcMain.handle('imports.preview', async (_e, payload) => {
+    const parsed = ImportPreviewInput.parse(payload)
+    const res = await previewFile(parsed.fileBase64)
+    return ImportPreviewOutput.parse(res as any)
+  })
+  ipcMain.handle('imports.execute', async (_e, payload) => {
+    const parsed = ImportExecuteInput.parse(payload)
+    // Safety: backup before potentially large data modification
+    await requireSafetyBackup(backup.makeBackup, 'preImportRows', 'Import ausführen')
+    try {
+      ensureVoucherForeignKeyTargets(getDb() as any)
+    } catch {
+      /* ignore */
+    }
+    const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
+    return ImportExecuteOutput.parse(res as any)
+  })
+  ipcMain.handle('imports.analyze', async (_e, payload) => {
+    const parsed = ImportAnalyzeInput.parse(payload)
+    const res = await analyzeFile(parsed.fileBase64, parsed.mapping as any, parsed.rules as any)
+    return ImportAnalyzeOutput.parse(res as any)
+  })
+  ipcMain.handle('imports.commitDraft', async (_e, payload) => {
+    const parsed = ImportCommitDraftInput.parse(payload)
+    await requireSafetyBackup(backup.makeBackup, 'preImportDraft', 'Importentwurf übernehmen')
+    try {
+      ensureVoucherForeignKeyTargets(getDb() as any)
+    } catch {
+      /* ignore */
+    }
+    const res = await commitImportDraft(parsed.rows as any)
+    return ImportExecuteOutput.parse(res as any)
+  })
+  ipcMain.handle('imports.createMissing', async (_e, payload) => {
+    const parsed = ImportCreateMissingInput.parse(payload)
+    const res = createMissingImportMasterData(parsed as any)
+    return ImportCreateMissingOutput.parse(res)
+  })
+  ipcMain.handle('imports.template', async (_e, payload) => {
+    ImportTemplateInput.parse(payload)
+    const res = await generateImportTemplate()
+    return ImportTemplateOutput.parse(res)
+  })
+
+  ipcMain.handle('imports.testdata', async (_e, payload) => {
+    ImportTestDataInput.parse(payload)
+    const res = await generateImportTestData()
+    return ImportTestDataOutput.parse(res)
+  })
+  ipcMain.handle('imports.editableExport', async (_e, payload) => {
+    ImportEditableExportInput.parse(payload)
+    const res = await exportEditableVouchersWorkbook()
+    return ImportEditableExportOutput.parse(res)
+  })
+
+  // Bank statement imports are staged for review before they become vouchers.
+  ipcMain.handle('bankImports.preview', async (_e, payload) => {
+    const parsed = BankImportPreviewInput.parse(payload)
+    return BankImportPreviewOutput.parse(previewBankImport(parsed as any))
+  })
+  ipcMain.handle('bankImports.commit', async (_e, payload) => {
+    const parsed = BankImportCommitInput.parse(payload)
+    await requireSafetyBackup(backup.makeBackup, 'preBankImport', 'Bankdaten importieren')
+    return BankImportCommitOutput.parse(commitBankImport(parsed as any))
+  })
+  ipcMain.handle('bankTransactions.list', async (_e, payload) => {
+    const parsed = BankTransactionsListInput.parse(payload ?? {})
+    return BankTransactionsListOutput.parse(listBankTransactions(parsed as any))
+  })
+  ipcMain.handle('bankTransactions.importStatus', async () => {
+    return BankImportStatusOutput.parse(getBankImportStatus())
+  })
+  ipcMain.handle('bankTransactions.get', async (_e, payload) => {
+    const parsed = BankTransactionIdInput.parse(payload)
+    return BankTransactionOutput.parse(getBankTransaction(parsed.id))
+  })
+  ipcMain.handle('bankTransactions.matches', async (_e, payload) => {
+    const parsed = BankTransactionMatchesInput.parse(payload)
+    return BankTransactionMatchesOutput.parse({ rows: findBankTransactionMatches(parsed) })
+  })
+  ipcMain.handle('bankTransactions.link', async (_e, payload) => {
+    const parsed = BankTransactionLinkInput.parse(payload)
+    return BankTransactionOutput.parse(
+      await withSchemaHealRetry(
+        () => linkBankTransaction({ ...parsed, origin: 'EXISTING' }),
+        ['bank_transactions', 'bank_import_batches']
+      )
+    )
+  })
+  ipcMain.handle('bankTransactions.check', async (_e, payload) => {
+    const parsed = BankTransactionCheckInput.parse(payload)
+    return BankTransactionOutput.parse(markBankTransactionChecked(parsed))
+  })
+  ipcMain.handle('bankTransactions.reopen', async (_e, payload) => {
+    const parsed = BankTransactionIdInput.parse(payload)
+    return BankTransactionOutput.parse(reopenBankTransaction(parsed.id))
+  })
+
+  // Attachments
+  ipcMain.handle('attachments.list', async (_e, payload) => {
+    const parsed = AttachmentsListInput.parse(payload)
+    const files = listFilesForVoucher(parsed.voucherId)
+    return AttachmentsListOutput.parse({
+      files: files.map((f) => ({
+        id: f.id,
+        fileName: f.fileName,
+        mimeType: f.mimeType ?? null,
+        size: f.size ?? null,
+        createdAt: f.createdAt
+      }))
+    })
+  })
+  ipcMain.handle('attachments.open', async (_e, payload) => {
+    const parsed = AttachmentOpenInput.parse(payload)
+    const f = getFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    try {
+      if (!fs.existsSync(src)) {
+        const alt = path.join(getAppDataDir().filesDir, pathBase)
+        if (fs.existsSync(alt)) src = alt
+      }
+    } catch {}
+    const res = await shell.openPath(src)
+    const ok = !res
+    return AttachmentOpenOutput.parse({ ok })
+  })
+  ipcMain.handle('attachments.saveAs', async (_e, payload) => {
+    const parsed = AttachmentSaveAsInput.parse(payload)
+    const f = getFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const save = await dialog.showSaveDialog({
+      title: 'Datei speichern unter …',
+      defaultPath: f.fileName
+    })
+    if (save.canceled || !save.filePath) throw new Error('Abbruch')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    if (!src || !fs.existsSync(src)) {
+      const alt = path.join(getAppDataDir().filesDir, pathBase)
+      if (fs.existsSync(alt)) src = alt
+    }
+    if (!src || !fs.existsSync(src))
+      throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+    fs.copyFileSync(src, save.filePath)
+    return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
+  })
+  ipcMain.handle('attachments.read', async (_e, payload) => {
+    const parsed = AttachmentReadInput.parse(payload)
+    const f = getFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    if (!src || !fs.existsSync(src)) {
+      const alt = path.join(getAppDataDir().filesDir, pathBase)
+      if (fs.existsSync(alt)) src = alt
+    }
+    if (!src || !fs.existsSync(src))
+      throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+    const buff = fs.readFileSync(src)
+    const dataBase64 = Buffer.from(buff).toString('base64')
+    return AttachmentReadOutput.parse({
+      fileName: f.fileName,
+      mimeType: f.mimeType || undefined,
+      dataBase64
+    })
+  })
+  ipcMain.handle('attachments.add', async (_e, payload) => {
+    const parsed = AttachmentAddInput.parse(payload)
+    const res = addFileToVoucher(
+      parsed.voucherId,
+      parsed.fileName,
+      parsed.dataBase64,
+      parsed.mimeType
+    )
+    return AttachmentAddOutput.parse(res)
+  })
+  ipcMain.handle('attachments.delete', async (_e, payload) => {
+    const parsed = AttachmentDeleteInput.parse(payload)
+    const res = deleteVoucherFile(parsed.fileId)
+    return AttachmentDeleteOutput.parse(res)
+  })
+
+  // Database: Export (save current database.sqlite)
+  ipcMain.handle('db.export', async () => {
+    DbExportInput.parse({})
+    const { root } = getAppDataDir()
+    const dbPath = path.join(root, 'database.sqlite')
+    if (!fs.existsSync(dbPath)) throw new Error('Datenbankdatei nicht gefunden')
+    const now = new Date()
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const defaultName = `VereinO_database_${stamp}.sqlite`
+    const save = await dialog.showSaveDialog({
+      title: 'Datenbank exportieren …',
+      defaultPath: defaultName,
+      filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }]
+    })
+    // Graceful cancel: return empty path instead of throwing
+    if (save.canceled || !save.filePath) return DbExportOutput.parse({ filePath: '' as any })
+    fs.copyFileSync(dbPath, save.filePath)
+    return DbExportOutput.parse({ filePath: save.filePath })
+  })
+
+  // Database: Import (file picker only, returns chosen file meta for comparison modal)
+  ipcMain.handle('db.import.pick', async () => {
+    DbImportInput.parse({})
+    const open = await dialog.showOpenDialog({
+      title: 'Datenbank wählen …',
+      filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }],
+      properties: ['openFile']
+    })
+    if (open.canceled || !open.filePaths?.[0]) return { ok: false }
+    const importPath = open.filePaths[0]
+    // Basic stats for comparison
+    try {
+      const stat = fs.statSync(importPath)
+      // Inspect counts using existing backup.inspect logic for uniformity
+      const counts = backup.inspectBackup(importPath)?.counts || {}
+      return { ok: true, filePath: importPath, size: stat.size, mtime: stat.mtimeMs, counts }
+    } catch {
+      return { ok: true, filePath: importPath }
+    }
+  })
+
+  // Database: Import from provided path after user confirms comparison
+  ipcMain.handle('db.import.fromPath', async (_e, payload) => {
+    const parsed = DbImportFromPathInput.parse(payload)
+    const importPath = parsed.filePath
+    const { root } = getAppDataDir()
+    const dbPath = path.join(root, 'database.sqlite')
+    try {
+      // Safety: create a backup before replacing the DB
+      try {
+        await backup.makeBackup('preImport')
+      } catch {
+        /* ignore backup errors */
+      }
+      // Close DB before replacing file
+      try {
+        closeDb()
+      } catch {}
+      fs.copyFileSync(importPath, dbPath)
+      // Reopen and ensure migrations are applied
+      const d = getDb()
+      // Ensure schema is up to date (e.g., tags tables)
+      try {
+        applyMigrations(d as any)
+      } catch {
+        /* ignore, handled by main on next start too */
+      }
+      // optional: run a lightweight pragma to ensure file is valid
+      d.pragma('foreign_keys = ON')
+      return DbImportFromPathOutput.parse({ ok: true, filePath: importPath })
+    } catch (e) {
+      throw new Error('Import fehlgeschlagen: ' + (e as any)?.message)
+    }
+  })
+
+  // DB location: info
+  ipcMain.handle('db.location.get', async () => {
+    const info = getCurrentDbInfo()
+    const cfg = readAppConfig()
+    return {
+      root: info.root,
+      dbPath: info.dbPath,
+      filesDir: info.filesDir,
+      configuredRoot: cfg.dbRoot || null
+    }
+  })
+
+  // DB location: pick a folder (no migration) – return info so renderer can decide next step
+  ipcMain.handle('db.location.pick', async () => {
+    const pick = await dialog.showOpenDialog({
+      title: 'Ordner wählen…',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
+    const chosen = pick.filePaths[0]
+    const dbPath = path.join(chosen, 'database.sqlite')
+    const hasDb = fs.existsSync(dbPath)
+    const filesDir = path.join(chosen, 'files')
+    return { root: chosen, hasDb, dbPath, filesDir }
+  })
+
+  // DB location: migrate to a specific folder (copy-overwrite)
+  ipcMain.handle('db.location.migrateTo', async (_e, payload: any) => {
+    const { root } = payload || {}
+    if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
+    const res = migrateToRoot(root, 'copy-overwrite')
+    const d = getDb()
+    try {
+      applyMigrations(d as any)
+    } catch {}
+    return { ok: true, ...res }
+  })
+
+  // DB location: use a specific folder that already contains database.sqlite (no copy)
+  ipcMain.handle('db.location.useFolder', async (_e, payload: any) => {
+    const { root } = payload || {}
+    if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
+    const res = migrateToRoot(root, 'use')
+    const d = getDb()
+    try {
+      applyMigrations(d as any)
+    } catch {}
+    return { ok: true, ...res }
+  })
+
+  // DB location: pick a new folder and migrate (copy-overwrite)
+  ipcMain.handle('db.location.chooseAndMigrate', async () => {
+    const pick = await dialog.showOpenDialog({
+      title: 'Ordner für Datenbank wählen',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
+    const chosen = pick.filePaths[0]
+    const res = migrateToRoot(chosen, 'copy-overwrite')
+    // Reopen DB to ensure app uses new file immediately
+    const d = getDb()
+    try {
+      applyMigrations(d as any)
+    } catch {}
+    return { ok: true, ...res }
+  })
+
+  // DB location: use existing folder with an existing database.sqlite (no copy)
+  ipcMain.handle('db.location.useExisting', async () => {
+    const pick = await dialog.showOpenDialog({
+      title: 'Bestehende Datenbank auswählen (Ordner)',
+      properties: ['openDirectory']
+    })
+    if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
+    const chosen = pick.filePaths[0]
+    const res = migrateToRoot(chosen, 'use')
+    const d = getDb()
+    try {
+      applyMigrations(d as any)
+    } catch {}
+    return { ok: true, ...res }
+  })
+
+  // DB location: reset to default (userData)
+  ipcMain.handle('db.location.resetDefault', async () => {
+    writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+    const info = getCurrentDbInfo()
+    // Reopen default DB
+    const d = getDb()
+    try {
+      applyMigrations(d as any)
+    } catch {}
+    return { ok: true, ...info }
+  })
+
+  // Smart restore preview: compare current configured DB vs default userData DB
+  ipcMain.handle('db.smartRestore.preview', async () => {
+    const currentInfo = getCurrentDbInfo()
+    const defaultInfo = getDefaultDbInfo()
+    function statOrNull(p: string) {
+      try {
+        return fs.statSync(p)
+      } catch {
+        return null
+      }
+    }
+    const curStat = statOrNull(currentInfo.dbPath)
+    const defStat = statOrNull(defaultInfo.dbPath)
+    const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
+    const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
+    // Recommendation heuristic:
+    // 1) If default exists and current does NOT -> useDefault
+    // 2) If both exist: compare last voucher date then mtime fallback
+    // 3) If default missing -> migrateToDefault
+    let recommendation: 'useDefault' | 'migrateToDefault' | 'manual' = 'manual'
+    if (defStat && !curStat) recommendation = 'useDefault'
+    else if (!defStat && curStat) recommendation = 'migrateToDefault'
+    else if (defStat && curStat) {
+      const lvCur = curInspect.last?.voucher || curInspect.last?.audit || null
+      const lvDef = defInspect.last?.voucher || defInspect.last?.audit || null
+      if (lvCur && lvDef) recommendation = lvCur > lvDef ? 'migrateToDefault' : 'useDefault'
+      else if (lvCur && !lvDef) recommendation = 'migrateToDefault'
+      else if (!lvCur && lvDef) recommendation = 'useDefault'
+      else {
+        // Fallback to mtime
+        const mCur = curStat?.mtimeMs || 0
+        const mDef = defStat?.mtimeMs || 0
+        recommendation = mCur > mDef ? 'migrateToDefault' : 'useDefault'
+      }
+    }
+    return DbSmartRestorePreviewOutput.parse({
+      current: {
+        root: currentInfo.root,
+        dbPath: currentInfo.dbPath,
+        exists: !!curStat,
+        mtime: curStat?.mtimeMs ?? null,
+        counts: curInspect.counts,
+        last: curInspect.last
+      },
+      default: {
+        root: defaultInfo.root,
+        dbPath: defaultInfo.dbPath,
+        exists: !!defStat,
+        mtime: defStat?.mtimeMs ?? null,
+        counts: defInspect.counts,
+        last: defInspect.last
+      },
+      recommendation
+    })
+  })
+
+  // Smart restore apply
+  ipcMain.handle('db.smartRestore.apply', async (_e, payload) => {
+    const parsed = DbSmartRestoreApplyInput.parse(payload)
+    const { action } = parsed
+    const currentInfo = getCurrentDbInfo()
+    const defaultInfo = getDefaultDbInfo()
+    if (action === 'useDefault') {
+      // Point config to default, do not copy current over
+      writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+      // Close any open DB and reopen default
+      try {
+        closeDb()
+      } catch {}
+      const d = getDb()
+      try {
+        applyMigrations(d as any)
+      } catch {}
+      return DbSmartRestoreApplyOutput.parse({ ok: true })
+    } else if (action === 'migrateToDefault') {
+      // Copy current DB + attachments to default, then reset config
+      try {
+        // Close current DB first
         try {
-            const stat = fs.statSync(importPath)
-            // Inspect counts using existing backup.inspect logic for uniformity
-            const counts = backup.inspectBackup(importPath)?.counts || {}
-            return { ok: true, filePath: importPath, size: stat.size, mtime: stat.mtimeMs, counts }
-        } catch {
-            return { ok: true, filePath: importPath }
-        }
-    })
-
-    // Database: Import from provided path after user confirms comparison
-    ipcMain.handle('db.import.fromPath', async (_e, payload) => {
-        const parsed = DbImportFromPathInput.parse(payload)
-        const importPath = parsed.filePath
-        const { root } = getAppDataDir()
-        const dbPath = path.join(root, 'database.sqlite')
+          closeDb()
+        } catch {}
+        // Ensure default dirs exist
+        if (!fs.existsSync(defaultInfo.root)) fs.mkdirSync(defaultInfo.root, { recursive: true })
+        if (!fs.existsSync(defaultInfo.filesDir))
+          fs.mkdirSync(defaultInfo.filesDir, { recursive: true })
+        // Copy DB file
+        fs.copyFileSync(currentInfo.dbPath, defaultInfo.dbPath)
+        // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
         try {
-            // Safety: create a backup before replacing the DB
-            try { await backup.makeBackup('preImport') } catch { /* ignore backup errors */ }
-            // Close DB before replacing file
-            try { closeDb() } catch { }
-            fs.copyFileSync(importPath, dbPath)
-            // Reopen and ensure migrations are applied
-            const d = getDb()
-            // Ensure schema is up to date (e.g., tags tables)
-            try { applyMigrations(d as any) } catch { /* ignore, handled by main on next start too */ }
-            // optional: run a lightweight pragma to ensure file is valid
-            d.pragma('foreign_keys = ON')
-            return DbImportFromPathOutput.parse({ ok: true, filePath: importPath })
-        } catch (e) {
-            throw new Error('Import fehlgeschlagen: ' + (e as any)?.message)
-        }
-    })
-
-    // DB location: info
-    ipcMain.handle('db.location.get', async () => {
-        const info = getCurrentDbInfo()
-        const cfg = readAppConfig()
-        return { root: info.root, dbPath: info.dbPath, filesDir: info.filesDir, configuredRoot: cfg.dbRoot || null }
-    })
-
-    // DB location: pick a folder (no migration) – return info so renderer can decide next step
-    ipcMain.handle('db.location.pick', async () => {
-        const pick = await dialog.showOpenDialog({ title: 'Ordner wählen…', properties: ['openDirectory', 'createDirectory'] })
-        if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-        const chosen = pick.filePaths[0]
-        const dbPath = path.join(chosen, 'database.sqlite')
-        const hasDb = fs.existsSync(dbPath)
-        const filesDir = path.join(chosen, 'files')
-        return { root: chosen, hasDb, dbPath, filesDir }
-    })
-
-    // DB location: migrate to a specific folder (copy-overwrite)
-    ipcMain.handle('db.location.migrateTo', async (_e, payload: any) => {
-        const { root } = payload || {}
-        if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-        const res = migrateToRoot(root, 'copy-overwrite')
-        const d = getDb()
-        try { applyMigrations(d as any) } catch { }
-        return { ok: true, ...res }
-    })
-
-    // DB location: use a specific folder that already contains database.sqlite (no copy)
-    ipcMain.handle('db.location.useFolder', async (_e, payload: any) => {
-        const { root } = payload || {}
-        if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-        const res = migrateToRoot(root, 'use')
-        const d = getDb()
-        try { applyMigrations(d as any) } catch { }
-        return { ok: true, ...res }
-    })
-
-    // DB location: pick a new folder and migrate (copy-overwrite)
-    ipcMain.handle('db.location.chooseAndMigrate', async () => {
-        const pick = await dialog.showOpenDialog({ title: 'Ordner für Datenbank wählen', properties: ['openDirectory', 'createDirectory'] })
-        if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-        const chosen = pick.filePaths[0]
-        const res = migrateToRoot(chosen, 'copy-overwrite')
-        // Reopen DB to ensure app uses new file immediately
-        const d = getDb()
-        try { applyMigrations(d as any) } catch { }
-        return { ok: true, ...res }
-    })
-
-    // DB location: use existing folder with an existing database.sqlite (no copy)
-    ipcMain.handle('db.location.useExisting', async () => {
-        const pick = await dialog.showOpenDialog({ title: 'Bestehende Datenbank auswählen (Ordner)', properties: ['openDirectory'] })
-        if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-        const chosen = pick.filePaths[0]
-        const res = migrateToRoot(chosen, 'use')
-        const d = getDb()
-        try { applyMigrations(d as any) } catch { }
-        return { ok: true, ...res }
-    })
-
-    // DB location: reset to default (userData)
-    ipcMain.handle('db.location.resetDefault', async () => {
-        writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-        const info = getCurrentDbInfo()
-        // Reopen default DB
-        const d = getDb()
-        try { applyMigrations(d as any) } catch { }
-        return { ok: true, ...info }
-    })
-
-    // Smart restore preview: compare current configured DB vs default userData DB
-    ipcMain.handle('db.smartRestore.preview', async () => {
-        const currentInfo = getCurrentDbInfo()
-        const defaultInfo = getDefaultDbInfo()
-        function statOrNull(p: string) {
-            try { return fs.statSync(p) } catch { return null }
-        }
-        const curStat = statOrNull(currentInfo.dbPath)
-        const defStat = statOrNull(defaultInfo.dbPath)
-        const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
-        const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
-        // Recommendation heuristic:
-        // 1) If default exists and current does NOT -> useDefault
-        // 2) If both exist: compare last voucher date then mtime fallback
-        // 3) If default missing -> migrateToDefault
-        let recommendation: 'useDefault' | 'migrateToDefault' | 'manual' = 'manual'
-        if (defStat && !curStat) recommendation = 'useDefault'
-        else if (!defStat && curStat) recommendation = 'migrateToDefault'
-        else if (defStat && curStat) {
-            const lvCur = curInspect.last?.voucher || curInspect.last?.audit || null
-            const lvDef = defInspect.last?.voucher || defInspect.last?.audit || null
-            if (lvCur && lvDef) recommendation = lvCur > lvDef ? 'migrateToDefault' : 'useDefault'
-            else if (lvCur && !lvDef) recommendation = 'migrateToDefault'
-            else if (!lvCur && lvDef) recommendation = 'useDefault'
-            else {
-                // Fallback to mtime
-                const mCur = curStat?.mtimeMs || 0
-                const mDef = defStat?.mtimeMs || 0
-                recommendation = mCur > mDef ? 'migrateToDefault' : 'useDefault'
-            }
-        }
-        return DbSmartRestorePreviewOutput.parse({
-            current: { root: currentInfo.root, dbPath: currentInfo.dbPath, exists: !!curStat, mtime: curStat?.mtimeMs ?? null, counts: curInspect.counts, last: curInspect.last },
-            default: { root: defaultInfo.root, dbPath: defaultInfo.dbPath, exists: !!defStat, mtime: defStat?.mtimeMs ?? null, counts: defInspect.counts, last: defInspect.last },
-            recommendation
-        })
-    })
-
-    // Smart restore apply
-    ipcMain.handle('db.smartRestore.apply', async (_e, payload) => {
-        const parsed = DbSmartRestoreApplyInput.parse(payload)
-        const { action } = parsed
-        const currentInfo = getCurrentDbInfo()
-        const defaultInfo = getDefaultDbInfo()
-        if (action === 'useDefault') {
-            // Point config to default, do not copy current over
-            writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-            // Close any open DB and reopen default
-            try { closeDb() } catch { }
-            const d = getDb()
-            try { applyMigrations(d as any) } catch { }
-            return DbSmartRestoreApplyOutput.parse({ ok: true })
-        } else if (action === 'migrateToDefault') {
-            // Copy current DB + attachments to default, then reset config
+          const files = fs.readdirSync(path.join(currentInfo.root, 'files'))
+          for (const f of files) {
+            const src = path.join(currentInfo.root, 'files', f)
+            const dst = path.join(defaultInfo.filesDir, f)
             try {
-                // Close current DB first
-                try { closeDb() } catch { }
-                // Ensure default dirs exist
-                if (!fs.existsSync(defaultInfo.root)) fs.mkdirSync(defaultInfo.root, { recursive: true })
-                if (!fs.existsSync(defaultInfo.filesDir)) fs.mkdirSync(defaultInfo.filesDir, { recursive: true })
-                // Copy DB file
-                fs.copyFileSync(currentInfo.dbPath, defaultInfo.dbPath)
-                // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
-                try {
-                    const files = fs.readdirSync(path.join(currentInfo.root, 'files'))
-                    for (const f of files) {
-                        const src = path.join(currentInfo.root, 'files', f)
-                        const dst = path.join(defaultInfo.filesDir, f)
-                        try { if (!fs.existsSync(dst)) fs.copyFileSync(src, dst) } catch { }
-                    }
-                } catch { /* ignore */ }
-                // Point config to default
-                writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-                // Reopen DB
-                const d = getDb()
-                try { applyMigrations(d as any) } catch { }
-                return DbSmartRestoreApplyOutput.parse({ ok: true })
-            } catch (e: any) {
-                throw new Error('Migration zum Standard fehlgeschlagen: ' + (e?.message || String(e)))
-            }
+              if (!fs.existsSync(dst)) fs.copyFileSync(src, dst)
+            } catch {}
+          }
+        } catch {
+          /* ignore */
         }
-        return DbSmartRestoreApplyOutput.parse({ ok: false })
-    })
-
-    // Tags CRUD
-    ipcMain.handle('tags.list', async (_e, payload) => {
-        const parsed = TagsListInput.parse(payload)
-        const rows = listTags(parsed ?? undefined) as any
-        return TagsListOutput.parse({ rows })
-    })
-    ipcMain.handle('tags.upsert', async (_e, payload) => {
-        const parsed = TagUpsertInput.parse(payload)
-        const res = upsertTag(parsed)
-        return TagUpsertOutput.parse({ id: res.id })
-    })
-    ipcMain.handle('tags.delete', async (_e, payload) => {
-        const parsed = TagDeleteInput.parse(payload)
-        const res = deleteTag(parsed.id)
-        return TagDeleteOutput.parse(res)
-    })
-    ipcMain.handle('tags.usage', async (_e, payload) => {
-        const parsed = TagUsageInput.parse(payload)
-        const res = tagUsage(parsed.tagId)
-        return TagUsageOutput.parse(res)
-    })
-
-    // Audit: recent actions
-    ipcMain.handle('audit.recent', async (_e, payload) => {
-        const parsed = AuditRecentInput.parse(payload) ?? { limit: 20 }
-        const rows = listRecentAudit(parsed.limit)
-        return AuditRecentOutput.parse({ rows })
-    })
-
-    // Members
-    ipcMain.handle('members.list', async (_e, payload) => {
-        const parsed = MembersListInput.parse(payload) ?? { limit: 50 }
-        const { rows, total } = listMembers(parsed as any)
-        return MembersListOutput.parse({ rows, total })
-    })
-    ipcMain.handle('members.create', async (_e, payload) => {
-        const parsed = MemberCreateInput.parse(payload)
-        const res = createMember(parsed as any)
-        return MemberCreateOutput.parse(res)
-    })
-    ipcMain.handle('members.update', async (_e, payload) => {
-        const parsed = MemberUpdateInput.parse(payload)
-        const res = updateMember(parsed as any)
-        return MemberUpdateOutput.parse(res)
-    })
-    ipcMain.handle('members.delete', async (_e, payload) => {
-        const parsed = MemberDeleteInput.parse(payload)
-        const res = deleteMember(parsed.id)
-        return MemberDeleteOutput.parse(res)
-    })
-    ipcMain.handle('members.get', async (_e, payload) => {
-        const parsed = MemberGetInput.parse(payload)
-        const res = getMemberById(parsed.id)
-        return MemberGetOutput.parse(res)
-    })
-
-    // Members export (Excel/PDF)
-    ipcMain.handle('members.export', async (_e, payload: MembersExportOptions) => {
-        const result = await exportMembers(payload)
-        return result
-    })
-
-    // Membership payments
-    ipcMain.handle('payments.listDue', async (_e, payload) => {
-        const parsed = PaymentsListDueInput.parse(payload)
-        const res = mp.listDue(parsed as any)
-        return PaymentsListDueOutput.parse(res as any)
-    })
-    ipcMain.handle('payments.markPaid', async (_e, payload) => {
-        const parsed = PaymentsMarkPaidInput.parse(payload)
-        const res = mp.markPaid(parsed as any)
-        return PaymentsMarkPaidOutput.parse(res as any)
-    })
-    ipcMain.handle('payments.unmark', async (_e, payload) => {
-        const parsed = PaymentsUnmarkInput.parse(payload)
-        const res = mp.unmark(parsed as any)
-        return PaymentsUnmarkOutput.parse(res as any)
-    })
-    ipcMain.handle('payments.suggestVouchers', async (_e, payload) => {
-        const parsed = PaymentsSuggestVouchersInput.parse(payload)
-        const res = mp.suggestVouchers(parsed as any)
-        return PaymentsSuggestVouchersOutput.parse(res as any)
-    })
-    ipcMain.handle('payments.status', async (_e, payload) => {
-        const res = mp.status(payload as any)
-        return res as any
-    })
-    ipcMain.handle('payments.dueSummary', async () => {
-        return PaymentsDueSummaryOutput.parse(mp.dueSummary())
-    })
-    ipcMain.handle('payments.history', async (_e, payload) => {
-        const res = mp.history(payload as any)
-        return res as any
-    })
-
-    // Year-end (Jahresabschluss)
-    ipcMain.handle('yearEnd.preview', async (_e, payload) => {
-        const parsed = YearEndPreviewInput.parse(payload)
-        const res = await yearEnd.preview(parsed.year)
-        return YearEndPreviewOutput.parse(res as any)
-    })
-    ipcMain.handle('yearEnd.export', async (_e, payload) => {
-        const parsed = YearEndExportInput.parse(payload)
-        const res = await yearEnd.exportPackage(parsed.year)
-        return YearEndExportOutput.parse(res as any)
-    })
-    ipcMain.handle('yearEnd.close', async (_e, payload) => {
-        const parsed = YearEndCloseInput.parse(payload)
-        // Safety: create a backup before locking a period
-        await requireSafetyBackup(backup.makeBackup, 'preClose', 'Jahresabschluss durchführen')
-        const res = yearEnd.closeYear(parsed.year)
-        return YearEndCloseOutput.parse(res as any)
-    })
-    ipcMain.handle('yearEnd.reopen', async (_e, payload) => {
-        const parsed = YearEndReopenInput.parse(payload)
-        const res = yearEnd.reopenAfter(parsed.year)
-        return YearEndReopenOutput.parse(res as any)
-    })
-    ipcMain.handle('yearEnd.status', async () => {
-        const res = yearEnd.status()
-        return YearEndStatusOutput.parse(res as any)
-    })
-
-    // ── Cash checks (Kassenprüfung) ──────────────────────────
-    ipcMain.handle('cashChecks.list', async (_e, payload) => {
-        const parsed = CashChecksListInput.parse(payload)
-        const res = listCashChecks({ year: parsed.year })
-        return CashChecksListOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.create', async (_e, payload) => {
-        const parsed = CashChecksCreateInput.parse(payload)
-        const res = createCashCheck(parsed as any)
-        return CashChecksCreateOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.setInspectors', async (_e, payload) => {
-        const parsed = CashChecksSetInspectorsInput.parse(payload)
-        const res = setCashCheckInspectors(parsed as any)
-        return CashChecksSetInspectorsOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.exportPdf', async (_e, payload) => {
-        const parsed = CashChecksExportPdfInput.parse(payload)
-        const res = await generateCashCheckPDF({ cashCheckId: parsed.id })
-        return CashChecksExportPdfOutput.parse(res)
-    })
-    ipcMain.handle('cashChecks.getInspectorDefaults', async () => {
-        const res = getCashCheckInspectorDefaults()
-        return CashChecksGetInspectorDefaultsOutput.parse(res)
-    })
-
-    // Work queue (dashboard): lightweight summary counts
-    ipcMain.handle('workQueue.summary', async () => {
+        // Point config to default
+        writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
+        // Reopen DB
+        const d = getDb()
         try {
-            const d = getDb()
-            const rowA = d.prepare("SELECT COUNT(1) as c FROM vouchers v WHERE (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) = 0").get() as any
-            const unlinkedReceiptsCount = Number(rowA?.c || 0)
-            const st = yearEnd.status()
-            let lockedEntriesCount = 0
-            if (st?.closedUntil) {
-                const r = d.prepare('SELECT COUNT(1) as c FROM vouchers WHERE date <= ?').get(st.closedUntil) as any
-                lockedEntriesCount = Number(r?.c || 0)
-            }
-            return { ok: true, unlinkedReceiptsCount, lockedEntriesCount }
-        } catch (e: any) {
-            return { ok: false, error: e?.message || String(e) }
+          applyMigrations(d as any)
+        } catch {}
+        return DbSmartRestoreApplyOutput.parse({ ok: true })
+      } catch (e: any) {
+        throw new Error('Migration zum Standard fehlgeschlagen: ' + (e?.message || String(e)))
+      }
+    }
+    return DbSmartRestoreApplyOutput.parse({ ok: false })
+  })
+
+  // Tags CRUD
+  ipcMain.handle('tags.list', async (_e, payload) => {
+    const parsed = TagsListInput.parse(payload)
+    const rows = listTags(parsed ?? undefined) as any
+    return TagsListOutput.parse({ rows })
+  })
+  ipcMain.handle('tags.upsert', async (_e, payload) => {
+    const parsed = TagUpsertInput.parse(payload)
+    const res = upsertTag(parsed)
+    return TagUpsertOutput.parse({ id: res.id })
+  })
+  ipcMain.handle('tags.delete', async (_e, payload) => {
+    const parsed = TagDeleteInput.parse(payload)
+    const res = deleteTag(parsed.id)
+    return TagDeleteOutput.parse(res)
+  })
+  ipcMain.handle('tags.usage', async (_e, payload) => {
+    const parsed = TagUsageInput.parse(payload)
+    const res = tagUsage(parsed.tagId)
+    return TagUsageOutput.parse(res)
+  })
+
+  // Audit: recent actions
+  ipcMain.handle('audit.recent', async (_e, payload) => {
+    const parsed = AuditRecentInput.parse(payload) ?? { limit: 20 }
+    const rows = listRecentAudit(parsed.limit)
+    return AuditRecentOutput.parse({ rows })
+  })
+
+  // Members
+  ipcMain.handle('members.list', async (_e, payload) => {
+    const parsed = MembersListInput.parse(payload) ?? { limit: 50 }
+    const { rows, total } = listMembers(parsed as any)
+    return MembersListOutput.parse({ rows, total })
+  })
+  ipcMain.handle('members.create', async (_e, payload) => {
+    const parsed = MemberCreateInput.parse(payload)
+    const res = createMember(parsed as any)
+    return MemberCreateOutput.parse(res)
+  })
+  ipcMain.handle('members.update', async (_e, payload) => {
+    const parsed = MemberUpdateInput.parse(payload)
+    const res = updateMember(parsed as any)
+    return MemberUpdateOutput.parse(res)
+  })
+  ipcMain.handle('members.delete', async (_e, payload) => {
+    const parsed = MemberDeleteInput.parse(payload)
+    const res = deleteMember(parsed.id)
+    return MemberDeleteOutput.parse(res)
+  })
+  ipcMain.handle('members.get', async (_e, payload) => {
+    const parsed = MemberGetInput.parse(payload)
+    const res = getMemberById(parsed.id)
+    return MemberGetOutput.parse(res)
+  })
+
+  // Members export (Excel/PDF)
+  ipcMain.handle('members.export', async (_e, payload: MembersExportOptions) => {
+    const result = await exportMembers(payload)
+    return result
+  })
+
+  // Membership payments
+  ipcMain.handle('payments.listDue', async (_e, payload) => {
+    const parsed = PaymentsListDueInput.parse(payload)
+    const res = mp.listDue(parsed as any)
+    return PaymentsListDueOutput.parse(res as any)
+  })
+  ipcMain.handle('payments.markPaid', async (_e, payload) => {
+    const parsed = PaymentsMarkPaidInput.parse(payload)
+    const res = mp.markPaid(parsed as any)
+    return PaymentsMarkPaidOutput.parse(res as any)
+  })
+  ipcMain.handle('payments.unmark', async (_e, payload) => {
+    const parsed = PaymentsUnmarkInput.parse(payload)
+    const res = mp.unmark(parsed as any)
+    return PaymentsUnmarkOutput.parse(res as any)
+  })
+  ipcMain.handle('payments.suggestVouchers', async (_e, payload) => {
+    const parsed = PaymentsSuggestVouchersInput.parse(payload)
+    const res = mp.suggestVouchers(parsed as any)
+    return PaymentsSuggestVouchersOutput.parse(res as any)
+  })
+  ipcMain.handle('payments.status', async (_e, payload) => {
+    const res = mp.status(payload as any)
+    return res as any
+  })
+  ipcMain.handle('payments.dueSummary', async () => {
+    return PaymentsDueSummaryOutput.parse(mp.dueSummary())
+  })
+  ipcMain.handle('payments.history', async (_e, payload) => {
+    const res = mp.history(payload as any)
+    return res as any
+  })
+
+  // Year-end (Jahresabschluss)
+  ipcMain.handle('yearEnd.preview', async (_e, payload) => {
+    const parsed = YearEndPreviewInput.parse(payload)
+    const res = await yearEnd.preview(parsed.year)
+    return YearEndPreviewOutput.parse(res as any)
+  })
+  ipcMain.handle('yearEnd.export', async (_e, payload) => {
+    const parsed = YearEndExportInput.parse(payload)
+    const res = await yearEnd.exportPackage(parsed.year)
+    return YearEndExportOutput.parse(res as any)
+  })
+  ipcMain.handle('yearEnd.close', async (_e, payload) => {
+    const parsed = YearEndCloseInput.parse(payload)
+    // Safety: create a backup before locking a period
+    await requireSafetyBackup(backup.makeBackup, 'preClose', 'Jahresabschluss durchführen')
+    const res = yearEnd.closeYear(parsed.year)
+    return YearEndCloseOutput.parse(res as any)
+  })
+  ipcMain.handle('yearEnd.reopen', async (_e, payload) => {
+    const parsed = YearEndReopenInput.parse(payload)
+    const res = yearEnd.reopenAfter(parsed.year)
+    return YearEndReopenOutput.parse(res as any)
+  })
+  ipcMain.handle('yearEnd.status', async () => {
+    const res = yearEnd.status()
+    return YearEndStatusOutput.parse(res as any)
+  })
+
+  // ── Cash checks (Kassenprüfung) ──────────────────────────
+  ipcMain.handle('cashChecks.list', async (_e, payload) => {
+    const parsed = CashChecksListInput.parse(payload)
+    const res = listCashChecks({ year: parsed.year })
+    return CashChecksListOutput.parse(res)
+  })
+  ipcMain.handle('cashChecks.create', async (_e, payload) => {
+    const parsed = CashChecksCreateInput.parse(payload)
+    const res = createCashCheck(parsed as any)
+    return CashChecksCreateOutput.parse(res)
+  })
+  ipcMain.handle('cashChecks.setInspectors', async (_e, payload) => {
+    const parsed = CashChecksSetInspectorsInput.parse(payload)
+    const res = setCashCheckInspectors(parsed as any)
+    return CashChecksSetInspectorsOutput.parse(res)
+  })
+  ipcMain.handle('cashChecks.exportPdf', async (_e, payload) => {
+    const parsed = CashChecksExportPdfInput.parse(payload)
+    const res = await generateCashCheckPDF({ cashCheckId: parsed.id })
+    return CashChecksExportPdfOutput.parse(res)
+  })
+  ipcMain.handle('cashChecks.getInspectorDefaults', async () => {
+    const res = getCashCheckInspectorDefaults()
+    return CashChecksGetInspectorDefaultsOutput.parse(res)
+  })
+
+  // Work queue (dashboard): lightweight summary counts
+  ipcMain.handle('workQueue.summary', async () => {
+    try {
+      const d = getDb()
+      const rowA = d
+        .prepare(
+          'SELECT COUNT(1) as c FROM vouchers v WHERE (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) = 0'
+        )
+        .get() as any
+      const unlinkedReceiptsCount = Number(rowA?.c || 0)
+      const st = yearEnd.status()
+      let lockedEntriesCount = 0
+      if (st?.closedUntil) {
+        const r = d
+          .prepare('SELECT COUNT(1) as c FROM vouchers WHERE date <= ?')
+          .get(st.closedUntil) as any
+        lockedEntriesCount = Number(r?.c || 0)
+      }
+      return { ok: true, unlinkedReceiptsCount, lockedEntriesCount }
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e) }
+    }
+  })
+
+  // Invoices
+  ipcMain.handle('invoices.create', async (_e, payload) => {
+    const parsed = InvoiceCreateInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => createInvoice(parsed as any),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceCreateOutput.parse(res)
+  })
+  ipcMain.handle('invoices.update', async (_e, payload) => {
+    const parsed = InvoiceUpdateInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => updateInvoice(parsed as any),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceUpdateOutput.parse(res)
+  })
+  ipcMain.handle('invoices.delete', async (_e, payload) => {
+    const parsed = InvoiceDeleteInput.parse(payload)
+    const res = deleteInvoice(parsed.id)
+    return InvoiceDeleteOutput.parse(res)
+  })
+  ipcMain.handle('invoices.list', async (_e, payload) => {
+    const parsed = InvoicesListInput.parse(payload) ?? {}
+    const { rows, total } = await withSchemaHealRetry(
+      () => listInvoicesPaged(parsed as any),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoicesListOutput.parse({ rows, total })
+  })
+  ipcMain.handle('invoices.summary', async (_e, payload) => {
+    const parsed = InvoicesSummaryInput.parse(payload) ?? {}
+    const res = await withSchemaHealRetry(
+      () => summarizeInvoices(parsed as any),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoicesSummaryOutput.parse(res as any)
+  })
+  ipcMain.handle('invoices.get', async (_e, payload) => {
+    const parsed = InvoiceByIdInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => getInvoiceById(parsed.id),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceByIdOutput.parse(res as any)
+  })
+  ipcMain.handle('invoices.addPayment', async (_e, payload) => {
+    const parsed = InvoiceAddPaymentInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => addPayment(parsed),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceAddPaymentOutput.parse(res as any)
+  })
+  ipcMain.handle('invoices.markPaid', async (_e, payload) => {
+    const parsed = InvoiceByIdInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => markPaid(parsed.id),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceAddPaymentOutput.parse(res as any)
+  })
+  ipcMain.handle('invoices.postToVoucher', async (_e, payload) => {
+    const parsed = InvoicePostToVoucherInput.parse(payload)
+    const res = await withSchemaHealRetry(
+      () => postInvoiceToVoucher(parsed.invoiceId),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoicePostToVoucherOutput.parse(res)
+  })
+
+  // Invoice files: open/save/read
+  ipcMain.handle('invoiceFiles.open', async (_e, payload) => {
+    const parsed = AttachmentOpenInput.parse(payload)
+    const f = getInvoiceFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    try {
+      if (!fs.existsSync(src)) {
+        const alt = path.join(getAppDataDir().filesDir, pathBase)
+        if (fs.existsSync(alt)) src = alt
+      }
+    } catch {}
+    const res = await shell.openPath(src)
+    const ok = !res
+    return AttachmentOpenOutput.parse({ ok })
+  })
+  ipcMain.handle('invoiceFiles.saveAs', async (_e, payload) => {
+    const parsed = AttachmentSaveAsInput.parse(payload)
+    const f = getInvoiceFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const save = await dialog.showSaveDialog({
+      title: 'Datei speichern unter …',
+      defaultPath: f.fileName
+    })
+    if (save.canceled || !save.filePath) throw new Error('Abbruch')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    if (!src || !fs.existsSync(src)) {
+      const alt = path.join(getAppDataDir().filesDir, pathBase)
+      if (fs.existsSync(alt)) src = alt
+    }
+    if (!src || !fs.existsSync(src))
+      throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+    fs.copyFileSync(src, save.filePath)
+    return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
+  })
+  ipcMain.handle('invoiceFiles.read', async (_e, payload) => {
+    const parsed = AttachmentReadInput.parse(payload)
+    const f = getInvoiceFileById(parsed.fileId)
+    if (!f) throw new Error('Datei nicht gefunden')
+    const pathBase = path.basename(f.filePath || '')
+    let src = f.filePath
+    if (!src || !fs.existsSync(src)) {
+      const alt = path.join(getAppDataDir().filesDir, pathBase)
+      if (fs.existsSync(alt)) src = alt
+    }
+    if (!src || !fs.existsSync(src))
+      throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
+    const buff = fs.readFileSync(src)
+    const dataBase64 = Buffer.from(buff).toString('base64')
+    return AttachmentReadOutput.parse({
+      fileName: f.fileName,
+      mimeType: f.mimeType || undefined,
+      dataBase64
+    })
+  })
+
+  // Invoice files CRUD for edit modal
+  ipcMain.handle('invoiceFiles.list', async (_e, payload) => {
+    const parsed = InvoiceFilesListInput.parse(payload)
+    const files = await withSchemaHealRetry(
+      () => listFilesForInvoice(parsed.invoiceId),
+      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+    )
+    return InvoiceFilesListOutput.parse({
+      files: files.map((f) => ({
+        id: f.id,
+        fileName: f.fileName,
+        mimeType: f.mimeType ?? null,
+        size: f.size ?? null,
+        createdAt: f.createdAt ?? null
+      }))
+    })
+  })
+  ipcMain.handle('invoiceFiles.add', async (_e, payload) => {
+    const parsed = InvoiceFileAddInput.parse(payload)
+    const res = addFileToInvoice(
+      parsed.invoiceId,
+      parsed.fileName,
+      parsed.dataBase64,
+      parsed.mimeType
+    )
+    return InvoiceFileAddOutput.parse(res)
+  })
+  ipcMain.handle('invoiceFiles.delete', async (_e, payload) => {
+    const parsed = InvoiceFileDeleteInput.parse(payload)
+    const res = deleteInvoiceFile(parsed.fileId)
+    return InvoiceFileDeleteOutput.parse(res)
+  })
+
+  // Settings: simple key/value
+  ipcMain.handle('settings.get', async (_e, payload) => {
+    const parsed = SettingsGetInput.parse(payload)
+    const value = getSetting(parsed.key)
+    return SettingsGetOutput.parse({ value })
+  })
+  ipcMain.handle('settings.set', async (_e, payload) => {
+    const parsed = SettingsSetInput.parse(payload)
+    setSetting(parsed.key, parsed.value)
+    return SettingsSetOutput.parse({ ok: true })
+  })
+
+  // Tax Exemption Certificate
+  ipcMain.handle('taxExemption.get', async () => {
+    const certificate = getTaxExemptionCertificate()
+    return TaxExemptionGetOutput.parse({ certificate })
+  })
+  ipcMain.handle('taxExemption.save', async (_e, payload) => {
+    const parsed = TaxExemptionSaveInput.parse(payload)
+    const certificate = {
+      fileName: parsed.fileName,
+      uploadDate: new Date().toISOString(),
+      validFrom: parsed.validFrom,
+      validUntil: parsed.validUntil,
+      fileData: parsed.fileData,
+      mimeType: parsed.mimeType,
+      fileSize: parsed.fileSize
+    }
+    saveTaxExemptionCertificate(certificate)
+    return TaxExemptionSaveOutput.parse({ ok: true })
+  })
+  ipcMain.handle('taxExemption.delete', async () => {
+    deleteTaxExemptionCertificate()
+    return TaxExemptionDeleteOutput.parse({ ok: true })
+  })
+  ipcMain.handle('taxExemption.updateValidity', async (_e, payload) => {
+    const parsed = TaxExemptionUpdateValidityInput.parse(payload)
+    updateTaxExemptionValidity(parsed.validFrom, parsed.validUntil)
+    return TaxExemptionUpdateValidityOutput.parse({ ok: true })
+  })
+
+  ipcMain.handle('donations.exportMoneyReceipt', async (_e, payload) => {
+    const parsed = DonationsExportMoneyReceiptInput.parse(payload)
+    const res = await exportMoneyDonationReceiptPdf(parsed)
+    return DonationsExportMoneyReceiptOutput.parse(res)
+  })
+
+  // Members: quick letter generation (RTF) and open
+  ipcMain.handle(
+    'members.writeLetter',
+    async (
+      _e,
+      payload: { id?: number; name: string; address?: string | null; memberNo?: string | null }
+    ) => {
+      try {
+        // If no address provided from renderer, try to load from DB by id
+        let effectiveAddress = payload.address || ''
+        if ((!effectiveAddress || !effectiveAddress.trim()) && payload.id) {
+          try {
+            const m = getMemberById(Number(payload.id))
+            if (m?.address) effectiveAddress = String(m.address)
+          } catch {
+            /* ignore */
+          }
         }
-    })
-
-    // Invoices
-    ipcMain.handle('invoices.create', async (_e, payload) => {
-        const parsed = InvoiceCreateInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => createInvoice(parsed as any),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceCreateOutput.parse(res)
-    })
-    ipcMain.handle('invoices.update', async (_e, payload) => {
-        const parsed = InvoiceUpdateInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => updateInvoice(parsed as any),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceUpdateOutput.parse(res)
-    })
-    ipcMain.handle('invoices.delete', async (_e, payload) => {
-        const parsed = InvoiceDeleteInput.parse(payload)
-        const res = deleteInvoice(parsed.id)
-        return InvoiceDeleteOutput.parse(res)
-    })
-    ipcMain.handle('invoices.list', async (_e, payload) => {
-        const parsed = InvoicesListInput.parse(payload) ?? {}
-        const { rows, total } = await withSchemaHealRetry(
-            () => listInvoicesPaged(parsed as any),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoicesListOutput.parse({ rows, total })
-    })
-    ipcMain.handle('invoices.summary', async (_e, payload) => {
-        const parsed = InvoicesSummaryInput.parse(payload) ?? {}
-        const res = await withSchemaHealRetry(
-            () => summarizeInvoices(parsed as any),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoicesSummaryOutput.parse(res as any)
-    })
-    ipcMain.handle('invoices.get', async (_e, payload) => {
-        const parsed = InvoiceByIdInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => getInvoiceById(parsed.id),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceByIdOutput.parse(res as any)
-    })
-    ipcMain.handle('invoices.addPayment', async (_e, payload) => {
-        const parsed = InvoiceAddPaymentInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => addPayment(parsed),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceAddPaymentOutput.parse(res as any)
-    })
-    ipcMain.handle('invoices.markPaid', async (_e, payload) => {
-        const parsed = InvoiceByIdInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => markPaid(parsed.id),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceAddPaymentOutput.parse(res as any)
-    })
-    ipcMain.handle('invoices.postToVoucher', async (_e, payload) => {
-        const parsed = InvoicePostToVoucherInput.parse(payload)
-        const res = await withSchemaHealRetry(
-            () => postInvoiceToVoucher(parsed.invoiceId),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoicePostToVoucherOutput.parse(res)
-    })
-
-    // Invoice files: open/save/read
-    ipcMain.handle('invoiceFiles.open', async (_e, payload) => {
-        const parsed = AttachmentOpenInput.parse(payload)
-        const f = getInvoiceFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        try { if (!fs.existsSync(src)) { const alt = path.join(getAppDataDir().filesDir, pathBase); if (fs.existsSync(alt)) src = alt } } catch { }
-        const res = await shell.openPath(src)
-        const ok = !res
-        return AttachmentOpenOutput.parse({ ok })
-    })
-    ipcMain.handle('invoiceFiles.saveAs', async (_e, payload) => {
-        const parsed = AttachmentSaveAsInput.parse(payload)
-        const f = getInvoiceFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const save = await dialog.showSaveDialog({ title: 'Datei speichern unter …', defaultPath: f.fileName })
-        if (save.canceled || !save.filePath) throw new Error('Abbruch')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        if (!src || !fs.existsSync(src)) {
-            const alt = path.join(getAppDataDir().filesDir, pathBase)
-            if (fs.existsSync(alt)) src = alt
-        }
-        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-        fs.copyFileSync(src, save.filePath)
-        return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
-    })
-    ipcMain.handle('invoiceFiles.read', async (_e, payload) => {
-        const parsed = AttachmentReadInput.parse(payload)
-        const f = getInvoiceFileById(parsed.fileId)
-        if (!f) throw new Error('Datei nicht gefunden')
-        const pathBase = path.basename(f.filePath || '')
-        let src = f.filePath
-        if (!src || !fs.existsSync(src)) {
-            const alt = path.join(getAppDataDir().filesDir, pathBase)
-            if (fs.existsSync(alt)) src = alt
-        }
-        if (!src || !fs.existsSync(src)) throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-        const buff = fs.readFileSync(src)
-        const dataBase64 = Buffer.from(buff).toString('base64')
-        return AttachmentReadOutput.parse({ fileName: f.fileName, mimeType: f.mimeType || undefined, dataBase64 })
-    })
-
-    // Invoice files CRUD for edit modal
-    ipcMain.handle('invoiceFiles.list', async (_e, payload) => {
-        const parsed = InvoiceFilesListInput.parse(payload)
-        const files = await withSchemaHealRetry(
-            () => listFilesForInvoice(parsed.invoiceId),
-            ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
-        )
-        return InvoiceFilesListOutput.parse({ files: files.map(f => ({ id: f.id, fileName: f.fileName, mimeType: f.mimeType ?? null, size: f.size ?? null, createdAt: f.createdAt ?? null })) })
-    })
-    ipcMain.handle('invoiceFiles.add', async (_e, payload) => {
-        const parsed = InvoiceFileAddInput.parse(payload)
-        const res = addFileToInvoice(parsed.invoiceId, parsed.fileName, parsed.dataBase64, parsed.mimeType)
-        return InvoiceFileAddOutput.parse(res)
-    })
-    ipcMain.handle('invoiceFiles.delete', async (_e, payload) => {
-        const parsed = InvoiceFileDeleteInput.parse(payload)
-        const res = deleteInvoiceFile(parsed.fileId)
-        return InvoiceFileDeleteOutput.parse(res)
-    })
-
-    // Settings: simple key/value
-    ipcMain.handle('settings.get', async (_e, payload) => {
-        const parsed = SettingsGetInput.parse(payload)
-        const value = getSetting(parsed.key)
-        return SettingsGetOutput.parse({ value })
-    })
-    ipcMain.handle('settings.set', async (_e, payload) => {
-        const parsed = SettingsSetInput.parse(payload)
-        setSetting(parsed.key, parsed.value)
-        return SettingsSetOutput.parse({ ok: true })
-    })
-
-    // Tax Exemption Certificate
-    ipcMain.handle('taxExemption.get', async () => {
-        const certificate = getTaxExemptionCertificate()
-        return TaxExemptionGetOutput.parse({ certificate })
-    })
-    ipcMain.handle('taxExemption.save', async (_e, payload) => {
-        const parsed = TaxExemptionSaveInput.parse(payload)
-        const certificate = {
-            fileName: parsed.fileName,
-            uploadDate: new Date().toISOString(),
-            validFrom: parsed.validFrom,
-            validUntil: parsed.validUntil,
-            fileData: parsed.fileData,
-            mimeType: parsed.mimeType,
-            fileSize: parsed.fileSize
-        }
-        saveTaxExemptionCertificate(certificate)
-        return TaxExemptionSaveOutput.parse({ ok: true })
-    })
-    ipcMain.handle('taxExemption.delete', async () => {
-        deleteTaxExemptionCertificate()
-        return TaxExemptionDeleteOutput.parse({ ok: true })
-    })
-    ipcMain.handle('taxExemption.updateValidity', async (_e, payload) => {
-        const parsed = TaxExemptionUpdateValidityInput.parse(payload)
-        updateTaxExemptionValidity(parsed.validFrom, parsed.validUntil)
-        return TaxExemptionUpdateValidityOutput.parse({ ok: true })
-    })
-
-    ipcMain.handle('donations.exportMoneyReceipt', async (_e, payload) => {
-        const parsed = DonationsExportMoneyReceiptInput.parse(payload)
-        const res = await exportMoneyDonationReceiptPdf(parsed)
-        return DonationsExportMoneyReceiptOutput.parse(res)
-    })
-
-    // Members: quick letter generation (RTF) and open
-    ipcMain.handle('members.writeLetter', async (_e, payload: { id?: number; name: string; address?: string | null; memberNo?: string | null }) => {
-        try {
-            // If no address provided from renderer, try to load from DB by id
-            let effectiveAddress = (payload.address || '')
-            if ((!effectiveAddress || !effectiveAddress.trim()) && payload.id) {
-                try {
-                    const m = getMemberById(Number(payload.id))
-                    if (m?.address) effectiveAddress = String(m.address)
-                } catch { /* ignore */ }
-            }
-            // Prepare address block (top-left): Name, then street, then "ZIP City"
-            const rawAddr = (effectiveAddress || '').trim()
-            let street = '', zipCity = ''
-            if (rawAddr) {
-                const idx = rawAddr.lastIndexOf(',')
-                if (idx >= 0) { street = rawAddr.slice(0, idx).trim(); zipCity = rawAddr.slice(idx + 1).trim() }
-                else { street = rawAddr }
-            }
-
-            // Build current date (German locale)
-            const today = new Date()
-            const datePretty = today.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
-            // Try to extract city from address (expecting "Straße, PLZ Ort")
-            let city = ''
-            if (zipCity) {
-                const m = /^(?:\d{4,5}\s+)?(.+)$/.exec(zipCity || '')
-                city = (m?.[1] || '').trim()
-            }
-            const dateLine = (city ? (city + ', ') : '') + datePretty
-
-            // Simple letter body with placeholders (use real umlauts; encoder will convert)
-            const subjectPlaceholder = '<<Betreff eintragen>>'
-            const bodyParas = [
-                `Sehr geehrte/r ${payload.name},`,
-                'wir kontaktieren Sie bezüglich Ihrer Mitgliedsbeiträge.',
-                'Bitte melden Sie sich bei Rückfragen.',
-                'Mit freundlichen Grüßen',
-                'Ihr Verein'
-            ]
-
-            // RTF helpers: escape control chars and encode non-ASCII as Unicode escapes
-            function rtfUnicodeEncode(s: string): string {
-                const map: Record<string, string> = { 'ä': "\\u228?", 'ö': "\\u246?", 'ü': "\\u252?", 'Ä': "\\u196?", 'Ö': "\\u214?", 'Ü': "\\u220?", 'ß': "\\u223?" }
-                let out = ''
-                for (const ch of s) {
-                    if (ch === '\\' || ch === '{' || ch === '}') { out += '\\' + ch; continue }
-                    const code = ch.codePointAt(0) as number
-                    if (code < 128) { out += ch } else if (map[ch]) { out += map[ch] } else {
-                        // RTF expects signed 16-bit for \uN; clamp
-                        const signed = ((code & 0xFFFF) > 0x7FFF) ? (code & 0xFFFF) - 0x10000 : (code & 0xFFFF)
-                        out += `\\u${signed}?`
-                    }
-                }
-                return out
-            }
-
-            // Determine salutation
-            const name = payload.name || ''
-            const lastName = (() => { const parts = name.trim().split(/\s+/); return parts.length ? parts[parts.length - 1] : name })()
-            const hasHerr = /\bHerr\b/i.test(name)
-            const hasFrau = /\bFrau\b/i.test(name)
-            const salutation = hasHerr ? `Sehr geehrter Herr ${lastName},` : hasFrau ? `Sehr geehrte Frau ${lastName},` : `Sehr geehrte/r ${name},`
-
-            // Minimal, Word-compatible RTF with margins and font table
-            const rtf = [
-                '{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1',
-                '{\\fonttbl{\\f0 Arial;}}',
-                '\\paperw11906\\paperh16838\\margl1134\\margr1134\\margt1134\\margb1134', // ~2cm margins
-                '\\fs22',
-                // Address block (top-left) with real RTF line breaks
-                '{\\pard ' + rtfUnicodeEncode(payload.name || '')
-                    + (street ? ' \\line ' + rtfUnicodeEncode(street) : '')
-                    + (zipCity ? ' \\line ' + rtfUnicodeEncode(zipCity) : '')
-                    + ' \\par}\\par',
-                // Subject (bold)
-                '{\\pard\\b ' + rtfUnicodeEncode('Betreff: ' + subjectPlaceholder) + ' \\b0 \\par}',
-                // City + Pretty Date
-                '{\\pard ' + rtfUnicodeEncode(dateLine) + ' \\par}\\par',
-                // Salutation and body paragraphs
-                '{\\pard ' + rtfUnicodeEncode(salutation) + ' \\par}\\par',
-                '{\\pard ' + rtfUnicodeEncode('wir wenden uns an Sie bezüglich Ihrer Mitgliedsbeiträge im Verein.') + ' \\par}\\par',
-                '{\\pard ' + rtfUnicodeEncode('Falls Sie Fragen oder Unklarheiten haben, melden Sie sich bitte bei uns. Wir stehen Ihnen gerne zur Verfügung.') + ' \\par}\\par',
-                '{\\pard ' + rtfUnicodeEncode('Mit freundlichen Grüßen') + ' \\par}',
-                '{\\pard ' + rtfUnicodeEncode('Ihr Vereinsvorstand') + ' \\par}',
-                '}'
-            ].join('\n')
-
-            const os = process.platform
-            const tmpDir = os === 'win32' ? (process.env.TEMP || process.env.TMP || '.') : (process.env.TMPDIR || '/tmp')
-            const fname = `Mitglied_${(payload.memberNo || payload.name || 'Brief').toString().replace(/[^a-zA-Z0-9_-]+/g,'_')}_${Date.now()}.rtf`
-            const fullPath = path.join(tmpDir, fname)
-            // Write as ASCII-safe string (contains only ASCII and RTF escapes), avoid UTF-8 BOM issues
-            fs.writeFileSync(fullPath, rtf, 'ascii')
-            await shell.openPath(fullPath)
-            return { ok: true, filePath: fullPath }
-        } catch (e: any) {
-            return { ok: false, error: e?.message || String(e) }
-        }
-    })
-
-    // ============= SUBMISSIONS =============
-    // List submissions
-    ipcMain.handle('submissions.list', async (_e, payload) => {
-        const parsed = SubmissionsListInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.list(parsed || {})
-        return SubmissionsListOutput.parse(result)
-    })
-
-    // Get single submission
-    ipcMain.handle('submissions.get', async (_e, payload) => {
-        const parsed = SubmissionGetInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.get(parsed.id)
-        return SubmissionGetOutput.parse(result)
-    })
-
-    // Import submissions from JSON
-    ipcMain.handle('submissions.import', async (_e, payload) => {
-        const parsed = SubmissionsImportInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.import(parsed)
-        return SubmissionsImportOutput.parse(result)
-    })
-
-    // Export category catalog for the public submission web form
-    ipcMain.handle('submissions.exportCatalog', async () => {
-        const activeOrg = getActiveOrganization()
-        const bindings = listBindings({ activeOnly: true })
-        const budgets = listBudgets({ includeArchived: false } as any)
-        const tags = listTags({})
-        const bindingById = new Map(bindings.map((binding: any) => [binding.id, binding]))
-
-        const labelForBudget = (budget: any) => {
-            if (budget.name && String(budget.name).trim()) return String(budget.name).trim()
-            if (budget.categoryName && String(budget.categoryName).trim()) return `${budget.year} - ${budget.categoryName}`
-            if (budget.projectName && String(budget.projectName).trim()) return `${budget.year} - ${budget.projectName}`
-            if (budget.earmarkId) {
-                const binding = bindingById.get(budget.earmarkId)
-                if (binding) return `${budget.year} - ${binding.code} ${binding.name}`
-            }
-            return `Budget ${budget.year}`
+        // Prepare address block (top-left): Name, then street, then "ZIP City"
+        const rawAddr = (effectiveAddress || '').trim()
+        let street = '',
+          zipCity = ''
+        if (rawAddr) {
+          const idx = rawAddr.lastIndexOf(',')
+          if (idx >= 0) {
+            street = rawAddr.slice(0, idx).trim()
+            zipCity = rawAddr.slice(idx + 1).trim()
+          } else {
+            street = rawAddr
+          }
         }
 
-        const paymentAccounts = listPaymentAccounts({ activeOnly: true })
-        const iconForPaymentAccountKind = (kind?: string | null) => {
-            switch (kind) {
-                case 'CASH': return '💵'
-                case 'BANK': return '🏦'
-                case 'PAYPAL': return '💳'
-                case 'CARD': return '💳'
-                default: return '💳'
-            }
+        // Build current date (German locale)
+        const today = new Date()
+        const datePretty = today.toLocaleDateString('de-DE', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        })
+        // Try to extract city from address (expecting "Straße, PLZ Ort")
+        let city = ''
+        if (zipCity) {
+          const m = /^(?:\d{4,5}\s+)?(.+)$/.exec(zipCity || '')
+          city = (m?.[1] || '').trim()
         }
-        const paymentMethodOptions = [
-            { id: 'BAR', label: 'Bar', icon: '💵', paymentMethod: 'BAR' },
-            { id: 'BANK', label: 'Bank', icon: '🏦', paymentMethod: 'BANK' }
+        const dateLine = (city ? city + ', ' : '') + datePretty
+
+        // Simple letter body with placeholders (use real umlauts; encoder will convert)
+        const subjectPlaceholder = '<<Betreff eintragen>>'
+        const bodyParas = [
+          `Sehr geehrte/r ${payload.name},`,
+          'wir kontaktieren Sie bezüglich Ihrer Mitgliedsbeiträge.',
+          'Bitte melden Sie sich bei Rückfragen.',
+          'Mit freundlichen Grüßen',
+          'Ihr Verein'
         ]
 
-        const exportData = {
-            type: 'vereino-submission-catalog',
-            version: '1.1',
-            exportedAt: new Date().toISOString(),
-            organization: activeOrg ? {
-                id: activeOrg.id,
-                name: activeOrg.name
-            } : null,
-            paymentMethods: paymentMethodOptions,
-            paymentAccounts: paymentAccounts.map((account: any) => ({
-                id: account.id,
-                name: account.name,
-                label: account.name,
-                icon: iconForPaymentAccountKind(account.kind),
-                paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
-                kind: account.kind,
-                color: account.color ?? null,
-                iban: account.iban ?? null
-            })),
-            categories: {
-                budgets: budgets.map((budget: any) => ({
-                    id: budget.id,
-                    label: labelForBudget(budget),
-                    year: budget.year,
-                    sphere: budget.sphere,
-                    amountPlanned: budget.amountPlanned,
-                    startDate: budget.startDate ?? null,
-                    endDate: budget.endDate ?? null,
-                    color: budget.color ?? null
-                })),
-                earmarks: bindings.map((binding: any) => ({
-                    id: binding.id,
-                    code: binding.code,
-                    name: binding.name,
-                    label: `${binding.code} - ${binding.name}`,
-                    startDate: binding.startDate ?? null,
-                    endDate: binding.endDate ?? null,
-                    color: binding.color ?? null
-                })),
-                tags: tags.map((tag: any) => ({
-                    id: tag.id,
-                    name: tag.name,
-                    color: tag.color ?? null
+        // RTF helpers: escape control chars and encode non-ASCII as Unicode escapes
+        function rtfUnicodeEncode(s: string): string {
+          const map: Record<string, string> = {
+            ä: '\\u228?',
+            ö: '\\u246?',
+            ü: '\\u252?',
+            Ä: '\\u196?',
+            Ö: '\\u214?',
+            Ü: '\\u220?',
+            ß: '\\u223?'
+          }
+          let out = ''
+          for (const ch of s) {
+            if (ch === '\\' || ch === '{' || ch === '}') {
+              out += '\\' + ch
+              continue
+            }
+            const code = ch.codePointAt(0) as number
+            if (code < 128) {
+              out += ch
+            } else if (map[ch]) {
+              out += map[ch]
+            } else {
+              // RTF expects signed 16-bit for \uN; clamp
+              const signed = (code & 0xffff) > 0x7fff ? (code & 0xffff) - 0x10000 : code & 0xffff
+              out += `\\u${signed}?`
+            }
+          }
+          return out
+        }
+
+        // Determine salutation
+        const name = payload.name || ''
+        const lastName = (() => {
+          const parts = name.trim().split(/\s+/)
+          return parts.length ? parts[parts.length - 1] : name
+        })()
+        const hasHerr = /\bHerr\b/i.test(name)
+        const hasFrau = /\bFrau\b/i.test(name)
+        const salutation = hasHerr
+          ? `Sehr geehrter Herr ${lastName},`
+          : hasFrau
+            ? `Sehr geehrte Frau ${lastName},`
+            : `Sehr geehrte/r ${name},`
+
+        // Minimal, Word-compatible RTF with margins and font table
+        const rtf = [
+          '{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1',
+          '{\\fonttbl{\\f0 Arial;}}',
+          '\\paperw11906\\paperh16838\\margl1134\\margr1134\\margt1134\\margb1134', // ~2cm margins
+          '\\fs22',
+          // Address block (top-left) with real RTF line breaks
+          '{\\pard ' +
+            rtfUnicodeEncode(payload.name || '') +
+            (street ? ' \\line ' + rtfUnicodeEncode(street) : '') +
+            (zipCity ? ' \\line ' + rtfUnicodeEncode(zipCity) : '') +
+            ' \\par}\\par',
+          // Subject (bold)
+          '{\\pard\\b ' + rtfUnicodeEncode('Betreff: ' + subjectPlaceholder) + ' \\b0 \\par}',
+          // City + Pretty Date
+          '{\\pard ' + rtfUnicodeEncode(dateLine) + ' \\par}\\par',
+          // Salutation and body paragraphs
+          '{\\pard ' + rtfUnicodeEncode(salutation) + ' \\par}\\par',
+          '{\\pard ' +
+            rtfUnicodeEncode('wir wenden uns an Sie bezüglich Ihrer Mitgliedsbeiträge im Verein.') +
+            ' \\par}\\par',
+          '{\\pard ' +
+            rtfUnicodeEncode(
+              'Falls Sie Fragen oder Unklarheiten haben, melden Sie sich bitte bei uns. Wir stehen Ihnen gerne zur Verfügung.'
+            ) +
+            ' \\par}\\par',
+          '{\\pard ' + rtfUnicodeEncode('Mit freundlichen Grüßen') + ' \\par}',
+          '{\\pard ' + rtfUnicodeEncode('Ihr Vereinsvorstand') + ' \\par}',
+          '}'
+        ].join('\n')
+
+        const os = process.platform
+        const tmpDir =
+          os === 'win32' ? process.env.TEMP || process.env.TMP || '.' : process.env.TMPDIR || '/tmp'
+        const fname = `Mitglied_${(payload.memberNo || payload.name || 'Brief').toString().replace(/[^a-zA-Z0-9_-]+/g, '_')}_${Date.now()}.rtf`
+        const fullPath = path.join(tmpDir, fname)
+        // Write as ASCII-safe string (contains only ASCII and RTF escapes), avoid UTF-8 BOM issues
+        fs.writeFileSync(fullPath, rtf, 'ascii')
+        await shell.openPath(fullPath)
+        return { ok: true, filePath: fullPath }
+      } catch (e: any) {
+        return { ok: false, error: e?.message || String(e) }
+      }
+    }
+  )
+
+  // ============= SUBMISSIONS =============
+  // List submissions
+  ipcMain.handle('submissions.list', async (_e, payload) => {
+    const parsed = SubmissionsListInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.list(parsed || {})
+    return SubmissionsListOutput.parse(result)
+  })
+
+  // Get single submission
+  ipcMain.handle('submissions.get', async (_e, payload) => {
+    const parsed = SubmissionGetInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.get(parsed.id)
+    return SubmissionGetOutput.parse(result)
+  })
+
+  // Import submissions from JSON
+  ipcMain.handle('submissions.import', async (_e, payload) => {
+    const parsed = SubmissionsImportInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.import(parsed)
+    return SubmissionsImportOutput.parse(result)
+  })
+
+  // Export category catalog for the public submission web form
+  ipcMain.handle('submissions.exportCatalog', async () => {
+    const activeOrg = getActiveOrganization()
+    const bindings = listBindings({ activeOnly: true })
+    const budgets = listBudgets({ includeArchived: false } as any)
+    const tags = listTags({})
+    const bindingById = new Map(bindings.map((binding: any) => [binding.id, binding]))
+
+    const labelForBudget = (budget: any) => {
+      if (budget.name && String(budget.name).trim()) return String(budget.name).trim()
+      if (budget.categoryName && String(budget.categoryName).trim())
+        return `${budget.year} - ${budget.categoryName}`
+      if (budget.projectName && String(budget.projectName).trim())
+        return `${budget.year} - ${budget.projectName}`
+      if (budget.earmarkId) {
+        const binding = bindingById.get(budget.earmarkId)
+        if (binding) return `${budget.year} - ${binding.code} ${binding.name}`
+      }
+      return `Budget ${budget.year}`
+    }
+
+    const paymentAccounts = listPaymentAccounts({ activeOnly: true })
+    const iconForPaymentAccountKind = (kind?: string | null) => {
+      switch (kind) {
+        case 'CASH':
+          return '💵'
+        case 'BANK':
+          return '🏦'
+        case 'PAYPAL':
+          return '💳'
+        case 'CARD':
+          return '💳'
+        default:
+          return '💳'
+      }
+    }
+    const paymentMethodOptions = [
+      { id: 'BAR', label: 'Bar', icon: '💵', paymentMethod: 'BAR' },
+      { id: 'BANK', label: 'Bank', icon: '🏦', paymentMethod: 'BANK' }
+    ]
+
+    const exportData = {
+      type: 'vereino-submission-catalog',
+      version: '1.1',
+      exportedAt: new Date().toISOString(),
+      organization: activeOrg
+        ? {
+            id: activeOrg.id,
+            name: activeOrg.name
+          }
+        : null,
+      paymentMethods: paymentMethodOptions,
+      paymentAccounts: paymentAccounts.map((account: any) => ({
+        id: account.id,
+        name: account.name,
+        label: account.name,
+        icon: iconForPaymentAccountKind(account.kind),
+        paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+        kind: account.kind,
+        color: account.color ?? null,
+        iban: account.iban ?? null
+      })),
+      categories: {
+        budgets: budgets.map((budget: any) => ({
+          id: budget.id,
+          label: labelForBudget(budget),
+          year: budget.year,
+          sphere: budget.sphere,
+          amountPlanned: budget.amountPlanned,
+          startDate: budget.startDate ?? null,
+          endDate: budget.endDate ?? null,
+          color: budget.color ?? null
+        })),
+        earmarks: bindings.map((binding: any) => ({
+          id: binding.id,
+          code: binding.code,
+          name: binding.name,
+          label: `${binding.code} - ${binding.name}`,
+          startDate: binding.startDate ?? null,
+          endDate: binding.endDate ?? null,
+          color: binding.color ?? null
+        })),
+        tags: tags.map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          color: tag.color ?? null
+        }))
+      }
+    }
+
+    const orgPart = (activeOrg?.name || 'verein').replace(/[^a-zA-Z0-9_-]+/g, '_')
+    const date = new Date().toISOString().slice(0, 10)
+    const save = await dialog.showSaveDialog({
+      title: 'Webformular-Kategorien exportieren',
+      defaultPath: `${orgPart}-${date}.vereino-catalog.json`,
+      filters: [
+        { name: 'VereinO Webformular-Kategorien', extensions: ['vereino-catalog.json', 'json'] }
+      ]
+    })
+    if (save.canceled || !save.filePath) {
+      return SubmissionsExportCatalogOutput.parse({ filePath: '' })
+    }
+
+    fs.writeFileSync(save.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+    return SubmissionsExportCatalogOutput.parse({ filePath: save.filePath })
+  })
+
+  // Import submissions from file picker
+  ipcMain.handle('submissions.importFromFile', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Einreichungen importieren',
+      filters: [{ name: 'Einreichungen', extensions: ['vereino-submission.json', 'json'] }],
+      properties: ['openFile', 'multiSelections']
+    })
+    if (result.canceled || !result.filePaths.length) {
+      return { imported: 0, ids: [] }
+    }
+
+    const allSubmissions: any[] = []
+    for (const filePath of result.filePaths) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8')
+        const data = JSON.parse(content)
+        if (Array.isArray(data.submissions)) {
+          // Transform web-app format to internal format
+          const transformed = data.submissions.map((sub: any) => ({
+            externalId: sub.externalId || sub.id,
+            date: sub.date,
+            type: sub.type || 'OUT',
+            sphere: sub.sphere || null,
+            paymentMethod: sub.paymentMethod || null,
+            description: sub.description,
+            grossAmount: sub.grossAmount,
+            categoryHint: sub.categoryHint,
+            counterparty: sub.counterparty,
+            budgetId: sub.budgetId ?? sub.budget?.id ?? null,
+            budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
+            earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
+            earmarkLabel:
+              sub.earmarkLabel ??
+              sub.earmark?.label ??
+              (sub.earmark
+                ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ')
+                : null),
+            tags: Array.isArray(sub.tags)
+              ? sub.tags
+                  .map((tag: any) => (typeof tag === 'string' ? tag : tag?.name))
+                  .filter(Boolean)
+              : [],
+            submittedBy: sub.submittedBy,
+            submittedAt: sub.submittedAt,
+            // Convert single attachment to attachments array
+            attachments: sub.attachment
+              ? [
+                  {
+                    filename: sub.attachment.name,
+                    mimeType: sub.attachment.mimeType,
+                    data: sub.attachment.dataBase64
+                  }
+                ]
+              : (sub.attachments || []).map((att: any) => ({
+                  filename: att.filename || att.name,
+                  mimeType: att.mimeType,
+                  data: att.data || att.dataBase64
                 }))
-            }
+          }))
+          allSubmissions.push(...transformed)
+        } else if (data.date && data.grossAmount) {
+          // Single submission format
+          const sub = data
+          allSubmissions.push({
+            externalId: sub.externalId || sub.id,
+            date: sub.date,
+            type: sub.type || 'OUT',
+            sphere: sub.sphere || null,
+            paymentMethod: sub.paymentMethod || null,
+            description: sub.description,
+            grossAmount: sub.grossAmount,
+            categoryHint: sub.categoryHint,
+            counterparty: sub.counterparty,
+            budgetId: sub.budgetId ?? sub.budget?.id ?? null,
+            budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
+            earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
+            earmarkLabel:
+              sub.earmarkLabel ??
+              sub.earmark?.label ??
+              (sub.earmark
+                ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ')
+                : null),
+            tags: Array.isArray(sub.tags)
+              ? sub.tags
+                  .map((tag: any) => (typeof tag === 'string' ? tag : tag?.name))
+                  .filter(Boolean)
+              : [],
+            submittedBy: sub.submittedBy,
+            submittedAt: sub.submittedAt,
+            attachments: sub.attachment
+              ? [
+                  {
+                    filename: sub.attachment.name,
+                    mimeType: sub.attachment.mimeType,
+                    data: sub.attachment.dataBase64
+                  }
+                ]
+              : []
+          })
         }
+      } catch (e) {
+        console.error(`Failed to parse submission file: ${filePath}`, e)
+      }
+    }
 
-        const orgPart = (activeOrg?.name || 'verein').replace(/[^a-zA-Z0-9_-]+/g, '_')
-        const date = new Date().toISOString().slice(0, 10)
-        const save = await dialog.showSaveDialog({
-            title: 'Webformular-Kategorien exportieren',
-            defaultPath: `${orgPart}-${date}.vereino-catalog.json`,
-            filters: [{ name: 'VereinO Webformular-Kategorien', extensions: ['vereino-catalog.json', 'json'] }]
+    if (allSubmissions.length === 0) {
+      return { imported: 0, ids: [] }
+    }
+
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const importResult = repo.import({ submissions: allSubmissions })
+    return SubmissionsImportOutput.parse(importResult)
+  })
+
+  // Approve submission
+  ipcMain.handle('submissions.approve', async (_e, payload) => {
+    const parsed = SubmissionApproveInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.approve(parsed.id, { reviewerNotes: parsed.reviewerNotes })
+    if (result.ok && parsed.voucherId) {
+      repo.linkToVoucher(parsed.id, parsed.voucherId)
+    }
+    return SubmissionApproveOutput.parse(result)
+  })
+
+  // Reject submission
+  ipcMain.handle('submissions.reject', async (_e, payload) => {
+    const parsed = SubmissionRejectInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.reject(parsed.id, { reviewerNotes: parsed.reviewerNotes })
+    return SubmissionRejectOutput.parse(result)
+  })
+
+  // Delete submission
+  ipcMain.handle('submissions.delete', async (_e, payload) => {
+    const parsed = SubmissionDeleteInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.delete(parsed.id)
+    return SubmissionDeleteOutput.parse(result)
+  })
+
+  // Convert approved submission to voucher
+  ipcMain.handle('submissions.convert', async (_e, payload) => {
+    const parsed = SubmissionConvertInput.parse(payload)
+    const db = getDb()
+    const submRepo = createSubmissionsRepository(db)
+
+    const submission = submRepo.get(parsed.id)
+    if (!submission) {
+      return { ok: false }
+    }
+    if (submission.status !== 'approved') {
+      return { ok: false }
+    }
+
+    // Create voucher from submission
+    const voucherPayload = {
+      date: submission.date,
+      type: submission.type as 'IN' | 'OUT',
+      sphere: parsed.sphere,
+      description: submission.description || undefined,
+      grossAmount: submission.grossAmount,
+      vatRate: 0,
+      paymentMethod: parsed.paymentMethod,
+      categoryId: parsed.categoryId,
+      earmarkId: parsed.earmarkId,
+      budgetId: parsed.budgetId,
+      counterparty: submission.counterparty || undefined,
+      files: [] as Array<{ name: string; dataBase64: string; mime?: string }>
+    }
+
+    // Add attachments as files
+    for (const att of submission.attachments) {
+      const fullAtt = submRepo.getAttachment(att.id)
+      if (fullAtt) {
+        voucherPayload.files.push({
+          name: fullAtt.filename,
+          dataBase64: fullAtt.data.toString('base64'),
+          mime: fullAtt.mimeType || undefined
         })
-        if (save.canceled || !save.filePath) {
-            return SubmissionsExportCatalogOutput.parse({ filePath: '' })
-        }
+      }
+    }
 
-        fs.writeFileSync(save.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
-        return SubmissionsExportCatalogOutput.parse({ filePath: save.filePath })
+    const voucherResult = createVoucher(voucherPayload)
+
+    // Link submission to voucher
+    if (voucherResult.id) {
+      submRepo.linkToVoucher(parsed.id, voucherResult.id)
+    }
+
+    return SubmissionConvertOutput.parse({ ok: true, voucherId: voucherResult.id })
+  })
+
+  // Summary
+  ipcMain.handle('submissions.summary', async () => {
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const result = repo.summary()
+    return SubmissionsSummaryOutput.parse(result)
+  })
+
+  // Read attachment data
+  ipcMain.handle('submissions.readAttachment', async (_e, payload) => {
+    const parsed = SubmissionAttachmentReadInput.parse(payload)
+    const db = getDb()
+    const repo = createSubmissionsRepository(db)
+    const att = repo.getAttachment(parsed.attachmentId)
+    if (!att) {
+      return null
+    }
+    return SubmissionAttachmentReadOutput.parse({
+      filename: att.filename,
+      mimeType: att.mimeType,
+      dataBase64: att.data.toString('base64')
     })
+  })
 
-    // Import submissions from file picker
-    ipcMain.handle('submissions.importFromFile', async () => {
-        const result = await dialog.showOpenDialog({
-            title: 'Einreichungen importieren',
-            filters: [
-                { name: 'Einreichungen', extensions: ['vereino-submission.json', 'json'] }
-            ],
-            properties: ['openFile', 'multiSelections']
-        })
-        if (result.canceled || !result.filePaths.length) {
-            return { imported: 0, ids: [] }
-        }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Organization Management
+  // ─────────────────────────────────────────────────────────────────────────
 
-        const allSubmissions: any[] = []
-        for (const filePath of result.filePaths) {
-            try {
-                const content = fs.readFileSync(filePath, 'utf-8')
-                const data = JSON.parse(content)
-                if (Array.isArray(data.submissions)) {
-                    // Transform web-app format to internal format
-                    const transformed = data.submissions.map((sub: any) => ({
-                        externalId: sub.externalId || sub.id,
-                        date: sub.date,
-                        type: sub.type || 'OUT',
-                        sphere: sub.sphere || null,
-                        paymentMethod: sub.paymentMethod || null,
-                        description: sub.description,
-                        grossAmount: sub.grossAmount,
-                        categoryHint: sub.categoryHint,
-                        counterparty: sub.counterparty,
-                        budgetId: sub.budgetId ?? sub.budget?.id ?? null,
-                        budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
-                        earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
-                        earmarkLabel: sub.earmarkLabel ?? sub.earmark?.label ?? (sub.earmark ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ') : null),
-                        tags: Array.isArray(sub.tags) ? sub.tags.map((tag: any) => typeof tag === 'string' ? tag : tag?.name).filter(Boolean) : [],
-                        submittedBy: sub.submittedBy,
-                        submittedAt: sub.submittedAt,
-                        // Convert single attachment to attachments array
-                        attachments: sub.attachment ? [{
-                            filename: sub.attachment.name,
-                            mimeType: sub.attachment.mimeType,
-                            data: sub.attachment.dataBase64
-                        }] : (sub.attachments || []).map((att: any) => ({
-                            filename: att.filename || att.name,
-                            mimeType: att.mimeType,
-                            data: att.data || att.dataBase64
-                        }))
-                    }))
-                    allSubmissions.push(...transformed)
-                } else if (data.date && data.grossAmount) {
-                    // Single submission format
-                    const sub = data
-                    allSubmissions.push({
-                        externalId: sub.externalId || sub.id,
-                        date: sub.date,
-                        type: sub.type || 'OUT',
-                        sphere: sub.sphere || null,
-                        paymentMethod: sub.paymentMethod || null,
-                        description: sub.description,
-                        grossAmount: sub.grossAmount,
-                        categoryHint: sub.categoryHint,
-                        counterparty: sub.counterparty,
-                        budgetId: sub.budgetId ?? sub.budget?.id ?? null,
-                        budgetLabel: sub.budgetLabel ?? sub.budget?.label ?? null,
-                        earmarkId: sub.earmarkId ?? sub.earmark?.id ?? null,
-                        earmarkLabel: sub.earmarkLabel ?? sub.earmark?.label ?? (sub.earmark ? [sub.earmark.code, sub.earmark.name].filter(Boolean).join(' - ') : null),
-                        tags: Array.isArray(sub.tags) ? sub.tags.map((tag: any) => typeof tag === 'string' ? tag : tag?.name).filter(Boolean) : [],
-                        submittedBy: sub.submittedBy,
-                        submittedAt: sub.submittedAt,
-                        attachments: sub.attachment ? [{
-                            filename: sub.attachment.name,
-                            mimeType: sub.attachment.mimeType,
-                            data: sub.attachment.dataBase64
-                        }] : []
-                    })
-                }
-            } catch (e) {
-                console.error(`Failed to parse submission file: ${filePath}`, e)
-            }
-        }
+  ipcMain.handle('organizations.list', async () => {
+    return { organizations: listOrganizations() }
+  })
 
-        if (allSubmissions.length === 0) {
-            return { imported: 0, ids: [] }
-        }
+  ipcMain.handle('organizations.active', async () => {
+    return { organization: getActiveOrganization() }
+  })
 
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const importResult = repo.import({ submissions: allSubmissions })
-        return SubmissionsImportOutput.parse(importResult)
-    })
+  ipcMain.handle('organizations.create', async (_e, payload: { name: string }) => {
+    if (!payload?.name) throw new Error('Name ist erforderlich')
+    const org = createOrganization(payload.name)
+    return { organization: org }
+  })
 
-    // Approve submission
-    ipcMain.handle('submissions.approve', async (_e, payload) => {
-        const parsed = SubmissionApproveInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.approve(parsed.id, { reviewerNotes: parsed.reviewerNotes })
-        if (result.ok && parsed.voucherId) {
-            repo.linkToVoucher(parsed.id, parsed.voucherId)
-        }
-        return SubmissionApproveOutput.parse(result)
-    })
+  ipcMain.handle('organizations.switch', async (_e, payload: { orgId: string }) => {
+    if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+    const before = getActiveOrganization()
+    const beforeId = before?.id || 'default'
+    const result = switchOrganization(payload.orgId)
 
-    // Reject submission
-    ipcMain.handle('submissions.reject', async (_e, payload) => {
-        const parsed = SubmissionRejectInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.reject(parsed.id, { reviewerNotes: parsed.reviewerNotes })
-        return SubmissionRejectOutput.parse(result)
-    })
+    // Ensure DB is initialized for the newly active organization.
+    // This is critical because renderer reload does NOT restart the main process.
+    try {
+      const db = getDb()
+      applyMigrations(db)
+    } catch (err) {
+      // Roll back config to the previous org to avoid leaving the app in a broken state.
+      try {
+        switchOrganization(beforeId)
+      } catch {
+        /* ignore rollback errors */
+      }
+      throw err
+    }
+    // Signal renderer to reload
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) {
+      win.webContents.send('organizations:switched', result.org)
+    }
+    return result
+  })
 
-    // Delete submission
-    ipcMain.handle('submissions.delete', async (_e, payload) => {
-        const parsed = SubmissionDeleteInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.delete(parsed.id)
-        return SubmissionDeleteOutput.parse(result)
-    })
+  ipcMain.handle('organizations.rename', async (_e, payload: { orgId: string; name: string }) => {
+    if (!payload?.orgId || !payload?.name) throw new Error('orgId und name sind erforderlich')
+    return renameOrganization(payload.orgId, payload.name)
+  })
 
-    // Convert approved submission to voucher
-    ipcMain.handle('submissions.convert', async (_e, payload) => {
-        const parsed = SubmissionConvertInput.parse(payload)
-        const db = getDb()
-        const submRepo = createSubmissionsRepository(db)
-        
-        const submission = submRepo.get(parsed.id)
-        if (!submission) {
-            return { ok: false }
-        }
-        if (submission.status !== 'approved') {
-            return { ok: false }
-        }
+  ipcMain.handle(
+    'organizations.delete',
+    async (_e, payload: { orgId: string; deleteData?: boolean }) => {
+      if (!payload?.orgId) throw new Error('orgId ist erforderlich')
 
-        // Create voucher from submission
-        const voucherPayload = {
-            date: submission.date,
-            type: submission.type as 'IN' | 'OUT',
-            sphere: parsed.sphere,
-            description: submission.description || undefined,
-            grossAmount: submission.grossAmount,
-            vatRate: 0,
-            paymentMethod: parsed.paymentMethod,
-            categoryId: parsed.categoryId,
-            earmarkId: parsed.earmarkId,
-            budgetId: parsed.budgetId,
-            counterparty: submission.counterparty || undefined,
-            files: [] as Array<{ name: string; dataBase64: string; mime?: string }>
-        }
+      const before = getActiveOrganization()
+      const beforeId = before?.id || 'default'
+      const result = deleteOrganization(payload.orgId, payload.deleteData ?? false)
 
-        // Add attachments as files
-        for (const att of submission.attachments) {
-            const fullAtt = submRepo.getAttachment(att.id)
-            if (fullAtt) {
-                voucherPayload.files.push({
-                    name: fullAtt.filename,
-                    dataBase64: fullAtt.data.toString('base64'),
-                    mime: fullAtt.mimeType || undefined
-                })
-            }
-        }
+      const after = getActiveOrganization()
+      const afterId = after?.id || 'default'
 
-        const voucherResult = createVoucher(voucherPayload)
-        
-        // Link submission to voucher
-        if (voucherResult.id) {
-            submRepo.linkToVoucher(parsed.id, voucherResult.id)
-        }
-
-        return SubmissionConvertOutput.parse({ ok: true, voucherId: voucherResult.id })
-    })
-
-    // Summary
-    ipcMain.handle('submissions.summary', async () => {
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const result = repo.summary()
-        return SubmissionsSummaryOutput.parse(result)
-    })
-
-    // Read attachment data
-    ipcMain.handle('submissions.readAttachment', async (_e, payload) => {
-        const parsed = SubmissionAttachmentReadInput.parse(payload)
-        const db = getDb()
-        const repo = createSubmissionsRepository(db)
-        const att = repo.getAttachment(parsed.attachmentId)
-        if (!att) {
-            return null
-        }
-        return SubmissionAttachmentReadOutput.parse({
-            filename: att.filename,
-            mimeType: att.mimeType,
-            dataBase64: att.data.toString('base64')
-        })
-    })
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Organization Management
-    // ─────────────────────────────────────────────────────────────────────────
-    
-    ipcMain.handle('organizations.list', async () => {
-        return { organizations: listOrganizations() }
-    })
-    
-    ipcMain.handle('organizations.active', async () => {
-        return { organization: getActiveOrganization() }
-    })
-    
-    ipcMain.handle('organizations.create', async (_e, payload: { name: string }) => {
-        if (!payload?.name) throw new Error('Name ist erforderlich')
-        const org = createOrganization(payload.name)
-        return { organization: org }
-    })
-    
-    ipcMain.handle('organizations.switch', async (_e, payload: { orgId: string }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        const before = getActiveOrganization()
-        const beforeId = before?.id || 'default'
-        const result = switchOrganization(payload.orgId)
-
-        // Ensure DB is initialized for the newly active organization.
-        // This is critical because renderer reload does NOT restart the main process.
+      // If the active organization changed (e.g. deleted active org), ensure DB is initialized.
+      if (afterId !== beforeId) {
         try {
-            const db = getDb()
-            applyMigrations(db)
+          const db = getDb()
+          applyMigrations(db)
         } catch (err) {
-            // Roll back config to the previous org to avoid leaving the app in a broken state.
-            try { switchOrganization(beforeId) } catch { /* ignore rollback errors */ }
-            throw err
+          // Deletion already succeeded (config/data updated).
+          // Do not fail the delete call because a follow-up migration failed.
+          console.warn('[organizations.delete] post-switch migration failed:', err)
         }
-        // Signal renderer to reload
+
         const win = BrowserWindow.getFocusedWindow()
-        if (win) {
-            win.webContents.send('organizations:switched', result.org)
+        if (win && after) {
+          win.webContents.send('organizations:switched', {
+            id: after.id,
+            name: after.name,
+            dbRoot: after.dbRoot
+          })
         }
-        return result
-    })
-    
-    ipcMain.handle('organizations.rename', async (_e, payload: { orgId: string; name: string }) => {
-        if (!payload?.orgId || !payload?.name) throw new Error('orgId und name sind erforderlich')
-        return renameOrganization(payload.orgId, payload.name)
-    })
-    
-    ipcMain.handle('organizations.delete', async (_e, payload: { orgId: string; deleteData?: boolean }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+      }
 
-        const before = getActiveOrganization()
-        const beforeId = before?.id || 'default'
-        const result = deleteOrganization(payload.orgId, payload.deleteData ?? false)
+      return result
+    }
+  )
 
-        const after = getActiveOrganization()
-        const afterId = after?.id || 'default'
+  ipcMain.handle('organizations.getAppearance', async (_e, payload: { orgId: string }) => {
+    if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+    return getOrganizationAppearance(payload.orgId)
+  })
 
-        // If the active organization changed (e.g. deleted active org), ensure DB is initialized.
-        if (afterId !== beforeId) {
-            try {
-                const db = getDb()
-                applyMigrations(db)
-            } catch (err) {
-                // Deletion already succeeded (config/data updated).
-                // Do not fail the delete call because a follow-up migration failed.
-                console.warn('[organizations.delete] post-switch migration failed:', err)
-            }
+  ipcMain.handle(
+    'organizations.setAppearance',
+    async (
+      _e,
+      payload: {
+        orgId: string
+        colorTheme?: string
+        backgroundImage?: string
+        customBackgroundImage?: string | null
+        glassModals?: boolean
+      }
+    ) => {
+      if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+      return setOrganizationAppearance(payload.orgId, {
+        colorTheme: payload.colorTheme,
+        backgroundImage: payload.backgroundImage,
+        customBackgroundImage: payload.customBackgroundImage,
+        glassModals: payload.glassModals
+      })
+    }
+  )
 
-            const win = BrowserWindow.getFocusedWindow()
-            if (win && after) {
-                win.webContents.send('organizations:switched', { id: after.id, name: after.name, dbRoot: after.dbRoot })
-            }
-        }
-
-        return result
-    })
-    
-    ipcMain.handle('organizations.getAppearance', async (_e, payload: { orgId: string }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return getOrganizationAppearance(payload.orgId)
-    })
-    
-    ipcMain.handle('organizations.setAppearance', async (_e, payload: { orgId: string; colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
-        if (!payload?.orgId) throw new Error('orgId ist erforderlich')
-        return setOrganizationAppearance(payload.orgId, {
-            colorTheme: payload.colorTheme,
-            backgroundImage: payload.backgroundImage,
-            customBackgroundImage: payload.customBackgroundImage,
-            glassModals: payload.glassModals
-        })
-    })
-    
-    ipcMain.handle('organizations.activeAppearance', async () => {
-        return getActiveOrganizationAppearance()
-    })
+  ipcMain.handle('organizations.activeAppearance', async () => {
+    return getActiveOrganizationAppearance()
+  })
 }

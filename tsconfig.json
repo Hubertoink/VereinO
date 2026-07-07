@@ -1,14 +1,15 @@
 {
-    "compilerOptions": {
-        "esModuleInterop": true
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "isolatedModules": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "tsconfig.node.json"
     },
-    "files": [],
-    "references": [
-        {
-            "path": "tsconfig.node.json"
-        },
-        {
-            "path": "tsconfig.renderer.json"
-        }
-    ]
+    {
+      "path": "tsconfig.renderer.json"
+    }
+  ]
 }

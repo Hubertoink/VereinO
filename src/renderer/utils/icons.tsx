@@ -110,14 +110,6 @@ export const IconAttachment = ({ size = 16, color }: { size?: number; color?: st
     </svg>
 )
 
-// Helper-Funktion für Platzhalter-Text
-// Helper für Zahlweg-Icons (React)
-function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
-    if (method === 'BANK') return <IconBank size={size} />
-    if (method === 'BAR') return <IconCash size={size} />
-    return <span>{ICONS.EMPTY}</span>
-}
-
 // Helper für Transfer-Anzeige mit Icons
 export function TransferDisplay({ from, to, size = 14 }: { from: 'BAR' | 'BANK' | null | undefined; to: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     return (
