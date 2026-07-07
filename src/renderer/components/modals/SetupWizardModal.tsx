@@ -2,16 +2,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
-import type { QuickAddAfterSave } from '../../context/UIPreferencesContextCore'
+import type {
+    BackgroundImage,
+    JournalRowDensity,
+    JournalRowStyle,
+    NavIconColorMode,
+    NavLayout,
+    QuickAddAfterSave
+} from '../../context/UIPreferencesContextCore'
+import type { ColorTheme } from '../../context/uiTheme'
+import type { ColKey, DateFmt } from '../../views/Settings/types'
 
-type NavLayout = 'left' | 'top'
-type NavIconColorMode = 'color' | 'mono'
-type ColorTheme = 'default' | 'fiery-ocean' | 'peachy-delight' | 'pastel-dreamland' | 'ocean-breeze' | 'earthy-tones' | 'monochrome-harmony' | 'vintage-charm' | 'soft-blush' | 'professional-light'
-type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-type JournalRowDensity = 'normal' | 'compact'
-type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
-type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
-type ColKey = 'actions' | 'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'note' | 'earmark' | 'budget' | 'paymentMethod' | 'attachments' | 'net' | 'vat' | 'gross'
 type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
 
 // Toggle button component for binary options

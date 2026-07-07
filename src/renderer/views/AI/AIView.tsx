@@ -311,15 +311,56 @@ const DEFAULT_AI_SETTINGS: TAiSettingsGetOutput = {
   hasApiKey: false,
   model: 'gpt-5.5',
   textModel: 'gpt-5.4-mini',
-  defaultReasoningEffort: 'medium'
+  defaultReasoningEffort: 'medium',
+  provider: 'openai',
+  apiBaseUrl: 'https://api.openai.com/v1'
 }
 
-const AI_MODEL_OPTIONS = [
-  { value: 'gpt-5.5', label: 'GPT-5.5', hint: 'Beste Qualität für Belege' },
-  { value: 'gpt-5.4', label: 'GPT-5.4', hint: 'Stark, günstiger als 5.5' },
-  { value: 'gpt-5.4-mini', label: 'GPT-5.4 mini', hint: 'Schnell und günstiger' },
-  { value: 'gpt-5.4-nano', label: 'GPT-5.4 nano', hint: 'Sehr günstig für einfache Texte' }
-]
+const AI_PROVIDER_CONFIG = {
+  openai: {
+    label: 'OpenAI',
+    apiBaseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-5.5',
+    defaultTextModel: 'gpt-5.4-mini',
+    modelOptions: [
+      { value: 'gpt-5.5', label: 'GPT-5.5', hint: 'Beste Qualität für Belege' },
+      { value: 'gpt-5.4', label: 'GPT-5.4', hint: 'Stark, günstiger als 5.5' },
+      { value: 'gpt-5.4-mini', label: 'GPT-5.4 mini', hint: 'Schnell und günstiger' },
+      { value: 'gpt-5.4-nano', label: 'GPT-5.4 nano', hint: 'Sehr günstig für einfache Texte' }
+    ]
+  },
+  minimax: {
+    label: 'Minimax',
+    apiBaseUrl: 'https://api.minimaxi.com/v1',
+    defaultModel: 'MiniMax-M3',
+    defaultTextModel: 'MiniMax-M3',
+    modelOptions: [
+      { value: 'MiniMax-M3', label: 'MiniMax-M3', hint: 'Aktuelles Agent- und Reasoning-Modell' },
+      { value: 'MiniMax-M1', label: 'MiniMax-M1', hint: 'Starkes Reasoning für längere Aufgaben' },
+      { value: 'MiniMax-Text-01', label: 'MiniMax-Text-01', hint: 'Klassisches Textmodell für Standardaufgaben' }
+    ]
+  }
+} as const
+
+const AI_PROVIDER_OPTIONS = Object.entries(AI_PROVIDER_CONFIG).map(([value, config]) => ({
+  value,
+  label: config.label
+})) as Array<{ value: TAiSettingsGetOutput['provider']; label: string }>
+
+function getAiProviderConfig(provider: TAiSettingsGetOutput['provider']) {
+  return AI_PROVIDER_CONFIG[provider] || AI_PROVIDER_CONFIG.openai
+}
+
+function normalizeAiSettings(settings: TAiSettingsGetOutput): TAiSettingsGetOutput {
+  const providerConfig = getAiProviderConfig(settings.provider)
+  const allowedModels = new Set(providerConfig.modelOptions.map((option) => option.value))
+  return {
+    ...settings,
+    apiBaseUrl: providerConfig.apiBaseUrl,
+    model: allowedModels.has(settings.model) ? settings.model : providerConfig.defaultModel,
+    textModel: allowedModels.has(settings.textModel) ? settings.textModel : providerConfig.defaultTextModel
+  }
+}
 
 const PROMPT_EXAMPLES = [
   'Lies diese Rechnung aus und erstelle einen Buchungsvorschlag.',
@@ -405,6 +446,14 @@ function attachmentBadge(file: File) {
   return 'DATEI'
 }
 
+function isAiAttachmentFile(file: File) {
+  const mimeType = String(file.type || '').toLowerCase()
+  const name = String(file.name || '').toLowerCase()
+  if (mimeType === 'application/pdf') return true
+  if (mimeType === 'image/png' || mimeType === 'image/jpeg') return true
+  return /\.(pdf|xlsx|xls|csv|tsv|png|jpe?g)$/i.test(name)
+}
+
 function statusLabel(status: string) {
   if (status === 'DRAFT') return 'Entwurf'
   if (status === 'QUEUED') return 'Wartet'
@@ -421,11 +470,6 @@ function typeLabel(type: string) {
   if (type === 'MEMBER_TEXT') return 'Mitgliedertext'
   if (type === 'REPORT_TEXT') return 'Berichtstext'
   return type
-}
-
-function confidenceLabel(value?: number) {
-  const percent = Math.round(Number(value || 0) * 100)
-  return `${percent}%`
 }
 
 function warningClassName(warning: string) {
@@ -1486,6 +1530,10 @@ function wantsBookingFromFiles(prompt: string, attachedFiles: File[]) {
   return !hasSpreadsheet
 }
 
+function shouldProcessFilesAsBookingDocuments(prompt: string, attachedFiles: File[]) {
+  return wantsBookingFromFiles(prompt, attachedFiles)
+}
+
 function bankReviewBody(result: TAiBankImportReviewOutput) {
   if (!result.suggestions.length) return 'Es wurden keine offenen Bankbelege gefunden.'
   const grouped = result.suggestions.reduce<Record<string, number>>((acc, suggestion) => {
@@ -1510,6 +1558,14 @@ function bankSuggestionLabel(suggestion: AiBankReviewSuggestion) {
   if (suggestion.action === 'CREATE_BOOKING') return 'Neue Buchung'
   if (suggestion.action === 'MARK_CHECKED') return 'Ohne Buchung'
   return 'Manuell prüfen'
+}
+
+function candidateSourceLabel(candidate: TAiBookingCandidate) {
+  return candidate.source?.label || candidate.source?.fileName || null
+}
+
+function candidateSourceStateLabel(candidate: TAiBookingCandidate, job: TAiJobsGetOutput) {
+  return isCandidateApproved(candidate, job) ? 'Gebucht' : 'Offen'
 }
 
 function bankSuggestionTone(suggestion: AiBankReviewSuggestion) {
@@ -1653,14 +1709,17 @@ function CandidateEditor({
   paymentAccounts: PaymentAccountOption[]
   busy: boolean
 }) {
-  const firstFile = job.files?.[0]
-  const previewSrc = firstFile?.dataBase64
-    ? `data:${firstFile.mimeType || 'application/octet-stream'};base64,${firstFile.dataBase64}`
+  const sourceFile = candidate.source?.fileName
+    ? job.files.find((file) => file.fileName === candidate.source?.fileName) || job.files?.[0]
+    : job.files?.[0]
+  const previewSrc = sourceFile?.dataBase64
+    ? `data:${sourceFile.mimeType || 'application/octet-stream'};base64,${sourceFile.dataBase64}`
     : ''
-  const isImage = String(firstFile?.mimeType || '').startsWith('image/')
+  const isImage = String(sourceFile?.mimeType || '').startsWith('image/')
   const activePaymentAccounts = paymentAccounts.filter((account) => account.isActive !== 0)
   const accountById = new Map(activePaymentAccounts.map((account) => [account.id, account]))
   const isApproved = isCandidateApproved(candidate, job)
+  const sourceLabel = candidateSourceLabel(candidate)
 
   const update = <K extends keyof TAiBookingCandidate>(key: K, value: TAiBookingCandidate[K]) => {
     onChange({ ...candidate, [key]: value })
@@ -1681,15 +1740,19 @@ function CandidateEditor({
       <section className="ai-preview-panel">
         <div className="ai-section-head">
           <strong>Quelle</strong>
-          <span>{job.files.length} Datei(en)</span>
+          <span>{sourceLabel ? 'Aktive Quelle' : `${job.files.length} Datei(en)`}</span>
         </div>
+        {sourceLabel ? <p className="helper ai-source-callout">Dieser Vorschlag stammt aus <strong>{sourceLabel}</strong>.</p> : null}
         {isImage && previewSrc ? (
-          <img className="ai-file-preview" src={previewSrc} alt={firstFile?.fileName || 'Beleg'} />
+          <img className="ai-file-preview" src={previewSrc} alt={sourceFile?.fileName || 'Beleg'} />
         ) : (
           <div className="ai-file-list">
             {job.files.map((file) => (
-              <div key={file.id} className="ai-file-row">
-                <strong>{file.fileName}</strong>
+              <div key={file.id} className={`ai-file-row ${file.fileName === candidate.source?.fileName ? 'is-source' : ''}`}>
+                <strong>
+                  {file.fileName}
+                  {file.fileName === candidate.source?.fileName ? <span className="ai-file-source-badge">Aktive Quelle</span> : null}
+                </strong>
                 <span>{file.mimeType || 'Datei'} · {Math.round(file.size / 1024)} KB</span>
               </div>
             ))}
@@ -1700,7 +1763,7 @@ function CandidateEditor({
       <section className="ai-candidate-panel">
         <div className="ai-section-head">
           <strong>Vorschlag {candidateIndex + 1}</strong>
-          <span>Konfidenz {confidenceLabel(candidate.confidence)}</span>
+          <span>{candidateSourceStateLabel(candidate, job)}</span>
         </div>
         <div className="ai-form-grid">
           <label className="field">
@@ -1786,6 +1849,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const historyDrawerRef = useRef<HTMLElement | null>(null)
   const agentContextDrawerRef = useRef<HTMLElement | null>(null)
   const settingsDrawerRef = useRef<HTMLElement | null>(null)
+  const dragDepthRef = useRef(0)
   const [initialChat] = useState(readAiChatSnapshot)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
   const [apiKey, setApiKey] = useState('')
@@ -1798,6 +1862,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [promptCursor, setPromptCursor] = useState(0)
   const [files, setFiles] = useState<File[]>([])
   const [filePreviews, setFilePreviews] = useState<AiAttachmentPreview[]>([])
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [messages, setMessages] = useState<AiMessage[]>(initialChat.messages || [])
   const [bankReview, setBankReview] = useState<AiBankReviewState | null>(initialChat.bankReview || null)
@@ -2212,7 +2277,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const loadSettings = useCallback(async () => {
     try {
       const next = await window.api.ai.settings.get()
-      setSettings(next)
+      setSettings(normalizeAiSettings(next))
     } catch (error: any) {
       notify('error', error?.message || String(error))
     }
@@ -2294,6 +2359,51 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     else if (job) setSelectedCandidate(firstOpenCandidateIndex(job))
     else setSelectedCandidate(0)
   }, [])
+
+  const appendFiles = useCallback((incoming: FileList | File[] | null) => {
+    const nextFiles = Array.from(incoming || [])
+    if (!nextFiles.length) return
+    const accepted = nextFiles.filter(isAiAttachmentFile)
+    const skipped = nextFiles.length - accepted.length
+    if (skipped > 0) {
+      notify('info', `${skipped} Datei(en) wurden übersprungen. Erlaubt sind PDF, PNG, JPG, XLSX, XLS, CSV und TSV.`)
+    }
+    if (!accepted.length) return
+    setFiles((current) => {
+      const existingKeys = new Set(current.map(filePreviewKey))
+      const additions = accepted.filter((file) => !existingKeys.has(filePreviewKey(file)))
+      return additions.length ? [...current, ...additions] : current
+    })
+  }, [notify])
+
+  const handleComposerDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return
+    event.preventDefault()
+    dragDepthRef.current += 1
+    setIsDraggingFiles(true)
+  }, [])
+
+  const handleComposerDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDraggingFiles(true)
+  }, [])
+
+  const handleComposerDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return
+    event.preventDefault()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setIsDraggingFiles(false)
+  }, [])
+
+  const handleComposerDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer?.files?.length) return
+    event.preventDefault()
+    dragDepthRef.current = 0
+    setIsDraggingFiles(false)
+    appendFiles(event.dataTransfer.files)
+  }, [appendFiles])
 
   useEffect(() => {
     void loadSettings()
@@ -2833,11 +2943,15 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       throw new Error(processed.error || 'KI-Verarbeitung fehlgeschlagen.')
     }
     selectJob(processed)
+    const processedAnalysis = processed.result as TAiBookingAnalysisResult | undefined
+    const sourceUnitCount = new Set((processedAnalysis?.candidates || []).map((item) => candidateSourceLabel(item) || `candidate-${item.description}`)).size
     pushMessage({
       role: 'assistant',
-      title: 'Buchungsvorschlag vorbereitet',
-      body: 'Ich habe aus den Anhängen einen Review-Vorschlag erstellt. Prüfe die Felder unten und buche erst danach.',
-      meta: [ `${processed.fileCount} Datei(en)`, formatAiUsage(processed.usage) ].filter(Boolean).join(' · '),
+      title: sourceUnitCount > 1 ? 'Stapel-Review vorbereitet' : 'Buchungsvorschlag vorbereitet',
+      body: sourceUnitCount > 1
+        ? 'Ich habe die Anhänge bzw. PDF-Seiten getrennt ausgewertet und einen Sammel-Review mit einzelnen Buchungsvorschlägen erstellt. Prüfe die Felder unten und buche erst danach.'
+        : 'Ich habe aus den Anhängen einen Review-Vorschlag erstellt. Prüfe die Felder unten und buche erst danach.',
+      meta: [ `${processed.fileCount} Datei(en)`, sourceUnitCount > 1 ? `${sourceUnitCount} Quellen` : null, formatAiUsage(processed.usage) ].filter(Boolean).join(' · '),
       jobId: processed.id,
       reviewable: true
     })
@@ -4871,6 +4985,20 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const plan = planned.plan
     const usageMeta = formatAiUsage(planned.usage)
 
+    if (files.length) {
+      if (
+        plan.entity === 'vouchers'
+        || plan.entity === 'payments'
+        || plan.operation === 'create'
+        || shouldProcessFilesAsBookingDocuments(userPrompt, files)
+      ) {
+        await processDocuments(userPrompt)
+      } else {
+        await processFileTextTask(userPrompt)
+      }
+      return true
+    }
+
     if (plan.safety === 'BLOCKED') {
       pushMessage({
         role: 'assistant',
@@ -4878,20 +5006,6 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: plan.answer || plan.summary || 'Diese Anfrage passt nicht zu VereinO-Aufgaben.',
         meta: usageMeta
       })
-      return true
-    }
-
-    if (files.length) {
-      if (
-        plan.entity === 'vouchers'
-        || plan.entity === 'payments'
-        || plan.operation === 'create'
-        || wantsBookingFromFiles(userPrompt, files)
-      ) {
-        await processDocuments(userPrompt)
-      } else {
-        await processFileTextTask(userPrompt)
-      }
       return true
     }
 
@@ -5015,12 +5129,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       try {
         const planned = await executeAiActionPlan(userPrompt)
         if (!planned) {
-          if (files.length) await processFileTextTask(userPrompt)
+          if (files.length) {
+            if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
+            else await processFileTextTask(userPrompt)
+          }
           else await processText(userPrompt)
         }
       } catch (error: any) {
         try {
-          if (files.length) await processFileTextTask(userPrompt)
+          if (files.length) {
+            if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
+            else await processFileTextTask(userPrompt)
+          }
           else await processText(userPrompt)
         } catch (fallbackError: any) {
           notify('error', fallbackError?.message || error?.message || String(error))
@@ -5426,7 +5546,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       if (!files.length && await applyPaymentAccountFollowup(userPrompt)) {
         setPrompt('')
       } else if (files.length) {
-        if (wantsBookingFromFiles(userPrompt, files)) await processDocuments(userPrompt)
+        if (shouldProcessFilesAsBookingDocuments(userPrompt, files)) await processDocuments(userPrompt)
         else await processFileTextTask(userPrompt)
       } else if (wantsBankImportReview(userPrompt)) {
         await processBankImport(userPrompt)
@@ -5510,14 +5630,17 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         model: settings.model,
         textModel: settings.textModel,
-        defaultReasoningEffort: settings.defaultReasoningEffort
+        defaultReasoningEffort: settings.defaultReasoningEffort,
+        provider: settings.provider
       })
-      setSettings({
+      setSettings(normalizeAiSettings({
         hasApiKey: next.hasApiKey,
         model: next.model,
         textModel: next.textModel,
-        defaultReasoningEffort: next.defaultReasoningEffort
-      })
+        defaultReasoningEffort: next.defaultReasoningEffort,
+        provider: next.provider,
+        apiBaseUrl: next.apiBaseUrl
+      }))
       setApiKey('')
       notify('success', 'KI-Einstellungen gespeichert.')
     } catch (error: any) {
@@ -5531,11 +5654,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setBusy(true)
     try {
       const res = await window.api.ai.settings.testConnection()
-      if (res.ok) notify('success', 'OpenAI-Verbindung funktioniert.')
-      else notify('error', res.error || 'OpenAI-Verbindung fehlgeschlagen.')
+      if (res.ok) notify('success', 'KI-Verbindung funktioniert.')
+      else notify('error', res.error || 'KI-Verbindung fehlgeschlagen.')
     } finally {
       setBusy(false)
     }
+  }
+
+  const providerConfig = getAiProviderConfig(settings.provider)
+  const handleProviderChange = (provider: TAiSettingsGetOutput['provider']) => {
+    const nextConfig = getAiProviderConfig(provider)
+    const allowedModels = new Set(nextConfig.modelOptions.map((option) => option.value))
+    setSettings((current) => ({
+      ...current,
+      provider,
+      apiBaseUrl: nextConfig.apiBaseUrl,
+      model: allowedModels.has(current.model) ? current.model : nextConfig.defaultModel,
+      textModel: allowedModels.has(current.textModel) ? current.textModel : nextConfig.defaultTextModel
+    }))
   }
 
   const markHistoryJobDone = async (event: React.MouseEvent, job: TAiJobsListOutput['rows'][number]) => {
@@ -5714,7 +5850,14 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         </div>
       )}
 
-      <div className={`ai-prompt-box ${busy ? 'is-busy' : ''}`} aria-busy={busy}>
+      <div
+        className={`ai-prompt-box ${busy ? 'is-busy' : ''} ${isDraggingFiles ? 'is-dragover' : ''}`}
+        aria-busy={busy}
+        onDragEnter={handleComposerDragEnter}
+        onDragOver={handleComposerDragOver}
+        onDragLeave={handleComposerDragLeave}
+        onDrop={handleComposerDrop}
+      >
         {!busy && <button className="btn ai-icon-btn" type="button" onClick={() => fileInputRef.current?.click()} aria-label="Anhänge hinzufügen">+</button>}
         <textarea
           ref={promptInputRef}
@@ -5747,6 +5890,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             ))}
           </div>
         )}
+        {!busy && isDraggingFiles && (
+          <div className="ai-prompt-drop-hint" aria-hidden="true">
+            Dateien hier ablegen, um sie an die Anfrage anzuhängen
+          </div>
+        )}
         <button className="btn primary ai-send-btn" type="button" disabled={busy || (!prompt.trim() && !files.length)} onClick={() => void submitPrompt()}>
           {busy ? <span className="ai-send-spinner" aria-hidden="true" /> : 'Senden'}
         </button>
@@ -5756,7 +5904,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           multiple
           accept=".pdf,.xlsx,.xls,.csv,.tsv,image/png,image/jpeg"
           hidden
-          onChange={(event) => setFiles(Array.from(event.target.files || []))}
+          onChange={(event) => {
+            appendFiles(event.target.files)
+            event.target.value = ''
+          }}
         />
       </div>
     </section>
@@ -6243,7 +6394,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                       className={[idx === selectedCandidate ? 'active' : '', booked ? 'is-booked' : 'is-open'].filter(Boolean).join(' ')}
                       onClick={() => setSelectedCandidate(idx)}
                     >
-                      <span>Vorschlag {idx + 1} · {confidenceLabel(item.confidence)}</span>
+                      <span>{candidateSourceLabel(item) || `Vorschlag ${idx + 1}`}</span>
                       <small>{booked ? 'Gebucht' : 'Offen'}</small>
                     </button>
                     )
@@ -6341,13 +6492,21 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           </div>
           <div className="ai-form-grid">
             <label className="field ai-field-wide">
-              <span>OpenAI API-Key</span>
+              <span>API-Key</span>
               <input className="input" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'sk-...'} />
+            </label>
+            <label className="field">
+              <span>Anbieter</span>
+              <select className="input" value={settings.provider} onChange={(event) => handleProviderChange(event.target.value as typeof settings.provider)}>
+                {AI_PROVIDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </label>
             <label className="field">
               <span>Beleganalyse-Modell</span>
               <select className="input" value={settings.model} onChange={(event) => setSettings({ ...settings, model: event.target.value })}>
-                {AI_MODEL_OPTIONS.map((option) => (
+                {providerConfig.modelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>
                 ))}
               </select>
@@ -6355,7 +6514,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             <label className="field">
               <span>Textmodell</span>
               <select className="input" value={settings.textModel} onChange={(event) => setSettings({ ...settings, textModel: event.target.value })}>
-                {AI_MODEL_OPTIONS.map((option) => (
+                {providerConfig.modelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>
                 ))}
               </select>
@@ -6368,7 +6527,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 <option value="high">High</option>
               </select>
             </label>
-            <p className="helper ai-settings-note">VereinO nutzt das Belegmodell für Rechnungserkennung und automatisch das Textmodell für Einladungen, Mitgliederinfos und Berichtsentwürfe.</p>
+            <p className="helper ai-settings-note">VereinO setzt den passenden API-Endpunkt für den gewählten Anbieter automatisch und zeigt nur die dafür freigegebenen Modelle an. Für Minimax ist MiniMax-M3 direkt auswählbar.</p>
           </div>
           <div className="ai-settings-actions">
             <button className="btn primary" disabled={busy} onClick={saveSettings}>Speichern</button>

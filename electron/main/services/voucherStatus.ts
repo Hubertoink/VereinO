@@ -1,12 +1,10 @@
-export type VoucherStatusKind = 'storno' | 'storniert' | ''
-
 function refLabel(no?: string | null, id?: number | string | null) {
   if (no) return `#${no}`
   if (id != null && id !== '') return `#${id}`
   return ''
 }
 
-export function voucherStatusKind(row: any): VoucherStatusKind {
+export function voucherStatusKind(row: any): 'storno' | 'storniert' | '' {
   if (row?.originalId) return 'storno'
   if (row?.reversedById) return 'storniert'
   return ''
@@ -22,10 +20,4 @@ export function voucherStatusText(row: any, activeLabel = '') {
     return `Storniert${ref ? ` durch ${ref}` : ''}`
   }
   return activeLabel
-}
-
-export function voucherDescriptionWithStatus(row: any) {
-  const description = String(row?.description || '').trim() || '-'
-  const status = voucherStatusText(row)
-  return status ? `${description} (${status})` : description
 }

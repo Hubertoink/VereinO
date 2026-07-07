@@ -84,6 +84,23 @@ function renderLockIcon(color: string) {
   )
 }
 
+function paymentRouteLabelForKind(kind?: string | null) {
+  switch (kind) {
+    case 'CASH':
+      return 'Bar'
+    case 'BANK':
+      return 'Bank'
+    case 'PAYPAL':
+      return 'PayPal'
+    case 'CARD':
+      return 'Karte'
+    case 'OTHER':
+      return 'Sonstiges'
+    default:
+      return null
+  }
+}
+
 export default function InvoiceDetailModal({
   detail,
   loading,
@@ -99,7 +116,15 @@ export default function InvoiceDetailModal({
   onDetailChange
 }: Props) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<null | { fileId: number; fileName: string }>(null)
-  const paymentAccountName = detail?.paymentAccountId ? paymentAccounts.find((account) => account.id === detail.paymentAccountId)?.name : null
+  const paymentAccountName = detail?.paymentAccountName
+    ?? (detail?.paymentAccountId ? paymentAccounts.find((account) => account.id === detail.paymentAccountId)?.name : null)
+  const paymentAccountKindLabel = paymentRouteLabelForKind(detail?.paymentAccountKind)
+  const paymentMethodLabel = detail?.paymentMethod === 'BAR'
+    ? 'Bar'
+    : detail?.paymentMethod === 'BANK'
+      ? 'Bank'
+      : null
+  const paymentRouteLabel = paymentAccountKindLabel || paymentAccountName || paymentMethodLabel || '-'
 
   async function deleteDetailFile(fileId: number) {
     if (!detail) return
@@ -158,7 +183,7 @@ export default function InvoiceDetailModal({
                 <div><div className="helper">Datum</div><div>{fmtDateLocal(detail.date)}</div></div>
                 <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '')}</div></div>
                 <div><div className="helper">Sphäre</div><div>{detail.sphere}</div></div>
-                <div><div className="helper">Zahlweg</div><div>{detail.paymentMethod || '-'}</div></div>
+                <div><div className="helper">Zahlweg</div><div>{paymentRouteLabel}</div></div>
                 <div><div className="helper">Zahlkonto</div><div>{paymentAccountName || (detail.paymentAccountId ? `#${detail.paymentAccountId}` : '-')}</div></div>
                 <div><div className="helper">Betrag</div><div>{eurFmt.format(detail.grossAmount)}</div></div>
                 <div><div className="helper">Bezahlt</div><div>{eurFmt.format(detail.paidSum || 0)}</div></div>

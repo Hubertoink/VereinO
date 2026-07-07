@@ -1,6 +1,7 @@
 import { safeStorage } from 'electron'
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
+import { PDFDocument } from 'pdf-lib'
 import {
   AiBankImportReviewResult,
   AiBankImportReviewResultStructured,
@@ -21,8 +22,32 @@ const API_KEY_SETTING = 'ai.openai.apiKey'
 const MODEL_SETTING = 'ai.openai.model'
 const TEXT_MODEL_SETTING = 'ai.openai.textModel'
 const EFFORT_SETTING = 'ai.openai.reasoningEffort'
-const DEFAULT_MODEL = 'gpt-5.5'
-const DEFAULT_TEXT_MODEL = 'gpt-5.4-mini'
+const PROVIDER_SETTING = 'ai.openai.provider'
+const DEFAULT_PROVIDER = 'openai'
+
+type AiProvider = 'openai' | 'minimax'
+
+type AiProviderPreset = {
+  apiBaseUrl: string
+  defaultModel: string
+  defaultTextModel: string
+  allowedModels: string[]
+}
+
+const AI_PROVIDER_PRESETS: Record<AiProvider, AiProviderPreset> = {
+  openai: {
+    apiBaseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-5.5',
+    defaultTextModel: 'gpt-5.4-mini',
+    allowedModels: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano']
+  },
+  minimax: {
+    apiBaseUrl: 'https://api.minimaxi.com/v1',
+    defaultModel: 'MiniMax-M3',
+    defaultTextModel: 'MiniMax-M3',
+    allowedModels: ['MiniMax-M3', 'MiniMax-M1', 'MiniMax-Text-01']
+  }
+}
 
 const MODEL_PRICING_USD_PER_MILLION: Record<string, { input: number; cachedInput: number; output: number }> = {
   'gpt-5.5': { input: 5, cachedInput: 0.5, output: 30 },
@@ -44,6 +69,8 @@ export type AiSettings = {
   model: string
   textModel: string
   defaultReasoningEffort: 'low' | 'medium' | 'high'
+  provider: AiProvider
+  apiBaseUrl: string
 }
 
 export type AiUsage = {
@@ -72,6 +99,18 @@ export type AiInputFile = {
   fileName: string
   mimeType?: string | null
   dataBase64: string
+}
+
+type AiAnalysisSource = {
+  fileName: string
+  pageNumber?: number
+  pageCount?: number
+  label: string
+}
+
+type ExpandedAiInputFile = {
+  file: AiInputFile
+  source: AiAnalysisSource
 }
 
 export type AiBankReviewTransaction = {
@@ -132,16 +171,32 @@ function decryptSecret(stored?: AiStoredSecret | string | null) {
   }
 }
 
+function getProviderPreset(provider?: string | null): AiProviderPreset {
+  if (provider === 'minimax') return AI_PROVIDER_PRESETS.minimax
+  return AI_PROVIDER_PRESETS.openai
+}
+
+function normalizeProviderModel(provider: AiProvider, model: string | null | undefined, kind: 'model' | 'textModel') {
+  const preset = getProviderPreset(provider)
+  const fallback = kind === 'model' ? preset.defaultModel : preset.defaultTextModel
+  const value = model?.trim()
+  return value && preset.allowedModels.includes(value) ? value : fallback
+}
+
 export function getAiSettings(): AiSettings {
   const apiKey = decryptSecret(getSetting<AiStoredSecret | string>(API_KEY_SETTING))
-  const model = getSetting<string>(MODEL_SETTING) || DEFAULT_MODEL
-  const textModel = getSetting<string>(TEXT_MODEL_SETTING) || DEFAULT_TEXT_MODEL
   const effort = getSetting<'low' | 'medium' | 'high'>(EFFORT_SETTING) || 'medium'
+  const provider = getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
+  const model = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
+  const textModel = normalizeProviderModel(provider, getSetting<string>(TEXT_MODEL_SETTING), 'textModel')
+  const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
   return {
     hasApiKey: !!apiKey.trim(),
     model,
     textModel,
-    defaultReasoningEffort: effort
+    defaultReasoningEffort: effort,
+    provider,
+    apiBaseUrl
   }
 }
 
@@ -150,32 +205,44 @@ export function setAiSettings(input: {
   model?: string
   textModel?: string
   defaultReasoningEffort?: 'low' | 'medium' | 'high'
+  provider?: AiProvider
+  apiBaseUrl?: string
 }) {
+  const current = getAiSettings()
+  const provider = input.provider || current.provider
+
   if (input.apiKey !== undefined) {
     const trimmed = input.apiKey.trim()
     if (trimmed) setSetting(API_KEY_SETTING, encryptSecret(trimmed))
   }
-  if (input.model?.trim()) setSetting(MODEL_SETTING, input.model.trim())
-  if (input.textModel?.trim()) setSetting(TEXT_MODEL_SETTING, input.textModel.trim())
+  setSetting(MODEL_SETTING, normalizeProviderModel(provider, input.model ?? current.model, 'model'))
+  setSetting(TEXT_MODEL_SETTING, normalizeProviderModel(provider, input.textModel ?? current.textModel, 'textModel'))
   if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
+  if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
   const next = getAiSettings()
   return {
     ok: true,
     hasApiKey: next.hasApiKey,
     model: next.model,
     textModel: next.textModel,
-    defaultReasoningEffort: next.defaultReasoningEffort
+    defaultReasoningEffort: next.defaultReasoningEffort,
+    provider: next.provider,
+    apiBaseUrl: next.apiBaseUrl
   }
 }
 
 function getApiKey() {
   const key = decryptSecret(getSetting<AiStoredSecret | string>(API_KEY_SETTING)).trim()
-  if (!key) throw new Error('OpenAI API-Key fehlt. Bitte in KI > Einstellungen hinterlegen.')
+  if (!key) throw new Error('API-Key fehlt. Bitte in KI > Einstellungen hinterlegen.')
   return key
 }
 
 export function createClient() {
-  return new OpenAI({ apiKey: getApiKey() })
+  const settings = getAiSettings()
+  return new OpenAI({
+    apiKey: getApiKey(),
+    baseURL: settings.apiBaseUrl
+  })
 }
 
 export function extractOutputText(response: any) {
@@ -308,6 +375,77 @@ function toResponseFileContent(file: AiInputFile) {
   }
 }
 
+function buildAnalysisSourceLabel(fileName: string, pageNumber?: number, pageCount?: number) {
+  if (pageNumber && pageCount && pageCount > 1) return `${fileName} · Seite ${pageNumber} von ${pageCount}`
+  return fileName
+}
+
+function derivedPdfPageName(fileName: string, pageNumber: number, pageCount: number) {
+  const match = fileName.match(/^(.*?)(\.pdf)$/i)
+  const baseName = match?.[1] || fileName
+  const suffix = String(pageNumber).padStart(String(pageCount).length, '0')
+  return `${baseName}__page_${suffix}.pdf`
+}
+
+async function splitPdfIntoAnalysisFiles(file: AiInputFile): Promise<ExpandedAiInputFile[]> {
+  const pdfBytes = Buffer.from(file.dataBase64, 'base64')
+  const loaded = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
+  const pageCount = loaded.getPageCount()
+  if (pageCount <= 1) {
+    return [{
+      file,
+      source: {
+        fileName: file.fileName,
+        pageNumber: 1,
+        pageCount,
+        label: buildAnalysisSourceLabel(file.fileName, pageCount > 1 ? 1 : undefined, pageCount > 1 ? pageCount : undefined)
+      }
+    }]
+  }
+
+  const pages: ExpandedAiInputFile[] = []
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const singlePage = await PDFDocument.create()
+    const [copiedPage] = await singlePage.copyPages(loaded, [pageIndex])
+    singlePage.addPage(copiedPage)
+    const bytes = await singlePage.save()
+    const pageNumber = pageIndex + 1
+    pages.push({
+      file: {
+        fileName: derivedPdfPageName(file.fileName, pageNumber, pageCount),
+        mimeType: 'application/pdf',
+        dataBase64: Buffer.from(bytes).toString('base64')
+      },
+      source: {
+        fileName: file.fileName,
+        pageNumber,
+        pageCount,
+        label: buildAnalysisSourceLabel(file.fileName, pageNumber, pageCount)
+      }
+    })
+  }
+  return pages
+}
+
+async function expandInputFilesForAnalysis(files: AiInputFile[]): Promise<ExpandedAiInputFile[]> {
+  const expanded: ExpandedAiInputFile[] = []
+  for (const file of files) {
+    const mimeType = inferInputFileMimeType(file)
+    if (mimeType === 'application/pdf') {
+      expanded.push(...await splitPdfIntoAnalysisFiles(file))
+      continue
+    }
+    expanded.push({
+      file,
+      source: {
+        fileName: file.fileName,
+        label: buildAnalysisSourceLabel(file.fileName)
+      }
+    })
+  }
+  return expanded
+}
+
 export async function testAiConnection() {
   try {
     const client = createClient()
@@ -341,15 +479,25 @@ export async function analyzeBookingDocuments(input: {
   if (!input.files.length) throw new Error('Bitte mindestens eine Rechnung oder einen Beleg hochladen.')
   const settings = getAiSettings()
   const model = input.model || settings.model
+  const expandedFiles = await expandInputFilesForAnalysis(input.files)
+  const sourceManifest = expandedFiles.map((item, idx) => `${idx + 1}. ${item.source.label}`).join('\n')
   const prompt = [
     'Du bist ein vorsichtiger Buchungsassistent fuer einen deutschen Verein.',
     'Extrahiere aus den angehaengten Belegen, Rechnungen oder Tabellen Buchungsvorschlaege fuer VereinO.',
+    'Jede angehaengte Quelle ist eine eigenstaendige Quelleinheit. Mehrseitige PDFs wurden vorab seitenweise getrennt.',
+    'Vermische niemals Inhalte aus verschiedenen Quelleinheiten in einem Kandidaten.',
+    'Setze fuer jeden Kandidaten source.fileName exakt auf den Originaldateinamen aus der Quellenliste.',
+    'Wenn eine Quelle aus einer PDF-Seite stammt, setze source.pageNumber und source.pageCount passend zur Quellenliste.',
+    'Wenn eine Quelle genau einen einzelnen Beleg oder Kassenbon enthaelt, erzeuge dafuer genau einen Kandidaten.',
     'Wenn eine Excel-/CSV-/Tabellendatei mehrere Buchungszeilen enthaelt, erstelle pro erkannter Buchungszeile einen eigenen Kandidaten.',
     'Erzeuge keine finale Buchung. Liefere nur Kandidaten, Warnungen und Evidenz.',
     'Nutze Budget-, Zweckbindungs- und Konto-IDs nur aus dem bereitgestellten Kontext.',
     'Bei Tags: Nutze vorhandene VereinO-Tags, wenn sie passen. Wenn eine Datei eine Tag-/Kategorie-Spalte mit einem noch nicht vorhandenen Tag enthaelt, uebernimm den Tag-Namen trotzdem als vorgeschlagenen Tag und ergaenze eine Warnung, dass der Tag vor dem Buchen angelegt werden muss.',
     'Wenn ein Feld unsicher ist, waehle den plausibelsten Wert und ergaenze eine Warnung.',
     'Betrage werden in Euro als positive Zahlen geliefert. Ausgabe/Einnahme steckt in type.',
+    '',
+    'Quellenliste:',
+    sourceManifest,
     '',
     'VereinO-Kontext:',
     JSON.stringify(compactContext(input.context))
@@ -363,7 +511,10 @@ export async function analyzeBookingDocuments(input: {
         role: 'user',
         content: [
           { type: 'input_text', text: prompt },
-          ...input.files.map(toResponseFileContent)
+          ...expandedFiles.flatMap((item, idx) => ([
+            { type: 'input_text', text: `Quelle ${idx + 1}: ${item.source.label}` },
+            toResponseFileContent(item.file)
+          ]))
         ]
       }
     ]

@@ -41,10 +41,3 @@ export function getEffectiveJournalOrder(order: JournalColKey[], allowVoucherDel
   const missing = defaultOrder.filter((key) => !base.includes(key))
   return [...base, ...missing]
 }
-
-export function shouldShowReverseAction(
-  voucher: { originalId?: number | null; reversedById?: number | null },
-  allowVoucherDeletion: boolean
-): boolean {
-  return !allowVoucherDeletion && !voucher.originalId && !voucher.reversedById
-}

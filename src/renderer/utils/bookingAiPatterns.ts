@@ -64,11 +64,11 @@ export type BookingAIPatternRow = {
   lastUsedAt?: number
 }
 
-export const AI_SUGGESTION_STORAGE_KEY = 'booking.aiSuggestions.v1'
-export const AI_SUGGESTION_ENABLED_KEY = 'booking.aiSuggestions.enabled'
+const AI_SUGGESTION_STORAGE_KEY = 'booking.aiSuggestions.v1'
+const AI_SUGGESTION_ENABLED_KEY = 'booking.aiSuggestions.enabled'
 export const AI_PATTERNS_CHANGED_EVENT = 'booking-ai-patterns:changed'
 
-export const BUILT_IN_BOOKING_AI_RULES: BookingAISuggestion[] = [
+const BUILT_IN_BOOKING_AI_RULES: BookingAISuggestion[] = [
   {
     key: 'rule:mitgliedsbeitrag',
     title: 'Mitgliedsbeitrag erkannt',
@@ -131,7 +131,7 @@ const GENERIC_TOKENS = new Set([
   'material',
 ])
 
-export function normalizeSuggestionText(value: string) {
+function normalizeSuggestionText(value: string) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
@@ -151,7 +151,7 @@ export function readAISuggestionLearning(): Record<string, BookingAIPattern> {
   }
 }
 
-export function writeAISuggestionLearning(data: Record<string, BookingAIPattern>) {
+function writeAISuggestionLearning(data: Record<string, BookingAIPattern>) {
   try {
     localStorage.setItem(AI_SUGGESTION_STORAGE_KEY, JSON.stringify(data))
     window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
@@ -173,12 +173,12 @@ export function setBookingAIPatternsEnabled(enabled: boolean) {
   } catch {}
 }
 
-export function resolveSuggestionTag(name: string, tagDefs: Array<{ id: number; name: string; color?: string | null }>) {
+function resolveSuggestionTag(name: string, tagDefs: Array<{ id: number; name: string; color?: string | null }>) {
   const found = tagDefs.find((tag) => tag.name.toLowerCase() === name.toLowerCase())
   return found?.name || name
 }
 
-export function textLearningKeys(description: string) {
+function textLearningKeys(description: string) {
   const tokens = normalizeSuggestionText(description)
     .split(/\s+/)
     .filter((token) => token.length >= 5 && !GENERIC_TOKENS.has(token))

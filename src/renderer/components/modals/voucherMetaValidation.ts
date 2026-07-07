@@ -4,10 +4,6 @@ export function isMetaAmountValid(amount: number | null | undefined, isInternal:
   return isInternal ? true : numericValue > 0
 }
 
-export function shouldIncludeMetaAssignment(amount: number | null | undefined, isInternal: boolean): boolean {
-  return isMetaAmountValid(amount, isInternal)
-}
-
 export function getInternalAssignmentValidationState({
   budgets,
   earmarks,

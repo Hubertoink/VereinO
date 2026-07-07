@@ -3,7 +3,7 @@ import { getDb, withTransaction } from '../db/database'
 
 type DB = InstanceType<typeof Database>
 
-export type Tag = { id: number; name: string; color?: string | null }
+type Tag = { id: number; name: string; color?: string | null }
 
 const AUTO_TAG_COLORS = ['#2962FF', '#00B8D4', '#26A69A', '#00C853', '#FFD600', '#FF9100', '#FF7043', '#F50057', '#9C27B0', '#7C4DFF']
 

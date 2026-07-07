@@ -859,8 +859,31 @@
   position: relative;
 }
 
+.ai-prompt-box.is-dragover {
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--surface) 88%, var(--accent) 12%) 0%, color-mix(in oklab, var(--surface) 94%, #ffd166 6%) 100%);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent), 0 16px 32px rgb(0 0 0 / 18%);
+}
+
 .ai-prompt-box.is-busy {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ai-prompt-drop-hint {
+  position: absolute;
+  inset: 8px 54px 8px 48px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in oklab, var(--accent) 60%, var(--border) 40%);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--surface) 72%, var(--accent) 28%);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
 }
 
 .ai-prompt-input {
@@ -2700,9 +2723,43 @@ html[data-glass-modals="true"] .ai-page .card {
   background: color-mix(in oklab, var(--surface) 94%, var(--bg) 6%);
 }
 
+.ai-file-row.is-source {
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent) 14%, var(--surface)) 0%,
+      color-mix(in oklab, #00b8d4 10%, var(--surface)) 100%
+    );
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.ai-file-row strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-file-source-badge {
+  display: inline-grid;
+  place-items: center;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+  color: color-mix(in oklab, var(--accent) 86%, var(--text) 14%);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .ai-file-row span {
   color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
   font-size: 12px;
+}
+
+.ai-source-callout strong {
+  color: var(--text);
 }
 
 .ai-form-grid {

@@ -1,19 +1,6 @@
-export type PingResponse = 'pong'
-
 /**
  * Organization profile for multi-org support
  * Each organization has its own database folder
- */
-export interface Organization {
-  id: string
-  name: string
-  dbRoot: string
-  createdAt: string
-}
-
-/**
- * Tax Exemption Certificate (Steuerbefreiungsbescheid)
- * Stored in settings as 'org.taxExemption'
  */
 export interface TaxExemptionCertificate {
   fileName: string

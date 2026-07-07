@@ -539,4 +539,4 @@ export function useQuickAdd(
     }
 }
 
-export type { QA, QuickAddDraft }
+export type { QA }

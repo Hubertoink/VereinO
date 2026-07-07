@@ -6,4 +6,3 @@
 
 export { useBackupSettings } from './useBackupSettings'
 export { useStorageLocation } from './useStorageLocation'
-export { useSettingsSync } from './useSettingsSync'

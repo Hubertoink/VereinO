@@ -5,11 +5,10 @@
 
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
+import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 import { getActivityReport, validateActivityReport } from '../repositories/activityReports'
 import { voucherStatusKind, voucherStatusText } from './voucherStatus'
@@ -64,11 +63,8 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
 
   // Create export directory
-  const when = new Date()
-  const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-  const filePath = path.join(baseDir, `Finanzamt_${fiscalYear}_${stamp}.pdf`)
+  const stamp = createExportStamp()
+  const filePath = createExportPath(`Finanzamt_${fiscalYear}_${stamp}.pdf`)
 
   // 1. Get opening balance (previous year end)
   const previousYearEnd = `${fiscalYear - 1}-12-31`

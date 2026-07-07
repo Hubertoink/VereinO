@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import FilterDropdown from './FilterDropdown'
 
-export type InvoiceStatus = 'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'
+type InvoiceFilterStatus = 'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'
 export type Sphere = '' | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 
 export interface InvoiceFilterDropdownValues {
-  status: InvoiceStatus
+  status: InvoiceFilterStatus
   sphere: Sphere
   budgetId: number | ''
   tag: string
@@ -33,7 +33,7 @@ export default function InvoiceFilterDropdown({
   onApply
 }: InvoiceFilterDropdownProps) {
   const closeRef = useRef<(() => void) | null>(null)
-  const [status, setStatus] = useState<InvoiceStatus>(statusProp)
+  const [status, setStatus] = useState<InvoiceFilterStatus>(statusProp)
   const [sphere, setSphere] = useState<Sphere>(sphereProp)
   const [budgetId, setBudgetId] = useState<number | ''>(budgetIdProp)
   const [tag, setTag] = useState<string>(tagProp)
@@ -111,7 +111,7 @@ export default function InvoiceFilterDropdown({
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">
           <label className="filter-dropdown__label">Status</label>
-          <select className="input" value={status} onChange={(e) => setStatus(e.target.value as InvoiceStatus)}>
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value as InvoiceFilterStatus)}>
             <option value="ALL">Alle</option>
             <option value="OPEN">Offen</option>
             <option value="PARTIAL">Teilweise</option>

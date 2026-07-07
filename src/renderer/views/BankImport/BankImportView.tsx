@@ -1222,4 +1222,3 @@ export default function BankImportView({ paymentAccounts, notify, onCreateBookin
   )
 }
 
-export type { BankTransaction }

@@ -429,7 +429,10 @@ export function summarizeInvoices(filters: {
 export function getInvoiceById(id: number) {
   const d = getDb()
   const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description,
-           i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId, i.sphere,
+           i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId,
+           (SELECT pa.name FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountName,
+           (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountKind,
+           i.sphere,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
            (SELECT v.voucher_no FROM vouchers v WHERE v.id = i.posted_voucher_id) as postedVoucherNo

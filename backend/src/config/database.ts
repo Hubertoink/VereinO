@@ -39,8 +39,3 @@ export function getDatabase(): Pool {
   return pool
 }
 
-export async function closeDatabase(): Promise<void> {
-  if (pool) {
-    await pool.end()
-  }
-}

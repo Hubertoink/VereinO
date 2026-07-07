@@ -16,18 +16,10 @@ import {
 } from './voucherAssignments'
 
 export {
-    addVoucherBudget,
-    addVoucherEarmark,
-    getVoucherBudgetTotal,
     getVoucherBudgets,
-    getVoucherEarmarkTotal,
     getVoucherEarmarks,
-    removeVoucherBudget,
-    removeVoucherEarmark,
     setVoucherBudgets,
-    setVoucherEarmarks,
-    type VoucherBudgetAssignment,
-    type VoucherEarmarkAssignment
+    setVoucherEarmarks
 } from './voucherAssignments'
 
 type DB = InstanceType<typeof Database>
@@ -500,41 +492,6 @@ export function listRecentVouchers(limit = 20) {
         .all(limit)) as any[]
     // Map concatenated tags to array
     return rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
-}
-
-export function listVouchersFiltered({ limit = 20, paymentMethod }: { limit?: number; paymentMethod?: 'BAR' | 'BANK' }) {
-    const d = getDb()
-    let sql = `SELECT id, voucher_no as voucherNo, date, type, sphere, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-                                        payment_account_id as paymentAccountId,
-                                        transfer_from_account_id as transferFromAccountId,
-                                        transfer_to_account_id as transferToAccountId,
-                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountName,
-                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountKind,
-                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.payment_account_id) as paymentAccountColor,
-                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountName,
-                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountKind,
-                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.transfer_from_account_id) as transferFromAccountColor,
-                                        (SELECT name FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountName,
-                                        (SELECT kind FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountKind,
-                                        (SELECT color FROM payment_accounts pa WHERE pa.id = vouchers.transfer_to_account_id) as transferToAccountColor,
-                                        description, note,
-                                        net_amount as netAmount, vat_rate as vatRate, vat_amount as vatAmount, gross_amount as grossAmount, amount_mode as amountMode,
-                                        original_id as originalId,
-                                        (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = vouchers.original_id) as originalVoucherNo,
-                                        reversed_by_id as reversedById,
-                                        (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = vouchers.reversed_by_id) as reversedByVoucherNo,
-                                        (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = vouchers.id) as fileCount
-                         FROM vouchers`
-    const params: any[] = []
-    const wh: string[] = []
-    if (paymentMethod) {
-        wh.push(`(payment_method = ? OR (type = 'TRANSFER' AND (transfer_from = ? OR transfer_to = ?)))`)
-        params.push(paymentMethod, paymentMethod, paymentMethod)
-    }
-    if (wh.length) sql += ` WHERE ` + wh.join(' AND ')
-    sql += ` ORDER BY date DESC, id DESC LIMIT ?`
-    params.push(limit)
-    return d.prepare(sql).all(...params) as any[]
 }
 
 export function listVouchersAdvanced(filters: {

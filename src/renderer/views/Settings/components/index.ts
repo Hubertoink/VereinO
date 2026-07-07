@@ -5,6 +5,5 @@
  */
 
 export { DnDOrder } from './DnDOrder'
-export { ThemeSelector } from './ThemeSelector'
 export { LocationInfoDisplay } from './LocationInfo'
 export { BackupList } from './BackupList'

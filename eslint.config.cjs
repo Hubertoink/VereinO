@@ -7,7 +7,7 @@ const reactHooks = require('eslint-plugin-react-hooks')
 module.exports = [
   // Ignore build artefacts
   {
-    ignores: ['dist', 'dist-electron', 'release', 'node_modules', 'fix-arrows.cjs', 'electron/main/**/*.js']
+    ignores: ['dist', 'dist-electron', 'release', 'node_modules', 'electron/main/**/*.js']
   },
   // TypeScript + React files
   {

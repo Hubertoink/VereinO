@@ -108,6 +108,8 @@ export type InvoiceDetail = {
   grossAmount: number
   paymentMethod?: string | null
   paymentAccountId?: number | null
+  paymentAccountName?: string | null
+  paymentAccountKind?: string | null
   sphere: InvoiceSphere
   earmarkId?: number | null
   budgetId?: number | null

@@ -19,7 +19,6 @@ import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/useToast'
 import { UIPreferencesProvider } from './context/UIPreferences'
 import { useUIPreferences } from './context/useUIPreferences'
-import { AppLayout } from './components/layout/AppLayout'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
@@ -94,6 +93,36 @@ type PageShortcutAction = {
     key: string
     label: string
     action: () => void
+}
+
+type SetOptionalNumber = (value: number | null) => void
+type SetOptionalText = (value: string | null) => void
+
+function resetVoucherFilters(options: {
+    setFilterEarmark: SetOptionalNumber
+    setFilterBudgetId: SetOptionalNumber
+    setFilterTag: SetOptionalText
+    setFilterType: SetOptionalText
+    setFilterPM: SetOptionalText
+    setFilterPaymentAccountId: SetOptionalNumber
+    setFilterSphere: SetOptionalText
+    setQ: (value: string) => void
+    setFrom?: (value: string) => void
+    setTo?: (value: string) => void
+    keepDateRange?: boolean
+}) {
+    options.setFilterEarmark(null)
+    options.setFilterBudgetId(null)
+    options.setFilterTag(null)
+    options.setFilterType(null)
+    options.setFilterPM(null)
+    options.setFilterPaymentAccountId(null)
+    options.setFilterSphere(null)
+    options.setQ('')
+    if (!options.keepDateRange) {
+        options.setFrom?.('')
+        options.setTo?.('')
+    }
 }
 
 function voucherRowToBookingForm(row: any) {
@@ -2163,20 +2192,6 @@ function AppInner() {
 
     // (earmarks loaded above)
 
-    // Color palette for navigation icons
-    const navIconPalette: Record<string, string> = {
-        'Dashboard': '#7C4DFF',
-        'Buchungen': '#2962FF',
-        'Bankimport': '#1976D2',
-        'Verbindlichkeiten': '#00B8D4',
-        'Mitglieder': '#26A69A',
-        'Vorschuesse': '#4CAF50',
-        'Budgets': '#00C853',
-        'Zweckbindungen': '#FFD600',
-        'Belege': '#FF9100',
-        'Reports': '#F50057',
-        'Einstellungen': '#9C27B0'
-    }
     const isTopNav = effectiveNavLayout === 'top'
     return (
         <div className={`app-root-grid ${isTopNav ? 'app-root-grid--top' : 'app-root-grid--side'}`}>
@@ -2281,13 +2296,17 @@ function AppInner() {
                             onGoToSubmissions={() => setActivePage('Einreichungen')}
                             onGoToVoucher={({ voucherId, recordDate }) => {
                                 // Reset filters so the voucher can be found reliably
-                                setFilterEarmark(null)
-                                setFilterBudgetId(null)
-                                setFilterTag(null)
-                                setFilterType(null)
-                                setFilterPM(null)
-                                setFilterPaymentAccountId(null)
-                                setFilterSphere(null)
+                                resetVoucherFilters({
+                                    setFilterEarmark,
+                                    setFilterBudgetId,
+                                    setFilterTag,
+                                    setFilterType,
+                                    setFilterPM,
+                                    setFilterPaymentAccountId,
+                                    setFilterSphere,
+                                    setQ,
+                                    keepDateRange: true
+                                })
                                 setQ(voucherId ? `#${voucherId}` : '')
 
                                 // Pin to the voucher date to avoid time-range filtering issues
@@ -2371,10 +2390,6 @@ function AppInner() {
                             showBookingEditTabs={showBookingEditTabs}
                             bookingsOpenDetached={bookingsOpenDetached}
                             allowVoucherDeletion={allowVoucherDeletion}
-                            onOpenVoucherAttachments={(voucher) => {
-                                setReceiptTarget(voucher)
-                                setActivePage('Belege')
-                            }}
                         />
                     )}
                     {/* Old Buchungen block removed - now using JournalView component */}
@@ -2444,15 +2459,18 @@ function AppInner() {
                             filterSphere={filterSphere || undefined}
                             onGoToBookings={(earmarkId) => {
                                 // Reset other filters first, then set earmark and navigate
-                                setFilterBudgetId(null)
-                                setFilterTag(null)
-                                setFilterType(null)
-                                setFilterPM(null)
-                                setFilterPaymentAccountId(null)
-                                setFilterSphere(null)
-                                setQ('')
-                                setFrom('')
-                                setTo('')
+                                resetVoucherFilters({
+                                    setFilterEarmark,
+                                    setFilterBudgetId,
+                                    setFilterTag,
+                                    setFilterType,
+                                    setFilterPM,
+                                    setFilterPaymentAccountId,
+                                    setFilterSphere,
+                                    setQ,
+                                    setFrom,
+                                    setTo
+                                })
                                 setFilterEarmark(earmarkId)
                                 // Use setTimeout to ensure state updates before navigation
                                 setTimeout(() => {
@@ -2469,15 +2487,18 @@ function AppInner() {
                         <BudgetsView
                             onGoToBookings={(budgetId) => {
                                 // Reset other filters first, then set budget and navigate
-                                setFilterEarmark(null)
-                                setFilterTag(null)
-                                setFilterType(null)
-                                setFilterPM(null)
-                                setFilterPaymentAccountId(null)
-                                setFilterSphere(null)
-                                setQ('')
-                                setFrom('')
-                                setTo('')
+                                resetVoucherFilters({
+                                    setFilterEarmark,
+                                    setFilterBudgetId,
+                                    setFilterTag,
+                                    setFilterType,
+                                    setFilterPM,
+                                    setFilterPaymentAccountId,
+                                    setFilterSphere,
+                                    setQ,
+                                    setFrom,
+                                    setTo
+                                })
                                 setFilterBudgetId(budgetId)
                                 // Use setTimeout to ensure state updates before navigation
                                 setTimeout(() => {

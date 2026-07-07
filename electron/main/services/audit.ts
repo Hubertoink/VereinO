@@ -6,7 +6,7 @@ function stableJson(obj: unknown) {
     return JSON.stringify(obj, Object.keys(obj as any).sort())
 }
 
-export function hashAudit(payload: unknown, timestamp: string, user: number | null) {
+function hashAudit(payload: unknown, timestamp: string, user: number | null) {
     const h = crypto.createHash('sha256')
     h.update(stableJson(payload))
     h.update(timestamp)

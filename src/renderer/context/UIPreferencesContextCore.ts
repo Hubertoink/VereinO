@@ -9,7 +9,7 @@ export type JournalRowDensity = 'normal' | 'compact'
 export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
 export type QuickAddAfterSave = 'close' | 'new'
 
-export interface UIPreferencesContextValue {
+interface UIPreferencesContextValue {
   navLayout: NavLayout
   setNavLayout: (val: NavLayout) => void
   sidebarCollapsed: boolean

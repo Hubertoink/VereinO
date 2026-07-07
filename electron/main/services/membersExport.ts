@@ -4,10 +4,9 @@
  */
 
 import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import { BrowserWindow } from 'electron'
 import { listMembers, MemberRow, MemberStatus } from '../repositories/members'
+import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 
 // We use ExcelJS for XLSX export - already a dependency
@@ -152,16 +151,9 @@ function formatFieldValue(member: MemberRow, field: MemberExportField): string {
  * Create export directory and return file path
  */
 function prepareExportPath(format: 'XLSX' | 'PDF'): string {
-  const when = new Date()
-  const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-
-  try {
-    fs.mkdirSync(baseDir, { recursive: true })
-  } catch { }
-
+  const stamp = createExportStamp()
   const ext = format === 'XLSX' ? 'xlsx' : 'pdf'
-  return path.join(baseDir, `Mitglieder_${stamp}.${ext}`)
+  return createExportPath(`Mitglieder_${stamp}.${ext}`)
 }
 
 /**

@@ -1,4 +1,4 @@
-import { AiBankImportReviewResult, AiBookingAnalysisResult, AiSettingsGetOutput, AiSettingsSetInput } from '../../electron/main/ipc/schemas'
+import { AiBankImportReviewResult, AiBookingAnalysisResult, AiBookingAnalysisResultStructured, AiSettingsGetOutput, AiSettingsSetInput } from '../../electron/main/ipc/schemas'
 
 describe('AiBookingAnalysisResult', () => {
   it('accepts a reviewable booking candidate with evidence and assignments', () => {
@@ -18,6 +18,12 @@ describe('AiBookingAnalysisResult', () => {
           confidence: 0.82,
           warnings: ['Zahlungsdatum aus Rechnungsdatum abgeleitet'],
           evidence: ['Rechnungsbetrag 42,50 EUR'],
+          source: {
+            fileName: 'stapel-scan.pdf',
+            pageNumber: 3,
+            pageCount: 10,
+            label: 'stapel-scan.pdf · Seite 3 von 10'
+          },
           review: {
             status: 'APPROVED',
             voucherId: 99,
@@ -31,6 +37,7 @@ describe('AiBookingAnalysisResult', () => {
     expect(parsed.candidates[0].grossAmount).toBe(42.5)
     expect(parsed.candidates[0].budgets[0].id).toBe(1)
     expect(parsed.candidates[0].review?.voucherNo).toBe('2026-00099')
+    expect(parsed.candidates[0].source?.pageNumber).toBe(3)
   })
 
   it('rejects non-reviewable candidates with invalid amount or unsupported type', () => {
@@ -47,6 +54,40 @@ describe('AiBookingAnalysisResult', () => {
       ]
     })).toThrow()
   })
+
+  it('accepts required structured source metadata for batch document analysis', () => {
+    const parsed = AiBookingAnalysisResultStructured.parse({
+      candidates: [
+        {
+          date: '2026-07-04',
+          type: 'OUT',
+          sphere: 'IDEELL',
+          description: 'Rechnung Material',
+          grossAmount: 42.5,
+          vatRate: 19,
+          paymentMethod: 'BANK',
+          paymentAccountId: null,
+          counterparty: 'Muster GmbH',
+          budgets: [{ id: 1, amount: 42.5 }],
+          earmarks: [],
+          tags: ['Projekt'],
+          confidence: 0.82,
+          warnings: [],
+          evidence: ['Rechnungsbetrag 42,50 EUR'],
+          source: {
+            fileName: 'stapel-scan.pdf',
+            pageNumber: 3,
+            pageCount: 10,
+            label: 'stapel-scan.pdf · Seite 3 von 10'
+          }
+        }
+      ],
+      summary: null,
+      warnings: []
+    })
+
+    expect(parsed.candidates[0].source.pageNumber).toBe(3)
+  })
 })
 
 describe('AiSettings schemas', () => {
@@ -55,11 +96,22 @@ describe('AiSettings schemas', () => {
       hasApiKey: true,
       model: 'gpt-5.5',
       textModel: 'gpt-5.4-mini',
-      defaultReasoningEffort: 'medium'
+      defaultReasoningEffort: 'medium',
+      provider: 'openai',
+      apiBaseUrl: 'https://api.openai.com/v1'
     })
 
     expect(settings.model).toBe('gpt-5.5')
     expect(settings.textModel).toBe('gpt-5.4-mini')
+    expect(settings.provider).toBe('openai')
+  })
+
+  it('allows updating provider and base URL for OpenAI-compatible APIs', () => {
+    const update = AiSettingsSetInput.parse({
+      provider: 'minimax'
+    })
+
+    expect(update.provider).toBe('minimax')
   })
 
   it('allows updating only the cheaper text model', () => {

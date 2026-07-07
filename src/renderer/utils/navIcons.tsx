@@ -153,19 +153,3 @@ export function getNavIcon(key: NavKey): React.ReactNode {
       return null
   }
 }
-
-export const navIconPalette: Record<NavKey, string> = {
-  Dashboard: '#7C4DFF',
-  Buchungen: '#2962FF',
-  Bankimport: '#1976D2',
-  Verbindlichkeiten: '#00B8D4',
-  Mitglieder: '#26A69A',
-  Vorschuesse: '#4CAF50',
-  Budgets: '#00C853',
-  Zweckbindungen: '#FFD600',
-  Einreichungen: '#FF7043',
-  KI: '#6A5CFF',
-  Belege: '#FF9100',
-  Reports: '#F50057',
-  Einstellungen: '#9C27B0'
-}

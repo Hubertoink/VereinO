@@ -1,9 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import ExcelJS from 'exceljs'
 import { getDb } from '../db/database'
 import { getSetting, setSetting } from './settings'
+import { createExportPath } from './exportPaths'
 import { summarizeVouchers, monthlyVouchers, listVouchersAdvanced, cashBalance as getCashBalance } from '../repositories/vouchers'
 import { writeAudit } from './audit'
 import { voucherStatusKind, voucherStatusText } from './voucherStatus'
@@ -40,10 +38,8 @@ function paymentAccountLabel(row: any) {
 export async function exportPackage(year: number): Promise<{ filePath: string }> {
     const from = `${year}-01-01`
     const to = `${year}-12-31`
-    const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-    try { fs.mkdirSync(baseDir, { recursive: true }) } catch {}
     const stamp = `${year}_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`
-    const filePath = path.join(baseDir, `Jahresabschluss_${stamp}.xlsx`)
+    const filePath = createExportPath(`Jahresabschluss_${stamp}.xlsx`)
 
     const wb = new ExcelJS.Workbook()
     // Summary sheet

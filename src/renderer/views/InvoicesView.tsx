@@ -793,7 +793,11 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                 const remaining = Math.max(0, Math.round((Number(row.grossAmount || 0) - Number(row.paidSum || 0)) * 100) / 100)
                 const fileCount = row.fileCount || 0
                 return (
-                  <tr key={row.id} className={flashId === row.id ? 'row-flash' : undefined}>
+                  <tr
+                    key={row.id}
+                    className={flashId === row.id ? 'row-flash' : undefined}
+                    onDoubleClick={() => { void openDetails(row.id) }}
+                  >
                     <td align="center" title={row.voucherType === 'IN' ? 'Einnahme' : 'Ausgabe'}>
                       <span className={`badge invoices-type-badge ${row.voucherType === 'IN' ? 'invoices-type-badge-in' : ''}`}>{row.voucherType === 'IN' ? '↑ IN' : '↓ OUT'}</span>
                     </td>

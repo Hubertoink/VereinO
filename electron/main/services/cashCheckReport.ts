@@ -1,9 +1,8 @@
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import { getCashCheckById } from '../repositories/cashChecks'
 import { getDb } from '../db/database'
+import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 
 function esc(s: any) {
@@ -15,15 +14,8 @@ function euro(n: number) {
 }
 
 function prepareExportPath(prefix: string, dateISO: string): string {
-  const when = new Date()
-  const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  try {
-    fs.mkdirSync(baseDir, { recursive: true })
-  } catch {
-    // ignore
-  }
-  return path.join(baseDir, `${prefix}_${dateISO}_${stamp}.pdf`)
+  const stamp = createExportStamp()
+  return createExportPath(`${prefix}_${dateISO}_${stamp}.pdf`)
 }
 
 function getAuditorsFromMembers(): { pr1?: string; pr2?: string } {

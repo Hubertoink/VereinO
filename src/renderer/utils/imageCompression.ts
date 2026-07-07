@@ -8,7 +8,7 @@ export type CompressedImageResult = {
   readonly bytes: number
 }
 
-export function approxBytesFromDataUrl(dataUrl: string): number {
+function approxBytesFromDataUrl(dataUrl: string): number {
   const comma = dataUrl.indexOf(',')
   const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
   const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0

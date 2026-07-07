@@ -28,7 +28,7 @@ export function base64ToFile(name: string, dataBase64: string, mime?: string): F
   return new File([stableBytes], name, { type: mime || '' })
 }
 
-export async function encodeFileForUpload(file: File): Promise<Base64UploadFile> {
+async function encodeFileForUpload(file: File): Promise<Base64UploadFile> {
   return {
     name: file.name,
     dataBase64: bufferToBase64Safe(await file.arrayBuffer()),

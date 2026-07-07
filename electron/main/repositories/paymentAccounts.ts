@@ -5,7 +5,7 @@ type DB = InstanceType<typeof Database>
 
 export type PaymentAccountKind = 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
 
-export type PaymentAccountRow = {
+type PaymentAccountRow = {
   id: number
   name: string
   kind: PaymentAccountKind

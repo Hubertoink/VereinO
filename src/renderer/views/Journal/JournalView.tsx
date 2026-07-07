@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
+import AttachmentsModal from '../../components/modals/AttachmentsModal'
 import TagsEditor from '../../components/TagsEditor'
 import { BatchAssignDropdown, FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 import { getEffectiveJournalCols, getEffectiveJournalOrder } from './utils/journalColumnVisibility'
@@ -104,7 +105,6 @@ interface JournalViewProps {
     showBookingEditTabs?: boolean
     bookingsOpenDetached?: boolean
     allowVoucherDeletion?: boolean
-    onOpenVoucherAttachments?: (voucher: { voucherId: number; voucherNo: string; date: string; description: string }) => void
 }
 
 export default function JournalView({
@@ -166,8 +166,7 @@ export default function JournalView({
     onCloseBookingDraft,
     showBookingEditTabs = false,
     bookingsOpenDetached = false,
-    allowVoucherDeletion = false,
-    onOpenVoucherAttachments
+    allowVoucherDeletion = false
 }: JournalViewProps) {
     const paymentMethodLabel = useCallback((method?: 'BAR' | 'BANK' | null) => {
         if (method === 'BAR') return 'Bar'
@@ -300,6 +299,7 @@ export default function JournalView({
 
     // Modal states
     const [infoVoucher, setInfoVoucher] = useState<VoucherRow | null>(null)
+    const [attachmentsVoucher, setAttachmentsVoucher] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
     const [editRow, setEditRowState] = useState<EditVoucherRow | null>(null)
     const [bookingEditTabs, setBookingEditTabs] = useState<BookingEditTab[]>([])
     const [activeEditTabId, setActiveEditTabId] = useState<string | null>(null)
@@ -2138,13 +2138,22 @@ export default function JournalView({
                             setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })
                         }}
                         onOpenAttachments={() => {
-                            onOpenVoucherAttachments?.({
+                            setAttachmentsVoucher({
                                 voucherId: infoVoucher.id,
                                 voucherNo: infoVoucher.voucherNo,
                                 date: infoVoucher.date,
                                 description: infoVoucher.description || '',
                             })
                             setInfoVoucher(null)
+                        }}
+                    />
+                )}
+                {attachmentsVoucher && (
+                    <AttachmentsModal
+                        voucher={attachmentsVoucher}
+                        onClose={() => setAttachmentsVoucher(null)}
+                        onChanged={async () => {
+                            await loadRecent()
                         }}
                     />
                 )}

@@ -5,14 +5,13 @@
 
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { listMembers } from '../repositories/members'
 import { listCashChecks } from '../repositories/cashChecks'
 import { summarizeInvoices } from '../repositories/invoices'
+import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 import { voucherStatusKind, voucherStatusText } from './voucherStatus'
 
@@ -91,11 +90,8 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   const orgLogoDataUrl = String(getSetting<string>('org.logoDataUrl') || '')
 
   // Create export directory
-  const when = new Date()
-  const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-  const filePath = path.join(baseDir, `Kassierbericht_${fiscalYear}_${stamp}.pdf`)
+  const stamp = createExportStamp()
+  const filePath = createExportPath(`Kassierbericht_${fiscalYear}_${stamp}.pdf`)
   const cashBalanceAsOf = cashBalanceDate || new Date().toISOString().slice(0, 10)
 
   // 1. Cash balance as of the selected cut-off date

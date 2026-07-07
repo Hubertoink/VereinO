@@ -3,7 +3,7 @@ type DB = InstanceType<typeof Database>
 
 type Mig = { version: number; up: string | ((db: DB) => void) }
 
-export const MIGRATIONS: Mig[] = [
+const MIGRATIONS: Mig[] = [
   {
     version: 1,
     up: `
@@ -743,7 +743,7 @@ export const MIGRATIONS: Mig[] = [
   }
 ]
 
-export function ensureMigrationsTable(db: DB) {
+function ensureMigrationsTable(db: DB) {
   db.prepare(
     `CREATE TABLE IF NOT EXISTS migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')));`
   ).run()
@@ -928,7 +928,7 @@ export function ensureAdvanceTables(db: DB) {
   }
 }
 
-export function ensureSubmissionColumns(db: DB) {
+function ensureSubmissionColumns(db: DB) {
   try {
     const submissionCols = db.prepare('PRAGMA table_info(submissions)').all() as Array<{ name: string }>
     const names = new Set(submissionCols.map((col) => col.name))
@@ -948,7 +948,7 @@ export function ensureSubmissionColumns(db: DB) {
   }
 }
 
-export function ensurePaymentAccountTables(db: DB) {
+function ensurePaymentAccountTables(db: DB) {
   try {
     db.exec(`
       CREATE TABLE IF NOT EXISTS payment_accounts (
@@ -1362,7 +1362,7 @@ export function expandVoucherTypeConstraint(sql: string): string {
   )
 }
 
-export function ensureInternalVoucherType(db: DB) {
+function ensureInternalVoucherType(db: DB) {
   try {
     const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='vouchers'").get() as { sql?: string } | undefined
     const sql = row?.sql || ''
@@ -1441,7 +1441,7 @@ export function ensureVoucherForeignKeyTargets(db: DB) {
   }
 }
 
-export function getAppliedVersions(db: DB): Set<number> {
+function getAppliedVersions(db: DB): Set<number> {
   ensureMigrationsTable(db)
   const rows = db.prepare('SELECT version FROM migrations ORDER BY version').all() as {
     version: number

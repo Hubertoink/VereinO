@@ -1,6 +1,6 @@
 {
   "name": "verein-budget-planner",
-  "version": "2.5.7",
+  "version": "2.5.8",
   "private": true,
   "description": "Offline-first Electron app for non-profit finance planning (Windows/macOS/Linux)",
   "main": "dist-electron/main/index.cjs",
@@ -34,6 +34,7 @@
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.2.5",
     "openai": "^6.45.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.530",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -69,7 +69,7 @@ export function writeAppConfig(cfg: AppConfig) {
     const p = getConfigPath()
     try { fs.writeFileSync(p, JSON.stringify(cfg, null, 2), 'utf8') } catch { }
 }
-export function getConfiguredRoot(): string {
+function getConfiguredRoot(): string {
     const cfg = readAppConfig()
     return (cfg.dbRoot && typeof cfg.dbRoot === 'string' && cfg.dbRoot.trim()) ? cfg.dbRoot : app.getPath('userData')
 }

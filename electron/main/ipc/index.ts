@@ -3,7 +3,7 @@ import { VoucherCreateInput, VoucherCreateOutput, VoucherReverseInput, VoucherRe
 import { AiActionPlanInput, AiActionPlanOutput, AiAgentAutoRuleUpsertInput, AiAgentAutoRulesListInput, AiAgentAutoRulesListOutput, AiAgentMemoryListInput, AiAgentMemoryListOutput, AiAgentMemoryUpsertInput, AiAgentRunInput, AiAgentRunOutput, AiBankImportReviewInput, AiBankImportReviewOutput, AiBookingAnalysisResult, AiJobIdInput, AiJobsApproveCandidateInput, AiJobsApproveCandidateOutput, AiJobsCreateInput, AiJobsCreateOutput, AiJobsDeleteOutput, AiJobsGetOutput, AiJobsListInput, AiJobsListOutput, AiJobsProcessOutput, AiJobsRejectInput, AiJobsUpdateCandidateInput, AiSettingsGetOutput, AiSettingsSetInput, AiSettingsSetOutput, AiSettingsTestOutput, AiTextGenerateInput, AiTextGenerateOutput } from './schemas'
 import { getDb, getAppDataDir, closeDb, getCurrentDbInfo, migrateToRoot, readAppConfig, writeAppConfig, listOrganizations, getActiveOrganization, createOrganization, switchOrganization, renameOrganization, deleteOrganization, getOrganizationAppearance, setOrganizationAppearance, getActiveOrganizationAppearance } from '../db/database'
 import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
-import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersFiltered, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, updateVoucherMeta, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
+import { createVoucher, reverseVoucher, listRecentVouchers, listVouchersAdvanced, listVouchersAdvancedPaged, updateVoucher, updateVoucherMeta, deleteVoucher, summarizeVouchers, monthlyVouchers, dailyVouchers, cashBalance, listFilesForVoucher, getFileById, addFileToVoucher, deleteVoucherFile, clearAllVouchers, listVoucherYears, batchAssignEarmark, batchAssignBudget, batchAssignTags, getVoucherBudgets, getVoucherEarmarks, setVoucherBudgets, setVoucherEarmarks } from '../repositories/vouchers'
 import { createInvoice, updateInvoice, deleteInvoice, listInvoicesPaged, summarizeInvoices, getInvoiceById, addPayment, markPaid, postInvoiceToVoucher, getInvoiceFileById, listFilesForInvoice, addFileToInvoice, deleteInvoiceFile } from '../repositories/invoices'
 import { listTags, upsertTag, deleteTag, tagUsage } from '../repositories/tags'
 import { listMembers, createMember, updateMember, deleteMember, getMemberById } from '../repositories/members'
@@ -110,6 +110,67 @@ async function withSchemaHealRetry<T>(run: () => T, schemaIdentifiers: string[])
             throw retryError
         }
     }
+}
+
+function normalizeAiSourceLookup(value: string) {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+function extractCandidateSourceIndex(candidate: any) {
+    const candidates = [candidate?.source?.fileName, candidate?.source?.label]
+    for (const value of candidates) {
+        const match = String(value || '').match(/\bquelle\s*(\d+)\b/i)
+        if (match) {
+            const index = Number(match[1]) - 1
+            if (Number.isInteger(index) && index >= 0) return index
+        }
+    }
+    return null
+}
+
+function resolveAiSourceFile(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, candidate: any, candidateIndex?: number) {
+    const sourceFileName = String(candidate?.source?.fileName || '').trim()
+    if (sourceFileName) {
+        const exact = jobFiles.find((file) => file.fileName === sourceFileName)
+        if (exact) return exact
+        const normalized = normalizeAiSourceLookup(sourceFileName)
+        const fuzzy = normalized ? jobFiles.find((file) => normalizeAiSourceLookup(file.fileName) === normalized) : null
+        if (fuzzy) return fuzzy
+    }
+    const sourceIndex = extractCandidateSourceIndex(candidate)
+    if (sourceIndex != null && jobFiles[sourceIndex]) return jobFiles[sourceIndex]
+    if ((!candidate?.source?.fileName && !candidate?.source?.label) && jobFiles.length === 1) return jobFiles[0]
+    if ((!candidate?.source?.fileName && !candidate?.source?.label) && candidateIndex != null && jobFiles.length > candidateIndex) return jobFiles[candidateIndex]
+    return null
+}
+
+function normalizeAiCandidateSources(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, result: any) {
+    if (!Array.isArray(result?.candidates)) return result
+    return {
+        ...result,
+        candidates: result.candidates.map((candidate: any, candidateIndex: number) => {
+            const matchedFile = resolveAiSourceFile(jobFiles, candidate, candidateIndex)
+            if (!matchedFile) return candidate
+            const pageNumber = candidate?.source?.pageNumber ?? null
+            const pageCount = candidate?.source?.pageCount ?? null
+            return {
+                ...candidate,
+                source: {
+                    fileName: matchedFile.fileName,
+                    pageNumber,
+                    pageCount,
+                    label: pageNumber && pageCount
+                        ? `${matchedFile.fileName} · Seite ${pageNumber} von ${pageCount}`
+                        : matchedFile.fileName
+                }
+            }
+        })
+    }
+}
+
+function filesForAiCandidate(jobFiles: Array<{ fileName: string; dataBase64?: string; mimeType?: string | null }>, candidate: any) {
+    const matchedFile = resolveAiSourceFile(jobFiles, candidate)
+    return matchedFile ? [matchedFile] : jobFiles
 }
 
 type RegisterIpcHandlersOptions = {
@@ -598,7 +659,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
                     context,
                     model: initial.model
                 })
-                const hardenedResult = applyPaymentAccountHintToAiAnalysis(analyzed.result, initial.prompt || initial.title || '', context.paymentAccounts || [])
+                const sourceNormalizedResult = normalizeAiCandidateSources(initial.files, analyzed.result)
+                const hardenedResult = applyPaymentAccountHintToAiAnalysis(sourceNormalizedResult, initial.prompt || initial.title || '', context.paymentAccounts || [])
                 saveAiJobResult(parsed.id, 'BOOKING_CANDIDATE', hardenedResult)
                 const processed = setAiJobStatus(parsed.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
                 return AiJobsProcessOutput.parse(processed)
@@ -652,7 +714,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
             earmarks: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
             tags: candidate.tags || [],
-            files: job.files.map((file) => ({
+            files: filesForAiCandidate(job.files, candidate).map((file) => ({
                 name: file.fileName,
                 dataBase64: file.dataBase64 || '',
                 mime: file.mimeType || undefined

@@ -72,12 +72,6 @@ export const IconPayPal = ({ size = 14, color }: { size?: number; color?: string
     </svg>
 )
 
-export const IconTransfer = ({ size = 14 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M3 5h10M10 2l3 3-3 3M13 11H3M6 14L3 11l3-3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-)
-
 // Transfer arrow – bold chevron with color
 export const IconArrow = ({ size = 14, color }: { size?: number; color?: string }) => (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color || 'currentColor'} strokeWidth="2">
@@ -118,7 +112,7 @@ export const IconAttachment = ({ size = 16, color }: { size?: number; color?: st
 
 // Helper-Funktion für Platzhalter-Text
 // Helper für Zahlweg-Icons (React)
-export function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
+function PaymentMethodIcon({ method, size = 14 }: { method: 'BAR' | 'BANK' | null | undefined; size?: number }) {
     if (method === 'BANK') return <IconBank size={size} />
     if (method === 'BAR') return <IconCash size={size} />
     return <span>{ICONS.EMPTY}</span>

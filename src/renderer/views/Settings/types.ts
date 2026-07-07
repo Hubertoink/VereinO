@@ -5,6 +5,15 @@
  */
 
 import type { NavKey } from '../../utils/navItems'
+import type {
+  BackgroundImage,
+  JournalRowDensity,
+  JournalRowStyle,
+  NavIconColorMode,
+  NavLayout,
+  QuickAddAfterSave
+} from '../../context/UIPreferencesContextCore'
+import type { ColorTheme } from '../../context/uiTheme'
 
 // ============================================================================
 // Navigation & Layout Types
@@ -26,35 +35,11 @@ export type TileKey =
   | 'tutorial' 
   | 'about'
 
-export type NavLayout = 'left' | 'top'
-
-export type NavIconColorMode = 'color' | 'mono'
-
-export type ColorTheme = 
-  | 'default' 
-  | 'fiery-ocean' 
-  | 'peachy-delight' 
-  | 'pastel-dreamland' 
-  | 'ocean-breeze' 
-  | 'earthy-tones' 
-  | 'monochrome-harmony' 
-  | 'vintage-charm'
-  | 'soft-blush'
-  | 'professional-light'
-
 // ============================================================================
 // Journal/Table Configuration Types
 // ============================================================================
 
-export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
-
-export type JournalRowDensity = 'normal' | 'compact'
-
-export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
-
 export type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
-
-export type QuickAddAfterSave = 'close' | 'new'
 
 export type ColKey = 
   | 'actions' 

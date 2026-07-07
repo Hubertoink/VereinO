@@ -7,11 +7,11 @@ export const PaymentAccountKind = z.enum(['CASH', 'BANK', 'PAYPAL', 'CARD', 'OTH
 export const VoucherAmountMode = z.enum(['NET', 'GROSS'])
 
 // Multiple assignment shapes (shared by create + update)
-export const VoucherBudgetAssignment = z.object({
+const VoucherBudgetAssignment = z.object({
     budgetId: z.number(),
     amount: z.number()
 })
-export const VoucherEarmarkAssignment = z.object({
+const VoucherEarmarkAssignment = z.object({
     earmarkId: z.number(),
     amount: z.number()
 })
@@ -121,7 +121,7 @@ export const FiscalReportOutput = z.object({ filePath: z.string() })
 export type TFiscalReportInput = z.infer<typeof FiscalReportInput>
 export type TFiscalReportOutput = z.infer<typeof FiscalReportOutput>
 
-export const ActivityReportPayload = z.object({
+const ActivityReportPayload = z.object({
     fiscalYear: z.number(),
     activities: z.string().default(''),
     purposeImpact: z.string().default(''),
@@ -262,7 +262,7 @@ export const CashChecksSetInspectorsOutput = z.object({ id: z.number() })
 export const CashChecksExportPdfInput = z.object({ id: z.number() })
 export const CashChecksExportPdfOutput = z.object({ filePath: z.string() })
 
-export const CashChecksGetInspectorDefaultsInput = z.object({}).optional()
+const CashChecksGetInspectorDefaultsInput = z.object({}).optional()
 export const CashChecksGetInspectorDefaultsOutput = z.object({
     inspector1Name: z.string().nullable(),
     inspector2Name: z.string().nullable()
@@ -446,7 +446,7 @@ export const VouchersListOutput = z.object({
 export type TVouchersListInput = z.infer<typeof VouchersListInput>
 export type TVouchersListOutput = z.infer<typeof VouchersListOutput>
 // Invoices
-export const InvoiceStatus = z.enum(['OPEN', 'PARTIAL', 'PAID'])
+const InvoiceStatus = z.enum(['OPEN', 'PARTIAL', 'PAID'])
 export const InvoiceCreateInput = z.object({
     date: z.string(),
     dueDate: z.string().nullable().optional(),
@@ -563,6 +563,8 @@ export const InvoiceByIdOutput = z.object({
     grossAmount: z.number(),
     paymentMethod: z.string().nullable().optional(),
     paymentAccountId: z.number().nullable().optional(),
+    paymentAccountName: z.string().nullable().optional(),
+    paymentAccountKind: z.string().nullable().optional(),
     sphere: Sphere,
     earmarkId: z.number().nullable().optional(),
     budgetId: z.number().nullable().optional(),
@@ -700,7 +702,7 @@ export type TVoucherUpdateOutput = z.infer<typeof VoucherUpdateOutput>
 export type TVoucherDeleteInput = z.infer<typeof VoucherDeleteInput>
 export type TVoucherDeleteOutput = z.infer<typeof VoucherDeleteOutput>
 
-export const PaymentAccountShape = z.object({
+const PaymentAccountShape = z.object({
     id: z.number(),
     name: z.string(),
     kind: PaymentAccountKind,
@@ -905,8 +907,8 @@ export type TBudgetListOutput = z.infer<typeof BudgetListOutput>
 export type TBudgetDeleteOutput = z.infer<typeof BudgetDeleteOutput>
 
 // Vorschüsse (Mitglieder/Personen)
-export const AdvanceStatus = z.enum(['OPEN', 'RESOLVED'])
-export const AdvancePurchaseType = z.enum(['IN', 'OUT'])
+const AdvanceStatus = z.enum(['OPEN', 'RESOLVED'])
+const AdvancePurchaseType = z.enum(['IN', 'OUT'])
 
 export const AdvancesListInput = z.object({
     q: z.string().optional(),
@@ -1321,7 +1323,7 @@ export const BankImportCommitOutput = z.object({
     errors: z.array(z.object({ row: z.number(), message: z.string() }))
 })
 
-export const BankTransactionStatus = z.enum(['OPEN', 'LINKED', 'CHECKED'])
+const BankTransactionStatus = z.enum(['OPEN', 'LINKED', 'CHECKED'])
 export const BankTransactionsListInput = z.object({
     status: z.union([BankTransactionStatus, z.literal('ALL')]).optional(),
     paymentAccountId: z.number().int().positive().optional(),
@@ -1445,7 +1447,7 @@ export type TTagDeleteInput = z.infer<typeof TagDeleteInput>
 export type TTagDeleteOutput = z.infer<typeof TagDeleteOutput>
 
 // Members CRUD
-export const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
+const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
 export const MembersListInput = z.object({
     q: z.string().optional(),
     status: z.enum(['ACTIVE','NEW','PAUSED','LEFT','ALL']).optional(),
@@ -1454,7 +1456,7 @@ export const MembersListInput = z.object({
     sortBy: z.enum(['memberNo', 'name', 'email', 'status']).optional(),
     sort: z.enum(['ASC', 'DESC']).optional()
 }).optional()
-export const BoardRole = z.enum(['V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'])
+const BoardRole = z.enum(['V1','V2','KASSIER','KASSENPR1','KASSENPR2','SCHRIFT'])
 export const MembersListOutput = z.object({ rows: z.array(z.object({ id: z.number(), memberNo: z.string().nullable().optional(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus, boardRole: BoardRole.nullable().optional(), createdAt: z.string(), updatedAt: z.string().nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string().nullable().optional(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })), total: z.number() })
 export const MemberCreateInput = z.object({ memberNo: z.string(), name: z.string(), email: z.string().nullable().optional(), phone: z.string().nullable().optional(), address: z.string().nullable().optional(), status: MemberStatus.optional(), boardRole: BoardRole.nullable().optional(), tags: z.array(z.string()).optional(), iban: z.string().nullable().optional(), bic: z.string().nullable().optional(), contribution_amount: z.number().nullable().optional(), contribution_interval: z.enum(['MONTHLY','QUARTERLY','YEARLY']).nullable().optional(), mandate_ref: z.string().nullable().optional(), mandate_date: z.string().nullable().optional(), join_date: z.string(), leave_date: z.string().nullable().optional(), notes: z.string().nullable().optional(), next_due_date: z.string().nullable().optional() })
 export const MemberCreateOutput = z.object({ id: z.number() })
@@ -1518,6 +1520,20 @@ export const AiBookingCandidateReview = z.object({
     approvedAt: z.string().nullable().optional()
 })
 
+export const AiBookingSource = z.object({
+    fileName: z.string().min(1),
+    pageNumber: z.number().int().positive().nullable().optional(),
+    pageCount: z.number().int().positive().nullable().optional(),
+    label: z.string().min(1)
+})
+
+export const AiBookingSourceStructured = z.object({
+    fileName: z.string().min(1),
+    pageNumber: z.number().int().positive().nullable(),
+    pageCount: z.number().int().positive().nullable(),
+    label: z.string().min(1)
+})
+
 export const AiBookingCandidate = z.object({
     date: z.string().min(4),
     type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
@@ -1534,6 +1550,7 @@ export const AiBookingCandidate = z.object({
     confidence: z.number().min(0).max(1).default(0.5),
     warnings: z.array(z.string()).default([]),
     evidence: z.array(z.string()).default([]),
+    source: AiBookingSource.optional(),
     review: AiBookingCandidateReview.optional()
 })
 
@@ -1564,7 +1581,8 @@ export const AiBookingCandidateStructured = z.object({
     tags: z.array(z.string()),
     confidence: z.number().min(0).max(1),
     warnings: z.array(z.string()),
-    evidence: z.array(z.string())
+    evidence: z.array(z.string()),
+    source: AiBookingSourceStructured
 })
 
 export const AiBookingAnalysisResultStructured = z.object({
@@ -1816,24 +1834,31 @@ export const AiJobDetailSchema = AiJobSchema.extend({
     }))
 })
 
+export const AiProvider = z.enum(['openai', 'minimax'])
 export const AiSettingsGetOutput = z.object({
     hasApiKey: z.boolean(),
     model: z.string(),
     textModel: z.string(),
-    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).default('medium')
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).default('medium'),
+    provider: AiProvider.default('openai'),
+    apiBaseUrl: z.string().url().default('https://api.openai.com/v1')
 })
 export const AiSettingsSetInput = z.object({
     apiKey: z.string().optional(),
     model: z.string().min(1).optional(),
     textModel: z.string().min(1).optional(),
-    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).optional()
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
+    provider: AiProvider.optional(),
+    apiBaseUrl: z.string().url().optional()
 })
 export const AiSettingsSetOutput = z.object({
     ok: z.boolean(),
     hasApiKey: z.boolean(),
     model: z.string(),
     textModel: z.string(),
-    defaultReasoningEffort: z.enum(['low', 'medium', 'high'])
+    defaultReasoningEffort: z.enum(['low', 'medium', 'high']),
+    provider: AiProvider,
+    apiBaseUrl: z.string().url()
 })
 export const AiSettingsTestOutput = z.object({ ok: z.boolean(), error: z.string().optional() })
 export const AiBankImportReviewInput = z.object({
@@ -2077,7 +2102,7 @@ export const SubmissionsListInput = z.object({
     offset: z.number().min(0).default(0).optional()
 }).optional()
 
-export const SubmissionSchema = z.object({
+const SubmissionSchema = z.object({
     id: z.number(),
     externalId: z.string().nullable().optional(),
     date: z.string(),

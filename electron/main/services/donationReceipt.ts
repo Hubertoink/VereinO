@@ -1,8 +1,7 @@
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { buildDonationReceiptHtml } from './donationReceiptTemplate'
+import { createExportPath, createExportStamp } from './exportPaths'
 
 export interface ExportMoneyDonationReceiptInput {
   receiptType?: 'MONEY' | 'IN_KIND'
@@ -50,16 +49,9 @@ export async function exportMoneyDonationReceiptPdf(input: ExportMoneyDonationRe
   if (receiptType === 'IN_KIND' && !String(input.itemCondition || '').trim()) throw new Error('Zustand der Sachspende fehlt')
   if (receiptType === 'IN_KIND' && !String(input.valuationMethod || '').trim()) throw new Error('Grundlage der Wertermittlung fehlt')
 
-  const now = new Date()
-  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+  const stamp = createExportStamp()
   const fileBase = sanitizeFilePart(input.donorName || 'Spendenbescheinigung')
-  const outDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  try {
-    fs.mkdirSync(outDir, { recursive: true })
-  } catch {
-    // ignore
-  }
-  const filePath = path.join(outDir, `Spendenbescheinigung_${fileBase}_${stamp}.pdf`)
+  const filePath = createExportPath(`Spendenbescheinigung_${fileBase}_${stamp}.pdf`)
 
   const html = buildDonationReceiptHtml({
     ...input,

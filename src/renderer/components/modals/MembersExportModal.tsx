@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-export type MemberExportField = 
+type MemberExportField = 
   | 'memberNo' 
   | 'name' 
   | 'email' 
@@ -18,7 +18,7 @@ export type MemberExportField =
   | 'leave_date' 
   | 'notes'
 
-export type MemberExportStatus = 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
+type MemberExportStatus = 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
 
 interface MembersExportModalProps {
   open: boolean
