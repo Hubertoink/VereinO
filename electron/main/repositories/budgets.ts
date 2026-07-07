@@ -108,18 +108,30 @@ export function deleteBudget(id: number) {
 
 export function budgetUsage(input: { budgetId: number; from?: string; to?: string }) {
     const d = getDb()
-    // Berechnung über die Junction-Tabelle voucher_budgets für mehrere Zuordnungen pro Buchung
-    // Der from/to Parameter wird nur für Dashboard-Zeitfilter verwendet
+    // Prefer voucher_budgets; include legacy voucher budget columns when no junction row exists.
+    // Der from/to Parameter wird nur für Dashboard-Zeitfilter verwendet.
     const row = d.prepare(`
+        WITH budget_assignments AS (
+            SELECT vb.voucher_id as voucherId, vb.budget_id as budgetId, vb.amount,
+                   v.type, v.date
+            FROM voucher_budgets vb
+            JOIN vouchers v ON v.id = vb.voucher_id
+            WHERE vb.budget_id = ?
+            UNION ALL
+            SELECT v.id as voucherId, v.budget_id as budgetId,
+                   COALESCE(NULLIF(v.budget_amount, 0), ABS(v.gross_amount), 0) as amount,
+                   v.type, v.date
+            FROM vouchers v
+            WHERE v.budget_id = ?
+              AND NOT EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id)
+        )
         SELECT
-          IFNULL(SUM(CASE WHEN v.type='OUT' THEN vb.amount WHEN v.type='INTERNAL' AND vb.amount < 0 THEN ABS(vb.amount) ELSE 0 END), 0) as spent,
-          IFNULL(SUM(CASE WHEN v.type='IN' THEN vb.amount WHEN v.type='INTERNAL' AND vb.amount > 0 THEN vb.amount ELSE 0 END), 0) as inflow,
+          IFNULL(SUM(CASE WHEN type='OUT' THEN amount WHEN type='INTERNAL' AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) as spent,
+          IFNULL(SUM(CASE WHEN type='IN' THEN amount WHEN type='INTERNAL' AND amount > 0 THEN amount ELSE 0 END), 0) as inflow,
           COUNT(1) as count,
-          MAX(v.date) as lastDate
-        FROM voucher_budgets vb
-        JOIN vouchers v ON v.id = vb.voucher_id
-        WHERE vb.budget_id = ?
-    `).get(input.budgetId) as any
+          MAX(date) as lastDate
+        FROM budget_assignments
+    `).get(input.budgetId, input.budgetId) as any
 
         const plannedRow = d.prepare(`SELECT amount_planned as planned FROM budgets WHERE id=?`).get(input.budgetId) as any
         const planned = Number(plannedRow?.planned ?? 0) || 0
@@ -129,20 +141,34 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
         const remaining = Math.round((planned + inflow - spent) * 100) / 100
     // Counts inside/outside relative to budget's own date range
     const meta = d.prepare(`SELECT start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
-    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_budgets WHERE budget_id=?`).get(input.budgetId) as any
-    const totalCount = Number(totalCountRow?.c || 0)
     const startDate = meta?.startDate || null
     const endDate = meta?.endDate || null
-    let countInside = totalCount
+    let countInside = 0
     let countOutside = 0
+    const assignmentCte = `
+        WITH budget_assignments AS (
+            SELECT vb.voucher_id as voucherId, vb.budget_id as budgetId, v.date
+            FROM voucher_budgets vb
+            JOIN vouchers v ON v.id = vb.voucher_id
+            WHERE vb.budget_id = ?
+            UNION ALL
+            SELECT v.id as voucherId, v.budget_id as budgetId, v.date
+            FROM vouchers v
+            WHERE v.budget_id = ?
+              AND NOT EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id)
+        )
+    `
+    const totalAssignmentRow = d.prepare(`${assignmentCte} SELECT COUNT(1) as c FROM budget_assignments`).get(input.budgetId, input.budgetId) as any
+    const legacyAwareTotalCount = Number(totalAssignmentRow?.c || 0)
+    countInside = legacyAwareTotalCount
     if (startDate || endDate) {
-        const wh2: string[] = ['vb.budget_id = ?']
-        const vals2: any[] = [input.budgetId]
-        if (startDate) { wh2.push('v.date >= ?'); vals2.push(startDate) }
-        if (endDate) { wh2.push('v.date <= ?'); vals2.push(endDate) }
-        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_budgets vb JOIN vouchers v ON v.id = vb.voucher_id WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
+        const wh2: string[] = ['1 = 1']
+        const vals2: any[] = [input.budgetId, input.budgetId]
+        if (startDate) { wh2.push('date >= ?'); vals2.push(startDate) }
+        if (endDate) { wh2.push('date <= ?'); vals2.push(endDate) }
+        const insideRow = d.prepare(`${assignmentCte} SELECT COUNT(1) as c FROM budget_assignments WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
         countInside = Number(insideRow?.c || 0)
-        countOutside = Math.max(0, totalCount - countInside)
+        countOutside = Math.max(0, legacyAwareTotalCount - countInside)
     }
     return { spent, inflow, planned, balance, remaining, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
 }

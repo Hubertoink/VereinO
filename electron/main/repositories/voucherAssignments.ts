@@ -19,7 +19,7 @@ export type VoucherEarmarkAssignment = {
 
 export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
     const db = getDb()
-    return db.prepare(`
+    const rows = db.prepare(`
         SELECT vb.id, vb.budget_id as budgetId, vb.amount,
                CASE
                    WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
@@ -33,17 +33,43 @@ export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] 
         WHERE vb.voucher_id = ?
         ORDER BY vb.id
     `).all(voucherId) as VoucherBudgetAssignment[]
+    if (rows.length) return rows
+
+    return db.prepare(`
+        SELECT 0 as id, v.budget_id as budgetId,
+               COALESCE(NULLIF(v.budget_amount, 0), ABS(v.gross_amount), 0) as amount,
+               CASE
+                   WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
+                   WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
+                   WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
+                   ELSE printf('%04d-%s', b.year, b.sphere)
+               END as label,
+               b.color
+        FROM vouchers v
+        JOIN budgets b ON b.id = v.budget_id
+        WHERE v.id = ? AND v.budget_id IS NOT NULL
+    `).all(voucherId) as VoucherBudgetAssignment[]
 }
 
 export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[] {
     const db = getDb()
-    return db.prepare(`
+    const rows = db.prepare(`
         SELECT ve.id, ve.earmark_id as earmarkId, ve.amount,
                e.code, e.name, e.color
         FROM voucher_earmarks ve
         JOIN earmarks e ON e.id = ve.earmark_id
         WHERE ve.voucher_id = ?
         ORDER BY ve.id
+    `).all(voucherId) as VoucherEarmarkAssignment[]
+    if (rows.length) return rows
+
+    return db.prepare(`
+        SELECT 0 as id, v.earmark_id as earmarkId,
+               COALESCE(NULLIF(v.earmark_amount, 0), ABS(v.gross_amount), 0) as amount,
+               e.code, e.name, e.color
+        FROM vouchers v
+        JOIN earmarks e ON e.id = v.earmark_id
+        WHERE v.id = ? AND v.earmark_id IS NOT NULL
     `).all(voucherId) as VoucherEarmarkAssignment[]
 }
 

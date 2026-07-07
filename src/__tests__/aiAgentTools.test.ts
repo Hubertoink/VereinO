@@ -111,4 +111,61 @@ describe('createAiAgentTools', () => {
       }
     ])
   })
+
+  it('prepares voucher update drafts with full gross amounts for budgets and earmarks', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'voucher_update_draft_prepare')
+
+    expect(tool).toBeTruthy()
+
+    const result = await tool!.run({
+      voucherIds: [49],
+      budgetId: 5,
+      earmarkId: 9,
+      reason: 'Buchung Budget und Zweckbindung zuordnen'
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.draft?.kind).toBe('voucherUpdate')
+    expect((result.draft?.payload as any).changes).toMatchObject([
+      {
+        voucherId: 49,
+        grossAmount: 20,
+        newBudgetId: 5,
+        newBudgetAmount: 20,
+        newEarmarkId: 9,
+        newEarmarkAmount: 20,
+        selected: true
+      }
+    ])
+  })
+
+  it('prepares one voucher update draft with multiple budget assignments', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'voucher_update_draft_prepare')
+
+    expect(tool).toBeTruthy()
+
+    const result = await tool!.run({
+      voucherIds: [49],
+      budgetAssignments: [
+        { budgetId: 5, amount: 12.5 },
+        { budgetId: 6, amount: 7.5 }
+      ],
+      reason: 'Buchung auf zwei Budgets aufteilen'
+    })
+
+    expect(result.ok).toBe(true)
+    expect((result.draft?.payload as any).changes).toMatchObject([
+      {
+        voucherId: 49,
+        newBudgetLabel: '2 Budgets',
+        newBudgets: [
+          { budgetId: 5, label: 'Budget #5', amount: 12.5 },
+          { budgetId: 6, label: 'Budget #6', amount: 7.5 }
+        ],
+        selected: true
+      }
+    ])
+  })
 })

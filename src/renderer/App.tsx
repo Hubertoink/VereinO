@@ -34,6 +34,10 @@ import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/Le
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
 import { base64ToFile, bufferToBase64Safe } from './utils/fileEncoding'
+import {
+  normalizeVoucherBudgetAssignments,
+  normalizeVoucherEarmarkAssignments
+} from './utils/voucherAssignmentFallbacks'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const SettingsView = lazy(() =>
@@ -178,8 +182,8 @@ function voucherRowToBookingForm(row: any) {
     grossAmount: row?.grossAmount ?? undefined,
     vatRate: row?.vatRate ?? 0,
     tags: Array.isArray(row?.tags) ? row.tags : [],
-    budgets: Array.isArray(row?.budgets) ? row.budgets : [],
-    earmarksAssigned: Array.isArray(row?.earmarksAssigned) ? row.earmarksAssigned : []
+    budgets: normalizeVoucherBudgetAssignments(row),
+    earmarksAssigned: normalizeVoucherEarmarkAssignments(row)
   }
 }
 
@@ -1307,6 +1311,7 @@ function AppInner() {
   // Global data refresh key to trigger summary re-fetches across views
   const [refreshKey, setRefreshKey] = useState(0)
   const bumpDataVersion = useCallback(() => setRefreshKey((k) => k + 1), [])
+  const [fabNearJournalEnd, setFabNearJournalEnd] = useState(false)
   const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
   const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
 
@@ -1358,6 +1363,33 @@ function AppInner() {
       return 'Buchungen'
     }
   })
+  useEffect(() => {
+    if (activePage !== 'Buchungen') {
+      setFabNearJournalEnd(false)
+      return
+    }
+    let cleanup: (() => void) | undefined
+    let cancelled = false
+    const attachObserver = () => {
+      if (cancelled) return
+      const marker = document.querySelector('.journal-table-end')
+      if (!marker) {
+        window.setTimeout(attachObserver, 120)
+        return
+      }
+      const observer = new IntersectionObserver(
+        ([entry]) => setFabNearJournalEnd(Boolean(entry?.isIntersecting)),
+        { threshold: 0.2 }
+      )
+      observer.observe(marker)
+      cleanup = () => observer.disconnect()
+    }
+    attachObserver()
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
+  }, [activePage, refreshKey])
   const [aiBusy, setAiBusy] = useState(false)
   const [aiViewMounted, setAiViewMounted] = useState(() => activePage === 'KI')
   const requiredNavItems = useMemo(
@@ -3479,7 +3511,11 @@ function AppInner() {
         activePage !== 'Budgets' &&
         activePage !== 'Zweckbindungen' &&
         activePage !== 'Vorschuesse' && (
-          <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
+          <button
+            className={`fab fab-buchung${fabNearJournalEnd ? ' fab-buchung--journal-end' : ''}`}
+            onClick={openBookingEntry}
+            title="+ Buchung"
+          >
             <span className="fab-buchung-icon">+</span>
             <span className="fab-buchung-text">Buchung</span>
           </button>

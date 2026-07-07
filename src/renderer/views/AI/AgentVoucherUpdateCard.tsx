@@ -1,5 +1,11 @@
 const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 
+export type AiVoucherBudgetAssignment = {
+  budgetId?: number | null
+  label?: string | null
+  amount?: number | null
+}
+
 export type AiVoucherUpdateChange = {
   id: string
   voucherId: number
@@ -12,10 +18,13 @@ export type AiVoucherUpdateChange = {
   oldBudgetLabel?: string | null
   newBudgetId?: number | null
   newBudgetLabel?: string | null
+  newBudgetAmount?: number | null
+  newBudgets?: AiVoucherBudgetAssignment[]
   oldEarmarkId?: number | null
   oldEarmarkLabel?: string | null
   newEarmarkId?: number | null
   newEarmarkLabel?: string | null
+  newEarmarkAmount?: number | null
   oldTags?: string[]
   newTags?: string[]
   noteAppend?: string | null
@@ -44,10 +53,20 @@ function formatIsoDate(value?: string | null) {
   return match ? `${match[3]}.${match[2]}.${match[1]}` : value
 }
 
+function amountSuffix(value?: number | null) {
+  const amount = Math.abs(Number(value || 0))
+  return amount > 0 ? ` (${euro.format(amount)})` : ''
+}
+
 function targetSummary(change: AiVoucherUpdateChange) {
+  const budgetSummary = change.newBudgets?.length
+    ? `Budget: ${change.newBudgets.map((budget) => `${budget.label || (budget.budgetId ? `Budget #${budget.budgetId}` : 'Budget')}${amountSuffix(budget.amount)}`).join(', ')}`
+    : change.newBudgetLabel
+      ? `Budget: ${change.newBudgetLabel}${amountSuffix(change.newBudgetAmount)}`
+      : null
   return [
-    change.newBudgetLabel ? `Budget: ${change.newBudgetLabel}` : null,
-    change.newEarmarkLabel ? `Zweck: ${change.newEarmarkLabel}` : null,
+    budgetSummary,
+    change.newEarmarkLabel ? `Zweck: ${change.newEarmarkLabel}${amountSuffix(change.newEarmarkAmount)}` : null,
     change.newTags?.length ? `Tags: ${change.newTags.join(', ')}` : null
   ].filter(Boolean).join(' · ') || 'Metadaten aktualisieren'
 }

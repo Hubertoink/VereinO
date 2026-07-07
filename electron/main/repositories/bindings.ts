@@ -53,20 +53,33 @@ export function deleteBinding(id: number) {
 
 export function bindingUsage(earmarkId: number, params?: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' }) {
     const d = getDb()
-    // Berechnung über die Junction-Tabelle voucher_earmarks für mehrere Zuordnungen pro Buchung
-    const wh: string[] = ['ve.earmark_id = ?']
+    // Prefer voucher_earmarks; include legacy voucher earmark columns when no junction row exists.
+    const wh: string[] = ['earmarkId = ?']
     const vals: any[] = [earmarkId]
-    if (params?.from) { wh.push('v.date >= ?'); vals.push(params.from) }
-    if (params?.to) { wh.push('v.date <= ?'); vals.push(params.to) }
-    if (params?.sphere) { wh.push('v.sphere = ?'); vals.push(params.sphere) }
+    if (params?.from) { wh.push('date >= ?'); vals.push(params.from) }
+    if (params?.to) { wh.push('date <= ?'); vals.push(params.to) }
+    if (params?.sphere) { wh.push('sphere = ?'); vals.push(params.sphere) }
     const whereSql = ' WHERE ' + wh.join(' AND ')
     const rows = d.prepare(`
-        SELECT v.type, IFNULL(SUM(ve.amount),0) as gross 
-        FROM voucher_earmarks ve 
-        JOIN vouchers v ON v.id = ve.voucher_id
+        WITH earmark_assignments AS (
+            SELECT ve.voucher_id as voucherId, ve.earmark_id as earmarkId, ve.amount,
+                   v.type, v.date, v.sphere
+            FROM voucher_earmarks ve
+            JOIN vouchers v ON v.id = ve.voucher_id
+            WHERE ve.earmark_id = ?
+            UNION ALL
+            SELECT v.id as voucherId, v.earmark_id as earmarkId,
+                   COALESCE(NULLIF(v.earmark_amount, 0), ABS(v.gross_amount), 0) as amount,
+                   v.type, v.date, v.sphere
+            FROM vouchers v
+            WHERE v.earmark_id = ?
+              AND NOT EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = v.id)
+        )
+        SELECT type, IFNULL(SUM(amount),0) as gross
+        FROM earmark_assignments
         ${whereSql} 
-        GROUP BY v.type
-    `).all(...vals) as any[]
+        GROUP BY type
+    `).all(earmarkId, earmarkId, ...vals) as any[]
     let allocated = 0, released = 0
     for (const r of rows) {
         if (r.type === 'IN') allocated += r.gross || 0
@@ -79,20 +92,33 @@ export function bindingUsage(earmarkId: number, params?: { from?: string; to?: s
     const balance = Math.round((allocated - released) * 100) / 100
     const remaining = Math.round(((budget + allocated - released) * 100)) / 100
     // Counts: total, inside, and outside relative to earmark's own date range
-    const totalCountRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_earmarks WHERE earmark_id=?`).get(earmarkId) as any
-    const totalCount = Number(totalCountRow?.c || 0)
     const startDate = metaRow?.startDate || null
     const endDate = metaRow?.endDate || null
-    let insideCount = totalCount
+    const assignmentCte = `
+        WITH earmark_assignments AS (
+            SELECT ve.voucher_id as voucherId, ve.earmark_id as earmarkId, v.date
+            FROM voucher_earmarks ve
+            JOIN vouchers v ON v.id = ve.voucher_id
+            WHERE ve.earmark_id = ?
+            UNION ALL
+            SELECT v.id as voucherId, v.earmark_id as earmarkId, v.date
+            FROM vouchers v
+            WHERE v.earmark_id = ?
+              AND NOT EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = v.id)
+        )
+    `
+    const totalAssignmentRow = d.prepare(`${assignmentCte} SELECT COUNT(1) as c FROM earmark_assignments`).get(earmarkId, earmarkId) as any
+    const legacyAwareTotalCount = Number(totalAssignmentRow?.c || 0)
+    let insideCount = legacyAwareTotalCount
     let outsideCount = 0
     if (startDate || endDate) {
-        const wh2: string[] = ['ve.earmark_id = ?']
-        const vals2: any[] = [earmarkId]
-        if (startDate) { wh2.push('v.date >= ?'); vals2.push(startDate) }
-        if (endDate) { wh2.push('v.date <= ?'); vals2.push(endDate) }
-        const insideRow = d.prepare(`SELECT COUNT(1) as c FROM voucher_earmarks ve JOIN vouchers v ON v.id = ve.voucher_id WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
+        const wh2: string[] = ['1 = 1']
+        const vals2: any[] = [earmarkId, earmarkId]
+        if (startDate) { wh2.push('date >= ?'); vals2.push(startDate) }
+        if (endDate) { wh2.push('date <= ?'); vals2.push(endDate) }
+        const insideRow = d.prepare(`${assignmentCte} SELECT COUNT(1) as c FROM earmark_assignments WHERE ${wh2.join(' AND ')}`).get(...vals2) as any
         insideCount = Number(insideRow?.c || 0)
-        outsideCount = Math.max(0, totalCount - insideCount)
+        outsideCount = Math.max(0, legacyAwareTotalCount - insideCount)
     }
-    return { allocated: Math.round(allocated * 100) / 100, released: Math.round(released * 100) / 100, balance, budget, remaining, totalCount, insideCount, outsideCount, startDate, endDate }
+    return { allocated: Math.round(allocated * 100) / 100, released: Math.round(released * 100) / 100, balance, budget, remaining, totalCount: legacyAwareTotalCount, insideCount, outsideCount, startDate, endDate }
 }

@@ -1800,6 +1800,19 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         voucherIds: { type: 'array', items: { type: 'number' } },
         budgetId: nullableNumber,
         budgetName: nullableString,
+        budgetAssignments: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              budgetId: nullableNumber,
+              budgetName: nullableString,
+              amount: nullableNumber
+            }
+          },
+          description: 'Mehrere Budget-Zuordnungen fuer dieselbe Buchung. amount ist der positive Bruttoteilbetrag in EUR.'
+        },
         earmarkId: nullableNumber,
         earmarkName: nullableString,
         addTags: { type: 'array', items: { type: 'string' } },
@@ -1811,13 +1824,19 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           voucherIds: z.array(z.number()).min(1).max(100),
           budgetId: z.number().nullable().optional(),
           budgetName: z.string().nullable().optional(),
+          budgetAssignments: z.array(z.object({
+            budgetId: z.number().nullable().optional(),
+            budgetName: z.string().nullable().optional(),
+            amount: z.number().nullable().optional()
+          })).optional(),
           earmarkId: z.number().nullable().optional(),
           earmarkName: z.string().nullable().optional(),
           addTags: z.array(z.string()).optional(),
           noteAppend: z.string().nullable().optional(),
           reason: z.string().nullable().optional()
         }), rawArgs)
-        const hasBudgetChange = Object.prototype.hasOwnProperty.call(args, 'budgetId') || !!args.budgetName
+        const requestedBudgetAssignments = (args.budgetAssignments || []).filter((item) => item.budgetId != null || !!item.budgetName)
+        const hasBudgetChange = Object.prototype.hasOwnProperty.call(args, 'budgetId') || !!args.budgetName || requestedBudgetAssignments.length > 0
         const hasEarmarkChange = Object.prototype.hasOwnProperty.call(args, 'earmarkId') || !!args.earmarkName
         if (!hasBudgetChange && !hasEarmarkChange && !(args.addTags || []).length && !args.noteAppend) {
           return { ok: false, warning: 'Es wurde keine konkrete Änderung für den Buchungsentwurf angegeben.' }
@@ -1841,6 +1860,23 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           : args.budgetName
             ? budgets.find((item: any) => normalizeLookup(budgetLabel(item)) === normalizeLookup(args.budgetName))
             : null
+        const resolveBudgetTarget = (target: { budgetId?: number | null; budgetName?: string | null }) => {
+          if (target.budgetId != null) {
+            const row = budgets.find((item: any) => Number(item.id) === Number(target.budgetId))
+            return {
+              budgetId: row?.id ?? target.budgetId,
+              label: row ? budgetLabel(row) : `Budget #${target.budgetId}`
+            }
+          }
+          if (target.budgetName) {
+            const row = budgets.find((item: any) => normalizeLookup(budgetLabel(item)) === normalizeLookup(target.budgetName))
+            return {
+              budgetId: row?.id ?? null,
+              label: row ? budgetLabel(row) : target.budgetName
+            }
+          }
+          return { budgetId: null, label: null }
+        }
         const earmarks = listBindings({ activeOnly: false } as any) || []
         const earmark = args.earmarkId != null
           ? earmarks.find((item: any) => Number(item.id) === Number(args.earmarkId))
@@ -1849,6 +1885,33 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             : null
         const changes = (voucherResult.rows || []).map((row: any) => {
           const addTags = (args.addTags || []).filter((tag) => !(row.tags || []).some((existing: string) => existing.toLowerCase() === tag.toLowerCase()))
+          const grossAmount = roundMoney(row.grossAmount)
+          const fullGrossAmount = Math.abs(grossAmount)
+          const budgetTargets = requestedBudgetAssignments.length
+            ? requestedBudgetAssignments
+            : hasBudgetChange
+              ? [{ budgetId: args.budgetId ?? null, budgetName: args.budgetName ?? null, amount: null }]
+              : []
+          const explicitBudgetTotal = budgetTargets.reduce((sum, target) => sum + (target.amount != null ? Math.abs(Number(target.amount || 0)) : 0), 0)
+          const missingBudgetAmounts = budgetTargets.filter((target) => target.amount == null).length
+          let remainingBudgetAmount = Math.max(0, roundMoney(fullGrossAmount - explicitBudgetTotal))
+          const newBudgets = budgetTargets.map((target, idx) => {
+            const resolved = resolveBudgetTarget(target)
+            let amount = target.amount != null ? Math.abs(roundMoney(target.amount)) : 0
+            if (target.amount == null && missingBudgetAmounts > 0) {
+              const remainingMissing = budgetTargets.slice(idx).filter((candidate) => candidate.amount == null).length
+              const isLastMissing = budgetTargets.slice(idx + 1).every((later) => later.amount != null)
+              amount = isLastMissing
+                ? remainingBudgetAmount
+                : roundMoney(remainingBudgetAmount / Math.max(1, remainingMissing))
+              remainingBudgetAmount = roundMoney(remainingBudgetAmount - amount)
+            }
+            return {
+              budgetId: resolved.budgetId,
+              label: resolved.label,
+              amount
+            }
+          })
           return {
             id: `agent-voucher-update-${row.id}`,
             voucherId: Number(row.id),
@@ -1856,18 +1919,23 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             date: row.date,
             type: row.type,
             description: row.description,
-            grossAmount: roundMoney(row.grossAmount),
+            grossAmount,
             oldBudgetId: row.budgetId ?? null,
             oldBudgetLabel: row.budgetLabel ?? null,
             ...(hasBudgetChange ? {
-              newBudgetId: budget?.id ?? args.budgetId ?? null,
-              newBudgetLabel: budget ? budgetLabel(budget) : (args.budgetName || (args.budgetId ? `Budget #${args.budgetId}` : null))
+              newBudgetId: newBudgets[0]?.budgetId ?? budget?.id ?? args.budgetId ?? null,
+              newBudgetLabel: newBudgets.length > 1
+                ? `${newBudgets.length} Budgets`
+                : (newBudgets[0]?.label ?? (budget ? budgetLabel(budget) : (args.budgetName || (args.budgetId ? `Budget #${args.budgetId}` : null)))),
+              newBudgetAmount: newBudgets.length === 1 ? newBudgets[0]?.amount ?? fullGrossAmount : fullGrossAmount,
+              newBudgets
             } : {}),
             oldEarmarkId: row.earmarkId ?? null,
             oldEarmarkLabel: row.earmarkCode ?? null,
             ...(hasEarmarkChange ? {
               newEarmarkId: earmark?.id ?? args.earmarkId ?? null,
-              newEarmarkLabel: earmark?.code || earmark?.name || args.earmarkName || (args.earmarkId ? `Zweckbindung #${args.earmarkId}` : null)
+              newEarmarkLabel: earmark?.code || earmark?.name || args.earmarkName || (args.earmarkId ? `Zweckbindung #${args.earmarkId}` : null),
+              newEarmarkAmount: fullGrossAmount
             } : {}),
             oldTags: row.tags || [],
             newTags: [...(row.tags || []), ...addTags],

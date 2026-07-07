@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
+import {
+    normalizeVoucherBudgetAssignments,
+    normalizeVoucherEarmarkAssignments
+} from '../../../utils/voucherAssignmentFallbacks'
 import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
 import { LABEL_FOR_COL, type BudgetAssignment, type EarmarkAssignment, type VoucherRow } from '../types'
 
@@ -49,6 +53,7 @@ function UsageHover({
     getUsage,
     rows,
     hint,
+    refreshKey,
     children
 }: {
     kind: 'budget' | 'earmark' | 'tag' | 'payment'
@@ -59,6 +64,7 @@ function UsageHover({
     getUsage?: (id: number) => Promise<any>
     rows?: Array<{ key: string; value: string; dotColor?: string }>
     hint?: string
+    refreshKey?: number
     children: React.ReactNode
 }) {
     const [loading, setLoading] = useState(false)
@@ -71,6 +77,11 @@ function UsageHover({
             aliveRef.current = false
         }
     }, [])
+
+    useEffect(() => {
+        setData(null)
+        setError('')
+    }, [refreshKey])
 
     const loadUsage = useCallback(async () => {
         if (!getUsage || id == null || data || loading) return
@@ -363,6 +374,7 @@ export default function JournalTable({
     const budgetUsageInFlight = useRef(new Map<number, Promise<any>>())
     const earmarkUsageCache = useRef(new Map<number, any>())
     const earmarkUsageInFlight = useRef(new Map<number, Promise<any>>())
+    const [usageRefreshKey, setUsageRefreshKey] = useState(0)
 
     const getBudgetUsage = useCallback(async (budgetId: number) => {
         const cached = budgetUsageCache.current.get(budgetId)
@@ -406,6 +418,22 @@ export default function JournalTable({
     const tagUsageInFlight = useRef(new Map<number, Promise<any>>())
     const paymentUsageCache = useRef(new Map<number, PaymentUsage>())
     const paymentUsageInFlight = useRef(new Map<number, Promise<PaymentUsage>>())
+
+    useEffect(() => {
+        const clearUsageCaches = () => {
+            budgetUsageCache.current.clear()
+            budgetUsageInFlight.current.clear()
+            earmarkUsageCache.current.clear()
+            earmarkUsageInFlight.current.clear()
+            tagUsageCache.current.clear()
+            tagUsageInFlight.current.clear()
+            paymentUsageCache.current.clear()
+            paymentUsageInFlight.current.clear()
+            setUsageRefreshKey((key) => key + 1)
+        }
+        window.addEventListener('data-changed', clearUsageCaches)
+        return () => window.removeEventListener('data-changed', clearUsageCaches)
+    }, [])
 
     const getTagUsage = useCallback(async (tagId: number) => {
         const cached = tagUsageCache.current.get(tagId)
@@ -747,6 +775,7 @@ export default function JournalTable({
                                 getUsage={getTagUsage}
                                 rows={tagUsageFallbackRows.get(String(t || '').toLowerCase())}
                                 hint="Klick filtert die Buchungsliste nach diesem Tag."
+                                refreshKey={usageRefreshKey}
                             >
                                 <button
                                     className="chip"
@@ -773,11 +802,7 @@ export default function JournalTable({
             <td key={k} align="center">
                 {(() => {
                     // Use earmarksAssigned array if available, otherwise fall back to single earmark
-                    const assignments = r.earmarksAssigned && r.earmarksAssigned.length > 0
-                        ? r.earmarksAssigned
-                        : r.earmarkId && r.earmarkCode
-                            ? [{ earmarkId: r.earmarkId, code: r.earmarkCode, amount: 0 }]
-                            : []
+                    const assignments = normalizeVoucherEarmarkAssignments(r)
 
                     if (assignments.length === 0) return ''
 
@@ -803,6 +828,7 @@ export default function JournalTable({
                                         accent={bg}
                                         eurFmt={eurFmt}
                                         getUsage={getEarmarkUsage}
+                                        refreshKey={usageRefreshKey}
                                     >
                                         <button
                                             className="badge-earmark"
@@ -850,7 +876,7 @@ export default function JournalTable({
                             { key: 'Betrag', value: eurFmt.format(Math.abs(Number(r.grossAmount || 0))), dotColor: 'var(--accent)' }
                         ]
                         return (
-                            <UsageHover kind="payment" title={title} rows={rows} eurFmt={eurFmt}>
+                            <UsageHover kind="payment" title={title} rows={rows} eurFmt={eurFmt} refreshKey={usageRefreshKey}>
                                 <button type="button" className={`badge pm-account-badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} aria-label={title} style={{ borderColor: r.transferFromAccountColor || r.transferToAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); onTransferClick?.() }}>
                                     <span className="pm-icon">
                                         {paymentAccountIcon(r.transferFromAccountKind, from)}
@@ -875,7 +901,7 @@ export default function JournalTable({
                             ]
                             const accountId = Number(r.paymentAccountId || 0)
                             return (
-                                <UsageHover kind="payment" title="Zahlungskonto" rows={rows} eurFmt={eurFmt} getUsage={accountId ? getPaymentUsage : undefined} id={accountId || undefined}>
+                                <UsageHover kind="payment" title="Zahlungskonto" rows={rows} eurFmt={eurFmt} getUsage={accountId ? getPaymentUsage : undefined} id={accountId || undefined} refreshKey={usageRefreshKey}>
                                     <button type="button" className={`badge pm-account-badge pm-${(r.paymentMethod || '').toLowerCase()}`} aria-label={`Zahlweg: ${label}`} style={{ borderColor: r.paymentAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); if (accountId) onPaymentAccountClick?.(accountId) }}>
                                         {paymentAccountIcon(r.paymentAccountKind, r.paymentMethod)}
                                         <span className="pm-account-badge__label">{label}</span>
@@ -890,11 +916,7 @@ export default function JournalTable({
             <td key={k} align="center">
                 {(() => {
                     // Use budgets array if available, otherwise fall back to single budget
-                    const assignments = r.budgets && r.budgets.length > 0
-                        ? r.budgets
-                        : r.budgetId && r.budgetLabel
-                            ? [{ budgetId: r.budgetId, label: r.budgetLabel, amount: 0, color: (r as any).budgetColor }]
-                            : []
+                    const assignments = normalizeVoucherBudgetAssignments(r)
 
                     if (assignments.length === 0) return ''
 
@@ -918,6 +940,7 @@ export default function JournalTable({
                                         accent={bg || null}
                                         eurFmt={eurFmt}
                                         getUsage={getBudgetUsage}
+                                        refreshKey={usageRefreshKey}
                                     >
                                         <button
                                             className="badge-budget"

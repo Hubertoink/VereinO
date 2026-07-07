@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.6.2] - 2026-07-07
+
+### Geändert
+
+- KI: Buchungs-Reviews unterstützen jetzt mehrere Budget-Zuordnungen auf einer einzelnen Buchung, inklusive Teilbeträgen.
+- Buchungsjournal: Der schwebende `+ Buchung`-Button zieht am Tabellenende animiert nach links, damit rechte Betragswerte sichtbar bleiben.
+
+### Behoben
+
+- KI: Budget- und Zweckbindungszuordnungen aus Agent-Reviews werden mit dem vollen Bruttobetrag bzw. den angegebenen Teilbeträgen übernommen.
+- Buchungen: Legacy-Zuordnungen ohne moderne Mehrfachzeile werden in Details, Bearbeiten-Dialog, Tabellen-Badges und Hover-Auswertungen wieder mit Betrag angezeigt.
+- Buchungsjournal: Hover-Auswertungen für Budget, Zweckbindung, Tags und Zahlungskonten werden nach Datenänderungen neu geladen.
+
 ## [2.6.1] - 2026-07-07
 
 ### Geändert

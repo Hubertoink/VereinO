@@ -2962,6 +2962,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 oldBudgetLabel: change.oldBudgetLabel,
                 newBudgetId: change.newBudgetId,
                 newBudgetLabel: change.newBudgetLabel,
+                newBudgets: change.newBudgets || [],
                 oldTags: change.oldTags || [],
                 newTags: change.newTags || [],
                 selected: change.selected,
@@ -5010,6 +5011,25 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     return lookup
   }
 
+  const buildEarmarkLookup = async () => {
+    const result = await window.api.bindings.list({ activeOnly: false })
+    const rows = (result.rows || result || []) as any[]
+    const lookup = new Map<string, number>()
+    const add = (label: unknown, id: unknown) => {
+      const normalized = normalizeLookup(label)
+      const numericId = Number(id)
+      if (normalized && Number.isFinite(numericId)) lookup.set(normalized, numericId)
+    }
+    for (const earmark of rows) {
+      add(earmark.code, earmark.id)
+      add(earmark.name, earmark.id)
+      add([earmark.code, earmark.name].filter(Boolean).join(' '), earmark.id)
+      add([earmark.code, earmark.name].filter(Boolean).join(' · '), earmark.id)
+      add(`Zweckbindung #${earmark.id}`, earmark.id)
+    }
+    return lookup
+  }
+
   const resolvePendingVoucherBudgetTargets = async (
     knownBudgets: Array<{ id: number; label: string }> = []
   ) => {
@@ -5661,33 +5681,78 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
     setBusy(true)
     try {
+      const budgetTargetsForChange = (change: AiVoucherUpdateChange) => {
+        if (Array.isArray(change.newBudgets) && change.newBudgets.length > 0) {
+          return change.newBudgets
+        }
+        if (change.newBudgetId !== undefined || change.newBudgetLabel || change.newBudgetAmount != null) {
+          return [{
+            budgetId: change.newBudgetId,
+            label: change.newBudgetLabel,
+            amount: change.newBudgetAmount
+          }]
+        }
+        return []
+      }
       const needsBudgetLookup = selected.some(
-        (change) => change.newBudgetId == null && !!change.newBudgetLabel
+        (change) => budgetTargetsForChange(change).some((budget) => budget.budgetId == null && !!budget.label)
+      )
+      const needsEarmarkLookup = selected.some(
+        (change) => change.newEarmarkId == null && !!change.newEarmarkLabel
       )
       const budgetLookup = needsBudgetLookup ? await buildBudgetLookup() : new Map<string, number>()
+      const earmarkLookup = needsEarmarkLookup ? await buildEarmarkLookup() : new Map<string, number>()
       for (const change of selected) {
-        const hasBudgetChange = change.newBudgetId !== undefined || !!change.newBudgetLabel
-        const resolvedBudgetId =
-          hasBudgetChange && change.newBudgetId == null && change.newBudgetLabel
-            ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
-            : change.newBudgetId
-        if (hasBudgetChange && resolvedBudgetId == null && change.newBudgetLabel) {
+        const budgetTargets = budgetTargetsForChange(change)
+        const hasBudgetChange = budgetTargets.length > 0 || change.newBudgetId !== undefined || !!change.newBudgetLabel
+        const hasEarmarkChange = change.newEarmarkId !== undefined || !!change.newEarmarkLabel
+        const fullGrossAmount = Math.abs(Number(change.grossAmount || 0))
+        const resolvedBudgets = budgetTargets.map((budget) => {
+          const resolvedBudgetId =
+            budget.budgetId == null && budget.label
+              ? budgetLookup.get(normalizeLookup(budget.label))
+              : budget.budgetId
+          const amount = Math.abs(Number(budget.amount ?? fullGrossAmount))
+          return {
+            budgetId: resolvedBudgetId,
+            label: budget.label,
+            amount
+          }
+        })
+        const resolvedEarmarkId =
+          hasEarmarkChange && change.newEarmarkId == null && change.newEarmarkLabel
+            ? earmarkLookup.get(normalizeLookup(change.newEarmarkLabel))
+            : change.newEarmarkId
+        const unresolvedBudget = resolvedBudgets.find((budget) => budget.budgetId == null && budget.label)
+        if (hasBudgetChange && unresolvedBudget) {
+          throw new Error(`Budget "${unresolvedBudget.label}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`)
+        }
+        if (hasEarmarkChange && resolvedEarmarkId == null && change.newEarmarkLabel) {
           throw new Error(
-            `Budget "${change.newBudgetLabel}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`
+            `Zweckbindung "${change.newEarmarkLabel}" wurde noch nicht gefunden. Bitte Zweckbindung zuerst übernehmen oder Namen prüfen.`
           )
+        }
+        const earmarkAmount = Math.abs(Number(change.newEarmarkAmount ?? fullGrossAmount))
+        if (hasBudgetChange && resolvedBudgets.some((budget) => budget.budgetId != null && budget.amount <= 0)) {
+          throw new Error(`Budget-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`)
+        }
+        if (hasEarmarkChange && resolvedEarmarkId != null && earmarkAmount <= 0) {
+          throw new Error(`Zweckbindungs-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`)
         }
         const payload: TVoucherMetaUpdateInput = {
           id: change.voucherId,
           ...(hasBudgetChange
             ? {
-                budgetId: resolvedBudgetId ?? null,
-                budgetAmount: Math.abs(Number(change.grossAmount || 0)) || undefined
+                budgets: resolvedBudgets
+                  .filter((budget) => budget.budgetId != null)
+                  .map((budget) => ({ budgetId: Number(budget.budgetId), amount: budget.amount }))
               }
             : {}),
-          ...(change.newEarmarkId !== undefined
+          ...(hasEarmarkChange
             ? {
-                earmarkId: change.newEarmarkId,
-                earmarkAmount: Math.abs(Number(change.grossAmount || 0)) || undefined
+                earmarks: resolvedEarmarkId != null
+                  ? [{ earmarkId: resolvedEarmarkId, amount: earmarkAmount }]
+                  : []
               }
             : {}),
           ...(change.newTags ? { tags: change.newTags } : {})
@@ -5704,7 +5769,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             change.newBudgetId == null && change.newBudgetLabel
               ? budgetLookup.get(normalizeLookup(change.newBudgetLabel))
               : change.newBudgetId
-          return { ...change, newBudgetId: resolvedBudgetId ?? change.newBudgetId, applied: true }
+          const resolvedBudgets = budgetTargetsForChange(change).map((budget) => ({
+            ...budget,
+            budgetId: budget.budgetId == null && budget.label
+              ? budgetLookup.get(normalizeLookup(budget.label)) ?? budget.budgetId
+              : budget.budgetId
+          }))
+          const resolvedEarmarkId =
+            change.newEarmarkId == null && change.newEarmarkLabel
+              ? earmarkLookup.get(normalizeLookup(change.newEarmarkLabel))
+              : change.newEarmarkId
+          return {
+            ...change,
+            newBudgetId: resolvedBudgets[0]?.budgetId ?? resolvedBudgetId ?? change.newBudgetId,
+            newBudgets: resolvedBudgets.length ? resolvedBudgets : change.newBudgets,
+            newEarmarkId: resolvedEarmarkId ?? change.newEarmarkId,
+            applied: true
+          }
         })
       })
       pushMessage({

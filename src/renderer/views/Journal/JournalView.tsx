@@ -15,6 +15,10 @@ import { buildVoucherUpdatePayloadFromEditRow, serializeEditRow } from './utils/
 import { shouldPromptDiscardForEdit } from './utils/journalEditDiscardPrompt'
 import { getInternalAssignmentValidationState } from '../../components/modals/voucherMetaValidation'
 import {
+    normalizeVoucherBudgetAssignments,
+    normalizeVoucherEarmarkAssignments
+} from '../../utils/voucherAssignmentFallbacks'
+import {
     DEFAULT_ORDER as SHARED_DEFAULT_ORDER,
     LABEL_FOR_COL,
     type BookingEditTab as SharedBookingEditTab,
@@ -449,17 +453,22 @@ export default function JournalView({
     }, [])
 
     const openEditRow = useCallback((row: EditVoucherRow) => {
-        const snapshot = serializeEditRow(row) || ''
+        const normalizedRow = {
+            ...row,
+            budgets: normalizeVoucherBudgetAssignments(row),
+            earmarksAssigned: normalizeVoucherEarmarkAssignments(row)
+        }
+        const snapshot = serializeEditRow(normalizedRow) || ''
 
         if (!showBookingEditTabs) {
             setActiveEditTabId(null)
             setConfirmDiscardEdit(false)
             setEditRowInitialSnapshot(snapshot)
-            setEditRowState(row)
+            setEditRowState(normalizedRow)
             return
         }
 
-        const tabId = `edit-${row.id}`
+        const tabId = `edit-${normalizedRow.id}`
         const existing = bookingEditTabs.find((tab) => tab.id === tabId)
         if (existing) {
             if (existing.detached) {
@@ -474,7 +483,7 @@ export default function JournalView({
             return
         }
 
-        const tab = { id: tabId, row, initialSnapshot: snapshot, detached: false }
+        const tab = { id: tabId, row: normalizedRow, initialSnapshot: snapshot, detached: false }
         setBookingEditTabs((tabs) => [...tabs, tab])
         activateBookingEditTab(tab)
     }, [activateBookingEditTab, bookingEditTabs, serializeEditRow, showBookingEditTabs])
