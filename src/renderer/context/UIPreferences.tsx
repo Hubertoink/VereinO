@@ -11,7 +11,9 @@ import {
   type QuickAddAfterSave
 } from './UIPreferencesContextCore'
 
-const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom']
+const NIKO_BACKGROUND_ID: BackgroundImage = 'niko-bg'
+const NIKO_BACKGROUND_SRC = new URL('../../../assets/Niko_BG.jpg', import.meta.url).href
+const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom', NIKO_BACKGROUND_ID]
 
 // Glassmorphism: transparent modals with blur
 
@@ -35,6 +37,20 @@ function safeLocalStorageRemove(key: string) {
 function clearLegacyBackgroundContrastPreference() {
   safeLocalStorageRemove('ui.backgroundContrast')
   document.documentElement.removeAttribute('data-background-contrast')
+}
+
+function normalizePersonName(value: unknown) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function isNikoBackgroundCashier(value: unknown) {
+  return normalizePersonName(value) === 'merle beckord'
 }
 
 function applyColorThemeToDocument(theme: string | null | undefined) {
@@ -80,6 +96,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   useLayoutEffect(() => {
     const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('ui.colorTheme') : null
     applyColorThemeToDocument(storedTheme)
+    document.documentElement.style.setProperty('--niko-background-image', `url("${NIKO_BACKGROUND_SRC}")`)
   }, [])
 
   // Load appearance settings from organization on mount
@@ -183,6 +200,54 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
   }
+
+  useEffect(() => {
+    let alive = true
+
+    const applyCashierBackground = async () => {
+      if (!appearanceInitializedRef.current) return
+      try {
+        const result = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
+        if (!alive) return
+        const shouldUseNikoBackground = isNikoBackgroundCashier(result?.value)
+        const current = document.documentElement.getAttribute('data-background-image') as BackgroundImage | null
+        const storedPrevious = localStorage.getItem('ui.backgroundImageBeforeNikoEgg') as BackgroundImage | null
+
+        if (shouldUseNikoBackground && current !== NIKO_BACKGROUND_ID) {
+          if (current) {
+            safeLocalStorageSet('ui.backgroundImageBeforeNikoEgg', current)
+          }
+          setBackgroundImageState(NIKO_BACKGROUND_ID)
+          saveAppearanceToOrg({ backgroundImage: NIKO_BACKGROUND_ID })
+          return
+        }
+
+        if (!shouldUseNikoBackground && current === NIKO_BACKGROUND_ID) {
+          const restore =
+            storedPrevious && VALID_BACKGROUNDS.includes(storedPrevious) && storedPrevious !== NIKO_BACKGROUND_ID
+              ? storedPrevious
+              : 'none'
+          safeLocalStorageRemove('ui.backgroundImageBeforeNikoEgg')
+          setBackgroundImageState(restore)
+          saveAppearanceToOrg({ backgroundImage: restore })
+        }
+      } catch {
+        // Easter egg lookup must never block normal appearance handling.
+      }
+    }
+
+    const onDataChanged = () => {
+      void applyCashierBackground()
+    }
+
+    const timer = window.setTimeout(() => void applyCashierBackground(), 80)
+    window.addEventListener('data-changed', onDataChanged)
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+      window.removeEventListener('data-changed', onDataChanged)
+    }
+  }, [backgroundImage, currentOrgId])
 
   // Wrapper to save theme to organization when changed
   const setColorTheme = (val: ColorTheme) => {

@@ -6,7 +6,7 @@ export type NavIconColorMode = 'color' | 'mono'
 export type DateFormat = 'de' | 'iso'
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 export type JournalRowDensity = 'normal' | 'compact'
-export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom'
+export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom' | 'niko-bg'
 export type QuickAddAfterSave = 'close' | 'new'
 
 interface UIPreferencesContextValue {
