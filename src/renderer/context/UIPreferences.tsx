@@ -39,6 +39,10 @@ function clearLegacyBackgroundContrastPreference() {
   document.documentElement.removeAttribute('data-background-contrast')
 }
 
+function getNikoBackgroundInitializedKey(orgId: string | null) {
+  return `ui.nikoBackgroundInitialized.${orgId || 'local'}`
+}
+
 function normalizePersonName(value: unknown) {
   return String(value || '')
     .toLowerCase()
@@ -211,25 +215,20 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!alive) return
         const shouldUseNikoBackground = isNikoBackgroundCashier(result?.value)
         const current = document.documentElement.getAttribute('data-background-image') as BackgroundImage | null
-        const storedPrevious = localStorage.getItem('ui.backgroundImageBeforeNikoEgg') as BackgroundImage | null
+        const initializedKey = getNikoBackgroundInitializedKey(currentOrgId)
+        const hasInitialized = localStorage.getItem(initializedKey) === 'true'
 
-        if (shouldUseNikoBackground && current !== NIKO_BACKGROUND_ID) {
-          if (current) {
-            safeLocalStorageSet('ui.backgroundImageBeforeNikoEgg', current)
-          }
-          setBackgroundImageState(NIKO_BACKGROUND_ID)
-          saveAppearanceToOrg({ backgroundImage: NIKO_BACKGROUND_ID })
+        if (current === NIKO_BACKGROUND_ID && !hasInitialized) {
+          safeLocalStorageSet(initializedKey, 'true')
+          safeLocalStorageRemove('ui.backgroundImageBeforeNikoEgg')
           return
         }
 
-        if (!shouldUseNikoBackground && current === NIKO_BACKGROUND_ID) {
-          const restore =
-            storedPrevious && VALID_BACKGROUNDS.includes(storedPrevious) && storedPrevious !== NIKO_BACKGROUND_ID
-              ? storedPrevious
-              : 'none'
+        if (shouldUseNikoBackground && !hasInitialized) {
+          safeLocalStorageSet(initializedKey, 'true')
           safeLocalStorageRemove('ui.backgroundImageBeforeNikoEgg')
-          setBackgroundImageState(restore)
-          saveAppearanceToOrg({ backgroundImage: restore })
+          setBackgroundImageState(NIKO_BACKGROUND_ID)
+          saveAppearanceToOrg({ backgroundImage: NIKO_BACKGROUND_ID })
         }
       } catch {
         // Easter egg lookup must never block normal appearance handling.

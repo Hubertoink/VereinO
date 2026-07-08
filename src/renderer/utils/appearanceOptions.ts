@@ -20,6 +20,7 @@ export const BACKGROUND_IMAGE_OPTIONS: Array<{ id: BackgroundImage; name: string
   { id: 'cherry-blossom', name: 'Kirschblüten', compactName: 'Kirschblüten', icon: 'CB' },
   { id: 'foggy-forest', name: 'Nebliger Wald', compactName: 'Nebelwald', icon: 'NF' },
   { id: 'mountain-snow', name: 'Schneeberge', compactName: 'Bergschnee', icon: 'SB' },
+  { id: 'niko-bg', name: 'Niko BG', compactName: 'Niko BG', icon: 'NB' },
   { id: 'custom', name: 'Eigenes', compactName: 'Eigenes...', icon: '+' },
 ]
 

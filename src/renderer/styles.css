@@ -9304,6 +9304,10 @@ html[data-glass-modals='true'] .flyout-arrow {
   background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
 }
 
+.bg-card__preview--niko-bg {
+  background-image: var(--niko-background-image);
+}
+
 .bg-card__name {
   font-size: 11px;
   font-weight: 500;
@@ -9488,6 +9492,10 @@ html[data-glass-modals='true'] .flyout-arrow {
 
 .background-preview.bg-mountain-snow {
   background-image: url('./assets/a_mountain_range_with_snow_on_top.jpg');
+}
+
+.background-preview.bg-niko-bg {
+  background-image: var(--niko-background-image);
 }
 
 /* ==================== Journal Filter Toolbar ==================== */

@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.7.0] - 2026-07-08
+
+### Geändert
+
+- Darstellung: Niko BG erscheint als eigenes Hintergrundbild in den Einstellungen und im Setup-Assistenten.
+- Darstellung: Das Merle-Beckord-Easter-Egg setzt Niko BG nur noch initial, danach kann der Hintergrund frei gewechselt werden.
+
 ## [2.6.6] - 2026-07-08
 
 ### Hinzugefügt
