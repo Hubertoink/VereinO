@@ -734,13 +734,8 @@ export default function JournalTable({
                 <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {(() => {
                         const fullText = r.description?.trim() || ''
-                        const shortenedText = truncateJournalDescription(fullText, 32)
-                        const hasOverflow = fullText.length > 32
                         if (!fullText) {
                             return <span className="journal-description-text" />
-                        }
-                        if (!hasOverflow) {
-                            return <span className="journal-description-text">{shortenedText}</span>
                         }
                         return (
                             <HoverTooltip<HTMLSpanElement>
@@ -751,7 +746,7 @@ export default function JournalTable({
                             >
                                 {({ ref, props }) => (
                                     <span ref={ref} className="journal-description-text" {...props}>
-                                        {shortenedText}
+                                        {fullText}
                                     </span>
                                 )}
                             </HoverTooltip>

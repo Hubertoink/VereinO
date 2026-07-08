@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.7.1] - 2026-07-08
+
+### Hinzugefügt
+
+- Buchungsjournal: Die Suche findet Buchungen jetzt auch über Datumsbegriffe wie `26. Juni`, `26.06.2026`, `Juni` oder `Juni 2026`.
+
+### Verbessert
+
+- Buchungsjournal: Beschreibungen nutzen den verfügbaren Tabellenplatz besser und werden erst nach bis zu zwei Zeilen gekürzt.
+- Verbindlichkeiten: Aktionsmenüs in Details öffnen außerhalb des Modal-Layouts, ohne den Inhalt zu verschieben.
+- Verbindlichkeiten: Die Tabelle erhält bei geringer Fensterbreite einen horizontalen Scrollbereich.
+
 ## [2.7.0] - 2026-07-08
 
 ### Geändert

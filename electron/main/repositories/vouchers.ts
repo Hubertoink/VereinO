@@ -51,13 +51,135 @@ function validateInternalTransferAssignments(
     }
 }
 
-function normalizeVoucherSearchQuery(raw?: string): { text: string; id: number | null } | null {
+function normalizeSearchText(raw: string) {
+    return raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[,\s]+/g, ' ')
+        .trim()
+}
+
+const GERMAN_MONTHS: Record<string, string> = {
+    jan: '01',
+    januar: '01',
+    feb: '02',
+    februar: '02',
+    mar: '03',
+    maer: '03',
+    marz: '03',
+    maerz: '03',
+    mrz: '03',
+    apr: '04',
+    april: '04',
+    mai: '05',
+    jun: '06',
+    juni: '06',
+    jul: '07',
+    juli: '07',
+    aug: '08',
+    august: '08',
+    sep: '09',
+    sept: '09',
+    september: '09',
+    okt: '10',
+    oktober: '10',
+    nov: '11',
+    november: '11',
+    dez: '12',
+    dezember: '12'
+}
+
+function twoDigit(value: string | number) {
+    return String(value).padStart(2, '0')
+}
+
+function normalizeYear(value?: string) {
+    if (!value) return null
+    if (/^\d{4}$/.test(value)) return value
+    if (/^\d{2}$/.test(value)) return `20${value}`
+    return null
+}
+
+function getVoucherDateSearchPatterns(text: string): string[] {
+    const normalized = normalizeSearchText(text.replace(/\./g, ' '))
+    const compact = text.trim()
+    const patterns = new Set<string>()
+
+    const iso = compact.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/)
+    if (iso) {
+        const year = iso[1]
+        const month = twoDigit(iso[2])
+        const day = iso[3] ? twoDigit(iso[3]) : null
+        patterns.add(day ? `${year}-${month}-${day}` : `${year}-${month}-%`)
+    }
+
+    const numeric = compact.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2}|\d{4}))?\.?$/)
+    if (numeric) {
+        const day = twoDigit(numeric[1])
+        const month = twoDigit(numeric[2])
+        const year = normalizeYear(numeric[3])
+        patterns.add(year ? `${year}-${month}-${day}` : `%-${month}-${day}`)
+    }
+
+    const textDate = normalized.match(/^(\d{1,2})\s+([a-z]+)(?:\s+(\d{2}|\d{4}))?$/)
+    if (textDate) {
+        const day = twoDigit(textDate[1])
+        const month = GERMAN_MONTHS[textDate[2]]
+        const year = normalizeYear(textDate[3])
+        if (month) patterns.add(year ? `${year}-${month}-${day}` : `%-${month}-${day}`)
+    }
+
+    const monthYear = normalized.match(/^([a-z]+)\s+(\d{2}|\d{4})$/)
+    if (monthYear) {
+        const month = GERMAN_MONTHS[monthYear[1]]
+        const year = normalizeYear(monthYear[2])
+        if (month && year) patterns.add(`${year}-${month}-%`)
+    }
+
+    const monthOnly = normalized.match(/^([a-z]+)$/)
+    if (monthOnly) {
+        const month = GERMAN_MONTHS[monthOnly[1]]
+        if (month) patterns.add(`%-${month}-%`)
+    }
+
+    return Array.from(patterns)
+}
+
+function normalizeVoucherSearchQuery(raw?: string): { text: string; id: number | null; datePatterns: string[] } | null {
     if (!raw) return null
     const trimmed = String(raw).trim()
     if (!trimmed) return null
     const text = trimmed.startsWith('#') ? trimmed.slice(1).trim() : trimmed
     const id = /^\d+$/.test(text) ? Number(text) : null
-    return { text, id }
+    return { text, id, datePatterns: getVoucherDateSearchPatterns(text) }
+}
+
+function appendVoucherSearchFilter(wh: string[], params: any[], raw?: string, alias?: string) {
+    const nq = normalizeVoucherSearchQuery(raw)
+    if (!nq) return
+
+    const col = (name: string) => alias ? `${alias}.${name}` : name
+    const like = `%${nq.text}%`
+    const parts = [
+        `${col('voucher_no')} LIKE ?`,
+        `${col('description')} LIKE ?`,
+        `${col('counterparty')} LIKE ?`,
+        `${col('date')} LIKE ?`
+    ]
+    params.push(like, like, like, like)
+
+    if (nq.id != null) {
+        parts.unshift(`${col('id')} = ?`)
+        params.splice(params.length - 4, 0, nq.id)
+    }
+
+    for (const pattern of nq.datePatterns) {
+        parts.push(`${col('date')} LIKE ?`)
+        params.push(pattern)
+    }
+
+    wh.push(`(${parts.join(' OR ')})`)
 }
 
 function getAdvancePlaceholderRef(d: DB, voucherId: number) {
@@ -565,19 +687,7 @@ export function listVouchersAdvanced(filters: {
         wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
         params.push(budgetId, budgetId)
     }
-    {
-        const nq = normalizeVoucherSearchQuery(q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-                params.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-                params.push(like, like, like, like)
-            }
-        }
-    }
+    appendVoucherSearchFilter(wh, params, q, 'v')
     if (tag) {
         sql += ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
         wh.push('t.name = ?')
@@ -642,19 +752,7 @@ export function listVouchersAdvancedPaged(filters: {
         wh.push(`v.id IN (${voucherIds.map(() => '?').join(', ')})`)
         params.push(...voucherIds)
     }
-    {
-        const nq = normalizeVoucherSearchQuery(q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-                params.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ?)')
-                params.push(like, like, like, like)
-            }
-        }
-    }
+    appendVoucherSearchFilter(wh, params, q, 'v')
     let joinSql = ''
     if (tag) {
         joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
@@ -754,19 +852,7 @@ function appendBatchVoucherFilters(wh: string[], args: any[], params: BatchVouch
     if (params.type) { wh.push('type = ?'); args.push(params.type) }
     if (params.from) { wh.push('date >= ?'); args.push(params.from) }
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
-    {
-        const nq = normalizeVoucherSearchQuery(params.q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(id = ? OR voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(voucher_no LIKE ? OR description LIKE ? OR counterparty LIKE ? OR date LIKE ?)')
-                args.push(like, like, like, like)
-            }
-        }
-    }
+    appendVoucherSearchFilter(wh, args, params.q)
     if (params.filterEarmarkId != null) {
         wh.push('(earmark_id = ? OR EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = vouchers.id AND ve.earmark_id = ?))')
         args.push(params.filterEarmarkId, params.filterEarmarkId)
@@ -951,19 +1037,7 @@ export function summarizeVouchers(filters: {
     if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
     if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
     if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
-    {
-        const nq = normalizeVoucherSearchQuery(q)
-        if (nq) {
-            const like = `%${nq.text}%`
-            if (nq.id != null) {
-                wh.push('(v.id = ? OR v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
-                paramsBase.push(nq.id, like, like, like, like)
-            } else {
-                wh.push('(v.voucher_no LIKE ? OR v.description LIKE ? OR v.counterparty LIKE ? OR v.date LIKE ? )')
-                paramsBase.push(like, like, like, like)
-            }
-        }
-    }
+    appendVoucherSearchFilter(wh, paramsBase, q, 'v')
     if (tag) {
         joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
         wh.push('t.name = ?')

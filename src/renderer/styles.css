@@ -1718,6 +1718,20 @@ label.settings-toggle-card {
   border-collapse: collapse;
   table-layout: auto;
 }
+.invoices-table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+.invoices-table-scroll-wrapper:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+.invoices-table--wide {
+  min-width: 980px;
+}
 .invoices-table th:last-child,
 .invoices-table td:last-child {
   width: 1%;
@@ -1797,6 +1811,17 @@ label.settings-toggle-card {
 }
 .invoices-actions-nowrap {
   white-space: nowrap;
+}
+.invoice-action-menu {
+  position: fixed;
+  z-index: 6500;
+  padding: 6px;
+  min-width: 168px;
+  display: grid;
+  gap: 6px;
+}
+.invoice-action-menu .btn {
+  justify-content: flex-start;
 }
 .invoices-payment-add {
   background: var(--success);
@@ -2819,15 +2844,22 @@ button.badge:hover {
 .journal-description-cell {
   min-width: 0;
   flex: 1 1 auto;
+  align-content: center;
+  line-height: 1.35;
 }
 
 .journal-description-text {
-  display: block;
+  display: -webkit-box;
+  flex: 1 1 220px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .journal-note-cell {

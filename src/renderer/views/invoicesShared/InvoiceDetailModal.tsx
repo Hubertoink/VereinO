@@ -1,6 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../../components/ModalHeader'
+import InvoiceActionMenu from './InvoiceActionMenu'
 import type { InvoiceDetail, InvoiceStatus, InvoiceTagDef } from './types'
 
 type Props = {
@@ -28,51 +29,6 @@ function contrastText(bg?: string | null) {
   const b = parseInt(hex.slice(4, 6), 16)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance > 0.6 ? '#000' : '#fff'
-}
-
-function ActionMenu({ actions }: { actions: Array<{ label: string; tone?: 'danger'; onClick: () => void }> }) {
-  const [open, setOpen] = React.useState(false)
-  const rootRef = React.useRef<HTMLDivElement | null>(null)
-
-  React.useEffect(() => {
-    if (!open) return
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [open])
-
-  return (
-    <div ref={rootRef} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button type="button" className="btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)} style={{ minWidth: 40, textAlign: 'center' }}>...</button>
-      {open && (
-      <div className="card" role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 1000, padding: 6, display: 'grid', gap: 6, minWidth: 150 }}>
-        {actions.map((action) => (
-          <button
-            key={action.label}
-            type="button"
-            role="menuitem"
-            className={`btn ${action.tone === 'danger' ? 'danger' : ''}`.trim()}
-            onClick={() => {
-              setOpen(false)
-              action.onClick()
-            }}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-      )}
-    </div>
-  )
 }
 
 function renderLockIcon(color: string) {
@@ -164,7 +120,7 @@ export default function InvoiceDetailModal({
         <div className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
-            {detail && <ActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
+            {detail && <InvoiceActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
             <button className="btn ghost" onClick={onClose}>×</button>
           </div>
         </div>
@@ -284,7 +240,7 @@ export default function InvoiceDetailModal({
                           <td align="right">{sizeMB != null ? `${sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)} MB` : '-'}</td>
                           <td>{file.createdAt || '-'}</td>
                           <td align="center">
-                            <ActionMenu
+                            <InvoiceActionMenu
                               actions={[
                                 { label: 'Öffnen', onClick: () => void openDetailFile(file.id) },
                                 { label: 'Speichern...', onClick: () => void saveDetailFile(file.id) },

@@ -868,7 +868,7 @@ export default function JournalView({
                     <input
                         ref={searchInputRef}
                         className="input journal-filter-toolbar__search"
-                        placeholder="Suche (#ID, Text, Betrag …)"
+                        placeholder="Suche (#ID, Text, Datum z. B. Juni, Juni 2026 oder 26.06.2026 …)"
                         value={activeQ}
                         onChange={(e) => {
                             activeSetQ(e.target.value)

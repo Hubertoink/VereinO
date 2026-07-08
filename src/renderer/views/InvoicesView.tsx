@@ -8,6 +8,7 @@ import InvoiceFilterDropdown from '../components/dropdowns/InvoiceFilterDropdown
 import { encodeFilesForUpload } from '../utils/fileEncoding'
 import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
+import InvoiceActionMenu from './invoicesShared/InvoiceActionMenu'
 import type {
   EditInvoiceFile,
   InvoiceBudgetAssignment,
@@ -85,71 +86,6 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
     voucherType: row?.voucherType ?? 'OUT',
     tags: Array.isArray(row?.tags) ? row.tags : []
   }
-}
-
-function ActionMenu({
-  actions,
-  title = 'Aktionen'
-}: {
-  actions: Array<{ label: string; tone?: 'danger' | 'primary'; onClick: () => void }>
-  title?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const rootRef = React.useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [open])
-
-  return (
-    <div ref={rootRef} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button
-        type="button"
-        className="btn"
-        title={title}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        style={{ minWidth: 40 }}
-      >
-        ...
-      </button>
-      {open && (
-        <div
-          className="card"
-          role="menu"
-          style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 1000, padding: 6, minWidth: 150, display: 'grid', gap: 6 }}
-        >
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              role="menuitem"
-              className={`btn ${action.tone === 'danger' ? 'danger' : action.tone === 'primary' ? 'primary' : ''}`.trim()}
-              onClick={() => {
-                setOpen(false)
-                action.onClick()
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
@@ -751,7 +687,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
             </div>
           )}
 
-          <table cellPadding={6} className="invoices-table">
+          <div className="invoices-table-scroll-wrapper" role="region" aria-label="Verbindlichkeiten-Tabelle" tabIndex={0}>
+          <table cellPadding={6} className="invoices-table invoices-table--wide">
             <thead>
               <tr>
                 <th align="center" title="Typ">Typ</th>
@@ -856,7 +793,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                             : [])
                         ]
                         return actions.length > 1
-                          ? <ActionMenu actions={actions} title="Aktionen" />
+                          ? <InvoiceActionMenu actions={actions} title="Aktionen" />
                           : <button className="btn" onClick={actions[0].onClick}>{actions[0].label}</button>
                       })()}
                     </td>
@@ -866,6 +803,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
               {rows.length === 0 && <tr><td colSpan={12} className="helper">Keine Verbindlichkeiten gefunden.</td></tr>}
             </tbody>
           </table>
+          </div>
 
           <div className="pagination-bar" style={{ marginTop: 12, marginBottom: 0 }}>
             <div className="pagination-bar__info">
