@@ -1057,7 +1057,7 @@ function BankImportModal({
                     <tr key={row.sourceRow} className={row.errors.length ? 'bank-row-error' : ''}>
                       <td>{row.sourceRow}</td>
                       <td>{formatDate(row.bookingDate)}</td>
-                      <td>{row.counterparty || row.purpose || '–'}</td>
+                      <td>{[row.counterparty, row.purpose].filter(Boolean).join(' - ') || '–'}</td>
                       <td>{row.direction}</td>
                       <td className="number">{euro.format(row.amount)}</td>
                       <td>{row.errors.join(' ') || 'OK'}</td>

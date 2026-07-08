@@ -40,6 +40,67 @@ describe('bank statement parser', () => {
     })
   })
 
+  it('decodes CAMT files with declared latin-1 encoding and nested party names', () => {
+    const xml = `<?xml version="1.0" encoding="ISO-8859-1"?>
+      <Document>
+        <BkToCstmrStmt>
+          <Stmt>
+            <Acct><Id><IBAN>DE12 3456 7890</IBAN></Id></Acct>
+            <Ntry>
+              <Amt Ccy="EUR">42.50</Amt>
+              <CdtDbtInd>CRDT</CdtDbtInd>
+              <BookgDt><Dt>2026-06-28</Dt></BookgDt>
+              <NtryDtls><TxDtls>
+                <RltdPties>
+                  <Dbtr><Pty><Nm>Merle Beckörd</Nm></Pty></Dbtr>
+                  <DbtrAcct><Id><IBAN>DE0099</IBAN></Id></DbtrAcct>
+                </RltdPties>
+                <RmtInf><Ustrd>Mitgliedsbeitrag für März</Ustrd></RmtInf>
+              </TxDtls></NtryDtls>
+            </Ntry>
+          </Stmt>
+        </BkToCstmrStmt>
+      </Document>`
+
+    const parsed = parseBankStatement(Buffer.from(xml, 'latin1').toString('base64'), 'camt052.xml')
+
+    expect(parsed.rows[0]).toMatchObject({
+      counterparty: 'Merle Beckörd',
+      purpose: 'Mitgliedsbeitrag für März',
+      errors: []
+    })
+  })
+
+  it('removes IBANs from imported description text while keeping counterparty IBAN separately', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Document>
+        <BkToCstmrStmt>
+          <Stmt>
+            <Ntry>
+              <Amt Ccy="EUR">12.00</Amt>
+              <CdtDbtInd>CRDT</CdtDbtInd>
+              <BookgDt><Dt>2026-06-28</Dt></BookgDt>
+              <NtryDtls><TxDtls>
+                <RltdPties>
+                  <Dbtr><Pty><Nm>Merle Beckord</Nm></Pty></Dbtr>
+                  <DbtrAcct><Id><IBAN>DE89370400440532013000</IBAN></Id></DbtrAcct>
+                </RltdPties>
+                <RmtInf><Ustrd>Mitgliedsbeitrag 2026 IBAN: DE89 3704 0044 0532 0130 00</Ustrd></RmtInf>
+              </TxDtls></NtryDtls>
+            </Ntry>
+          </Stmt>
+        </BkToCstmrStmt>
+      </Document>`
+
+    const parsed = parseCamtStatement(xml)
+
+    expect(parsed.rows[0]).toMatchObject({
+      counterparty: 'Merle Beckord',
+      counterpartyIban: 'DE89370400440532013000',
+      purpose: 'Mitgliedsbeitrag 2026'
+    })
+  })
+
   it('detects and parses a German semicolon CSV with quoted values', () => {
     const csv = [
       'Buchungstag;Betrag;Währung;Empfänger;Verwendungszweck',

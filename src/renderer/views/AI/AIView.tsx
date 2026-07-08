@@ -152,6 +152,7 @@ type AiChatSnapshot = {
   pendingVoucherUpdates?: AiVoucherUpdateState | null
   pendingVoucherReverse?: AiVoucherReverseState | null
   pendingVoucherRebook?: AiVoucherRebookState | null
+  pendingBankLinks?: AiBankLinkState | null
   pendingInvoiceActions?: AiInvoiceActionState | null
   pendingBudgetActions?: AiBudgetActionState | null
   pendingEarmarkActions?: AiEarmarkActionState | null
@@ -170,6 +171,35 @@ type AiBankReviewState = Omit<TAiBankImportReviewOutput, 'suggestions'> & {
   allSuggestions?: AiBankReviewSuggestion[]
   sourceTotal?: number
   filterSummary?: string | null
+}
+
+type AiBankLinkChange = {
+  id: string
+  bankTransactionId: number
+  bankBookingDate?: string | null
+  bankDirection?: 'IN' | 'OUT' | string | null
+  bankAmount: number
+  bankCounterparty?: string | null
+  bankPurpose?: string | null
+  bankReference?: string | null
+  paymentAccountName?: string | null
+  voucherId: number
+  voucherNo?: string | null
+  voucherDate?: string | null
+  voucherType?: 'IN' | 'OUT' | string | null
+  voucherDescription?: string | null
+  voucherGrossAmount: number
+  selected: boolean
+  applied?: boolean
+  error?: string | null
+}
+
+type AiBankLinkState = {
+  changes: AiBankLinkChange[]
+  reason?: string | null
+  warnings?: string[]
+  sourcePrompt: string
+  status: 'DRAFT' | 'APPLIED'
 }
 
 type AiMemberDraft = {
@@ -430,9 +460,7 @@ const PROMPT_EXAMPLES = [
   'Welche Tags und Kategorien haben wir angelegt?',
   'Exportiere einen Controllingbericht für das Jahr 2026 als PDF.',
   'Setze bei allen aktiven Mitgliedern den Beitrag auf 20 € monatlich.',
-  'Prüfe diese Exceldatei und bereite einen Importvorschlag vor.',
-  'Formuliere einen kurzen Berichtstext aus diesen Stichpunkten.',
-  'Erstelle eine freundliche Mitgliederinfo zum nächsten Arbeitseinsatz.'
+  'Prüfe diese Exceldatei und bereite einen Importvorschlag vor.'
 ]
 
 const TAG_ACTION_COLORS = [
@@ -2553,6 +2581,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [pendingVoucherRebook, setPendingVoucherRebook] = useState<AiVoucherRebookState | null>(
     initialChat.pendingVoucherRebook || null
   )
+  const [pendingBankLinks, setPendingBankLinks] = useState<AiBankLinkState | null>(
+    initialChat.pendingBankLinks || null
+  )
   const [pendingInvoiceActions, setPendingInvoiceActions] = useState<AiInvoiceActionState | null>(
     initialChat.pendingInvoiceActions || null
   )
@@ -2657,6 +2688,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED') ||
     (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED') ||
     (!!pendingVoucherRebook && pendingVoucherRebook.status !== 'APPLIED') ||
+    (!!pendingBankLinks && pendingBankLinks.status !== 'APPLIED') ||
     (!!pendingInvoiceActions && pendingInvoiceActions.status !== 'APPLIED') ||
     (!!pendingBudgetActions && pendingBudgetActions.status !== 'APPLIED') ||
     (!!pendingEarmarkActions && pendingEarmarkActions.status !== 'APPLIED') ||
@@ -2697,6 +2729,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         role: 'assistant',
         title: 'Storno & Ersatzbuchung vorbereitet',
         body: `Ich habe einen Review vorbereitet: Beleg ${payload.original.voucherNo || `#${payload.original.id}`} wird storniert und als ${payload.replacement.type} neu angelegt.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
+    if (draft.kind === 'bankLink') {
+      const changes = (payload?.changes || []) as AiBankLinkChange[]
+      if (!changes.length) return
+      setPendingBankLinks({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        reason: payload?.reason || draft.title,
+        warnings: payload?.warnings || [],
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Bankbeleg-Verknüpfung vorbereitet',
+        body: `${changes.length} Bankbeleg(e) werden mit bestehenden Buchungen verknüpft. Es wird nichts storniert und keine Ersatzbuchung angelegt.`,
         meta: `Agent-Review${autoMeta}`
       })
       return
@@ -2979,6 +3029,24 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               original: pendingVoucherRebook.original.voucherNo || pendingVoucherRebook.original.id
             }
           : null,
+        bankLinks: pendingBankLinks
+          ? {
+              status: pendingBankLinks.status,
+              reason: pendingBankLinks.reason || null,
+              count: pendingBankLinks.changes.length,
+              sample: pendingBankLinks.changes.slice(0, 30).map((change) => ({
+                bankTransactionId: change.bankTransactionId,
+                bankCounterparty: change.bankCounterparty,
+                bankPurpose: change.bankPurpose,
+                bankAmount: change.bankAmount,
+                voucherId: change.voucherId,
+                voucherNo: change.voucherNo,
+                voucherDescription: change.voucherDescription,
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
         invoiceActions: pendingInvoiceActions
           ? {
               status: pendingInvoiceActions.status,
@@ -3045,6 +3113,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }, [
     bankReview,
     messages,
+    pendingBankLinks,
     pendingBudgetActions,
     pendingContributionPayment,
     pendingContributionLinks,
@@ -3291,6 +3360,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingVoucherUpdates,
       pendingVoucherReverse,
       pendingVoucherRebook,
+      pendingBankLinks,
       pendingInvoiceActions,
       pendingBudgetActions,
       pendingEarmarkActions,
@@ -3303,6 +3373,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     bankReview,
     messages,
     pendingBudgetActions,
+    pendingBankLinks,
     pendingContributionPayment,
     pendingContributionLinks,
     pendingEarmarkActions,
@@ -3492,6 +3563,22 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         anchorId: 'ai-review-voucher-rebook'
       })
     }
+    if (pendingBankLinks) {
+      const openLinks = pendingBankLinks.changes.filter(
+        (change) => change.selected && !change.applied
+      ).length
+      items.push({
+        id: 'bank-links',
+        title: 'Bankbelege verknüpfen',
+        summary:
+          pendingBankLinks.status === 'APPLIED'
+            ? 'Bankbelege wurden verknüpft.'
+            : pendingBankLinks.reason || 'Bankbelege warten auf Verknüpfung mit Buchungen.',
+        status: pendingBankLinks.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: openLinks || pendingBankLinks.changes.length,
+        anchorId: 'ai-review-bank-links'
+      })
+    }
     if (pendingInvoiceActions) {
       items.push({
         id: 'invoice-actions',
@@ -3554,6 +3641,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }, [
     analysis,
     bankReview,
+    pendingBankLinks,
     pendingBudgetActions,
     pendingContributionPayment,
     pendingContributionLinks,
@@ -3596,6 +3684,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     !!pendingVoucherUpdates ||
     !!pendingVoucherReverse ||
     !!pendingVoucherRebook ||
+    !!pendingBankLinks ||
     !!pendingInvoiceActions ||
     !!pendingBudgetActions ||
     !!pendingEarmarkActions ||
@@ -3818,6 +3907,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setPendingVoucherUpdates(null)
     setPendingVoucherReverse(null)
     setPendingVoucherRebook(null)
+    setPendingBankLinks(null)
     setPendingInvoiceActions(null)
     setPendingBudgetActions(null)
     setPendingEarmarkActions(null)
@@ -5918,6 +6008,82 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     }
   }
 
+  const toggleBankLink = (id: string) => {
+    setPendingBankLinks((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
+  }
+
+  const applyPendingBankLinks = async () => {
+    if (!pendingBankLinks || pendingBankLinks.status === 'APPLIED') return
+    const selected = pendingBankLinks.changes.filter((change) => change.selected && !change.applied)
+    if (!selected.length) {
+      notify('info', 'Keine Bankbeleg-Verknüpfungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    const appliedIds = new Set<string>()
+    const failures: string[] = []
+    try {
+      for (const change of selected) {
+        try {
+          const linked = await window.api.bankTransactions.link({
+            id: change.bankTransactionId,
+            voucherId: change.voucherId
+          })
+          appliedIds.add(change.id)
+          updateBankSuggestion(change.bankTransactionId, {
+            resolved: 'LINKED',
+            resolvedVoucherId: change.voucherId,
+            resolvedVoucherNo: change.voucherNo || linked.voucherNo || null
+          })
+        } catch (error: any) {
+          failures.push(
+            `Bankbeleg #${change.bankTransactionId}: ${error?.message || String(error)}`
+          )
+        }
+      }
+
+      setPendingBankLinks({
+        ...pendingBankLinks,
+        status: failures.length ? 'DRAFT' : 'APPLIED',
+        changes: pendingBankLinks.changes.map((change) =>
+          appliedIds.has(change.id)
+            ? { ...change, applied: true, selected: true, error: null }
+            : failures.length && selected.some((item) => item.id === change.id)
+              ? { ...change, error: failures.find((failure) => failure.includes(`#${change.bankTransactionId}`)) || null }
+              : change
+        )
+      })
+
+      if (appliedIds.size) {
+        pushMessage({
+          role: 'assistant',
+          title: failures.length ? 'Bankbelege teilweise verknüpft' : 'Bankbelege verknüpft',
+          body: failures.length
+            ? `${appliedIds.size} Bankbeleg(e) wurden verknüpft. Offen: ${failures.join(' ')}`
+            : `${appliedIds.size} Bankbeleg(e) wurden mit bestehenden Buchungen verknüpft.`,
+          meta: 'VereinO-Daten geändert'
+        })
+        window.dispatchEvent(new Event('data-changed'))
+        onBooked?.()
+      }
+      if (failures.length) notify('error', `Bankverknüpfung teilweise fehlgeschlagen: ${failures[0]}`)
+      else notify('success', `${appliedIds.size} Bankbeleg(e) verknüpft.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const linkBankSuggestion = async (suggestion: AiBankReviewSuggestion) => {
     if (!suggestion.voucherId) {
       notify('error', 'Für diesen Treffer fehlt die Buchungs-ID.')
@@ -6566,6 +6732,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (
       !modifiesPendingReview &&
       !files.length &&
+      pendingBankLinks &&
+      pendingBankLinks.status !== 'APPLIED' &&
+      wantsApplyPendingVoucherActions(userPrompt)
+    ) {
+      await applyPendingBankLinks()
+      return true
+    }
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
       pendingVoucherUpdates &&
       pendingVoucherUpdates.status !== 'APPLIED' &&
       wantsApplyPendingVoucherActions(userPrompt)
@@ -6842,6 +7018,31 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         setPrompt('')
         return
       }
+    }
+    if (!files.length && pendingBankLinks && pendingBankLinks.status !== 'APPLIED') {
+      setBusy(true)
+      pushMessage({ role: 'user', body: userPrompt })
+      try {
+        if (wantsApplyPendingVoucherActions(userPrompt)) {
+          await applyPendingBankLinks()
+        } else if (!settings.hasApiKey) {
+          notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+          setShowSettings(true)
+        } else {
+          await processText(userPrompt)
+        }
+        setPrompt('')
+      } catch (error: any) {
+        notify('error', error?.message || String(error))
+        pushMessage({
+          role: 'assistant',
+          title: 'Bankverknüpfung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
+      } finally {
+        setBusy(false)
+      }
+      return
     }
     if (
       !files.length &&
@@ -8469,6 +8670,77 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               onToggle={toggleVoucherUpdate}
               onApply={() => void applyPendingVoucherUpdates()}
             />
+          )}
+
+          {pendingBankLinks && (
+            <section id="ai-review-bank-links" className="card ai-review-card">
+              <div className="ai-section-head">
+                <strong>Bankbelege verknüpfen</strong>
+                <span>
+                  {pendingBankLinks.status === 'APPLIED'
+                    ? 'Erledigt'
+                    : `${pendingBankLinks.changes.filter((change) => change.selected && !change.applied).length} offen`}
+                </span>
+              </div>
+              {pendingBankLinks.reason && <p>{pendingBankLinks.reason}</p>}
+              {pendingBankLinks.warnings?.length ? (
+                <div className="ai-warning">{pendingBankLinks.warnings.join(' ')}</div>
+              ) : null}
+              <div className="ai-voucher-action-list">
+                {pendingBankLinks.changes.map((change) => (
+                  <article
+                    key={change.id}
+                    className={`ai-voucher-action-row ${change.applied ? 'is-created' : ''}`}
+                  >
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={change.selected || change.applied}
+                        disabled={busy || change.applied || pendingBankLinks.status === 'APPLIED'}
+                        onChange={() => toggleBankLink(change.id)}
+                      />
+                      <span>
+                        <strong>Bankbeleg #{change.bankTransactionId}</strong>
+                        <em>
+                          {formatIsoDate(change.bankBookingDate)} ·{' '}
+                          {[change.bankCounterparty, change.bankPurpose].filter(Boolean).join(' - ') ||
+                            'ohne Beschreibung'}{' '}
+                          · {euro.format(Number(change.bankAmount || 0))}
+                        </em>
+                      </span>
+                    </label>
+                    <div className="ai-voucher-tag-diff">
+                      <span>
+                        {change.voucherNo || `#${change.voucherId}`} ·{' '}
+                        {change.voucherDescription || 'ohne Beschreibung'}
+                      </span>
+                      <b aria-hidden="true">→</b>
+                      <strong>verknüpfen</strong>
+                    </div>
+                    {change.error && <small className="ai-warning">{change.error}</small>}
+                  </article>
+                ))}
+              </div>
+              <div className="ai-review-actions">
+                <span className="helper">
+                  {pendingBankLinks.status === 'APPLIED'
+                    ? 'Diese Bankbelege wurden bereits verknüpft.'
+                    : 'Es werden nur Bankbelege mit bestehenden Buchungen verknüpft; es wird nichts storniert.'}
+                </span>
+                <button
+                  className="btn primary"
+                  type="button"
+                  disabled={
+                    busy ||
+                    pendingBankLinks.status === 'APPLIED' ||
+                    !pendingBankLinks.changes.some((change) => change.selected && !change.applied)
+                  }
+                  onClick={() => void applyPendingBankLinks()}
+                >
+                  {pendingBankLinks.status === 'APPLIED' ? 'Verknüpft' : 'Bankbelege verknüpfen'}
+                </button>
+              </div>
+            </section>
           )}
 
           {pendingVoucherReverse && (

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import ExcelJS from 'exceljs'
-import { listBankTransactions, findBankTransactionMatches } from '../repositories/bankTransactions'
+import { listBankTransactions, findBankTransactionMatches, getBankTransaction } from '../repositories/bankTransactions'
 import { listBindings } from '../repositories/bindings'
 import { listBudgets } from '../repositories/budgets'
 import { listInvoicesPaged, summarizeInvoices } from '../repositories/invoices'
@@ -1793,6 +1793,118 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
       }
     },
     {
+      name: 'bank_transaction_link_draft_prepare',
+      description: 'Bereitet einen Review-Entwurf vor, um offene Bankimportbelege mit bereits vorhandenen passenden Buchungen zu verknüpfen. Nutze dies bei "Bankbeleg/Bankimport mit Buchung verknüpfen/zuordnen". Das storniert nichts und legt keine Ersatzbuchung an.',
+      readOnly: false,
+      parameters: toolParameters({
+        links: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              bankTransactionId: { type: 'number' },
+              voucherId: { type: 'number' }
+            },
+            required: ['bankTransactionId', 'voucherId']
+          }
+        },
+        reason: nullableString
+      }, ['links']),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          links: z.array(z.object({
+            bankTransactionId: z.number().int().positive(),
+            voucherId: z.number().int().positive()
+          })).min(1).max(50),
+          reason: z.string().nullable().optional()
+        }), rawArgs)
+        const voucherIds = [...new Set(args.links.map((link) => Number(link.voucherId)))]
+        const voucherResult = listVouchersAdvancedPaged({
+          voucherIds,
+          limit: voucherIds.length,
+          sort: 'ASC',
+          sortBy: 'date'
+        } as any)
+        const vouchersById = new Map((voucherResult.rows || []).map((row: any) => [Number(row.id), row]))
+        const changes: any[] = []
+        const warnings: string[] = []
+
+        for (const link of args.links) {
+          let transaction: any
+          try {
+            transaction = getBankTransaction(link.bankTransactionId)
+          } catch (error: any) {
+            warnings.push(`Bankbeleg #${link.bankTransactionId}: ${error?.message || 'nicht gefunden'}.`)
+            continue
+          }
+          const voucher = vouchersById.get(Number(link.voucherId)) as any
+          if (!voucher) {
+            warnings.push(`Buchung #${link.voucherId} wurde nicht gefunden.`)
+            continue
+          }
+          if (transaction.status !== 'OPEN') {
+            warnings.push(`Bankbeleg #${link.bankTransactionId} ist nicht offen.`)
+            continue
+          }
+          if (voucher.reversedById || voucher.originalId) {
+            warnings.push(`Buchung ${voucher.voucherNo || `#${voucher.id}`} ist storniert oder selbst eine Stornobuchung.`)
+            continue
+          }
+          if (voucher.type !== transaction.direction) {
+            warnings.push(`Bankbeleg #${link.bankTransactionId} passt vom Typ nicht zu ${voucher.voucherNo || `#${voucher.id}`}.`)
+            continue
+          }
+          if (roundMoney(voucher.grossAmount) !== roundMoney(transaction.amount)) {
+            warnings.push(`Bankbeleg #${link.bankTransactionId} passt vom Betrag nicht zu ${voucher.voucherNo || `#${voucher.id}`}.`)
+            continue
+          }
+          changes.push({
+            id: `agent-bank-link-${transaction.id}-${voucher.id}`,
+            bankTransactionId: Number(transaction.id),
+            bankBookingDate: transaction.bookingDate,
+            bankDirection: transaction.direction,
+            bankAmount: roundMoney(transaction.amount),
+            bankCounterparty: transaction.counterparty ?? null,
+            bankPurpose: transaction.purpose ?? null,
+            bankReference: transaction.bankReference ?? null,
+            paymentAccountName: transaction.paymentAccountName ?? null,
+            voucherId: Number(voucher.id),
+            voucherNo: voucher.voucherNo,
+            voucherDate: voucher.date,
+            voucherType: voucher.type,
+            voucherDescription: voucher.description,
+            voucherGrossAmount: roundMoney(voucher.grossAmount),
+            selected: true
+          })
+        }
+
+        if (!changes.length) {
+          return {
+            ok: false,
+            warning: warnings[0] || 'Es wurde keine kompatible Bankbeleg-Verknüpfung gefunden.'
+          }
+        }
+
+        return {
+          ok: true,
+          data: {
+            message: `${changes.length} Bankbeleg-Verknüpfung(en) als Review-Entwurf vorbereitet.`,
+            warnings
+          },
+          draft: {
+            kind: 'bankLink',
+            title: args.reason || `${changes.length} Bankbeleg(e) verknüpfen`,
+            payload: {
+              changes,
+              reason: args.reason || null,
+              warnings
+            }
+          }
+        }
+      }
+    },
+    {
       name: 'voucher_update_draft_prepare',
       description: 'Bereitet einen Review-Entwurf vor, um vorhandene Buchungen mit Budget, Zweckbindung, Notiz oder Tags zu aktualisieren. Speichert nichts direkt.',
       readOnly: false,
@@ -2053,6 +2165,17 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           bankTransactionId: z.number().nullable().optional(),
           reason: z.string().nullable().optional()
         }), rawArgs)
+        const intentText = normalizeLookup(args.reason || '')
+        if (
+          args.bankTransactionId &&
+          /(bank|bankimport|bankbeleg|banktransaktion).*(verknuepf|verknupf|zuord|link)|(?:verknuepf|verknupf|zuord|link).*(bank|bankimport|bankbeleg|banktransaktion)/.test(intentText) &&
+          !/(storn|storno|korrekt|korrig|falsch|neu buch|neu anleg|ersatz|in statt out|out statt in|soll in|soll out)/.test(intentText)
+        ) {
+          return {
+            ok: false,
+            warning: 'Dieser Auftrag klingt nach reiner Bankbeleg-Verknüpfung. Nutze bank_transaction_link_draft_prepare; dafür darf keine Buchung storniert oder ersetzt werden.'
+          }
+        }
         const voucherResult = listVouchersAdvancedPaged({
           voucherIds: [args.originalVoucherId],
           limit: 1,

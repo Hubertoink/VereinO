@@ -134,11 +134,14 @@ describe('VereinoMcpHost', () => {
       const memory = await host.readResource('vereino://agent/memory')
       const rules = await host.readResource('vereino://agent/auto-rules')
       const history = await host.readResource('vereino://agent/session/session-1/history')
+      const systemPrompt = await host.getAgentInstructions()
 
       expect(JSON.parse((overview.contents[0] as any).text).organization.name).toBe('Testverein')
       expect(JSON.parse((memory.contents[0] as any).text)[0].key).toBe('standard')
       expect(JSON.parse((rules.contents[0] as any).text)[0].draftKind).toBe('tagChange')
       expect(JSON.parse((history.contents[0] as any).text)[0].content).toBe('Hallo')
+      expect(systemPrompt).toContain('Denke wie ein sorgfaeltiger Kassier')
+      expect(systemPrompt).toContain('Waehle niemals ein riskanteres oder fachlich anderes Tool')
     } finally {
       await host.close()
     }

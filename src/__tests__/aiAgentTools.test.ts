@@ -4,7 +4,18 @@ jest.mock('electron', () => ({
 
 jest.mock('../../electron/main/repositories/bankTransactions', () => ({
   listBankTransactions: jest.fn(),
-  findBankTransactionMatches: jest.fn(() => [])
+  findBankTransactionMatches: jest.fn(() => []),
+  getBankTransaction: jest.fn((id: number) => ({
+    id,
+    status: 'OPEN',
+    bookingDate: '2026-07-07',
+    direction: 'OUT',
+    amount: id === 23 ? 111 : 117.56,
+    counterparty: 'Marc Reiner',
+    purpose: id === 23 ? 'Zirkus Trolori 7-9' : 'Einkaufen für Förderverein',
+    bankReference: `REF-${id}`,
+    paymentAccountName: 'Bank'
+  }))
 }))
 
 jest.mock('../../electron/main/repositories/bindings', () => ({
@@ -69,17 +80,33 @@ jest.mock('../../electron/main/repositories/tags', () => ({
 jest.mock('../../electron/main/repositories/vouchers', () => ({
   cashBalance: jest.fn(() => ({})),
   listVouchersAdvanced: jest.fn(() => []),
-  listVouchersAdvancedPaged: jest.fn(() => ({
-    rows: [
+  listVouchersAdvancedPaged: jest.fn((input?: { voucherIds?: number[] }) => {
+    const rows = [
       {
         id: 49,
         voucherNo: '2026-07-07_00044',
         date: '2026-07-07',
         description: 'Mitgliedsbeitrag 2026-04',
         grossAmount: 20
+      },
+      {
+        id: 48,
+        voucherNo: '2026-07-07_00048',
+        date: '2026-07-07',
+        type: 'OUT',
+        sphere: 'IDEELL',
+        description: 'Zirkus Trolori 7-9',
+        grossAmount: 111,
+        vatRate: 0,
+        paymentMethod: 'BANK',
+        paymentAccountId: 1,
+        paymentAccountName: 'Bank',
+        tags: ['Zirkus']
       }
     ]
-  })),
+    const wanted = new Set((input?.voucherIds || []).map(Number))
+    return { rows: wanted.size ? rows.filter((row) => wanted.has(Number(row.id))) : rows }
+  }),
   monthlyVouchers: jest.fn(() => []),
   summarizeVouchers: jest.fn(() => ({}))
 }))
@@ -167,5 +194,47 @@ describe('createAiAgentTools', () => {
         selected: true
       }
     ])
+  })
+
+  it('prepares bank transaction link drafts without rebooking vouchers', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'bank_transaction_link_draft_prepare')
+
+    expect(tool).toBeTruthy()
+
+    const result = await tool!.run({
+      links: [{ bankTransactionId: 23, voucherId: 48 }],
+      reason: 'Bankimportbeleg mit vorhandener Buchung verknüpfen'
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.draft?.kind).toBe('bankLink')
+    expect((result.draft?.payload as any).changes).toMatchObject([
+      {
+        bankTransactionId: 23,
+        voucherId: 48,
+        voucherNo: '2026-07-07_00048',
+        bankCounterparty: 'Marc Reiner',
+        bankPurpose: 'Zirkus Trolori 7-9',
+        selected: true
+      }
+    ])
+  })
+
+  it('blocks rebook drafts for pure bank transaction linking requests', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'voucher_rebook_draft_prepare')
+
+    expect(tool).toBeTruthy()
+
+    const result = await tool!.run({
+      originalVoucherId: 48,
+      newType: 'OUT',
+      bankTransactionId: 23,
+      reason: 'Bankbeleg 23 mit der vorhandenen Buchung verknüpfen'
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.warning).toContain('reiner Bankbeleg-Verknüpfung')
   })
 })

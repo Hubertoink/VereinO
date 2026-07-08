@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.6.5] - 2026-07-08
+
+### Geändert
+
+- Bankimport: CAMT-/CSV-Texte werden bereinigt, Gegenpartei und Zweck werden in Vorschau und Buchungsbeschreibung nachvollziehbarer angezeigt.
+- KI: VereinI denkt bei Agent-Aufgaben stärker aus Kassier-Sicht und weicht bei fehlenden Tools nicht mehr auf fachlich riskante Ersatzaktionen aus.
+- KI: Bankbelege können als eigener Agent-Review mit bestehenden Buchungen verknüpft werden, ohne Storno- oder Ersatzbuchung.
+
+### Behoben
+
+- Bankimport: Umlaute aus CAMT-Dateien mit abweichendem Encoding werden korrekt dekodiert.
+- Bankimport: IBANs aus Verwendungszwecken werden aus Beschreibungstexten entfernt, bleiben aber als Gegenkonto-IBAN erhalten.
+- KI: Reine Bankbeleg-Verknüpfungen werden nicht mehr als Storno-/Ersatzbuchungs-Review vorgeschlagen.
+
 ## [2.6.2] - 2026-07-07
 
 ### Geändert

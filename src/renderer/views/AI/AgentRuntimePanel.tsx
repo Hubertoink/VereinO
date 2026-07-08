@@ -19,6 +19,7 @@ function draftKindLabel(kind: string) {
   if (kind === 'voucherUpdate') return 'Buchungen'
   if (kind === 'voucherReverse') return 'Storno'
   if (kind === 'voucherRebook') return 'Umbuchung'
+  if (kind === 'bankLink') return 'Bankbelege'
   if (kind === 'memberUpdate') return 'Mitglieder'
   if (kind === 'tagChange') return 'Tags'
   if (kind === 'budgetChange') return 'Budgets'

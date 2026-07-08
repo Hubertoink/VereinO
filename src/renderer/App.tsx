@@ -202,6 +202,35 @@ function bookingEditTitle(row: any) {
     : 'Buchung bearbeiten'
 }
 
+const BANK_DESCRIPTION_IBAN_PATTERN = /\b[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
+const BANK_DESCRIPTION_IBAN_WITH_LABEL_PATTERN =
+  /\b(?:IBAN|KONTO|KTO)\s*:?\s*[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
+
+function bankDescriptionPart(value?: string | null) {
+  return String(value || '')
+    .replace(BANK_DESCRIPTION_IBAN_WITH_LABEL_PATTERN, ' ')
+    .replace(BANK_DESCRIPTION_IBAN_PATTERN, ' ')
+    .replace(/\s+([,.;:|])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildBankBookingDescription(transaction: {
+  counterparty?: string | null
+  purpose?: string | null
+}) {
+  const purpose = bankDescriptionPart(transaction.purpose)
+  const counterparty = bankDescriptionPart(transaction.counterparty)
+  const normalizedPurpose = purpose.toLocaleLowerCase('de-DE')
+  const parts = [
+    purpose,
+    counterparty && !normalizedPurpose.includes(counterparty.toLocaleLowerCase('de-DE'))
+      ? counterparty
+      : ''
+  ].filter(Boolean)
+  return (parts.join(' · ') || counterparty || 'Bankbeleg').slice(0, 255)
+}
+
 function voucherMutationBlockReason(row: any) {
   if (!row) return ''
   if (row.originalId) {
@@ -3389,10 +3418,7 @@ function AppInner() {
                     mode: 'GROSS',
                     grossAmount: Number(transaction.amount),
                     vatRate: 0,
-                    description: [transaction.counterparty, transaction.purpose]
-                      .filter(Boolean)
-                      .join(' · ')
-                      .slice(0, 255),
+                    description: buildBankBookingDescription(transaction),
                     note: [
                       transaction.endToEndId && `End-to-End-ID: ${transaction.endToEndId}`,
                       transaction.bankReference && `Bankreferenz: ${transaction.bankReference}`

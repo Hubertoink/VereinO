@@ -55,6 +55,21 @@ function text(value: unknown): string {
   return String(value).trim()
 }
 
+function compactWhitespace(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+const IBAN_PATTERN = /\b[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
+const IBAN_WITH_LABEL_PATTERN = /\b(?:IBAN|KONTO|KTO)\s*:?\s*[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
+
+function stripIbans(value: string) {
+  return compactWhitespace(value.replace(IBAN_WITH_LABEL_PATTERN, ' ').replace(IBAN_PATTERN, ' ').replace(/\s+([,.;:|])/g, '$1'))
+}
+
+function cleanBankText(value: unknown): string {
+  return stripIbans(text(value))
+}
+
 function normalizeIban(value: unknown) {
   return text(value).replace(/\s+/g, '').toUpperCase()
 }
@@ -88,12 +103,39 @@ function detectFormat(buffer: Buffer, fileName: string): BankStatementFormat {
   return 'CSV'
 }
 
+function decodeTextBuffer(buffer: Buffer, preferredEncoding?: string) {
+  const normalizedEncoding = preferredEncoding?.trim().replace(/^['"]|['"]$/g, '').toLowerCase()
+  const decoderLabels: string[] = []
+  if (normalizedEncoding) decoderLabels.push(normalizedEncoding)
+  decoderLabels.push('utf-8', 'windows-1252')
+
+  for (const label of [...new Set(decoderLabels)]) {
+    try {
+      return new TextDecoder(label, { fatal: true }).decode(buffer).replace(/^\uFEFF/, '')
+    } catch {
+      // Try the next declared or fallback encoding.
+    }
+  }
+
+  return new TextDecoder('utf-8', { fatal: false }).decode(buffer).replace(/^\uFEFF/, '')
+}
+
+function decodeXml(buffer: Buffer) {
+  const head = buffer.subarray(0, 200).toString('ascii')
+  const encoding = /<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']/i.exec(head)?.[1]
+  return decodeTextBuffer(buffer, encoding)
+}
+
 function currencyFrom(value: unknown): string {
   if (value && typeof value === 'object') {
     const objectValue = value as Record<string, unknown>
     return text(objectValue['@_Ccy'] ?? objectValue['@_ccy'] ?? 'EUR').toUpperCase()
   }
   return 'EUR'
+}
+
+function partyName(value: any) {
+  return cleanBankText(value?.Nm ?? value?.Pty?.Nm)
 }
 
 export function parseCamtStatement(xml: string): ParsedBankStatement {
@@ -128,7 +170,7 @@ export function parseCamtStatement(xml: string): ParsedBankStatement {
       const transactionDetails = arrayify<any>(entry?.NtryDtls).flatMap((details) => arrayify<any>(details?.TxDtls))
       for (const details of transactionDetails) {
         for (const purpose of arrayify<any>(details?.RmtInf?.Ustrd)) {
-          const value = text(purpose)
+          const value = cleanBankText(purpose)
           if (value) purposes.push(value)
         }
         const parties = details?.RltdPties ?? {}
@@ -136,7 +178,7 @@ export function parseCamtStatement(xml: string): ParsedBankStatement {
         const party = isCredit
           ? (parties?.Dbtr ?? details?.Dbtr)
           : (parties?.Cdtr ?? details?.Cdtr)
-        counterparty ||= text(party?.Nm)
+        counterparty ||= partyName(party)
         const account = isCredit
           ? (parties?.DbtrAcct ?? details?.DbtrAcct)
           : (parties?.CdtrAcct ?? details?.CdtrAcct)
@@ -145,7 +187,7 @@ export function parseCamtStatement(xml: string): ParsedBankStatement {
         bankReference ||= text(details?.Refs?.AcctSvcrRef ?? details?.Refs?.TxId)
       }
 
-      const fallbackPurpose = text(entry?.AddtlNtryInf)
+      const fallbackPurpose = cleanBankText(entry?.AddtlNtryInf)
       if (!purposes.length && fallbackPurpose) purposes.push(fallbackPurpose)
       const errors: string[] = []
       if (!bookingDate) errors.push('Buchungsdatum fehlt oder ist ungültig.')
@@ -183,10 +225,7 @@ export function parseCamtStatement(xml: string): ParsedBankStatement {
 }
 
 function decodeCsv(buffer: Buffer) {
-  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
-  const replacements = (utf8.match(/\uFFFD/g) || []).length
-  if (replacements === 0) return utf8.replace(/^\uFEFF/, '')
-  return new TextDecoder('windows-1252').decode(buffer).replace(/^\uFEFF/, '')
+  return decodeTextBuffer(buffer)
 }
 
 function detectDelimiter(csv: string) {
@@ -303,9 +342,9 @@ function parseCsvStatement(buffer: Buffer, mapping?: BankCsvMapping): ParsedBank
       direction: (signedAmount ?? 0) < 0 ? 'OUT' : 'IN',
       amount: Math.abs(signedAmount ?? 0),
       currency,
-      counterparty: read(record, selected.counterparty) || undefined,
+      counterparty: cleanBankText(read(record, selected.counterparty)) || undefined,
       counterpartyIban: normalizeIban(read(record, selected.counterpartyIban)) || undefined,
-      purpose: read(record, selected.purpose) || undefined,
+      purpose: cleanBankText(read(record, selected.purpose)) || undefined,
       endToEndId: read(record, selected.endToEndId) || undefined,
       bankReference: read(record, selected.reference) || undefined,
       accountIban: accountIban || undefined,
@@ -320,6 +359,6 @@ function parseCsvStatement(buffer: Buffer, mapping?: BankCsvMapping): ParsedBank
 export function parseBankStatement(fileBase64: string, fileName: string, mapping?: BankCsvMapping): ParsedBankStatement {
   const buffer = NodeBuffer.from(fileBase64, 'base64')
   const format = detectFormat(buffer, fileName)
-  if (format === 'CAMT') return parseCamtStatement(buffer.toString('utf8'))
+  if (format === 'CAMT') return parseCamtStatement(decodeXml(buffer))
   return parseCsvStatement(buffer, mapping)
 }

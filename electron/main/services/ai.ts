@@ -567,7 +567,7 @@ export async function planAiAction(input: {
     },
     {
       entity: 'bankImport',
-      operations: ['reviewBankImport']
+      operations: ['reviewBankImport', 'linkExisting']
     }
   ]
 
@@ -584,6 +584,8 @@ export async function planAiAction(input: {
             'Du bist der Aktionsplaner fuer VereinO. Analysiere, was der Nutzer will, und liefere ausschliesslich einen strukturierten Action Plan.',
             'Du fuehrst keine finalen Schreibaktionen aus. Schreibende Aktionen muessen safety REVIEW_REQUIRED haben.',
             'Wenn die Anfrage ausserhalb von VereinO/Vereinsverwaltung liegt, setze entity unknown, operation none, safety BLOCKED und erklaere kurz in answer.',
+            'Denke wie ein Kassier: Belege, Bankimporte, Buchungen und Zahlungskonten muessen nachvollziehbar zusammenpassen. Plane keine Aktion, die Duplikate erzeugt oder Bankbelege unverbunden laesst.',
+            'Wenn der Nutzer eine fachliche Aktion verlangt, die im erlaubten Toolset nicht sicher abbildbar ist, waehle keine ungefaehr passende Ersatzaktion. Setze safety BLOCKED oder REVIEW_REQUIRED mit einer klaren Rueckfrage in answer.',
             'Nutze echte Namen aus dem Kontext, z.B. vorhandene Tags, Mitglieder, Zahlungskonten, Budgets und Zweckbindungen.',
             'Bei Folgefragen nutze die Unterhaltung. Korrigiere fruehere Annahmen, wenn der Nutzer sie verbessert.',
             'Fuer Beispiele wie "alle Buchungen mit Tag X bekommen Tag Y": entity vouchers, operation update, filter field tag eq X, change field tags mode add value [Y].',
@@ -593,6 +595,7 @@ export async function planAiAction(input: {
             'Fuer "offene/faellige Mitgliedsbeitraege, ausstehende Beitragszahlungen, wer schuldet Beitrag": entity payments, operation read, safety READ_ONLY.',
             'Fuer "erstelle eine Buchung fuer Mitgliedsbeitrag und verknuepfe sie": entity payments, operation create, filter memberName, change amount/date/paymentAccountName/tags. Das lokale Tool erstellt danach einen Review mit Buchung und Beitragsverknuepfung.',
             'Wenn vorher offene Mitgliedsbeitraege genannt wurden und der Nutzer danach "hierzu/dazu eine Buchung anlegen/verknuepfen" schreibt, ist das payments create, nicht members create.',
+            'Fuer "Bankbeleg/Bankimport mit bestehender Buchung verknuepfen": entity bankImport, operation linkExisting, safety REVIEW_REQUIRED. Das ist kein Storno und keine Ersatzbuchung.',
             'Wenn vorher ein Report/Controllingbericht besprochen wurde und der Nutzer einen anderen Zeitraum, "letzte X Monate", "was sticht heraus" oder weitere KPIs nennt, ist das entity reports, operation export/generateText, nicht members.',
             'Fuer "Report/Bericht fuer die letzten X Monate" oder "Controlling fuer Zeitraum" ist entity reports, operation export, safety REVIEW_REQUIRED.',
             'Fuer reine Fragen: operation read, safety READ_ONLY, answer nur wenn eine direkte kurze Antwort ohne Tool reicht.',
@@ -693,6 +696,7 @@ export async function reviewBankImportTransactions(input: {
   const model = input.model || settings.textModel
   const prompt = [
     'Du bist ein vorsichtiger Bankimport-Assistent fuer einen deutschen Verein.',
+    'Denke wie ein Kassier: Jeder offene Bankbeleg soll entweder mit einer vorhandenen Buchung verknuepft, als neue Buchung vorbereitet, als nicht buchungsrelevant markiert oder bewusst manuell geklaert werden. Lass Bankbelege nicht unverbunden, wenn du eine Buchung daraus erzeugst.',
     'Pruefe offene Bankbelege und entscheide pro Beleg genau eine Aktion:',
     '- LINK_EXISTING: wenn eine vorhandene Buchung sehr wahrscheinlich passt.',
     '- CREATE_BOOKING: wenn keine passende Buchung existiert und aus dem Bankbeleg eine neue Buchung vorbereitet werden soll.',
@@ -702,7 +706,9 @@ export async function reviewBankImportTransactions(input: {
     'Wichtige Regeln:',
     'Verknuepfe nur mit voucherId aus den mitgegebenen matches.',
     'LINK_EXISTING nur bei passendem Typ, Betrag und hoher Plausibilitaet.',
+    'Wenn ein lokaler Treffer passt, ist LINK_EXISTING vorrangig. Erstelle dann keine neue Buchung.',
     'CREATE_BOOKING erzeugt nur einen Vorschlag, keine finale Buchung.',
+    'CREATE_BOOKING wird spaeter mit dem Bankbeleg verknuepft; die Beschreibung soll den Zahler/Zweck nachvollziehbar enthalten, aber keine IBAN-Fuelltexte.',
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
     'Wenn Budget-/Zweckbindungs-IDs unsicher sind, lasse diese Listen leer und schreibe eine Warnung.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
