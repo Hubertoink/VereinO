@@ -252,16 +252,79 @@ function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, ch
 // LocalStorage key for column widths
 const COLUMN_WIDTHS_KEY = 'journal-column-widths'
 
+const DEFAULT_JOURNAL_COL_WIDTHS: Record<string, number> = {
+    actions: 54,
+    date: 122,
+    voucherNo: 110,
+    type: 70,
+    sphere: 82,
+    description: 260,
+    note: 180,
+    earmark: 120,
+    budget: 130,
+    paymentMethod: 120,
+    attachments: 44,
+    net: 85,
+    vat: 70,
+    gross: 95
+}
+
+const MIN_JOURNAL_COL_WIDTHS: Record<string, number> = {
+    actions: 50,
+    date: 118,
+    voucherNo: 72,
+    type: 62,
+    sphere: 76,
+    description: 160,
+    note: 120,
+    earmark: 96,
+    budget: 100,
+    paymentMethod: 110,
+    attachments: 40,
+    net: 80,
+    vat: 64,
+    gross: 90
+}
+
+const MAX_JOURNAL_COL_WIDTH = 640
+const MAX_JOURNAL_COL_WIDTHS: Record<string, number> = {
+    actions: 54,
+    date: 122,
+    type: 70,
+    sphere: 82,
+    attachments: 44
+}
+const FIXED_JOURNAL_COLUMNS = new Set(['actions', 'date', 'type', 'sphere', 'attachments'])
+
+function clampJournalColumnWidth(columnKey: string, width: number): number {
+    const fallback = DEFAULT_JOURNAL_COL_WIDTHS[columnKey] || 100
+    const min = MIN_JOURNAL_COL_WIDTHS[columnKey] || 40
+    const max = MAX_JOURNAL_COL_WIDTHS[columnKey] || MAX_JOURNAL_COL_WIDTH
+    const value = Number.isFinite(width) ? width : fallback
+    return Math.min(max, Math.max(min, Math.round(value)))
+}
+
 function loadColumnWidths(): Record<string, number> {
     try {
         const stored = localStorage.getItem(COLUMN_WIDTHS_KEY)
-        return stored ? JSON.parse(stored) : {}
+        const parsed = stored ? JSON.parse(stored) : {}
+        if (!parsed || typeof parsed !== 'object') return {}
+        return Object.fromEntries(
+            Object.entries(parsed)
+                .filter(([, value]) => typeof value === 'number')
+                .map(([key, value]) => [key, clampJournalColumnWidth(key, value as number)])
+        )
     } catch { return {} }
 }
 
 function saveColumnWidths(widths: Record<string, number>) {
     try {
-        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(widths))
+        const sanitized = Object.fromEntries(
+            Object.entries(widths)
+                .filter(([, value]) => typeof value === 'number')
+                .map(([key, value]) => [key, clampJournalColumnWidth(key, value)])
+        )
+        localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(sanitized))
     } catch { /* ignore */ }
 }
 
@@ -494,6 +557,13 @@ export default function JournalTable({
     const activeResizeHandle = useRef<HTMLElement | null>(null)
     const tableRef = useRef<HTMLTableElement>(null)
 
+    const getColWidthNumber = useCallback((columnKey: string): number => {
+        return clampJournalColumnWidth(
+            columnKey,
+            columnWidths[columnKey] ?? DEFAULT_JOURNAL_COL_WIDTHS[columnKey] ?? 100
+        )
+    }, [columnWidths])
+
     // Save column widths when they change
     useEffect(() => {
         if (Object.keys(columnWidths).length > 0) {
@@ -529,7 +599,7 @@ export default function JournalTable({
         // Get current column width
         const handle = e.currentTarget as HTMLElement
         const th = handle.closest('th')
-        resizeStartWidth.current = th?.offsetWidth || 100
+        resizeStartWidth.current = getColWidthNumber(colKey) || th?.offsetWidth || 100
         activeResizeHandle.current = handle
         handle.classList.add('resizing')
 
@@ -537,33 +607,16 @@ export default function JournalTable({
         document.addEventListener('mouseup', handleResizeEnd)
         document.body.style.cursor = 'col-resize'
         document.body.style.userSelect = 'none'
-    }, [])
+    }, [getColWidthNumber])
 
     // Handle resize move
     const handleResizeMove = useCallback((e: MouseEvent) => {
         if (!resizingCol.current || !tableRef.current) return
         const delta = e.clientX - resizeStartX.current
-        const newWidth = Math.max(40, resizeStartWidth.current + delta)
+        const columnKey = resizingCol.current
+        const newWidth = clampJournalColumnWidth(columnKey, resizeStartWidth.current + delta)
 
-        // Get container width to limit total table width
-        const container = tableRef.current.parentElement
-        if (container) {
-            const containerWidth = container.clientWidth
-            const currentTableWidth = tableRef.current.offsetWidth
-            const currentColWidth = resizeStartWidth.current
-            const projectedTableWidth = currentTableWidth - currentColWidth + newWidth
-
-            // If table would exceed container, limit the column width
-            if (projectedTableWidth > containerWidth && delta > 0) {
-                const maxNewWidth = currentColWidth + (containerWidth - currentTableWidth)
-                if (maxNewWidth > 40) {
-                    setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(40, maxNewWidth) }))
-                }
-                return
-            }
-        }
-
-        setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }))
+        setColumnWidths(prev => ({ ...prev, [columnKey]: newWidth }))
     }, [])
 
     // Handle resize end
@@ -670,29 +723,11 @@ export default function JournalTable({
     const isReversalVoucher = (r: any) => !!r.originalId
     const isReversedOriginal = (r: any) => !!r.reversedById
 
-    // Column width configuration for fixed table layout (default values)
-    const defaultColWidths: Record<string, number> = {
-        actions: 50,
-        date: 90,
-        voucherNo: 110,
-        type: 70,
-        sphere: 70,
-        description: 200,
-        note: 180,
-        earmark: 120,
-        budget: 130,
-        paymentMethod: 95,
-        attachments: 40,
-        net: 85,
-        vat: 70,
-        gross: 95
-    }
+    const visibleTableWidth = visibleOrder.reduce((sum, key) => sum + getColWidthNumber(key), 0)
 
     // Get column width (user-defined or default)
     const getColWidth = (k: string): string => {
-        if (columnWidths[k]) return `${columnWidths[k]}px`
-        if (k === 'description') return 'auto' // description flexes
-        return `${defaultColWidths[k] || 100}px`
+        return `${getColWidthNumber(k)}px`
     }
 
     // Render resize handle
@@ -981,57 +1016,57 @@ export default function JournalTable({
     return (
         <>
             <div className="journal-table-scroll-wrapper">
-            <table className="journal-table resizable-table" cellPadding={6} ref={tableRef}>
-                <colgroup>
-                    {visibleOrder.map((k) => (
-                        <col key={k} style={{ width: getColWidth(k) }} />
-                    ))}
-                </colgroup>
-                <thead>
-                    <tr>
-                        {visibleOrder.map((k, idx) => {
-                            const isLast = idx === visibleOrder.length - 1
-                            const th = thFor(k)
-                            // Clone the th and add resize handle
-                            return React.cloneElement(th, {
-                                key: k,
-                                className: `${th.props.className || ''} resizable-th`.trim(),
-                                onContextMenu: (event: React.MouseEvent) => openHeaderMenu(event, k),
-                                children: (
-                                    <>
-                                        {th.props.children}
-                                        {!isLast && <ResizeHandle colKey={k} />}
-                                    </>
-                                )
-                            })
-                        })}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((r) => (
-                        <tr
-                            key={r.id}
-                            className={[
-                                highlightId === r.id ? 'row-flash' : '',
-                                r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
-                                isReversalVoucher(r) ? 'journal-row-storno' : '',
-                                isReversedOriginal(r) ? 'journal-row-storniert' : ''
-                            ].filter(Boolean).join(' ') || undefined}
-                            onDoubleClick={() => onRowDoubleClick?.(r)}
-                        >
-                            {visibleOrder.map((k) => tdFor(k, r))}
-                        </tr>
-                    ))}
-                    {rows.length === 0 && (
+                <table className="journal-table resizable-table" cellPadding={6} ref={tableRef} style={{ minWidth: visibleTableWidth, width: `max(100%, ${visibleTableWidth}px)` }}>
+                    <colgroup>
+                        {visibleOrder.map((k) => (
+                            <col key={k} style={{ width: getColWidth(k) }} />
+                        ))}
+                    </colgroup>
+                    <thead>
                         <tr>
-                            <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                            {visibleOrder.map((k, idx) => {
+                                const isLast = idx === visibleOrder.length - 1
+                                const th = thFor(k)
+                                // Clone the th and add resize handle
+                                return React.cloneElement(th, {
+                                    key: k,
+                                    className: `${th.props.className || ''} resizable-th`.trim(),
+                                    onContextMenu: (event: React.MouseEvent) => openHeaderMenu(event, k),
+                                    children: (
+                                        <>
+                                            {th.props.children}
+                                            {!isLast && !FIXED_JOURNAL_COLUMNS.has(k) && <ResizeHandle colKey={k} />}
+                                        </>
+                                    )
+                                })
+                            })}
                         </tr>
-                    )}
-                </tbody>
-            </table>
-            <div className="journal-table-end" aria-hidden="true">
-                <span>Ende der Seite</span>
-            </div>
+                    </thead>
+                    <tbody>
+                        {rows.map((r) => (
+                            <tr
+                                key={r.id}
+                                className={[
+                                    highlightId === r.id ? 'row-flash' : '',
+                                    r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
+                                    isReversalVoucher(r) ? 'journal-row-storno' : '',
+                                    isReversedOriginal(r) ? 'journal-row-storniert' : ''
+                                ].filter(Boolean).join(' ') || undefined}
+                                onDoubleClick={() => onRowDoubleClick?.(r)}
+                            >
+                                {visibleOrder.map((k) => tdFor(k, r))}
+                            </tr>
+                        ))}
+                        {rows.length === 0 && (
+                            <tr>
+                                <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+                <div className="journal-table-end" aria-hidden="true">
+                    <span>Ende der Seite</span>
+                </div>
             </div>
             {headerMenu ? createPortal(
                 <div

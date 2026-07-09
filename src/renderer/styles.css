@@ -11934,6 +11934,7 @@ html[data-glass-modals='true'] .flyout-arrow {
 .journal-table-scroll-wrapper .journal-table,
 .journal-table-scroll-wrapper .resizable-table {
   display: table;
+  max-width: none;
   min-width: 780px;
   width: max(100%, 780px);
   table-layout: fixed;

@@ -125,6 +125,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const seg = usable / Math.max(1, n)
     return P + seg / 2 + i * seg
   }
+  const xSegment = (W - 2 * P) / Math.max(1, labels.length)
   // Use unified scale for both bars and line
   const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
   const yLine = (v: number) => {
@@ -133,7 +134,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     // Use same scale as bars
     return baseY - (v / Math.max(1e-9, maxValue)) * maxH
   }
-  const barW = 12, gap = 8
+  const barGap = Math.max(0.5, Math.min(8, xSegment * 0.16))
+  const barW = Math.max(1.2, Math.min(12, (xSegment - barGap) / 2))
   const MONTH_NAMES = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
 
   function niceStep(max: number) {
@@ -206,6 +208,23 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     else if (totalMonths > 12) tickEvery = 2
     else tickEvery = 1
   }
+  const visibleTickIndexes = (() => {
+    const indexes: number[] = []
+    for (let i = 0; i < labels.length; i++) {
+      if (i % tickEvery === 0) indexes.push(i)
+    }
+
+    const lastIndex = labels.length - 1
+    const lastRenderedIndex = indexes[indexes.length - 1]
+    if (lastIndex >= 0 && lastRenderedIndex !== lastIndex) {
+      const previousX = lastRenderedIndex == null ? -Infinity : xs(lastRenderedIndex, labels.length)
+      const lastX = xs(lastIndex, labels.length)
+      const minLabelGap = isDaily ? 28 : 48
+      if (lastX - previousX >= minLabelGap) indexes.push(lastIndex)
+    }
+
+    return new Set(indexes)
+  })()
 
   return (
     <section className="card chart-card-overflow">
@@ -228,15 +247,15 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           {/* Bars */}
           {labels.map((m, i) => (
             <g key={m}>
-              <rect x={xs(i, labels.length) - barW - gap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill="var(--success)" rx={2} />
-              <rect x={xs(i, labels.length) + gap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill="var(--danger)" rx={2} />
+              <rect x={xs(i, labels.length) - barW - barGap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill="var(--success)" rx={2} />
+              <rect x={xs(i, labels.length) + barGap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill="var(--danger)" rx={2} />
             </g>
           ))}
           {/* Cumulative line */}
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
           {/* X labels */}
           {labels.map((m,i)=>{
-            if (i % tickEvery !== 0 && i !== labels.length - 1) return null
+            if (!visibleTickIndexes.has(i)) return null
             let label: string
             if (isDaily) {
               label = m.slice(8, 10)
