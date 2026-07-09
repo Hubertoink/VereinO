@@ -38,12 +38,14 @@ type BankTransaction = {
 
 type BankImportStatus = {
   lastBookingDate: string | null
+  lastImportAt?: string | null
   total: number
   accounts: Array<{
     id: number
     name: string
     color?: string | null
     lastBookingDate?: string | null
+    lastImportAt?: string | null
     total: number
   }>
 }
@@ -145,6 +147,19 @@ function formatDate(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? value : date.format(parsed)
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return '–'
+  const normalized = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return value
+  return new Intl.DateTimeFormat('de-DE', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(parsed)
+}
+
 function parseLocalDate(value?: string | null) {
   if (!value) return null
   const [year, month, day] = value.split('-').map(Number)
@@ -193,7 +208,7 @@ function getBankImportReminder(status: BankImportStatus | null) {
   return {
     title: 'Neuer Bankimport empfohlen',
     summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
-    detail: `Letzter importierter Buchungstag: ${formatDate(toISODate(lastDate))}. Empfohlener Importzeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}.`
+    detail: `Letzter Import: ${formatDateTime(status.lastImportAt)} · letzter importierter Buchungstag: ${formatDate(toISODate(lastDate))}. Empfohlener Importzeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}.`
   }
 }
 

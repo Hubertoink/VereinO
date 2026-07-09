@@ -14,21 +14,23 @@
         "isolatedModules": true,
         "strict": true,
         "noEmit": true,
+        "types": [
+            "jest",
+            "node"
+        ],
         "jsx": "react-jsx",
-        "ignoreDeprecations": "5.0",
-        "baseUrl": ".",
         "paths": {
             "@main/*": [
-                "electron/main/*"
+                "./electron/main/*"
             ],
             "@preload/*": [
-                "electron/preload/*"
+                "./electron/preload/*"
             ],
             "@renderer/*": [
-                "src/*"
+                "./src/*"
             ],
             "@shared/*": [
-                "shared/*"
+                "./shared/*"
             ]
         }
     },

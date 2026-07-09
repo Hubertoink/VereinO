@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run typecheck:ts7
       - run: npm run build
       - run: npm test -- --ci --reporters=default --reporters=jest-junit
       - run: npm run test:e2e -- --reporter=list

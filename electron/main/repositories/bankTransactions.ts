@@ -356,12 +356,21 @@ export function getBankImportStatus() {
     SELECT MAX(bt.booking_date) as lastBookingDate, COUNT(*) as total
     FROM bank_transactions bt
   `).get() as { lastBookingDate?: string | null; total?: number } | undefined
+  const latestBatch = d.prepare(`
+    SELECT MAX(created_at) as lastImportAt, COUNT(*) as total
+    FROM bank_import_batches
+  `).get() as { lastImportAt?: string | null; total?: number } | undefined
   const accounts = d.prepare(`
     SELECT
       pa.id,
       pa.name,
       pa.color,
       MAX(bt.booking_date) as lastBookingDate,
+      (
+        SELECT MAX(bib.created_at)
+        FROM bank_import_batches bib
+        WHERE bib.payment_account_id = pa.id
+      ) as lastImportAt,
       COUNT(bt.id) as total
     FROM payment_accounts pa
     LEFT JOIN bank_transactions bt ON bt.payment_account_id = pa.id
@@ -369,9 +378,10 @@ export function getBankImportStatus() {
       AND pa.kind <> 'CASH'
     GROUP BY pa.id, pa.name, pa.color
     ORDER BY pa.sort_order ASC, pa.name COLLATE NOCASE ASC
-  `).all() as Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; total: number }>
+  `).all() as Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; lastImportAt?: string | null; total: number }>
   return {
     lastBookingDate: latest?.lastBookingDate ?? null,
+    lastImportAt: latestBatch?.lastImportAt ?? null,
     total: Number(latest?.total || 0),
     accounts
   }

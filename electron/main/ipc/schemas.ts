@@ -1552,6 +1552,7 @@ export const BankTransactionsListOutput = z.object({
 })
 export const BankImportStatusOutput = z.object({
   lastBookingDate: z.string().nullable(),
+  lastImportAt: z.string().nullable().optional(),
   total: z.number(),
   accounts: z.array(
     z.object({
@@ -1559,6 +1560,7 @@ export const BankImportStatusOutput = z.object({
       name: z.string(),
       color: z.string().nullable().optional(),
       lastBookingDate: z.string().nullable().optional(),
+      lastImportAt: z.string().nullable().optional(),
       total: z.number()
     })
   )

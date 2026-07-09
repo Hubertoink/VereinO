@@ -248,6 +248,18 @@ export default function DashboardView({
       const parsed = new Date(`${value}T00:00:00`)
       return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('de-DE').format(parsed)
     }
+    const formatDateTime = (value?: string | null) => {
+      if (!value) return '—'
+      const normalized = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(value)
+        ? `${value.replace(' ', 'T')}Z`
+        : value
+      const parsed = new Date(normalized)
+      if (Number.isNaN(parsed.getTime())) return value
+      return new Intl.DateTimeFormat('de-DE', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+      }).format(parsed)
+    }
     const parseLocalDate = (value?: string | null) => {
       if (!value) return null
       const [year, month, day] = value.split('-').map(Number)
@@ -301,7 +313,7 @@ export default function DashboardView({
         if (from <= previousMonthEnd) {
           setBankImportReminder({
             summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
-            detail: `${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}`
+            detail: `Letzter Import: ${formatDateTime(bankStatus?.lastImportAt || null)} · fehlender Zeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}`
           })
         } else {
           setBankImportReminder(null)
