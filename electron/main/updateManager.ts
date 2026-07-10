@@ -1,5 +1,5 @@
 import { app, BrowserWindow } from 'electron'
-import { autoUpdater } from 'electron-updater'
+import type { AppUpdater } from 'electron-updater'
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
 
@@ -13,6 +13,20 @@ export type UpdateState = {
 }
 
 let initialized = false
+let initializationPromise: Promise<void> | null = null
+let autoUpdater: AppUpdater | null = null
+let updaterPromise: Promise<AppUpdater> | null = null
+
+async function loadAutoUpdater(): Promise<AppUpdater> {
+    if (autoUpdater) return autoUpdater
+    if (!updaterPromise) {
+        updaterPromise = import('electron-updater').then((module) => {
+            autoUpdater = module.autoUpdater
+            return module.autoUpdater
+        })
+    }
+    return updaterPromise
+}
 
 let updateState: UpdateState = {
     status: app.isPackaged ? 'idle' : 'unsupported',
@@ -42,19 +56,18 @@ function toMessage(error: unknown) {
     return text.replace(/^Error: /, '')
 }
 
-export function initUpdateManager() {
-    if (initialized) return
-    initialized = true
-
+async function initializeUpdateManager() {
     if (!app.isPackaged) {
+        initialized = true
         broadcastUpdateState()
         return
     }
 
-    autoUpdater.autoDownload = false
-    autoUpdater.autoInstallOnAppQuit = false
+    const updater = await loadAutoUpdater()
+    updater.autoDownload = false
+    updater.autoInstallOnAppQuit = false
 
-    autoUpdater.on('checking-for-update', () => {
+    updater.on('checking-for-update', () => {
         setUpdateState({
             status: 'checking',
             availableVersion: null,
@@ -64,7 +77,7 @@ export function initUpdateManager() {
         })
     })
 
-    autoUpdater.on('update-available', (info) => {
+    updater.on('update-available', (info) => {
         setUpdateState({
             status: 'available',
             availableVersion: info.version,
@@ -74,7 +87,7 @@ export function initUpdateManager() {
         })
     })
 
-    autoUpdater.on('download-progress', (progress) => {
+    updater.on('download-progress', (progress) => {
         setUpdateState({
             status: 'downloading',
             downloadProgress: Math.max(0, Math.min(100, Math.round(progress.percent))),
@@ -84,7 +97,7 @@ export function initUpdateManager() {
         })
     })
 
-    autoUpdater.on('update-downloaded', (info) => {
+    updater.on('update-downloaded', (info) => {
         setUpdateState({
             status: 'downloaded',
             availableVersion: info.version,
@@ -94,7 +107,7 @@ export function initUpdateManager() {
         })
     })
 
-    autoUpdater.on('update-not-available', () => {
+    updater.on('update-not-available', () => {
         setUpdateState({
             status: 'not-available',
             availableVersion: null,
@@ -104,13 +117,25 @@ export function initUpdateManager() {
         })
     })
 
-    autoUpdater.on('error', (error) => {
+    updater.on('error', (error) => {
         setUpdateState({
             status: 'error',
             downloadProgress: null,
             message: `Update fehlgeschlagen: ${toMessage(error)}`
         })
     })
+    initialized = true
+}
+
+export async function initUpdateManager() {
+    if (initialized) return
+    if (!initializationPromise) {
+        initializationPromise = initializeUpdateManager().catch((error) => {
+            initializationPromise = null
+            throw error
+        })
+    }
+    await initializationPromise
 }
 
 export function getUpdateState() {
@@ -131,7 +156,8 @@ export async function checkForAppUpdates() {
     }
 
     try {
-        await autoUpdater.checkForUpdates()
+        await initUpdateManager()
+        await autoUpdater!.checkForUpdates()
     } catch (error) {
         setUpdateState({
             status: 'error',
@@ -161,6 +187,7 @@ export async function downloadAppUpdate() {
     }
 
     try {
+        await initUpdateManager()
         setUpdateState({
             status: 'downloading',
             downloadProgress: 0,
@@ -168,7 +195,7 @@ export async function downloadAppUpdate() {
                 ? `Update ${updateState.availableVersion} wird heruntergeladen...`
                 : 'Update wird heruntergeladen...'
         })
-        await autoUpdater.downloadUpdate()
+        await autoUpdater!.downloadUpdate()
     } catch (error) {
         setUpdateState({
             status: 'error',
@@ -185,12 +212,13 @@ export async function installAppUpdate() {
         return { ok: false, state: updateState }
     }
 
+    await initUpdateManager()
     setUpdateState({
         message: `Update ${updateState.downloadedVersion || updateState.availableVersion || ''} wird installiert...`
     })
 
     setImmediate(() => {
-        autoUpdater.quitAndInstall()
+        autoUpdater!.quitAndInstall()
     })
 
     return { ok: true, state: updateState }

@@ -12,9 +12,25 @@ export interface QuickAddPayload {
     [key: string]: unknown
 }
 
+export interface StartupBootstrapData {
+    counts: {
+        pendingSubmissions: number
+        openBankImports: number
+        dueMembershipFees: number
+        openInvoices: number
+    }
+    years: number[]
+    earmarks: unknown[]
+    paymentAccounts: unknown[]
+    tags: unknown[]
+    periodLock: { closedUntil: string | null }
+    backup: { mode: string; intervalDays: number; lastAuto: number }
+}
+
 export interface CoreApi {
     app: {
         version: () => Promise<{ version: string; name: string }>
+        bootstrap: () => Promise<StartupBootstrapData>
         notifyDataChanged: () => void
         onDataChanged: (callback: () => void) => () => void
     }

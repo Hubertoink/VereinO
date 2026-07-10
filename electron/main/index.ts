@@ -2,9 +2,7 @@ import { app, BrowserWindow, shell, Menu, session, dialog, screen } from 'electr
 import { getDb } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
-import { applyMigrations, ensureActivityReportsTable, ensureAdvanceTables, ensureInvoiceTables, ensureVoucherColumns, ensureVoucherJunctionTables } from './db/migrations'
-import { registerIpcHandlers } from './ipc'
-import { initUpdateManager } from './updateManager'
+import { applyMigrations } from './db/migrations'
 import { requireAllowedExternalUrl } from './services/externalUrl'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,11 +11,36 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = !app.isPackaged
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
 const detachedQuickAddInitials = new Map<string, any>()
 const detachedQuickAddWindows = new Map<string, BrowserWindow>()
 const DETACHED_QUICK_ADD_BOUNDS_SETTING = 'ui.detachedQuickAddBounds'
 let pendingMainCloseWindow: BrowserWindow | null = null
 let pendingMainCloseConfirmed = false
+let pendingSecondInstanceFocus = false
+
+function focusPrimaryWindow() {
+    const windows = BrowserWindow.getAllWindows()
+    const primary =
+        windows.find((win) => !(win as any).__isDetachedQuickAddWindow) ?? windows[0] ?? null
+    if (!primary || primary.isDestroyed()) return false
+    if (primary.isMinimized()) primary.restore()
+    primary.show()
+    primary.focus()
+    return true
+}
+
+if (!hasSingleInstanceLock) {
+    dialog.showErrorBox(
+        'VereinO ist bereits geöffnet',
+        'Es läuft bereits eine Instanz von VereinO. Bitte verwenden Sie das bereits geöffnete Fenster.'
+    )
+    app.quit()
+} else {
+    app.on('second-instance', () => {
+        pendingSecondInstanceFocus = !focusPrimaryWindow()
+    })
+}
 
 type WindowBounds = { x: number; y: number; width: number; height: number }
 
@@ -182,7 +205,22 @@ function detachedQuickAddWindowsHas(win: BrowserWindow) {
     return false
 }
 
-async function createWindow(): Promise<BrowserWindow> {
+const STARTUP_HTML = `<!doctype html><html lang="de"><head><meta charset="utf-8"><style>
+html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#111827;color:#f8fafc;font:14px system-ui,sans-serif}
+.startup{text-align:center}.mark{font-size:34px;font-weight:750;letter-spacing:.02em}.status{margin-top:12px;color:#94a3b8}
+.bar{width:220px;height:3px;margin:20px auto 0;overflow:hidden;border-radius:4px;background:#273449}.bar:after{content:"";display:block;width:45%;height:100%;background:#38bdf8;animation:load 1.1s ease-in-out infinite alternate}@keyframes load{to{transform:translateX(125%)}}
+</style></head><body><div class="startup"><div class="mark">VereinO</div><div class="status">Daten werden vorbereitet …</div><div class="bar"></div></div></body></html>`
+
+async function loadRenderer(win: BrowserWindow) {
+    if (isDev) {
+        const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
+        await win.loadURL(url)
+    } else {
+        await win.loadFile(path.join(__dirname, '../../dist/index.html'))
+    }
+}
+
+async function createWindow(showStartup = false): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -268,12 +306,10 @@ async function createWindow(): Promise<BrowserWindow> {
         })
     })
 
-    if (isDev) {
-        const url = process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173'
-        await win.loadURL(url)
-        // DevTools can be opened manually via menu or keyboard
+    if (showStartup) {
+        await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(STARTUP_HTML)}`)
     } else {
-        await win.loadFile(path.join(__dirname, '../../dist/index.html'))
+        await loadRenderer(win)
     }
 
     win.webContents.setWindowOpenHandler(createWindowOpenHandler())
@@ -298,19 +334,22 @@ function createMenu() {
     }
 }
 
-app.whenReady().then(async () => {
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
+    createMenu()
+    // Make startup progress visible before native modules, schema checks and the
+    // complete IPC graph are initialized.
+    const win = await createWindow(true)
+    if (pendingSecondInstanceFocus) {
+        pendingSecondInstanceFocus = false
+        focusPrimaryWindow()
+    }
+
     // Try DB init + migrations, but don't exit on failure – let renderer handle recovery
     let dbInitError: any = null
     try {
         const db = getDb()
         ; (global as any).singletonDb = db
 
-        // Defensive: legacy DBs may miss junction tables even when most data loads.
-        ensureVoucherColumns(db)
-        ensureVoucherJunctionTables(db)
-        ensureActivityReportsTable(db)
-        ensureAdvanceTables(db)
-        ensureInvoiceTables(db)
         applyMigrations(db)
         
         // CRITICAL FIX: Always ensure enforce_time_range columns exist
@@ -341,6 +380,8 @@ app.whenReady().then(async () => {
         dbInitError = err
         // Do NOT block startup. We'll inform the renderer via an event so it can present recovery options.
     }
+    // Loading this graph after the startup window avoids blocking first paint.
+    const { registerIpcHandlers } = await import('./ipc')
     // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers({
         openDetachedQuickAdd: createDetachedQuickAddWindow,
@@ -356,9 +397,7 @@ app.whenReady().then(async () => {
             }
         }
     })
-    initUpdateManager()
-    createMenu()
-    const win = await createWindow()
+    await loadRenderer(win)
 
     // After window finished load, inform renderer if DB init failed
     if (dbInitError && win) {

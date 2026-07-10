@@ -1462,6 +1462,7 @@ export function applyMigrations(db: DB) {
   ensureBankImportTables(db)
 
   const applied = getAppliedVersions(db)
+  let migrationApplied = false
   for (const mig of MIGRATIONS) {
     if (applied.has(mig.version)) continue
 
@@ -1515,6 +1516,7 @@ export function applyMigrations(db: DB) {
         db.prepare('INSERT INTO migrations(version) VALUES (?)').run(mig.version)
       })
       exec()
+      migrationApplied = true
       console.log(`[Migration ${mig.version}] Applied successfully`)
     } catch (error: any) {
       console.error(`[Migration ${mig.version}] Failed:`, error.message)
@@ -1528,16 +1530,18 @@ export function applyMigrations(db: DB) {
     }
   }
 
-  // A brand-new database does not have domain tables yet when the pre-flight
-  // healers above run. Run them again after migrations so additive columns and
-  // indexes that depend on base tables are created for fresh organizations too.
-  ensurePaymentAccountTables(db)
-  ensureVoucherColumns(db)
-  ensureInternalVoucherType(db)
-  ensureVoucherForeignKeyTargets(db)
-  ensureVoucherJunctionTables(db)
-  ensureActivityReportsTable(db)
-  ensureAdvanceTables(db)
-  ensureSubmissionColumns(db)
-  ensureBankImportTables(db)
+  // A brand-new or upgraded database may not have had the base tables required
+  // by the pre-flight healers. A database that was already current must not pay
+  // for a second complete schema scan on every startup.
+  if (migrationApplied) {
+    ensurePaymentAccountTables(db)
+    ensureVoucherColumns(db)
+    ensureInternalVoucherType(db)
+    ensureVoucherForeignKeyTargets(db)
+    ensureVoucherJunctionTables(db)
+    ensureActivityReportsTable(db)
+    ensureAdvanceTables(db)
+    ensureSubmissionColumns(db)
+    ensureBankImportTables(db)
+  }
 }

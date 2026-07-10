@@ -280,7 +280,7 @@ import {
   deleteMember,
   getMemberById
 } from '../repositories/members'
-import { exportMembers, MembersExportOptions } from '../services/membersExport'
+import type { MembersExportOptions } from '../services/membersExport'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
 import {
@@ -312,19 +312,8 @@ import {
   deleteTaxExemptionCertificate,
   updateTaxExemptionValidity
 } from '../services/taxExemption'
-import ExcelJS from 'exceljs'
 import { getWeeklyQuote } from '../services/quotes'
 import { voucherStatusKind, voucherStatusText } from '../services/voucherStatus'
-import {
-  previewFile,
-  executeFile,
-  analyzeFile,
-  commitImportDraft,
-  createMissingImportMasterData,
-  generateImportTemplate,
-  generateImportTestData,
-  exportEditableVouchersWorkbook
-} from '../services/imports'
 import {
   DbExportInput,
   DbExportOutput,
@@ -357,7 +346,6 @@ import {
   DbSmartRestoreApplyInput,
   DbSmartRestoreApplyOutput
 } from './schemas'
-import * as yearEnd from '../services/yearEnd'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
@@ -448,23 +436,19 @@ import {
   updateAiJobCandidate
 } from '../repositories/aiJobs'
 import {
-  analyzeBookingDocuments,
-  generateAiText,
-  getAiSettings,
-  planAiAction,
-  reviewBankImportTransactions,
-  setAiSettings,
-  testAiConnection
-} from '../services/ai'
-import { buildAiContext } from '../services/aiContext'
-import { runAiAgent } from '../services/aiAgent'
-import { configureAiMcpEndpoint, getAiMcpStatus } from '../services/aiMcp'
-import {
   listAiAgentAutoRules,
   listAiAgentMemory,
   upsertAiAgentAutoRule,
   upsertAiAgentMemory
 } from '../repositories/aiAgentKnowledge'
+
+const loadAiService = () => import('../services/ai')
+const loadAiContextService = () => import('../services/aiContext')
+const loadAiAgentService = () => import('../services/aiAgent')
+const loadAiMcpService = () => import('../services/aiMcp')
+const loadImportsService = () => import('../services/imports')
+const loadMembersExportService = () => import('../services/membersExport')
+const loadYearEndService = () => import('../services/yearEnd')
 
 function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
   const message = String((error as any)?.message ?? '')
@@ -695,6 +679,33 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       return { version: '0.0.0', name: 'VereinO' }
     }
   })
+  ipcMain.handle('app.bootstrap', async () => {
+    const submissions = createSubmissionsRepository(getDb()).list({ status: 'pending', limit: 1 })
+    const bankImports = listBankTransactions({ status: 'OPEN', limit: 1, page: 1 }) as any
+    const openInvoices = listInvoicesPaged({ status: 'OPEN', limit: 1 })
+    const partialInvoices = listInvoicesPaged({ status: 'PARTIAL', limit: 1 })
+    const membership = mp.dueSummary()
+    const lock = getSetting<{ closedUntil?: string | null }>('period_lock')
+
+    return {
+      counts: {
+        pendingSubmissions: Number((submissions as any)?.total || 0),
+        openBankImports: Number(bankImports?.stats?.open || bankImports?.total || 0),
+        dueMembershipFees: Number(membership?.dueMembers || 0),
+        openInvoices: Number(openInvoices.total || 0) + Number(partialInvoices.total || 0)
+      },
+      years: listVoucherYears(),
+      earmarks: listBindings({ activeOnly: true }),
+      paymentAccounts: listPaymentAccounts(),
+      tags: listTags({ includeUsage: true }),
+      periodLock: { closedUntil: lock?.closedUntil ?? null },
+      backup: {
+        mode: String(getSetting<string>('backup.auto') || 'PROMPT').toUpperCase(),
+        intervalDays: Number(getSetting<number>('backup.intervalDays') || 7),
+        lastAuto: Number(getSetting<number>('backup.lastAuto') || 0)
+      }
+    }
+  })
   ipcMain.handle('updates.getState', async () => getUpdateState())
   ipcMain.handle('updates.check', async () => checkForAppUpdates())
   ipcMain.handle('updates.download', async () => downloadAppUpdate())
@@ -785,17 +796,26 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       } catch {}
     }
   })
-  ipcMain.handle('ai.settings.get', async () => AiSettingsGetOutput.parse(getAiSettings()))
+  ipcMain.handle('ai.settings.get', async () => {
+    const { getAiSettings } = await loadAiService()
+    return AiSettingsGetOutput.parse(getAiSettings())
+  })
   ipcMain.handle('ai.settings.set', async (_e, payload) => {
     const parsed = AiSettingsSetInput.parse(payload)
+    const { setAiSettings } = await loadAiService()
     return AiSettingsSetOutput.parse(setAiSettings(parsed))
   })
-  ipcMain.handle('ai.settings.testConnection', async () =>
-    AiSettingsTestOutput.parse(await testAiConnection())
-  )
-  ipcMain.handle('ai.mcp.status', async () => AiMcpStatusOutput.parse(await getAiMcpStatus()))
+  ipcMain.handle('ai.settings.testConnection', async () => {
+    const { testAiConnection } = await loadAiService()
+    return AiSettingsTestOutput.parse(await testAiConnection())
+  })
+  ipcMain.handle('ai.mcp.status', async () => {
+    const { getAiMcpStatus } = await loadAiMcpService()
+    return AiMcpStatusOutput.parse(await getAiMcpStatus())
+  })
   ipcMain.handle('ai.mcp.configure', async (_e, payload) => {
     const parsed = AiMcpConfigureInput.parse(payload)
+    const { configureAiMcpEndpoint } = await loadAiMcpService()
     return AiMcpConfigureOutput.parse(await configureAiMcpEndpoint(parsed))
   })
   ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
@@ -829,6 +849,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         matches
       }
     })
+    const [{ reviewBankImportTransactions }, { buildAiContext }] = await Promise.all([
+      loadAiService(),
+      loadAiContextService()
+    ])
     const reviewed = await reviewBankImportTransactions({
       transactions,
       context: buildAiContext()
@@ -900,6 +924,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = AiJobIdInput.parse(payload)
     const initial = setAiJobStatus(parsed.id, 'PROCESSING')
     try {
+      const [{ analyzeBookingDocuments, generateAiText }, { buildAiContext }] = await Promise.all([
+        loadAiService(),
+        loadAiContextService()
+      ])
       if (initial.type === 'BOOKING_FROM_DOCUMENTS') {
         const context = buildAiContext()
         const analyzed = await analyzeBookingDocuments({
@@ -1033,16 +1061,28 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
   ipcMain.handle('ai.text.generate', async (_e, payload) => {
     const parsed = AiTextGenerateInput.parse(payload)
+    const [{ generateAiText }, { buildAiContext }] = await Promise.all([
+      loadAiService(),
+      loadAiContextService()
+    ])
     const generated = await generateAiText({ ...parsed, context: buildAiContext() })
     return AiTextGenerateOutput.parse(generated.result)
   })
   ipcMain.handle('ai.actions.plan', async (_e, payload) => {
     const parsed = AiActionPlanInput.parse(payload)
+    const [{ planAiAction }, { buildAiContext }] = await Promise.all([
+      loadAiService(),
+      loadAiContextService()
+    ])
     const planned = await planAiAction({ ...parsed, context: buildAiContext() })
     return AiActionPlanOutput.parse(planned)
   })
   ipcMain.handle('ai.agent.run', async (_e, payload) => {
     const parsed = AiAgentRunInput.parse(payload)
+    const [{ runAiAgent }, { buildAiContext }] = await Promise.all([
+      loadAiAgentService(),
+      loadAiContextService()
+    ])
     const result = await runAiAgent({ ...parsed, context: buildAiContext() })
     return AiAgentRunOutput.parse(result)
   })
@@ -1731,6 +1771,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       } catch {}
       return ReportsExportOutput.parse({ filePath })
     } else if (parsed.format === 'XLSX') {
+      const { default: ExcelJS } = await import('exceljs')
       const orgName =
         (parsed.orgName && parsed.orgName.trim()) ||
         ((getSetting<string>('org.name') || 'VereinO') as string)
@@ -2128,6 +2169,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   // Imports
   ipcMain.handle('imports.preview', async (_e, payload) => {
     const parsed = ImportPreviewInput.parse(payload)
+    const { previewFile } = await loadImportsService()
     const res = await previewFile(parsed.fileBase64)
     return ImportPreviewOutput.parse(res as any)
   })
@@ -2140,11 +2182,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     } catch {
       /* ignore */
     }
+    const { executeFile } = await loadImportsService()
     const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
     return ImportExecuteOutput.parse(res as any)
   })
   ipcMain.handle('imports.analyze', async (_e, payload) => {
     const parsed = ImportAnalyzeInput.parse(payload)
+    const { analyzeFile } = await loadImportsService()
     const res = await analyzeFile(parsed.fileBase64, parsed.mapping as any, parsed.rules as any)
     return ImportAnalyzeOutput.parse(res as any)
   })
@@ -2156,27 +2200,32 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     } catch {
       /* ignore */
     }
+    const { commitImportDraft } = await loadImportsService()
     const res = await commitImportDraft(parsed.rows as any)
     return ImportExecuteOutput.parse(res as any)
   })
   ipcMain.handle('imports.createMissing', async (_e, payload) => {
     const parsed = ImportCreateMissingInput.parse(payload)
+    const { createMissingImportMasterData } = await loadImportsService()
     const res = createMissingImportMasterData(parsed as any)
     return ImportCreateMissingOutput.parse(res)
   })
   ipcMain.handle('imports.template', async (_e, payload) => {
     ImportTemplateInput.parse(payload)
+    const { generateImportTemplate } = await loadImportsService()
     const res = await generateImportTemplate()
     return ImportTemplateOutput.parse(res)
   })
 
   ipcMain.handle('imports.testdata', async (_e, payload) => {
     ImportTestDataInput.parse(payload)
+    const { generateImportTestData } = await loadImportsService()
     const res = await generateImportTestData()
     return ImportTestDataOutput.parse(res)
   })
   ipcMain.handle('imports.editableExport', async (_e, payload) => {
     ImportEditableExportInput.parse(payload)
+    const { exportEditableVouchersWorkbook } = await loadImportsService()
     const res = await exportEditableVouchersWorkbook()
     return ImportEditableExportOutput.parse(res)
   })
@@ -2653,6 +2702,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
   // Members export (Excel/PDF)
   ipcMain.handle('members.export', async (_e, payload: MembersExportOptions) => {
+    const { exportMembers } = await loadMembersExportService()
     const result = await exportMembers(payload)
     return result
   })
@@ -2693,11 +2743,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   // Year-end (Jahresabschluss)
   ipcMain.handle('yearEnd.preview', async (_e, payload) => {
     const parsed = YearEndPreviewInput.parse(payload)
+    const yearEnd = await loadYearEndService()
     const res = await yearEnd.preview(parsed.year)
     return YearEndPreviewOutput.parse(res as any)
   })
   ipcMain.handle('yearEnd.export', async (_e, payload) => {
     const parsed = YearEndExportInput.parse(payload)
+    const yearEnd = await loadYearEndService()
     const res = await yearEnd.exportPackage(parsed.year)
     return YearEndExportOutput.parse(res as any)
   })
@@ -2705,15 +2757,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = YearEndCloseInput.parse(payload)
     // Safety: create a backup before locking a period
     await requireSafetyBackup(backup.makeBackup, 'preClose', 'Jahresabschluss durchführen')
+    const yearEnd = await loadYearEndService()
     const res = yearEnd.closeYear(parsed.year)
     return YearEndCloseOutput.parse(res as any)
   })
   ipcMain.handle('yearEnd.reopen', async (_e, payload) => {
     const parsed = YearEndReopenInput.parse(payload)
+    const yearEnd = await loadYearEndService()
     const res = yearEnd.reopenAfter(parsed.year)
     return YearEndReopenOutput.parse(res as any)
   })
   ipcMain.handle('yearEnd.status', async () => {
+    const yearEnd = await loadYearEndService()
     const res = yearEnd.status()
     return YearEndStatusOutput.parse(res as any)
   })
@@ -2754,7 +2809,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         )
         .get() as any
       const unlinkedReceiptsCount = Number(rowA?.c || 0)
-      const st = yearEnd.status()
+      const lock = getSetting<{ closedUntil?: string | null }>('period_lock')
+      const st = { closedUntil: lock?.closedUntil ?? null }
       let lockedEntriesCount = 0
       if (st?.closedUntil) {
         const r = d

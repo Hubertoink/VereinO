@@ -763,34 +763,6 @@ export default function JournalView({
         return () => window.removeEventListener('data-changed', onChanged)
     }, [loadRecent])
 
-    // Hydrate column prefs from server
-    useEffect(() => {
-        (async () => {
-            try {
-                const c = await window.api?.settings?.get?.({ key: 'journal.cols' })
-                if (c?.value) {
-                    const parsed = JSON.parse(String(c.value))
-                    if (parsed && typeof parsed === 'object') setCols(parsed)
-                }
-                const o = await window.api?.settings?.get?.({ key: 'journal.order' })
-                if (o?.value) {
-                    const parsedO = JSON.parse(String(o.value))
-                    if (Array.isArray(parsedO)) setOrder(parsedO as ColKey[])
-                }
-            } catch { /* ignore */ }
-        })()
-    }, [])
-
-    // Persist column prefs
-    useEffect(() => {
-        try { localStorage.setItem('journalCols', JSON.stringify(cols)) } catch { }
-        try { window.api?.settings?.set?.({ key: 'journal.cols', value: JSON.stringify(cols) }) } catch { }
-    }, [cols])
-    useEffect(() => {
-        try { localStorage.setItem('journalColsOrder', JSON.stringify(order)) } catch { }
-        try { window.api?.settings?.set?.({ key: 'journal.order', value: JSON.stringify(order) }) } catch { }
-    }, [order])
-
     // Load attachments when opening edit modal
     useEffect(() => {
         if (editRow?.id) {

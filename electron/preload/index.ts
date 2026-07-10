@@ -353,6 +353,7 @@ const rendererApi = {
   },
   app: {
     version: () => invoke('app.version'),
+    bootstrap: () => invoke('app.bootstrap'),
     notifyDataChanged: () => ipcRenderer.send('app.notifyDataChanged'),
     onDataChanged: (cb: () => void) => {
       const handler = () => cb()

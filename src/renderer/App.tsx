@@ -1,23 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ICONS } from './utils/icons'
-import ActivityReportEditorModal from './views/Reports/ActivityReportEditorModal'
-import JournalView from './views/Journal/JournalView'
 import {
   getDefaultJournalCols,
   getDefaultJournalOrder
 } from './views/Journal/utils/journalColumnVisibility'
-import TagsManagerModal from './components/modals/TagsManagerModal'
-import AutoBackupPromptModal from './components/modals/AutoBackupPromptModal'
-import UpdateAvailableModal, {
-  type UpdateModalState
-} from './components/modals/UpdateAvailableModal'
-import MetaFilterModal from './components/modals/MetaFilterModal'
-import TimeFilterModal from './components/modals/TimeFilterModal'
-import ExportOptionsModal from './components/modals/ExportOptionsModal'
-import AttachmentsModal from './components/modals/AttachmentsModal'
-import QuickAddModal from './components/modals/QuickAddModal'
-import VoucherInfoModal from './components/modals/VoucherInfoModal'
-import SetupWizardModal from './components/modals/SetupWizardModal'
+import type { UpdateModalState } from './components/modals/UpdateAvailableModal'
 import LoadingState from './components/LoadingState'
 import { useQuickAdd } from './hooks/useQuickAdd'
 import { ToastProvider } from './context/ToastContext'
@@ -40,6 +27,18 @@ import {
 } from './utils/voucherAssignmentFallbacks'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
+const JournalView = lazy(() => import('./views/Journal/JournalView'))
+const ActivityReportEditorModal = lazy(() => import('./views/Reports/ActivityReportEditorModal'))
+const TagsManagerModal = lazy(() => import('./components/modals/TagsManagerModal'))
+const AutoBackupPromptModal = lazy(() => import('./components/modals/AutoBackupPromptModal'))
+const UpdateAvailableModal = lazy(() => import('./components/modals/UpdateAvailableModal'))
+const MetaFilterModal = lazy(() => import('./components/modals/MetaFilterModal'))
+const TimeFilterModal = lazy(() => import('./components/modals/TimeFilterModal'))
+const ExportOptionsModal = lazy(() => import('./components/modals/ExportOptionsModal'))
+const AttachmentsModal = lazy(() => import('./components/modals/AttachmentsModal'))
+const QuickAddModal = lazy(() => import('./components/modals/QuickAddModal'))
+const VoucherInfoModal = lazy(() => import('./components/modals/VoucherInfoModal'))
+const SetupWizardModal = lazy(() => import('./components/modals/SetupWizardModal'))
 const SettingsView = lazy(() =>
   import('./views/Settings/SettingsView').then((module) => ({ default: module.SettingsView }))
 )
@@ -1236,106 +1235,15 @@ function AppInner() {
 
   // Pending submissions count for nav badge
   const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    async function loadPendingCount() {
-      try {
-        // Use limit: 1 and total from API (efficient count)
-        const res = await (window as any).api?.submissions?.list?.({ status: 'pending', limit: 1 })
-        if (!cancelled) {
-          setPendingSubmissionsCount(res?.total || 0)
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    loadPendingCount()
-    const onChanged = () => loadPendingCount()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      cancelled = true
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
 
   // Open bank transactions count for nav badge
   const [openBankImportsCount, setOpenBankImportsCount] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    async function loadOpenCount() {
-      try {
-        const res = await (window as any).api?.bankTransactions?.list?.({
-          status: 'OPEN',
-          limit: 1,
-          page: 1
-        })
-        if (!cancelled) {
-          setOpenBankImportsCount(res?.stats?.open || res?.total || 0)
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    loadOpenCount()
-    const onChanged = () => loadOpenCount()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      cancelled = true
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
 
   // Due membership fees count for nav badge
   const [dueMembershipFeesCount, setDueMembershipFeesCount] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    async function loadDueMembershipFeesCount() {
-      try {
-        const res = await (window as any).api?.payments?.dueSummary?.()
-        if (!cancelled) {
-          setDueMembershipFeesCount(res?.dueMembers || 0)
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    loadDueMembershipFeesCount()
-    const onChanged = () => loadDueMembershipFeesCount()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      cancelled = true
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
 
   // Open invoices count for nav badge
   const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    async function loadOpenCount() {
-      try {
-        // Count OPEN and PARTIAL invoices using total from API (limit: 1 to minimize data transfer)
-        const resOpen = await (window as any).api?.invoices?.list?.({ status: 'OPEN', limit: 1 })
-        const resPartial = await (window as any).api?.invoices?.list?.({
-          status: 'PARTIAL',
-          limit: 1
-        })
-        if (!cancelled) {
-          const openCount = (resOpen?.total || 0) + (resPartial?.total || 0)
-          setOpenInvoicesCount(openCount)
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    loadOpenCount()
-    const onChanged = () => loadOpenCount()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      cancelled = true
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
 
   // Global data refresh key to trigger summary re-fetches across views
   const [refreshKey, setRefreshKey] = useState(0)
@@ -1369,22 +1277,6 @@ function AppInner() {
   const friendlyError = friendlyVoucherError
   // Dynamic available years from vouchers
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
-  useEffect(() => {
-    let cancelled = false
-    async function loadYears() {
-      try {
-        const res = await window.api?.reports?.years?.()
-        if (!cancelled && res?.years) setYearsAvail(res.years)
-      } catch {}
-    }
-    loadYears()
-    const onChanged = () => loadYears()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      cancelled = true
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
   const [activePage, setActivePage] = useState<NavKey>(() => {
     try {
       return (localStorage.getItem('activePage') as NavKey) || 'Buchungen'
@@ -1552,34 +1444,6 @@ function AppInner() {
       } catch {}
     }
   }, [notify])
-  useEffect(() => {
-    // Decide locally if a prompt should be shown; mirrors logic from main but with modal UX
-    let disposed = false
-    ;(async () => {
-      try {
-        const mode = String(
-          (await window.api?.settings?.get?.({ key: 'backup.auto' }))?.value || 'PROMPT'
-        ).toUpperCase()
-        if (mode !== 'PROMPT') return
-        const intervalDays = Number(
-          (await window.api?.settings?.get?.({ key: 'backup.intervalDays' }))?.value || 7
-        )
-        const lastAuto = Number(
-          (await window.api?.settings?.get?.({ key: 'backup.lastAuto' }))?.value || 0
-        )
-        const now = Date.now()
-        const due = !lastAuto || now - lastAuto > intervalDays * 24 * 60 * 60 * 1000
-        if (!due) return
-        if (!disposed) setAutoBackupPrompt({ intervalDays })
-      } catch {
-        /* ignore */
-      }
-    })()
-    return () => {
-      disposed = true
-    }
-  }, [])
-
   const showStartupUpdateNotice = useCallback(
     (state: UpdateModalState) => {
       if (startupUpdateNoticeShown.current) return
@@ -1657,22 +1521,6 @@ function AppInner() {
 
   // Period lock (year-end) status for UI controls (e.g., lock edit)
   const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
-  useEffect(() => {
-    let alive = true
-    async function load() {
-      try {
-        const s = await (window as any).api?.yearEnd?.status?.()
-        if (alive) setPeriodLock(s || { closedUntil: null })
-      } catch {}
-    }
-    load()
-    const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => {
-      alive = false
-      window.removeEventListener('data-changed', onChanged)
-    }
-  }, [])
   // Export options modal state (Reports)
   const [showExportOptions, setShowExportOptions] = useState<boolean>(false)
   const [showActivityReportEditor, setShowActivityReportEditor] = useState<boolean>(false)
@@ -2608,24 +2456,6 @@ function AppInner() {
       /* ignore */
     }
   }
-  async function loadPaymentAccounts() {
-    try {
-      const res = await window.api?.paymentAccounts?.list?.()
-      setPaymentAccounts((res as any)?.rows || [])
-    } catch {
-      /* ignore */
-    }
-  }
-  useEffect(() => {
-    loadEarmarks()
-    loadPaymentAccounts()
-    const onChanged = () => {
-      loadEarmarks()
-      loadPaymentAccounts()
-    }
-    window.addEventListener('data-changed', onChanged)
-    return () => window.removeEventListener('data-changed', onChanged)
-  }, [])
   // Map of budget id -> friendly label for filter chips
   const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
   const chips = useMemo(() => {
@@ -2699,19 +2529,49 @@ function AppInner() {
   const [tagDefs, setTagDefs] = useState<
     Array<{ id: number; name: string; color?: string | null; usage?: number }>
   >([])
-  async function loadTags() {
-    try {
-      const res = await window.api?.tags?.list?.({ includeUsage: true })
-      if (res) setTagDefs(res.rows || [])
-    } catch {
-      /* ignore */
-    }
-  }
   useEffect(() => {
-    loadTags()
-    const onChanged = () => loadTags()
+    let cancelled = false
+
+    const loadBootstrap = async () => {
+      try {
+        const data = await window.api.app.bootstrap()
+        if (cancelled) return
+        setPendingSubmissionsCount(data.counts.pendingSubmissions)
+        setOpenBankImportsCount(data.counts.openBankImports)
+        setDueMembershipFeesCount(data.counts.dueMembershipFees)
+        setOpenInvoicesCount(data.counts.openInvoices)
+        setYearsAvail(data.years)
+        setEarmarks(data.earmarks as typeof earmarks)
+        setPaymentAccounts(data.paymentAccounts as typeof paymentAccounts)
+        setTagDefs(data.tags as typeof tagDefs)
+        setPeriodLock(data.periodLock)
+
+        const { mode, intervalDays, lastAuto } = data.backup
+        const due = !lastAuto || Date.now() - lastAuto > intervalDays * 24 * 60 * 60 * 1000
+        if (mode === 'PROMPT' && due) setAutoBackupPrompt({ intervalDays })
+      } catch {
+        // Individual views keep their own error handling for essential data.
+      }
+    }
+
+    const scheduleInitialLoad = () => {
+      const requestIdle = (window as any).requestIdleCallback as
+        | ((callback: () => void, options?: { timeout: number }) => number)
+        | undefined
+      if (requestIdle) return requestIdle(() => void loadBootstrap(), { timeout: 500 })
+      return window.setTimeout(() => void loadBootstrap(), 0)
+    }
+
+    const taskId = scheduleInitialLoad()
+    const onChanged = () => void loadBootstrap()
     window.addEventListener('data-changed', onChanged)
-    return () => window.removeEventListener('data-changed', onChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener('data-changed', onChanged)
+      const cancelIdle = (window as any).cancelIdleCallback as ((id: number) => void) | undefined
+      if (cancelIdle) cancelIdle(taskId)
+      else window.clearTimeout(taskId)
+    }
   }, [])
 
   // Journal table UI: column visibility and order (Buchungen view)
@@ -2785,26 +2645,32 @@ function AppInner() {
       return defaultOrder
     }
   })
+  const journalPrefsHydrated = useRef(false)
   // Try to hydrate from persisted settings (server) once on mount if present
   useEffect(() => {
     ;(async () => {
       try {
-        const c = await window.api?.settings?.get?.({ key: 'journal.cols' })
+        const [c, o] = await Promise.all([
+          window.api?.settings?.get?.({ key: 'journal.cols' }),
+          window.api?.settings?.get?.({ key: 'journal.order' })
+        ])
         if (c?.value) {
           const parsed = JSON.parse(String(c.value))
           if (parsed && typeof parsed === 'object') setCols({ ...defaultCols, ...parsed })
         }
-        const o = await window.api?.settings?.get?.({ key: 'journal.order' })
         if (o?.value) {
           const parsedO = JSON.parse(String(o.value))
           if (Array.isArray(parsedO)) setOrder(parsedO as ColKey[])
         }
       } catch {
         /* ignore */
+      } finally {
+        journalPrefsHydrated.current = true
       }
     })()
   }, [])
   useEffect(() => {
+    if (!journalPrefsHydrated.current) return
     try {
       localStorage.setItem('journalCols', JSON.stringify(cols))
     } catch {}
@@ -2813,6 +2679,7 @@ function AppInner() {
     } catch {}
   }, [cols])
   useEffect(() => {
+    if (!journalPrefsHydrated.current) return
     try {
       localStorage.setItem('journalColsOrder', JSON.stringify(order))
     } catch {}
@@ -3903,7 +3770,9 @@ export default function App() {
   return (
     <UIPreferencesProvider>
       <ToastProvider>
-        {isDetachedQuickAdd ? <DetachedQuickAddWindow /> : <AppInner />}
+        <Suspense fallback={<LoadingState message="VereinO wird geladen …" />}>
+          {isDetachedQuickAdd ? <DetachedQuickAddWindow /> : <AppInner />}
+        </Suspense>
       </ToastProvider>
     </UIPreferencesProvider>
   )

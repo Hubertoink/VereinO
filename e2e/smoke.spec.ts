@@ -44,12 +44,15 @@ test('starts the real Electron app with its preload bridge', async () => {
 
   const bridgeResult = await page.evaluate(async () => ({
     ping: window.api.ping(),
-    appInfo: await window.api.app.version()
+    appInfo: await window.api.app.version(),
+    bootstrap: await window.api.app.bootstrap()
   }))
 
   expect(bridgeResult.ping).toBe('pong')
   expect(bridgeResult.appInfo.name).toBeTruthy()
   expect(bridgeResult.appInfo.version).toMatch(/^\d+\.\d+\.\d+/)
+  expect(bridgeResult.bootstrap.counts.pendingSubmissions).toBeGreaterThanOrEqual(0)
+  expect(Array.isArray(bridgeResult.bootstrap.paymentAccounts)).toBe(true)
 })
 
 test('creates and lists a backup through the real IPC bridge', async () => {
