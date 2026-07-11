@@ -125,6 +125,9 @@ const rendererApi = {
       set: (payload) => cleanInvoke('ai.settings.set', payload),
       testConnection: () => cleanInvoke('ai.settings.testConnection')
     },
+    invoice: {
+      extract: (payload) => cleanInvoke('ai.invoice.extract', payload)
+    },
     jobs: {
       create: (payload) => cleanInvoke('ai.jobs.create', payload),
       list: (payload) => invoke('ai.jobs.list', payload),

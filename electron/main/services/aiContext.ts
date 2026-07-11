@@ -82,6 +82,52 @@ function compactVoucherForAi(row: any) {
   }
 }
 
+export function buildAiInvoiceContext(): AiContext {
+  const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
+  const budgets = listBudgets({ includeArchived: true } as any) || []
+  const earmarks = listBindings({ activeOnly: true } as any) || []
+  const tags = listTags({ includeUsage: true } as any) || []
+
+  return {
+    generatedAt: new Date().toISOString().slice(0, 10),
+    paymentAccounts: paymentAccounts.map((account: any) => ({
+      id: account.id,
+      name: account.name,
+      kind: account.kind,
+      ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
+      color: account.color,
+      sortOrder: account.sortOrder,
+      isActive: account.isActive
+    })),
+    budgets: budgets
+      .filter((budget: any) => budget.isArchived !== 1)
+      .map((budget: any) => ({
+        id: budget.id,
+        label: budgetLabelForAi(budget),
+        year: budget.year,
+        sphere: budget.sphere,
+        categoryName: budget.categoryName,
+        projectName: budget.projectName,
+        amountPlanned: budget.amountPlanned,
+        isArchived: budget.isArchived
+      })),
+    earmarks: earmarks
+      .filter((earmark: any) => earmark.isActive !== 0)
+      .map((earmark: any) => ({
+        id: earmark.id,
+        code: earmark.code,
+        name: earmark.name,
+        isActive: earmark.isActive
+      })),
+    tags: tags.slice(0, 120).map((tag: any) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      usage: Number(tag.usage || 0)
+    }))
+  }
+}
+
 export function buildAiContext(): AiContext {
   const today = new Date().toISOString().slice(0, 10)
   const currentYear = Number(today.slice(0, 4))

@@ -9,6 +9,7 @@ import { encodeFilesForUpload } from '../utils/fileEncoding'
 import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
 import InvoiceActionMenu from './invoicesShared/InvoiceActionMenu'
+import LocalInvoiceScanModal, { type LocalInvoiceScanResult } from '../components/modals/LocalInvoiceScanModal'
 import type {
   EditInvoiceFile,
   InvoiceBudgetAssignment,
@@ -55,6 +56,16 @@ function firstEarmarkId(earmarks: InvoiceEarmarkAssignment[]) {
   return typeof earmarks[0]?.earmarkId === 'number' && earmarks[0].earmarkId > 0 ? earmarks[0].earmarkId : ''
 }
 
+function parseScannedAmount(value: string) {
+  const clean = String(value || '').replace(/[^0-9,.-]/g, '')
+  const decimalIndex = Math.max(clean.lastIndexOf(','), clean.lastIndexOf('.'))
+  const normalized = decimalIndex >= 0
+    ? `${clean.slice(0, decimalIndex).replace(/[.,-]/g, '')}.${clean.slice(decimalIndex + 1).replace(/[^0-9]/g, '')}`
+    : clean.replace(/[^0-9-]/g, '')
+  const amount = Number(normalized)
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : null
+}
+
 function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): InvoiceDraft {
   const budgets = Array.isArray(row?.budgets) && row.budgets.length
     ? row.budgets.map((item) => ({ budgetId: Number(item.budgetId || 0), amount: Number(item.amount || 0) }))
@@ -74,6 +85,7 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
     invoiceNo: row?.invoiceNo ?? '',
     party: row?.party ?? '',
     description: row?.description ?? '',
+    note: row?.note ?? '',
     grossAmount: row?.grossAmount != null ? String(row.grossAmount) : '',
     paymentMethod: row?.paymentMethod === 'BAR' || row?.paymentMethod === 'BANK' ? row.paymentMethod : '',
     paymentAccountId: typeof row?.paymentAccountId === 'number' ? row.paymentAccountId : '',
@@ -457,6 +469,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [editInvoiceFiles, setEditInvoiceFiles] = useState<EditInvoiceFile[]>([])
   const [formError, setFormError] = useState('')
   const [requiredTouched, setRequiredTouched] = useState(false)
+  const [showInvoiceScan, setShowInvoiceScan] = useState(false)
 
   const openCreate = useCallback(() => {
     setForm({
@@ -467,6 +480,62 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     setFormError('')
     setRequiredTouched(false)
   }, [])
+
+  async function createInvoiceFromScan(result: LocalInvoiceScanResult) {
+    const grossAmount = parseScannedAmount(result.fields.grossAmount)
+    const missing = [
+      !result.fields.invoiceDate && 'Rechnungsdatum',
+      !result.fields.invoiceNumber.trim() && 'Rechnungsnummer',
+      !result.fields.supplier.trim() && 'Lieferant',
+      (!grossAmount || grossAmount <= 0) && 'Bruttobetrag'
+    ].filter(Boolean)
+    if (missing.length) {
+      notify('error', `Bitte ergänze: ${missing.join(', ')}.`)
+      return false
+    }
+    const normalizedGrossAmount = grossAmount ?? 0
+
+    const invoiceFacts = [
+      result.note.trim(),
+      result.fields.netAmount && `Netto: ${result.fields.netAmount} €`,
+      result.fields.taxAmount && `Umsatzsteuer: ${result.fields.taxAmount} €`,
+      result.fields.iban && `IBAN: ${result.fields.iban}`
+    ].filter(Boolean).join('\n')
+
+    try {
+      const [file] = await encodeFilesForUpload([result.file])
+      const response = await window.api.invoices.create({
+        date: result.fields.invoiceDate,
+        dueDate: result.fields.dueDate || null,
+        invoiceNo: result.fields.invoiceNumber.trim(),
+        party: result.fields.supplier.trim(),
+        description: result.fields.description.trim() || null,
+        note: invoiceFacts || null,
+        grossAmount: normalizedGrossAmount,
+        paymentMethod: result.bookingMeta.paymentMethod || null,
+        paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
+        sphere: result.bookingMeta.sphere || 'IDEELL',
+        budgetId: result.budgets[0]?.budgetId || null,
+        earmarkId: result.earmarksAssigned[0]?.earmarkId || null,
+        budgets: result.budgets.map((item) => ({ budgetId: item.budgetId, amount: item.amount })),
+        earmarks: result.earmarksAssigned.map((item) => ({ earmarkId: item.earmarkId, amount: item.amount })),
+        autoPost: true,
+        voucherType: 'OUT',
+        files: file ? [file] : undefined,
+        tags: result.tags
+      })
+      setOffset(0)
+      setFlashId(response.id)
+      window.setTimeout(() => setFlashId((current) => current === response.id ? null : current), 3000)
+      void Promise.all([load(), loadSummary()])
+      try { window.dispatchEvent(new Event('data-changed')) } catch {}
+      notify('success', 'Verbindlichkeit angelegt')
+      return true
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      return false
+    }
+  }
 
   async function openEdit(row: InvoiceListRow | InvoiceDetail) {
     if (row.status === 'PAID') {
@@ -523,6 +592,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           invoiceNo: (draft.invoiceNo || '').trim() || null,
           party: draft.party.trim(),
           description: (draft.description || '').trim() || null,
+          note: (draft.note || '').trim() || null,
           grossAmount: amount,
           paymentMethod: draft.paymentMethod || null,
           paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
@@ -553,6 +623,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           invoiceNo: (draft.invoiceNo || '').trim() || null,
           party: draft.party.trim(),
           description: (draft.description || '').trim() || null,
+          note: (draft.note || '').trim() || null,
           grossAmount: amount,
           paymentMethod: draft.paymentMethod || null,
           paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
@@ -672,6 +743,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           />
           {!!(q.trim() || status !== 'ALL' || sphere || budgetId || tag || dueFrom || dueTo) && <button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">×</button>}
           <div className="filter-divider" />
+          <button className="btn invoices-scan-button" onClick={() => setShowInvoiceScan(true)}>Rechnung erfassen</button>
           <button className="btn primary" onClick={openCreate}>+ Neu</button>
         </div>
       </div>
@@ -903,6 +975,23 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           onUploadEditFiles={uploadEditInvoiceFiles}
           onDeleteEditFile={deleteEditInvoiceFile}
           parseAmount={parseAmount}
+        />
+      )}
+      {showInvoiceScan && (
+        <LocalInvoiceScanModal
+          onClose={() => setShowInvoiceScan(false)}
+          onCreateInvoice={async (result) => {
+            const created = await createInvoiceFromScan(result)
+            if (created) setShowInvoiceScan(false)
+            return created
+          }}
+          budgetsForEdit={budgets.map((budget) => ({
+            id: budget.id,
+            label: budget.name ? `${budget.year} · ${budget.name}` : String(budget.year),
+            year: budget.year
+          }))}
+          earmarks={earmarks}
+          tagDefs={tags}
         />
       )}
 

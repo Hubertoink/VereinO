@@ -6096,8 +6096,87 @@ textarea:focus {
     padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.fab-buchung--journal-end {
+.journal-fab-cluster {
+  position: fixed;
+  right: 50px;
+  bottom: 24px;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.journal-fab-cluster--journal-end {
   transform: translateX(-78px);
+}
+
+.journal-fab-cluster > .fab {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+}
+
+.fab-local-invoice {
+  width: 48px;
+  height: 48px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: color-mix(in oklab, var(--accent) 72%, var(--text));
+  background: color-mix(in oklab, var(--surface) 78%, var(--accent) 22%);
+  border: 1px solid color-mix(in oklab, var(--accent) 34%, var(--border));
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition:
+    width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-local-invoice:hover,
+.fab-local-invoice:focus-visible {
+  width: 190px;
+  padding: 0 16px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--accent) 32%, var(--surface));
+}
+
+.fab-local-invoice-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-local-invoice:hover .fab-local-invoice-icon,
+.fab-local-invoice:focus-visible .fab-local-invoice-icon {
+  transform: scale(0.9);
+}
+
+.fab-local-invoice-text {
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  transition:
+    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fab-local-invoice:hover .fab-local-invoice-text,
+.fab-local-invoice:focus-visible .fab-local-invoice-text {
+  max-width: 142px;
+  margin-left: 8px;
+  opacity: 1;
 }
 
 .fab-buchung-icon {
@@ -6138,6 +6217,884 @@ textarea:focus {
   opacity: 1;
   max-width: 100px;
   margin-left: 6px;
+}
+
+/* Local invoice recognition experiment */
+.local-invoice-scan-overlay {
+  padding: 28px;
+  overscroll-behavior: contain;
+}
+
+.local-invoice-scan {
+  width: min(1260px, 96vw);
+  max-height: min(900px, 92vh);
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.local-invoice-scan__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.local-invoice-scan__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.local-invoice-scan__title-row h2 {
+  margin: 1px 0 0;
+  font-size: 20px;
+}
+
+.local-invoice-scan__title-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  border: 1px solid color-mix(in oklab, var(--accent) 38%, var(--border));
+  border-radius: 12px;
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+.local-invoice-scan__eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.local-invoice-scan__close {
+  min-width: 38px;
+  padding-inline: 10px;
+  font-size: 18px;
+}
+
+.local-invoice-scan__privacy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in oklab, var(--success) 28%, var(--border));
+  border-radius: 10px;
+  color: color-mix(in oklab, var(--success) 62%, var(--text));
+  background: color-mix(in oklab, var(--success) 8%, transparent);
+  font-size: 12px;
+}
+
+.local-invoice-scan__dropzone {
+  min-height: 390px;
+  margin: 18px 20px;
+  border: 1.5px dashed color-mix(in oklab, var(--accent) 48%, var(--border));
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--accent) 5%, transparent);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.local-invoice-scan__dropzone:hover,
+.local-invoice-scan__dropzone:focus-visible,
+.local-invoice-scan__dropzone.is-dragging {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 11%, transparent);
+  transform: translateY(-1px);
+}
+
+.local-invoice-scan__dropzone > span:not(.local-invoice-scan__drop-icon) {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.local-invoice-scan__dropzone small {
+  margin-top: 8px;
+  color: var(--text-dim);
+}
+
+.local-invoice-scan__drop-error {
+  max-width: min(520px, 90%);
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.local-invoice-scan__drop-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+
+.local-invoice-scan__workspace {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(360px, 1.08fr) minmax(390px, 0.92fr);
+  gap: 14px;
+  padding: 14px 20px 18px;
+  overflow: hidden;
+}
+
+.local-invoice-scan__preview-panel,
+.local-invoice-scan__result-panel {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--surface-2, var(--surface)) 76%, transparent);
+}
+
+.local-invoice-scan__preview-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.local-invoice-scan__result-panel {
+  padding: 14px;
+  overflow: auto;
+}
+
+.local-invoice-scan__panel-heading {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.local-invoice-scan__result-panel > .local-invoice-scan__panel-heading {
+  margin: -14px -14px 12px;
+}
+
+.local-invoice-scan__file-info {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.local-invoice-scan__file-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-invoice-scan__file-info span {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.local-invoice-scan__preview {
+  min-height: 360px;
+  flex: 1;
+  padding: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  background:
+    linear-gradient(45deg, rgba(127, 127, 127, 0.045) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(127, 127, 127, 0.045) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(127, 127, 127, 0.045) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(127, 127, 127, 0.045) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.local-invoice-scan__preview canvas,
+.local-invoice-scan__preview img {
+  max-width: 100%;
+  height: auto !important;
+  display: block;
+  border-radius: 3px;
+  background: white;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.local-invoice-scan__preview img {
+  max-height: 62vh;
+  object-fit: contain;
+}
+
+.local-invoice-scan__loading {
+  align-self: center;
+  color: var(--text-dim);
+}
+
+.local-invoice-scan__pagination {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.local-invoice-scan .btn.small {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.local-invoice-scan__test-badge {
+  padding: 4px 7px;
+  border: 1px solid color-mix(in oklab, var(--accent) 32%, var(--border));
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.local-invoice-scan__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-dim);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.local-invoice-scan__status-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.local-invoice-scan__status.is-analyzing .local-invoice-scan__status-dot {
+  background: var(--accent);
+  animation: localInvoicePulse 1s ease-in-out infinite;
+}
+
+.local-invoice-scan__status.is-text-found {
+  border-color: color-mix(in oklab, var(--success) 30%, var(--border));
+  color: color-mix(in oklab, var(--success) 60%, var(--text));
+}
+
+.local-invoice-scan__status.is-text-found .local-invoice-scan__status-dot {
+  background: var(--success);
+}
+
+.local-invoice-scan__status.is-ocr-needed {
+  border-color: color-mix(in oklab, var(--warning) 34%, var(--border));
+  color: color-mix(in oklab, var(--warning) 66%, var(--text));
+}
+
+.local-invoice-scan__status.is-ocr-needed .local-invoice-scan__status-dot {
+  background: var(--warning);
+}
+
+.local-invoice-scan__status.is-error {
+  border-color: color-mix(in oklab, var(--danger) 34%, var(--border));
+  color: var(--danger);
+}
+
+.local-invoice-scan__status.is-error .local-invoice-scan__status-dot {
+  background: var(--danger);
+}
+
+@keyframes localInvoicePulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+.local-invoice-scan__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.local-invoice-scan__field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.local-invoice-scan__field .input {
+  width: 100%;
+}
+
+.local-invoice-scan__field-span {
+  grid-column: 1 / -1;
+}
+
+.local-invoice-scan__raw-text {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.local-invoice-scan__raw-text summary {
+  cursor: pointer;
+}
+
+.local-invoice-scan__raw-text pre {
+  max-height: 180px;
+  margin: 8px 0 0;
+  padding: 9px;
+  overflow: auto;
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg) 80%, transparent);
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.local-invoice-scan__next-step {
+  margin: 12px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.local-invoice-scan__footer {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 980px) {
+  .local-invoice-scan {
+    max-height: 92vh;
+    overflow: auto;
+  }
+
+  .local-invoice-scan__workspace {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .local-invoice-scan__preview {
+    max-height: 52vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .journal-fab-cluster {
+    right: 20px;
+  }
+
+  .local-invoice-scan-overlay {
+    padding: 10px;
+  }
+
+  .local-invoice-scan__privacy {
+    align-items: flex-start;
+  }
+
+  .local-invoice-scan__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .local-invoice-scan__field-span {
+    grid-column: auto;
+  }
+
+  .local-invoice-scan__footer {
+    align-items: flex-end;
+  }
+}
+
+/* Local invoice capture: compact review layout */
+.local-invoice-scan-overlay {
+  padding: 28px;
+}
+
+.local-invoice-scan {
+  width: min(1280px, 96vw);
+  max-height: min(920px, 92vh);
+}
+
+.local-invoice-scan__header-actions,
+.local-invoice-scan__preview-actions,
+.local-invoice-scan__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.local-invoice-scan__title-row h2 {
+  margin: 0;
+}
+
+.local-invoice-scan__ai-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: color-mix(in oklab, var(--accent) 66%, var(--text));
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--border));
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.local-invoice-scan__ai-button:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+.local-invoice-scan__workspace {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  align-items: stretch;
+}
+
+.local-invoice-scan__preview-panel,
+.local-invoice-scan__result-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.local-invoice-scan__result-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.local-invoice-scan__result-heading {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px 18px 14px;
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+}
+
+.local-invoice-scan__result-body {
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 18px 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.local-invoice-scan__preview {
+  min-width: 0;
+  min-height: 320px;
+  padding: 14px;
+  overscroll-behavior: contain;
+}
+
+.local-invoice-scan__pdf-page {
+  position: relative;
+  width: var(--pdf-page-width, 595px);
+  min-width: var(--pdf-page-width, 595px);
+  height: var(--pdf-page-height, 842px);
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.local-invoice-scan__preview .local-invoice-scan__pdf-page canvas {
+  width: var(--pdf-page-width, 595px) !important;
+  max-width: none;
+  height: var(--pdf-page-height, 842px) !important;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.local-invoice-scan__text-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.local-invoice-scan__text-layer.is-picker-active {
+  opacity: 1;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.local-invoice-scan__text-layer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+
+.local-invoice-scan__text-layer > :not(.markedContent),
+.local-invoice-scan__text-layer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.local-invoice-scan__text-layer ::selection {
+  background: color-mix(in oklab, var(--accent) 58%, transparent);
+}
+
+.local-invoice-scan__picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(145px, 0.55fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+
+.local-invoice-scan__picker-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.local-invoice-scan__picker-copy strong,
+.local-invoice-scan__picker-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-invoice-scan__picker-copy strong {
+  font-size: 11px;
+}
+
+.local-invoice-scan__picker-copy span {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.local-invoice-scan__picker select,
+.local-invoice-scan__assignment-row select {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.local-invoice-scan__fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+.local-invoice-scan__field,
+.local-invoice-scan__field-span,
+.local-invoice-scan__field .input {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.local-invoice-scan__field .input {
+  width: 100%;
+}
+
+/* Match the slightly raised, more legible fields of the booking form. */
+.local-invoice-scan {
+  --booking-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
+  --booking-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+}
+
+.local-invoice-scan :is(.input, select, textarea) {
+  background: var(--booking-field-bg);
+  border-color: var(--booking-field-border);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--text) 7%, transparent),
+    0 1px 2px color-mix(in oklab, var(--bg) 42%, transparent);
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.local-invoice-scan :is(.input, select, textarea):hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--booking-field-border));
+  background: color-mix(in oklab, var(--booking-field-bg) 96%, var(--accent) 4%);
+}
+
+.local-invoice-scan :is(.input, select, textarea):focus,
+.local-invoice-scan :is(.input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--booking-field-bg);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent);
+}
+
+.local-invoice-scan__picker-toggle {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  place-items: center;
+  padding-inline: 0 !important;
+}
+
+.local-invoice-scan__optional {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.local-invoice-scan__optional-heading,
+.local-invoice-scan__optional-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.local-invoice-scan__optional-heading {
+  margin-bottom: 9px;
+}
+
+.local-invoice-scan__optional-heading > span {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.local-invoice-scan__optional-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.local-invoice-scan__optional-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+}
+
+.local-invoice-scan__optional-card-header > div {
+  display: flex;
+  gap: 4px;
+}
+
+.local-invoice-scan__icon-button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 2px 7px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.local-invoice-scan__assignment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px 30px;
+  align-items: center;
+  gap: 7px;
+}
+
+.local-invoice-scan__assignment-row > label {
+  position: relative;
+  min-width: 0;
+}
+
+.local-invoice-scan__assignment-row .input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 23px;
+}
+
+.local-invoice-scan__assignment-row > label > span:last-child {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.local-invoice-scan__tags .tags-editor-input,
+.local-invoice-scan__tags .tags-suggestions {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.local-invoice-scan__tags .tags-suggestions {
+  max-height: 104px;
+  overflow-y: auto;
+}
+
+.local-invoice-scan__comment {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.local-invoice-scan__raw-text pre {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.local-invoice-scan__footer {
+  flex: 0 0 auto;
+}
+
+.local-invoice-scan__footer-actions {
+  margin-left: auto;
+}
+
+.invoices-scan-button {
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 78%, #fff),
+    color-mix(in oklab, var(--accent) 58%, #fff)
+  );
+  color: #24171b;
+  font-weight: 800;
+  box-shadow: 0 5px 16px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+.invoices-scan-button:hover:not(:disabled),
+.invoices-scan-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #24171b;
+  box-shadow: 0 7px 20px color-mix(in oklab, var(--accent) 42%, transparent);
+}
+
+/* The scanner is a true modal: background page scrolling must stay disabled. */
+body:has(.local-invoice-scan) .app-main {
+  overflow: hidden !important;
+}
+
+.local-invoice-scan .is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-height: 760px) {
+  .local-invoice-scan-overlay {
+    padding: 64px 12px 12px;
+  }
+}
+
+@media (max-width: 980px) {
+  .local-invoice-scan__workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .local-invoice-scan__preview-panel {
+    min-height: 480px;
+  }
+
+  .local-invoice-scan__result-panel {
+    max-height: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .local-invoice-scan-overlay {
+    padding: 8px;
+  }
+
+  .local-invoice-scan__header,
+  .local-invoice-scan__footer {
+    padding-inline: 12px;
+  }
+
+  .local-invoice-scan__workspace {
+    padding-inline: 12px;
+  }
+
+  .local-invoice-scan__header-actions {
+    gap: 4px;
+  }
+
+  .local-invoice-scan__ai-button {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+
+  .local-invoice-scan__picker {
+    grid-template-columns: 1fr;
+  }
+
+  .local-invoice-scan__assignment-row {
+    grid-template-columns: minmax(0, 1fr) 88px 30px;
+  }
+
+  .local-invoice-scan__footer {
+    align-items: flex-end;
+    flex-direction: column;
+  }
 }
 
 /* Base sizing for invoice modal fields (prevent over-stretching) */

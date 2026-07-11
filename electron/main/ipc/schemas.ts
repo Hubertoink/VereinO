@@ -548,6 +548,7 @@ export const InvoiceCreateInput = z.object({
   invoiceNo: z.string().nullable().optional(),
   party: z.string(),
   description: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
   grossAmount: z.number(),
   paymentMethod: z.string().nullable().optional(),
   paymentAccountId: z.number().nullable().optional(),
@@ -572,6 +573,7 @@ export const InvoiceUpdateInput = z.object({
   invoiceNo: z.string().nullable().optional(),
   party: z.string().optional(),
   description: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
   grossAmount: z.number().optional(),
   paymentMethod: z.string().nullable().optional(),
   paymentAccountId: z.number().nullable().optional(),
@@ -613,6 +615,7 @@ export const InvoicesListOutput = z.object({
       invoiceNo: z.string().nullable().optional(),
       party: z.string(),
       description: z.string().nullable().optional(),
+      note: z.string().nullable().optional(),
       grossAmount: z.number(),
       paymentMethod: z.string().nullable().optional(),
       paymentAccountId: z.number().nullable().optional(),
@@ -663,6 +666,7 @@ export const InvoiceByIdOutput = z.object({
   invoiceNo: z.string().nullable().optional(),
   party: z.string(),
   description: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
   grossAmount: z.number(),
   paymentMethod: z.string().nullable().optional(),
   paymentAccountId: z.number().nullable().optional(),
@@ -1980,6 +1984,31 @@ export const AiBookingAnalysisResultStructured = z.object({
   warnings: z.array(z.string())
 })
 
+export const AiInvoiceExtractionResult = z.object({
+  supplier: z.string().nullable(),
+  invoiceNumber: z.string().nullable(),
+  invoiceDate: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  grossAmount: z.number().nonnegative().nullable(),
+  netAmount: z.number().nonnegative().nullable(),
+  taxAmount: z.number().nonnegative().nullable(),
+  vatRate: z.number().min(0).max(100).nullable(),
+  iban: z.string().nullable(),
+  description: z.string().nullable(),
+  type: z.enum(['IN', 'OUT']),
+  sphere: Sphere,
+  paymentMethod: PaymentMethod.nullable(),
+  paymentAccountId: z.number().int().positive().nullable(),
+  budgets: z.array(AiBookingAssignment),
+  earmarks: z.array(AiBookingAssignment),
+  tags: z.array(z.string()),
+  confidence: z.number().min(0).max(1),
+  warnings: z.array(z.string()),
+  evidence: z.array(z.string())
+})
+
+export const AiInvoiceExtractionResultStructured = AiInvoiceExtractionResult
+
 export const AiTextDraftResultStructured = z.object({
   title: z.string(),
   body: z.string(),
@@ -2165,6 +2194,30 @@ export const AiUsageSchema = z.object({
   totalTokens: z.number().default(0),
   estimatedCostUsd: z.number().nullable().optional(),
   pricingNote: z.string().optional()
+})
+
+const AiInvoiceMimeType = z.enum([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp'
+])
+const MAX_AI_INVOICE_BASE64_LENGTH = 4 * Math.ceil((10 * 1024 * 1024) / 3)
+export const AiInvoiceExtractInput = z.object({
+  file: z.object({
+    fileName: z.string().trim().min(1).max(255),
+    mimeType: AiInvoiceMimeType,
+    dataBase64: z
+      .string()
+      .min(1)
+      .max(MAX_AI_INVOICE_BASE64_LENGTH)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Ungültige Base64-Datei')
+  })
+})
+export const AiInvoiceExtractOutput = z.object({
+  model: z.string(),
+  result: AiInvoiceExtractionResult,
+  usage: AiUsageSchema
 })
 
 export const AiAgentDraft = z.object({
@@ -2432,6 +2485,7 @@ export type TAiResultKind = z.infer<typeof AiResultKind>
 export type TAiJobFileInput = z.infer<typeof AiJobFileInput>
 export type TAiBookingCandidate = z.infer<typeof AiBookingCandidate>
 export type TAiBookingAnalysisResult = z.infer<typeof AiBookingAnalysisResult>
+export type TAiInvoiceExtractionResult = z.infer<typeof AiInvoiceExtractionResult>
 export type TAiTextDraftResult = z.infer<typeof AiTextDraftResult>
 export type TAiActionPlan = z.infer<typeof AiActionPlan>
 export type TAiBankImportReviewSuggestion = z.infer<typeof AiBankImportReviewSuggestion>
@@ -2447,6 +2501,8 @@ export type TAiAgentAutoRulesListInput = z.infer<typeof AiAgentAutoRulesListInpu
 export type TAiAgentAutoRulesListOutput = z.infer<typeof AiAgentAutoRulesListOutput>
 export type TAiAgentAutoRuleUpsertInput = z.infer<typeof AiAgentAutoRuleUpsertInput>
 export type TAiUsage = z.infer<typeof AiUsageSchema>
+export type TAiInvoiceExtractInput = z.infer<typeof AiInvoiceExtractInput>
+export type TAiInvoiceExtractOutput = z.infer<typeof AiInvoiceExtractOutput>
 export type TAiSettingsGetOutput = z.infer<typeof AiSettingsGetOutput>
 export type TAiSettingsSetInput = z.infer<typeof AiSettingsSetInput>
 export type TAiSettingsSetOutput = z.infer<typeof AiSettingsSetOutput>

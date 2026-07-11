@@ -21,6 +21,8 @@ import type {
   TAiJobsProcessOutput,
   TAiJobsRejectInput,
   TAiJobsUpdateCandidateInput,
+  TAiInvoiceExtractInput,
+  TAiInvoiceExtractOutput,
   TAiMcpConfigureInput,
   TAiMcpConfigureOutput,
   TAiMcpStatusOutput,
@@ -40,6 +42,9 @@ export interface AiApi {
       get: () => Promise<TAiSettingsGetOutput>
       set: (payload: TAiSettingsSetInput) => Promise<TAiSettingsSetOutput>
       testConnection: () => Promise<TAiSettingsTestOutput>
+    }
+    invoice: {
+      extract: (payload: TAiInvoiceExtractInput) => Promise<TAiInvoiceExtractOutput>
     }
     jobs: {
       create: (payload: TAiJobsCreateInput) => Promise<TAiJobsCreateOutput>

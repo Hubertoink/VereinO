@@ -740,6 +740,13 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensureAdvanceTables(db)
     }
+  },
+  {
+    version: 35,
+    up: `
+    -- Optional comment on invoices / liabilities.
+    ALTER TABLE invoices ADD COLUMN note TEXT;
+    `
   }
 ]
 
@@ -1226,6 +1233,7 @@ export function ensureInvoiceTables(db: DB) {
         invoice_no TEXT,
         party TEXT NOT NULL,
         description TEXT,
+        note TEXT,
         gross_amount NUMERIC NOT NULL,
         payment_method TEXT,
         sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL,
@@ -1281,6 +1289,7 @@ export function ensureInvoiceTables(db: DB) {
     const invoiceCols = db.prepare('PRAGMA table_info(invoices)').all() as Array<{ name: string }>
     const invoiceNames = new Set(invoiceCols.map((col) => col.name))
     if (!invoiceNames.has('payment_account_id')) db.exec('ALTER TABLE invoices ADD COLUMN payment_account_id INTEGER;')
+    if (!invoiceNames.has('note')) db.exec('ALTER TABLE invoices ADD COLUMN note TEXT;')
 
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_invoices_due ON invoices(due_date);

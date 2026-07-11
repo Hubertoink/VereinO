@@ -133,6 +133,7 @@ export default function InvoiceDetailModal({
                 <div className="invoices-detail-overview-left">
                   <div style={{ fontWeight: 600 }}>{detail.party}</div>
                   <div className="helper">{detail.description || '-'}</div>
+                  {detail.note && <div className="helper" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{detail.note}</div>}
                 </div>
                 <div>{statusBadge(detail.status)}</div>
               </div>

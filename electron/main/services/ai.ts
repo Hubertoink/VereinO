@@ -7,6 +7,8 @@ import {
   AiBankImportReviewResultStructured,
   AiBookingAnalysisResult,
   AiBookingAnalysisResultStructured,
+  AiInvoiceExtractionResult,
+  AiInvoiceExtractionResultStructured,
   AiActionPlan,
   AiActionPlanStructured,
   AiTextDraftResult,
@@ -14,6 +16,7 @@ import {
   type TAiActionPlan,
   type TAiBankImportReviewResult,
   type TAiBookingAnalysisResult,
+  type TAiInvoiceExtractionResult,
   type TAiTextDraftResult
 } from '../ipc/schemas'
 import { getSetting, setSetting } from './settings'
@@ -520,6 +523,93 @@ export async function analyzeBookingDocuments(input: {
     ]
   } as any)
   return { model, result: AiBookingAnalysisResult.parse(parseStructured(response, AiBookingAnalysisResultStructured)), usage: normalizeUsage(response, model) } as any
+}
+
+const MAX_TRANSIENT_INVOICE_BYTES = 10 * 1024 * 1024
+const MAX_TRANSIENT_INVOICE_PAGES = 20
+
+function hasInvoiceMagic(bytes: Buffer, mimeType: string) {
+  if (mimeType === 'application/pdf') return bytes.subarray(0, 5).toString('ascii') === '%PDF-'
+  if (mimeType === 'image/png') {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  }
+  if (mimeType === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  if (mimeType === 'image/webp') {
+    return bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP'
+  }
+  return false
+}
+
+async function validateTransientInvoiceFile(file: AiInputFile) {
+  const mimeType = inferInputFileMimeType(file)
+  const bytes = Buffer.from(file.dataBase64, 'base64')
+  if (!bytes.length || bytes.length > MAX_TRANSIENT_INVOICE_BYTES) {
+    throw new Error('Die KI-Analyse unterstützt Rechnungen bis 10 MB.')
+  }
+  if (!hasInvoiceMagic(bytes, mimeType)) {
+    throw new Error('Dateityp und Dateiinhalt der Rechnung stimmen nicht überein.')
+  }
+  if (mimeType === 'application/pdf') {
+    const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true })
+    if (pdf.getPageCount() > MAX_TRANSIENT_INVOICE_PAGES) {
+      throw new Error(`Die KI-Analyse unterstützt PDFs bis ${MAX_TRANSIENT_INVOICE_PAGES} Seiten.`)
+    }
+  }
+}
+
+export async function analyzeInvoiceDocument(input: {
+  file: AiInputFile
+  context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'generatedAt'>
+}): Promise<{ model: string; result: TAiInvoiceExtractionResult; usage: AiUsage }> {
+  await validateTransientInvoiceFile(input.file)
+  const settings = getAiSettings()
+  const model = settings.model
+  const context = {
+    generatedAt: input.context.generatedAt,
+    paymentAccounts: (input.context.paymentAccounts || [])
+      .filter((account) => account.isActive !== 0)
+      .map((account) => ({ id: account.id, name: account.name, kind: account.kind })),
+    budgets: (input.context.budgets || [])
+      .filter((budget) => budget.isArchived !== 1)
+      .map((budget) => ({ id: budget.id, label: budget.label, year: budget.year, sphere: budget.sphere })),
+    earmarks: (input.context.earmarks || [])
+      .filter((earmark) => earmark.isActive !== 0)
+      .map((earmark) => ({ id: earmark.id, code: earmark.code, name: earmark.name })),
+    tags: (input.context.tags || []).map((tag) => ({ id: tag.id, name: tag.name })).slice(0, 120)
+  }
+  const prompt = [
+    'Analysiere genau diese eine Rechnung fuer einen deutschen Verein.',
+    'Liefere ausschliesslich die strukturierten Rechnungs- und Buchungsfelder.',
+    'Erfinde keine Werte: Nutze null, leere Arrays und Warnungen, wenn etwas nicht sicher erkennbar ist.',
+    'Bewahre Rechnungsnummer und IBAN exakt; Datumswerte muessen YYYY-MM-DD sein.',
+    'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt Einnahme oder Ausgabe.',
+    'Nutze Konto-, Budget- und Zweckbindungs-IDs nur aus dem folgenden Stammdatenkontext.',
+    'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
+    '',
+    'Minimaler VereinO-Stammdatenkontext:',
+    JSON.stringify(context)
+  ].join('\n')
+  const response = await createClient().responses.create({
+    model,
+    reasoning: { effort: settings.defaultReasoningEffort },
+    text: { format: zodTextFormat(AiInvoiceExtractionResultStructured, 'vereino_invoice_extraction') },
+    input: [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: prompt },
+          toResponseFileContent(input.file)
+        ]
+      }
+    ]
+  } as any)
+  return {
+    model,
+    result: AiInvoiceExtractionResult.parse(
+      parseStructured(response, AiInvoiceExtractionResultStructured)
+    ),
+    usage: normalizeUsage(response, model)
+  }
 }
 
 export async function planAiAction(input: {

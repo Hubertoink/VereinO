@@ -68,7 +68,8 @@ function saveInvoiceAssignments(d: DB, invoiceId: number, budgets: InvoiceBudget
 function buildInvoiceVoucherNote(invoice: any) {
   const parts = [
     invoice?.party ? `Partei: ${String(invoice.party).trim()}` : '',
-    invoice?.invoice_no ? `Verbindlichkeit-Nr.: ${String(invoice.invoice_no).trim()}` : ''
+    invoice?.invoice_no ? `Verbindlichkeit-Nr.: ${String(invoice.invoice_no).trim()}` : '',
+    invoice?.note ? `Kommentar: ${String(invoice.note).trim()}` : ''
   ].filter(Boolean)
   return parts.length ? parts.join('\n') : null
 }
@@ -143,6 +144,7 @@ export function createInvoice(input: {
   invoiceNo?: string | null
   party: string
   description?: string | null
+  note?: string | null
   grossAmount: number
   paymentMethod?: string | null
   paymentAccountId?: number | null
@@ -163,13 +165,14 @@ export function createInvoice(input: {
     const normalizedEarmarks = normalizeInvoiceEarmarkAssignments(input, clamp2(input.grossAmount))
     const normalizedBudgetId = normalizedBudgets[0]?.budgetId ?? input.budgetId ?? null
     const normalizedEarmarkId = normalizedEarmarks[0]?.earmarkId ?? input.earmarkId ?? null
-    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, description, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, description, note, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         input.date,
         input.dueDate ?? null,
         input.invoiceNo ?? null,
         input.party,
         input.description ?? null,
+        input.note ?? null,
         clamp2(input.grossAmount),
         input.paymentMethod ?? null,
         input.sphere,
@@ -205,6 +208,7 @@ export function updateInvoice(input: {
   invoiceNo?: string | null
   party?: string
   description?: string | null
+  note?: string | null
   grossAmount?: number
   paymentMethod?: string | null
   paymentAccountId?: number | null
@@ -240,6 +244,7 @@ export function updateInvoice(input: {
       invoice_no=COALESCE(?, invoice_no),
       party=COALESCE(?, party),
       description=COALESCE(?, description),
+      note=COALESCE(?, note),
       gross_amount=COALESCE(?, gross_amount),
       payment_method=COALESCE(?, payment_method),
       sphere=COALESCE(?, sphere),
@@ -255,6 +260,7 @@ export function updateInvoice(input: {
       input.invoiceNo ?? null,
       input.party ?? null,
       input.description ?? null,
+      input.note ?? null,
       input.grossAmount != null ? clamp2(input.grossAmount) : null,
       input.paymentMethod ?? null,
       input.sphere ?? null,
@@ -328,7 +334,7 @@ export function listInvoicesPaged(filters: {
   const orderDir = sort ?? 'ASC'
 
   const rows = d.prepare(`
-    SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description,
+    SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.sphere,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
@@ -432,7 +438,7 @@ export function summarizeInvoices(filters: {
 
 export function getInvoiceById(id: number) {
   const d = getDb()
-  const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description,
+  const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId,
            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountName,
            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountKind,

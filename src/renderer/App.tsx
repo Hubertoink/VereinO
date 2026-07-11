@@ -3405,8 +3405,24 @@ function AppInner() {
         </div>
       )}
       {/* removed: Confirm mark as paid modal */}
-      {/* Global Floating Action Button: + Buchung (hidden on certain pages) */}
-      {activePage !== 'Einstellungen' &&
+      {/* Journal action */}
+      {activePage === 'Buchungen' ? (
+        <div
+          className={`journal-fab-cluster${fabNearJournalEnd ? ' journal-fab-cluster--journal-end' : ''}`}
+          role="group"
+          aria-label="Journal-Aktionen"
+        >
+          <button
+            className="fab fab-buchung"
+            onClick={openBookingEntry}
+            title="+ Buchung"
+          >
+            <span className="fab-buchung-icon">+</span>
+            <span className="fab-buchung-text">Buchung</span>
+          </button>
+        </div>
+      ) : (
+        activePage !== 'Einstellungen' &&
         activePage !== 'Mitglieder' &&
         activePage !== 'Verbindlichkeiten' &&
         activePage !== 'Bankimport' &&
@@ -3414,15 +3430,12 @@ function AppInner() {
         activePage !== 'Budgets' &&
         activePage !== 'Zweckbindungen' &&
         activePage !== 'Vorschuesse' && (
-          <button
-            className={`fab fab-buchung${fabNearJournalEnd ? ' fab-buchung--journal-end' : ''}`}
-            onClick={openBookingEntry}
-            title="+ Buchung"
-          >
+          <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
             <span className="fab-buchung-icon">+</span>
             <span className="fab-buchung-text">Buchung</span>
           </button>
-        )}
+        )
+      )}
       {/* Auto-backup prompt modal (renderer) */}
       {autoBackupPrompt && (
         <AutoBackupPromptModal

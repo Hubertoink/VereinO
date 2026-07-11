@@ -1,4 +1,12 @@
-import { AiBankImportReviewResult, AiBookingAnalysisResult, AiBookingAnalysisResultStructured, AiSettingsGetOutput, AiSettingsSetInput } from '../../electron/main/ipc/schemas'
+import {
+  AiBankImportReviewResult,
+  AiBookingAnalysisResult,
+  AiBookingAnalysisResultStructured,
+  AiInvoiceExtractInput,
+  AiInvoiceExtractionResult,
+  AiSettingsGetOutput,
+  AiSettingsSetInput
+} from '../../electron/main/ipc/schemas'
 
 describe('AiBookingAnalysisResult', () => {
   it('accepts a reviewable booking candidate with evidence and assignments', () => {
@@ -41,18 +49,20 @@ describe('AiBookingAnalysisResult', () => {
   })
 
   it('rejects non-reviewable candidates with invalid amount or unsupported type', () => {
-    expect(() => AiBookingAnalysisResult.parse({
-      candidates: [
-        {
-          date: '2026-07-04',
-          type: 'TRANSFER',
-          sphere: 'IDEELL',
-          description: 'Umbuchung',
-          grossAmount: 0,
-          vatRate: 0
-        }
-      ]
-    })).toThrow()
+    expect(() =>
+      AiBookingAnalysisResult.parse({
+        candidates: [
+          {
+            date: '2026-07-04',
+            type: 'TRANSFER',
+            sphere: 'IDEELL',
+            description: 'Umbuchung',
+            grossAmount: 0,
+            vatRate: 0
+          }
+        ]
+      })
+    ).toThrow()
   })
 
   it('accepts required structured source metadata for batch document analysis', () => {
@@ -123,6 +133,53 @@ describe('AiSettings schemas', () => {
   })
 })
 
+describe('AiInvoiceExtractionResult', () => {
+  it('accepts a complete, reviewable invoice extraction without persisting a job', () => {
+    const parsed = AiInvoiceExtractionResult.parse({
+      supplier: 'Borcelle Apotheke',
+      invoiceNumber: '01234',
+      invoiceDate: '2026-01-01',
+      dueDate: null,
+      grossAmount: 52.36,
+      netAmount: 44,
+      taxAmount: 8.36,
+      vatRate: 19,
+      iban: 'DE89370400440532013000',
+      description: 'Borcelle Apotheke · Rechnung 01234',
+      type: 'OUT',
+      sphere: 'IDEELL',
+      paymentMethod: 'BANK',
+      paymentAccountId: null,
+      budgets: [{ id: 7, amount: 52.36 }],
+      earmarks: [],
+      tags: ['Medizin'],
+      confidence: 0.91,
+      warnings: [],
+      evidence: ['Gesamt 52,36 EUR']
+    })
+
+    expect(parsed.invoiceNumber).toBe('01234')
+    expect(parsed.budgets[0].id).toBe(7)
+  })
+
+  it('limits transient invoice uploads to one supported Base64 file', () => {
+    const parsed = AiInvoiceExtractInput.parse({
+      file: {
+        fileName: 'rechnung.pdf',
+        mimeType: 'application/pdf',
+        dataBase64: 'JVBERi0='
+      }
+    })
+
+    expect(parsed.file.mimeType).toBe('application/pdf')
+    expect(() =>
+      AiInvoiceExtractInput.parse({
+        file: { fileName: 'rechnung.svg', mimeType: 'image/svg+xml', dataBase64: 'PHN2Zz4=' }
+      })
+    ).toThrow()
+  })
+})
+
 describe('AiBankImportReviewResult', () => {
   it('accepts link and create suggestions for open bank transactions', () => {
     const parsed = AiBankImportReviewResult.parse({
@@ -158,15 +215,17 @@ describe('AiBankImportReviewResult', () => {
   })
 
   it('rejects unsafe link suggestions without voucher id', () => {
-    expect(() => AiBankImportReviewResult.parse({
-      suggestions: [
-        {
-          transactionId: 10,
-          action: 'LINK_EXISTING',
-          confidence: 0.8,
-          reason: 'Unsicherer Treffer ohne Buchungs-ID.'
-        }
-      ]
-    })).toThrow()
+    expect(() =>
+      AiBankImportReviewResult.parse({
+        suggestions: [
+          {
+            transactionId: 10,
+            action: 'LINK_EXISTING',
+            confidence: 0.8,
+            reason: 'Unsicherer Treffer ohne Buchungs-ID.'
+          }
+        ]
+      })
+    ).toThrow()
   })
 })

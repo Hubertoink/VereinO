@@ -278,6 +278,17 @@ export default function InvoiceFormModal({
                       placeholder="z. B. Mitgliedsbeitrag, Spende ..."
                     />
                   </div>
+                  <div className="field">
+                    <label htmlFor="invoice-note">Kommentar</label>
+                    <textarea
+                      id="invoice-note"
+                      className="input"
+                      value={form.draft.note || ''}
+                      onChange={(e) => setDraft({ note: e.target.value })}
+                      placeholder="Interne Notiz zur Verbindlichkeit"
+                      rows={2}
+                    />
+                  </div>
                   <TagsEditor
                     label="Tags"
                     className="invoice-tags-editor"

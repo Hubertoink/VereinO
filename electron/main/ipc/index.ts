@@ -189,6 +189,8 @@ import {
   AiBankImportReviewInput,
   AiBankImportReviewOutput,
   AiBookingAnalysisResult,
+  AiInvoiceExtractInput,
+  AiInvoiceExtractOutput,
   AiJobIdInput,
   AiJobsApproveCandidateInput,
   AiJobsApproveCandidateOutput,
@@ -455,7 +457,7 @@ function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
   if (message.includes('no such table:')) {
     return identifiers.some((identifier) => message.includes(`no such table: ${identifier}`))
   }
-  if (message.includes('no such column:')) {
+  if (message.includes('no such column:') || message.includes('has no column named')) {
     return identifiers.some((identifier) => {
       const bareIdentifier = identifier.includes('.')
         ? (identifier.split('.').pop() ?? identifier)
@@ -463,6 +465,7 @@ function isMissingSchemaError(error: unknown, identifiers: string[]): boolean {
       return (
         message.includes(`no such column: ${identifier}`) ||
         message.includes(`no such column: ${bareIdentifier}`) ||
+        message.includes(`has no column named ${bareIdentifier}`) ||
         message.includes(`no such column: v.${bareIdentifier}`)
       )
     })
@@ -808,6 +811,26 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('ai.settings.testConnection', async () => {
     const { testAiConnection } = await loadAiService()
     return AiSettingsTestOutput.parse(await testAiConnection())
+  })
+  ipcMain.handle('ai.invoice.extract', async (event, payload) => {
+    const senderFrame = event.senderFrame
+    const senderUrl = senderFrame?.url || ''
+    const isTrustedRenderer =
+      senderFrame === event.sender.mainFrame &&
+      (senderUrl.startsWith('file:') ||
+        /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(senderUrl))
+    if (!isTrustedRenderer) throw new Error('Nicht erlaubter KI-Aufruf.')
+
+    const parsed = AiInvoiceExtractInput.parse(payload)
+    const [{ analyzeInvoiceDocument }, { buildAiInvoiceContext }] = await Promise.all([
+      loadAiService(),
+      loadAiContextService()
+    ])
+    const analyzed = await analyzeInvoiceDocument({
+      file: parsed.file,
+      context: buildAiInvoiceContext()
+    })
+    return AiInvoiceExtractOutput.parse(analyzed)
   })
   ipcMain.handle('ai.mcp.status', async () => {
     const { getAiMcpStatus } = await loadAiMcpService()
@@ -2829,7 +2852,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = InvoiceCreateInput.parse(payload)
     const res = await withSchemaHealRetry(
       () => createInvoice(parsed as any),
-      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+      ['invoices.payment_account_id', 'invoices.note', 'invoice_budgets', 'invoice_earmarks']
     )
     return InvoiceCreateOutput.parse(res)
   })
@@ -2837,7 +2860,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = InvoiceUpdateInput.parse(payload)
     const res = await withSchemaHealRetry(
       () => updateInvoice(parsed as any),
-      ['invoices.payment_account_id', 'invoice_budgets', 'invoice_earmarks']
+      ['invoices.payment_account_id', 'invoices.note', 'invoice_budgets', 'invoice_earmarks']
     )
     return InvoiceUpdateOutput.parse(res)
   })

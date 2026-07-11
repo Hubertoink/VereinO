@@ -47,6 +47,7 @@ export type InvoiceListRow = {
   invoiceNo?: string | null
   party: string
   description?: string | null
+  note?: string | null
   grossAmount: number
   paymentMethod?: string | null
   paymentAccountId?: number | null
@@ -72,6 +73,7 @@ export type InvoiceDraft = {
   invoiceNo?: string | null
   party: string
   description?: string | null
+  note?: string | null
   grossAmount: string
   paymentMethod?: InvoicePaymentMethod
   paymentAccountId?: number | ''
@@ -105,6 +107,7 @@ export type InvoiceDetail = {
   invoiceNo?: string | null
   party: string
   description?: string | null
+  note?: string | null
   grossAmount: number
   paymentMethod?: string | null
   paymentAccountId?: number | null
