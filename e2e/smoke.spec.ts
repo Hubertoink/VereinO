@@ -104,8 +104,9 @@ test('presents the optimized booking workflow', async () => {
   await expect(dialog.getByRole('button', { name: 'Ausgabe', exact: true })).toBeVisible()
   await expect(dialog.getByPlaceholder(/Was wurde gebucht/i)).toBeVisible()
   await expect(dialog.getByText('Zuordnungen', { exact: true })).toBeVisible()
-  await expect(dialog.getByText('Tags', { exact: true })).toBeVisible()
-  await expect(dialog.getByText('Kommentar', { exact: true })).toBeVisible()
+  const detailSummaries = dialog.locator('.booking-details summary')
+  await expect(detailSummaries.filter({ hasText: /^Tags/ })).toBeVisible()
+  await expect(detailSummaries.filter({ hasText: /^Kommentar/ })).toBeVisible()
 
   expect(await dialog.locator('input[type="date"]').evaluate(
     (input) => getComputedStyle(input).appearance

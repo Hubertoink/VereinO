@@ -21,8 +21,18 @@ async function loadAutoUpdater(): Promise<AppUpdater> {
     if (autoUpdater) return autoUpdater
     if (!updaterPromise) {
         updaterPromise = import('electron-updater').then((module) => {
-            autoUpdater = module.autoUpdater
-            return module.autoUpdater
+            // electron-updater is CommonJS. In the packaged CJS bundle Node may
+            // expose its exports below `default`, while development builds expose
+            // them as named exports.
+            const defaultExport = (module as typeof module & {
+                default?: { autoUpdater?: AppUpdater }
+            }).default
+            const updater = module.autoUpdater ?? defaultExport?.autoUpdater
+            if (!updater) {
+                throw new Error('electron-updater konnte nicht geladen werden.')
+            }
+            autoUpdater = updater
+            return updater
         })
     }
     return updaterPromise
