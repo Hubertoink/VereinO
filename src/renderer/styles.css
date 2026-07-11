@@ -1983,6 +1983,9 @@ label.settings-toggle-card {
   max-height: min(600px, 88vh);
   padding: 0;
   overflow: hidden;
+  --invoice-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
+  --invoice-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+  --invoice-field-focus-bg: color-mix(in oklab, var(--invoice-field-bg) 92%, var(--accent) 8%);
 }
 
 .invoices-modal-header {
@@ -1996,6 +1999,209 @@ label.settings-toggle-card {
 
 .invoices-modal-header h2 {
   font-size: 1.1rem;
+}
+
+.invoices-modal-header .invoices-modal-close-btn {
+  flex: 0 0 auto;
+}
+
+:root[data-theme='light'] .invoices-modal-redesign .booking-modal-close-btn,
+:root[data-theme='light'] .invoices-modal-redesign .booking-modal-close-btn:hover,
+:root[data-theme='light'] .invoices-modal-redesign .booking-modal-close-btn:focus-visible {
+  color: color-mix(in oklab, var(--danger-strong) 84%, var(--text));
+}
+
+/* The invoice modal uses the same compact floating-label pattern as bookings. */
+.invoices-modal-redesign .invoice-floating-field,
+.invoices-modal-redesign .invoice-floating-control {
+  position: relative;
+  min-width: 0;
+  --invoice-floating-label-notch: 72px;
+}
+
+.invoices-modal-redesign .invoice-floating-field {
+  gap: 0;
+}
+
+.invoices-modal-redesign .invoice-type-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.invoices-modal-redesign .invoice-type-field > label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.invoices-modal-redesign .invoice-type-field .btn-group {
+  align-items: center;
+}
+
+.invoices-modal-redesign .invoice-floating-field > label,
+.invoices-modal-redesign .invoice-floating-control > label {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 1px 3px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: top 0.16s ease, transform 0.16s ease, color 0.16s ease, font-size 0.16s ease;
+}
+
+.invoices-modal-redesign .invoice-floating-field::before,
+.invoices-modal-redesign .invoice-floating-control::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 7px;
+  z-index: 1;
+  width: var(--invoice-floating-label-notch);
+  height: 2px;
+  background: var(--invoice-field-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-date']) {
+  --invoice-floating-label-notch: 68px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-sphere']) {
+  --invoice-floating-label-notch: 66px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-account']) {
+  --invoice-floating-label-notch: 52px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-description']) {
+  --invoice-floating-label-notch: 98px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-party']) {
+  --invoice-floating-label-notch: 58px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-number']) {
+  --invoice-floating-label-notch: 116px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-due-date']) {
+  --invoice-floating-label-notch: 78px;
+}
+
+.invoices-modal-redesign .invoice-floating-control:has(> label[for='invoice-amount']) {
+  --invoice-floating-label-notch: 66px;
+}
+
+.invoices-modal-redesign .invoice-floating-field > :is(.input, select),
+.invoices-modal-redesign .invoice-floating-field > .booking-date-input-wrap > .input,
+.invoices-modal-redesign .invoice-floating-control > .input {
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding-top: 17px;
+  padding-bottom: 5px;
+  background: var(--invoice-field-bg);
+  border-color: var(--invoice-field-border);
+}
+
+.invoices-modal-redesign .invoice-floating-control > .input {
+  min-width: 0;
+}
+
+.invoices-modal-redesign input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.invoices-modal-redesign .invoice-floating-field > .booking-date-input-wrap .input {
+  padding-right: 42px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:focus-within > label,
+.invoices-modal-redesign .invoice-floating-field--filled > label,
+.invoices-modal-redesign .invoice-floating-control:focus-within > label,
+.invoices-modal-redesign .invoice-floating-control--filled > label {
+  top: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.invoices-modal-redesign .invoice-floating-field:focus-within::before,
+.invoices-modal-redesign .invoice-floating-field--filled::before,
+.invoices-modal-redesign .invoice-floating-control:focus-within::before,
+.invoices-modal-redesign .invoice-floating-control--filled::before {
+  opacity: 1;
+}
+
+.invoices-modal-redesign .invoice-floating-field:focus-within::before,
+.invoices-modal-redesign .invoice-floating-control:focus-within::before {
+  background: var(--invoice-field-focus-bg);
+}
+
+/* Keep the label notch visually clean: the global focus halo otherwise wraps
+   around the cut-out and looks like a highlighted label background. */
+.invoices-modal-redesign .invoice-floating-field > :is(.input, select):focus,
+.invoices-modal-redesign .invoice-floating-field > .booking-date-input-wrap > .input:focus,
+.invoices-modal-redesign .invoice-floating-control > .input:focus {
+  background: var(--invoice-field-focus-bg);
+  box-shadow: none;
+}
+
+.invoices-modal-redesign .invoice-floating-field:not(.invoice-floating-field--filled):not(:focus-within) > .input::placeholder {
+  color: transparent;
+}
+
+.invoices-modal-redesign .invoice-floating-control:not(.invoice-floating-control--filled):not(:focus-within) > .input::placeholder {
+  color: transparent;
+}
+
+.invoices-modal-redesign .invoice-tags-editor__control {
+  width: 100%;
+}
+
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field > .tags-editor-input {
+  height: auto;
+  min-height: 46px;
+  padding-top: 17px;
+  padding-bottom: 5px;
+  background: var(--invoice-field-bg);
+  border-color: var(--invoice-field-border);
+}
+
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field {
+  --invoice-floating-label-notch: 44px;
+}
+
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field:has(.chip) > label,
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field:has(.tags-editor-text-input:not(:placeholder-shown)) > label {
+  top: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field:has(.chip)::before,
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field:has(.tags-editor-text-input:not(:placeholder-shown))::before {
+  opacity: 1;
+}
+
+.invoices-modal-redesign .invoice-tags-editor .invoice-floating-field:not(:focus-within):not(:has(.chip)):not(:has(.tags-editor-text-input:not(:placeholder-shown))) .tags-editor-text-input::placeholder {
+  color: transparent;
 }
 
 .invoices-modal-body {
@@ -2732,6 +2938,36 @@ button.badge:hover {
   background: color-mix(in oklab, #64748b 22%, transparent);
   color: var(--badge-text);
   border: 1px dashed color-mix(in oklab, #64748b 55%, transparent);
+}
+
+.voucher-type-badge {
+  min-width: 34px;
+  text-align: center;
+  box-shadow: inset 0 1px 0 color-mix(in oklab, #fff 18%, transparent);
+}
+
+.badge.voucher-type-badge--in {
+  background: color-mix(in oklab, var(--success) 78%, #fff 10%);
+  border-color: color-mix(in oklab, var(--success) 62%, var(--border));
+  color: #f7fff9;
+}
+
+.badge.voucher-type-badge--out {
+  background: color-mix(in oklab, var(--danger) 76%, #fff 8%);
+  border-color: color-mix(in oklab, var(--danger) 62%, var(--border));
+  color: #fff6f7;
+}
+
+.badge.voucher-type-badge--transfer {
+  background: color-mix(in oklab, #d6a73b 72%, var(--surface));
+  border-color: color-mix(in oklab, #d6a73b 58%, var(--border));
+  color: #fff8e6;
+}
+
+.badge.voucher-type-badge--internal {
+  background: color-mix(in oklab, var(--accent) 54%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 48%, var(--border));
+  color: #eef6ff;
 }
 
 .badge.sphere-ideell {
@@ -4168,14 +4404,14 @@ svg text {
   transform: none;
 }
 
-.booking-modal-close-btn {
+.booking-modal-icon-btn.booking-modal-close-btn {
   background: color-mix(in oklab, var(--danger) 78%, transparent);
   color: #fff;
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--danger) 45%, transparent);
 }
 
-.booking-modal-close-btn:hover,
-.booking-modal-close-btn:focus-visible {
+.booking-modal-icon-btn.booking-modal-close-btn:hover,
+.booking-modal-icon-btn.booking-modal-close-btn:focus-visible {
   background: color-mix(in oklab, var(--danger) 86%, white 12%);
   color: #fff;
   box-shadow:
@@ -4184,8 +4420,15 @@ svg text {
   transform: translateY(-1px);
 }
 
-.booking-modal-close-btn:active {
+.booking-modal-icon-btn.booking-modal-close-btn:active {
   transform: translateY(0) scale(0.98);
+}
+
+/* A white close icon lacks contrast against the light-theme danger tint. */
+:root[data-theme='light'] .quick-add-modal .booking-modal-close-btn,
+:root[data-theme='light'] .quick-add-modal .booking-modal-close-btn:hover,
+:root[data-theme='light'] .quick-add-modal .booking-modal-close-btn:focus-visible {
+  color: color-mix(in oklab, var(--danger-strong) 84%, var(--text));
 }
 
 .booking-modal-icon-btn:active,
@@ -7684,6 +7927,23 @@ button.dashboard-task-strip__item:hover {
   min-width: 0;
 }
 
+.booking-validation-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in oklab, var(--danger) 62%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 88%, var(--danger) 12%);
+  color: color-mix(in oklab, var(--danger) 84%, var(--text));
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .booking-ai-assist {
   position: relative;
   z-index: 2;
@@ -8054,19 +8314,36 @@ button.dashboard-task-strip__item:hover {
 .file-list {
   margin: 8px 0 0;
   padding-left: 18px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .file-list-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .file-name {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.quick-add-modal .file-list-item > .flex-gap-8 {
+  flex: 0 0 auto;
+}
+
+.quick-add-modal .attachment-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Attachment card */
@@ -8231,6 +8508,19 @@ button.dashboard-task-strip__item:hover {
   list-style: none;
 }
 
+.booking-comment-preview {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-left: 4px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .booking-details__heading {
   display: flex;
   align-items: center;
@@ -8368,6 +8658,11 @@ button.dashboard-task-strip__item:hover {
 
   .booking-modal-save-actions {
     width: 100%;
+  }
+
+  .booking-validation-badge {
+    max-width: 100%;
+    border-radius: 8px;
   }
 }
 
@@ -13701,10 +13996,8 @@ html[data-glass-modals='true'] .flyout-arrow {
 .quick-add-modal :is(.input, select, textarea):focus-visible:not(.input-error) {
   outline: none;
   border-color: var(--accent);
-  background: color-mix(in oklab, var(--booking-field-bg) 92%, var(--accent) 8%);
-  box-shadow:
-    0 0 0 3px color-mix(in oklab, var(--accent) 24%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent);
+  background: var(--booking-field-bg);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent);
 }
 
 .quick-add-modal :is(.input, select, textarea).input-error {
@@ -13713,12 +14006,46 @@ html[data-glass-modals='true'] .flyout-arrow {
 }
 
 .quick-add-modal :is(.input, select, textarea).input-error:focus {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 24%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent);
 }
 
 .quick-add-modal :is(.input, select, textarea):disabled {
   opacity: 0.68;
   background: color-mix(in oklab, var(--surface) 86%, var(--bg) 14%);
+}
+
+/* Floating selects use a real CSS chevron; other selects retain their native marker. */
+.quick-add-modal .booking-floating-field > select,
+.quick-add-modal .booking-select-shell > select {
+  appearance: none;
+  padding-right: 38px;
+  background-image: none;
+}
+
+.quick-add-modal .booking-floating-field:has(> select)::after,
+.quick-add-modal .booking-select-shell::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  z-index: 3;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  pointer-events: none;
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.quick-add-modal .booking-select-shell {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 46px;
+}
+
+.quick-add-modal .booking-select-shell > select {
+  height: 100%;
 }
 
 .quick-add-modal :is(input, textarea)::placeholder {
@@ -13829,4 +14156,559 @@ html[data-glass-modals='true'] .flyout-arrow {
 
 .booking-sphere-tooltip__content b {
   color: var(--text);
+}
+
+/* Floating labels keep the booking form compact while preserving field context. */
+.quick-add-modal .booking-floating-field,
+.quick-add-modal .booking-floating-control {
+  position: relative;
+  min-width: 0;
+  --booking-floating-label-notch: 72px;
+}
+
+.quick-add-modal .booking-floating-field {
+  gap: 0;
+}
+
+.quick-add-modal .booking-floating-field > label,
+.quick-add-modal .booking-floating-control > label {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 1px 3px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: top 0.16s ease, transform 0.16s ease, color 0.16s ease, font-size 0.16s ease, background-color 0.16s ease;
+}
+
+.quick-add-modal .booking-floating-field::before,
+.quick-add-modal .booking-floating-control::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 7px;
+  z-index: 1;
+  width: var(--booking-floating-label-notch);
+  height: 2px;
+  background: var(--booking-field-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-date']) {
+  --booking-floating-label-notch: 68px;
+}
+
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-sphere']) {
+  --booking-floating-label-notch: 66px;
+}
+
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-account']) {
+  --booking-floating-label-notch: 62px;
+}
+
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-vat-rate']) {
+  --booking-floating-label-notch: 48px;
+}
+
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-description']) {
+  --booking-floating-label-notch: 98px;
+}
+
+.quick-add-modal .booking-floating-control:has(> label[for='quick-add-amount']) {
+  --booking-floating-label-notch: 66px;
+}
+
+.quick-add-modal .booking-floating-control:has(> label[for='quick-add-transfer-amount']) {
+  --booking-floating-label-notch: 132px;
+}
+
+.quick-add-modal .booking-floating-field > :is(.input, select),
+.quick-add-modal .booking-floating-field > .booking-date-input-wrap > .input,
+.quick-add-modal .booking-floating-control > .input {
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding-top: 17px;
+  padding-bottom: 5px;
+}
+
+.quick-add-modal .booking-floating-field > .booking-date-input-wrap .input {
+  padding-right: 42px;
+}
+
+.quick-add-modal .booking-floating-control {
+  min-width: 0;
+}
+
+.quick-add-modal .booking-floating-control > .input {
+  min-width: 0;
+}
+
+.quick-add-modal .booking-floating-field:focus-within > label,
+.quick-add-modal .booking-floating-field--filled > label,
+.quick-add-modal .booking-floating-control:focus-within > label,
+.quick-add-modal .booking-floating-control--filled > label {
+  top: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.quick-add-modal .booking-floating-field:focus-within::before,
+.quick-add-modal .booking-floating-field--filled::before,
+.quick-add-modal .booking-floating-control:focus-within::before,
+.quick-add-modal .booking-floating-control--filled::before {
+  opacity: 1;
+}
+
+.quick-add-modal .booking-floating-field:focus-within::before,
+.quick-add-modal .booking-floating-control:focus-within::before {
+  background: var(--booking-field-bg);
+}
+
+.quick-add-modal .booking-floating-field:has(.input-error):focus-within::before,
+.quick-add-modal .booking-floating-control:has(.input-error):focus-within::before {
+  background: color-mix(in oklab, var(--booking-field-bg) 94%, var(--danger) 6%);
+}
+
+.quick-add-modal .booking-floating-field:has(.input-error):focus-within > label,
+.quick-add-modal .booking-floating-control:has(.input-error):focus-within > label {
+  color: var(--danger);
+}
+
+.quick-add-modal .booking-floating-field:not(.booking-floating-field--filled):not(:focus-within) > .input::placeholder {
+  color: transparent;
+}
+
+.quick-add-modal .booking-floating-field--with-info > .booking-floating-field__info {
+  position: absolute;
+  top: 50%;
+  right: 42px;
+  z-index: 3;
+  transform: translateY(-50%);
+}
+
+.quick-add-modal .finance-amount-highlight .flex-gap-8 {
+  align-items: center;
+}
+
+.quick-add-modal .finance-amount-highlight .flex-gap-8 > select,
+.quick-add-modal .finance-amount-highlight .booking-floating-control > .input {
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+.quick-add-modal .booking-tags-editor__control {
+  width: 100%;
+}
+
+.quick-add-modal .booking-tags-editor .booking-floating-field > .tags-editor-input {
+  height: auto;
+  min-height: 46px;
+  padding-top: 17px;
+  padding-bottom: 5px;
+}
+
+.quick-add-modal .booking-tags-editor .booking-floating-field:has(.chip) > label,
+.quick-add-modal .booking-tags-editor .booking-floating-field:has(.tags-editor-text-input:not(:placeholder-shown)) > label {
+  top: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.quick-add-modal .booking-tags-editor .booking-floating-field {
+  --booking-floating-label-notch: 44px;
+}
+
+.quick-add-modal .booking-tags-editor .booking-floating-field:has(.chip)::before,
+.quick-add-modal .booking-tags-editor .booking-floating-field:has(.tags-editor-text-input:not(:placeholder-shown))::before {
+  opacity: 1;
+}
+
+.quick-add-modal .booking-tags-editor .booking-floating-field:not(:focus-within):not(:has(.chip)):not(:has(.tags-editor-text-input:not(:placeholder-shown))) .tags-editor-text-input::placeholder {
+  color: transparent;
+}
+
+/* Let the booking type guide the header without competing with the active tab. */
+.quick-add-modal {
+  --booking-header-tone: var(--accent);
+}
+
+.quick-add-modal.booking-modal--type-in {
+  --booking-header-tone: var(--success);
+}
+
+.quick-add-modal.booking-modal--type-out {
+  --booking-header-tone: var(--danger);
+}
+
+.quick-add-modal.booking-modal--type-transfer {
+  --booking-header-tone: var(--warning);
+}
+
+.quick-add-modal.booking-modal--type-internal {
+  --booking-header-tone: var(--accent);
+}
+
+.quick-add-modal .modal-header-flex {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklab, var(--booking-header-tone) 24%, var(--border));
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--booking-header-tone) 13%, var(--surface)),
+    color-mix(in oklab, var(--booking-header-tone) 5%, var(--surface))
+  );
+}
+
+@media (min-width: 901px) {
+  .detached-quick-add-modal .modal-header-flex {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(320px, 460px) auto;
+    align-items: center;
+  }
+
+  .detached-quick-add-modal .modal-header-flex > h2 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .detached-quick-add-modal .booking-kind-switch {
+    width: 100%;
+    margin-inline: 0;
+  }
+}
+
+/* Basis and Finanzen intentionally share a row and therefore one visual height. */
+.quick-add-modal .booking-primary-grid,
+.detached-quick-add-modal .booking-primary-grid {
+  align-items: stretch;
+}
+
+.quick-add-modal .booking-primary-grid > .form-card {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.booking-assignments-card .booking-assignment-empty-hint {
+  min-width: 0;
+  font-size: 0.76rem;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.3;
+  opacity: 0.72;
+}
+
+/* Shared floating-label treatment for advances, budgets and earmarks. */
+.standard-floating-modal {
+  --standard-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
+  --standard-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+  --standard-field-focus-bg: color-mix(in oklab, var(--standard-field-bg) 92%, var(--accent) 8%);
+}
+
+.advances-form-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.advances-form-modal .advances-modal-header,
+.advances-form-modal .advances-modal-actions {
+  margin: 0;
+}
+
+.standard-floating-modal .row,
+.standard-floating-modal .date-range-container {
+  gap: 12px;
+}
+
+.standard-floating-modal .standard-floating-field {
+  position: relative;
+  min-width: 0;
+  gap: 0;
+  --standard-floating-label-notch: 88px;
+}
+
+.standard-floating-modal .standard-floating-field > label {
+  position: absolute;
+  top: 23px;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 1px 3px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: top 0.16s ease, transform 0.16s ease, color 0.16s ease, font-size 0.16s ease;
+}
+
+.standard-floating-modal .standard-floating-field::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 7px;
+  z-index: 1;
+  width: var(--standard-floating-label-notch);
+  height: 2px;
+  background: var(--standard-field-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.standard-floating-modal .standard-floating-field > :is(.input, select),
+.standard-floating-modal .standard-floating-field > .booking-date-input-wrap > .input {
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding-top: 17px;
+  padding-bottom: 5px;
+  background: var(--standard-field-bg);
+  border-color: var(--standard-field-border);
+}
+
+.standard-floating-modal .standard-floating-field > textarea.input {
+  width: 100%;
+  min-height: 88px;
+  box-sizing: border-box;
+  padding-top: 20px;
+  padding-bottom: 8px;
+  resize: vertical;
+  background: var(--standard-field-bg);
+  border-color: var(--standard-field-border);
+}
+
+.standard-floating-modal .standard-floating-field > .booking-date-input-wrap .input {
+  padding-right: 42px;
+}
+
+.standard-floating-modal input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.standard-floating-modal .standard-floating-field:focus-within > label,
+.standard-floating-modal .standard-floating-field--filled > label {
+  top: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.standard-floating-modal .standard-floating-field:focus-within::before,
+.standard-floating-modal .standard-floating-field--filled::before {
+  opacity: 1;
+}
+
+.standard-floating-modal .standard-floating-field:focus-within::before {
+  background: var(--standard-field-focus-bg);
+}
+
+.standard-floating-modal .standard-floating-field > :is(.input, select, textarea):focus,
+.standard-floating-modal .standard-floating-field > .booking-date-input-wrap > .input:focus {
+  background: var(--standard-field-focus-bg);
+  box-shadow: none;
+}
+
+.standard-floating-modal .standard-floating-field:has(.input-error) > label {
+  color: var(--danger);
+}
+
+.standard-floating-modal .standard-floating-field:has(.input-error)::before {
+  background: color-mix(in oklab, var(--standard-field-bg) 94%, var(--danger) 6%);
+}
+
+.standard-floating-modal .standard-floating-field:not(.standard-floating-field--filled):not(:focus-within) > :is(input, textarea)::placeholder {
+  color: transparent;
+}
+
+.standard-floating-modal .standard-floating-field > .helper {
+  margin-top: 6px;
+}
+
+:root[data-theme='light'] .standard-floating-modal .booking-modal-close-btn,
+:root[data-theme='light'] .standard-floating-modal .booking-modal-close-btn:hover,
+:root[data-theme='light'] .standard-floating-modal .booking-modal-close-btn:focus-visible {
+  color: color-mix(in oklab, var(--danger-strong) 84%, var(--text));
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-recipient']) {
+  --standard-floating-label-notch: 88px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-issued-at']),
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-settled-at']) {
+  --standard-floating-label-notch: 118px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-amount']),
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-settle-amount']) {
+  --standard-floating-label-notch: 96px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-budget']) {
+  --standard-floating-label-notch: 126px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-earmark']) {
+  --standard-floating-label-notch: 166px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-notes']),
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-settle-note']) {
+  --standard-floating-label-notch: 108px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-invoice']) {
+  --standard-floating-label-notch: 138px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='advance-voucher-id']) {
+  --standard-floating-label-notch: 124px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-year']),
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-start-date']),
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-end-date']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-start-date']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-end-date']) {
+  --standard-floating-label-notch: 52px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-amount']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-budget']) {
+  --standard-floating-label-notch: 94px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-name']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-name']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-code']),
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-status']) {
+  --standard-floating-label-notch: 66px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-category']) {
+  --standard-floating-label-notch: 82px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='budget-project']) {
+  --standard-floating-label-notch: 64px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='binding-description']) {
+  --standard-floating-label-notch: 98px;
+}
+
+.member-floating-modal .block-grid {
+  gap: 12px !important;
+}
+
+.member-address-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 90px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.member-finance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-number']) {
+  --standard-floating-label-notch: 106px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-name']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-email']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-phone']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-status']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-contribution-interval']) {
+  --standard-floating-label-notch: 68px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-street']) {
+  --standard-floating-label-notch: 98px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-zip']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-city']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-iban']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-bic']) {
+  --standard-floating-label-notch: 50px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-join-date']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-leave-date']) {
+  --standard-floating-label-notch: 72px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-board-role']) {
+  --standard-floating-label-notch: 126px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-notes']) {
+  --standard-floating-label-notch: 100px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-mandate-ref']) {
+  --standard-floating-label-notch: 94px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-contribution']) {
+  --standard-floating-label-notch: 104px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-mandate-date']) {
+  --standard-floating-label-notch: 110px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-next-due-date']),
+.standard-floating-modal .standard-floating-field:has(> label[for='member-invite-bcc']) {
+  --standard-floating-label-notch: 122px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-invite-subject']) {
+  --standard-floating-label-notch: 72px;
+}
+
+.standard-floating-modal .standard-floating-field:has(> label[for='member-invite-message']) {
+  --standard-floating-label-notch: 84px;
+}
+
+@media (max-width: 900px) {
+  .member-finance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .member-address-grid,
+  .member-finance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .member-finance-grid > [style*='grid-column'] {
+    grid-column: auto !important;
+  }
 }

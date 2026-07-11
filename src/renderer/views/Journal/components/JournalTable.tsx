@@ -761,7 +761,7 @@ export default function JournalTable({
         ) : k === 'voucherNo' ? (
             <td key={k}>{r.voucherNo}</td>
         ) : k === 'type' ? (
-            <td key={k}><span className={`badge ${r.type.toLowerCase()}`}>{r.type}</span></td>
+            <td key={k}><span className={`badge voucher-type-badge voucher-type-badge--${r.type.toLowerCase()} ${r.type.toLowerCase()}`}>{r.type}</span></td>
         ) : k === 'sphere' ? (
             <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (

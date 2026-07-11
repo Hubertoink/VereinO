@@ -469,6 +469,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   }, [])
 
   async function openEdit(row: InvoiceListRow | InvoiceDetail) {
+    if (row.status === 'PAID') {
+      notify('info', 'Bezahlte Einträge können nicht mehr bearbeitet werden.')
+      return
+    }
     let source = row as Partial<InvoiceListRow & InvoiceDetail>
     if (!Array.isArray(source.budgets) || !Array.isArray(source.earmarks)) {
       try {

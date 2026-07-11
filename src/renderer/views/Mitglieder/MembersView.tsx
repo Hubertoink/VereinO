@@ -5,6 +5,7 @@ import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
+import DatePickerButton from '../../components/common/DatePickerButton'
 
 type PageShortcutAction = {
     id: string
@@ -143,6 +144,9 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     const memberNameInputRef = useRef<HTMLInputElement | null>(null)
     const memberEmailInputRef = useRef<HTMLInputElement | null>(null)
     const memberJoinInputRef = useRef<HTMLInputElement | null>(null)
+    const memberLeaveInputRef = useRef<HTMLInputElement | null>(null)
+    const memberMandateDateInputRef = useRef<HTMLInputElement | null>(null)
+    const memberNextDueDateInputRef = useRef<HTMLInputElement | null>(null)
     const memberIbanInputRef = useRef<HTMLInputElement | null>(null)
     const memberNotesInputRef = useRef<HTMLTextAreaElement | null>(null)
     useEffect(() => {
@@ -655,12 +659,12 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
 
             {form && (
                     <div className="modal-overlay" role="dialog" aria-modal="true">
-                    <div className="modal member-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
+                    <div className="modal member-modal standard-floating-modal member-floating-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
-                                <button className="btn ghost" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
+                                <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                                     </svg>
@@ -674,24 +678,32 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             <div className="card" style={{ padding: 12 }}>
                                 <div className="helper" style={{ marginBottom: 8 }}>Basis</div>
                                 <div className="row">
-                                    <div className="field">
-                                        <label>Mitglieds-Nr. <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
-                                        <input ref={memberNoInputRef} className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                    <div className={`field standard-floating-field${String(form.draft.memberNo || '').trim() ? ' standard-floating-field--filled' : ''}`}>
+                                        <label htmlFor="member-number">Mitglieds-Nr. <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                        <input id="member-number" ref={memberNoInputRef} className="input" placeholder="z.B. 12345" value={form.draft.memberNo ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, memberNo: e.target.value || null } })} style={requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                                         {requiredTouched && (!form.draft.memberNo || !String(form.draft.memberNo).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                     </div>
-                                    <div className="field">
-                                        <label>Name <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
-                                        <input ref={memberNameInputRef} className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                    <div className={`field standard-floating-field${form.draft.name.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                        <label htmlFor="member-name">Name <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                        <input id="member-name" ref={memberNameInputRef} className="input" placeholder="Max Mustermann" value={form.draft.name} onChange={(e) => setForm({ ...form, draft: { ...form.draft, name: e.target.value } })} style={requiredTouched && (!form.draft.name || !form.draft.name.trim()) ? { borderColor: 'var(--danger)' } : undefined} />
                                         {requiredTouched && (!form.draft.name || !form.draft.name.trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                     </div>
-                                    <div className="field"><label>E-Mail</label><input ref={memberEmailInputRef} className="input" type="email" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
-                                    <div className="field"><label>Telefon</label><input className="input" type="tel" inputMode="numeric" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value.replace(/[^0-9\s\-\+]/g, '') || null } })} /></div>
-                                    <div className="field" style={{ gridColumn: '1 / -1' }}>
-                                        <label>Adresse</label>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 70px 1fr', gap: 6 }}>
-                                            <input className="input" placeholder="Straße und Nr." value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} />
-                                            <input className="input" inputMode="numeric" placeholder="PLZ" value={addrZip} onChange={(e) => setAddrZip(e.target.value.replace(/[^0-9]/g, ''))} maxLength={5} />
-                                            <input className="input" placeholder="Ort" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
+                                    <div className={`field standard-floating-field${String(form.draft.email || '').trim() ? ' standard-floating-field--filled' : ''}`}><label htmlFor="member-email">E-Mail</label><input id="member-email" ref={memberEmailInputRef} className="input" type="email" placeholder="max@example.org" value={form.draft.email ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, email: e.target.value || null } })} /></div>
+                                    <div className={`field standard-floating-field${String(form.draft.phone || '').trim() ? ' standard-floating-field--filled' : ''}`}><label htmlFor="member-phone">Telefon</label><input id="member-phone" className="input" type="tel" inputMode="numeric" placeholder="0123 4567890" value={form.draft.phone ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, phone: e.target.value.replace(/[^0-9\s\-\+]/g, '') || null } })} /></div>
+                                    <div className="field member-address-field" style={{ gridColumn: '1 / -1' }}>
+                                        <div className="member-address-grid">
+                                            <div className={`field standard-floating-field${addrStreet.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                                <label htmlFor="member-street">Straße und Nr.</label>
+                                                <input id="member-street" className="input" value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} />
+                                            </div>
+                                            <div className={`field standard-floating-field${addrZip.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                                <label htmlFor="member-zip">PLZ</label>
+                                                <input id="member-zip" className="input" inputMode="numeric" value={addrZip} onChange={(e) => setAddrZip(e.target.value.replace(/[^0-9]/g, ''))} maxLength={5} />
+                                            </div>
+                                            <div className={`field standard-floating-field${addrCity.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                                <label htmlFor="member-city">Ort</label>
+                                                <input id="member-city" className="input" value={addrCity} onChange={(e) => setAddrCity(e.target.value)} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -702,24 +714,27 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <div className="card" style={{ padding: 12 }}>
                                     <div className="helper" style={{ marginBottom: 8 }}>Mitgliedschaft</div>
                                     <div className="row">
-                                        <div className="field">
-                                            <label>Eintritt <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
-                                            <input ref={memberJoinInputRef} className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                        <div className="field standard-floating-field standard-floating-field--filled">
+                                            <label htmlFor="member-join-date">Eintritt <span style={{ color: 'var(--danger)' }} title="Pflichtfeld">*</span></label>
+                                            <span className="booking-date-input-wrap">
+                                                <input id="member-join-date" ref={memberJoinInputRef} className="input" type="date" value={form.draft.join_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, join_date: e.target.value || null } })} style={requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) ? { borderColor: 'var(--danger)' } : undefined} />
+                                                <DatePickerButton inputRef={memberJoinInputRef} ariaLabel="Kalender zur Auswahl des Eintrittsdatums öffnen" />
+                                            </span>
                                             {requiredTouched && (!form.draft.join_date || !String(form.draft.join_date).trim()) && (<div className="helper" style={{ color: 'var(--danger)' }}>Pflichtfeld</div>)}
                                         </div>
-                                        <div className="field"><label>Austritt</label><input className="input" type="date" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /></div>
-                                        <div className="field">
-                                            <label>Status</label>
-                                            <select className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
+                                        <div className="field standard-floating-field standard-floating-field--filled"><label htmlFor="member-leave-date">Austritt</label><span className="booking-date-input-wrap"><input id="member-leave-date" ref={memberLeaveInputRef} className="input" type="date" value={form.draft.leave_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, leave_date: e.target.value || null } })} /><DatePickerButton inputRef={memberLeaveInputRef} ariaLabel="Kalender zur Auswahl des Austrittsdatums öffnen" /></span></div>
+                                        <div className="field standard-floating-field standard-floating-field--filled">
+                                            <label htmlFor="member-status">Status</label>
+                                            <select id="member-status" className="input" value={form.draft.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, draft: { ...form.draft, status: e.target.value as any } })}>
                                                 <option value="ACTIVE">Aktiv</option>
                                                 <option value="NEW">Neu</option>
                                                 <option value="PAUSED">Pause</option>
                                                 <option value="LEFT">Ausgetreten</option>
                                             </select>
                                         </div>
-                                        <div className="field">
-                                            <label>Vorstandsfunktion</label>
-                                            <select className="input" value={form.draft.boardRole ?? ''} onChange={(e) => { setBoardRoleError(null); setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } }) }}>
+                                        <div className="field standard-floating-field standard-floating-field--filled">
+                                            <label htmlFor="member-board-role">Vorstandsfunktion</label>
+                                            <select id="member-board-role" className="input" value={form.draft.boardRole ?? ''} onChange={(e) => { setBoardRoleError(null); setForm({ ...form, draft: { ...form.draft, boardRole: (e.target.value || null) as any } }) }}>
                                                 <option value="">—</option>
                                                 <option value="V1">1. Vorsitz</option>
                                                 <option value="V2">2. Vorsitz</option>
@@ -733,8 +748,10 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     </div>
                                 </div>
                                 <div className="card" style={{ padding: 12, flex: 1 }}>
-                                    <div className="helper" style={{ marginBottom: 6 }}>Anmerkungen</div>
-                                    <textarea ref={memberNotesInputRef} className="input" rows={2} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
+                                    <div className={`field standard-floating-field${String(form.draft.notes || '').trim() ? ' standard-floating-field--filled' : ''}`}>
+                                        <label htmlFor="member-notes">Anmerkungen</label>
+                                        <textarea id="member-notes" ref={memberNotesInputRef} className="input" rows={2} placeholder="Freitext …" value={form.draft.notes ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, notes: e.target.value || null } })} style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box' }} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -744,45 +761,51 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
                                 <div className="helper">Finanzen & SEPA-Mandat</div>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                            <div className="member-finance-grid">
                                 {(() => { const v = validateIBAN(form.draft.iban); return (
-                                    <div className="field" style={{ gridColumn: 'span 2' }}>
-                                        <label title="IBAN mit Prüfziffer">IBAN</label>
-                                        <input ref={memberIbanInputRef} className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                    <div className={`field standard-floating-field${String(form.draft.iban || '').trim() ? ' standard-floating-field--filled' : ''}`} style={{ gridColumn: 'span 2' }}>
+                                        <label htmlFor="member-iban" title="IBAN mit Prüfziffer">IBAN</label>
+                                        <input id="member-iban" ref={memberIbanInputRef} className="input" placeholder="DE12 3456 7890 1234 5678 90" value={form.draft.iban ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, iban: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
                                         {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
                                     </div>
                                 ) })()}
                                 {(() => { const v = validateBIC(form.draft.bic); return (
-                                    <div className="field">
-                                        <label title="8 oder 11 Zeichen">BIC</label>
-                                        <input className="input" placeholder="BANKDEFFXXX" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
+                                    <div className={`field standard-floating-field${String(form.draft.bic || '').trim() ? ' standard-floating-field--filled' : ''}`}>
+                                        <label htmlFor="member-bic" title="8 oder 11 Zeichen">BIC</label>
+                                        <input id="member-bic" className="input" placeholder="BANKDEFFXXX" value={form.draft.bic ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, bic: e.target.value || null } })} style={{ borderColor: v.ok ? undefined : 'var(--danger)' }} />
                                         {!v.ok && <div className="helper" style={{ color: 'var(--danger)' }}>{v.msg}</div>}
                                     </div>
                                 ) })()}
-                                <div className="field">
-                                    <label>Mandats-Ref.</label>
-                                    <input className="input" placeholder="M-2025-001" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} />
+                                <div className={`field standard-floating-field${String(form.draft.mandate_ref || '').trim() ? ' standard-floating-field--filled' : ''}`}>
+                                    <label htmlFor="member-mandate-ref">Mandats-Ref.</label>
+                                    <input id="member-mandate-ref" className="input" placeholder="M-2025-001" value={form.draft.mandate_ref ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_ref: e.target.value || null } })} />
                                 </div>
-                                <div className="field">
-                                    <label>Beitrag (EUR)</label>
-                                    <input className="input" type="number" step="0.01" placeholder="z.B. 12,00" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
+                                <div className={`field standard-floating-field${form.draft.contribution_amount != null ? ' standard-floating-field--filled' : ''}`}>
+                                    <label htmlFor="member-contribution">Beitrag (EUR)</label>
+                                    <input id="member-contribution" className="input" type="number" step="0.01" placeholder="z.B. 12,00" value={form.draft.contribution_amount ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_amount: e.target.value ? Number(e.target.value) : null } })} />
                                 </div>
-                                <div className="field">
-                                    <label>Intervall</label>
-                                    <select className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
+                                <div className="field standard-floating-field standard-floating-field--filled">
+                                    <label htmlFor="member-contribution-interval">Intervall</label>
+                                    <select id="member-contribution-interval" className="input" value={form.draft.contribution_interval ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, contribution_interval: (e.target.value || null) as any } })}>
                                         <option value="">—</option>
                                         <option value="MONTHLY">Monatlich</option>
                                         <option value="QUARTERLY">Quartal</option>
                                         <option value="YEARLY">Jährlich</option>
                                     </select>
                                 </div>
-                                <div className="field">
-                                    <label>Mandats-Datum</label>
-                                    <input className="input" type="date" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} />
+                                <div className="field standard-floating-field standard-floating-field--filled">
+                                    <label htmlFor="member-mandate-date">Mandats-Datum</label>
+                                    <span className="booking-date-input-wrap">
+                                        <input id="member-mandate-date" ref={memberMandateDateInputRef} className="input" type="date" value={form.draft.mandate_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, mandate_date: e.target.value || null } })} />
+                                        <DatePickerButton inputRef={memberMandateDateInputRef} ariaLabel="Kalender zur Auswahl des Mandatsdatums öffnen" />
+                                    </span>
                                 </div>
-                                <div className="field">
-                                    <label>Initiale Fälligkeit</label>
-                                    <input className="input" type="date" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} />
+                                <div className="field standard-floating-field standard-floating-field--filled">
+                                    <label htmlFor="member-next-due-date">Initiale Fälligkeit</label>
+                                    <span className="booking-date-input-wrap">
+                                        <input id="member-next-due-date" ref={memberNextDueDateInputRef} className="input" type="date" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} />
+                                        <DatePickerButton inputRef={memberNextDueDateInputRef} ariaLabel="Kalender zur Auswahl der initialen Fälligkeit öffnen" />
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -806,10 +829,12 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             )}
             {showInvite && (
                 <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" onClick={() => setShowInvite(false)}>
-                    <div className="modal invite-modal" onClick={(e)=>e.stopPropagation()}>
+                    <div className="modal invite-modal standard-floating-modal member-invite-floating-modal" onClick={(e)=>e.stopPropagation()}>
                         <header className="invite-modal-header">
                             <h3 id="invite-modal-title">Einladung per E-Mail</h3>
-                            <button className="btn" onClick={()=>setShowInvite(false)} aria-label="Schließen">×</button>
+                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={()=>setShowInvite(false)} aria-label="Schließen" title="Schließen (ESC)">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                            </button>
                         </header>
                         <div className="card invite-modal-content">
                             <div className="invite-summary-row">
@@ -834,9 +859,9 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             </div>
                             <div className="helper invite-filter-hint">Aktuelle Filter: Status = {inviteActiveOnly ? 'ACTIVE' : status}, Suche = {q ? `"${q}"` : '—'}</div>
                             <div className="invite-grid">
-                                <div className="field">
-                                    <label>Betreff</label>
-                                    <input ref={inviteSubjectRef} className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
+                                <div className={`field standard-floating-field${inviteSubject.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                    <label htmlFor="member-invite-subject">Betreff</label>
+                                    <input id="member-invite-subject" ref={inviteSubjectRef} className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
                                 </div>
                                 <div className="field">
                                     <label>Empfänger im Batch (BCC)</label>
@@ -845,13 +870,13 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                         <span>automatisch aus aktueller Auswahl</span>
                                     </div>
                                 </div>
-                                <div className="field invite-grid-span">
-                                    <label>Nachricht</label>
-                                    <textarea className="input invite-message-input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} />
+                                <div className={`field invite-grid-span standard-floating-field${inviteBody.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                    <label htmlFor="member-invite-message">Nachricht</label>
+                                    <textarea id="member-invite-message" className="input invite-message-input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} />
                                 </div>
-                                <div className="field invite-grid-span">
-                                    <label>Empfänger (BCC)</label>
-                                    <textarea className="input invite-bcc-input" readOnly rows={3} value={inviteCurrentBatch.join('; ')} />
+                                <div className={`field invite-grid-span standard-floating-field${inviteCurrentBatch.length ? ' standard-floating-field--filled' : ''}`}>
+                                    <label htmlFor="member-invite-bcc">Empfänger (BCC)</label>
+                                    <textarea id="member-invite-bcc" className="input invite-bcc-input" readOnly rows={3} value={inviteCurrentBatch.join('; ')} />
                                     {inviteTotalBatches > 1 && (
                                         <div className="invite-batch-row">
                                             <div className="helper">Batch {inviteBatchIndex + 1} von {inviteTotalBatches} (max. {INVITE_BCC_BATCH_SIZE} Empfänger je E-Mail)</div>

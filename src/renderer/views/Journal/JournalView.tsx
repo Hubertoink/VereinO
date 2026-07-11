@@ -1192,13 +1192,21 @@ export default function JournalView({
                         fmtDate={(s?: string) => fmtDate(s || '')}
                         getVoucherById={getVoucherById}
                         onStornoPairClick={filterStornoPair}
-                        onEdit={(r) => {
+                        onEdit={async (r) => {
+                            let currentRow: any = r
+                            try {
+                                const refreshed = await window.api?.vouchers?.list?.({ limit: 1, voucherIds: [Number(r.id)] })
+                                const freshRow = refreshed?.rows?.[0]
+                                if (freshRow) currentRow = { ...r, ...freshRow }
+                            } catch {
+                                // Continue with the visible journal row if refreshing fails.
+                            }
                             const nextEdit = {
-                                ...r,
-                                mode: (r as any).amountMode ?? (((r as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS'),
-                                netAmount: (r as any).netAmount ?? null,
-                                grossAmount: (r as any).grossAmount ?? null,
-                                vatRate: (r as any).vatRate ?? 0
+                                ...currentRow,
+                                mode: (currentRow as any).amountMode ?? (((currentRow as any).netAmount ?? 0) > 0 ? 'NET' : 'GROSS'),
+                                netAmount: (currentRow as any).netAmount ?? null,
+                                grossAmount: (currentRow as any).grossAmount ?? null,
+                                vatRate: (currentRow as any).vatRate ?? 0
                             } as any
                             const blockReason = voucherMutationBlockReason(nextEdit)
                             if (blockReason) {

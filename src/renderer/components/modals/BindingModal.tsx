@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../ModalHeader'
+import DatePickerButton from '../common/DatePickerButton'
 
 // Local contrast helper (kept self-contained)
 function contrastText(bg?: string | null) {
@@ -37,6 +38,8 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
+  const startDateRef = useRef<HTMLInputElement | null>(null)
+  const endDateRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => { setV(value); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
 
   async function save() {
@@ -70,13 +73,14 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
 
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal standard-floating-modal binding-floating-modal" onClick={(e) => e.stopPropagation()}>
         <ModalHeader
           title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
           onClose={onClose}
+          closeButtonClassName="booking-modal-icon-btn booking-modal-close-btn"
         />
         <div className="row">
-          <div className="field">
+          <div className={`field standard-floating-field${v.code.trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="binding-code">Code <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-code"
@@ -89,7 +93,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Code angeben</div>
             )}
           </div>
-          <div className="field">
+          <div className={`field standard-floating-field${v.name.trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="binding-name">Name <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-name"
@@ -102,18 +106,24 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
             )}
           </div>
-          <div className="field field-full-width">
+          <div className={`field field-full-width standard-floating-field${(v.description || '').trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="binding-description">Beschreibung</label>
             <input id="binding-description" className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} placeholder="Optional" />
           </div>
           <div className="date-range-container">
-            <div className="field">
+            <div className="field standard-floating-field standard-floating-field--filled">
               <label htmlFor="binding-start-date">Von</label>
-              <input id="binding-start-date" className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+              <span className="booking-date-input-wrap">
+                <input id="binding-start-date" ref={startDateRef} className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+                <DatePickerButton inputRef={startDateRef} ariaLabel="Kalender zur Auswahl des Beginns öffnen" />
+              </span>
             </div>
-            <div className="field">
+            <div className="field standard-floating-field standard-floating-field--filled">
               <label htmlFor="binding-end-date">Bis</label>
-              <input id="binding-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+              <span className="booking-date-input-wrap">
+                <input id="binding-end-date" ref={endDateRef} className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+                <DatePickerButton inputRef={endDateRef} ariaLabel="Kalender zur Auswahl des Endes öffnen" />
+              </span>
             </div>
           </div>
           {(v.startDate || v.endDate) && (
@@ -131,14 +141,14 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper">Wenn aktiv: Buchungen dürfen diese Zweckbindung nur im Zeitraum Von/Bis nutzen.</div>
             </div>
           )}
-          <div className="field">
+          <div className="field standard-floating-field standard-floating-field--filled">
             <label htmlFor="binding-status">Status</label>
             <select id="binding-status" className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>
               <option value="1">aktiv</option>
               <option value="0">inaktiv</option>
             </select>
           </div>
-          <div className="field">
+          <div className={`field standard-floating-field${v.budget != null ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="binding-budget">Budget (€)</label>
             <input id="binding-budget" className="input" type="number" step="0.01" value={(v.budget ?? '') as any}
               onChange={(e) => {

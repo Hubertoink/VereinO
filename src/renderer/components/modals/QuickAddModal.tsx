@@ -255,7 +255,6 @@ export default function QuickAddModal({
         : qa.type === 'INTERNAL'
             ? false
             : !(qa as any).paymentAccountId
-    const amountError = 'Bitte einen Betrag größer als 0 € eingeben.'
     const internalAssignmentValidation = getInternalAssignmentValidationState({
         budgets: budgetsList,
         earmarks: earmarksList,
@@ -264,6 +263,17 @@ export default function QuickAddModal({
     })
     const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
     const saveBlocked = hasOutOfRange || hasInvalidAmount || hasMissingAccount || internalAssignmentBlocked
+    const bookingValidationMessage = footerLeft
+        ? null
+        : hasInvalidAmount
+            ? 'Bitte einen Betrag größer als 0 € eingeben.'
+            : hasMissingAccount
+                ? 'Bitte ein Buchungskonto auswählen.'
+                : hasOutOfRange
+                    ? 'Eine Zuordnung ist für das Buchungsdatum nicht gültig.'
+                    : internalAssignmentBlocked
+                        ? 'Interne Buchungen benötigen ausgeglichene Zuordnungen.'
+                        : null
     const saveAndNew = onSaveAndNew ?? onSave
     const saveAndClose = onSaveAndClose ?? onSave
     const defaultSaveLabel = saveLabel || 'Speichern'
@@ -638,7 +648,7 @@ export default function QuickAddModal({
         <div className={`modal-overlay quick-add-modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`} role="dialog" aria-modal="true">
             <div
                 ref={modalRef}
-                className={`modal booking-modal quick-add-modal${windowMode ? ' detached-quick-add-modal' : ''}`}
+                className={`modal booking-modal quick-add-modal booking-modal--type-${qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}`}
                 onClick={(e) => e.stopPropagation()}
                 style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
@@ -939,15 +949,15 @@ export default function QuickAddModal({
                     </div>
 
                     {/* Blocks A+B in a side-by-side grid on wide screens */}
-                    <div className="block-grid block-grid-mb">
+                    <div className="block-grid block-grid-mb booking-primary-grid">
                         {/* Block A – Basisinfos */}
                         <div className="card form-card">
                             <div className="helper helper-mb">Basis</div>
                             <div className="row booking-basis-fields">
-                                <div className="field">
-                                    <label>Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                <div className={`field booking-floating-field${qa.date ? ' booking-floating-field--filled' : ''}`}>
+                                    <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <span className="booking-date-input-wrap">
-                                        <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
+                                        <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
                                         <button
                                             type="button"
                                             className="booking-date-picker-button"
@@ -962,36 +972,34 @@ export default function QuickAddModal({
                                     </span>
                                 </div>
                                 {qa.type !== 'TRANSFER' && (
-                                    <div className="field">
-                                        <div className="booking-field-label-row">
-                                            <label>Bereich</label>
-                                            <HoverTooltip<HTMLButtonElement>
-                                                preferredPlacement="bottom"
-                                                className="tooltip-modal booking-sphere-tooltip"
-                                                content={(
-                                                    <div className="booking-sphere-tooltip__content">
-                                                        <strong>Steuerliche Bereiche</strong>
-                                                        <div><b>Ideeller Bereich:</b> Satzungsarbeit ohne entgeltliche Marktleistung.</div>
-                                                        <div><b>Zweckbetrieb:</b> Wirtschaftliche Tätigkeit, die unmittelbar dem Satzungszweck dient.</div>
-                                                        <div><b>Vermögensverwaltung:</b> Erträge aus Vereinsvermögen, etwa Zinsen oder Vermietung.</div>
-                                                        <div><b>Wirtschaftlicher Geschäftsbetrieb:</b> Entgeltliche Tätigkeiten außerhalb des Zweckbetriebs.</div>
-                                                    </div>
-                                                )}
-                                            >
-                                                {({ ref, props }) => (
-                                                    <button
-                                                        ref={ref}
-                                                        {...props}
-                                                        type="button"
-                                                        className="booking-inline-info"
-                                                        aria-label="Erklärung zu den steuerlichen Bereichen"
-                                                    >
-                                                        i
-                                                    </button>
-                                                )}
-                                            </HoverTooltip>
-                                        </div>
-                                        <select value={qa.sphere} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })} aria-label="Sphäre der Buchung">
+                                    <div className="field booking-floating-field booking-floating-field--filled booking-floating-field--with-info">
+                                        <label htmlFor="quick-add-sphere">Bereich</label>
+                                        <HoverTooltip<HTMLButtonElement>
+                                            preferredPlacement="bottom"
+                                            className="tooltip-modal booking-sphere-tooltip"
+                                            content={(
+                                                <div className="booking-sphere-tooltip__content">
+                                                    <strong>Steuerliche Bereiche</strong>
+                                                    <div><b>Ideeller Bereich:</b> Satzungsarbeit ohne entgeltliche Marktleistung.</div>
+                                                    <div><b>Zweckbetrieb:</b> Wirtschaftliche Tätigkeit, die unmittelbar dem Satzungszweck dient.</div>
+                                                    <div><b>Vermögensverwaltung:</b> Erträge aus Vereinsvermögen, etwa Zinsen oder Vermietung.</div>
+                                                    <div><b>Wirtschaftlicher Geschäftsbetrieb:</b> Entgeltliche Tätigkeiten außerhalb des Zweckbetriebs.</div>
+                                                </div>
+                                            )}
+                                        >
+                                            {({ ref, props }) => (
+                                                <button
+                                                    ref={ref}
+                                                    {...props}
+                                                    type="button"
+                                                    className="booking-inline-info booking-floating-field__info"
+                                                    aria-label="Erklärung zu den steuerlichen Bereichen"
+                                                >
+                                                    i
+                                                </button>
+                                            )}
+                                        </HoverTooltip>
+                                        <select id="quick-add-sphere" value={qa.sphere} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })} aria-label="Sphäre der Buchung">
                                             <option value="IDEELL">Ideeller Bereich</option>
                                             <option value="ZWECK">Zweckbetrieb</option>
                                             <option value="VERMOEGEN">Vermögensverwaltung</option>
@@ -1057,9 +1065,10 @@ export default function QuickAddModal({
                                         <div className="badge pm-account-badge pm-internal">intern</div>
                                     </div>
                                 ) : (
-                                    <div className="field">
-                                        <label>Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                    <div className={`field booking-floating-field${(qa as any).paymentAccountId ? ' booking-floating-field--filled' : ''}`}>
+                                        <label htmlFor="quick-add-account">Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <select
+                                            id="quick-add-account"
                                             className="input"
                                             value={String((qa as any).paymentAccountId ?? '')}
                                             required
@@ -1076,7 +1085,7 @@ export default function QuickAddModal({
                                             }}
                                             aria-label="Buchungskonto wählen"
                                         >
-                                            <option value="">Konto wählen</option>
+                                            <option value="" />
                                             {activePaymentAccounts.map((account) => (
                                                 <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
                                             ))}
@@ -1092,12 +1101,9 @@ export default function QuickAddModal({
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field field-full-width finance-amount-highlight">
-                                        <label>
-                                            Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span>
-                                            {hasInvalidAmount && <span className="booking-field-error has-tooltip" data-tooltip={amountError} tabIndex={0}>!</span>}
-                                        </label>
-                                        <span className="adorn-wrap">
-                                            <input ref={amountInputRef} className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
+                                        <span className={`adorn-wrap booking-floating-control${(qa as any).grossAmount !== null && (qa as any).grossAmount !== undefined && (qa as any).grossAmount !== '' ? ' booking-floating-control--filled' : ''}`}>
+                                            <label htmlFor="quick-add-transfer-amount">Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                            <input id="quick-add-transfer-amount" ref={amountInputRef} className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                 onFocus={(e) => e.currentTarget.select()}
                                                 onClick={(e) => e.currentTarget.select()}
                                                 onChange={(e) => {
@@ -1108,47 +1114,45 @@ export default function QuickAddModal({
                                                 aria-invalid={hasInvalidAmount} />
                                             <span className="adorn-suffix">€</span>
                                         </span>
-                                        <div className="helper">Transfers sind umsatzsteuerneutral.</div>
                                     </div>
                                 ) : (
                                     <>
                                         <div className="field finance-amount-highlight">
-                                            <label>
-                                                {(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span>
-                                                {hasInvalidAmount && <span className="booking-field-error has-tooltip" data-tooltip={amountError} tabIndex={0}>!</span>}
-                                            </label>
                                             <div className="flex-gap-8">
-                                                <select
-                                                    className="input"
-                                                    value={(qa as any).mode ?? 'NET'}
-                                                    onChange={(e) => {
-                                                        const newMode = e.target.value as 'NET' | 'GROSS'
-                                                        const next = { ...qa, mode: newMode } as any
-                                                        if (newMode === 'NET') {
-                                                            // Falls kein Netto gesetzt ist, aus Brutto übernehmen
-                                                            if (next.netAmount == null || isNaN(next.netAmount)) {
-                                                                if (typeof next.grossAmount === 'number') next.netAmount = next.grossAmount
-                                                                else next.netAmount = 0
+                                                <span className="booking-select-shell">
+                                                    <select
+                                                        className="input"
+                                                        value={(qa as any).mode ?? 'NET'}
+                                                        onChange={(e) => {
+                                                            const newMode = e.target.value as 'NET' | 'GROSS'
+                                                            const next = { ...qa, mode: newMode } as any
+                                                            if (newMode === 'NET') {
+                                                                // Falls kein Netto gesetzt ist, aus Brutto übernehmen
+                                                                if (next.netAmount == null || isNaN(next.netAmount)) {
+                                                                    if (typeof next.grossAmount === 'number') next.netAmount = next.grossAmount
+                                                                    else next.netAmount = 0
+                                                                }
+                                                                // Wenn bisher vatRate=0 (vom Brutto-Modus), setze Standard auf 19%
+                                                                if (Number(next.vatRate) === 0) next.vatRate = 19
+                                                            } else if (newMode === 'GROSS') {
+                                                                // Wechsel zu Brutto: vatRate immer 0, Brutto ggf. aus Netto berechnen
+                                                                if (typeof next.netAmount === 'number' && (next.grossAmount == null || isNaN(next.grossAmount))) {
+                                                                    const rate = Number(next.vatRate) || 0
+                                                                    next.grossAmount = Math.round((next.netAmount * (1 + rate / 100)) * 100) / 100
+                                                                }
+                                                                next.vatRate = 0
                                                             }
-                                                            // Wenn bisher vatRate=0 (vom Brutto-Modus), setze Standard auf 19%
-                                                            if (Number(next.vatRate) === 0) next.vatRate = 19
-                                                        } else if (newMode === 'GROSS') {
-                                                            // Wechsel zu Brutto: vatRate immer 0, Brutto ggf. aus Netto berechnen
-                                                            if (typeof next.netAmount === 'number' && (next.grossAmount == null || isNaN(next.grossAmount))) {
-                                                                const rate = Number(next.vatRate) || 0
-                                                                next.grossAmount = Math.round((next.netAmount * (1 + rate / 100)) * 100) / 100
-                                                            }
-                                                            next.vatRate = 0
-                                                        }
-                                                        setQa(next)
-                                                    }}
-                                                    aria-label="Netto oder Brutto Modus"
-                                                >
-                                                    <option value="NET">Netto</option>
-                                                    <option value="GROSS">Brutto</option>
-                                                </select>
-                                                <span className="adorn-wrap flex-1">
-                                                    <input ref={amountInputRef} className={`input amount-input ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount ?? ''}
+                                                            setQa(next)
+                                                        }}
+                                                        aria-label="Netto oder Brutto Modus"
+                                                    >
+                                                        <option value="NET">Netto</option>
+                                                        <option value="GROSS">Brutto</option>
+                                                    </select>
+                                                </span>
+                                                <span className={`adorn-wrap flex-1 booking-floating-control${((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== null && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== undefined && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== '' ? ' booking-floating-control--filled' : ''}`}>
+                                                    <label htmlFor="quick-add-amount">{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                                    <input id="quick-add-amount" ref={amountInputRef} className={`input amount-input ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount ?? ''}
                                                         onFocus={(e) => e.currentTarget.select()}
                                                         onClick={(e) => e.currentTarget.select()}
                                                         onChange={(e) => {
@@ -1161,12 +1165,12 @@ export default function QuickAddModal({
                                                     <span className="adorn-suffix">€</span>
                                                 </span>
                                             </div>
-                                            <div className="helper">{(qa as any).mode === 'GROSS' ? 'Bei Brutto wird USt/Netto nicht berechnet' : 'USt wird automatisch berechnet'}</div>
                                         </div>
                                         {(qa as any).mode === 'NET' && (
-                                            <div className="field">
-                                                <label>USt %</label>
+                                            <div className="field booking-floating-field booking-floating-field--filled">
+                                                <label htmlFor="quick-add-vat-rate">USt %</label>
                                                 <select
+                                                    id="quick-add-vat-rate"
                                                     className="input"
                                                     value={String(qa.vatRate)}
                                                     onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })}
@@ -1192,9 +1196,9 @@ export default function QuickAddModal({
                     </div>
 
                     <div className="card form-card booking-description-card">
-                        <div className="field field-full-width">
-                            <label>Beschreibung</label>
-                            <input ref={descriptionInputRef} className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="Was wurde gebucht? z. B. Mitgliedsbeitrag Juli" />
+                        <div className={`field field-full-width booking-floating-field${qa.description.trim() ? ' booking-floating-field--filled' : ''}`}>
+                            <label htmlFor="quick-add-description">Beschreibung</label>
+                            <input id="quick-add-description" ref={descriptionInputRef} className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="Was wurde gebucht? z. B. Mitgliedsbeitrag Juli" />
                             <datalist id="desc-suggestions">
                                 {descSuggest.map((description, index) => (<option key={index} value={description} />))}
                             </datalist>
@@ -1229,6 +1233,9 @@ export default function QuickAddModal({
                                             </button>
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Kein Budget vorhanden</span>
+                                        )}
+                                        {hasAvailableBudgets && budgetsList.length === 0 && (
+                                            <span className="helper booking-assignment-empty-hint" title="Klicke + zum Hinzufügen.">Kein Budget zugeordnet.</span>
                                         )}
                                     </div>
                                     {(() => {
@@ -1329,10 +1336,6 @@ export default function QuickAddModal({
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens ein Budget ist für dieses Datum nicht gültig</div>
                                                 )}
                                             </div>
-                                        ) : hasAvailableBudgets ? (
-                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>
-                                                Kein Budget zugeordnet. Klicke + zum Hinzufügen.
-                                            </div>
                                         ) : null
                                     })()}
                                 </div>
@@ -1355,6 +1358,9 @@ export default function QuickAddModal({
                                             </button>
                                         ) : (
                                             <span className="helper" style={{ fontWeight: 400 }}>Keine Zweckbindung vorhanden</span>
+                                        )}
+                                        {hasAvailableEarmarks && earmarksList.length === 0 && (
+                                            <span className="helper booking-assignment-empty-hint" title="Klicke + zum Hinzufügen.">Keine Zweckbindung zugeordnet.</span>
                                         )}
                                     </div>
                                     {(() => {
@@ -1429,10 +1435,6 @@ export default function QuickAddModal({
                                                     <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Mindestens eine Zweckbindung ist für dieses Datum nicht gültig</div>
                                                 )}
                                             </div>
-                                        ) : hasAvailableEarmarks ? (
-                                            <div className="helper" style={{ fontStyle: 'italic', opacity: 0.7 }}>
-                                                Keine Zweckbindung zugeordnet. Klicke + zum Hinzufügen.
-                                            </div>
                                         ) : null
                                     })()}
                                 </div>
@@ -1472,7 +1474,8 @@ export default function QuickAddModal({
                                     </span>
                                 </summary>
                                 <TagsEditor
-                                    label="Tags auswählen"
+                                    label="Tags"
+                                    className="booking-tags-editor"
                                     value={(qa as any).tags || []}
                                     onChange={(tags) => setQa({ ...(qa as any), tags } as any)}
                                     tagDefs={tagDefs}
@@ -1482,7 +1485,11 @@ export default function QuickAddModal({
                             <details className="booking-details">
                                 <summary>
                                     <span>Kommentar</span>
-                                    {(qa as any).note && <span className="badge">vorhanden</span>}
+                                    {(qa as any).note && (
+                                        <span className="booking-comment-preview" title={(qa as any).note}>
+                                            {(qa as any).note}
+                                        </span>
+                                    )}
                                 </summary>
                                 <div className="field field-full-width booking-note-field">
                                     <textarea
@@ -1523,7 +1530,7 @@ export default function QuickAddModal({
                                 <ul className="file-list">
                                     {existingFiles.map((f) => (
                                         <li key={`existing-${f.id}`} className="file-list-item">
-                                            <span className="file-name">{f.fileName}</span>
+                                            <span className="file-name" title={f.fileName}>{f.fileName}</span>
                                             <div className="flex-gap-8">
                                                 {onOpenExistingFile && (
                                                     <button type="button" className="btn" onClick={() => { void onOpenExistingFile(f.id) }}>Öffnen</button>
@@ -1539,7 +1546,7 @@ export default function QuickAddModal({
                                     ))}
                                     {files.map((f, i) => (
                                         <li key={`new-${i}-${f.name}`} className="file-list-item">
-                                            <span className="file-name">{f.name}</span>
+                                            <span className="file-name" title={f.name}>{f.name}</span>
                                             <div className="flex-gap-8">
                                                 <span className="helper">neu</span>
                                                 <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
@@ -1559,10 +1566,11 @@ export default function QuickAddModal({
                     <div className="modal-footer-actions">
                         <div className="booking-footer-status" role="status">
                             {footerLeft}
-                            {!footerLeft && hasInvalidAmount && <div className="booking-footer-error">Bitte einen Betrag größer als 0 € eingeben.</div>}
-                            {!footerLeft && !hasInvalidAmount && hasMissingAccount && <div className="booking-footer-error">Bitte ein Buchungskonto auswählen.</div>}
-                            {!footerLeft && !hasInvalidAmount && !hasMissingAccount && hasOutOfRange && <div className="booking-footer-error">Eine Zuordnung ist für das Buchungsdatum nicht gültig.</div>}
-                            {!footerLeft && !hasInvalidAmount && !hasMissingAccount && !hasOutOfRange && internalAssignmentBlocked && <div className="booking-footer-error">Interne Buchungen benötigen ausgeglichene Zuordnungen.</div>}
+                            {bookingValidationMessage && (
+                                <div className="booking-validation-badge" aria-live="polite">
+                                    {bookingValidationMessage}
+                                </div>
+                            )}
                             {!footerLeft && !saveBlocked && <div className="helper">{footerHint || 'Ctrl+S Speichern · Ctrl+U Datei · Esc Abbrechen'}</div>}
                         </div>
                         <div className="booking-modal-save-actions" onBlur={(e) => {

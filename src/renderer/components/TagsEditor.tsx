@@ -3,6 +3,11 @@ import { getContrastTextColor, resolveTagDisplayColor } from '../utils/tagColors
 
 export default function TagsEditor({ label, labelAccessory, value, onChange, tagDefs, className, inputRef }: { label?: string; labelAccessory?: React.ReactNode; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string; inputRef?: React.Ref<HTMLInputElement> }) {
   const [input, setInput] = useState('')
+  const floatingEditorClass = className?.includes('booking-tags-editor')
+    ? 'booking-tags-editor__control booking-floating-field'
+    : className?.includes('invoice-tags-editor')
+      ? 'invoice-tags-editor__control invoice-floating-field'
+      : null
   const suggestions = useMemo(() => {
     const q = input.trim().toLowerCase()
     return (tagDefs || [])
@@ -17,9 +22,8 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
   }
   function removeTag(name: string) { onChange((value || []).filter(v => v !== name)) }
   const colorFor = (name: string) => resolveTagDisplayColor(name, tagDefs)
-  return (
-    <div className={`field field-full-width ${className || ''}`.trim()}>
-      {label && <label>{label}{labelAccessory}</label>}
+  const fieldLabel = label && <label>{label}{labelAccessory}</label>
+  const editorInput = (
       <div className="input tags-editor-input">
         {(value || []).map(t => {
           const bg = colorFor(t) || undefined
@@ -44,6 +48,20 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
           aria-label="Neuen Tag hinzufügen"
         />
       </div>
+  )
+  return (
+    <div className={`field field-full-width ${className || ''}`.trim()}>
+      {floatingEditorClass ? (
+        <div className={floatingEditorClass}>
+          {fieldLabel}
+          {editorInput}
+        </div>
+      ) : (
+        <>
+          {fieldLabel}
+          {editorInput}
+        </>
+      )}
       {suggestions.length > 0 && (
         <div className="card tags-suggestions" aria-label="Verfügbare Tags">
           {suggestions.map(s => {

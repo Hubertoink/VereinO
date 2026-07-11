@@ -1,6 +1,7 @@
-import React, { createRef, useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../../components/TagsEditor'
+import DatePickerButton from '../../components/common/DatePickerButton'
 import type {
   InvoiceBudgetAssignment,
   EditInvoiceFile,
@@ -70,12 +71,13 @@ export default function InvoiceFormModal({
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const editInvoiceFileInputRef = useRef<HTMLInputElement | null>(null)
-  const invoiceDateInputRef = createRef<HTMLInputElement>()
-  const invoicePartyInputRef = createRef<HTMLInputElement>()
-  const invoiceNoInputRef = createRef<HTMLInputElement>()
-  const invoiceAmountInputRef = createRef<HTMLInputElement>()
-  const invoiceDescriptionInputRef = createRef<HTMLInputElement>()
-  const invoiceTagsInputRef = createRef<HTMLInputElement>()
+  const invoiceDateInputRef = useRef<HTMLInputElement | null>(null)
+  const invoiceDueDateInputRef = useRef<HTMLInputElement | null>(null)
+  const invoicePartyInputRef = useRef<HTMLInputElement | null>(null)
+  const invoiceNoInputRef = useRef<HTMLInputElement | null>(null)
+  const invoiceAmountInputRef = useRef<HTMLInputElement | null>(null)
+  const invoiceDescriptionInputRef = useRef<HTMLInputElement | null>(null)
+  const invoiceTagsInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -182,35 +184,43 @@ export default function InvoiceFormModal({
     <>
       {createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal invoice-modal invoices-modal-redesign" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal invoice-modal invoices-modal-redesign invoices-modal--type-${form.draft.voucherType.toLowerCase()}`} onClick={(e) => e.stopPropagation()}>
             <div className="invoices-modal-header">
               <h2 style={{ margin: 0 }}>
                 {form.mode === 'create'
                   ? `+ ${form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'}`
                   : `${form.draft.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} bearbeiten`}
               </h2>
-              <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+              <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn invoices-modal-close-btn" onClick={onClose} title="Schließen (ESC)" aria-label="Schließen">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+              </button>
             </div>
 
             {formError && <div className="invoices-text-danger" style={{ padding: '0 16px' }}>{formError}</div>}
 
             <div className="invoices-modal-body">
               <div className="invoices-modal-left">
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card invoice-form-card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                   <div className="row">
-                    <div className="field">
-                      <label>Datum <span className="req-asterisk">*</span></label>
-                      <input
-                        ref={invoiceDateInputRef}
-                        className="input"
-                        type="date"
-                        value={form.draft.date}
-                        onChange={(e) => setDraft({ date: e.target.value })}
-                        style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined}
-                      />
+                    <div className={`field invoice-floating-field${form.draft.date ? ' invoice-floating-field--filled' : ''}`}>
+                      <label htmlFor="invoice-date">Datum <span className="req-asterisk">*</span></label>
+                      <span className="booking-date-input-wrap">
+                        <input
+                          id="invoice-date"
+                          ref={invoiceDateInputRef}
+                          className="input"
+                          type="date"
+                          value={form.draft.date}
+                          onChange={(e) => setDraft({ date: e.target.value })}
+                          style={requiredTouched && !form.draft.date ? { borderColor: 'var(--danger)' } : undefined}
+                        />
+                        <DatePickerButton inputRef={invoiceDateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
+                      </span>
                     </div>
-                    <div className="field">
+                    <div className="field invoice-type-field">
                       <label>Art</label>
                       <div className="btn-group" role="group">
                         <button type="button" className={`btn ${form.draft.voucherType === 'IN' ? 'btn-toggle-active btn-type-in' : ''}`} onClick={() => setDraft({ voucherType: 'IN' })}>IN</button>
@@ -219,18 +229,19 @@ export default function InvoiceFormModal({
                     </div>
                   </div>
                   <div className="row">
-                    <div className="field">
-                      <label>Sphäre</label>
-                      <select className="input" value={form.draft.sphere} onChange={(e) => setDraft({ sphere: e.target.value as InvoiceDraft['sphere'] })}>
+                    <div className="field invoice-floating-field invoice-floating-field--filled">
+                      <label htmlFor="invoice-sphere">Sphäre</label>
+                      <select id="invoice-sphere" className="input" value={form.draft.sphere} onChange={(e) => setDraft({ sphere: e.target.value as InvoiceDraft['sphere'] })}>
                         <option value="IDEELL">IDEELL</option>
                         <option value="ZWECK">ZWECK</option>
                         <option value="VERMOEGEN">VERMOEGEN</option>
                         <option value="WGB">WGB</option>
                       </select>
                     </div>
-                    <div className="field">
-                      <label>Konto</label>
+                    <div className={`field invoice-floating-field${form.draft.paymentAccountId ? ' invoice-floating-field--filled' : ''}`}>
+                      <label htmlFor="invoice-account">Konto</label>
                       <select
+                        id="invoice-account"
                         className="input"
                         value={form.draft.paymentAccountId ?? ''}
                         onChange={(e) => {
@@ -242,7 +253,7 @@ export default function InvoiceFormModal({
                           })
                         }}
                       >
-                        <option value="">-</option>
+                        <option value="" />
                         {activePaymentAccounts.map((account) => (
                           <option key={account.id} value={account.id}>
                             {(PAYMENT_ACCOUNT_KIND_LABEL[account.kind || 'OTHER'] || 'Sonstiges') + ' · ' + account.name}
@@ -253,11 +264,12 @@ export default function InvoiceFormModal({
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card invoice-form-card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Beschreibung & Tags</div>
-                  <div className="field">
-                    <label>Beschreibung</label>
+                  <div className={`field invoice-floating-field${(form.draft.description || '').trim() ? ' invoice-floating-field--filled' : ''}`}>
+                    <label htmlFor="invoice-description">Beschreibung</label>
                     <input
+                      id="invoice-description"
                       ref={invoiceDescriptionInputRef}
                       className="input"
                       list="desc-suggestions"
@@ -268,6 +280,7 @@ export default function InvoiceFormModal({
                   </div>
                   <TagsEditor
                     label="Tags"
+                    className="invoice-tags-editor"
                     value={form.draft.tags}
                     onChange={(nextTags) => setDraft({ tags: nextTags })}
                     tagDefs={tags}
@@ -277,11 +290,12 @@ export default function InvoiceFormModal({
               </div>
 
               <div className="invoices-modal-right">
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card invoice-form-card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
-                  <div className="field">
-                    <label>Partei <span className="req-asterisk">*</span></label>
+                  <div className={`field invoice-floating-field${form.draft.party?.trim() ? ' invoice-floating-field--filled' : ''}`}>
+                    <label htmlFor="invoice-party">Partei <span className="req-asterisk">*</span></label>
                     <input
+                      id="invoice-party"
                       ref={invoicePartyInputRef}
                       className="input"
                       list="party-suggestions"
@@ -292,9 +306,10 @@ export default function InvoiceFormModal({
                     />
                   </div>
                   <div className="row">
-                    <div className="field">
-                      <label>{form.draft.voucherType === 'IN' ? 'Forderungs-Nr.' : 'Verbindl.-Nr.'} <span className="req-asterisk">*</span></label>
+                    <div className={`field invoice-floating-field${(form.draft.invoiceNo || '').trim() ? ' invoice-floating-field--filled' : ''}`}>
+                      <label htmlFor="invoice-number">{form.draft.voucherType === 'IN' ? 'Forderungs-Nr.' : 'Verbindl.-Nr.'} <span className="req-asterisk">*</span></label>
                       <input
+                        id="invoice-number"
                         ref={invoiceNoInputRef}
                         className="input"
                         value={form.draft.invoiceNo || ''}
@@ -303,16 +318,20 @@ export default function InvoiceFormModal({
                         style={requiredTouched && !(form.draft.invoiceNo || '').trim() ? { borderColor: 'var(--danger)' } : undefined}
                       />
                     </div>
-                    <div className="field">
-                      <label>Fälligkeit</label>
-                      <input className="input" type="date" value={form.draft.dueDate || ''} onChange={(e) => setDraft({ dueDate: e.target.value || null })} />
+                    <div className="field invoice-floating-field invoice-floating-field--filled">
+                      <label htmlFor="invoice-due-date">Fälligkeit</label>
+                      <span className="booking-date-input-wrap">
+                        <input id="invoice-due-date" ref={invoiceDueDateInputRef} className="input" type="date" value={form.draft.dueDate || ''} onChange={(e) => setDraft({ dueDate: e.target.value || null })} />
+                        <DatePickerButton inputRef={invoiceDueDateInputRef} ariaLabel="Kalender zur Fälligkeitsauswahl öffnen" />
+                      </span>
                     </div>
                   </div>
                   <div className="row">
                     <div className="field">
-                      <label>Betrag <span className="req-asterisk">*</span></label>
-                      <span className="adorn-wrap">
+                      <span className={`adorn-wrap invoice-floating-control${form.draft.grossAmount?.trim() ? ' invoice-floating-control--filled' : ''}`}>
+                        <label htmlFor="invoice-amount">Betrag <span className="req-asterisk">*</span></label>
                         <input
+                          id="invoice-amount"
                           ref={invoiceAmountInputRef}
                           className="input"
                           inputMode="decimal"

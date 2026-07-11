@@ -72,6 +72,7 @@ export default function InvoiceDetailModal({
   onDetailChange
 }: Props) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<null | { fileId: number; fileName: string }>(null)
+  const canEdit = detail?.status !== 'PAID'
   const paymentAccountName = detail?.paymentAccountName
     ?? (detail?.paymentAccountId ? paymentAccounts.find((account) => account.id === detail.paymentAccountId)?.name : null)
   const paymentAccountKindLabel = paymentRouteLabelForKind(detail?.paymentAccountKind)
@@ -120,7 +121,7 @@ export default function InvoiceDetailModal({
         <div className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
-            {detail && <InvoiceActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
+            {detail && canEdit && <InvoiceActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
             <button className="btn ghost" onClick={onClose}>×</button>
           </div>
         </div>

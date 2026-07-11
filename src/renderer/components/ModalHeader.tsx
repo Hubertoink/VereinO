@@ -4,6 +4,7 @@ interface ModalHeaderProps {
   title: string
   onClose: () => void
   subtitle?: string
+  closeButtonClassName?: string
 }
 
 /**
@@ -15,7 +16,7 @@ interface ModalHeaderProps {
  * - ESC-Taste-Support
  * - Konsistente Abstände und Styling
  */
-export default function ModalHeader({ title, onClose, subtitle }: ModalHeaderProps) {
+export default function ModalHeader({ title, onClose, subtitle, closeButtonClassName }: ModalHeaderProps) {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -54,7 +55,7 @@ export default function ModalHeader({ title, onClose, subtitle }: ModalHeaderPro
       </div>
 
       <button 
-        className="btn ghost" 
+        className={`btn ghost${closeButtonClassName ? ` ${closeButtonClassName}` : ''}`}
         onClick={onClose} 
         title="Schließen (ESC)"
         style={{

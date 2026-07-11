@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ModalHeader from '../ModalHeader'
+import DatePickerButton from '../common/DatePickerButton'
 
 function contrastText(bg?: string | null) {
   if (!bg) return '#000'
@@ -39,6 +40,8 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
   const [nameError, setNameError] = useState<string>('')
   const [requiredTouched, setRequiredTouched] = useState(false)
   const nameRef = useRef<HTMLInputElement | null>(null)
+  const startDateRef = useRef<HTMLInputElement | null>(null)
+  const endDateRef = useRef<HTMLInputElement | null>(null)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
@@ -82,21 +85,22 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
 
   return createPortal(
     <div className="modal-overlay">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal standard-floating-modal budget-floating-modal" onClick={(e) => e.stopPropagation()}>
         <ModalHeader 
           title={v.id ? 'Budget bearbeiten' : 'Budget anlegen'}
           onClose={onClose}
+          closeButtonClassName="booking-modal-icon-btn booking-modal-close-btn"
         />
         <div className="row">
-          <div className="field">
+          <div className="field standard-floating-field standard-floating-field--filled">
             <label htmlFor="budget-year">Jahr <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input id="budget-year" className="input" type="number" value={v.year} onChange={(e) => setV({ ...v, year: Number(e.target.value) })} placeholder="2025" />
           </div>
-          <div className="field">
+          <div className="field standard-floating-field standard-floating-field--filled">
             <label htmlFor="budget-amount">Budget (€) <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input id="budget-amount" className="input" type="number" step="0.01" value={v.amountPlanned} onChange={(e) => setV({ ...v, amountPlanned: Number(e.target.value) })} placeholder="0.00" />
           </div>
-          <div className="field">
+          <div className={`field standard-floating-field${(v.name || '').trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="budget-name">Name <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="budget-name"
@@ -111,22 +115,28 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
               <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
             )}
           </div>
-          <div className="field">
+          <div className={`field standard-floating-field${(v.categoryName || '').trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="budget-category">Kategorie</label>
             <input id="budget-category" className="input" value={v.categoryName ?? ''} onChange={(e) => setV({ ...v, categoryName: e.target.value || null })} placeholder="z. B. Material" />
           </div>
-          <div className="field">
+          <div className={`field standard-floating-field${(v.projectName || '').trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="budget-project">Projekt</label>
             <input id="budget-project" className="input" value={v.projectName ?? ''} onChange={(e) => setV({ ...v, projectName: e.target.value || null })} placeholder="z. B. Projekt X" />
           </div>
           <div className="date-range-container">
-            <div className="field">
+            <div className="field standard-floating-field standard-floating-field--filled">
               <label htmlFor="budget-start-date">Von</label>
-              <input id="budget-start-date" className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+              <span className="booking-date-input-wrap">
+                <input id="budget-start-date" ref={startDateRef} className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
+                <DatePickerButton inputRef={startDateRef} ariaLabel="Kalender zur Auswahl des Budgetbeginns öffnen" />
+              </span>
             </div>
-            <div className="field">
+            <div className="field standard-floating-field standard-floating-field--filled">
               <label htmlFor="budget-end-date">Bis</label>
-              <input id="budget-end-date" className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+              <span className="booking-date-input-wrap">
+                <input id="budget-end-date" ref={endDateRef} className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
+                <DatePickerButton inputRef={endDateRef} ariaLabel="Kalender zur Auswahl des Budgetendes öffnen" />
+              </span>
             </div>
           </div>
           {(v.startDate || v.endDate) && (

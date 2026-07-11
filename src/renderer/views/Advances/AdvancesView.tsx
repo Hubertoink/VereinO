@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../context/useToast'
 import QuickAddModal from '../../components/modals/QuickAddModal'
+import DatePickerButton from '../../components/common/DatePickerButton'
 import type { QA } from '../../hooks/useQuickAdd'
 
 type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
@@ -80,6 +81,16 @@ function paymentMethodForAccountKind(kind?: PaymentAccount['kind'] | null): 'BAR
   return kind === 'CASH' ? 'BAR' : 'BANK'
 }
 
+function AdvanceModalCloseButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" aria-label="Schließen" title="Schließen (ESC)" disabled={disabled} onClick={onClick}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+      </svg>
+    </button>
+  )
+}
+
 function buildAdvancePurchaseQa(accounts: PaymentAccount[]): QA {
   const activeAccounts = accounts.filter((account) => account.isActive !== 0)
   const defaultCashAccount = activeAccounts.find((account) => account.kind === 'CASH') ?? activeAccounts[0] ?? null
@@ -152,6 +163,7 @@ export default function AdvancesView() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createBusy, setCreateBusy] = useState(false)
+  const createIssuedAtRef = useRef<HTMLInputElement | null>(null)
   const [createDraft, setCreateDraft] = useState({
     recipientName: '',
     issuedAt: new Date().toISOString().slice(0, 10),
@@ -163,6 +175,7 @@ export default function AdvancesView() {
 
   const [settleOpen, setSettleOpen] = useState(false)
   const [settleBusy, setSettleBusy] = useState(false)
+  const settleDateRef = useRef<HTMLInputElement | null>(null)
   const [settleDraft, setSettleDraft] = useState({
     settledAt: new Date().toISOString().slice(0, 10),
     amount: '',
@@ -771,40 +784,43 @@ export default function AdvancesView() {
 
       {createOpen && (
         <div className="modal-overlay" onClick={() => setCreateOpen(false)} role="dialog" aria-modal="true">
-          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="advances-modal-header">
               <h2 style={{ margin: 0 }}>Vorschuss erfassen</h2>
-              <button className="btn ghost" type="button" aria-label="Schließen" onClick={() => setCreateOpen(false)}>×</button>
+              <AdvanceModalCloseButton onClick={() => setCreateOpen(false)} />
             </div>
             <div className="row">
-              <div className="field">
-                <label>Empfänger *</label>
-                <input className="input" value={createDraft.recipientName} onChange={(e) => setCreateDraft((prev) => ({ ...prev, recipientName: e.target.value }))} placeholder="z. B. Max Mustermann" />
+              <div className={`field standard-floating-field${createDraft.recipientName.trim() ? ' standard-floating-field--filled' : ''}`}>
+                <label htmlFor="advance-recipient">Empfänger *</label>
+                <input id="advance-recipient" className="input" value={createDraft.recipientName} onChange={(e) => setCreateDraft((prev) => ({ ...prev, recipientName: e.target.value }))} placeholder="z. B. Max Mustermann" />
               </div>
             </div>
             <div className="row">
-              <div className="field">
-                <label>Ausgabedatum *</label>
-                <input type="date" className="input" value={createDraft.issuedAt} onChange={(e) => setCreateDraft((prev) => ({ ...prev, issuedAt: e.target.value }))} />
+              <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-issued-at">Ausgabedatum *</label>
+                <span className="booking-date-input-wrap">
+                  <input id="advance-issued-at" ref={createIssuedAtRef} type="date" className="input" value={createDraft.issuedAt} onChange={(e) => setCreateDraft((prev) => ({ ...prev, issuedAt: e.target.value }))} />
+                  <DatePickerButton inputRef={createIssuedAtRef} ariaLabel="Kalender zur Auswahl des Ausgabedatums öffnen" />
+                </span>
               </div>
-              <div className="field">
-                <label>Betrag (€) *</label>
-                <input className="input" value={createDraft.amount} onChange={(e) => setCreateDraft((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0,00" />
+              <div className={`field standard-floating-field${createDraft.amount.trim() ? ' standard-floating-field--filled' : ''}`}>
+                <label htmlFor="advance-amount">Betrag (€) *</label>
+                <input id="advance-amount" className="input" value={createDraft.amount} onChange={(e) => setCreateDraft((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0,00" />
               </div>
             </div>
             <div className="row">
-              <div className="field">
-                <label>Budget (optional)</label>
-                <select className="input" value={createDraft.budgetId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, budgetId: e.target.value }))}>
+              <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-budget">Budget (optional)</label>
+                <select id="advance-budget" className="input" value={createDraft.budgetId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, budgetId: e.target.value }))}>
                   <option value="">Nicht gesetzt</option>
                   {budgets.map((budget) => (
                     <option key={budget.id} value={budget.id}>{budget.label}</option>
                   ))}
                 </select>
               </div>
-              <div className="field">
-                <label>Zweckbindung (optional)</label>
-                <select className="input" value={createDraft.earmarkId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, earmarkId: e.target.value }))}>
+              <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-earmark">Zweckbindung (optional)</label>
+                <select id="advance-earmark" className="input" value={createDraft.earmarkId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, earmarkId: e.target.value }))}>
                   <option value="">Nicht gesetzt</option>
                   {earmarks.map((earmark) => (
                     <option key={earmark.id} value={earmark.id}>{earmark.code} – {earmark.name}</option>
@@ -812,9 +828,9 @@ export default function AdvancesView() {
                 </select>
               </div>
             </div>
-            <div className="field">
-              <label>Notiz (optional)</label>
-              <textarea className="input" rows={3} value={createDraft.notes} onChange={(e) => setCreateDraft((prev) => ({ ...prev, notes: e.target.value }))} />
+            <div className={`field standard-floating-field${createDraft.notes.trim() ? ' standard-floating-field--filled' : ''}`}>
+              <label htmlFor="advance-notes">Notiz (optional)</label>
+              <textarea id="advance-notes" className="input" rows={3} value={createDraft.notes} onChange={(e) => setCreateDraft((prev) => ({ ...prev, notes: e.target.value }))} />
             </div>
             <div className="advances-modal-actions">
               <button className="btn" type="button" onClick={() => setCreateOpen(false)}>Abbrechen</button>
@@ -826,26 +842,29 @@ export default function AdvancesView() {
 
       {settleOpen && detail && (
         <div className="modal-overlay" onClick={() => setSettleOpen(false)} role="dialog" aria-modal="true">
-          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="advances-modal-header">
               <h2 style={{ margin: 0 }}>Vorschuss auflösen</h2>
-              <button className="btn ghost" type="button" aria-label="Schließen" onClick={() => setSettleOpen(false)}>×</button>
+              <AdvanceModalCloseButton onClick={() => setSettleOpen(false)} />
             </div>
             <div className="helper">Offener Betrag: {eurFmt.format(detail.openAmount)}</div>
             <div className="row">
-              <div className="field">
-                <label>Auflösungsdatum *</label>
-                <input type="date" className="input" value={settleDraft.settledAt} onChange={(e) => setSettleDraft((prev) => ({ ...prev, settledAt: e.target.value }))} />
+              <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-settled-at">Auflösungsdatum *</label>
+                <span className="booking-date-input-wrap">
+                  <input id="advance-settled-at" ref={settleDateRef} type="date" className="input" value={settleDraft.settledAt} onChange={(e) => setSettleDraft((prev) => ({ ...prev, settledAt: e.target.value }))} />
+                  <DatePickerButton inputRef={settleDateRef} ariaLabel="Kalender zur Auswahl des Auflösungsdatums öffnen" />
+                </span>
               </div>
-              <div className="field">
-                <label>Betrag (€) *</label>
-                <input className="input" value={settleDraft.amount} onChange={(e) => setSettleDraft((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0,00" />
+              <div className={`field standard-floating-field${settleDraft.amount.trim() ? ' standard-floating-field--filled' : ''}`}>
+                <label htmlFor="advance-settle-amount">Betrag (€) *</label>
+                <input id="advance-settle-amount" className="input" value={settleDraft.amount} onChange={(e) => setSettleDraft((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0,00" />
               </div>
             </div>
             <div className="row">
-              <div className="field">
-                <label>Rechnung (optional)</label>
-                <select className="input" value={settleDraft.invoiceId} onChange={(e) => setSettleDraft((prev) => ({ ...prev, invoiceId: e.target.value }))}>
+              <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-invoice">Rechnung (optional)</label>
+                <select id="advance-invoice" className="input" value={settleDraft.invoiceId} onChange={(e) => setSettleDraft((prev) => ({ ...prev, invoiceId: e.target.value }))}>
                   <option value="">Keine Zuordnung</option>
                   {invoices.map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>
@@ -854,14 +873,14 @@ export default function AdvancesView() {
                   ))}
                 </select>
               </div>
-              <div className="field">
-                <label>Beleg-ID (optional)</label>
-                <input className="input" value={settleDraft.voucherId} onChange={(e) => setSettleDraft((prev) => ({ ...prev, voucherId: e.target.value }))} placeholder="z. B. 123" />
+              <div className={`field standard-floating-field${settleDraft.voucherId.trim() ? ' standard-floating-field--filled' : ''}`}>
+                <label htmlFor="advance-voucher-id">Beleg-ID (optional)</label>
+                <input id="advance-voucher-id" className="input" value={settleDraft.voucherId} onChange={(e) => setSettleDraft((prev) => ({ ...prev, voucherId: e.target.value }))} placeholder="z. B. 123" />
               </div>
             </div>
-            <div className="field">
-              <label>Notiz (optional)</label>
-              <textarea className="input" rows={3} value={settleDraft.note} onChange={(e) => setSettleDraft((prev) => ({ ...prev, note: e.target.value }))} />
+            <div className={`field standard-floating-field${settleDraft.note.trim() ? ' standard-floating-field--filled' : ''}`}>
+              <label htmlFor="advance-settle-note">Notiz (optional)</label>
+              <textarea id="advance-settle-note" className="input" rows={3} value={settleDraft.note} onChange={(e) => setSettleDraft((prev) => ({ ...prev, note: e.target.value }))} />
             </div>
             <div className="advances-modal-actions">
               <button className="btn" type="button" onClick={() => setSettleOpen(false)}>Abbrechen</button>
@@ -876,7 +895,7 @@ export default function AdvancesView() {
           <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div className="advances-modal-header">
               <h2 style={{ margin: 0 }}>Vorschuss jetzt auflösen?</h2>
-              <button className="btn ghost" type="button" aria-label="Schließen" disabled={resolveBusy} onClick={() => setResolveConfirmOpen(false)}>×</button>
+              <AdvanceModalCloseButton disabled={resolveBusy} onClick={() => setResolveConfirmOpen(false)} />
             </div>
             <div className="helper" style={{ marginBottom: 8 }}>Empfänger: {detail.memberName || detail.recipientName}</div>
             <div style={{ display: 'grid', gap: 6 }}>

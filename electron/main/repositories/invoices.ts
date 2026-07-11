@@ -222,6 +222,10 @@ export function updateInvoice(input: {
   return withTransaction((d: DB) => {
     const cur = d.prepare('SELECT * FROM invoices WHERE id=?').get(input.id) as any
     if (!cur) throw new Error('Rechnung nicht gefunden')
+    const paidRow = d.prepare('SELECT IFNULL(SUM(amount),0) as s FROM invoice_payments WHERE invoice_id = ?').get(input.id) as any
+    if (computeStatus(Number(cur.gross_amount || 0), Number(paidRow?.s || 0)) === 'PAID') {
+      throw new Error('Bezahlte Einträge können nicht mehr bearbeitet werden.')
+    }
     const normalizedBudgets = input.budgets !== undefined
       ? normalizeInvoiceBudgetAssignments({ budgets: input.budgets, budgetId: input.budgetId, budgetAmount: input.budgetAmount }, Number(cur.gross_amount || 0))
       : (input.budgetId != null || input.budgetAmount != null ? normalizeInvoiceBudgetAssignments({ budgetId: input.budgetId, budgetAmount: input.budgetAmount }, Number(cur.gross_amount || 0)) : undefined)

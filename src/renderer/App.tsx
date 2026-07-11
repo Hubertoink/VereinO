@@ -599,9 +599,19 @@ function DetachedQuickAddWindow() {
           }
         }
       } else if (initial?.mode === 'edit') {
-        const form = voucherRowToBookingForm(
-          initial?.qa || initial?.voucher || { id: initial?.voucherId }
-        )
+        const initialRow = initial?.qa || initial?.voucher || { id: initial?.voucherId }
+        let currentRow = initialRow
+        const voucherId = Number(initial?.voucherId || initialRow?.id || 0)
+        if (voucherId > 0) {
+          try {
+            const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [voucherId] })
+            const freshRow = (refreshed as any)?.rows?.[0]
+            if (freshRow) currentRow = { ...initialRow, ...freshRow }
+          } catch {
+            // The initial payload remains a safe fallback if refreshing fails.
+          }
+        }
+        const form = voucherRowToBookingForm(currentRow)
         setWindowModeKind('edit')
         setEditQa(form)
         setEditFiles(initialFiles)
