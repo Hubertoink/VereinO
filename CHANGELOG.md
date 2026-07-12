@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.0] - 2026-07-12
+
+### Hinzugefügt
+
+- KI-Rechnungsbatch: Mehrseitige Scanpakete mit mehreren Rechnungen werden vor der Buchungsanalyse seitenweise klassifiziert und in eigenständige Rechnungsentwürfe aufgeteilt.
+- KI-Rechnungsbatch: Erkannte Einzelrechnungen zeigen ihre Seitenspanne und Gruppierungssicherheit; unsichere Grenzen werden ausdrücklich zur Prüfung markiert.
+- KI-Rechnungsbatch: Bis zu 50 Seiten eines Scanpakets können vollständig, lückenlos und ohne doppelte Seiten gruppiert werden.
+
+### Geändert
+
+- KI-Rechnungsbatch: Duplikate werden nach der Aufteilung pro erkannter Einzelrechnung geprüft; die ursprüngliche PDF bleibt erhalten, bis alle Teilrechnungen gebucht oder verworfen wurden.
+- Rechnungserfassung: Dokument- und Datenkopf sind dezent farblich abgehoben; der Bereich „Erkannte Daten“ besitzt mehr Innenabstand.
+- Qualitätssicherung: Electron-E2E-Tests laufen wegen des anwendungsweiten Single-Instance-Zustands deterministisch in einem Worker und mit einer frischen App-Instanz pro Smoke-Test.
+
+### Behoben
+
+- KI-Rechnungsbatch: Ungültige KI-Gruppierungen mit fehlenden, doppelten oder nicht fortlaufenden Seiten werden abgelehnt, statt unbemerkt falsche Teilrechnungen zu erzeugen.
+- E2E: Start- und Tooltip-Prüfungen verwenden stabile, barrierefreie Bereitschafts- und Fokusbedingungen.
+
 ## [2.8.7] - 2026-07-12
 
 ### Hinzugefügt

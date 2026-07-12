@@ -2236,7 +2236,14 @@ export const AiInvoiceBatchItem = z.object({
   result: AiInvoiceExtractionResult.nullable().optional(),
   isDuplicate: z.boolean().default(false),
   duplicateVoucherId: z.number().int().positive().nullable().optional(),
-  duplicateVoucherNo: z.string().nullable().optional()
+  duplicateVoucherNo: z.string().nullable().optional(),
+  packet: z.object({
+    index: z.number().int().positive(),
+    total: z.number().int().positive(),
+    pageNumbers: z.array(z.number().int().positive()).min(1),
+    confidence: z.number().min(0).max(1),
+    warnings: z.array(z.string())
+  }).nullable().optional()
 })
 export const AiInvoiceBatchListOutput = z.object({
   rows: z.array(AiInvoiceBatchItem),

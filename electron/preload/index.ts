@@ -137,8 +137,8 @@ const rendererApi = {
       approve: (payload) => cleanInvoke('ai.invoiceBatch.approve', payload),
       discard: (payload) => cleanInvoke('ai.invoiceBatch.discard', payload),
       openFolder: () => cleanInvoke('ai.invoiceBatch.openFolder'),
-      onChanged: (cb: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => void) => {
-        const handler = (_event: IpcRendererEvent, change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => cb(change)
+      onChanged: (cb: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }>; packetSplit?: { fileName: string; invoiceCount: number; uncertainCount: number; duplicateCount: number } }) => void) => {
+        const handler = (_event: IpcRendererEvent, change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }>; packetSplit?: { fileName: string; invoiceCount: number; uncertainCount: number; duplicateCount: number } }) => cb(change)
         ipcRenderer.on('ai:invoice-batch-changed', handler)
         return () => ipcRenderer.removeListener('ai:invoice-batch-changed', handler)
       }

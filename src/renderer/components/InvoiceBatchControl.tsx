@@ -34,6 +34,13 @@ export default function InvoiceBatchControl({
   useEffect(() => {
     void reload()
     const off = window.api.ai.invoiceBatch.onChanged((change) => {
+      if (change?.packetSplit) {
+        const { fileName, invoiceCount, uncertainCount, duplicateCount } = change.packetSplit
+        notify(
+          uncertainCount > 0 || duplicateCount > 0 ? 'warn' : 'success',
+          `${fileName} wurde in ${invoiceCount} Rechnungen aufgeteilt.${uncertainCount > 0 ? ` Bei ${uncertainCount} Gruppierung${uncertainCount === 1 ? '' : 'en'} bitte die Seitengrenze prüfen.` : ''}${duplicateCount > 0 ? ` ${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'} wurde${duplicateCount === 1 ? '' : 'n'} angehalten.` : ''}`
+        )
+      }
       const duplicates = change?.duplicatesAdded || []
       if (duplicates.length > 0) {
         const names = duplicates.slice(0, 2).map((item) => item.fileName).join(', ')
@@ -143,6 +150,17 @@ export default function InvoiceBatchControl({
                 <button className="invoice-batch-item__main" disabled={item.status !== 'NEEDS_REVIEW'} onClick={() => onReview(item.id)}>
                   <strong title={item.fileName}>{item.fileName}</strong>
                   <small title={item.error || undefined}>{item.isDuplicate ? `Mögliches Duplikat${item.duplicateVoucherNo ? ` von ${item.duplicateVoucherNo}` : ''}` : item.status === 'FAILED' && item.error ? item.error : STATUS_LABELS[item.status] || item.status}</small>
+                  {item.packet && (
+                    <span
+                      className={`invoice-batch-item__packet${item.packet.confidence < 0.75 ? ' is-uncertain' : ''}`}
+                      title={item.packet.warnings.join(' · ') || `Seitengruppierung: ${Math.round(item.packet.confidence * 100)} % sicher`}
+                    >
+                      Scanpaket {item.packet.index}/{item.packet.total} · {item.packet.pageNumbers.length === 1
+                        ? `Seite ${item.packet.pageNumbers[0]}`
+                        : `Seiten ${item.packet.pageNumbers[0]}–${item.packet.pageNumbers[item.packet.pageNumbers.length - 1]}`}
+                      {item.packet.confidence < 0.75 ? ' · Grenze prüfen' : ''}
+                    </span>
+                  )}
                 </button>
                 {item.isDuplicate && (
                   <button

@@ -2,6 +2,7 @@ import { safeStorage, session } from 'electron'
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
+import { z } from 'zod'
 import {
   AiBankImportReviewResult,
   AiBankImportReviewResultStructured,
@@ -20,6 +21,7 @@ import {
   type TAiTextDraftResult
 } from '../ipc/schemas'
 import { getSetting, setSetting } from './settings'
+import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
 
 const API_KEY_SETTING = 'ai.openai.apiKey'
 const MODEL_SETTING = 'ai.openai.model'
@@ -635,7 +637,91 @@ export async function analyzeBookingDocuments(input: {
 }
 
 const MAX_TRANSIENT_INVOICE_BYTES = 10 * 1024 * 1024
-const MAX_TRANSIENT_INVOICE_PAGES = 20
+const MAX_TRANSIENT_INVOICE_PAGES = 50
+
+const InvoicePacketSegmentationStructured = z.object({
+  groups: z.array(z.object({
+    pageNumbers: z.array(z.number().int().positive()),
+    confidence: z.number().min(0).max(1),
+    reason: z.string(),
+    warnings: z.array(z.string())
+  })).min(1),
+  warnings: z.array(z.string())
+})
+
+export type InvoicePacketGroup = {
+  pageNumbers: number[]
+  confidence: number
+  reason: string
+  warnings: string[]
+  dataBase64: string
+}
+
+async function pdfForPages(source: PDFDocument, pageNumbers: number[]) {
+  const output = await PDFDocument.create()
+  const pages = await output.copyPages(source, pageNumbers.map((page) => page - 1))
+  for (const page of pages) output.addPage(page)
+  return Buffer.from(await output.save()).toString('base64')
+}
+
+export async function segmentInvoicePacket(file: AiInputFile): Promise<{
+  groups: InvoicePacketGroup[]
+  warnings: string[]
+}> {
+  await validateTransientInvoiceFile(file)
+  const bytes = Buffer.from(file.dataBase64, 'base64')
+  const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true })
+  const pageCount = pdf.getPageCount()
+  if (pageCount <= 1) {
+    return {
+      groups: [{ pageNumbers: [1], confidence: 1, reason: 'Einseitige PDF', warnings: [], dataBase64: file.dataBase64 }],
+      warnings: []
+    }
+  }
+
+  const pageFiles = await splitPdfIntoAnalysisFiles(file)
+  const settings = getAiSettings()
+  const response = await createClient().responses.create({
+    model: settings.model,
+    reasoning: { effort: settings.defaultReasoningEffort },
+    text: { format: zodTextFormat(InvoicePacketSegmentationStructured, 'vereino_invoice_packet_segmentation') },
+    input: [{
+      role: 'user',
+      content: [
+        {
+          type: 'input_text',
+          text: [
+            `Diese PDF hat ${pageCount} Seiten und kann mehrere hintereinander gescannte Rechnungen enthalten.`,
+            'Gruppiere ausschließlich aufeinanderfolgende Seiten, die zu derselben Rechnung gehören.',
+            'Nutze Rechnungsnummer, Lieferant, Datum, Seitennummern, Überträge, Summen und Layout als Indizien.',
+            'Jede Seite von 1 bis zur letzten Seite muss exakt einmal vorkommen; keine Seite auslassen oder doppelt verwenden.',
+            'Eine neue Rechnungsnummer oder ein klar neuer Rechnungskopf beginnt normalerweise eine neue Gruppe.',
+            'Folgeseiten, Anlagen und Seitenangaben wie Seite 2 von 3 bleiben bei ihrer Rechnung.',
+            'Bei unsicheren Grenzen senke confidence und erkläre die Unsicherheit in warnings.',
+            'Extrahiere noch keine Buchungsdaten.'
+          ].join('\n')
+        },
+        ...pageFiles.flatMap((page, index) => ([
+          { type: 'input_text', text: `Seite ${index + 1} von ${pageCount}` },
+          toResponseFileContent(page.file)
+        ]))
+      ]
+    }]
+  } as any)
+  const segmented = InvoicePacketSegmentationStructured.parse(
+    parseStructured(response, InvoicePacketSegmentationStructured)
+  )
+  const normalized = normalizeInvoicePacketGroups(segmented.groups, pageCount)
+  return {
+    groups: await Promise.all(normalized.map(async (group) => ({
+      ...group,
+      dataBase64: normalized.length === 1 && group.pageNumbers.length === pageCount
+        ? file.dataBase64
+        : await pdfForPages(pdf, group.pageNumbers)
+    }))),
+    warnings: segmented.warnings
+  }
+}
 
 function hasInvoiceMagic(bytes: Buffer, mimeType: string) {
   if (mimeType === 'application/pdf') return bytes.subarray(0, 5).toString('ascii') === '%PDF-'

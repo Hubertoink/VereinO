@@ -8,7 +8,7 @@ let electronApp: ElectronApplication
 let page: Page
 let userDataDir: string
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-e2e-'))
   const mainEntry = path.resolve('dist-electron/main/index.cjs')
   const rendererEntry = pathToFileURL(path.resolve('dist/index.html')).toString()
@@ -27,9 +27,10 @@ test.beforeAll(async () => {
   })
   page = await electronApp.firstWindow()
   await page.waitForLoadState('domcontentloaded')
+  await expect(page).toHaveTitle(/VereinO/i, { timeout: 15_000 })
 })
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   if (electronApp) {
     await electronApp.evaluate(({ app }) => app.exit(0)).catch(() => undefined)
   }
@@ -201,7 +202,7 @@ test('presents the optimized booking workflow', async () => {
   expect(await calendarIcon.evaluate((icon) => getComputedStyle(icon).color)).not.toBe('rgb(0, 0, 0)')
 
   const sphereInfo = dialog.getByRole('button', { name: 'Erklärung zu den steuerlichen Bereichen' })
-  await sphereInfo.hover()
+  await sphereInfo.focus()
   const sphereTooltip = page.getByRole('tooltip').filter({ hasText: 'Steuerliche Bereiche' })
   await expect(sphereTooltip).toContainText('Ideeller Bereich')
   await expect(sphereTooltip).toContainText('Zweckbetrieb')

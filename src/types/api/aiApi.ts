@@ -63,7 +63,7 @@ export interface AiApi {
       approve: (payload: TAiInvoiceBatchApproveInput) => Promise<{ ok: boolean }>
       discard: (payload: { id: number }) => Promise<{ ok: boolean }>
       openFolder: () => Promise<{ ok: boolean; error?: string }>
-      onChanged: (callback: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => void) => () => void
+      onChanged: (callback: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }>; packetSplit?: { fileName: string; invoiceCount: number; uncertainCount: number; duplicateCount: number } }) => void) => () => void
     }
     jobs: {
       create: (payload: TAiJobsCreateInput) => Promise<TAiJobsCreateOutput>

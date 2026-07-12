@@ -14,7 +14,7 @@ import {
   setAiJobStatus
 } from '../repositories/aiJobs'
 import { buildAiInvoiceContext } from './aiContext'
-import { analyzeInvoiceDocument, getAiSettings } from './ai'
+import { analyzeInvoiceDocument, getAiSettings, segmentInvoicePacket } from './ai'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const POLL_MS = 4000
@@ -77,11 +77,17 @@ function findSavedVoucherDuplicate(data: Buffer): InvoiceDuplicate | null {
   return null
 }
 
-function queuePrompt(filePath: string, data: Buffer) {
-  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: fileHash(data) })}`
+type InvoiceBatchSourceMeta = {
+  path: string
+  sha256?: string
+  segment?: { index: number; total: number; pageNumbers: number[]; confidence: number; warnings: string[] }
 }
 
-function sourceMetaFromPrompt(prompt?: string | null): { path: string; sha256?: string } | null {
+function queuePrompt(filePath: string, data: Buffer, segment?: InvoiceBatchSourceMeta['segment'], sourceSha256?: string) {
+  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: sourceSha256 || fileHash(data), segment })}`
+}
+
+function sourceMetaFromPrompt(prompt?: string | null): InvoiceBatchSourceMeta | null {
   if (!prompt?.startsWith('invoice-batch:')) return null
   const value = prompt.slice('invoice-batch:'.length)
   try {
@@ -92,13 +98,27 @@ function sourceMetaFromPrompt(prompt?: string | null): { path: string; sha256?: 
   }
 }
 
+function openJobsForSource(filePath: string) {
+  return listAiJobs({ type: 'BOOKING_FROM_DOCUMENTS', limit: 200, includeInvoiceBatch: true }).rows
+    .filter((job: any) => !['APPROVED', 'REJECTED'].includes(job.status))
+    .filter((job: any) => sourceMetaFromPrompt(job.prompt)?.path === path.resolve(filePath))
+}
+
+function pageRangeLabel(pageNumbers: number[]) {
+  if (pageNumbers.length === 1) return `Seite ${pageNumbers[0]}`
+  return `Seiten ${pageNumbers[0]}–${pageNumbers[pageNumbers.length - 1]}`
+}
+
 export function getInvoiceSubmitDirectory() {
   const folder = path.join(getAppDataDir().root, 'Submit')
   fs.mkdirSync(folder, { recursive: true })
   return folder
 }
 
-type InvoiceBatchChange = { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }
+type InvoiceBatchChange = {
+  duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }>
+  packetSplit?: { fileName: string; invoiceCount: number; uncertainCount: number; duplicateCount: number }
+}
 
 function notifyQueueChanged(change?: InvoiceBatchChange) {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -148,6 +168,7 @@ export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: bool
       const data = fs.readFileSync(filePath)
       const prompt = queuePrompt(filePath, data)
       const existing = findAiJobByPrompt('BOOKING_FROM_DOCUMENTS', prompt)
+      const sourceJobs = openJobsForSource(filePath)
       const duplicate = findSavedVoucherDuplicate(data)
       if (existing) {
         const wasDuplicate = duplicateFromError(existing.error)
@@ -166,6 +187,7 @@ export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: bool
         }
         continue
       }
+      if (sourceJobs.length > 0) continue
       const job = createAiJob({
         type: 'BOOKING_FROM_DOCUMENTS',
         title: path.basename(filePath),
@@ -221,6 +243,51 @@ export async function processInvoiceBatchQueue() {
         const job = getAiJob(next.id)
         const file = job.files[0]
         if (!file?.dataBase64) throw new Error('PDF-Daten fehlen.')
+        const source = sourceMetaFromPrompt(job.prompt)
+        if (!source) throw new Error('Quelldaten des Scanpakets fehlen.')
+        if (!source.segment) {
+          const packet = await segmentInvoicePacket({
+            fileName: file.fileName,
+            mimeType: file.mimeType || 'application/pdf',
+            dataBase64: file.dataBase64
+          })
+          if (packet.groups.length > 1) {
+            const originalName = path.basename(source.path)
+            let duplicateCount = 0
+            for (const [index, group] of packet.groups.entries()) {
+              const groupData = Buffer.from(group.dataBase64, 'base64')
+              const segment = {
+                index: index + 1,
+                total: packet.groups.length,
+                pageNumbers: group.pageNumbers,
+                confidence: group.confidence,
+                warnings: [...packet.warnings, ...group.warnings]
+              }
+              const title = `${originalName} · Rechnung ${index + 1} · ${pageRangeLabel(group.pageNumbers)}`
+              const child = createAiJob({
+                type: 'BOOKING_FROM_DOCUMENTS',
+                title,
+                prompt: queuePrompt(source.path, groupData, segment, source.sha256),
+                files: [{ fileName: title.replace(/\.pdf(?= ·)/i, '') + '.pdf', mimeType: 'application/pdf', dataBase64: group.dataBase64 }]
+              })
+              const duplicate = findSavedVoucherDuplicate(groupData)
+              if (duplicate) duplicateCount += 1
+              setAiJobStatus(child.id, duplicate ? 'DRAFT' : 'QUEUED', {
+                error: duplicate ? duplicateError(duplicate) : null
+              })
+            }
+            deleteAiJob(job.id)
+            notifyQueueChanged({
+              packetSplit: {
+                fileName: originalName,
+                invoiceCount: packet.groups.length,
+                uncertainCount: packet.groups.filter((group) => group.confidence < 0.75 || group.warnings.length > 0).length,
+                duplicateCount
+              }
+            })
+            continue
+          }
+        }
         const analyzed = await analyzeInvoiceDocument({
           file: {
             fileName: file.fileName,
@@ -229,6 +296,13 @@ export async function processInvoiceBatchQueue() {
           },
           context: buildAiInvoiceContext()
         })
+        if (source.segment) {
+          const groupingWarnings = [...source.segment.warnings]
+          if (source.segment.confidence < 0.75) {
+            groupingWarnings.unshift(`Die Zuordnung der Seiten dieses Scanpakets ist nur zu ${Math.round(source.segment.confidence * 100)} % sicher. Bitte Seitengrenze prüfen.`)
+          }
+          analyzed.result.warnings = [...new Set([...groupingWarnings, ...analyzed.result.warnings])]
+        }
         saveAiJobResult(job.id, 'BOOKING_CANDIDATE', analyzed.result)
         setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
       } catch (error: any) {
@@ -247,6 +321,7 @@ export function listInvoiceBatchItems() {
     .filter((job: any) => !['APPROVED', 'REJECTED'].includes(job.status))
     .map((job: any) => {
       const duplicate = duplicateFromError(job.error)
+      const source = sourceMetaFromPrompt(job.prompt)
       return {
         id: job.id,
         fileName: job.title || `Rechnung ${job.id}`,
@@ -256,7 +331,14 @@ export function listInvoiceBatchItems() {
         result: job.result || null,
         isDuplicate: !!duplicate,
         duplicateVoucherId: duplicate?.voucherId ?? null,
-        duplicateVoucherNo: duplicate?.voucherNo ?? null
+        duplicateVoucherNo: duplicate?.voucherNo ?? null,
+        packet: source?.segment ? {
+          index: source.segment.index,
+          total: source.segment.total,
+          pageNumbers: source.segment.pageNumbers,
+          confidence: source.segment.confidence,
+          warnings: source.segment.warnings
+        } : null
       }
     })
   return { rows, submitDirectory: getInvoiceSubmitDirectory(), aiAvailable: getAiSettings().hasApiKey }
@@ -266,6 +348,7 @@ export function getInvoiceBatchItem(id: number) {
   const job = getAiJob(id)
   if (job.type !== 'BOOKING_FROM_DOCUMENTS' || !job.prompt?.startsWith('invoice-batch:')) throw new Error('Batch-Rechnung nicht gefunden.')
   const duplicate = duplicateFromError(job.error)
+  const source = sourceMetaFromPrompt(job.prompt)
   return {
     id: job.id,
     fileName: job.title || job.files[0]?.fileName || `Rechnung ${job.id}`,
@@ -275,7 +358,14 @@ export function getInvoiceBatchItem(id: number) {
     file: job.files[0] || null,
     isDuplicate: !!duplicate,
     duplicateVoucherId: duplicate?.voucherId ?? null,
-    duplicateVoucherNo: duplicate?.voucherNo ?? null
+    duplicateVoucherNo: duplicate?.voucherNo ?? null,
+    packet: source?.segment ? {
+      index: source.segment.index,
+      total: source.segment.total,
+      pageNumbers: source.segment.pageNumbers,
+      confidence: source.segment.confidence,
+      warnings: source.segment.warnings
+    } : null
   }
 }
 
@@ -296,6 +386,8 @@ function removeSourceFile(job: ReturnType<typeof getAiJob>) {
   const folder = path.resolve(getInvoiceSubmitDirectory())
   const resolved = path.resolve(source.path)
   if (path.dirname(resolved) !== folder) throw new Error('Ungültiger Submit-Dateipfad.')
+  const siblingStillOpen = openJobsForSource(resolved).some((candidate: any) => candidate.id !== job.id)
+  if (siblingStillOpen) return
   try {
     if (source.sha256 && fs.existsSync(resolved) && fileHash(fs.readFileSync(resolved)) !== source.sha256) return
     fs.unlinkSync(resolved)
