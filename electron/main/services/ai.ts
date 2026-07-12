@@ -755,6 +755,7 @@ async function validateTransientInvoiceFile(file: AiInputFile) {
 export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
   context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'generatedAt'>
+  localDocumentText?: string | null
 }): Promise<{ model: string; result: TAiInvoiceExtractionResult; usage: AiUsage }> {
   await validateTransientInvoiceFile(input.file)
   const settings = getAiSettings()
@@ -780,6 +781,10 @@ export async function analyzeInvoiceDocument(input: {
     'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt Einnahme oder Ausgabe.',
     'Nutze Konto-, Budget- und Zweckbindungs-IDs nur aus dem folgenden Stammdatenkontext.',
     'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
+    input.localDocumentText?.trim()
+      ? 'Docling hat lokal bereits strukturierten Dokumenttext erkannt. Nutze ihn als zusätzliche Evidenz, prüfe Werte aber weiterhin gegen das Originaldokument.'
+      : '',
+    input.localDocumentText?.trim() ? `Lokaler Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}` : '',
     '',
     'Minimaler VereinO-Stammdatenkontext:',
     JSON.stringify(context)

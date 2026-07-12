@@ -23,6 +23,7 @@ export type TileKey =
   | 'general'
   | 'table'
   | 'storage'
+  | 'docling'
   | 'import'
   | 'org'
   | 'donations'

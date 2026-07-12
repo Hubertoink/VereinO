@@ -2248,7 +2248,8 @@ export const AiInvoiceBatchItem = z.object({
 export const AiInvoiceBatchListOutput = z.object({
   rows: z.array(AiInvoiceBatchItem),
   submitDirectory: z.string(),
-  aiAvailable: z.boolean()
+  aiAvailable: z.boolean(),
+  doclingAvailable: z.boolean().default(false)
 })
 export const AiInvoiceBatchGetOutput = AiInvoiceBatchItem.extend({
   file: z.object({

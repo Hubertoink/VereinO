@@ -844,6 +844,16 @@ label.settings-toggle-card {
   display: grid;
   gap: 12px;
 }
+
+.docling-settings-card { display: grid; gap: 14px; }
+.docling-settings-card__head,
+.docling-settings-card__controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.docling-settings-card .settings-title { display: inline-flex; align-items: center; gap: 8px; }
+.docling-status { flex: 0 0 auto; padding: 5px 9px; border: 1px solid color-mix(in oklab, var(--warning) 42%, var(--border)); border-radius: 999px; color: color-mix(in oklab, var(--warning) 72%, var(--text)); background: color-mix(in oklab, var(--warning) 9%, var(--surface)); font-size: 11px; font-weight: 750; }
+.docling-status.is-installed { border-color: color-mix(in oklab, var(--success) 52%, var(--border)); color: var(--success); background: color-mix(in oklab, var(--success) 9%, transparent); }
+.docling-settings-card__controls { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in oklab, var(--surface-2, var(--surface)) 78%, transparent); }
+.docling-settings-card__controls .settings-toggle-card__copy { margin-right: auto; }
+.docling-settings-card__error { overflow-wrap: anywhere; color: var(--warning); }
 .storage-actions {
   display: flex;
   gap: 8px;

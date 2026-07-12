@@ -22,6 +22,7 @@ const settingsIconColors: Record<TileKey, string> = {
   general: '#7C4DFF',
   table: '#2962FF',
   storage: '#00B8D4',
+  docling: '#8B5CF6',
   import: '#F50057',
   org: '#26A69A',
   donations: '#FF7043',
@@ -112,6 +113,14 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M2 12l10 5 10-5" />
         </svg>
       )
+    case 'docling':
+      return (
+        <svg {...iconProps}>
+          <path d="M7 2h7l4 4v16H7z" />
+          <path d="M14 2v5h5" />
+          <path d="m10 12 1.2 2.8L14 16l-2.8 1.2L10 20l-1.2-2.8L6 16l2.8-1.2L10 12z" />
+        </svg>
+      )
     case 'aiPatterns':
       return (
         <svg {...iconProps}>
@@ -191,6 +200,7 @@ const GROUPS: SettingsGroup[] = [
     label: 'Daten',
     items: [
       { key: 'storage', label: 'Speicher & Backup', shortLabel: 'Speicher' },
+      { key: 'docling', label: 'Docling', shortLabel: 'Docling' },
       { key: 'import', label: 'Import', shortLabel: 'Import' },
       { key: 'updates', label: 'Updates', shortLabel: 'Updates' },
     ],

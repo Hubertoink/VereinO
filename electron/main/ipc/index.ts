@@ -848,7 +848,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('ai.invoiceBatch.list', async () => {
     const { listInvoiceBatchItems, scanInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')
     scanInvoiceSubmitDirectory()
-    return AiInvoiceBatchListOutput.parse(listInvoiceBatchItems())
+    return AiInvoiceBatchListOutput.parse(await listInvoiceBatchItems())
   })
   ipcMain.handle('ai.invoiceBatch.get', async (_event, payload) => {
     const parsed = AiInvoiceBatchIdInput.parse(payload)
@@ -3066,6 +3066,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = SettingsSetInput.parse(payload)
     setSetting(parsed.key, parsed.value)
     return SettingsSetOutput.parse({ ok: true })
+  })
+  ipcMain.handle('docling.status', async (_e, force?: boolean) => {
+    const { getDoclingStatus } = await import('../services/docling')
+    return getDoclingStatus(Boolean(force))
+  })
+  ipcMain.handle('docling.setEnabled', async (_e, enabled?: boolean) => {
+    const { setDoclingEnabled } = await import('../services/docling')
+    return setDoclingEnabled(Boolean(enabled))
+  })
+  ipcMain.handle('docling.extract', async (_e, payload) => {
+    const { extractWithDocling } = await import('../services/docling')
+    return extractWithDocling(payload)
   })
 
   // Tax Exemption Certificate

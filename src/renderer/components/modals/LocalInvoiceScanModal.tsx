@@ -500,6 +500,41 @@ export default function LocalInvoiceScanModal({
       setVisibleSections(new Set(restored.visibleSections))
     }
 
+    const applyDocling = async (fallbackText = '') => {
+      try {
+        if (restored) return false
+        if (mimeType === 'image/webp') return false
+        const status = await window.api.docling.status()
+        if (!status.enabled) return false
+        setAnalysisState('analyzing')
+        setAnalysisMessage('Docling analysiert Text, OCR und Dokumentlayout lokal …')
+        const result = await window.api.docling.extract({
+          fileName: nextFile.name,
+          mimeType,
+          dataBase64: bufferToBase64Safe(await nextFile.arrayBuffer())
+        })
+        if (requestRef.current !== requestId) return true
+        const doclingText = result.text.trim()
+        const text = doclingText.length >= 20 ? doclingText : fallbackText
+        setRawText(text)
+        if (!restored && text.length >= 20) setFields(extractLocalInvoiceFields(text))
+        setAnalysisState(text.length >= 20 ? 'text-found' : 'ocr-needed')
+        setAnalysisMessage(text.length >= 20
+          ? `Mit Docling ${result.version ? `v${result.version} ` : ''}lokal erkannt und vorbefüllt.`
+          : 'Docling konnte keinen ausreichend verwertbaren Text erkennen.')
+        return true
+      } catch (error: any) {
+        if (requestRef.current !== requestId) return true
+        if (!fallbackText) {
+          setAnalysisState('error')
+          setAnalysisMessage(`Docling-Analyse fehlgeschlagen: ${error?.message || String(error)}`)
+          return true
+        }
+        setAnalysisMessage(`Textschicht erkannt; Docling konnte nicht ergänzt werden: ${error?.message || String(error)}`)
+        return false
+      }
+    }
+
     if (mimeType !== 'application/pdf') {
       const url = URL.createObjectURL(nextFile)
       imageUrlRef.current = url
@@ -510,10 +545,11 @@ export default function LocalInvoiceScanModal({
       setImageUrl(url)
       setPreviewKind('image')
       if (restored) setFields(restored.fields)
-      setAnalysisState('ocr-needed')
-      setAnalysisMessage(
-        'Bildvorschau bereit. Für lokale Texterkennung wird ein OCR-Modell benötigt.'
-      )
+      const handledByDocling = await applyDocling()
+      if (!handledByDocling) {
+        setAnalysisState('ocr-needed')
+        setAnalysisMessage('Bildvorschau bereit. Für lokale Texterkennung kann Docling aktiviert werden.')
+      }
       return
     }
 
@@ -541,6 +577,7 @@ export default function LocalInvoiceScanModal({
       const text = pageTexts.join('\n\n').trim()
       setRawText(text)
       if (restored) setFields(restored.fields)
+      if (text.length < 20 && await applyDocling(text)) return
       if (text.length >= 20) {
         if (!restored) setFields(extractLocalInvoiceFields(text))
         setAnalysisState('text-found')

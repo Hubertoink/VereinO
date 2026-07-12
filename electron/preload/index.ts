@@ -346,6 +346,11 @@ const rendererApi = {
       invokeRaw<{ value: T }>('settings.get', payload),
     set: (payload) => invoke('settings.set', payload)
   },
+  docling: {
+    status: (force = false) => invoke('docling.status', force),
+    setEnabled: (enabled: boolean) => cleanInvoke('docling.setEnabled', enabled),
+    extract: (payload: { fileName: string; mimeType?: string | null; dataBase64: string }) => cleanInvoke('docling.extract', payload)
+  },
   taxExemption: {
     get: () => invoke('taxExemption.get'),
     save: (payload) => invoke('taxExemption.save', payload),

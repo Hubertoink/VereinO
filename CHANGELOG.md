@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.1] - 2026-07-12
+
+### Hinzugefügt
+
+- Daten/Docling: Eine vorhandene lokale Docling-Installation kann geprüft und optional aktiviert werden; Installation und Modelle werden nicht automatisch heruntergeladen.
+- Rechnungserfassung: Docling übernimmt bei Scans oder PDFs ohne brauchbare Textschicht lokal OCR und Dokumentlayoutanalyse.
+- KI-Rechnungsbatch: Docling kann strukturierte lokale Texte als zusätzliche KI-Evidenz liefern oder ohne API-Key konservative Grundentwürfe vorbereiten.
+
+### Geändert
+
+- Daten: Docling besitzt einen eigenen Unterpunkt neben Speicher, Import und Updates mit Status, Version, Laufzeit und Installationshilfe.
+- Rechnungserfassung: Digitale PDFs mit guter Textschicht verwenden weiterhin den schnellen PDF.js-Pfad; Docling läuft nur als OCR-Fallback.
+- KI-Rechnungsbatch: Bereits vorbefüllte KI-Entwürfe starten beim Öffnen des Reviews keinen erneuten Docling-Lauf.
+
+### Behoben
+
+- Docling: Windows-Installationen außerhalb des `PATH`, etwa unter `AppData\\Local\\Programs\\Python`, werden zuverlässig erkannt.
+- Docling: Markdown-Kommentare, Bildmarker und Formatierungszeichen werden vor der lokalen Rechnungsfelderkennung entfernt.
+- Docling: Das Status-Badge „Nicht installiert“ besitzt in dunklen und transparenten Designs ausreichend Kontrast.
+
 ## [2.9.0] - 2026-07-12
 
 ### Hinzugefügt

@@ -31,6 +31,31 @@ interface OrganizationAppearance {
 }
 
 export interface SystemApi {
+    docling: {
+        status: (force?: boolean) => Promise<{
+            installed: boolean
+            enabled: boolean
+            configured: boolean
+            version: string | null
+            runtime: string | null
+            error: string | null
+        }>
+        setEnabled: (enabled: boolean) => Promise<{
+            installed: boolean
+            enabled: boolean
+            configured: boolean
+            version: string | null
+            runtime: string | null
+            error: string | null
+        }>
+        extract: (payload: { fileName: string; mimeType?: string | null; dataBase64: string }) => Promise<{
+            ok: boolean
+            markdown: string
+            text: string
+            document: unknown
+            version: string | null
+        }>
+    }
     backup: {
         make: (reason?: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>
         list: () => Promise<{

@@ -34,6 +34,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
   // Legacy simple migrate modal (kept for fallback when counts fail to load)
   const [migrateModal, setMigrateModal] = React.useState<{ mode: 'useOrMigrate' | 'migrateEmpty'; root: string; dbPath?: string } | null>(null)
 
+
   async function doMakeBackup() {
     setBusy(true); setErr('')
     try {

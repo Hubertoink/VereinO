@@ -13,12 +13,14 @@ import { AIPatternsPane } from './panes/AIPatternsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
 import { YearEndPane } from './panes/YearEndPane'
 import { UpdatesPane } from './panes/UpdatesPane'
+import { DoclingPane } from './panes/DoclingPane'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'general',
   'table',
   'storage',
+  'docling',
   'import',
   'org',
   'donations',
@@ -185,6 +187,8 @@ export function SettingsView(props: SettingsProps) {
             openTagsManager={props.openTagsManager}
           />
         )}
+
+        {activeTile === 'docling' && <DoclingPane notify={props.notify} />}
 
         {activeTile === 'aiPatterns' && (
           <AIPatternsPane

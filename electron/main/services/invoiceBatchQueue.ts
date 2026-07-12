@@ -15,6 +15,8 @@ import {
 } from '../repositories/aiJobs'
 import { buildAiInvoiceContext } from './aiContext'
 import { analyzeInvoiceDocument, getAiSettings, segmentInvoicePacket } from './ai'
+import { extractWithDocling, getDoclingStatus } from './docling'
+import { extractLocalInvoiceFields } from '../../../src/renderer/utils/localInvoiceExtraction'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const POLL_MS = 4000
@@ -230,10 +232,13 @@ export async function importInvoiceBatchFiles(files: Array<{ fileName: string; d
 }
 
 export async function processInvoiceBatchQueue() {
-  if (processing || !getAiSettings().hasApiKey) return
+  if (processing) return
+  const initialAiAvailable = getAiSettings().hasApiKey
+  const initialDoclingAvailable = (await getDoclingStatus()).enabled
+  if (!initialAiAvailable && !initialDoclingAvailable) return
   processing = true
   try {
-    while (getAiSettings().hasApiKey) {
+    while (getAiSettings().hasApiKey || (await getDoclingStatus()).enabled) {
       const next = listAiJobs({ type: 'BOOKING_FROM_DOCUMENTS', status: 'QUEUED', limit: 200, includeInvoiceBatch: true }).rows
         .find((job: any) => job.prompt?.startsWith('invoice-batch:'))
       if (!next) break
@@ -245,6 +250,47 @@ export async function processInvoiceBatchQueue() {
         if (!file?.dataBase64) throw new Error('PDF-Daten fehlen.')
         const source = sourceMetaFromPrompt(job.prompt)
         if (!source) throw new Error('Quelldaten des Scanpakets fehlen.')
+        const aiAvailable = getAiSettings().hasApiKey
+        if (!aiAvailable) {
+          const local = await extractWithDocling({
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            dataBase64: file.dataBase64
+          })
+          const fields = extractLocalInvoiceFields(local.text)
+          const amount = (value: string) => {
+            const parsed = value.trim() ? Number(value) : Number.NaN
+            return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+          }
+          saveAiJobResult(job.id, 'BOOKING_CANDIDATE', {
+            supplier: fields.supplier || null,
+            invoiceNumber: fields.invoiceNumber || null,
+            invoiceDate: fields.invoiceDate || null,
+            dueDate: fields.dueDate || null,
+            grossAmount: amount(fields.grossAmount),
+            netAmount: amount(fields.netAmount),
+            taxAmount: amount(fields.taxAmount),
+            vatRate: null,
+            iban: fields.iban || null,
+            description: fields.description || fields.supplier || path.parse(file.fileName).name,
+            type: 'OUT',
+            sphere: 'IDEELL',
+            paymentMethod: null,
+            paymentAccountId: null,
+            budgets: [],
+            earmarks: [],
+            tags: [],
+            confidence: 0.55,
+            warnings: [
+              'Lokal mit Docling ohne generative KI vorbereitet. Bitte Betrag, Richtung und steuerliche Zuordnung vollständig prüfen.',
+              'Mehrere Rechnungen innerhalb derselben PDF können im reinen Offline-Modus nicht zuverlässig getrennt werden.'
+            ],
+            evidence: [`Docling ${local.version || ''}`.trim()]
+          })
+          setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: `docling-${local.version || 'local'}` })
+          notifyQueueChanged()
+          continue
+        }
         if (!source.segment) {
           const packet = await segmentInvoicePacket({
             fileName: file.fileName,
@@ -288,13 +334,26 @@ export async function processInvoiceBatchQueue() {
             continue
           }
         }
+        let localDocumentText = ''
+        try {
+          if ((await getDoclingStatus()).enabled) {
+            localDocumentText = (await extractWithDocling({
+              fileName: file.fileName,
+              mimeType: file.mimeType,
+              dataBase64: file.dataBase64
+            })).text
+          }
+        } catch (error) {
+          console.warn('[InvoiceBatch] Optionale Docling-Vorverarbeitung fehlgeschlagen:', error)
+        }
         const analyzed = await analyzeInvoiceDocument({
           file: {
             fileName: file.fileName,
             mimeType: file.mimeType || 'application/pdf',
             dataBase64: file.dataBase64
           },
-          context: buildAiInvoiceContext()
+          context: buildAiInvoiceContext(),
+          localDocumentText
         })
         if (source.segment) {
           const groupingWarnings = [...source.segment.warnings]
@@ -315,7 +374,7 @@ export async function processInvoiceBatchQueue() {
   }
 }
 
-export function listInvoiceBatchItems() {
+export async function listInvoiceBatchItems() {
   const rows = listAiJobs({ type: 'BOOKING_FROM_DOCUMENTS', limit: 200, includeInvoiceBatch: true }).rows
     .filter((job: any) => job.prompt?.startsWith('invoice-batch:'))
     .filter((job: any) => !['APPROVED', 'REJECTED'].includes(job.status))
@@ -341,7 +400,12 @@ export function listInvoiceBatchItems() {
         } : null
       }
     })
-  return { rows, submitDirectory: getInvoiceSubmitDirectory(), aiAvailable: getAiSettings().hasApiKey }
+  return {
+    rows,
+    submitDirectory: getInvoiceSubmitDirectory(),
+    aiAvailable: getAiSettings().hasApiKey,
+    doclingAvailable: (await getDoclingStatus()).enabled
+  }
 }
 
 export function getInvoiceBatchItem(id: number) {

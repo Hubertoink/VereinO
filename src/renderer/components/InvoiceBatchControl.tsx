@@ -140,8 +140,11 @@ export default function InvoiceBatchControl({
             <div><strong>KI-Rechnungsentwürfe</strong><small>{readyCount ? `${readyCount} bereit` : duplicateCount ? `${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'}` : busyCount ? `${busyCount} in Vorbereitung` : 'Keine offenen Entwürfe'}</small></div>
             <button className="btn ghost" onClick={() => setOpen(false)} aria-label="Flyout schließen">✕</button>
           </header>
-          {!queue?.aiAvailable && (
-            <p className="invoice-batch-flyout__notice">Für die Hintergrundanalyse muss unter Einstellungen ein KI-API-Key aktiv sein.</p>
+          {!queue?.aiAvailable && !queue?.doclingAvailable && (
+            <p className="invoice-batch-flyout__notice">Für die Hintergrundanalyse muss ein KI-API-Key oder die lokale Docling-Verarbeitung aktiv sein.</p>
+          )}
+          {!queue?.aiAvailable && queue?.doclingAvailable && (
+            <p className="invoice-batch-flyout__notice">Lokaler Docling-Modus: Grunddaten werden offline vorbereitet; Zuordnung und Scanpaket-Grenzen bitte vollständig prüfen.</p>
           )}
           <div className="invoice-batch-flyout__list">
             {rows.map((item: BatchItem) => (
