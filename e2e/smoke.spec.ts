@@ -28,6 +28,12 @@ test.beforeEach(async () => {
   page = await electronApp.firstWindow()
   await page.waitForLoadState('domcontentloaded')
   await expect(page).toHaveTitle(/VereinO/i, { timeout: 15_000 })
+  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
+  await laterButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
+  if (await laterButton.isVisible()) {
+    await laterButton.click()
+    await expect(laterButton).toBeHidden()
+  }
 })
 
 test.afterEach(async () => {
