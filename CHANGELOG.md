@@ -5,6 +5,27 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.8.6] - 2026-07-12
+
+### Hinzugefügt
+
+- Rechnungsjournal: Mehrere PDF-Rechnungen können über einen Batch-Upload oder den vereinsbezogenen `Submit`-Ordner im Hintergrund durch die konfigurierte KI vorbereitet werden.
+- Rechnungsjournal: Ein Flyout zeigt wartende, laufende, prüfbereite und fehlgeschlagene Rechnungsentwürfe; fertige Vorschläge lassen sich im bestehenden Rechnungs- und Buchungsdialog prüfen.
+- Rechnungsjournal: Inhaltsbasierte Duplikaterkennung hält bereits als Buchungsanhang gespeicherte PDFs an und erlaubt Verwerfen oder eine bewusste erneute KI-Analyse.
+
+### Geändert
+
+- Rechnungsjournal: Der Rechnungsbutton besitzt getrennte Aktionen für Einzel- und Batch-Erfassung sowie direkten Zugriff auf den `Submit`-Ordner.
+- Buchungsdialog: Anhangsaktionen werden als dezente Icons erst bei Hover oder Tastaturfokus eingeblendet.
+- Buchungsjournal: Offene Rechnungs-Tabs verwenden eine kompakte Beschreibung als Betreff, sobald diese verfügbar ist.
+
+### Behoben
+
+- Rechnungsjournal: Bereits wartende Batch-Einträge werden erneut auf gespeicherte Duplikate geprüft und nicht unbeabsichtigt automatisch analysiert.
+- Rechnungsjournal: Identische, erneut ausgewählte PDFs werden im `Submit`-Ordner wiederverwendet, statt künstliche `(2)`-Kopien anzulegen.
+- Rechnungsjournal: Duplikat- und Queue-Benachrichtigungen bleiben bei unterschiedlich gestarteten Electron-Prozessen rückwärtskompatibel und verursachen keinen Toast-Fehler.
+- Buchungsdialog: Lange Kommentarvorschauen bleiben innerhalb der vorgesehenen Spalte und überlagern den Anhangsbereich nicht.
+
 ## [2.7.1] - 2026-07-08
 
 ### Hinzugefügt

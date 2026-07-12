@@ -23,6 +23,10 @@ import type {
   TAiJobsUpdateCandidateInput,
   TAiInvoiceExtractInput,
   TAiInvoiceExtractOutput,
+  TAiInvoiceBatchApproveInput,
+  TAiInvoiceBatchGetOutput,
+  TAiInvoiceBatchImportInput,
+  TAiInvoiceBatchListOutput,
   TAiMcpConfigureInput,
   TAiMcpConfigureOutput,
   TAiMcpStatusOutput,
@@ -45,6 +49,21 @@ export interface AiApi {
     }
     invoice: {
       extract: (payload: TAiInvoiceExtractInput) => Promise<TAiInvoiceExtractOutput>
+    }
+    invoiceBatch: {
+      list: () => Promise<TAiInvoiceBatchListOutput>
+      get: (payload: { id: number }) => Promise<TAiInvoiceBatchGetOutput>
+      import: (payload: TAiInvoiceBatchImportInput) => Promise<{
+        ok: boolean
+        imported: string[]
+        reused: string[]
+        duplicates: Array<{ fileName: string; voucherNo?: string | null }>
+      }>
+      retry: (payload: { id: number }) => Promise<{ ok: boolean }>
+      approve: (payload: TAiInvoiceBatchApproveInput) => Promise<{ ok: boolean }>
+      discard: (payload: { id: number }) => Promise<{ ok: boolean }>
+      openFolder: () => Promise<{ ok: boolean; error?: string }>
+      onChanged: (callback: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => void) => () => void
     }
     jobs: {
       create: (payload: TAiJobsCreateInput) => Promise<TAiJobsCreateOutput>

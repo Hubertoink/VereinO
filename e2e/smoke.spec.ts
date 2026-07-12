@@ -84,6 +84,84 @@ test('loads split application pages on demand', async () => {
   await expect(page.getByRole('textbox', { name: 'Suche', exact: true })).toBeVisible()
 })
 
+test('queues batch invoices in the Submit folder and exposes the review flyout', async () => {
+  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
+  await laterButton.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined)
+  if (await laterButton.isVisible()) await laterButton.click()
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+
+  const splitControl = page.locator('.invoice-split-fab')
+  await expect(splitControl).toBeVisible()
+  await expect(splitControl.locator('button')).toHaveCount(2)
+  await splitControl.locator('.invoice-split-fab__batch').click()
+  const flyout = page.locator('.invoice-batch-flyout')
+  await expect(flyout).toBeVisible()
+  await expect(flyout).toContainText('KI-Rechnungsentwürfe')
+  await expect(flyout).toContainText('KI-API-Key')
+
+  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+    name: 'batch-test.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n% VereinO batch queue test\n%%EOF')
+  })
+  await expect(flyout.getByText('batch-test.pdf')).toBeVisible()
+  const queue = await page.evaluate(() => window.api.ai.invoiceBatch.list())
+  expect(queue.submitDirectory).toMatch(/[\\/]Submit$/)
+  expect(queue.rows.some((item) => item.fileName === 'batch-test.pdf')).toBe(true)
+
+  await flyout.getByRole('button', { name: 'batch-test.pdf verwerfen' }).click()
+  await expect(flyout.getByText('batch-test.pdf')).toHaveCount(0)
+  await expect.poll(async () => page.evaluate(async () => (await window.api.ai.invoiceBatch.list()).rows.length)).toBe(0)
+
+  const duplicatePdf = Buffer.from('%PDF-1.4\n% VereinO saved duplicate test\n%%EOF')
+  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+    name: 'duplicate-test.pdf',
+    mimeType: 'application/pdf',
+    buffer: duplicatePdf
+  })
+  await expect(flyout.getByText('duplicate-test.pdf')).toBeVisible()
+
+  const savedVoucher = await page.evaluate(async (dataBase64) => {
+    const bootstrap = await window.api.app.bootstrap()
+    const account = (bootstrap.paymentAccounts as any[])[0]
+    if (!account) throw new Error('Duplicate test needs a payment account')
+    return window.api.vouchers.create({
+      date: '2026-07-01',
+      type: 'OUT',
+      sphere: 'IDEELL',
+      description: 'Bereits gespeicherte Rechnung',
+      grossAmount: 10,
+      vatRate: 0,
+      paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+      paymentAccountId: account.id,
+      files: [{ name: 'saved-duplicate.pdf', mime: 'application/pdf', dataBase64 }]
+    })
+  }, duplicatePdf.toString('base64'))
+
+  await page.evaluate(() => window.api.ai.invoiceBatch.list())
+  const duplicateItem = flyout.locator('.invoice-batch-item--duplicate')
+  await expect(duplicateItem).toContainText('duplicate-test.pdf')
+  await expect(duplicateItem).toContainText(savedVoucher.voucherNo)
+  await expect(page.getByRole('alert')).toContainText('als Duplikat angehalten')
+  const duplicateQueue = await page.evaluate(() => window.api.ai.invoiceBatch.list())
+  expect(duplicateQueue.rows[0]?.isDuplicate).toBe(true)
+  expect(duplicateQueue.rows[0]?.duplicateVoucherId).toBe(savedVoucher.id)
+
+  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+    name: 'duplicate-test.pdf',
+    mimeType: 'application/pdf',
+    buffer: duplicatePdf
+  })
+  await expect.poll(async () => page.evaluate(async () => (await window.api.ai.invoiceBatch.list()).rows.length)).toBe(1)
+  await expect(flyout.getByText(/duplicate-test \(2\)\.pdf/)).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: 'bereits im Batch' })).toBeVisible()
+
+  await duplicateItem.getByRole('button', { name: 'duplicate-test.pdf trotzdem mit KI auslesen' }).click()
+  await expect(flyout.locator('.invoice-batch-item--duplicate')).toHaveCount(0)
+  await flyout.getByRole('button', { name: 'duplicate-test.pdf verwerfen' }).click()
+  await expect.poll(async () => page.evaluate(async () => (await window.api.ai.invoiceBatch.list()).rows.length)).toBe(0)
+})
+
 test('presents the optimized booking workflow', async () => {
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined)
@@ -104,6 +182,12 @@ test('presents the optimized booking workflow', async () => {
   await expect(dialog.getByRole('button', { name: 'Ausgabe', exact: true })).toBeVisible()
   await expect(dialog.getByPlaceholder(/Was wurde gebucht/i)).toBeVisible()
   await expect(dialog.getByText('Zuordnungen', { exact: true })).toBeVisible()
+  const attachmentCard = dialog.locator('.attachment-card')
+  const attachmentActions = attachmentCard.locator('.attachment-actions--header')
+  await expect.poll(() => attachmentActions.evaluate((element) => getComputedStyle(element).opacity)).toBe('0')
+  await attachmentCard.hover()
+  await expect.poll(() => attachmentActions.evaluate((element) => getComputedStyle(element).opacity)).toBe('1')
+  await expect(attachmentActions.getByRole('button', { name: 'Dateien hinzufügen' })).toBeVisible()
   const detailSummaries = dialog.locator('.booking-details summary')
   await expect(detailSummaries.filter({ hasText: /^Tags/ })).toBeVisible()
   await expect(detailSummaries.filter({ hasText: /^Kommentar/ })).toBeVisible()
@@ -132,6 +216,25 @@ test('presents the optimized booking workflow', async () => {
   await tagDetails.locator('summary').click()
   await expect(tagDetails.locator('.booking-tag-count')).toHaveText('1')
   await expect(tagDetails.locator('.booking-tag-summary__badge')).toHaveText('Testtag')
+
+  const commentDetails = dialog.locator('.booking-details').filter({ hasText: 'Kommentar' })
+  await commentDetails.locator('summary').click()
+  await commentDetails.getByRole('textbox', { name: 'Kommentar zur Buchung' }).fill(
+    'Rechnung: 2026_Sep Rechnungsteller nicht eindeutig; Supplier aus Kopfzeile abgeleitet. Betrag aus teilweise unklarer Layout-Extraktion als 200 EUR interpretiert.'
+  )
+  await commentDetails.evaluate((details) => { (details as HTMLDetailsElement).open = false })
+  const commentBounds = await commentDetails.evaluate((details) => {
+    const preview = details.querySelector('.booking-comment-preview')
+    const attachment = details.closest('.booking-secondary-grid')?.querySelector('.attachment-card')
+    if (!preview || !attachment) throw new Error('Comment preview layout is incomplete')
+    return {
+      previewRight: preview.getBoundingClientRect().right,
+      detailsRight: details.getBoundingClientRect().right,
+      attachmentLeft: attachment.getBoundingClientRect().left
+    }
+  })
+  expect(commentBounds.previewRight).toBeLessThanOrEqual(commentBounds.detailsRight + 1)
+  expect(commentBounds.previewRight).toBeLessThanOrEqual(commentBounds.attachmentLeft + 1)
 
   const amountInput = dialog.locator('input[type="number"]').first()
   await expect(amountInput).toHaveValue('')

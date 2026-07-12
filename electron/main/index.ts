@@ -91,13 +91,16 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
     }
     detachedQuickAddInitials.set(token, initialState || null)
 
-    const savedBounds = getDetachedQuickAddBounds()
+    const isInvoiceScan = initialState?.mode === 'invoice'
+    const savedBounds = isInvoiceScan ? undefined : getDetachedQuickAddBounds()
     const win = new BrowserWindow({
-        width: 1180,
-        height: 760,
+        width: isInvoiceScan ? 760 : 1180,
+        height: isInvoiceScan ? 600 : 760,
         ...(savedBounds || {}),
-        minWidth: 860,
-        minHeight: 620,
+        minWidth: isInvoiceScan ? 760 : 860,
+        minHeight: isInvoiceScan ? 600 : 620,
+        resizable: !isInvoiceScan,
+        maximizable: !isInvoiceScan,
         show: false,
         autoHideMenuBar: true,
         frame: false,
@@ -126,7 +129,9 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
             }
             return
         }
-        try { setSetting(DETACHED_QUICK_ADD_BOUNDS_SETTING, win.getNormalBounds()) } catch { }
+        if (!isInvoiceScan) {
+            try { setSetting(DETACHED_QUICK_ADD_BOUNDS_SETTING, win.getNormalBounds()) } catch { }
+        }
     })
     win.on('closed', () => {
         detachedQuickAddInitials.delete(token)
@@ -397,6 +402,12 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
             }
         }
     })
+    try {
+        const { startInvoiceBatchQueue } = await import('./services/invoiceBatchQueue')
+        startInvoiceBatchQueue()
+    } catch (error) {
+        console.warn('[InvoiceBatch] Hintergrundwarteschlange konnte nicht gestartet werden:', error)
+    }
     await loadRenderer(win)
 
     // After window finished load, inform renderer if DB init failed

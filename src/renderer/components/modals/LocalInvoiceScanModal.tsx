@@ -56,6 +56,16 @@ export type LocalInvoiceScanResult = {
   bookingMeta: BookingMeta
 }
 
+export type LocalInvoiceScanDraftState = {
+  fields: LocalInvoiceFields
+  budgets: BudgetAssignment[]
+  earmarksAssigned: EarmarkAssignment[]
+  tags: string[]
+  note: string
+  bookingMeta: BookingMeta
+  visibleSections: OptionalSection[]
+}
+
 const MAX_FILE_BYTES = 25 * 1024 * 1024
 const MAX_AI_FILE_BYTES = 10 * 1024 * 1024
 const MAX_TEXT_PAGES = 20
@@ -204,13 +214,27 @@ export default function LocalInvoiceScanModal({
   onCreateInvoice,
   budgetsForEdit,
   earmarks,
-  tagDefs
+  tagDefs,
+  submitLabel = 'Verbindlichkeit anlegen',
+  commentAriaLabel = 'Kommentar zur Verbindlichkeit',
+  closeOnCreate = true,
+  initialFile,
+  initialState,
+  onDraftChange,
+  onFileChange
 }: {
   onClose: () => void
   onCreateInvoice: (result: LocalInvoiceScanResult) => Promise<boolean> | boolean
   budgetsForEdit: BudgetOption[]
   earmarks: EarmarkOption[]
   tagDefs: Array<{ id: number; name: string; color?: string | null }>
+  submitLabel?: string
+  commentAriaLabel?: string
+  closeOnCreate?: boolean
+  initialFile?: File
+  initialState?: LocalInvoiceScanDraftState
+  onDraftChange?: (state: LocalInvoiceScanDraftState & { file: File }) => void
+  onFileChange?: (file: File | null) => void
 }) {
   const { notify } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -224,6 +248,12 @@ export default function LocalInvoiceScanModal({
   const imageUrlRef = useRef('')
   const requestRef = useRef(0)
   const manuallyEditedRef = useRef(new Set<LocalInvoicePickerField>())
+  const onDraftChangeRef = useRef(onDraftChange)
+  const onFileChangeRef = useRef(onFileChange)
+  const onCloseRef = useRef(onClose)
+  onDraftChangeRef.current = onDraftChange
+  onFileChangeRef.current = onFileChange
+  onCloseRef.current = onClose
   const [file, setFile] = useState<File | null>(null)
   const [previewKind, setPreviewKind] = useState<PreviewKind>('none')
   const [imageUrl, setImageUrl] = useState('')
@@ -252,6 +282,7 @@ export default function LocalInvoiceScanModal({
   const [aiAvailable, setAiAvailable] = useState(false)
   const [aiProvider, setAiProvider] = useState('KI')
   const [aiBusy, setAiBusy] = useState(false)
+  const [draftReady, setDraftReady] = useState(!initialFile)
 
   const grossAmount = useMemo(
     () => Number(fields.grossAmount.replace(',', '.')) || 0,
@@ -293,7 +324,7 @@ export default function LocalInvoiceScanModal({
     document.documentElement.style.overflow = 'hidden'
     closeButtonRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => {
@@ -303,7 +334,7 @@ export default function LocalInvoiceScanModal({
       document.documentElement.style.overflow = rootOverflow
       previouslyFocused?.focus?.()
     }
-  }, [onClose])
+  }, [])
 
   useEffect(
     () => () => {
@@ -329,6 +360,8 @@ export default function LocalInvoiceScanModal({
           textLayerTaskRef.current?.cancel?.()
         } catch {}
         const page = await pdfDocumentRef.current.getPage(pdfPage)
+        if (cancelled) return
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
         if (cancelled) return
         const canvas = canvasRef.current
         const textLayer = textLayerRef.current
@@ -411,6 +444,7 @@ export default function LocalInvoiceScanModal({
     releaseCurrentPreview()
     manuallyEditedRef.current.clear()
     setFile(null)
+    onFileChangeRef.current?.(null)
     setPreviewKind('none')
     setAnalysisState('idle')
     setAnalysisMessage('')
@@ -430,7 +464,7 @@ export default function LocalInvoiceScanModal({
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const analyzeFile = async (nextFile: File) => {
+  const analyzeFile = async (nextFile: File, restored?: LocalInvoiceScanDraftState) => {
     const mimeType = inferMimeType(nextFile)
     if (!isSupportedFile(nextFile) || !mimeType) {
       setAnalysisState('error')
@@ -448,6 +482,7 @@ export default function LocalInvoiceScanModal({
     releaseCurrentPreview()
     manuallyEditedRef.current.clear()
     setFile(nextFile)
+    onFileChangeRef.current?.(nextFile)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setPdfPage(1)
@@ -455,6 +490,15 @@ export default function LocalInvoiceScanModal({
     setPickerText('')
     setAnalysisState('analyzing')
     setAnalysisMessage('Dokument wird gelesen …')
+    if (restored) {
+      setFields(restored.fields)
+      setBudgets(restored.budgets)
+      setEarmarkAssignments(restored.earmarksAssigned)
+      setTags(restored.tags)
+      setNote(restored.note)
+      setBookingMeta(restored.bookingMeta)
+      setVisibleSections(new Set(restored.visibleSections))
+    }
 
     if (mimeType !== 'application/pdf') {
       const url = URL.createObjectURL(nextFile)
@@ -465,6 +509,7 @@ export default function LocalInvoiceScanModal({
       }
       setImageUrl(url)
       setPreviewKind('image')
+      if (restored) setFields(restored.fields)
       setAnalysisState('ocr-needed')
       setAnalysisMessage(
         'Bildvorschau bereit. Für lokale Texterkennung wird ein OCR-Modell benötigt.'
@@ -495,8 +540,9 @@ export default function LocalInvoiceScanModal({
 
       const text = pageTexts.join('\n\n').trim()
       setRawText(text)
+      if (restored) setFields(restored.fields)
       if (text.length >= 20) {
-        setFields(extractLocalInvoiceFields(text))
+        if (!restored) setFields(extractLocalInvoiceFields(text))
         setAnalysisState('text-found')
         setAnalysisMessage(
           document.numPages > MAX_TEXT_PAGES
@@ -521,6 +567,31 @@ export default function LocalInvoiceScanModal({
     const nextFile = files?.[0]
     if (nextFile) void analyzeFile(nextFile)
   }
+
+  useEffect(() => {
+    if (!initialFile) return
+    let cancelled = false
+    void analyzeFile(initialFile, initialState).finally(() => {
+      if (!cancelled) setDraftReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [initialFile])
+
+  useEffect(() => {
+    if (!file || !draftReady) return
+    onDraftChangeRef.current?.({
+      file,
+      fields,
+      budgets,
+      earmarksAssigned: earmarkAssignments,
+      tags,
+      note,
+      bookingMeta,
+      visibleSections: Array.from(visibleSections)
+    })
+  }, [bookingMeta, budgets, draftReady, earmarkAssignments, fields, file, note, tags, visibleSections])
 
   const addOptionalSection = (section: OptionalSection) => {
     setVisibleSections((current) => new Set([...current, section]))
@@ -640,7 +711,7 @@ export default function LocalInvoiceScanModal({
       note,
       bookingMeta
     })
-    if (created) onClose()
+    if (created && closeOnCreate) onClose()
   }
 
   return createPortal(
@@ -1183,7 +1254,7 @@ export default function LocalInvoiceScanModal({
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
                         placeholder="Interne Notiz oder Ablagehinweis …"
-                        aria-label="Kommentar zur Verbindlichkeit"
+                        aria-label={commentAriaLabel}
                       />
                     </div>
                   )}
@@ -1204,7 +1275,7 @@ export default function LocalInvoiceScanModal({
           <div className="local-invoice-scan__footer-actions">
             {file && (
               <button type="button" className="btn primary" onClick={() => void createInvoice()}>
-                Verbindlichkeit anlegen
+                {submitLabel}
               </button>
             )}
             <button type="button" className="btn" onClick={onClose}>

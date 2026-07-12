@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getInternalAssignmentValidationState } from '../components/modals/voucherMetaValidation'
+import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoiceScanModal'
 
 type QA = {
     date: string
@@ -34,11 +35,14 @@ type QuickAddDraft = {
     qa: QA
     files: File[]
     detached?: boolean
+    kind?: 'booking' | 'invoice'
+    invoiceState?: LocalInvoiceScanDraftState
+    invoiceBatchJobId?: number
 }
 
 type QuickAddAfterSave = 'close' | 'new'
 type QuickAddSaveMode = QuickAddAfterSave | 'default'
-type OpenQuickAddOptions = { detached?: boolean; showModal?: boolean }
+type OpenQuickAddOptions = { detached?: boolean; showModal?: boolean; kind?: 'booking' | 'invoice' }
 
 function createDraftId() {
     return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -175,8 +179,10 @@ export function useQuickAdd(
 
     const qa = activeDraft?.qa ?? makeDefaults()
     const files = activeDraft?.files ?? []
+    const activeDraftKind = activeDraft?.kind ?? 'booking'
+    const activeInvoiceState = activeDraft?.invoiceState
 
-    const openQuickAdd = useCallback((initial?: { qa?: QA; files?: File[] }, options?: OpenQuickAddOptions) => {
+    const openQuickAdd = useCallback((initial?: { qa?: QA; files?: File[]; invoiceState?: LocalInvoiceScanDraftState; invoiceBatchJobId?: number }, options?: OpenQuickAddOptions) => {
         const detached = !!options?.detached
         const showModal = options?.showModal ?? !detached
         const draft: QuickAddDraft = {
@@ -184,7 +190,10 @@ export function useQuickAdd(
             sequence: nextSequenceRef.current++,
             qa: initial?.qa ?? makeDefaults(),
             files: initial?.files ?? [],
-            detached
+            detached,
+            kind: options?.kind ?? 'booking',
+            invoiceState: initial?.invoiceState,
+            invoiceBatchJobId: initial?.invoiceBatchJobId
         }
         setDrafts((prev) => draftTabsEnabled ? [...prev, draft] : [draft])
         setActiveDraftId(showModal ? draft.id : null)
@@ -240,7 +249,7 @@ export function useQuickAdd(
         setQuickAdd(true)
     }, [])
 
-    const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean }) => {
+    const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean; kind?: 'booking' | 'invoice'; invoiceState?: LocalInvoiceScanDraftState; invoiceBatchJobId?: number }) => {
         setDrafts((prev) => prev.map((draft) => (
             draft.id === draftId ? { ...draft, ...patch } : draft
         )))
@@ -414,6 +423,13 @@ export function useQuickAdd(
 
         const res = await create(payload)
         if (res) {
+            if (activeDraft.invoiceBatchJobId) {
+                try {
+                    await window.api.ai.invoiceBatch.approve({ id: activeDraft.invoiceBatchJobId, voucherId: res.id })
+                } catch (error: any) {
+                    notify?.('error', `Buchung wurde gespeichert, die Submit-PDF aber nicht entfernt: ${error?.message || String(error)}`)
+                }
+            }
             // Track user habits for smart defaults
             trackBookingHabit(activeDraft.qa.type, activeDraft.qa.paymentMethod, (activeDraft.qa as any).mode)
             const saveMode: QuickAddAfterSave = mode === 'default' ? afterSaveDefault : mode
@@ -520,6 +536,8 @@ export function useQuickAdd(
 
     return {
         quickAdd,
+        activeDraftKind,
+        activeInvoiceState,
         qa,
         setQa,
         onQuickSave,

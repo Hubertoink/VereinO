@@ -28,6 +28,15 @@ type AISuggestionPartKey =
     | `budget:${number}`
     | `earmark:${number}`
 
+function AttachmentActionIcon({ kind }: { kind: 'add' | 'open' | 'save' | 'remove' | 'clear' }) {
+    const common = { width: 17, height: 17, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
+    if (kind === 'add') return <svg {...common}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 12v6M9 15h6"/></svg>
+    if (kind === 'open') return <svg {...common}><path d="M14 3h7v7M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+    if (kind === 'save') return <svg {...common}><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+    if (kind === 'clear') return <svg {...common}><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/><path d="M10 11v6M14 11v6"/></svg>
+    return <svg {...common}><path d="M6 6l12 12M18 6 6 18"/></svg>
+}
+
 interface QuickAddModalProps {
     qa: QA
     setQa: (qa: QA) => void
@@ -1514,13 +1523,15 @@ export default function QuickAddModal({
                                     <strong>Anhänge</strong>
                                     {hasAnyAttachment && <div className="helper">Dateien hierher ziehen</div>}
                                 </div>
-                                <div className="flex-gap-8">
+                                <div className="attachment-actions attachment-actions--header">
                                     <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
-                                    <button type="button" className="btn" onClick={openFilePicker}>
-                                        + Datei(en)
+                                    <button type="button" className="attachment-icon-btn" onClick={openFilePicker} title="Dateien hinzufügen" aria-label="Dateien hinzufügen">
+                                        <AttachmentActionIcon kind="add" />
                                     </button>
                                     {files.length > 0 && (
-                                        <button type="button" className="btn" onClick={() => setFiles([])}>Leeren</button>
+                                        <button type="button" className="attachment-icon-btn attachment-icon-btn--danger" onClick={() => setFiles([])} title="Alle neuen Anhänge entfernen" aria-label="Alle neuen Anhänge entfernen">
+                                            <AttachmentActionIcon kind="clear" />
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -1531,15 +1542,15 @@ export default function QuickAddModal({
                                     {existingFiles.map((f) => (
                                         <li key={`existing-${f.id}`} className="file-list-item">
                                             <span className="file-name" title={f.fileName}>{f.fileName}</span>
-                                            <div className="flex-gap-8">
+                                            <div className="attachment-actions attachment-actions--row">
                                                 {onOpenExistingFile && (
-                                                    <button type="button" className="btn" onClick={() => { void onOpenExistingFile(f.id) }}>Öffnen</button>
+                                                    <button type="button" className="attachment-icon-btn" title="Öffnen" aria-label={`${f.fileName} öffnen`} onClick={() => { void onOpenExistingFile(f.id) }}><AttachmentActionIcon kind="open" /></button>
                                                 )}
                                                 {onDownloadExistingFile && (
-                                                    <button type="button" className="btn" onClick={() => { void onDownloadExistingFile(f.id) }}>Speichern</button>
+                                                    <button type="button" className="attachment-icon-btn" title="Speichern" aria-label={`${f.fileName} speichern`} onClick={() => { void onDownloadExistingFile(f.id) }}><AttachmentActionIcon kind="save" /></button>
                                                 )}
                                                 {onDeleteExistingFile && (
-                                                    <button type="button" className="btn danger" title="Löschen" onClick={() => { void onDeleteExistingFile(f) }}>Löschen</button>
+                                                    <button type="button" className="attachment-icon-btn attachment-icon-btn--danger" title="Löschen" aria-label={`${f.fileName} löschen`} onClick={() => { void onDeleteExistingFile(f) }}><AttachmentActionIcon kind="clear" /></button>
                                                 )}
                                             </div>
                                         </li>
@@ -1547,9 +1558,9 @@ export default function QuickAddModal({
                                     {files.map((f, i) => (
                                         <li key={`new-${i}-${f.name}`} className="file-list-item">
                                             <span className="file-name" title={f.name}>{f.name}</span>
-                                            <div className="flex-gap-8">
+                                            <div className="attachment-actions attachment-actions--row">
                                                 <span className="helper">neu</span>
-                                                <button type="button" className="btn" onClick={() => setFiles(files.filter((_, idx) => idx !== i))}>Entfernen</button>
+                                                <button type="button" className="attachment-icon-btn attachment-icon-btn--danger" title="Entfernen" aria-label={`${f.name} entfernen`} onClick={() => setFiles(files.filter((_, idx) => idx !== i))}><AttachmentActionIcon kind="remove" /></button>
                                             </div>
                                         </li>
                                     ))}

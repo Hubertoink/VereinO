@@ -148,7 +148,7 @@ export function createAiJob(input: {
   })
 }
 
-export function listAiJobs(filters?: { status?: AiJobStatus | 'ALL'; type?: AiJobType; limit?: number; offset?: number }) {
+export function listAiJobs(filters?: { status?: AiJobStatus | 'ALL'; type?: AiJobType; limit?: number; offset?: number; includeInvoiceBatch?: boolean }) {
   const d = db()
   const where: string[] = []
   const params: any[] = []
@@ -160,6 +160,7 @@ export function listAiJobs(filters?: { status?: AiJobStatus | 'ALL'; type?: AiJo
     where.push('j.type = ?')
     params.push(filters.type)
   }
+  if (!filters?.includeInvoiceBatch) where.push("(j.prompt IS NULL OR j.prompt NOT LIKE 'invoice-batch:%')")
   const limit = Math.max(1, Math.min(200, Number(filters?.limit || 100)))
   const offset = Math.max(0, Number(filters?.offset || 0))
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
@@ -235,4 +236,16 @@ export function deleteAiJob(id: number) {
   const d = db()
   d.prepare('DELETE FROM ai_jobs WHERE id = ?').run(id)
   return { ok: true }
+}
+
+export function clearAiJobFiles(id: number) {
+  const d = db()
+  d.prepare('DELETE FROM ai_job_files WHERE job_id = ?').run(id)
+  return getAiJob(id)
+}
+
+export function findAiJobByPrompt(type: AiJobType, prompt: string) {
+  const d = db()
+  const row = d.prepare(`${selectJobSql("WHERE j.type = ? AND j.prompt = ? AND j.status NOT IN ('APPROVED', 'REJECTED')")} ORDER BY j.id DESC LIMIT 1`).get(type, prompt) as any
+  return row ? mapJob(row) : null
 }

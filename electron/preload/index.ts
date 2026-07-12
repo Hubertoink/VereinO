@@ -76,6 +76,7 @@ const rendererApi = {
     close: () => invoke('window.close'),
     confirmClose: () => invoke('window.confirmClose'),
     cancelClose: () => invoke('window.cancelClose'),
+    setInvoiceScanExpanded: (expanded: boolean) => invoke('window.setInvoiceScanExpanded', expanded),
     onMaximizeChanged: (cb: (isMax: boolean) => void) => {
       const handler = (_event: IpcRendererEvent, v: boolean) => cb(!!v)
       const unmaximizeHandler = () => cb(false)
@@ -127,6 +128,20 @@ const rendererApi = {
     },
     invoice: {
       extract: (payload) => cleanInvoke('ai.invoice.extract', payload)
+    },
+    invoiceBatch: {
+      list: () => invoke('ai.invoiceBatch.list'),
+      get: (payload) => invoke('ai.invoiceBatch.get', payload),
+      import: (payload) => cleanInvoke('ai.invoiceBatch.import', payload),
+      retry: (payload) => cleanInvoke('ai.invoiceBatch.retry', payload),
+      approve: (payload) => cleanInvoke('ai.invoiceBatch.approve', payload),
+      discard: (payload) => cleanInvoke('ai.invoiceBatch.discard', payload),
+      openFolder: () => cleanInvoke('ai.invoiceBatch.openFolder'),
+      onChanged: (cb: (change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => void) => {
+        const handler = (_event: IpcRendererEvent, change?: { duplicatesAdded?: Array<{ fileName: string; voucherNo?: string | null }> }) => cb(change)
+        ipcRenderer.on('ai:invoice-batch-changed', handler)
+        return () => ipcRenderer.removeListener('ai:invoice-batch-changed', handler)
+      }
     },
     jobs: {
       create: (payload) => cleanInvoke('ai.jobs.create', payload),

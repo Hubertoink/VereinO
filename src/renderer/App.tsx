@@ -6,7 +6,11 @@ import {
 } from './views/Journal/utils/journalColumnVisibility'
 import type { UpdateModalState } from './components/modals/UpdateAvailableModal'
 import LoadingState from './components/LoadingState'
-import { useQuickAdd } from './hooks/useQuickAdd'
+import { useQuickAdd, type QA } from './hooks/useQuickAdd'
+import type {
+  LocalInvoiceScanDraftState,
+  LocalInvoiceScanResult
+} from './components/modals/LocalInvoiceScanModal'
 import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/useToast'
 import { UIPreferencesProvider } from './context/UIPreferences'
@@ -14,6 +18,7 @@ import { useUIPreferences } from './context/useUIPreferences'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
+import InvoiceBatchControl from './components/InvoiceBatchControl'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 import { getNavIcon } from './utils/navIcons'
@@ -25,6 +30,7 @@ import {
   normalizeVoucherBudgetAssignments,
   normalizeVoucherEarmarkAssignments
 } from './utils/voucherAssignmentFallbacks'
+import { invoiceDraftTabText } from './utils/invoiceDraftLabel'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
@@ -37,6 +43,7 @@ const TimeFilterModal = lazy(() => import('./components/modals/TimeFilterModal')
 const ExportOptionsModal = lazy(() => import('./components/modals/ExportOptionsModal'))
 const AttachmentsModal = lazy(() => import('./components/modals/AttachmentsModal'))
 const QuickAddModal = lazy(() => import('./components/modals/QuickAddModal'))
+const LocalInvoiceScanModal = lazy(() => import('./components/modals/LocalInvoiceScanModal'))
 const VoucherInfoModal = lazy(() => import('./components/modals/VoucherInfoModal'))
 const SetupWizardModal = lazy(() => import('./components/modals/SetupWizardModal'))
 const SettingsView = lazy(() =>
@@ -371,6 +378,95 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
   return { payload }
 }
 
+function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
+  initial?: { qa: QA; files: File[] }
+  missing?: string[]
+} {
+  const clean = String(result.fields.grossAmount || '').replace(/[^0-9,.-]/g, '')
+  const decimalIndex = Math.max(clean.lastIndexOf(','), clean.lastIndexOf('.'))
+  const normalized = decimalIndex >= 0
+    ? `${clean.slice(0, decimalIndex).replace(/[.,-]/g, '')}.${clean.slice(decimalIndex + 1).replace(/[^0-9]/g, '')}`
+    : clean.replace(/[^0-9-]/g, '')
+  const parsedAmount = Number(normalized)
+  const grossAmount = Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) / 100 : 0
+  const missing = [
+    !result.fields.invoiceDate && 'Rechnungsdatum',
+    !result.fields.supplier.trim() && 'Lieferant',
+    grossAmount <= 0 && 'Bruttobetrag'
+  ].filter(Boolean) as string[]
+  if (missing.length) return { missing }
+
+  const invoiceDetails = [
+    result.fields.invoiceNumber.trim() && `Rechnung: ${result.fields.invoiceNumber.trim()}`,
+    result.note.trim(),
+    result.fields.netAmount && `Netto: ${result.fields.netAmount} €`,
+    result.fields.taxAmount && `Umsatzsteuer: ${result.fields.taxAmount} €`,
+    result.fields.iban && `IBAN: ${result.fields.iban}`
+  ].filter(Boolean).join('\n')
+  return {
+    initial: {
+      qa: {
+        date: result.fields.invoiceDate,
+        type: result.bookingMeta.type === 'IN' ? 'IN' : 'OUT',
+        sphere: result.bookingMeta.sphere || 'IDEELL',
+        mode: 'GROSS',
+        grossAmount,
+        vatRate: 0,
+        description: result.fields.description.trim() || result.fields.supplier.trim(),
+        note: invoiceDetails,
+        paymentMethod: result.bookingMeta.paymentMethod || 'BANK',
+        paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
+        budgets: result.budgets,
+        earmarksAssigned: result.earmarksAssigned,
+        budgetId: result.budgets[0]?.budgetId ?? null,
+        earmarkId: result.earmarksAssigned[0]?.earmarkId ?? null,
+        tags: result.tags
+      },
+      files: [result.file]
+    }
+  }
+}
+
+function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
+  const amount = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : ''
+  const budgets = Array.isArray(result?.budgets)
+    ? result.budgets.map((item: any) => ({ budgetId: Number(item.id), amount: Number(item.amount) }))
+    : []
+  const earmarksAssigned = Array.isArray(result?.earmarks)
+    ? result.earmarks.map((item: any) => ({ earmarkId: Number(item.id), amount: Number(item.amount) }))
+    : []
+  const tags = Array.isArray(result?.tags) ? result.tags.map(String) : []
+  return {
+    fields: {
+      supplier: result?.supplier || '',
+      invoiceNumber: result?.invoiceNumber || '',
+      invoiceDate: result?.invoiceDate || '',
+      dueDate: result?.dueDate || '',
+      grossAmount: amount(result?.grossAmount),
+      netAmount: amount(result?.netAmount),
+      taxAmount: amount(result?.taxAmount),
+      iban: result?.iban || '',
+      description: result?.description || ''
+    },
+    budgets,
+    earmarksAssigned,
+    tags,
+    note: Array.isArray(result?.warnings) ? result.warnings.join('\n') : '',
+    bookingMeta: {
+      type: result?.type === 'IN' ? 'IN' : 'OUT',
+      sphere: result?.sphere || 'IDEELL',
+      paymentMethod: result?.paymentMethod === 'BAR' ? 'BAR' : 'BANK',
+      paymentAccountId: result?.paymentAccountId ?? null
+    },
+    visibleSections: [
+      ...(budgets.length ? ['budgets' as const] : []),
+      ...(earmarksAssigned.length ? ['earmarks' as const] : []),
+      ...(tags.length ? ['tags' as const] : []),
+      ...(Array.isArray(result?.warnings) && result.warnings.length ? ['comment' as const] : [])
+    ]
+  }
+}
+
 function DetachedQuickAddWindow() {
   const { notify } = useToast()
   const { quickAddAfterSave, allowVoucherDeletion, showBookingDraftTabs, showBookingEditTabs } =
@@ -426,7 +522,9 @@ function DetachedQuickAddWindow() {
     Array<{ id: number; name: string; color?: string | null; usage?: number }>
   >([])
   const [descSuggest, setDescSuggest] = useState<string[]>([])
-  const [windowModeKind, setWindowModeKind] = useState<'create' | 'edit' | 'details'>('create')
+  const [windowModeKind, setWindowModeKind] = useState<'create' | 'invoice' | 'edit' | 'details'>('create')
+  const [invoiceDraftFile, setInvoiceDraftFile] = useState<File | null>(null)
+  const [invoiceDraftState, setInvoiceDraftState] = useState<LocalInvoiceScanDraftState | null>(null)
   const [editQa, setEditQa] = useState<any | null>(null)
   const [detailVoucher, setDetailVoucher] = useState<any | null>(null)
   const [detailAttachmentsVoucher, setDetailAttachmentsVoucher] = useState<null | {
@@ -582,7 +680,11 @@ function DetachedQuickAddWindow() {
           )
         : []
       openedRef.current = true
-      if (initial?.mode === 'details') {
+      if (initial?.mode === 'invoice') {
+        setWindowModeKind('invoice')
+        setInvoiceDraftFile(initialFiles[0] || null)
+        setInvoiceDraftState((initial?.invoiceState as LocalInvoiceScanDraftState) || null)
+      } else if (initial?.mode === 'details') {
         setWindowModeKind('details')
         const initialVoucher = initial?.voucher || initial?.qa || null
         if (initialVoucher?.id) {
@@ -654,6 +756,37 @@ function DetachedQuickAddWindow() {
       window.api?.window?.confirmClose?.()
     }
   }, [loaded, quickAdd, windowModeKind])
+
+  const syncDetachedInvoiceDraft = useCallback(async () => {
+    if (!detachedDraftIdRef.current) return
+    const encodedFiles = invoiceDraftFile
+      ? [{
+          name: invoiceDraftFile.name,
+          dataBase64: bufferToBase64Safe(await invoiceDraftFile.arrayBuffer()),
+          mime: invoiceDraftFile.type || undefined
+        }]
+      : []
+    await window.api?.quickAdd?.syncDraft?.({
+      draftId: detachedDraftIdRef.current,
+      files: encodedFiles,
+      invoiceState: invoiceDraftState || undefined,
+      kind: 'invoice',
+      detached: true
+    })
+  }, [invoiceDraftFile, invoiceDraftState])
+
+  useEffect(() => {
+    if (windowModeKind !== 'invoice' || !loaded || !invoiceDraftFile) return
+    const timeout = window.setTimeout(() => {
+      void syncDetachedInvoiceDraft()
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [invoiceDraftFile, invoiceDraftState, loaded, syncDetachedInvoiceDraft, windowModeKind])
+
+  useEffect(() => {
+    if (windowModeKind !== 'invoice' || !loaded) return
+    void window.api?.window?.setInvoiceScanExpanded?.(!!invoiceDraftFile)
+  }, [invoiceDraftFile, loaded, windowModeKind])
 
   const isCreateDraftDirty = useCallback(() => {
     if (!qa) return false
@@ -798,6 +931,16 @@ function DetachedQuickAddWindow() {
 
   useEffect(() => {
     return window.api?.window?.onCloseRequested?.(() => {
+      if (windowModeKind === 'invoice') {
+        void (async () => {
+          try {
+            await syncDetachedInvoiceDraft()
+          } finally {
+            window.api?.window?.confirmClose?.()
+          }
+        })()
+        return
+      }
       if (windowModeKind === 'details') {
         window.api?.window?.confirmClose?.()
         return
@@ -808,7 +951,7 @@ function DetachedQuickAddWindow() {
       }
       requestCloseDetachedCreate()
     })
-  }, [requestCloseDetachedCreate, requestCloseDetachedEdit, windowModeKind])
+  }, [requestCloseDetachedCreate, requestCloseDetachedEdit, syncDetachedInvoiceDraft, windowModeKind])
 
   const deleteDetachedEdit = useCallback(async () => {
     if (!editQa?.id) return
@@ -908,6 +1051,57 @@ function DetachedQuickAddWindow() {
     (windowModeKind === 'details' && !detailVoucher)
   ) {
     return <div className="detached-quick-add-loading">Buchungsfenster wird vorbereitet...</div>
+  }
+
+  if (windowModeKind === 'invoice') {
+    return (
+      <LocalInvoiceScanModal
+        onClose={() => {
+          void (async () => {
+            try {
+              await syncDetachedInvoiceDraft()
+            } finally {
+              window.api?.window?.confirmClose?.()
+            }
+          })()
+        }}
+        onCreateInvoice={async (result) => {
+          const converted = scannedInvoiceToBooking(result)
+          if (!converted.initial) {
+            notify('error', `Bitte ergänze: ${(converted.missing || []).join(', ')}.`)
+            return false
+          }
+          const encodedFiles = await Promise.all(converted.initial.files.map(async (file) => ({
+            name: file.name,
+            dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+            mime: file.type || undefined
+          })))
+          await window.api?.quickAdd?.syncDraft?.({
+            draftId: detachedDraftIdRef.current,
+            qa: converted.initial.qa,
+            files: encodedFiles,
+            kind: 'booking',
+            detached: true
+          })
+          setWindowModeKind('create')
+          openQuickAdd(converted.initial)
+          return true
+        }}
+        budgetsForEdit={budgetsForEdit}
+        earmarks={earmarks}
+        tagDefs={tagDefs}
+        submitLabel="Als Buchung übernehmen"
+        commentAriaLabel="Kommentar zur Buchung"
+        closeOnCreate={false}
+        initialFile={invoiceDraftFile || undefined}
+        initialState={invoiceDraftState || undefined}
+        onDraftChange={(state) => {
+          setInvoiceDraftFile(state.file)
+          setInvoiceDraftState(state)
+        }}
+        onFileChange={setInvoiceDraftFile}
+      />
+    )
   }
 
   if (windowModeKind === 'details' && detailVoucher) {
@@ -1733,6 +1927,8 @@ function AppInner() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const {
     quickAdd,
+    activeDraftKind,
+    activeInvoiceState,
     qa,
     setQa,
     onQuickSave,
@@ -1837,6 +2033,12 @@ function AppInner() {
       if (typeof payload?.detached === 'boolean') {
         patch.detached = payload.detached
       }
+      if (payload?.kind === 'booking' || payload?.kind === 'invoice') {
+        patch.kind = payload.kind
+      }
+      if (payload?.invoiceState) {
+        patch.invoiceState = payload.invoiceState
+      }
       if (Object.keys(patch).length) updateDraft(draftId, patch)
     })
     return () => {
@@ -1894,6 +2096,16 @@ function AppInner() {
 
   const bookingDraftTabs = useMemo(() => {
     return bookingDrafts.map((draft) => {
+      if (draft.kind === 'invoice') {
+        const tabText = invoiceDraftTabText(draft.invoiceState?.fields.description, !!draft.detached)
+        return {
+          id: draft.id,
+          label: tabText.label,
+          title: tabText.title,
+          isActive: draft.id === activeDraftId,
+          isDetached: !!draft.detached
+        }
+      }
       const desc = draft.qa.description.trim()
       const dateLabel = fmtDate(draft.qa.date)
       return {
@@ -1930,8 +2142,10 @@ function AppInner() {
             )
             const res = await window.api?.quickAdd?.openDetached?.({
               draftId,
+              mode: sourceDraft.kind === 'invoice' ? 'invoice' : 'create',
               qa: sourceDraft.qa,
               files: detachedFiles,
+              invoiceState: sourceDraft.invoiceState,
               afterSaveDefault: quickAddAfterSave
             })
             if (!res?.ok) {
@@ -2023,6 +2237,53 @@ function AppInner() {
     quickAddAfterSave,
     showBookingDraftTabs
   ])
+
+  const openJournalInvoiceScan = useCallback(() => {
+    if (!bookingsOpenDetached) {
+      openQuickAdd(undefined, { kind: 'invoice' })
+      return
+    }
+    const draft = openQuickAdd(undefined, { detached: true, showModal: false, kind: 'invoice' })
+    void (async () => {
+      try {
+        const response = await window.api?.quickAdd?.openDetached?.({
+          draftId: draft.id,
+          mode: 'invoice',
+          kind: 'invoice',
+          afterSaveDefault: quickAddAfterSave
+        })
+        if (!response?.ok) {
+          notify('error', response?.error || 'Rechnungsfenster konnte nicht geöffnet werden.')
+          dockAndOpenDraft(draft.id)
+        }
+      } catch (error: any) {
+        notify('error', 'Rechnungsfenster konnte nicht geöffnet werden: ' + String(error?.message || error))
+        dockAndOpenDraft(draft.id)
+      }
+    })()
+  }, [bookingsOpenDetached, dockAndOpenDraft, notify, openQuickAdd, quickAddAfterSave])
+
+  const reviewBatchInvoice = useCallback(async (jobId: number) => {
+    try {
+      const item = await window.api.ai.invoiceBatch.get({ id: jobId })
+      if (item.status !== 'NEEDS_REVIEW' || !item.result || !item.file?.dataBase64) {
+        notify('info', 'Dieser Rechnungsentwurf ist noch nicht bereit.')
+        return
+      }
+      const file = base64ToFile(
+        item.fileName,
+        item.file.dataBase64,
+        item.file.mimeType || 'application/pdf'
+      )
+      openQuickAdd({
+        files: [file],
+        invoiceState: aiInvoiceResultToDraft(item.result),
+        invoiceBatchJobId: jobId
+      }, { kind: 'invoice' })
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+    }
+  }, [notify, openQuickAdd])
 
   // These values are displayed and changed by the global shortcut menu, so they
   // must be initialized before shortcutCommands is created.
@@ -3350,7 +3611,7 @@ function AppInner() {
       <LeaderShortcuts commands={shortcutCommands} />
 
       {/* Quick-Add Modal */}
-      {quickAdd && (
+      {quickAdd && activeDraftKind === 'booking' && (
         <QuickAddModal
           key={activeDraftId ?? 'quick-add'}
           qa={qa}
@@ -3374,6 +3635,38 @@ function AppInner() {
           paymentAccounts={paymentAccounts}
           tagDefs={tagDefs}
           descSuggest={descSuggest}
+        />
+      )}
+      {quickAdd && activeDraftKind === 'invoice' && activeDraftId && (
+        <LocalInvoiceScanModal
+          onClose={parkQuickAdd}
+          onCreateInvoice={async (result) => {
+            const converted = scannedInvoiceToBooking(result)
+            if (!converted.initial) {
+              notify('error', `Bitte ergänze: ${(converted.missing || []).join(', ')}.`)
+              return false
+            }
+            updateDraft(activeDraftId, {
+              qa: converted.initial.qa,
+              files: converted.initial.files,
+              kind: 'booking'
+            })
+            return true
+          }}
+          budgetsForEdit={budgetsForEdit}
+          earmarks={earmarks}
+          tagDefs={tagDefs}
+          submitLabel="Als Buchung übernehmen"
+          commentAriaLabel="Kommentar zur Buchung"
+          closeOnCreate={false}
+          initialFile={files[0]}
+          initialState={activeInvoiceState}
+          onDraftChange={(state) => {
+            updateDraft(activeDraftId, {
+              files: [state.file],
+              invoiceState: state
+            })
+          }}
         />
       )}
       {showOpenBookingTabsClosePrompt && (
@@ -3412,6 +3705,11 @@ function AppInner() {
           role="group"
           aria-label="Journal-Aktionen"
         >
+          <InvoiceBatchControl
+            onNewInvoice={openJournalInvoiceScan}
+            onReview={(id) => void reviewBatchInvoice(id)}
+            notify={notify}
+          />
           <button
             className="fab fab-buchung"
             onClick={openBookingEntry}

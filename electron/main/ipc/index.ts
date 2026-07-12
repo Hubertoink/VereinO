@@ -191,6 +191,12 @@ import {
   AiBookingAnalysisResult,
   AiInvoiceExtractInput,
   AiInvoiceExtractOutput,
+  AiInvoiceBatchActionOutput,
+  AiInvoiceBatchApproveInput,
+  AiInvoiceBatchGetOutput,
+  AiInvoiceBatchIdInput,
+  AiInvoiceBatchImportInput,
+  AiInvoiceBatchListOutput,
   AiJobIdInput,
   AiJobsApproveCandidateInput,
   AiJobsApproveCandidateOutput,
@@ -749,6 +755,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('window.cancelClose', async () => {
     return options.cancelPendingMainClose?.() ?? { ok: true }
   })
+  ipcMain.handle('window.setInvoiceScanExpanded', async (event, expanded: boolean) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || !(win as any).__isDetachedQuickAddWindow) return { ok: false }
+    win.setSize(expanded ? 1240 : 760, expanded ? 760 : 600, true)
+    win.center()
+    return { ok: true }
+  })
   ipcMain.handle('window.isMaximized', async () => {
     const win = getCurrentWindow()
     return { isMaximized: !!win?.isMaximized() }
@@ -831,6 +844,40 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       context: buildAiInvoiceContext()
     })
     return AiInvoiceExtractOutput.parse(analyzed)
+  })
+  ipcMain.handle('ai.invoiceBatch.list', async () => {
+    const { listInvoiceBatchItems, scanInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')
+    scanInvoiceSubmitDirectory()
+    return AiInvoiceBatchListOutput.parse(listInvoiceBatchItems())
+  })
+  ipcMain.handle('ai.invoiceBatch.get', async (_event, payload) => {
+    const parsed = AiInvoiceBatchIdInput.parse(payload)
+    const { getInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
+    return AiInvoiceBatchGetOutput.parse(getInvoiceBatchItem(parsed.id))
+  })
+  ipcMain.handle('ai.invoiceBatch.import', async (_event, payload) => {
+    const parsed = AiInvoiceBatchImportInput.parse(payload)
+    const { importInvoiceBatchFiles } = await import('../services/invoiceBatchQueue')
+    return importInvoiceBatchFiles(parsed.files)
+  })
+  ipcMain.handle('ai.invoiceBatch.retry', async (_event, payload) => {
+    const parsed = AiInvoiceBatchIdInput.parse(payload)
+    const { retryInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
+    return AiInvoiceBatchActionOutput.parse(retryInvoiceBatchItem(parsed.id))
+  })
+  ipcMain.handle('ai.invoiceBatch.approve', async (_event, payload) => {
+    const parsed = AiInvoiceBatchApproveInput.parse(payload)
+    const { approveInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
+    return AiInvoiceBatchActionOutput.parse(approveInvoiceBatchItem(parsed.id, parsed.voucherId))
+  })
+  ipcMain.handle('ai.invoiceBatch.discard', async (_event, payload) => {
+    const parsed = AiInvoiceBatchIdInput.parse(payload)
+    const { discardInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
+    return AiInvoiceBatchActionOutput.parse(discardInvoiceBatchItem(parsed.id))
+  })
+  ipcMain.handle('ai.invoiceBatch.openFolder', async () => {
+    const { openInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')
+    return openInvoiceSubmitDirectory()
   })
   ipcMain.handle('ai.mcp.status', async () => {
     const { getAiMcpStatus } = await loadAiMcpService()

@@ -1,6 +1,8 @@
 export interface QuickAddPayload {
     draftId?: string | null
-    mode?: 'create' | 'edit' | 'details' | 'delete' | 'reverse'
+    mode?: 'create' | 'invoice' | 'edit' | 'details' | 'delete' | 'reverse'
+    kind?: 'booking' | 'invoice'
+    invoiceState?: unknown
     voucherId?: number
     originalId?: number
     id?: number
@@ -49,6 +51,7 @@ export interface CoreApi {
         close: () => Promise<{ ok: boolean }>
         confirmClose: () => Promise<{ ok: boolean }>
         cancelClose: () => Promise<{ ok: boolean }>
+        setInvoiceScanExpanded: (expanded: boolean) => Promise<{ ok: boolean }>
         onMaximizeChanged: (callback: (isMaximized: boolean) => void) => () => void
         onCloseRequested: (callback: () => void) => () => void
     }

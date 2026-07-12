@@ -2220,6 +2220,40 @@ export const AiInvoiceExtractOutput = z.object({
   usage: AiUsageSchema
 })
 
+export const AiInvoiceBatchFileInput = z.object({
+  fileName: z.string().min(1).max(255),
+  dataBase64: z.string().min(1)
+})
+export const AiInvoiceBatchImportInput = z.object({
+  files: z.array(AiInvoiceBatchFileInput).min(1).max(50)
+})
+export const AiInvoiceBatchItem = z.object({
+  id: z.number().int().positive(),
+  fileName: z.string(),
+  status: AiJobStatus,
+  error: z.string().nullable().optional(),
+  createdAt: z.string().optional(),
+  result: AiInvoiceExtractionResult.nullable().optional(),
+  isDuplicate: z.boolean().default(false),
+  duplicateVoucherId: z.number().int().positive().nullable().optional(),
+  duplicateVoucherNo: z.string().nullable().optional()
+})
+export const AiInvoiceBatchListOutput = z.object({
+  rows: z.array(AiInvoiceBatchItem),
+  submitDirectory: z.string(),
+  aiAvailable: z.boolean()
+})
+export const AiInvoiceBatchGetOutput = AiInvoiceBatchItem.extend({
+  file: z.object({
+    fileName: z.string(),
+    mimeType: z.string().nullable().optional(),
+    dataBase64: z.string().optional()
+  }).nullable()
+})
+export const AiInvoiceBatchActionOutput = z.object({ ok: z.boolean() })
+export const AiInvoiceBatchIdInput = z.object({ id: z.number().int().positive() })
+export const AiInvoiceBatchApproveInput = AiInvoiceBatchIdInput.extend({ voucherId: z.number().int().positive() })
+
 export const AiAgentDraft = z.object({
   kind: z.enum([
     'booking',
@@ -2503,6 +2537,10 @@ export type TAiAgentAutoRuleUpsertInput = z.infer<typeof AiAgentAutoRuleUpsertIn
 export type TAiUsage = z.infer<typeof AiUsageSchema>
 export type TAiInvoiceExtractInput = z.infer<typeof AiInvoiceExtractInput>
 export type TAiInvoiceExtractOutput = z.infer<typeof AiInvoiceExtractOutput>
+export type TAiInvoiceBatchImportInput = z.infer<typeof AiInvoiceBatchImportInput>
+export type TAiInvoiceBatchListOutput = z.infer<typeof AiInvoiceBatchListOutput>
+export type TAiInvoiceBatchGetOutput = z.infer<typeof AiInvoiceBatchGetOutput>
+export type TAiInvoiceBatchApproveInput = z.infer<typeof AiInvoiceBatchApproveInput>
 export type TAiSettingsGetOutput = z.infer<typeof AiSettingsGetOutput>
 export type TAiSettingsSetInput = z.infer<typeof AiSettingsSetInput>
 export type TAiSettingsSetOutput = z.infer<typeof AiSettingsSetOutput>
