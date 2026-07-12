@@ -230,11 +230,15 @@ test('presents the optimized booking workflow', async () => {
     return {
       previewRight: preview.getBoundingClientRect().right,
       detailsRight: details.getBoundingClientRect().right,
-      attachmentLeft: attachment.getBoundingClientRect().left
+      detailsBottom: details.getBoundingClientRect().bottom,
+      attachmentLeft: attachment.getBoundingClientRect().left,
+      attachmentTop: attachment.getBoundingClientRect().top
     }
   })
   expect(commentBounds.previewRight).toBeLessThanOrEqual(commentBounds.detailsRight + 1)
-  expect(commentBounds.previewRight).toBeLessThanOrEqual(commentBounds.attachmentLeft + 1)
+  const cardsAreSideBySide = commentBounds.attachmentLeft >= commentBounds.detailsRight - 1
+  const attachmentIsBelow = commentBounds.attachmentTop >= commentBounds.detailsBottom - 1
+  expect(cardsAreSideBySide || attachmentIsBelow).toBe(true)
 
   const amountInput = dialog.locator('input[type="number"]').first()
   await expect(amountInput).toHaveValue('')

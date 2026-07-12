@@ -2778,6 +2778,45 @@ html[data-glass-modals="true"] .ai-page .card {
   color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
 }
 
+.ai-settings-divider {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-settings-divider span,
+.ai-network-help {
+  color: color-mix(in oklab, var(--text) 64%, var(--bg) 36%);
+  font-size: 12px;
+}
+
+.ai-network-help {
+  align-self: end;
+  margin: 0 0 7px;
+}
+
+.ai-network-result {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, var(--text) 18%);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-alt) 90%, var(--surface) 10%);
+}
+
+.ai-network-result.is-success { border-color: color-mix(in oklab, var(--success) 52%, var(--border)); }
+.ai-network-result.is-error { border-color: color-mix(in oklab, var(--danger) 58%, var(--border)); }
+.ai-network-result.is-success strong { color: var(--success); }
+.ai-network-result.is-error strong { color: var(--danger); }
+.ai-network-result span { font-size: 13px; }
+.ai-network-result small {
+  overflow-wrap: anywhere;
+  color: color-mix(in oklab, var(--text) 62%, var(--bg) 38%);
+}
+
 .ai-evidence {
   display: flex;
   flex-wrap: wrap;

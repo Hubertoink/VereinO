@@ -398,7 +398,10 @@ const DEFAULT_AI_SETTINGS: TAiSettingsGetOutput = {
   textModel: 'gpt-5.4-mini',
   defaultReasoningEffort: 'medium',
   provider: 'openai',
-  apiBaseUrl: 'https://api.openai.com/v1'
+  apiBaseUrl: 'https://api.openai.com/v1',
+  proxyMode: 'system',
+  proxyUrl: '',
+  proxyBypassRules: '<local>'
 }
 
 const AI_PROVIDER_CONFIG = {
@@ -2540,6 +2543,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [initialChat] = useState(readAiChatSnapshot)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
   const [apiKey, setApiKey] = useState('')
+  const [connectionTest, setConnectionTest] = useState<Awaited<ReturnType<typeof window.api.ai.settings.testConnection>> | null>(null)
   const [jobs, setJobs] = useState<TAiJobsListOutput['rows']>([])
   const [selectedJob, setSelectedJob] = useState<TAiJobsGetOutput | null>(null)
   const [selectedJobId, setSelectedJobId] = useState<number | null>(
@@ -7626,7 +7630,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         model: settings.model,
         textModel: settings.textModel,
         defaultReasoningEffort: settings.defaultReasoningEffort,
-        provider: settings.provider
+        provider: settings.provider,
+        proxyMode: settings.proxyMode,
+        proxyUrl: settings.proxyUrl,
+        proxyBypassRules: settings.proxyBypassRules
       })
       setSettings(
         normalizeAiSettings({
@@ -7635,7 +7642,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           textModel: next.textModel,
           defaultReasoningEffort: next.defaultReasoningEffort,
           provider: next.provider,
-          apiBaseUrl: next.apiBaseUrl
+          apiBaseUrl: next.apiBaseUrl,
+          proxyMode: next.proxyMode,
+          proxyUrl: next.proxyUrl,
+          proxyBypassRules: next.proxyBypassRules
         })
       )
       setApiKey('')
@@ -7651,6 +7661,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setBusy(true)
     try {
       const res = await window.api.ai.settings.testConnection()
+      setConnectionTest(res)
       if (res.ok) notify('success', 'KI-Verbindung funktioniert.')
       else notify('error', res.error || 'KI-Verbindung fehlgeschlagen.')
     } finally {
@@ -9068,6 +9079,76 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               zeigt nur die dafür freigegebenen Modelle an. Für Minimax ist MiniMax-M3 direkt
               auswählbar.
             </p>
+            <div className="ai-settings-divider ai-field-wide">
+              <strong>Netzwerk &amp; Proxy</strong>
+              <span>Gilt nur für KI-Anfragen.</span>
+            </div>
+            <label className="field">
+              <span>Verbindungsmodus</span>
+              <select
+                className="input"
+                value={settings.proxyMode}
+                onChange={(event) => {
+                  setConnectionTest(null)
+                  setSettings({
+                    ...settings,
+                    proxyMode: event.target.value as typeof settings.proxyMode
+                  })
+                }}
+              >
+                <option value="system">Systemproxy (empfohlen)</option>
+                <option value="direct">Direkt, ohne Proxy</option>
+                <option value="manual">Manueller Proxy</option>
+              </select>
+            </label>
+            <p className="helper ai-network-help">
+              Der Systemmodus übernimmt Betriebssystem, PAC und Firmenrichtlinien. Zugangsdaten
+              bleiben in der Systemanmeldung und werden nicht in VereinO gespeichert.
+            </p>
+            {settings.proxyMode === 'manual' && (
+              <>
+                <label className="field ai-field-wide">
+                  <span>Proxy-Adresse</span>
+                  <input
+                    className="input"
+                    value={settings.proxyUrl}
+                    onChange={(event) => {
+                      setConnectionTest(null)
+                      setSettings({ ...settings, proxyUrl: event.target.value })
+                    }}
+                    placeholder="http://proxy.firma.local:8080"
+                    spellCheck={false}
+                  />
+                </label>
+                <label className="field ai-field-wide">
+                  <span>Proxy-Ausnahmen</span>
+                  <input
+                    className="input"
+                    value={settings.proxyBypassRules}
+                    onChange={(event) => {
+                      setConnectionTest(null)
+                      setSettings({ ...settings, proxyBypassRules: event.target.value })
+                    }}
+                    placeholder="<local>;localhost;*.firma.local"
+                    spellCheck={false}
+                  />
+                </label>
+              </>
+            )}
+            {connectionTest && (
+              <div
+                className={`ai-network-result ai-field-wide ${connectionTest.ok ? 'is-success' : 'is-error'}`}
+                role="status"
+              >
+                <strong>{connectionTest.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'}</strong>
+                {!connectionTest.ok && <span>{connectionTest.error}</span>}
+                <small>
+                  Ziel: {connectionTest.targetUrl || settings.apiBaseUrl} · Route:{' '}
+                  {connectionTest.resolvedProxy || 'nicht ermittelt'}
+                  {connectionTest.errorCode ? ` · ${connectionTest.errorCode}` : ''}
+                </small>
+              </div>
+            )}
           </div>
           <div className="ai-settings-actions">
             <button className="btn primary" disabled={busy} onClick={saveSettings}>

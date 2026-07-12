@@ -2402,13 +2402,17 @@ export const AiJobDetailSchema = AiJobSchema.extend({
 })
 
 export const AiProvider = z.enum(['openai', 'minimax'])
+export const AiProxyMode = z.enum(['system', 'direct', 'manual'])
 export const AiSettingsGetOutput = z.object({
   hasApiKey: z.boolean(),
   model: z.string(),
   textModel: z.string(),
   defaultReasoningEffort: z.enum(['low', 'medium', 'high']).default('medium'),
   provider: AiProvider.default('openai'),
-  apiBaseUrl: z.string().url().default('https://api.openai.com/v1')
+  apiBaseUrl: z.string().url().default('https://api.openai.com/v1'),
+  proxyMode: AiProxyMode.default('system'),
+  proxyUrl: z.string().default(''),
+  proxyBypassRules: z.string().default('<local>')
 })
 export const AiSettingsSetInput = z.object({
   apiKey: z.string().optional(),
@@ -2416,7 +2420,10 @@ export const AiSettingsSetInput = z.object({
   textModel: z.string().min(1).optional(),
   defaultReasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
   provider: AiProvider.optional(),
-  apiBaseUrl: z.string().url().optional()
+  apiBaseUrl: z.string().url().optional(),
+  proxyMode: AiProxyMode.optional(),
+  proxyUrl: z.string().max(2048).optional(),
+  proxyBypassRules: z.string().max(4096).optional()
 })
 export const AiSettingsSetOutput = z.object({
   ok: z.boolean(),
@@ -2425,9 +2432,19 @@ export const AiSettingsSetOutput = z.object({
   textModel: z.string(),
   defaultReasoningEffort: z.enum(['low', 'medium', 'high']),
   provider: AiProvider,
-  apiBaseUrl: z.string().url()
+  apiBaseUrl: z.string().url(),
+  proxyMode: AiProxyMode,
+  proxyUrl: z.string(),
+  proxyBypassRules: z.string()
 })
-export const AiSettingsTestOutput = z.object({ ok: z.boolean(), error: z.string().optional() })
+export const AiSettingsTestOutput = z.object({
+  ok: z.boolean(),
+  error: z.string().optional(),
+  errorCode: z.string().optional(),
+  proxyMode: AiProxyMode.optional(),
+  resolvedProxy: z.string().optional(),
+  targetUrl: z.string().optional()
+})
 export const AiMcpStatusOutput = z.object({
   localhostEnabled: z.boolean(),
   running: z.boolean(),

@@ -1,4 +1,4 @@
-import { safeStorage } from 'electron'
+import { safeStorage, session } from 'electron'
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
@@ -26,9 +26,13 @@ const MODEL_SETTING = 'ai.openai.model'
 const TEXT_MODEL_SETTING = 'ai.openai.textModel'
 const EFFORT_SETTING = 'ai.openai.reasoningEffort'
 const PROVIDER_SETTING = 'ai.openai.provider'
+const PROXY_MODE_SETTING = 'ai.network.proxyMode'
+const PROXY_URL_SETTING = 'ai.network.proxyUrl'
+const PROXY_BYPASS_SETTING = 'ai.network.proxyBypassRules'
 const DEFAULT_PROVIDER = 'openai'
 
 type AiProvider = 'openai' | 'minimax'
+type AiProxyMode = 'system' | 'direct' | 'manual'
 
 type AiProviderPreset = {
   apiBaseUrl: string
@@ -74,6 +78,9 @@ export type AiSettings = {
   defaultReasoningEffort: 'low' | 'medium' | 'high'
   provider: AiProvider
   apiBaseUrl: string
+  proxyMode: AiProxyMode
+  proxyUrl: string
+  proxyBypassRules: string
 }
 
 export type AiUsage = {
@@ -193,13 +200,17 @@ export function getAiSettings(): AiSettings {
   const model = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
   const textModel = normalizeProviderModel(provider, getSetting<string>(TEXT_MODEL_SETTING), 'textModel')
   const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
+  const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
     hasApiKey: !!apiKey.trim(),
     model,
     textModel,
     defaultReasoningEffort: effort,
     provider,
-    apiBaseUrl
+    apiBaseUrl,
+    proxyMode: ['system', 'direct', 'manual'].includes(proxyMode) ? proxyMode : 'system',
+    proxyUrl: getSetting<string>(PROXY_URL_SETTING) || '',
+    proxyBypassRules: getSetting<string>(PROXY_BYPASS_SETTING) || '<local>'
   }
 }
 
@@ -210,6 +221,9 @@ export function setAiSettings(input: {
   defaultReasoningEffort?: 'low' | 'medium' | 'high'
   provider?: AiProvider
   apiBaseUrl?: string
+  proxyMode?: AiProxyMode
+  proxyUrl?: string
+  proxyBypassRules?: string
 }) {
   const current = getAiSettings()
   const provider = input.provider || current.provider
@@ -222,6 +236,28 @@ export function setAiSettings(input: {
   setSetting(TEXT_MODEL_SETTING, normalizeProviderModel(provider, input.textModel ?? current.textModel, 'textModel'))
   if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
   if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
+  if (input.proxyMode) setSetting(PROXY_MODE_SETTING, input.proxyMode)
+  if (input.proxyUrl !== undefined) {
+    const proxyUrl = input.proxyUrl.trim()
+    if (proxyUrl) {
+      let parsed: URL
+      try {
+        parsed = new URL(proxyUrl)
+      } catch {
+        throw new Error('Die manuelle Proxy-Adresse ist ungültig.')
+      }
+      if (!['http:', 'https:', 'socks4:', 'socks5:'].includes(parsed.protocol)) {
+        throw new Error('Der Proxy muss HTTP, HTTPS, SOCKS4 oder SOCKS5 verwenden.')
+      }
+      if (parsed.username || parsed.password) {
+        throw new Error('Proxy-Zugangsdaten bitte über Windows bzw. die Firmenanmeldung verwalten.')
+      }
+    }
+    setSetting(PROXY_URL_SETTING, proxyUrl)
+  }
+  if (input.proxyBypassRules !== undefined) {
+    setSetting(PROXY_BYPASS_SETTING, input.proxyBypassRules.trim())
+  }
   const next = getAiSettings()
   return {
     ok: true,
@@ -230,7 +266,10 @@ export function setAiSettings(input: {
     textModel: next.textModel,
     defaultReasoningEffort: next.defaultReasoningEffort,
     provider: next.provider,
-    apiBaseUrl: next.apiBaseUrl
+    apiBaseUrl: next.apiBaseUrl,
+    proxyMode: next.proxyMode,
+    proxyUrl: next.proxyUrl,
+    proxyBypassRules: next.proxyBypassRules
   }
 }
 
@@ -240,11 +279,49 @@ function getApiKey() {
   return key
 }
 
+const aiNetworkSession = () => session.fromPartition('persist:vereino-ai-network')
+let appliedProxySignature = ''
+let proxyConfiguration: Promise<void> | null = null
+
+function electronProxyConfig(settings: AiSettings) {
+  if (settings.proxyMode === 'direct') return { mode: 'direct' as const }
+  if (settings.proxyMode === 'manual') {
+    if (!settings.proxyUrl.trim()) throw new Error('Bitte eine manuelle Proxy-Adresse eintragen.')
+    return {
+      mode: 'fixed_servers' as const,
+      proxyRules: settings.proxyUrl.trim(),
+      proxyBypassRules: settings.proxyBypassRules.trim()
+    }
+  }
+  return { mode: 'system' as const }
+}
+
+async function configureAiNetwork(settings: AiSettings) {
+  const config = electronProxyConfig(settings)
+  const signature = JSON.stringify(config)
+  if (signature === appliedProxySignature && proxyConfiguration) return proxyConfiguration
+  appliedProxySignature = signature
+  proxyConfiguration = aiNetworkSession().setProxy(config).catch((error) => {
+    appliedProxySignature = ''
+    proxyConfiguration = null
+    throw error
+  })
+  return proxyConfiguration
+}
+
+function createElectronFetch(settings: AiSettings): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    await configureAiNetwork(settings)
+    return aiNetworkSession().fetch(input as any, init as any) as any
+  }) as typeof fetch
+}
+
 export function createClient() {
   const settings = getAiSettings()
   return new OpenAI({
     apiKey: getApiKey(),
-    baseURL: settings.apiBaseUrl
+    baseURL: settings.apiBaseUrl,
+    fetch: createElectronFetch(settings)
   })
 }
 
@@ -450,9 +527,12 @@ async function expandInputFilesForAnalysis(files: AiInputFile[]): Promise<Expand
 }
 
 export async function testAiConnection() {
+  const settings = getAiSettings()
+  let resolvedProxy = ''
   try {
+    await configureAiNetwork(settings)
+    resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
     const client = createClient()
-    const settings = getAiSettings()
     await client.responses.create({
       model: settings.model,
       input: 'Antworte nur mit OK.',
@@ -467,9 +547,38 @@ export async function testAiConnection() {
         reasoning: { effort: 'low' }
       } as any)
     }
-    return { ok: true }
+    return {
+      ok: true,
+      proxyMode: settings.proxyMode,
+      resolvedProxy: resolvedProxy || 'DIRECT',
+      targetUrl: settings.apiBaseUrl
+    }
   } catch (error: any) {
-    return { ok: false, error: error?.message || String(error) }
+    const rawMessage = error?.message || String(error)
+    const errorCode = String(error?.code || error?.cause?.code || '').trim()
+    const combined = `${errorCode} ${rawMessage}`.toUpperCase()
+    let errorMessage = rawMessage
+    if (combined.includes('407') || combined.includes('PROXY_AUTH')) {
+      errorMessage = 'Der Proxy verlangt eine Anmeldung (HTTP 407). Bitte Windows-/Firmenanmeldung oder Proxy-Richtlinie prüfen.'
+    } else if (combined.includes('CERT') || combined.includes('SELF_SIGNED') || combined.includes('UNABLE_TO_VERIFY')) {
+      errorMessage = 'Die TLS-Zertifikatsprüfung ist fehlgeschlagen. Vermutlich fehlt das Firmen-CA-Zertifikat im Windows-Zertifikatsspeicher.'
+    } else if (combined.includes('TIMEDOUT') || combined.includes('TIMEOUT') || combined.includes('ABORT')) {
+      errorMessage = 'Die Verbindung ist abgelaufen. Proxy oder Firewall haben die Anfrage möglicherweise nicht weitergeleitet.'
+    } else if (combined.includes('ENOTFOUND') || combined.includes('NAME_NOT_RESOLVED')) {
+      errorMessage = 'Der API-Host konnte nicht aufgelöst werden. Bitte DNS- und Proxy-Konfiguration prüfen.'
+    } else if (combined.includes('401') || combined.includes('UNAUTHORIZED')) {
+      errorMessage = 'Die API hat den Schlüssel abgelehnt (HTTP 401).'
+    } else if (combined.includes('403') || combined.includes('FORBIDDEN')) {
+      errorMessage = 'Die API oder Firmenrichtlinie hat die Anfrage abgelehnt (HTTP 403).'
+    }
+    return {
+      ok: false,
+      error: errorMessage,
+      errorCode: errorCode || undefined,
+      proxyMode: settings.proxyMode,
+      resolvedProxy: resolvedProxy || undefined,
+      targetUrl: settings.apiBaseUrl
+    }
   }
 }
 

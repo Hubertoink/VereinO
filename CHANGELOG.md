@@ -5,6 +5,21 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.8.7] - 2026-07-12
+
+### Hinzugefügt
+
+- KI-Einstellungen: Systemproxy, direkte Verbindung oder ein manueller HTTP-, HTTPS- beziehungsweise SOCKS-Proxy können gezielt für KI-Anfragen gewählt werden.
+- KI-Einstellungen: Der Verbindungstest zeigt die aufgelöste Route und verständliche Hinweise bei Proxy-, Firewall-, DNS-, Zertifikats- und API-Fehlern.
+
+### Geändert
+
+- KI-Anfragen verwenden eine isolierte Electron-Netzwerksitzung und damit im Systemmodus den Proxy-, PAC- und Zertifikatsspeicher des Betriebssystems.
+
+### Behoben
+
+- CI: Der Buchungsdialog-E2E-Test berücksichtigt sowohl nebeneinanderliegende als auch responsive untereinander angeordnete Kommentar- und Anhangsbereiche.
+
 ## [2.8.6] - 2026-07-12
 
 ### Hinzugefügt
