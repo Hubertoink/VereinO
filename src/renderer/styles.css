@@ -6935,7 +6935,8 @@ textarea:focus {
   font-weight: 650;
 }
 
-.local-invoice-scan__field .input {
+.local-invoice-scan__field .input,
+.local-invoice-scan__field select {
   width: 100%;
 }
 
@@ -7300,13 +7301,15 @@ body.detached-quick-add-body .local-invoice-scan__header select {
 
 .local-invoice-scan__field,
 .local-invoice-scan__field-span,
-.local-invoice-scan__field .input {
+.local-invoice-scan__field .input,
+.local-invoice-scan__field select {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
 }
 
-.local-invoice-scan__field .input {
+.local-invoice-scan__field .input,
+.local-invoice-scan__field select {
   width: 100%;
 }
 

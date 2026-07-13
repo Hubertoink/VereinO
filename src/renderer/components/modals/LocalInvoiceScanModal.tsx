@@ -80,6 +80,12 @@ const PICKER_FIELDS: Array<{ value: LocalInvoicePickerField; label: string }> = 
   { value: 'iban', label: 'IBAN' },
   { value: 'description', label: 'Beschreibung' }
 ]
+const SPHERE_OPTIONS: Array<{ value: BookingMeta['sphere']; label: string }> = [
+  { value: 'IDEELL', label: 'Ideeller Bereich' },
+  { value: 'ZWECK', label: 'Zweckbetrieb' },
+  { value: 'VERMOEGEN', label: 'Vermögensverwaltung' },
+  { value: 'WGB', label: 'Wirtschaftlicher Geschäftsbetrieb' }
+]
 
 function FileTextPlusIcon({ size = 24 }: { size?: number }) {
   return (
@@ -163,6 +169,35 @@ function Field({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </label>
+  )
+}
+
+function SelectField<T extends string>({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (value: T) => void
+}) {
+  return (
+    <label className="local-invoice-scan__field">
+      <span>{label}</span>
+      <select
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   )
 }
@@ -1007,6 +1042,14 @@ export default function LocalInvoiceScanModal({
                     value={fields.iban}
                     onChange={(value) => updateField('iban', value)}
                     placeholder="Noch nicht erkannt"
+                  />
+                  <SelectField
+                    label="Sphäre"
+                    value={bookingMeta.sphere}
+                    options={SPHERE_OPTIONS}
+                    onChange={(value) =>
+                      setBookingMeta((current) => ({ ...current, sphere: value }))
+                    }
                   />
                   <div className="local-invoice-scan__field-span">
                     <Field
