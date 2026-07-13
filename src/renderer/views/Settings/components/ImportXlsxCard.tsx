@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { dispatchDataChanged } from '../../../utils/refresh'
 
 interface ImportXlsxCardProps {
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
@@ -77,19 +78,9 @@ function safeJson<T>(raw: string | null, fallback: T): T {
   try { return raw ? JSON.parse(raw) as T : fallback } catch { return fallback }
 }
 
-function bufferToBase64(buf: ArrayBuffer) {
-  const bytes = new Uint8Array(buf)
-  const chunk = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-  }
-  return btoa(binary)
-}
-
 export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   const [fileName, setFileName] = useState('')
-  const [base64, setBase64] = useState('')
+  const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
   const [headers, setHeaders] = useState<string[]>([])
   const [sample, setSample] = useState<Array<Record<string, any>>>([])
   const [headerRowIndex, setHeaderRowIndex] = useState<number | null>(null)
@@ -111,7 +102,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     localStorage.setItem('vereino.import.rules', JSON.stringify(rules))
   }, [rules])
 
-  const step = !base64 ? 0 : analysis ? 2 : 1
+  const step = !fileBytes ? 0 : analysis ? 2 : 1
   const missingCount = analysis
     ? analysis.missing.tags.length + analysis.missing.budgets.length + analysis.missing.earmarks.length + analysis.missing.paymentAccounts.length
     : 0
@@ -130,14 +121,14 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       return
     }
     try {
-      const b64 = bufferToBase64(await f.arrayBuffer())
-      setBase64(b64)
+      const bytes = new Uint8Array(await f.arrayBuffer())
+      setFileBytes(bytes)
       setBusy(true)
       try {
         if (!window.api?.imports?.preview) {
           throw new Error('Import-API ist nicht geladen. Bitte VereinO einmal komplett neu starten.')
         }
-        const prev = await window.api?.imports.preview?.({ fileBase64: b64 })
+        const prev = await window.api?.imports.preview?.({ fileBytes: bytes })
         if (prev) {
           const remembered = safeJson<Record<string, string | null>>(localStorage.getItem(storageKey(prev.headers)), {})
           setHeaders(prev.headers)
@@ -154,7 +145,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   async function analyze() {
-    if (!base64) return
+    if (!fileBytes) return
     setBusy(true)
     setError('')
     setResult(null)
@@ -163,7 +154,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         throw new Error('Der neue Import-Assistent ist im laufenden Fenster noch nicht verfügbar. Bitte VereinO einmal komplett schließen und neu starten.')
       }
       localStorage.setItem(storageKey(headers), JSON.stringify(mapping))
-      const res = await window.api?.imports.analyze?.({ fileBase64: base64, mapping, rules })
+      const res = await window.api?.imports.analyze?.({ fileBytes, mapping, rules })
       if (res) {
         setAnalysis(res)
         setRows(res.rows)
@@ -212,7 +203,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       const res = await window.api?.imports.commitDraft?.({ rows })
       if (res) {
         setResult(res)
-        window.dispatchEvent(new Event('data-changed'))
+        dispatchDataChanged(['vouchers'])
         if ((res.errors?.length || 0) > 0 || (res.newTags?.length || 0) > 0) setShowErrorsModal(true)
         else notify?.('success', `Import übernommen: ${res.imported} importiert, ${res.skipped} übersprungen`)
       } else {
@@ -343,7 +334,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <strong>Kopfzeile erkannt: Zeile {headerRowIndex || 1}</strong>
               <div className="helper">VereinO merkt sich diese Zuordnung für dieselbe Tabellenstruktur automatisch.</div>
             </div>
-            <button className="btn primary" onClick={analyze} disabled={busy || !base64}>Validieren & Entwurf laden</button>
+            <button className="btn primary" onClick={analyze} disabled={busy || !fileBytes}>Validieren & Entwurf laden</button>
           </div>
           <div className="members-mapping-grid" style={{ marginTop: 8 }}>
             <div className="mapping-section"><div className="section-title">Basis</div><Field keyName="voucherId" /><Field keyName="voucherNo" /><Field keyName="date" /><Field keyName="description" /><Field keyName="note" /><Field keyName="type" /><Field keyName="sphere" /></div>

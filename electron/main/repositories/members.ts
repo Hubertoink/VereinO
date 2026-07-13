@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
+import { getMemberPaymentStatuses } from './members_payments'
 
 type DB = InstanceType<typeof Database>
 
@@ -42,9 +43,31 @@ function setMemberTags(d: DB, memberId: number, tags?: string[]) {
   }
 }
 
-export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL'; limit?: number; offset?: number; sortBy?: 'memberNo'|'name'|'email'|'status'; sort?: 'ASC'|'DESC' }): { rows: MemberRow[]; total: number } {
+export type MembersListParams = {
+  q?: string
+  status?: MemberStatus | 'ALL'
+  limit?: number
+  offset?: number
+  sortBy?: 'memberNo'|'name'|'email'|'status'
+  sort?: 'ASC'|'DESC'
+  contributionFilter?: 'ALL'|'DUE'|'NOT_DUE'|'NO_PLAN'
+  intervalFilter?: 'ALL'|'MONTHLY'|'QUARTERLY'|'YEARLY'
+  boardFilter?: 'ALL'|'ANY'|'NONE'|'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT'
+}
+
+export function listMembers(params: MembersListParams): { rows: MemberRow[]; total: number } {
   const d = getDb()
-  const { q, status, limit = 50, offset = 0, sortBy = 'name', sort = 'ASC' } = params || {} as any
+  const {
+    q,
+    status,
+    limit = 50,
+    offset = 0,
+    sortBy = 'name',
+    sort = 'ASC',
+    contributionFilter = 'ALL',
+    intervalFilter = 'ALL',
+    boardFilter = 'ALL'
+  } = params || {} as MembersListParams
   const wh: string[] = []
   const args: any[] = []
   if (q && q.trim()) {
@@ -53,9 +76,17 @@ export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL';
     args.push(like, like, like, like, like)
   }
   if (status && status !== 'ALL') { wh.push('m.status = ?'); args.push(status) }
+  if (intervalFilter !== 'ALL') { wh.push('m.contribution_interval = ?'); args.push(intervalFilter) }
+  if (boardFilter === 'ANY') wh.push('m.board_role IS NOT NULL')
+  else if (boardFilter === 'NONE') wh.push('m.board_role IS NULL')
+  else if (boardFilter !== 'ALL') { wh.push('m.board_role = ?'); args.push(boardFilter) }
+  if (contributionFilter === 'NO_PLAN') {
+    wh.push('(m.contribution_interval IS NULL OR IFNULL(m.contribution_amount, 0) <= 0)')
+  } else if (contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
+    wh.push('m.contribution_interval IS NOT NULL AND IFNULL(m.contribution_amount, 0) > 0')
+  }
   const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
   const base = `FROM members m${whereSql}`
-  const total = (d.prepare(`SELECT COUNT(1) as c ${base}`).get(...args) as any)?.c || 0
   const dir = String(sort).toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
   // Custom ORDER BY to ensure numeric sorting for member numbers
   const orderClause = (() => {
@@ -69,7 +100,7 @@ export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL';
     const collate = col === 'm.name' ? ' COLLATE NOCASE' : ''
     return `${col}${collate} ${dir}, m.id ${dir}`
   })()
-  const rows = d.prepare(`
+  const selectSql = `
     SELECT m.id, m.member_no as memberNo, m.name, m.email, m.phone, m.address, m.status, m.created_at as createdAt, m.updated_at as updatedAt,
            m.board_role as boardRole,
            m.iban as iban, m.bic as bic, m.contribution_amount as contribution_amount, m.contribution_interval as contribution_interval,
@@ -82,10 +113,22 @@ export function listMembers(params: { q?: string; status?: MemberStatus | 'ALL';
            ) as tagsConcat
     ${base}
     ORDER BY ${orderClause}
-    LIMIT ? OFFSET ?
-  `).all(...args, limit, offset) as any[]
-  const mapped: MemberRow[] = rows.map(r => ({ ...r, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] }))
-  return { rows: mapped, total }
+  `
+  const mapRows = (rows: any[]): MemberRow[] => rows.map(r => ({ ...r, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] }))
+
+  if (contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
+    const candidates = mapRows(d.prepare(selectSql).all(...args) as any[])
+    const statuses = getMemberPaymentStatuses(candidates)
+    const filtered = candidates.filter((member) => {
+      const isDue = (statuses.get(member.id)?.overdue || 0) > 0
+      return contributionFilter === 'DUE' ? isDue : !isDue
+    })
+    return { rows: filtered.slice(offset, offset + limit), total: filtered.length }
+  }
+
+  const total = (d.prepare(`SELECT COUNT(1) as c ${base}`).get(...args) as any)?.c || 0
+  const rows = d.prepare(`${selectSql} LIMIT ? OFFSET ?`).all(...args, limit, offset) as any[]
+  return { rows: mapRows(rows), total }
 }
 
 export function createMember(input: { memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[];

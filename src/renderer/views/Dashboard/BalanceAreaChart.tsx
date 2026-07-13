@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { BalanceAreaChartProps } from './types'
+import { addDataChangedListener } from '../../utils/refresh'
 
 type Bucket = { month: string; net: number; vat: number; gross: number }
 
@@ -96,8 +97,8 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
         setRows(filled)
       }) } catch { }
     }
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [from, to])
 
   // Prepare values for chart

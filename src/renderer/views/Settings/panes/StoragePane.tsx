@@ -1,6 +1,7 @@
 import React from 'react'
 import { StoragePaneProps } from '../types'
 import DbMigrateModal from '../../../DbMigrateModal'
+import { dispatchDataChanged } from '../../../utils/refresh'
 
 import { useStorageLocation, useBackupSettings } from '../hooks'
 import { LocationInfoDisplay, BackupList } from '../components'
@@ -55,7 +56,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
     setBusy(true); setErr('')
     try {
       const res = await window.api?.backup?.restore?.(filePath)
-      if (res?.ok) { notify('success', 'Backup wiederhergestellt'); window.dispatchEvent(new Event('data-changed')) }
+      if (res?.ok) { notify('success', 'Backup wiederhergestellt'); dispatchDataChanged() }
       else notify('error', res?.error || 'Wiederherstellung fehlgeschlagen')
     } catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
     finally { setBusy(false) }
@@ -459,7 +460,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
                   const res = await api?.fromPath?.(importPick.filePath)
                   if (res?.ok) {
                     notify('success', 'Datenbank importiert. Neu laden …')
-                    window.dispatchEvent(new Event('data-changed'))
+                    dispatchDataChanged()
                     window.setTimeout(() => window.location.reload(), 600)
                   }
                 } catch (e: any) {
@@ -510,7 +511,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
                     const n = res?.deleted ?? 0
                     setShowDeleteAll(false)
                     notify('success', `${n} Buchung(en) gelöscht.`)
-                    window.dispatchEvent(new Event('data-changed'))
+                    dispatchDataChanged()
                   } catch (e: any) {
                     notify('error', e?.message || String(e))
                   }
@@ -561,7 +562,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
                     await window.api?.organizations?.delete?.({ orgId, deleteData: true })
                     notify('success', 'Organisation gelöscht. Neu laden …')
-                    window.dispatchEvent(new Event('data-changed'))
+                    dispatchDataChanged()
                     window.setTimeout(() => window.location.reload(), 600)
                   } catch (e: any) {
                     notify('error', e?.message || String(e))

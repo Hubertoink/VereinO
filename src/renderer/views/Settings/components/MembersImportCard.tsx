@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { dispatchDataChanged } from '../../../utils/refresh'
 
 interface MembersImportCardProps {
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
@@ -346,7 +347,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
       if (res) {
         setResult(res)
         // let app know data changed
-        window.dispatchEvent(new Event('data-changed'))
+        dispatchDataChanged(['members'])
         if ((res.errors?.length || 0) > 0) {
           setShowErrorsModal(true)
           if (res.errorFilePath) {

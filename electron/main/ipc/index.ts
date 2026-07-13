@@ -1,4 +1,11 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
+import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataChange'
+import type { DashboardSnapshotInput } from '../../../shared/dashboard'
+import { filePayloadToBase64 } from '../services/filePayload'
+import {
+  clearDashboardSnapshotCache,
+  getDashboardSnapshot
+} from '../services/dashboardSnapshot'
 import {
   VoucherCreateInput,
   VoucherCreateOutput,
@@ -311,6 +318,7 @@ import {
 import { generateCashCheckPDF } from '../services/cashCheckReport'
 import { createSubmissionsRepository } from '../repositories/submissions'
 import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { getSetting, setSetting } from '../services/settings'
@@ -667,10 +675,10 @@ function applyPaymentAccountHintToAiAnalysis(result: any, prompt: string, paymen
   }
 }
 
-function notifyDataChanged() {
+function notifyDataChanged(scopes?: DataChangeScope[]) {
   for (const win of BrowserWindow.getAllWindows()) {
     try {
-      win.webContents.send('app:data-changed')
+      win.webContents.send('app:data-changed', scopes)
     } catch {}
   }
 }
@@ -714,6 +722,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         lastAuto: Number(getSetting<number>('backup.lastAuto') || 0)
       }
     }
+  })
+  ipcMain.handle('app.dashboardSnapshot', async (_event, payload: DashboardSnapshotInput) => {
+    return getDashboardSnapshot(payload)
   })
   ipcMain.handle('updates.getState', async () => getUpdateState())
   ipcMain.handle('updates.check', async () => checkForAppUpdates())
@@ -805,10 +816,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     return { ok: true }
   })
-  ipcMain.on('app.notifyDataChanged', async () => {
+  ipcMain.on('app.notifyDataChanged', async (_event, scopes?: unknown) => {
+    const validScopes = Array.isArray(scopes)
+      ? scopes.filter((scope): scope is DataChangeScope => DATA_CHANGE_SCOPES.includes(scope as DataChangeScope))
+      : undefined
+    clearDashboardSnapshotCache(validScopes)
     for (const win of BrowserWindow.getAllWindows()) {
       try {
-        win.webContents.send('app:data-changed')
+        win.webContents.send('app:data-changed', validScopes)
       } catch {}
     }
   })
@@ -840,14 +855,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       loadAiContextService()
     ])
     const analyzed = await analyzeInvoiceDocument({
-      file: parsed.file,
+      file: {
+        fileName: parsed.file.fileName,
+        mimeType: parsed.file.mimeType,
+        dataBase64: filePayloadToBase64(parsed.file)
+      },
       context: buildAiInvoiceContext()
     })
     return AiInvoiceExtractOutput.parse(analyzed)
   })
   ipcMain.handle('ai.invoiceBatch.list', async () => {
     const { listInvoiceBatchItems, scanInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')
-    scanInvoiceSubmitDirectory()
+    await scanInvoiceSubmitDirectory()
     return AiInvoiceBatchListOutput.parse(await listInvoiceBatchItems())
   })
   ipcMain.handle('ai.invoiceBatch.get', async (_event, payload) => {
@@ -868,12 +887,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('ai.invoiceBatch.approve', async (_event, payload) => {
     const parsed = AiInvoiceBatchApproveInput.parse(payload)
     const { approveInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
-    return AiInvoiceBatchActionOutput.parse(approveInvoiceBatchItem(parsed.id, parsed.voucherId))
+    return AiInvoiceBatchActionOutput.parse(await approveInvoiceBatchItem(parsed.id, parsed.voucherId))
   })
   ipcMain.handle('ai.invoiceBatch.discard', async (_event, payload) => {
     const parsed = AiInvoiceBatchIdInput.parse(payload)
     const { discardInvoiceBatchItem } = await import('../services/invoiceBatchQueue')
-    return AiInvoiceBatchActionOutput.parse(discardInvoiceBatchItem(parsed.id))
+    return AiInvoiceBatchActionOutput.parse(await discardInvoiceBatchItem(parsed.id))
   })
   ipcMain.handle('ai.invoiceBatch.openFolder', async () => {
     const { openInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')
@@ -1114,7 +1133,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     setAiJobStatus(parsed.id, allCandidatesApproved ? 'APPROVED' : 'NEEDS_REVIEW', {
       voucherId: voucher.id
     })
-    notifyDataChanged()
+    notifyDataChanged(['vouchers'])
     return AiJobsApproveCandidateOutput.parse({
       ok: true,
       voucherId: voucher.id,
@@ -1270,7 +1289,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
     const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
     try {
-      fs.mkdirSync(baseDir, { recursive: true })
+      await fsp.mkdir(baseDir, { recursive: true })
     } catch {}
 
     const defaultCols = [
@@ -1325,7 +1344,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
       const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
       try {
-        fs.mkdirSync(baseDir, { recursive: true })
+        await fsp.mkdir(baseDir, { recursive: true })
       } catch {}
       const filePath = path.join(baseDir, `Controlling_${stamp}.pdf`)
 
@@ -1835,7 +1854,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       const win = new BrowserWindow({ show: false, width: 900, height: 1200 })
       await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
       const buff = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
-      fs.writeFileSync(filePath, buff)
+      await fsp.writeFile(filePath, buff)
       try {
         win.destroy()
       } catch {}
@@ -1919,7 +1938,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         })
         lines.push(vals.join(';'))
       }
-      fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+      await fsp.writeFile(filePath, lines.join('\n'), 'utf8')
       return ReportsExportOutput.parse({ filePath })
     }
   })
@@ -2240,7 +2259,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('imports.preview', async (_e, payload) => {
     const parsed = ImportPreviewInput.parse(payload)
     const { previewFile } = await loadImportsService()
-    const res = await previewFile(parsed.fileBase64)
+    const fileBase64 = filePayloadToBase64({
+      dataBytes: parsed.fileBytes,
+      dataBase64: parsed.fileBase64
+    })
+    const res = await previewFile(fileBase64)
     return ImportPreviewOutput.parse(res as any)
   })
   ipcMain.handle('imports.execute', async (_e, payload) => {
@@ -2253,13 +2276,21 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       /* ignore */
     }
     const { executeFile } = await loadImportsService()
-    const res = await executeFile(parsed.fileBase64, parsed.mapping as any)
+    const fileBase64 = filePayloadToBase64({
+      dataBytes: parsed.fileBytes,
+      dataBase64: parsed.fileBase64
+    })
+    const res = await executeFile(fileBase64, parsed.mapping as any)
     return ImportExecuteOutput.parse(res as any)
   })
   ipcMain.handle('imports.analyze', async (_e, payload) => {
     const parsed = ImportAnalyzeInput.parse(payload)
     const { analyzeFile } = await loadImportsService()
-    const res = await analyzeFile(parsed.fileBase64, parsed.mapping as any, parsed.rules as any)
+    const fileBase64 = filePayloadToBase64({
+      dataBytes: parsed.fileBytes,
+      dataBase64: parsed.fileBase64
+    })
+    const res = await analyzeFile(fileBase64, parsed.mapping as any, parsed.rules as any)
     return ImportAnalyzeOutput.parse(res as any)
   })
   ipcMain.handle('imports.commitDraft', async (_e, payload) => {
@@ -2303,12 +2334,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   // Bank statement imports are staged for review before they become vouchers.
   ipcMain.handle('bankImports.preview', async (_e, payload) => {
     const parsed = BankImportPreviewInput.parse(payload)
-    return BankImportPreviewOutput.parse(previewBankImport(parsed as any))
+    const fileBase64 = filePayloadToBase64({
+      dataBytes: parsed.fileBytes,
+      dataBase64: parsed.fileBase64
+    })
+    return BankImportPreviewOutput.parse(previewBankImport({ ...parsed, fileBase64 } as any))
   })
   ipcMain.handle('bankImports.commit', async (_e, payload) => {
     const parsed = BankImportCommitInput.parse(payload)
     await requireSafetyBackup(backup.makeBackup, 'preBankImport', 'Bankdaten importieren')
-    return BankImportCommitOutput.parse(commitBankImport(parsed as any))
+    const fileBase64 = filePayloadToBase64({
+      dataBytes: parsed.fileBytes,
+      dataBase64: parsed.fileBase64
+    })
+    return BankImportCommitOutput.parse(commitBankImport({ ...parsed, fileBase64 } as any))
   })
   ipcMain.handle('bankTransactions.list', async (_e, payload) => {
     const parsed = BankTransactionsListInput.parse(payload ?? {})
@@ -2390,7 +2429,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     if (!src || !fs.existsSync(src))
       throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-    fs.copyFileSync(src, save.filePath)
+    await fsp.copyFile(src, save.filePath)
     return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
   })
   ipcMain.handle('attachments.read', async (_e, payload) => {
@@ -2405,12 +2444,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     if (!src || !fs.existsSync(src))
       throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-    const buff = fs.readFileSync(src)
-    const dataBase64 = Buffer.from(buff).toString('base64')
+    const buff = await fsp.readFile(src)
     return AttachmentReadOutput.parse({
       fileName: f.fileName,
       mimeType: f.mimeType || undefined,
-      dataBase64
+      dataBytes: new Uint8Array(buff.buffer, buff.byteOffset, buff.byteLength)
     })
   })
   ipcMain.handle('attachments.add', async (_e, payload) => {
@@ -2418,7 +2456,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const res = addFileToVoucher(
       parsed.voucherId,
       parsed.fileName,
-      parsed.dataBase64,
+      parsed,
       parsed.mimeType
     )
     return AttachmentAddOutput.parse(res)
@@ -2445,7 +2483,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     })
     // Graceful cancel: return empty path instead of throwing
     if (save.canceled || !save.filePath) return DbExportOutput.parse({ filePath: '' as any })
-    fs.copyFileSync(dbPath, save.filePath)
+    await fsp.copyFile(dbPath, save.filePath)
     return DbExportOutput.parse({ filePath: save.filePath })
   })
 
@@ -2461,7 +2499,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const importPath = open.filePaths[0]
     // Basic stats for comparison
     try {
-      const stat = fs.statSync(importPath)
+      const stat = await fsp.stat(importPath)
       // Inspect counts using existing backup.inspect logic for uniformity
       const counts = backup.inspectBackup(importPath)?.counts || {}
       return { ok: true, filePath: importPath, size: stat.size, mtime: stat.mtimeMs, counts }
@@ -2487,7 +2525,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       try {
         closeDb()
       } catch {}
-      fs.copyFileSync(importPath, dbPath)
+      await fsp.copyFile(importPath, dbPath)
       // Reopen and ensure migrations are applied
       const d = getDb()
       // Ensure schema is up to date (e.g., tags tables)
@@ -2534,7 +2572,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('db.location.migrateTo', async (_e, payload: any) => {
     const { root } = payload || {}
     if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-    const res = migrateToRoot(root, 'copy-overwrite')
+    const res = await migrateToRoot(root, 'copy-overwrite')
     const d = getDb()
     try {
       applyMigrations(d as any)
@@ -2546,7 +2584,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('db.location.useFolder', async (_e, payload: any) => {
     const { root } = payload || {}
     if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-    const res = migrateToRoot(root, 'use')
+    const res = await migrateToRoot(root, 'use')
     const d = getDb()
     try {
       applyMigrations(d as any)
@@ -2562,7 +2600,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     })
     if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
     const chosen = pick.filePaths[0]
-    const res = migrateToRoot(chosen, 'copy-overwrite')
+    const res = await migrateToRoot(chosen, 'copy-overwrite')
     // Reopen DB to ensure app uses new file immediately
     const d = getDb()
     try {
@@ -2579,7 +2617,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     })
     if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
     const chosen = pick.filePaths[0]
-    const res = migrateToRoot(chosen, 'use')
+    const res = await migrateToRoot(chosen, 'use')
     const d = getDb()
     try {
       applyMigrations(d as any)
@@ -2603,15 +2641,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('db.smartRestore.preview', async () => {
     const currentInfo = getCurrentDbInfo()
     const defaultInfo = getDefaultDbInfo()
-    function statOrNull(p: string) {
+    async function statOrNull(p: string) {
       try {
-        return fs.statSync(p)
+        return await fsp.stat(p)
       } catch {
         return null
       }
     }
-    const curStat = statOrNull(currentInfo.dbPath)
-    const defStat = statOrNull(defaultInfo.dbPath)
+    const [curStat, defStat] = await Promise.all([
+      statOrNull(currentInfo.dbPath),
+      statOrNull(defaultInfo.dbPath)
+    ])
     const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
     const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
     // Recommendation heuristic:
@@ -2681,19 +2721,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
           closeDb()
         } catch {}
         // Ensure default dirs exist
-        if (!fs.existsSync(defaultInfo.root)) fs.mkdirSync(defaultInfo.root, { recursive: true })
-        if (!fs.existsSync(defaultInfo.filesDir))
-          fs.mkdirSync(defaultInfo.filesDir, { recursive: true })
+        await fsp.mkdir(defaultInfo.filesDir, { recursive: true })
         // Copy DB file
-        fs.copyFileSync(currentInfo.dbPath, defaultInfo.dbPath)
+        await fsp.copyFile(currentInfo.dbPath, defaultInfo.dbPath)
         // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
         try {
-          const files = fs.readdirSync(path.join(currentInfo.root, 'files'))
+          const files = await fsp.readdir(path.join(currentInfo.root, 'files'))
           for (const f of files) {
             const src = path.join(currentInfo.root, 'files', f)
             const dst = path.join(defaultInfo.filesDir, f)
             try {
-              if (!fs.existsSync(dst)) fs.copyFileSync(src, dst)
+              if (!fs.existsSync(dst)) await fsp.copyFile(src, dst)
             } catch {}
           }
         } catch {
@@ -2999,7 +3037,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     if (!src || !fs.existsSync(src))
       throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-    fs.copyFileSync(src, save.filePath)
+    await fsp.copyFile(src, save.filePath)
     return AttachmentSaveAsOutput.parse({ filePath: save.filePath })
   })
   ipcMain.handle('invoiceFiles.read', async (_e, payload) => {
@@ -3014,12 +3052,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     if (!src || !fs.existsSync(src))
       throw new Error('Quelldatei nicht gefunden: ' + (f.filePath || pathBase))
-    const buff = fs.readFileSync(src)
-    const dataBase64 = Buffer.from(buff).toString('base64')
+    const buff = await fsp.readFile(src)
     return AttachmentReadOutput.parse({
       fileName: f.fileName,
       mimeType: f.mimeType || undefined,
-      dataBase64
+      dataBytes: new Uint8Array(buff.buffer, buff.byteOffset, buff.byteLength)
     })
   })
 
@@ -3045,7 +3082,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const res = addFileToInvoice(
       parsed.invoiceId,
       parsed.fileName,
-      parsed.dataBase64,
+      parsed,
       parsed.mimeType
     )
     return InvoiceFileAddOutput.parse(res)
@@ -3254,7 +3291,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const fname = `Mitglied_${(payload.memberNo || payload.name || 'Brief').toString().replace(/[^a-zA-Z0-9_-]+/g, '_')}_${Date.now()}.rtf`
         const fullPath = path.join(tmpDir, fname)
         // Write as ASCII-safe string (contains only ASCII and RTF escapes), avoid UTF-8 BOM issues
-        fs.writeFileSync(fullPath, rtf, 'ascii')
+        await fsp.writeFile(fullPath, rtf, 'ascii')
         await shell.openPath(fullPath)
         return { ok: true, filePath: fullPath }
       } catch (e: any) {
@@ -3394,7 +3431,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       return SubmissionsExportCatalogOutput.parse({ filePath: '' })
     }
 
-    fs.writeFileSync(save.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+    await fsp.writeFile(save.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
     return SubmissionsExportCatalogOutput.parse({ filePath: save.filePath })
   })
 
@@ -3412,7 +3449,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const allSubmissions: any[] = []
     for (const filePath of result.filePaths) {
       try {
-        const content = fs.readFileSync(filePath, 'utf-8')
+        const content = await fsp.readFile(filePath, 'utf-8')
         const data = JSON.parse(content)
         if (Array.isArray(data.submissions)) {
           // Transform web-app format to internal format
@@ -3677,7 +3714,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
       const before = getActiveOrganization()
       const beforeId = before?.id || 'default'
-      const result = deleteOrganization(payload.orgId, payload.deleteData ?? false)
+      const result = await deleteOrganization(payload.orgId, payload.deleteData ?? false)
 
       const after = getActiveOrganization()
       const afterId = after?.id || 'default'

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { dispatchDataChanged } from '../../utils/refresh'
 
 type BudgetRow = {
   id: number
@@ -175,7 +176,7 @@ export default function CashCheckModal(props: {
       const voucherNo = res?.voucherNo ? String(res.voucherNo) : ''
       notify('success', voucherNo ? `Kassenprüfung gebucht (${voucherNo}).` : 'Kassenprüfung gebucht.')
       try {
-        window.dispatchEvent(new Event('data-changed'))
+        dispatchDataChanged(['vouchers'])
       } catch {
         // ignore
       }

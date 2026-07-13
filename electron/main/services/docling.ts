@@ -1,9 +1,11 @@
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { getSetting, setSetting } from './settings'
+import { filePayloadToBuffer } from './filePayload'
+import type { FileDataPayload } from '../../../shared/filePayload'
 
 const ENABLED_SETTING = 'documents.docling.enabled'
 const MAX_INPUT_BYTES = 10 * 1024 * 1024
@@ -14,7 +16,7 @@ const EXTRACT_TIMEOUT_MS = 180_000
 type PythonCommand = { command: string; prefix: string[]; label: string }
 type DoclingDetection = { installed: boolean; version: string | null; runtime: PythonCommand | null; error?: string }
 
-function installedWindowsPythonCommands(): PythonCommand[] {
+async function installedWindowsPythonCommands(): Promise<PythonCommand[]> {
   const roots = [
     path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python'),
     path.join(process.env.LOCALAPPDATA || '', 'Python')
@@ -22,12 +24,13 @@ function installedWindowsPythonCommands(): PythonCommand[] {
   const commands: PythonCommand[] = []
   for (const root of roots) {
     try {
-      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+      for (const entry of await fs.readdir(root, { withFileTypes: true })) {
         if (!entry.isDirectory() || !/^Python\d+$/i.test(entry.name)) continue
         const executable = path.join(root, entry.name, 'python.exe')
-        if (fs.existsSync(executable)) {
+        try {
+          await fs.access(executable)
           commands.push({ command: executable, prefix: [], label: entry.name })
-        }
+        } catch { /* executable not present */ }
       }
     } catch {
       // An absent Python installation root is expected.
@@ -36,16 +39,18 @@ function installedWindowsPythonCommands(): PythonCommand[] {
   return commands.sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true }))
 }
 
-const PYTHON_CANDIDATES: PythonCommand[] = process.platform === 'win32'
-  ? [
-      ...installedWindowsPythonCommands(),
-      { command: 'py', prefix: ['-3'], label: 'py -3' },
-      { command: 'python', prefix: [], label: 'python' }
-    ]
-  : [
-      { command: 'python3', prefix: [], label: 'python3' },
-      { command: 'python', prefix: [], label: 'python' }
-    ]
+async function pythonCandidates(): Promise<PythonCommand[]> {
+  return process.platform === 'win32'
+    ? [
+        ...await installedWindowsPythonCommands(),
+        { command: 'py', prefix: ['-3'], label: 'py -3' },
+        { command: 'python', prefix: [], label: 'python' }
+      ]
+    : [
+        { command: 'python3', prefix: [], label: 'python3' },
+        { command: 'python', prefix: [], label: 'python' }
+      ]
+}
 
 let detectionCache: { at: number; value: DoclingDetection } | null = null
 
@@ -93,7 +98,7 @@ function runPython(runtime: PythonCommand, code: string, args: string[], timeout
 async function detectDocling(force = false): Promise<DoclingDetection> {
   if (!force && detectionCache && Date.now() - detectionCache.at < 60_000) return detectionCache.value
   let lastError = 'Python 3 oder das Python-Modul „docling“ wurde nicht gefunden.'
-  for (const runtime of PYTHON_CANDIDATES) {
+  for (const runtime of await pythonCandidates()) {
     try {
       const version = await runPython(
         runtime,
@@ -155,21 +160,23 @@ export function cleanDoclingMarkdown(markdown: string) {
     .trim()
 }
 
-export async function extractWithDocling(input: { fileName: string; mimeType?: string | null; dataBase64: string }) {
+export async function extractWithDocling(
+  input: { fileName: string; mimeType?: string | null } & FileDataPayload
+) {
   const status = await getDoclingStatus()
   if (!status.enabled) throw new Error('Die lokale Docling-Verarbeitung ist nicht aktiviert.')
   const detected = await detectDocling()
   if (!detected.runtime) throw new Error('Docling-Laufzeit nicht gefunden.')
-  const bytes = Buffer.from(input.dataBase64, 'base64')
+  const bytes = filePayloadToBuffer(input)
   if (!bytes.length || bytes.length > MAX_INPUT_BYTES) throw new Error('Docling verarbeitet in VereinO Dateien bis 10 MB.')
   const extension = path.extname(input.fileName).toLowerCase()
   if (!['.pdf', '.png', '.jpg', '.jpeg', '.tif', '.tiff'].includes(extension)) {
     throw new Error('Docling unterstützt hier PDF-, PNG-, JPEG- und TIFF-Dateien.')
   }
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vereino-docling-'))
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-docling-'))
   const inputPath = path.join(tempDir, `${randomUUID()}${extension}`)
   try {
-    fs.writeFileSync(inputPath, bytes)
+    await fs.writeFile(inputPath, bytes)
     const output = await runPython(
       detected.runtime,
       [
@@ -191,6 +198,6 @@ export async function extractWithDocling(input: { fileName: string; mimeType?: s
       version: detected.version
     }
   } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true })
+    await fs.rm(tempDir, { recursive: true, force: true })
   }
 }

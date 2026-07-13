@@ -1,6 +1,6 @@
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
+import fsSync from 'node:fs'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
 import { BrowserWindow, shell } from 'electron'
 import { getAppDataDir, getDb } from '../db/database'
 import {
@@ -16,12 +16,15 @@ import {
 import { buildAiInvoiceContext } from './aiContext'
 import { analyzeInvoiceDocument, getAiSettings, segmentInvoicePacket } from './ai'
 import { extractWithDocling, getDoclingStatus } from './docling'
+import { filePayloadToBuffer } from './filePayload'
 import { extractLocalInvoiceFields } from '../../../src/renderer/utils/localInvoiceExtraction'
+import { pathExists, sha256Buffer, sha256File } from './asyncFile'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 const POLL_MS = 4000
 let timer: NodeJS.Timeout | null = null
 let processing = false
+let scanPromise: Promise<{ added: number; duplicates: Array<{ fileName: string; voucherNo?: string | null }> }> | null = null
 const savedFileHashCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>()
 const DUPLICATE_ERROR_PREFIX = 'INVOICE_DUPLICATE:'
 const DUPLICATE_OVERRIDE_ERROR = 'INVOICE_DUPLICATE_OVERRIDE'
@@ -44,21 +47,17 @@ function duplicateFromError(error?: string | null): InvoiceDuplicate | null {
   }
 }
 
-function fileHash(data: Buffer) {
-  return createHash('sha256').update(data).digest('hex')
-}
-
-function hashSavedFile(filePath: string) {
-  const stat = fs.statSync(filePath)
+async function hashSavedFile(filePath: string) {
+  const stat = await fs.stat(filePath)
   const cached = savedFileHashCache.get(filePath)
   if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) return cached.sha256
-  const sha256 = fileHash(fs.readFileSync(filePath))
+  const sha256 = await sha256File(filePath)
   savedFileHashCache.set(filePath, { size: stat.size, mtimeMs: stat.mtimeMs, sha256 })
   return sha256
 }
 
-function findSavedVoucherDuplicate(data: Buffer): InvoiceDuplicate | null {
-  const sha256 = fileHash(data)
+async function findSavedVoucherDuplicate(data: Buffer, dataSha256?: string): Promise<InvoiceDuplicate | null> {
+  const sha256 = dataSha256 || await sha256Buffer(data)
   const rows = getDb().prepare(`
     SELECT vf.file_path as filePath, vf.voucher_id as voucherId, v.voucher_no as voucherNo
     FROM voucher_files vf
@@ -69,7 +68,7 @@ function findSavedVoucherDuplicate(data: Buffer): InvoiceDuplicate | null {
   `).all(data.length) as Array<{ filePath: string; voucherId: number; voucherNo?: string | null }>
   for (const row of rows) {
     try {
-      if (fs.existsSync(row.filePath) && hashSavedFile(row.filePath) === sha256) {
+      if (await pathExists(row.filePath) && await hashSavedFile(row.filePath) === sha256) {
         return { voucherId: Number(row.voucherId), voucherNo: row.voucherNo || null }
       }
     } catch {
@@ -85,8 +84,8 @@ type InvoiceBatchSourceMeta = {
   segment?: { index: number; total: number; pageNumbers: number[]; confidence: number; warnings: string[] }
 }
 
-function queuePrompt(filePath: string, data: Buffer, segment?: InvoiceBatchSourceMeta['segment'], sourceSha256?: string) {
-  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: sourceSha256 || fileHash(data), segment })}`
+function queuePrompt(filePath: string, sourceSha256: string, segment?: InvoiceBatchSourceMeta['segment']) {
+  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: sourceSha256, segment })}`
 }
 
 function sourceMetaFromPrompt(prompt?: string | null): InvoiceBatchSourceMeta | null {
@@ -113,7 +112,7 @@ function pageRangeLabel(pageNumbers: number[]) {
 
 export function getInvoiceSubmitDirectory() {
   const folder = path.join(getAppDataDir().root, 'Submit')
-  fs.mkdirSync(folder, { recursive: true })
+  fsSync.mkdirSync(folder, { recursive: true })
   return folder
 }
 
@@ -128,10 +127,10 @@ function notifyQueueChanged(change?: InvoiceBatchChange) {
   }
 }
 
-function safePdfFiles() {
+async function safePdfFiles() {
   const folder = getInvoiceSubmitDirectory()
   try {
-    return fs.readdirSync(folder, { withFileTypes: true })
+    return (await fs.readdir(folder, { withFileTypes: true }))
       .filter((entry) => entry.isFile() && /\.pdf$/i.test(entry.name))
       .map((entry) => path.join(folder, entry.name))
   } catch {
@@ -139,15 +138,15 @@ function safePdfFiles() {
   }
 }
 
-function uniqueDestination(fileName: string, data: Buffer) {
+async function uniqueDestination(fileName: string, dataSha256: string) {
   const folder = getInvoiceSubmitDirectory()
   const safeName = path.basename(fileName).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') || 'Rechnung.pdf'
   const parsed = path.parse(/\.pdf$/i.test(safeName) ? safeName : `${safeName}.pdf`)
   let candidate = path.join(folder, `${parsed.name}${parsed.ext}`)
   let index = 2
-  while (fs.existsSync(candidate)) {
+  while (await pathExists(candidate)) {
     try {
-      if (fileHash(fs.readFileSync(candidate)) === fileHash(data)) {
+      if (await sha256File(candidate) === dataSha256) {
         return { path: candidate, reused: true }
       }
     } catch {
@@ -159,19 +158,20 @@ function uniqueDestination(fileName: string, data: Buffer) {
   return { path: candidate, reused: false }
 }
 
-export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: boolean }) {
+async function runInvoiceSubmitDirectoryScan(options?: { announceDuplicates?: boolean }) {
   let added = 0
   let changed = 0
   const duplicates: Array<{ fileName: string; voucherNo?: string | null }> = []
-  for (const filePath of safePdfFiles()) {
+  for (const filePath of await safePdfFiles()) {
     try {
-      const stat = fs.statSync(filePath)
+      const stat = await fs.stat(filePath)
       if (!stat.isFile()) continue
-      const data = fs.readFileSync(filePath)
-      const prompt = queuePrompt(filePath, data)
+      const data = await fs.readFile(filePath)
+      const dataSha256 = await sha256Buffer(data)
+      const prompt = queuePrompt(filePath, dataSha256)
       const existing = findAiJobByPrompt('BOOKING_FROM_DOCUMENTS', prompt)
       const sourceJobs = openJobsForSource(filePath)
-      const duplicate = findSavedVoucherDuplicate(data)
+      const duplicate = await findSavedVoucherDuplicate(data, dataSha256)
       if (existing) {
         const wasDuplicate = duplicateFromError(existing.error)
         const manuallyReleased = existing.error === DUPLICATE_OVERRIDE_ERROR
@@ -215,19 +215,28 @@ export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: bool
   return { added, duplicates }
 }
 
-export async function importInvoiceBatchFiles(files: Array<{ fileName: string; dataBase64: string }>) {
+export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: boolean }) {
+  if (!scanPromise) {
+    scanPromise = runInvoiceSubmitDirectoryScan(options).finally(() => { scanPromise = null })
+  }
+  return scanPromise
+}
+
+export async function importInvoiceBatchFiles(
+  files: Array<{ fileName: string; dataBytes?: Uint8Array; dataBase64?: string }>
+) {
   const imported: string[] = []
   const reused: string[] = []
   for (const file of files) {
-    const data = Buffer.from(file.dataBase64, 'base64')
+    const data = filePayloadToBuffer(file)
     if (!data.length) continue
-    const destination = uniqueDestination(file.fileName, data)
-    if (!destination.reused) fs.writeFileSync(destination.path, data)
+    const destination = await uniqueDestination(file.fileName, await sha256Buffer(data))
+    if (!destination.reused) await fs.writeFile(destination.path, data)
     const importedName = path.basename(destination.path)
     imported.push(importedName)
     if (destination.reused) reused.push(importedName)
   }
-  const queued = scanInvoiceSubmitDirectory({ announceDuplicates: false })
+  const queued = await scanInvoiceSubmitDirectory({ announceDuplicates: false })
   return { ok: true, imported, reused, duplicates: queued.duplicates }
 }
 
@@ -313,10 +322,10 @@ export async function processInvoiceBatchQueue() {
               const child = createAiJob({
                 type: 'BOOKING_FROM_DOCUMENTS',
                 title,
-                prompt: queuePrompt(source.path, groupData, segment, source.sha256),
+                prompt: queuePrompt(source.path, source.sha256 || await sha256Buffer(groupData), segment),
                 files: [{ fileName: title.replace(/\.pdf(?= ·)/i, '') + '.pdf', mimeType: 'application/pdf', dataBase64: group.dataBase64 }]
               })
-              const duplicate = findSavedVoucherDuplicate(groupData)
+              const duplicate = await findSavedVoucherDuplicate(groupData)
               if (duplicate) duplicateCount += 1
               setAiJobStatus(child.id, duplicate ? 'DRAFT' : 'QUEUED', {
                 error: duplicate ? duplicateError(duplicate) : null
@@ -444,7 +453,7 @@ export function retryInvoiceBatchItem(id: number) {
   return { ok: true }
 }
 
-function removeSourceFile(job: ReturnType<typeof getAiJob>) {
+async function removeSourceFile(job: ReturnType<typeof getAiJob>) {
   const source = sourceMetaFromPrompt(job.prompt)
   if (!source) return
   const folder = path.resolve(getInvoiceSubmitDirectory())
@@ -453,19 +462,19 @@ function removeSourceFile(job: ReturnType<typeof getAiJob>) {
   const siblingStillOpen = openJobsForSource(resolved).some((candidate: any) => candidate.id !== job.id)
   if (siblingStillOpen) return
   try {
-    if (source.sha256 && fs.existsSync(resolved) && fileHash(fs.readFileSync(resolved)) !== source.sha256) return
-    fs.unlinkSync(resolved)
+    if (source.sha256 && await pathExists(resolved) && await sha256File(resolved) !== source.sha256) return
+    await fs.unlink(resolved)
   } catch (error: any) {
     if (error?.code !== 'ENOENT') throw error
   }
 }
 
-export function approveInvoiceBatchItem(id: number, voucherId: number) {
+export async function approveInvoiceBatchItem(id: number, voucherId: number) {
   const job = getAiJob(id)
   if (job.type !== 'BOOKING_FROM_DOCUMENTS' || !job.prompt?.startsWith('invoice-batch:')) throw new Error('Batch-Rechnung nicht gefunden.')
   setAiJobStatus(id, 'APPROVED', { voucherId })
   try {
-    removeSourceFile(job)
+    await removeSourceFile(job)
     clearAiJobFiles(id)
     return { ok: true }
   } finally {
@@ -475,10 +484,10 @@ export function approveInvoiceBatchItem(id: number, voucherId: number) {
   }
 }
 
-export function discardInvoiceBatchItem(id: number) {
+export async function discardInvoiceBatchItem(id: number) {
   const job = getAiJob(id)
   if (job.type !== 'BOOKING_FROM_DOCUMENTS' || !job.prompt?.startsWith('invoice-batch:')) throw new Error('Batch-Rechnung nicht gefunden.')
-  removeSourceFile(job)
+  await removeSourceFile(job)
   deleteAiJob(id)
   notifyQueueChanged()
   return { ok: true }
@@ -495,8 +504,8 @@ export function startInvoiceBatchQueue() {
   for (const job of interrupted) {
     if (job.prompt?.startsWith('invoice-batch:')) setAiJobStatus(job.id, 'QUEUED')
   }
-  scanInvoiceSubmitDirectory()
-  timer = setInterval(() => scanInvoiceSubmitDirectory(), POLL_MS)
+  void scanInvoiceSubmitDirectory()
+  timer = setInterval(() => { void scanInvoiceSubmitDirectory() }, POLL_MS)
   timer.unref?.()
 }
 

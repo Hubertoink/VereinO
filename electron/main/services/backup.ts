@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
+import fsSync from 'node:fs'
 import path from 'node:path'
 import { app, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
@@ -50,42 +51,35 @@ function pathsEqual(left: string, right: string) {
 }
 
 function ensureDir(dir: string) {
-  fs.mkdirSync(dir, { recursive: true })
+  fsSync.mkdirSync(dir, { recursive: true })
 }
 
-function removeFileIfExists(filePath: string) {
+async function pathExists(filePath: string) {
   try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    await fs.access(filePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function removePathIfExists(targetPath: string) {
+  try {
+    await fs.rm(targetPath, { recursive: true, force: true })
   } catch {
     /* ignore */
   }
 }
 
-function removeDirIfExists(dir: string) {
-  try {
-    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true })
-  } catch {
-    /* ignore */
-  }
+async function copyDirRecursive(src: string, dest: string) {
+  if (!(await pathExists(src))) return
+  await fs.cp(src, dest, { recursive: true, force: true })
 }
 
-function copyDirRecursive(src: string, dest: string) {
-  if (!fs.existsSync(src)) return
-  fs.mkdirSync(dest, { recursive: true })
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name)
-    const destPath = path.join(dest, entry.name)
-    if (entry.isDirectory()) copyDirRecursive(srcPath, destPath)
-    else if (entry.isFile()) fs.copyFileSync(srcPath, destPath)
-  }
-}
-
-function clearDirContents(dir: string) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    fs.rmSync(full, { recursive: true, force: true })
-  }
+async function clearDirContents(dir: string) {
+  if (!(await pathExists(dir))) return
+  const entries = await fs.readdir(dir, { withFileTypes: true })
+  await Promise.all(entries.map((entry) => fs.rm(path.join(dir, entry.name), { recursive: true, force: true })))
 }
 
 function relinkFilePaths(d: any, filesDir: string) {
@@ -129,23 +123,23 @@ function applyBackupDirSetting(dir: string | null | undefined) {
   return fallback
 }
 
-function migrateBackupFiles(sourceDir: string, targetDir: string) {
+async function migrateBackupFiles(sourceDir: string, targetDir: string) {
   if (pathsEqual(sourceDir, targetDir)) return 0
 
   let moved = 0
   try {
-    const files = fs.existsSync(sourceDir) ? fs.readdirSync(sourceDir) : []
+    const files = await pathExists(sourceDir) ? await fs.readdir(sourceDir) : []
     for (const fileName of files) {
       if (!BACKUP_FILE_PATTERN.test(fileName)) continue
       const sourceFile = path.join(sourceDir, fileName)
       const targetFile = path.join(targetDir, fileName)
       try {
-        if (fs.existsSync(targetFile)) continue
-        fs.copyFileSync(sourceFile, targetFile)
+        if (await pathExists(targetFile)) continue
+        await fs.copyFile(sourceFile, targetFile)
         const sourceSnapshot = snapshotDirForBackupFile(sourceFile)
         const targetSnapshot = snapshotDirForBackupFile(targetFile)
-        if (fs.existsSync(sourceSnapshot) && !fs.existsSync(targetSnapshot))
-          copyDirRecursive(sourceSnapshot, targetSnapshot)
+        if (await pathExists(sourceSnapshot) && !(await pathExists(targetSnapshot)))
+          await copyDirRecursive(sourceSnapshot, targetSnapshot)
         moved += 1
       } catch {
         /* skip individual files */
@@ -185,15 +179,15 @@ export function setBackupDir(dir: string | null | undefined): { ok: boolean; dir
  * to the new one. Copies only .sqlite files. If a file with the same name already exists
  * in the target directory, it will be skipped to avoid overwriting.
  */
-export function setBackupDirWithMigration(dir: string | null | undefined): {
+export async function setBackupDirWithMigration(dir: string | null | undefined): Promise<{
   ok: boolean
   dir: string
   moved: number
-} {
+}> {
   try {
     const previousDir = configuredBackupDir() ?? defaultBackupDir()
     const targetDir = applyBackupDirSetting(dir)
-    return { ok: true, dir: targetDir, moved: migrateBackupFiles(previousDir, targetDir) }
+    return { ok: true, dir: targetDir, moved: await migrateBackupFiles(previousDir, targetDir) }
   } catch {
     return { ok: false, dir: getBackupDir(), moved: 0 }
   }
@@ -223,15 +217,15 @@ export async function makeBackup(reason?: string): Promise<{ filePath: string }>
     } else {
       // Fallback: copy file directly (less safe with WAL but better than nothing)
       const { dbPath } = getCurrentDbInfo()
-      fs.copyFileSync(dbPath, out)
+      await fs.copyFile(dbPath, out)
     }
     const { filesDir } = getCurrentDbInfo()
-    if (fs.existsSync(snapshotDir)) fs.rmSync(snapshotDir, { recursive: true, force: true })
-    copyDirRecursive(filesDir, snapshotDir)
+    await removePathIfExists(snapshotDir)
+    await copyDirRecursive(filesDir, snapshotDir)
   } catch (e) {
     // If backup failed, ensure file does not remain as a partial
-    removeFileIfExists(out)
-    removeDirIfExists(snapshotDir)
+    await removePathIfExists(out)
+    await removePathIfExists(snapshotDir)
     throw e
   }
   try {
@@ -242,16 +236,16 @@ export async function makeBackup(reason?: string): Promise<{ filePath: string }>
   return { filePath: out }
 }
 
-export function listBackups(): { dir: string; backups: BackupEntry[] } {
+export async function listBackups(): Promise<{ dir: string; backups: BackupEntry[] }> {
   const dir = getBackupDir()
   const entries: BackupEntry[] = []
   try {
-    const files = fs.readdirSync(dir)
+    const files = await fs.readdir(dir)
     for (const f of files) {
       if (!BACKUP_FILE_PATTERN.test(f)) continue
       const full = path.join(dir, f)
       try {
-        const st = fs.statSync(full)
+        const st = await fs.stat(full)
         if (st.isFile()) entries.push({ filePath: full, size: st.size, mtime: st.mtimeMs })
       } catch {
         /* ignore */
@@ -266,11 +260,13 @@ export function listBackups(): { dir: string; backups: BackupEntry[] } {
 
 // Simple rotation: keep the most recent backup files; delete older ones.
 export async function rotateBackups(keep: number = 5): Promise<void> {
-  const { backups } = listBackups()
+  const { backups } = await listBackups()
   if (backups.length <= keep) return
   for (const backup of backups.slice(keep)) {
-    removeFileIfExists(backup.filePath)
-    removeDirIfExists(snapshotDirForBackupFile(backup.filePath))
+    await Promise.all([
+      removePathIfExists(backup.filePath),
+      removePathIfExists(snapshotDirForBackupFile(backup.filePath))
+    ])
   }
 }
 
@@ -372,7 +368,7 @@ export function inspectBackupDetailed(filePath: string): {
   return inspectDbFile(filePath, true)
 }
 
-export function restoreBackup(filePath: string): { ok: boolean; error?: string } {
+export async function restoreBackup(filePath: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const { dbPath, filesDir } = getCurrentDbInfo()
     const snapshotDir = snapshotDirForBackupFile(filePath)
@@ -382,11 +378,11 @@ export function restoreBackup(filePath: string): { ok: boolean; error?: string }
       /* ignore */
     }
 
-    fs.copyFileSync(filePath, dbPath)
+    await fs.copyFile(filePath, dbPath)
     ensureDir(filesDir)
-    if (fs.existsSync(snapshotDir)) {
-      clearDirContents(filesDir)
-      copyDirRecursive(snapshotDir, filesDir)
+    if (await pathExists(snapshotDir)) {
+      await clearDirContents(filesDir)
+      await copyDirRecursive(snapshotDir, filesDir)
     }
 
     const d = getDb()

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { CommonFilters } from './types'
+import { addDataChangedListener } from '../../utils/refresh'
 
 // Interactive donut for key-value pairs (hover shows Anteil % und Wert)
 function Donut({ data, colors, title }: { data: Array<{ key: string; value: number }>; colors: Record<string, string>; title: string }) {
@@ -98,8 +99,8 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [from, to])
 
   const sphereColors: Record<string, string> = {

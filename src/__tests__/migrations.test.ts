@@ -1,4 +1,10 @@
-import { ensureAdvanceTables, ensureAiTables, ensureBankImportTables, expandVoucherTypeConstraint } from '../../electron/main/db/migrations'
+import {
+  ensureAdvanceTables,
+  ensureAiTables,
+  ensureBankImportTables,
+  ensureJournalPerformanceIndexes,
+  expandVoucherTypeConstraint
+} from '../../electron/main/db/migrations'
 
 describe('expandVoucherTypeConstraint', () => {
   it('updates the vouchers table SQL to support INTERNAL voucher types', () => {
@@ -51,5 +57,22 @@ describe('ensureAdvanceTables', () => {
     const sql = exec.mock.calls.map((call) => String(call[0])).join('\n')
     expect(sql).toContain('payment_account_id INTEGER REFERENCES payment_accounts(id)')
     expect(sql).toContain('idx_member_advance_purchases_payment_account')
+  })
+})
+
+describe('ensureJournalPerformanceIndexes', () => {
+  it('indexes Journal ordering, common filters and attachment lookups', () => {
+    const exec = jest.fn()
+
+    ensureJournalPerformanceIndexes({ exec } as any)
+
+    const sql = String(exec.mock.calls[0][0])
+    expect(sql).toContain('idx_vouchers_date_id')
+    expect(sql).toContain('ON vouchers(date, id)')
+    expect(sql).toContain('idx_vouchers_type_date_id')
+    expect(sql).toContain('idx_vouchers_payment_account_date_id')
+    expect(sql).toContain('idx_vouchers_earmark_date_id')
+    expect(sql).toContain('idx_voucher_files_voucher')
+    expect(sql).toContain('idx_invoice_files_invoice')
   })
 })

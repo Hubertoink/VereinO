@@ -48,7 +48,7 @@ export interface SystemApi {
             runtime: string | null
             error: string | null
         }>
-        extract: (payload: { fileName: string; mimeType?: string | null; dataBase64: string }) => Promise<{
+        extract: (payload: { fileName: string; mimeType?: string | null; dataBytes?: Uint8Array; dataBase64?: string }) => Promise<{
             ok: boolean
             markdown: string
             text: string

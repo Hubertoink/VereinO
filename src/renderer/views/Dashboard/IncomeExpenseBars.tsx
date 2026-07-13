@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomeExpenseBarsProps } from './types'
+import { addDataChangedListener } from '../../utils/refresh'
 
 type Bucket = { month: string; gross: number }
 
@@ -51,8 +52,8 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [from, to])
 
   const labels = rowsIn.map(r => r.month)

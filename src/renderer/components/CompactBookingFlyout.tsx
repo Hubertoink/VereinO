@@ -3,6 +3,7 @@ import type { QA } from '../hooks/useQuickAdd'
 import { rememberBookingAIPattern } from '../utils/bookingAiPatterns'
 import TagsEditor from './TagsEditor'
 import DatePickerButton from './common/DatePickerButton'
+import HoverTooltip from './common/HoverTooltip'
 import { getInternalAssignmentValidationState } from './modals/voucherMetaValidation'
 
 type OptionalSection = 'budget' | 'earmark' | 'tags' | 'comment' | 'attachments'
@@ -435,7 +436,34 @@ export default function CompactBookingFlyout({
 
             {qa.type !== 'TRANSFER' && (
               <label className="compact-booking-field">
-                <span>Bereich</span>
+                <span className="booking-field-label-row">
+                  <span>Bereich</span>
+                  <HoverTooltip<HTMLButtonElement>
+                    preferredPlacement="bottom"
+                    className="tooltip-modal booking-sphere-tooltip"
+                    content={(
+                      <div className="booking-sphere-tooltip__content">
+                        <strong>Steuerliche Bereiche</strong>
+                        <div><b>Ideeller Bereich:</b> Satzungsarbeit ohne entgeltliche Marktleistung.</div>
+                        <div><b>Zweckbetrieb:</b> Wirtschaftliche Tätigkeit, die unmittelbar dem Satzungszweck dient.</div>
+                        <div><b>Vermögensverwaltung:</b> Erträge aus Vereinsvermögen, etwa Zinsen oder Vermietung.</div>
+                        <div><b>Wirtschaftlicher Geschäftsbetrieb:</b> Entgeltliche Tätigkeiten außerhalb des Zweckbetriebs.</div>
+                      </div>
+                    )}
+                  >
+                    {({ ref, props }) => (
+                      <button
+                        ref={ref}
+                        {...props}
+                        type="button"
+                        className="booking-inline-info"
+                        aria-label="Erklärung zu den steuerlichen Bereichen"
+                      >
+                        i
+                      </button>
+                    )}
+                  </HoverTooltip>
+                </span>
                 <select className="input" value={qa.sphere} onChange={(event) => patchQa({ sphere: event.target.value as QA['sphere'] })} aria-label="Sphäre der Buchung">
                   <option value="IDEELL">Ideeller Bereich</option>
                   <option value="ZWECK">Zweckbetrieb</option>
@@ -651,10 +679,9 @@ export default function CompactBookingFlyout({
 
         <footer className="compact-booking-flyout__footer">
           <div className={validationMessage ? 'compact-booking-error' : 'compact-booking-footer-hint'} role={validationMessage ? 'alert' : undefined}>
-            {validationMessage || (afterSaveDefault === 'new' ? 'Speichert und öffnet eine neue Buchung.' : draftTabsEnabled ? 'Schließen parkt diesen Entwurf im Reiter.' : 'Strg+S zum Speichern')}
+            {validationMessage || (afterSaveDefault === 'new' ? 'Speichert und öffnet eine neue Buchung.' : 'Strg+S zum Speichern')}
           </div>
           <div>
-            <button type="button" className="btn ghost" onClick={onClose}>{draftTabsEnabled ? 'Parken' : 'Abbrechen'}</button>
             <button type="submit" className="btn primary" disabled={saveBlocked}>Buchung speichern</button>
           </div>
         </footer>

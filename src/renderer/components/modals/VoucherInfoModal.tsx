@@ -313,7 +313,7 @@ Status: ${statusLabel}`
         position: 'fixed',
         inset: 0,
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: windowMode ? 'stretch' : 'center',
         justifyContent: 'center',
         background: windowMode ? 'transparent' : 'color-mix(in oklab, var(--surface) 65%, transparent)',
         padding: windowMode ? '0' : '24px 16px',

@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const SQLITE_ARTIFACTS = [
@@ -13,18 +13,18 @@ function isSubdirectory(parentDir: string, candidateDir: string): boolean {
     return relative.length > 0 && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
-export function deleteOrganizationStorage(orgRoot: string, managedOrganizationsRoot: string): void {
+export async function deleteOrganizationStorage(orgRoot: string, managedOrganizationsRoot: string): Promise<void> {
     const normalizedOrgRoot = path.resolve(orgRoot)
     const normalizedManagedRoot = path.resolve(managedOrganizationsRoot)
 
     if (isSubdirectory(normalizedManagedRoot, normalizedOrgRoot)) {
-        fs.rmSync(normalizedOrgRoot, { recursive: true, force: true })
+        await fs.rm(normalizedOrgRoot, { recursive: true, force: true })
         return
     }
 
     for (const fileName of SQLITE_ARTIFACTS) {
-        fs.rmSync(path.join(normalizedOrgRoot, fileName), { force: true })
+        await fs.rm(path.join(normalizedOrgRoot, fileName), { force: true })
     }
 
-    fs.rmSync(path.join(normalizedOrgRoot, 'files'), { recursive: true, force: true })
+    await fs.rm(path.join(normalizedOrgRoot, 'files'), { recursive: true, force: true })
 }

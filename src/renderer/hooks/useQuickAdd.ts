@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getInternalAssignmentValidationState } from '../components/modals/voucherMetaValidation'
 import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoiceScanModal'
 import type { BookingEntryPresentation } from '../context/UIPreferencesContextCore'
+import { encodeFilesForUpload } from '../utils/fileEncoding'
 
 type QA = {
     date: string
@@ -432,20 +433,8 @@ export function useQuickAdd(
             payload.bankTransactionId = (activeDraft.qa as any).bankTransactionId
         }
 
-        // Convert attachments to Base64
         if (activeDraft.files.length) {
-            const enc = async (f: File) => {
-                const buf = await f.arrayBuffer()
-                let binary = ''
-                const bytes = new Uint8Array(buf)
-                const chunk = 0x8000
-                for (let i = 0; i < bytes.length; i += chunk) {
-                    binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-                }
-                const dataBase64 = btoa(binary)
-                return { name: f.name, dataBase64, mime: f.type || undefined }
-            }
-            payload.files = await Promise.all(activeDraft.files.map(enc))
+            payload.files = await encodeFilesForUpload(activeDraft.files)
         }
 
         const res = await create(payload)

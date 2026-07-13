@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import { buildDonationReceiptHtml } from './donationReceiptTemplate'
 import { createExportPath, createExportStamp } from './exportPaths'
 
@@ -73,7 +73,7 @@ export async function exportMoneyDonationReceiptPdf(input: ExportMoneyDonationRe
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     const pdf = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
-    fs.writeFileSync(filePath, pdf)
+    await fs.writeFile(filePath, pdf)
   } finally {
     try {
       win.close()

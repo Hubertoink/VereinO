@@ -1,3 +1,7 @@
+import type { DataChangeScope } from '../../../shared/dataChange'
+import type { UploadFilePayload } from '../../../shared/filePayload'
+import type { DashboardSnapshot, DashboardSnapshotInput } from '../../../shared/dashboard'
+
 export interface QuickAddPayload {
     draftId?: string | null
     mode?: 'create' | 'invoice' | 'edit' | 'details' | 'delete' | 'reverse'
@@ -10,7 +14,7 @@ export interface QuickAddPayload {
     detached?: boolean
     qa?: unknown
     voucher?: unknown
-    files?: Array<{ name: string; dataBase64: string; mime?: string }>
+    files?: UploadFilePayload[]
     [key: string]: unknown
 }
 
@@ -33,7 +37,8 @@ export interface CoreApi {
     app: {
         version: () => Promise<{ version: string; name: string }>
         bootstrap: () => Promise<StartupBootstrapData>
-        notifyDataChanged: () => void
+        dashboardSnapshot: (payload: DashboardSnapshotInput) => Promise<DashboardSnapshot>
+        notifyDataChanged: (scopes?: DataChangeScope[]) => void
         onDataChanged: (callback: () => void) => () => void
     }
     workQueue: {

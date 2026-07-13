@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 
@@ -116,13 +117,13 @@ export function closeDb() {
 // Migrate database and attachments to a new root directory.
 // mode: 'use' -> just switch to the folder (expects a database.sqlite there), no copy
 //       'copy-overwrite' -> copy current DB and attachments to new root; rewrite attachment file paths
-export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 'copy-overwrite') {
+export async function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 'copy-overwrite') {
     if (!newRoot || typeof newRoot !== 'string') throw new Error('Ungültiger Zielordner')
     const normalizedTarget = path.resolve(newRoot)
-    if (!fs.existsSync(normalizedTarget)) fs.mkdirSync(normalizedTarget, { recursive: true })
+    await fsp.mkdir(normalizedTarget, { recursive: true })
     const dstRoot = normalizedTarget
     const dstFilesDir = path.join(dstRoot, 'files')
-    if (!fs.existsSync(dstFilesDir)) fs.mkdirSync(dstFilesDir, { recursive: true })
+    await fsp.mkdir(dstFilesDir, { recursive: true })
     const dstDbPath = path.join(dstRoot, 'database.sqlite')
 
     // Close current DB so OS file locks are released
@@ -149,7 +150,7 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
     }
 
     // copy-overwrite: copy DB file
-    try { fs.copyFileSync(srcDbPath, dstDbPath) } catch (e) { throw new Error('Kopieren der Datenbank fehlgeschlagen: ' + (e as any)?.message) }
+    try { await fsp.copyFile(srcDbPath, dstDbPath) } catch (e) { throw new Error('Kopieren der Datenbank fehlgeschlagen: ' + (e as any)?.message) }
 
     // Try to update attachment paths inside the copied DB and copy files
     try {
@@ -161,7 +162,7 @@ export function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 
             const src = path.join(srcFilesDir, baseName)
             const dst = path.join(dstFilesDir, baseName)
             try {
-                if (fs.existsSync(src)) fs.copyFileSync(src, dst)
+                if (fs.existsSync(src)) await fsp.copyFile(src, dst)
             } catch { /* ignore */ }
             d.prepare('UPDATE voucher_files SET file_path = ? WHERE id = ?').run(dst, r.id)
         }
@@ -348,7 +349,7 @@ export function renameOrganization(orgId: string, newName: string): { success: b
  * Delete an organization and optionally its data.
  * Cannot delete the last organization or the currently active one.
  */
-export function deleteOrganization(orgId: string, deleteData: boolean = false): { success: boolean } {
+export async function deleteOrganization(orgId: string, deleteData: boolean = false): Promise<{ success: boolean }> {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
 
@@ -374,7 +375,7 @@ export function deleteOrganization(orgId: string, deleteData: boolean = false): 
     // Optionally delete data folder
     if (deleteData && org.dbRoot) {
         try {
-            deleteOrganizationStorage(org.dbRoot, path.join(app.getPath('userData'), 'organizations'))
+            await deleteOrganizationStorage(org.dbRoot, path.join(app.getPath('userData'), 'organizations'))
         } catch (e) {
             console.warn('Could not delete org folder:', e)
         }

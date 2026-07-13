@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import { getCashCheckById } from '../repositories/cashChecks'
 import { getDb } from '../db/database'
 import { createExportPath, createExportStamp } from './exportPaths'
@@ -162,7 +162,7 @@ async function printHtmlToPdf(html: string, filePath: string) {
   try {
     await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
     const buff = await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
-    fs.writeFileSync(filePath, buff)
+    await fs.writeFile(filePath, buff)
   } finally {
     try {
       win.close()

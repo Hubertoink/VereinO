@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
 type PaymentAccount = {
   id: number
@@ -216,15 +217,6 @@ function statusLabel(status: BankTransaction['status']) {
   if (status === 'LINKED') return 'Zugeordnet'
   if (status === 'CHECKED') return 'Geprüft'
   return 'Offen'
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error)
-    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '')
-    reader.readAsDataURL(file)
-  })
 }
 
 function MappingSelect({
@@ -755,7 +747,7 @@ function BankImportModal({
 }) {
   const paymentAccountRef = React.useRef<HTMLSelectElement | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [fileBase64, setFileBase64] = useState('')
+  const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [mapping, setMapping] = useState<CsvMapping>({})
   const [paymentAccountId, setPaymentAccountId] = useState<number | null>(null)
@@ -765,12 +757,12 @@ function BankImportModal({
   const [commitResult, setCommitResult] = useState<ImportCommitResult | null>(null)
   const [selectedDuplicateRows, setSelectedDuplicateRows] = useState<number[]>([])
 
-  const loadPreview = async (nextFile: File, nextBase64: string, nextMapping?: CsvMapping) => {
+  const loadPreview = async (nextFile: File, nextBytes: Uint8Array, nextMapping?: CsvMapping) => {
     setBusy(true)
     setError('')
     try {
       const result = (await window.api.bankImports.preview({
-        fileBase64: nextBase64,
+        fileBytes: nextBytes,
         fileName: nextFile.name,
         mapping: nextMapping
       })) as ImportPreview
@@ -795,13 +787,13 @@ function BankImportModal({
       return
     }
     setFile(nextFile)
-    const nextBase64 = await fileToBase64(nextFile)
-    setFileBase64(nextBase64)
-    await loadPreview(nextFile, nextBase64)
+    const nextBytes = new Uint8Array(await nextFile.arrayBuffer())
+    setFileBytes(nextBytes)
+    await loadPreview(nextFile, nextBytes)
   }
 
   const commit = async () => {
-    if (!file || !fileBase64) return
+    if (!file || !fileBytes) return
     if (!paymentAccountId) {
       setPaymentAccountError(true)
       window.setTimeout(() => paymentAccountRef.current?.focus(), 0)
@@ -811,7 +803,7 @@ function BankImportModal({
     setError('')
     try {
       const result = (await window.api.bankImports.commit({
-        fileBase64,
+        fileBytes,
         fileName: file.name,
         paymentAccountId,
         mapping: preview?.format === 'CSV' ? mapping : undefined
@@ -833,12 +825,12 @@ function BankImportModal({
   }
 
   const importSelectedDuplicates = async () => {
-    if (!file || !fileBase64 || !paymentAccountId || selectedDuplicateRows.length === 0) return
+    if (!file || !fileBytes || !paymentAccountId || selectedDuplicateRows.length === 0) return
     setBusy(true)
     setError('')
     try {
       const result = (await window.api.bankImports.commit({
-        fileBase64,
+        fileBytes,
         fileName: file.name,
         paymentAccountId,
         mapping: preview?.format === 'CSV' ? mapping : undefined,
@@ -980,7 +972,7 @@ function BankImportModal({
                   <button
                     className="btn"
                     disabled={busy}
-                    onClick={() => file && void loadPreview(file, fileBase64, mapping)}
+                    onClick={() => file && fileBytes && void loadPreview(file, fileBytes, mapping)}
                   >
                     Vorschau aktualisieren
                   </button>
@@ -1569,8 +1561,7 @@ export default function BankImportView({
       void load()
       void loadImportStatus()
     }
-    window.addEventListener('data-changed', refresh)
-    return () => window.removeEventListener('data-changed', refresh)
+    return addDataChangedListener(['bank-imports', 'vouchers'], refresh)
   }, [load, loadImportStatus])
 
   const activeAccounts = useMemo(
@@ -1814,7 +1805,7 @@ export default function BankImportView({
           notify={notify}
           onClose={() => setSelected(null)}
           onChanged={() => {
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['bank-imports', 'vouchers'])
             void load()
           }}
           onCreateBooking={onCreateBooking}

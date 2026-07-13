@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import ExcelJS from 'exceljs'
@@ -274,9 +274,9 @@ const reportFieldLabels: Record<string, string> = {
   tags: 'Tags'
 }
 
-function ensureReportExportDir() {
+async function ensureReportExportDir() {
   const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  fs.mkdirSync(baseDir, { recursive: true })
+  await fs.mkdir(baseDir, { recursive: true })
   return baseDir
 }
 
@@ -373,7 +373,7 @@ function renderAgentContentHtml(markdown: string) {
 }
 
 async function exportAgentContentPdf(args: AgentContentPdfExportInput) {
-  const dir = ensureReportExportDir()
+  const dir = await ensureReportExportDir()
   const filePath = path.join(dir, `${safeFilePart(args.fileName || args.title, 'VereinO-Agent-PDF')}_${reportStamp()}.pdf`)
   const title = args.title || 'VereinO Agent PDF'
   const html = `<!doctype html>
@@ -395,7 +395,7 @@ ${renderAgentContentHtml(args.body)}
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     const pdf = await win.webContents.printToPDF({ printBackground: true })
-    fs.writeFileSync(filePath, pdf)
+    await fs.writeFile(filePath, pdf)
   } finally {
     win.destroy()
   }
@@ -538,7 +538,7 @@ ${includeVoucherList ? `<section class="card" style="margin-top:12px"><h2>Buchun
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     const pdf = await win.webContents.printToPDF({ printBackground: true })
-    fs.writeFileSync(filePath, pdf)
+    await fs.writeFile(filePath, pdf)
   } finally {
     win.destroy()
   }
@@ -547,7 +547,7 @@ ${includeVoucherList ? `<section class="card" style="margin-top:12px"><h2>Buchun
 async function exportAgentReport(args: AgentReportExportInput) {
   const rows = reportRows(args)
   const fields = args.fields?.length ? args.fields : ['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount', 'tags']
-  const dir = ensureReportExportDir()
+  const dir = await ensureReportExportDir()
   const fileBase = `${args.type === 'JOURNAL' ? 'Journal' : 'Controlling'}_${reportStamp()}`
   const filePath = path.join(dir, `${fileBase}.${args.format.toLowerCase()}`)
   const outNegative = args.amountMode === 'OUT_NEGATIVE'
@@ -555,7 +555,7 @@ async function exportAgentReport(args: AgentReportExportInput) {
   if (args.format === 'CSV') {
     const header = fields.map((field) => csvValue(reportFieldLabels[field] || field)).join(';')
     const body = rows.map((row: any) => fields.map((field) => csvValue(reportCell(row, field, outNegative))).join(';')).join('\n')
-    fs.writeFileSync(filePath, `${header}\n${body}`, 'utf8')
+    await fs.writeFile(filePath, `${header}\n${body}`, 'utf8')
   } else if (args.format === 'XLSX') {
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet(args.title || 'VereinO Export')

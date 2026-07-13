@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
-import { bufferToBase64Safe } from '../utils/fileEncoding'
 
 type BatchItem = TAiInvoiceBatchListOutput['rows'][number]
 
@@ -87,7 +86,7 @@ export default function InvoiceBatchControl({
     try {
       const payload = await Promise.all(pdfs.map(async (file) => ({
         fileName: file.name,
-        dataBase64: bufferToBase64Safe(await file.arrayBuffer())
+        dataBytes: new Uint8Array(await file.arrayBuffer())
       })))
       const result = await window.api.ai.invoiceBatch.import({ files: payload })
       const duplicates = result.duplicates || []

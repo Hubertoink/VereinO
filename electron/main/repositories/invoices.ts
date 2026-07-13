@@ -5,6 +5,8 @@ import { getAppDataDir, getDb, withTransaction } from '../db/database'
 import { createVoucher } from './vouchers'
 import { setVoucherTags } from './tags'
 import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
+import { filePayloadToBuffer } from '../services/filePayload'
+import type { FileDataPayload, UploadFilePayload } from '../../../shared/filePayload'
 
  type DB = InstanceType<typeof Database>
 
@@ -157,7 +159,7 @@ export function createInvoice(input: {
   earmarks?: InvoiceEarmarkAssignment[]
   autoPost?: boolean
   voucherType: 'IN' | 'OUT'
-  files?: { name: string; dataBase64: string; mime?: string }[]
+  files?: UploadFilePayload[]
   tags?: string[]
 }) {
   return withTransaction((d: DB) => {
@@ -188,7 +190,7 @@ export function createInvoice(input: {
     if (input.files?.length) {
       const { filesDir } = getAppDataDir()
       for (const f of input.files) {
-        const buff = Buffer.from(f.dataBase64, 'base64')
+        const buff = filePayloadToBuffer(f)
         const safe = `${id}-${Date.now()}-${f.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
         const abs = path.join(filesDir, safe)
         fs.writeFileSync(abs, buff)
@@ -478,10 +480,10 @@ export function listFilesForInvoice(invoiceId: number) {
 }
 
 // Add a new file to an existing invoice
-export function addFileToInvoice(invoiceId: number, fileName: string, dataBase64: string, mime?: string) {
+export function addFileToInvoice(invoiceId: number, fileName: string, data: FileDataPayload, mime?: string) {
   const d = getDb()
   const { filesDir } = getAppDataDir()
-  const buff = Buffer.from(dataBase64, 'base64')
+  const buff = filePayloadToBuffer(data)
   const safeName = `${invoiceId}-${Date.now()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
   const abs = path.join(filesDir, safeName)
   fs.writeFileSync(abs, buff)

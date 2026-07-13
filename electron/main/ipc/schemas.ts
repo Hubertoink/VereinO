@@ -16,6 +16,33 @@ const VoucherEarmarkAssignment = z.object({
   amount: z.number()
 })
 
+const BinaryBytes = z.custom<Uint8Array>(
+  (value) => value instanceof Uint8Array,
+  'Ungültige Binärdaten'
+)
+const FileDataFields = {
+  dataBytes: BinaryBytes.optional(),
+  dataBase64: z.string().optional()
+}
+const hasFileData = (value: { dataBytes?: Uint8Array; dataBase64?: string }) =>
+  (value.dataBytes instanceof Uint8Array && value.dataBytes.byteLength > 0) ||
+  (typeof value.dataBase64 === 'string' && value.dataBase64.length > 0)
+const ImportFileFields = {
+  fileBytes: BinaryBytes.optional(),
+  fileBase64: z.string().optional()
+}
+const hasImportFileData = (value: { fileBytes?: Uint8Array; fileBase64?: string }) =>
+  (value.fileBytes instanceof Uint8Array && value.fileBytes.byteLength > 0) ||
+  (typeof value.fileBase64 === 'string' && value.fileBase64.length > 0)
+
+export const UploadFileInput = z
+  .object({
+    name: z.string(),
+    ...FileDataFields,
+    mime: z.string().optional()
+  })
+  .refine(hasFileData, { message: 'Dateidaten fehlen.' })
+
 export const VoucherCreateInput = z
   .object({
     date: z.string(),
@@ -43,15 +70,7 @@ export const VoucherCreateInput = z
     // Optional: multiple budget/earmark assignments
     budgets: z.array(VoucherBudgetAssignment).optional(),
     earmarks: z.array(VoucherEarmarkAssignment).optional(),
-    files: z
-      .array(
-        z.object({
-          name: z.string(),
-          dataBase64: z.string(),
-          mime: z.string().optional()
-        })
-      )
-      .optional(),
+    files: z.array(UploadFileInput).optional(),
     tags: z.array(z.string()).optional(),
     bankTransactionId: z.number().int().positive().optional()
   })
@@ -559,9 +578,7 @@ export const InvoiceCreateInput = z.object({
   voucherType: z.enum(['IN', 'OUT']),
   budgets: z.array(z.object({ budgetId: z.number(), amount: z.number().optional() })).optional(),
   earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number().optional() })).optional(),
-  files: z
-    .array(z.object({ name: z.string(), dataBase64: z.string(), mime: z.string().optional() }))
-    .optional(),
+  files: z.array(UploadFileInput).optional(),
   tags: z.array(z.string()).optional()
 })
 export const InvoiceCreateOutput = z.object({ id: z.number() })
@@ -742,9 +759,9 @@ export const InvoiceFilesListOutput = z.object({
 export const InvoiceFileAddInput = z.object({
   invoiceId: z.number(),
   fileName: z.string(),
-  dataBase64: z.string(),
+  ...FileDataFields,
   mimeType: z.string().optional()
-})
+}).refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const InvoiceFileAddOutput = z.object({ id: z.number() })
 export const InvoiceFileDeleteInput = z.object({ fileId: z.number() })
 export const InvoiceFileDeleteOutput = z.object({ id: z.number() })
@@ -1207,15 +1224,7 @@ export const AdvancePurchaseCreateInput = z
     projectId: z.number().optional(),
     budgets: z.array(VoucherBudgetAssignment).optional(),
     earmarks: z.array(VoucherEarmarkAssignment).optional(),
-    files: z
-      .array(
-        z.object({
-          name: z.string(),
-          dataBase64: z.string(),
-          mime: z.string().optional()
-        })
-      )
-      .optional(),
+    files: z.array(UploadFileInput).optional(),
     tags: z.array(z.string()).optional()
   })
   .refine((v) => v.netAmount != null || v.grossAmount != null, {
@@ -1242,15 +1251,7 @@ export const AdvancePurchaseUpdateInput = z
     projectId: z.number().optional(),
     budgets: z.array(VoucherBudgetAssignment).optional(),
     earmarks: z.array(VoucherEarmarkAssignment).optional(),
-    files: z
-      .array(
-        z.object({
-          name: z.string(),
-          dataBase64: z.string(),
-          mime: z.string().optional()
-        })
-      )
-      .optional(),
+    files: z.array(UploadFileInput).optional(),
     tags: z.array(z.string()).optional()
   })
   .refine((v) => v.netAmount != null || v.grossAmount != null, {
@@ -1306,7 +1307,9 @@ export type TQuoteWeeklyInput = z.infer<typeof QuoteWeeklyInput>
 export type TQuoteWeeklyOutput = z.infer<typeof QuoteWeeklyOutput>
 
 // Imports (Excel)
-export const ImportPreviewInput = z.object({ fileBase64: z.string() })
+export const ImportPreviewInput = z
+  .object(ImportFileFields)
+  .refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 export const ImportPreviewOutput = z.object({
   headers: z.array(z.string()),
   sample: z.array(z.record(z.any())),
@@ -1314,9 +1317,9 @@ export const ImportPreviewOutput = z.object({
   headerRowIndex: z.number()
 })
 export const ImportExecuteInput = z.object({
-  fileBase64: z.string(),
+  ...ImportFileFields,
   mapping: z.record(z.string().nullable())
-})
+}).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 export const ImportExecuteOutput = z.object({
   imported: z.number(),
   skipped: z.number(),
@@ -1370,10 +1373,10 @@ const ImportMissingSchema = z.object({
 })
 
 export const ImportAnalyzeInput = z.object({
-  fileBase64: z.string(),
+  ...ImportFileFields,
   mapping: z.record(z.string().nullable()),
   rules: z.array(ImportRuleSchema).optional()
-})
+}).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 
 export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
   rows: z.array(ImportDraftRowSchema),
@@ -1450,11 +1453,14 @@ const BankCsvMappingSchema = z.object({
   accountIban: z.string().nullable().optional()
 })
 
-export const BankImportPreviewInput = z.object({
-  fileBase64: z.string(),
+const BankImportInputBase = z.object({
+  ...ImportFileFields,
   fileName: z.string().min(1),
   paymentAccountId: z.number().int().positive().nullable().optional(),
   mapping: BankCsvMappingSchema.optional()
+})
+export const BankImportPreviewInput = BankImportInputBase.refine(hasImportFileData, {
+  message: 'Importdatei fehlt.'
 })
 
 const BankImportPreviewRow = z.object({
@@ -1482,9 +1488,9 @@ export const BankImportPreviewOutput = z.object({
   summary: z.object({ total: z.number(), valid: z.number(), errors: z.number() })
 })
 
-export const BankImportCommitInput = BankImportPreviewInput.extend({
+export const BankImportCommitInput = BankImportInputBase.extend({
   forceImportSourceRows: z.array(z.number().int().positive()).optional()
-})
+}).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 
 const BankImportDuplicateRow = z.object({
   sourceRow: z.number(),
@@ -1603,19 +1609,21 @@ export const AttachmentOpenOutput = z.object({ ok: z.boolean() })
 export const AttachmentSaveAsInput = z.object({ fileId: z.number() })
 export const AttachmentSaveAsOutput = z.object({ filePath: z.string() })
 export const AttachmentReadInput = z.object({ fileId: z.number() })
-export const AttachmentReadOutput = z.object({
-  fileName: z.string(),
-  mimeType: z.string().optional(),
-  dataBase64: z.string()
-})
+export const AttachmentReadOutput = z
+  .object({
+    fileName: z.string(),
+    mimeType: z.string().optional(),
+    ...FileDataFields
+  })
+  .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 
 // Attachments add/delete
 export const AttachmentAddInput = z.object({
   voucherId: z.number(),
   fileName: z.string(),
-  dataBase64: z.string(),
+  ...FileDataFields,
   mimeType: z.string().optional()
-})
+}).refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const AttachmentAddOutput = z.object({ id: z.number() })
 export const AttachmentDeleteInput = z.object({ fileId: z.number() })
 export const AttachmentDeleteOutput = z.object({ id: z.number() })
@@ -1701,7 +1709,10 @@ export const MembersListInput = z
     limit: z.number().min(1).max(200).default(50).optional(),
     offset: z.number().min(0).default(0).optional(),
     sortBy: z.enum(['memberNo', 'name', 'email', 'status']).optional(),
-    sort: z.enum(['ASC', 'DESC']).optional()
+    sort: z.enum(['ASC', 'DESC']).optional(),
+    contributionFilter: z.enum(['ALL', 'DUE', 'NOT_DUE', 'NO_PLAN']).optional(),
+    intervalFilter: z.enum(['ALL', 'MONTHLY', 'QUARTERLY', 'YEARLY']).optional(),
+    boardFilter: z.enum(['ALL', 'ANY', 'NONE', 'V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT']).optional()
   })
   .optional()
 const BoardRole = z.enum(['V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])
@@ -2204,15 +2215,23 @@ const AiInvoiceMimeType = z.enum([
 ])
 const MAX_AI_INVOICE_BASE64_LENGTH = 4 * Math.ceil((10 * 1024 * 1024) / 3)
 export const AiInvoiceExtractInput = z.object({
-  file: z.object({
-    fileName: z.string().trim().min(1).max(255),
-    mimeType: AiInvoiceMimeType,
-    dataBase64: z
-      .string()
-      .min(1)
-      .max(MAX_AI_INVOICE_BASE64_LENGTH)
-      .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Ungültige Base64-Datei')
-  })
+  file: z
+    .object({
+      fileName: z.string().trim().min(1).max(255),
+      mimeType: AiInvoiceMimeType,
+      ...FileDataFields
+    })
+    .refine(hasFileData, { message: 'Dateidaten fehlen.' })
+    .refine(
+      (file) =>
+        (file.dataBytes?.byteLength ?? 0) <= 10 * 1024 * 1024 &&
+        (file.dataBase64?.length ?? 0) <= MAX_AI_INVOICE_BASE64_LENGTH,
+      { message: 'Die Datei ist zu groß.' }
+    )
+    .refine(
+      (file) => !file.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(file.dataBase64),
+      { message: 'Ungültige Base64-Datei' }
+    )
 })
 export const AiInvoiceExtractOutput = z.object({
   model: z.string(),
@@ -2220,10 +2239,12 @@ export const AiInvoiceExtractOutput = z.object({
   usage: AiUsageSchema
 })
 
-export const AiInvoiceBatchFileInput = z.object({
-  fileName: z.string().min(1).max(255),
-  dataBase64: z.string().min(1)
-})
+export const AiInvoiceBatchFileInput = z
+  .object({
+    fileName: z.string().min(1).max(255),
+    ...FileDataFields
+  })
+  .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const AiInvoiceBatchImportInput = z.object({
   files: z.array(AiInvoiceBatchFileInput).min(1).max(50)
 })

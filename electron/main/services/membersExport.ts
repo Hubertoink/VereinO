@@ -3,7 +3,7 @@
  * Generates Excel (XLSX) and PDF exports of member data
  */
 
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import { BrowserWindow } from 'electron'
 import { listMembers, MemberRow, MemberStatus } from '../repositories/members'
 import { createExportPath, createExportStamp } from './exportPaths'
@@ -312,7 +312,7 @@ async function printMembersPdf(html: string, filePath: string, landscape: boolea
         right: 0.5
       }
     })
-    fs.writeFileSync(filePath, pdfData)
+    await fs.writeFile(filePath, pdfData)
   } finally {
     win.destroy()
   }

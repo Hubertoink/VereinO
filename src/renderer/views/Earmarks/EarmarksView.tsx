@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { addDataChangedListener } from '../../utils/refresh'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
 
@@ -78,8 +79,7 @@ export default function EarmarksView({
   useEffect(() => {
     loadBindings()
     const onChanged = () => loadBindings()
-    window.addEventListener('data-changed', onChanged)
-    return () => window.removeEventListener('data-changed', onChanged)
+    return addDataChangedListener(['earmarks', 'vouchers'], onChanged)
   }, [showArchived])
 
   const archivedCount = useMemo(() => allBindings.filter((b) => !b.isActive).length, [allBindings])
@@ -178,9 +178,23 @@ export default function EarmarksView({
             placeholder="Suche (Code, Name, Zeitraum, Beschreibung)"
             style={{ flex: 1, minWidth: 260 }}
           />
-          <div className="btn-group" role="group" aria-label="Kartenansicht">
-            <button type="button" className={`btn-option ${!compactCards ? 'active' : ''}`} onClick={() => setCompactCards(false)}>Detail</button>
-            <button type="button" className={`btn-option ${compactCards ? 'active' : ''}`} onClick={() => setCompactCards(true)}>Kompakt</button>
+          <div className="btn-group presentation-segmented-control" role="group" aria-label="Darstellung der Zweckbindungskarten">
+            <button
+              type="button"
+              className={`btn-option ${!compactCards ? 'active' : ''}`}
+              aria-pressed={!compactCards}
+              onClick={() => setCompactCards(false)}
+            >
+              Detail
+            </button>
+            <button
+              type="button"
+              className={`btn-option ${compactCards ? 'active' : ''}`}
+              aria-pressed={compactCards}
+              onClick={() => setCompactCards(true)}
+            >
+              Kompakt
+            </button>
           </div>
           <div className="helper">{visibleBindings.length} von {bindings.length}</div>
         </div>

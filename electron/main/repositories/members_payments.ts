@@ -6,6 +6,17 @@ type DB = InstanceType<typeof Database>
 
 export type Interval = 'MONTHLY'|'QUARTERLY'|'YEARLY'
 
+export type MemberPaymentStatusInput = {
+  id: number
+  contribution_interval?: Interval | null
+  contribution_amount?: number | null
+  next_due_date?: string | null
+  join_date?: string | null
+  leave_date?: string | null
+}
+
+type MemberPaymentRow = { memberId: number; periodKey: string; datePaid?: string | null }
+
 export function periodKeyFromDate(d: Date, interval: Interval): string {
   const y = d.getUTCFullYear()
   if (interval === 'MONTHLY') {
@@ -281,16 +292,14 @@ export function history(input: { memberId: number; limit?: number; offset?: numb
   return { rows, total: rows.length }
 }
 
-export function status(input: { memberId: number }) {
-  const d = getDb()
-  const m = d.prepare('SELECT contribution_interval as interval, contribution_amount as amount, next_due_date as nextDue, join_date as joinDate, leave_date as leaveDate FROM members WHERE id = ?').get(input.memberId) as any
+function computeMemberPaymentStatus(m: any, paidRows: MemberPaymentRow[]) {
   if (!m || !m.interval) return { hasPlan: 0, state: 'NONE' as const }
   const interval = m.interval as Interval
   const amount = Number(m.amount || 0)
   const leaveDate = m.leaveDate as string | null
   let nextDue = m.nextDue as string | null
   // last paid
-  const last = d.prepare('SELECT period_key as periodKey, date_paid as datePaid FROM membership_payments WHERE member_id = ? ORDER BY period_key DESC LIMIT 1').get(input.memberId) as any
+  const last = paidRows[0]
   const lastPeriod = last?.periodKey || null
   const lastDate = last?.datePaid || null
   const today = new Date()
@@ -303,7 +312,6 @@ export function status(input: { memberId: number }) {
     nextDue = start
   }
   // Build set of paid period keys for overdue calc
-  const paidRows = d.prepare('SELECT period_key as periodKey FROM membership_payments WHERE member_id = ?').all(input.memberId) as any[]
   const paidSet = new Set((paidRows || []).map(r => r.periodKey))
   // Determine effective end key: if member left, use leave date period, else today
   const leaveKey = leaveDate ? periodKeyFromDate(new Date(leaveDate), interval) : null
@@ -328,21 +336,68 @@ export function status(input: { memberId: number }) {
   return { hasPlan: 1, interval, amount, lastPeriod, lastDate, nextDue: nextDue || null, overdue, state, joinDate: m.joinDate || null, leaveDate: leaveDate || null, firstOverdue: firstOverdue || null }
 }
 
+export function getMemberPaymentStatuses(members: MemberPaymentStatusInput[]) {
+  const d = getDb()
+  const ids = members.map((member) => Number(member.id)).filter((id) => Number.isFinite(id))
+  const paidByMember = new Map<number, MemberPaymentRow[]>()
+
+  // Stay below SQLite's common parameter limit while still avoiding per-member queries.
+  for (let start = 0; start < ids.length; start += 500) {
+    const chunk = ids.slice(start, start + 500)
+    if (!chunk.length) continue
+    const placeholders = chunk.map(() => '?').join(',')
+    const rows = d.prepare(`
+      SELECT member_id as memberId, period_key as periodKey, date_paid as datePaid
+      FROM membership_payments
+      WHERE member_id IN (${placeholders})
+      ORDER BY member_id, period_key DESC
+    `).all(...chunk) as MemberPaymentRow[]
+    for (const row of rows) {
+      const list = paidByMember.get(row.memberId) || []
+      list.push(row)
+      paidByMember.set(row.memberId, list)
+    }
+  }
+
+  const result = new Map<number, ReturnType<typeof computeMemberPaymentStatus>>()
+  for (const member of members) {
+    result.set(member.id, computeMemberPaymentStatus({
+      interval: member.contribution_interval,
+      amount: member.contribution_amount,
+      nextDue: member.next_due_date,
+      joinDate: member.join_date,
+      leaveDate: member.leave_date
+    }, paidByMember.get(member.id) || []))
+  }
+  return result
+}
+
+export function status(input: { memberId: number }) {
+  const d = getDb()
+  const member = d.prepare(`
+    SELECT id, contribution_interval, contribution_amount, next_due_date, join_date, leave_date
+    FROM members WHERE id = ?
+  `).get(input.memberId) as MemberPaymentStatusInput | undefined
+  if (!member) return { hasPlan: 0, state: 'NONE' as const }
+  return getMemberPaymentStatuses([member]).get(member.id) || { hasPlan: 0, state: 'NONE' as const }
+}
+
 export function dueSummary() {
   const d = getDb()
   const includePaused = !!getSetting<boolean>('membership.includePaused')
   const statuses = includePaused ? ["'ACTIVE'", "'PAUSED'"] : ["'ACTIVE'"]
   const members = d.prepare(`
-    SELECT id
+    SELECT id, contribution_interval, contribution_amount, next_due_date, join_date, leave_date
     FROM members
     WHERE contribution_amount IS NOT NULL
       AND contribution_interval IS NOT NULL
       AND status IN (${statuses.join(',')})
-  `).all() as Array<{ id: number }>
+  `).all() as MemberPaymentStatusInput[]
+  const statusesByMember = getMemberPaymentStatuses(members)
   let dueMembers = 0
   let duePeriods = 0
   for (const member of members) {
-    const s = status({ memberId: member.id })
+    const s = statusesByMember.get(member.id)
     const overdue = Number((s as any)?.overdue || 0)
     if (overdue > 0) {
       dueMembers += 1

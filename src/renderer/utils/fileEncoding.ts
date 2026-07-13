@@ -1,8 +1,6 @@
-export type Base64UploadFile = {
-  name: string
-  dataBase64: string
-  mime?: string
-}
+import type { UploadFilePayload } from '../../../shared/filePayload'
+
+export type BinaryUploadFile = UploadFilePayload & { dataBytes: Uint8Array }
 
 export function bufferToBase64Safe(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf)
@@ -28,14 +26,23 @@ export function base64ToFile(name: string, dataBase64: string, mime?: string): F
   return new File([stableBytes], name, { type: mime || '' })
 }
 
-async function encodeFileForUpload(file: File): Promise<Base64UploadFile> {
+export function uploadPayloadToFile(payload: UploadFilePayload): File {
+  if (payload.dataBytes instanceof Uint8Array) {
+    const bytes = new Uint8Array(payload.dataBytes.byteLength)
+    bytes.set(payload.dataBytes)
+    return new File([bytes], payload.name, { type: payload.mime || '' })
+  }
+  return base64ToFile(payload.name, payload.dataBase64 || '', payload.mime)
+}
+
+export async function encodeFileForUpload(file: File): Promise<BinaryUploadFile> {
   return {
     name: file.name,
-    dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+    dataBytes: new Uint8Array(await file.arrayBuffer()),
     mime: file.type || undefined
   }
 }
 
-export async function encodeFilesForUpload(files: File[]): Promise<Base64UploadFile[]> {
+export async function encodeFilesForUpload(files: File[]): Promise<BinaryUploadFile[]> {
   return Promise.all(files.map((file) => encodeFileForUpload(file)))
 }

@@ -3,6 +3,8 @@ import { useToast } from '../../context/useToast'
 import QuickAddModal from '../../components/modals/QuickAddModal'
 import DatePickerButton from '../../components/common/DatePickerButton'
 import type { QA } from '../../hooks/useQuickAdd'
+import { dispatchDataChanged } from '../../utils/refresh'
+import { encodeFilesForUpload } from '../../utils/fileEncoding'
 
 type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 
@@ -388,7 +390,7 @@ export default function AdvancesView() {
       })
       await loadList()
       notify('success', 'Vorschuss erfasst')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {
@@ -427,7 +429,7 @@ export default function AdvancesView() {
       })
       await Promise.all([loadList(), loadDetail(advanceId)])
       notify('success', 'Vorschuss aufgelöst')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {
@@ -451,7 +453,7 @@ export default function AdvancesView() {
       setDetail(null)
       setSelectedId(null)
       await loadList()
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {
@@ -523,18 +525,7 @@ export default function AdvancesView() {
     if (Array.isArray((qa as any).tags)) payload.tags = (qa as any).tags
 
     if (purchaseFiles.length) {
-      const enc = async (f: File) => {
-        const buf = await f.arrayBuffer()
-        let binary = ''
-        const bytes = new Uint8Array(buf)
-        const chunk = 0x8000
-        for (let i = 0; i < bytes.length; i += chunk) {
-          binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-        }
-        const dataBase64 = btoa(binary)
-        return { name: f.name, dataBase64, mime: f.type || undefined }
-      }
-      payload.files = await Promise.all(purchaseFiles.map(enc))
+      payload.files = await encodeFilesForUpload(purchaseFiles)
     }
 
     try {
@@ -556,7 +547,7 @@ export default function AdvancesView() {
       }))
       await Promise.all([loadList(), loadDetail(advanceId)])
       notify('success', editPurchaseId ? 'Buchung aktualisiert' : 'Buchung hinzugefügt')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     }
@@ -584,7 +575,7 @@ export default function AdvancesView() {
       setDeletePurchaseConfirm(null)
       await Promise.all([loadList(), loadDetail(advanceId)])
       notify('success', 'Buchung entfernt')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {
@@ -606,7 +597,7 @@ export default function AdvancesView() {
       setResolveConfirmOpen(false)
       await Promise.all([loadList(), loadDetail(advanceId)])
       notify('success', 'Vorschuss aufgelöst')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {

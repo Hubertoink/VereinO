@@ -38,14 +38,6 @@ type Props = {
   parseAmount: (input: string) => number | null
 }
 
-const PAYMENT_ACCOUNT_KIND_LABEL: Record<string, string> = {
-  CASH: 'Bar',
-  BANK: 'Bank',
-  PAYPAL: 'PayPal',
-  CARD: 'Karte',
-  OTHER: 'Sonstiges'
-}
-
 export default function InvoiceFormModal({
   form,
   formError,
@@ -243,6 +235,7 @@ export default function InvoiceFormModal({
                       <select
                         id="invoice-account"
                         className="input"
+                        style={{ color: paymentAccountById.get(Number(form.draft.paymentAccountId || 0))?.color || undefined }}
                         value={form.draft.paymentAccountId ?? ''}
                         onChange={(e) => {
                           const nextAccountId = e.target.value ? Number(e.target.value) : ''
@@ -255,8 +248,8 @@ export default function InvoiceFormModal({
                       >
                         <option value="" />
                         {activePaymentAccounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {(PAYMENT_ACCOUNT_KIND_LABEL[account.kind || 'OTHER'] || 'Sonstiges') + ' · ' + account.name}
+                          <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>
+                            {account.name}
                           </option>
                         ))}
                       </select>

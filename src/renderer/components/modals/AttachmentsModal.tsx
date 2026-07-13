@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../../context/useToast'
 import { notifyDataChanged } from '../../utils/refresh'
-import { base64ToUint8Array, bufferToBase64Safe } from '../../utils/fileEncoding'
+import { base64ToUint8Array, encodeFileForUpload } from '../../utils/fileEncoding'
 
 // Vite will copy the worker file and return a URL string
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -97,9 +97,14 @@ export default function AttachmentsModal({
     const currentPreviewRequestRef = useRef(0)
     const [previewAreaWidth, setPreviewAreaWidth] = useState<number>(0)
 
+    const revokePreview = (value: PreviewState) => {
+        if (value?.kind === 'image' && value.url.startsWith('blob:')) URL.revokeObjectURL(value.url)
+    }
+
     useEffect(() => {
         let alive = true
         setLoading(true); setError('')
+        for (const value of previewCacheRef.current.values()) revokePreview(value)
         previewCacheRef.current.clear()
         pdfDocCacheRef.current.clear()
         pdfDocRef.current = null
@@ -117,6 +122,8 @@ export default function AttachmentsModal({
         return () => {
             alive = false
             window.removeEventListener('keydown', onKey)
+            for (const value of previewCacheRef.current.values()) revokePreview(value)
+            previewCacheRef.current.clear()
         }
     }, [voucher.voucherId])
 
@@ -147,14 +154,20 @@ export default function AttachmentsModal({
         try {
             const res = await (window as any).api?.attachments.read?.({ fileId: id })
             if (!res || currentPreviewRequestRef.current !== requestId) return
+            const bytes = res.dataBytes instanceof Uint8Array
+                ? res.dataBytes
+                : base64ToUint8Array(String(res.dataBase64 || ''))
             if (isImg) {
-                const nextPreview: Exclude<PreviewState, null> = { kind: 'image', url: `data:${res.mimeType || 'image/*'};base64,${res.dataBase64}` }
+                const nextPreview: Exclude<PreviewState, null> = {
+                    kind: 'image',
+                    url: URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'image/*' }))
+                }
                 previewCacheRef.current.set(id, nextPreview)
                 setPreview(nextPreview)
                 return
             }
             if (isPdf) {
-                const nextPreview: Exclude<PreviewState, null> = { kind: 'pdf', data: base64ToUint8Array(res.dataBase64), fileId: id }
+                const nextPreview: Exclude<PreviewState, null> = { kind: 'pdf', data: bytes, fileId: id }
                 previewCacheRef.current.set(id, nextPreview)
                 setPreview(nextPreview)
             }
@@ -299,15 +312,19 @@ export default function AttachmentsModal({
         if (!fileList || !fileList.length) return
         try {
             for (const f of Array.from(fileList)) {
-                const buf = await f.arrayBuffer()
-                const dataBase64 = bufferToBase64Safe(buf)
-                await (window as any).api?.attachments.add?.({ voucherId: voucher.voucherId, fileName: f.name, dataBase64, mimeType: f.type || undefined })
+                const encoded = await encodeFileForUpload(f)
+                await (window as any).api?.attachments.add?.({
+                    voucherId: voucher.voucherId,
+                    fileName: encoded.name,
+                    dataBytes: encoded.dataBytes,
+                    mimeType: encoded.mime
+                })
             }
             const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
             try { onChanged?.() } catch { }
-            try { notifyDataChanged((window as any).api) } catch { }
+            try { notifyDataChanged((window as any).api, undefined, ['vouchers']) } catch { }
         } catch (e: any) {
             notify('error', 'Upload fehlgeschlagen: ' + (e?.message || String(e)))
         } finally {
@@ -331,6 +348,7 @@ export default function AttachmentsModal({
         if (!confirmDelete) return
         try {
             await (window as any).api?.attachments.delete?.({ fileId: confirmDelete.id })
+            revokePreview(previewCacheRef.current.get(confirmDelete.id) || null)
             previewCacheRef.current.delete(confirmDelete.id)
             pdfDocCacheRef.current.delete(confirmDelete.id)
             const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
@@ -341,7 +359,7 @@ export default function AttachmentsModal({
             pdfDocRef.current = null
             setConfirmDelete(null)
             try { onChanged?.() } catch { }
-            try { notifyDataChanged((window as any).api) } catch { }
+            try { notifyDataChanged((window as any).api, undefined, ['vouchers']) } catch { }
         } catch (e: any) {
             notify('error', 'Löschen fehlgeschlagen: ' + (e?.message || String(e)))
         }

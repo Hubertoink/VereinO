@@ -27,12 +27,18 @@ import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
-import { base64ToFile, bufferToBase64Safe } from './utils/fileEncoding'
+import {
+  base64ToFile,
+  encodeFileForUpload,
+  encodeFilesForUpload,
+  uploadPayloadToFile
+} from './utils/fileEncoding'
 import {
   normalizeVoucherBudgetAssignments,
   normalizeVoucherEarmarkAssignments
 } from './utils/voucherAssignmentFallbacks'
 import { invoiceDraftTabText } from './utils/invoiceDraftLabel'
+import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
@@ -100,10 +106,10 @@ function TopHeaderOrg({
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
+    const removeDataChangedListener = addDataChangedListener(['settings', 'organizations'], onChanged)
     return () => {
       cancelled = true
-      window.removeEventListener('data-changed', onChanged)
+      removeDataChangedListener()
     }
   }, [])
   const text = cashier.trim()
@@ -676,9 +682,7 @@ function DetachedQuickAddWindow() {
       if (cancelled || openedRef.current) return
       detachedDraftIdRef.current = String(initial?.draftId || token || '')
       const initialFiles = Array.isArray(initial?.files)
-        ? initial.files.map((file: any) =>
-            base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime)
-          )
+        ? initial.files.map((file: any) => uploadPayloadToFile({ ...file, name: String(file.name || 'Datei') }))
         : []
       openedRef.current = true
       if (initial?.mode === 'invoice') {
@@ -761,11 +765,7 @@ function DetachedQuickAddWindow() {
   const syncDetachedInvoiceDraft = useCallback(async () => {
     if (!detachedDraftIdRef.current) return
     const encodedFiles = invoiceDraftFile
-      ? [{
-          name: invoiceDraftFile.name,
-          dataBase64: bufferToBase64Safe(await invoiceDraftFile.arrayBuffer()),
-          mime: invoiceDraftFile.type || undefined
-        }]
+      ? [await encodeFileForUpload(invoiceDraftFile)]
       : []
     await window.api?.quickAdd?.syncDraft?.({
       draftId: detachedDraftIdRef.current,
@@ -814,13 +814,7 @@ function DetachedQuickAddWindow() {
       const draftId = detachedDraftIdRef.current
       void (async () => {
         try {
-          const encodedFiles = await Promise.all(
-            files.map(async (file) => ({
-              name: file.name,
-              dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-              mime: file.type || undefined
-            }))
-          )
+          const encodedFiles = await encodeFilesForUpload(files)
           await window.api?.quickAdd?.syncDraft?.({
             draftId,
             qa,
@@ -851,13 +845,7 @@ function DetachedQuickAddWindow() {
     if (!loaded || !quickAdd || !draftId) return
     let cancelled = false
     async function syncFiles() {
-      const encoded = await Promise.all(
-        files.map(async (file) => ({
-          name: file.name,
-          dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-          mime: file.type || undefined
-        }))
-      )
+      const encoded = await encodeFilesForUpload(files)
       if (!cancelled) void window.api?.quickAdd?.syncDraft?.({ draftId, files: encoded })
     }
     syncFiles()
@@ -893,11 +881,11 @@ function DetachedQuickAddWindow() {
     try {
       const res = await window.api?.vouchers.update?.(payload)
       for (const file of editFiles) {
-        const dataBase64 = bufferToBase64Safe(await file.arrayBuffer())
+        const encoded = await encodeFileForUpload(file)
         await window.api?.attachments.add?.({
           voucherId: Number(editQa.id),
           fileName: file.name,
-          dataBase64,
+          dataBytes: encoded.dataBytes,
           mimeType: file.type || undefined
         })
       }
@@ -1006,7 +994,7 @@ function DetachedQuickAddWindow() {
       })
       const next = (refreshed as any)?.rows?.[0]
       if (next) setDetailVoucher(next)
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers'])
       await window.api?.quickAdd?.notifySaved?.({
         id: res?.id,
         originalId: Number(detailVoucher.id),
@@ -1072,11 +1060,7 @@ function DetachedQuickAddWindow() {
             notify('error', `Bitte ergänze: ${(converted.missing || []).join(', ')}.`)
             return false
           }
-          const encodedFiles = await Promise.all(converted.initial.files.map(async (file) => ({
-            name: file.name,
-            dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-            mime: file.type || undefined
-          })))
+          const encodedFiles = await encodeFilesForUpload(converted.initial.files)
           await window.api?.quickAdd?.syncDraft?.({
             draftId: detachedDraftIdRef.current,
             qa: converted.initial.qa,
@@ -1142,7 +1126,7 @@ function DetachedQuickAddWindow() {
             })
             const next = (refreshed as any)?.rows?.[0]
             if (next) setDetailVoucher(next)
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['vouchers'])
             await window.api?.quickAdd?.notifySaved?.({
               id: detailVoucher.id,
               draftId: detachedDraftIdRef.current,
@@ -1460,8 +1444,10 @@ function AppInner() {
 
   useEffect(() => {
     const onDataChanged = () => bumpDataVersion()
-    window.addEventListener('data-changed', onDataChanged)
-    return () => window.removeEventListener('data-changed', onDataChanged)
+    return addDataChangedListener(
+      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations'],
+      onDataChanged
+    )
   }, [bumpDataVersion])
 
   useEffect(() => {
@@ -1472,7 +1458,7 @@ function AppInner() {
         setFlashId(id)
         window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 3000)
       }
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers'])
     })
     return () => {
       if (typeof off === 'function') off()
@@ -1965,9 +1951,7 @@ function AppInner() {
           if (w && w.length) {
             for (const msg of w) notify('info', 'Warnung: ' + msg)
           }
-          // JournalView handles reload via refreshKey dependency; bump version to trigger it
-          bumpDataVersion()
-          if (p?.bankTransactionId) window.dispatchEvent(new Event('data-changed'))
+          if (p?.bankTransactionId) dispatchDataChanged(['bank-imports'])
           await window.api?.quickAdd?.notifySaved?.({
             ...res,
             agentDraftId: p?.agentDraftId
@@ -2034,13 +2018,7 @@ function AppInner() {
   const detachQuickAdd = useCallback(async () => {
     if (!activeDraftId) return
     try {
-      const detachedFiles = await Promise.all(
-        files.map(async (file) => ({
-          name: file.name,
-          dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-          mime: file.type || undefined
-        }))
-      )
+      const detachedFiles = await encodeFilesForUpload(files)
       const res = await window.api?.quickAdd?.openDetached?.({
         draftId: activeDraftId,
         qa,
@@ -2077,9 +2055,10 @@ function AppInner() {
       const patch: any = {}
       if (payload.qa) patch.qa = payload.qa
       if (Array.isArray(payload.files)) {
-        patch.files = payload.files.map((file: any) =>
-          base64ToFile(String(file.name || 'Datei'), String(file.dataBase64 || ''), file.mime)
-        )
+        patch.files = payload.files.map((file: any) => uploadPayloadToFile({
+          ...file,
+          name: String(file.name || 'Datei')
+        }))
       }
       if (typeof payload?.detached === 'boolean') {
         patch.detached = payload.detached
@@ -2151,6 +2130,7 @@ function AppInner() {
         const tabText = invoiceDraftTabText(draft.invoiceState?.fields.description, !!draft.detached)
         return {
           id: draft.id,
+          type: draft.qa.type,
           label: tabText.label,
           title: tabText.title,
           isActive: draft.id === activeDraftId && quickAdd,
@@ -2161,6 +2141,7 @@ function AppInner() {
       const dateLabel = fmtDate(draft.qa.date)
       return {
         id: draft.id,
+        type: draft.qa.type,
         label: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · #${draft.sequence}`,
         title: `${desc ? `${desc} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`}${draft.detached ? ' · abgedockt' : ''}`,
         isActive: draft.id === activeDraftId && quickAdd,
@@ -2184,13 +2165,7 @@ function AppInner() {
           const sourceDraft = bookingDrafts.find((entry) => entry.id === draftId)
           if (!sourceDraft) return
           try {
-            const detachedFiles = await Promise.all(
-              sourceDraft.files.map(async (file) => ({
-                name: file.name,
-                dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-                mime: file.type || undefined
-              }))
-            )
+            const detachedFiles = await encodeFilesForUpload(sourceDraft.files)
             const res = await window.api?.quickAdd?.openDetached?.({
               draftId,
               mode: sourceDraft.kind === 'invoice' ? 'invoice' : 'create',
@@ -2310,11 +2285,7 @@ function AppInner() {
     const draft = openQuickAdd({ files: [file] }, { detached: true, showModal: false, kind: 'invoice' })
     void (async () => {
       try {
-        const encodedFile = {
-          name: file.name,
-          dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
-          mime: file.type || undefined
-        }
+        const encodedFile = await encodeFileForUpload(file)
         const response = await window.api?.quickAdd?.openDetached?.({
           draftId: draft.id,
           mode: 'invoice',
@@ -2910,10 +2881,13 @@ function AppInner() {
 
     const taskId = scheduleInitialLoad()
     const onChanged = () => void loadBootstrap()
-    window.addEventListener('data-changed', onChanged)
+    const removeDataChangedListener = addDataChangedListener(
+      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'settings'],
+      onChanged
+    )
     return () => {
       cancelled = true
-      window.removeEventListener('data-changed', onChanged)
+      removeDataChangedListener()
       const cancelIdle = (window as any).cancelIdleCallback as ((id: number) => void) | undefined
       if (cancelIdle) cancelIdle(taskId)
       else window.clearTimeout(taskId)
@@ -3442,7 +3416,6 @@ function AppInner() {
               budgetNames={budgetNames}
               eurFmt={eurFmt}
               friendlyError={friendlyError}
-              bufferToBase64Safe={bufferToBase64Safe}
               journalLimit={journalLimit}
               setJournalLimit={(n: number) => {
                 setJournalLimit(n)
@@ -3661,8 +3634,7 @@ function AppInner() {
                 notify={notify}
                 onBusyChange={setAiBusy}
                 onBooked={() => {
-                  bumpDataVersion()
-                  window.dispatchEvent(new Event('data-changed'))
+                  dispatchDataChanged(['vouchers', 'members', 'budgets', 'earmarks'])
                 }}
               />
             </div>
@@ -3851,7 +3823,7 @@ function AppInner() {
               if (res?.filePath) {
                 await window.api?.settings?.set?.({ key: 'backup.lastAuto', value: Date.now() })
                 notify('success', 'Backup erstellt')
-                window.dispatchEvent(new Event('data-changed'))
+                dispatchDataChanged(['settings'])
               } else {
                 notify('error', 'Backup konnte nicht erstellt werden')
               }

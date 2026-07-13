@@ -28,6 +28,9 @@ import {
     type EditVoucherRow as SharedEditVoucherRow,
     type VoucherRow
 } from './types'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { dispatchDataChanged } from '../../utils/refresh'
+import { encodeFileForUpload } from '../../utils/fileEncoding'
 
 type EditVoucherRow = SharedEditVoucherRow
 
@@ -69,7 +72,6 @@ interface JournalViewProps {
     // Helpers
     eurFmt: Intl.NumberFormat
     friendlyError: (e: any) => string
-    bufferToBase64Safe: (buf: ArrayBuffer) => string
     // Settings from App
     journalLimit: number
     setJournalLimit: (n: number) => void
@@ -103,7 +105,7 @@ interface JournalViewProps {
     page?: number
     setPage?: (v: number) => void
     showBookingDraftTabs?: boolean
-    bookingDraftTabs?: Array<{ id: string; label: string; title: string; isActive: boolean; isDetached?: boolean }>
+    bookingDraftTabs?: Array<{ id: string; label: string; title: string; type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; isActive: boolean; isDetached?: boolean }>
     onOpenBookingDraft?: (draftId: string) => void
     onCloseBookingDraft?: (draftId: string) => void
     showBookingEditTabs?: boolean
@@ -132,7 +134,6 @@ export default function JournalView({
     budgetNames,
     eurFmt,
     friendlyError,
-    bufferToBase64Safe,
     journalLimit: journalLimitProp,
     setJournalLimit: setJournalLimitProp,
     dateFmt,
@@ -243,7 +244,9 @@ export default function JournalView({
     const activeFilterBudgetId = filterBudgetIdProp !== undefined ? filterBudgetIdProp : filterBudgetId
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
     const activeQ = qProp !== undefined ? qProp : q
+    const debouncedQ = useDebouncedValue(activeQ, 250)
     const activePage = pageProp !== undefined ? pageProp : page
+    const loadRequestIdRef = useRef(0)
 
     // Setters that use props if available
     const activeSetFrom = setFromProp || setFrom
@@ -662,7 +665,7 @@ export default function JournalView({
             const draftId = typeof payload?.draftId === 'string' ? payload.draftId : ''
             if (payload?.mode === 'details' || draftId.startsWith('details-')) {
                 void loadRecent()
-                window.dispatchEvent(new Event('data-changed'))
+                dispatchDataChanged(['vouchers'])
                 return
             }
             if (!draftId.startsWith('edit-')) return
@@ -720,6 +723,7 @@ export default function JournalView({
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
+        const requestId = ++loadRequestIdRef.current
         try {
             const offset = (activePage - 1) * journalLimit
             const res = await window.api?.vouchers?.list?.({
@@ -736,18 +740,20 @@ export default function JournalView({
                 earmarkId: activeFilterEarmark || undefined,
                 budgetId: activeFilterBudgetId || undefined,
                 voucherIds: stornoPairIds || undefined,
-                q: activeQ.trim() || undefined,
+                q: debouncedQ.trim() || undefined,
                 tag: activeFilterTag || undefined
             })
-            if (res) {
+            if (res && requestId === loadRequestIdRef.current) {
                 setRows(res.rows || [])
                 setTotalRows(res.total || 0)
             }
         } catch (e: any) {
-            notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
+            if (requestId === loadRequestIdRef.current) {
+                notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
+            }
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, activeQ, activeFilterTag, stornoPairIds, notify, refreshKey])
+    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, debouncedQ, activeFilterTag, stornoPairIds, notify, refreshKey])
 
     const getVoucherById = useCallback(async (id: number) => {
         const cached = voucherTooltipCache.current.get(id)
@@ -775,14 +781,6 @@ export default function JournalView({
     // Load on mount and filter changes
     useEffect(() => {
         loadRecent()
-    }, [loadRecent])
-
-    useEffect(() => {
-        const onChanged = () => {
-            void loadRecent()
-        }
-        window.addEventListener('data-changed', onChanged)
-        return () => window.removeEventListener('data-changed', onChanged)
     }, [loadRecent])
 
     // Load attachments when opening edit modal
@@ -842,6 +840,7 @@ export default function JournalView({
                 return {
                     id: tab.id,
                     kind: 'edit' as const,
+                    type: tab.row.type,
                     label,
                     title: `Bearbeitung: ${label}`,
                     isActive: tab.id === activeEditTabId,
@@ -1143,7 +1142,7 @@ export default function JournalView({
                             {bookingTabs.map((draft) => (
                                 <div
                                     key={draft.id}
-                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}${draft.kind === 'edit' ? ' booking-draft-tab--edit' : ''}`}
+                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}${draft.kind === 'edit' ? ' booking-draft-tab--edit' : ''}${draft.type === 'IN' ? ' booking-draft-tab--type-in' : ''}${draft.type === 'OUT' ? ' booking-draft-tab--type-out' : ''}${draft.type === 'TRANSFER' ? ' booking-draft-tab--type-transfer' : ''}${draft.type === 'INTERNAL' ? ' booking-draft-tab--type-internal' : ''}`}
                                 >
                                     <button
                                         type="button"
@@ -1867,9 +1866,13 @@ export default function JournalView({
                                             try {
                                                 const list = Array.from(e.dataTransfer?.files || [])
                                                 for (const f of list) {
-                                                    const buf = await f.arrayBuffer()
-                                                    const dataBase64 = bufferToBase64Safe(buf)
-                                                    await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: f.name, dataBase64, mimeType: f.type || undefined })
+                                                    const encoded = await encodeFileForUpload(f)
+                                                    await window.api?.attachments.add?.({
+                                                        voucherId: editRow.id,
+                                                        fileName: encoded.name,
+                                                        dataBytes: encoded.dataBytes,
+                                                        mimeType: encoded.mime
+                                                    })
                                                 }
                                                 const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
                                                 setEditRowFiles(res?.files || [])
@@ -1899,9 +1902,13 @@ export default function JournalView({
                                                     if (!list || !list.length || !editRow) return
                                                     try {
                                                         for (const f of Array.from(list)) {
-                                                            const buf = await f.arrayBuffer()
-                                                            const dataBase64 = bufferToBase64Safe(buf)
-                                                            await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: f.name, dataBase64, mimeType: f.type || undefined })
+                                                            const encoded = await encodeFileForUpload(f)
+                                                            await window.api?.attachments.add?.({
+                                                                voucherId: editRow.id,
+                                                                fileName: encoded.name,
+                                                                dataBytes: encoded.dataBytes,
+                                                                mimeType: encoded.mime
+                                                            })
                                                         }
                                                         const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
                                                         setEditRowFiles(res?.files || [])
@@ -2143,7 +2150,7 @@ export default function JournalView({
                                 } : cur)
                             }
                             await loadRecent()
-                            window.dispatchEvent(new Event('data-changed'))
+                            dispatchDataChanged(['vouchers'])
                         }}
                         onReverse={() => {
                             setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })

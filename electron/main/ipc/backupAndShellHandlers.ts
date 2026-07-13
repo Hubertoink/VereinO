@@ -17,7 +17,7 @@ export function registerBackupAndShellHandlers(): void {
     })
     ipcMain.handle('backup.list', async () => {
         try {
-            return { ok: true, ...backup.listBackups() }
+            return { ok: true, ...(await backup.listBackups()) }
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
         }
@@ -43,7 +43,7 @@ export function registerBackupAndShellHandlers(): void {
                 properties: ['openDirectory', 'createDirectory']
             })
             if (pick.canceled || !pick.filePaths[0]) throw new Error('Abbruch')
-            const result = backup.setBackupDirWithMigration(pick.filePaths[0])
+            const result = await backup.setBackupDirWithMigration(pick.filePaths[0])
             return { ok: result.ok, dir: result.dir, moved: result.moved }
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
@@ -51,7 +51,7 @@ export function registerBackupAndShellHandlers(): void {
     })
     ipcMain.handle('backup.resetDir', async () => {
         try {
-            const result = backup.setBackupDirWithMigration(null)
+            const result = await backup.setBackupDirWithMigration(null)
             return { ok: result.ok, dir: result.dir, moved: result.moved }
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
@@ -73,7 +73,7 @@ export function registerBackupAndShellHandlers(): void {
     })
     ipcMain.handle('backup.restore', async (_event, payload: { filePath: string }) => {
         try {
-            return backup.restoreBackup(payload.filePath)
+            return await backup.restoreBackup(payload.filePath)
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
         }

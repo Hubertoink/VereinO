@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { QuickAddPayload, RendererApi, UpdateState } from '../../src/types/api'
+import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../shared/dataChange'
 
 type AsyncApiMethod = (...args: never[]) => Promise<unknown>
 
@@ -38,16 +39,23 @@ function invokeRaw<T>(channel: string, ...args: unknown[]): Promise<T> {
   return ipcRenderer.invoke(channel, ...args)
 }
 
-const notifyLocalDataChanged = () => {
+const notifyLocalDataChanged = (scopes?: DataChangeScope[]) => {
   try {
-    window.dispatchEvent(new Event('data-changed'))
+    if (!scopes?.length) {
+      window.dispatchEvent(new Event('data-changed'))
+      return
+    }
+    for (const scope of new Set(scopes)) window.dispatchEvent(new Event(`data-changed:${scope}`))
   } catch {
     // ignore
   }
 }
 
-ipcRenderer.on('app:data-changed', () => {
-  notifyLocalDataChanged()
+ipcRenderer.on('app:data-changed', (_event, scopes?: unknown) => {
+  const validScopes = Array.isArray(scopes)
+    ? scopes.filter((scope): scope is DataChangeScope => DATA_CHANGE_SCOPES.includes(scope as DataChangeScope))
+    : undefined
+  notifyLocalDataChanged(validScopes)
 })
 
 // Helper to clean up error messages from IPC
@@ -349,7 +357,7 @@ const rendererApi = {
   docling: {
     status: (force = false) => invoke('docling.status', force),
     setEnabled: (enabled: boolean) => cleanInvoke('docling.setEnabled', enabled),
-    extract: (payload: { fileName: string; mimeType?: string | null; dataBase64: string }) => cleanInvoke('docling.extract', payload)
+    extract: (payload: { fileName: string; mimeType?: string | null; dataBytes?: Uint8Array; dataBase64?: string }) => cleanInvoke('docling.extract', payload)
   },
   taxExemption: {
     get: () => invoke('taxExemption.get'),
@@ -377,7 +385,8 @@ const rendererApi = {
   app: {
     version: () => invoke('app.version'),
     bootstrap: () => invoke('app.bootstrap'),
-    notifyDataChanged: () => ipcRenderer.send('app.notifyDataChanged'),
+    dashboardSnapshot: (payload) => invoke('app.dashboardSnapshot', payload),
+    notifyDataChanged: (scopes) => ipcRenderer.send('app.notifyDataChanged', scopes),
     onDataChanged: (cb: () => void) => {
       const handler = () => cb()
       ipcRenderer.on('app:data-changed', handler)

@@ -9,7 +9,7 @@ function makeTempDir(): string {
 }
 
 describe('deleteOrganizationStorage', () => {
-    it('removes an organization folder completely when it lives under the managed organizations root', () => {
+    it('removes an organization folder completely when it lives under the managed organizations root', async () => {
         const tempRoot = makeTempDir()
         const managedRoot = path.join(tempRoot, 'organizations')
         const orgRoot = path.join(managedRoot, 'org_1')
@@ -18,12 +18,12 @@ describe('deleteOrganizationStorage', () => {
         fs.writeFileSync(path.join(orgRoot, 'database.sqlite'), 'db')
         fs.writeFileSync(path.join(orgRoot, 'files', 'receipt.pdf'), 'file')
 
-        deleteOrganizationStorage(orgRoot, managedRoot)
+        await deleteOrganizationStorage(orgRoot, managedRoot)
 
         expect(fs.existsSync(orgRoot)).toBe(false)
     })
 
-    it('only removes database artifacts for shared roots and keeps unrelated app data intact', () => {
+    it('only removes database artifacts for shared roots and keeps unrelated app data intact', async () => {
         const tempRoot = makeTempDir()
         const managedRoot = path.join(tempRoot, 'organizations')
         const sharedRoot = path.join(tempRoot, 'shared-root')
@@ -37,7 +37,7 @@ describe('deleteOrganizationStorage', () => {
         fs.writeFileSync(path.join(sharedRoot, 'files', 'member.csv'), 'member-data')
         fs.writeFileSync(path.join(siblingOrgRoot, 'database.sqlite'), 'other-db')
 
-        deleteOrganizationStorage(sharedRoot, managedRoot)
+        await deleteOrganizationStorage(sharedRoot, managedRoot)
 
         expect(fs.existsSync(path.join(sharedRoot, 'database.sqlite'))).toBe(false)
         expect(fs.existsSync(path.join(sharedRoot, 'database.sqlite-wal'))).toBe(false)

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import NewOrgModal from '../modals/NewOrgModal'
 import ConfirmSwitchOrgModal from '../modals/ConfirmSwitchOrgModal'
+import { addDataChangedListener } from '../../utils/refresh'
 
 interface Organization {
   id: string
@@ -45,8 +46,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
     
     // Reload when data changes (e.g. after rename)
     const onDataChanged = () => loadOrganizations()
-    window.addEventListener('data-changed', onDataChanged)
-    return () => window.removeEventListener('data-changed', onDataChanged)
+    return addDataChangedListener(['organizations'], onDataChanged)
   }, [])
 
   // Close dropdown when clicking outside

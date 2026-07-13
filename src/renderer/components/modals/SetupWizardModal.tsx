@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
+import { dispatchDataChanged } from '../../utils/refresh'
 import type {
     BackgroundImage,
     BookingEntryPresentation,
@@ -273,7 +274,7 @@ export default function SetupWizardModal({
 
             // Mark setup completed
             await (window as any).api?.settings?.set?.({ key: 'setup.completed', value: true })
-            try { window.dispatchEvent(new Event('data-changed')) } catch {}
+            dispatchDataChanged(['settings', 'organizations', 'tags'])
             notify('success', 'Setup gespeichert. Du kannst alles später unter „Einstellungen“ ändern.')
         } catch (e: any) {
             notify('error', e?.message || String(e))

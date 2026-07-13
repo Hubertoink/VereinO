@@ -6,6 +6,7 @@ import LoadingState from '../components/LoadingState'
 import ColumnSelectDropdown from '../components/dropdowns/ColumnSelectDropdown'
 import InvoiceFilterDropdown from '../components/dropdowns/InvoiceFilterDropdown'
 import { encodeFilesForUpload } from '../utils/fileEncoding'
+import { addDataChangedListener, dispatchDataChanged } from '../utils/refresh'
 import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
 import InvoiceActionMenu from './invoicesShared/InvoiceActionMenu'
@@ -190,7 +191,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       } catch {}
       try {
         const paymentAccountsRes = await window.api?.paymentAccounts?.list?.()
-        if (!cancelled) setPaymentAccounts((paymentAccountsRes?.rows || []).map((row: any) => ({ id: row.id, name: row.name, kind: row.kind ?? null })))
+        if (!cancelled) setPaymentAccounts((paymentAccountsRes?.rows || []).map((row: any) => ({ id: row.id, name: row.name, kind: row.kind ?? null, color: row.color ?? null })))
       } catch {}
       try {
         const yearsRes = await window.api?.reports?.years?.()
@@ -247,8 +248,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   useEffect(() => { void loadSummary() }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag])
   useEffect(() => {
     const onChanged = () => { void loadSummary() }
-    try { window.addEventListener('data-changed', onChanged) } catch {}
-    return () => { try { window.removeEventListener('data-changed', onChanged) } catch {} }
+    return addDataChangedListener(['invoices', 'vouchers'], onChanged)
   }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag])
   useEffect(() => { try { localStorage.setItem('invoices.sort', sortDir) } catch {} }, [sortDir])
   useEffect(() => { try { localStorage.setItem('invoices.sortBy', sortBy) } catch {} }, [sortBy])
@@ -369,7 +369,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           notify('success', `${invoiceRow.invoiceNo ? `Verbindlichkeit ${invoiceRow.invoiceNo}` : `Verbindlichkeit #${invoiceRow.id}`} wurde automatisch als Buchung erstellt.`)
         }
         setShowPayModal(null)
-        try { window.dispatchEvent(new Event('data-changed')) } catch {}
+        dispatchDataChanged(['invoices', 'vouchers'])
         await loadSummary()
       }
     } catch (e: any) {
@@ -431,7 +431,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         setShowPaymentMethodModal(null)
       }
 
-      try { window.dispatchEvent(new Event('data-changed')) } catch {}
+      dispatchDataChanged(['invoices', 'vouchers'])
       await loadSummary()
     } catch (e: any) {
       notify('error', e?.message || String(e))
@@ -528,7 +528,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       setFlashId(response.id)
       window.setTimeout(() => setFlashId((current) => current === response.id ? null : current), 3000)
       void Promise.all([load(), loadSummary()])
-      try { window.dispatchEvent(new Event('data-changed')) } catch {}
+      dispatchDataChanged(['invoices'])
       notify('success', 'Verbindlichkeit angelegt')
       return true
     } catch (error: any) {
@@ -692,7 +692,12 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     if (!form?.draft.id) return
     const encoded = await encodeFilesForUpload(files)
     for (const file of encoded) {
-      await window.api?.invoiceFiles?.add?.({ invoiceId: form.draft.id, fileName: file.name, dataBase64: file.dataBase64, mimeType: file.mime })
+      await window.api?.invoiceFiles?.add?.({
+        invoiceId: form.draft.id,
+        fileName: file.name,
+        dataBytes: file.dataBytes,
+        mimeType: file.mime
+      })
     }
     const res = await window.api?.invoiceFiles?.list?.({ invoiceId: form.draft.id })
     setEditInvoiceFiles(res?.files || [])

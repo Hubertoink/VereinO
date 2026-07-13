@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { addDataChangedListener } from '../../utils/refresh'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import BudgetModal from '../../components/modals/BudgetModal'
 
@@ -81,8 +82,7 @@ export default function BudgetsView({
   useEffect(() => {
     loadBudgets()
     const onChanged = () => loadBudgets()
-    window.addEventListener('data-changed', onChanged)
-    return () => window.removeEventListener('data-changed', onChanged)
+    return addDataChangedListener(['budgets', 'vouchers'], onChanged)
   }, [showArchived])
 
   const archivedCount = useMemo(() => allBudgets.filter((b) => b.isArchived).length, [allBudgets])
@@ -184,9 +184,23 @@ export default function BudgetsView({
             placeholder="Suche (Name, Kategorie, Projekt, Jahr, Zeitraum)"
             style={{ flex: 1, minWidth: 260 }}
           />
-          <div className="btn-group" role="group" aria-label="Kartenansicht">
-            <button type="button" className={`btn-option ${!compactCards ? 'active' : ''}`} onClick={() => setCompactCards(false)}>Detail</button>
-            <button type="button" className={`btn-option ${compactCards ? 'active' : ''}`} onClick={() => setCompactCards(true)}>Kompakt</button>
+          <div className="btn-group presentation-segmented-control" role="group" aria-label="Darstellung der Budgetkarten">
+            <button
+              type="button"
+              className={`btn-option ${!compactCards ? 'active' : ''}`}
+              aria-pressed={!compactCards}
+              onClick={() => setCompactCards(false)}
+            >
+              Detail
+            </button>
+            <button
+              type="button"
+              className={`btn-option ${compactCards ? 'active' : ''}`}
+              aria-pressed={compactCards}
+              onClick={() => setCompactCards(true)}
+            >
+              Kompakt
+            </button>
           </div>
           <div className="helper">{visibleBudgets.length} von {budgets.length}</div>
         </div>

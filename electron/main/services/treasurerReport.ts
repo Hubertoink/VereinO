@@ -4,7 +4,7 @@
  */
 
 import { BrowserWindow } from 'electron'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
@@ -851,7 +851,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     margins: { top: 0, bottom: 0, left: 0, right: 0 }
   })
 
-  fs.writeFileSync(filePath, buff)
+  await fs.writeFile(filePath, buff)
   try { win.destroy() } catch { }
 
   return { filePath }

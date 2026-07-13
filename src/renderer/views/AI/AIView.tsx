@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './AIView.css'
+import { dispatchDataChanged } from '../../utils/refresh'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
 import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
@@ -4364,7 +4365,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${created.length} Mitglied(er) wurden angelegt:\n${created.map((member) => `- ${member.createdMemberNo} · ${member.name}`).join('\n')}`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['members'])
       notify('success', `${created.length} Mitglieder angelegt.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -4929,7 +4930,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Änderung(en) bei ${grouped.size} Mitglied(er)n übernommen.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['members'])
       notify('success', `${selected.length} Mitgliederänderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -4980,7 +4981,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `Buchung ${voucher.voucherNo} wurde erstellt und mit ${pendingContributionPayment.memberName} / ${pendingContributionPayment.periodKey} verknüpft.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers', 'members'])
       onBooked?.()
       notify('success', `Beitragsbuchung ${voucher.voucherNo} erstellt.`)
     } catch (error: any) {
@@ -5046,7 +5047,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Beitragszeitraum/-zeiträume wurden mit vorhandenen Buchungen verknüpft und als bezahlt markiert.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['members'])
       onBooked?.()
       notify('success', `${selected.length} Beitrags-Verknüpfung(en) übernommen.`)
     } catch (error: any) {
@@ -5409,7 +5410,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Tag-Änderung(en) übernommen.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['tags', 'vouchers', 'members', 'invoices'])
       notify('success', `${selected.length} Tag-Änderungen übernommen.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -5466,7 +5467,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Budget-Änderung(en) übernommen.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['budgets', 'vouchers'])
       await loadMentionOptions()
       notify('success', `${selected.length} Budget-Änderungen übernommen.`)
     } catch (error: any) {
@@ -5515,7 +5516,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Zweckbindungs-Änderung(en) übernommen.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['earmarks', 'vouchers'])
       await loadMentionOptions()
       notify('success', `${selected.length} Zweckbindungs-Änderungen übernommen.`)
     } catch (error: any) {
@@ -5566,7 +5567,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Forderung(en)/Verbindlichkeit(en) angelegt.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['invoices'])
       notify('success', `${selected.length} offene Posten angelegt.`)
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -5734,7 +5735,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Buchung(en) wurden aktualisiert.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers'])
       onBooked?.()
       notify('success', `${selected.length} Buchungen aktualisiert.`)
     } catch (error: any) {
@@ -5888,7 +5889,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `${selected.length} Buchung(en) wurden aus dem Agent-Review übernommen.`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers'])
       onBooked?.()
       notify('success', `${selected.length} Buchungsänderungen übernommen.`)
     } catch (error: any) {
@@ -5937,7 +5938,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       }
       setPendingVoucherReverse(nextState)
       if (reversed.length) {
-        window.dispatchEvent(new Event('data-changed'))
+        dispatchDataChanged(['vouchers'])
         onBooked?.()
       }
       pushMessage({
@@ -5997,7 +5998,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         body: `Beleg ${pendingVoucherRebook.original.voucherNo || `#${pendingVoucherRebook.original.id}`} wurde storniert (${reversal.voucherNo}) und als ${replacement.type} neu angelegt (${created.voucherNo}).`,
         meta: 'VereinO-Daten geändert'
       })
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['vouchers'])
       onBooked?.()
       notify('success', `Korrektur erstellt: ${reversal.voucherNo} + ${created.voucherNo}.`)
     } catch (error: any) {
@@ -6078,7 +6079,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             : `${appliedIds.size} Bankbeleg(e) wurden mit bestehenden Buchungen verknüpft.`,
           meta: 'VereinO-Daten geändert'
         })
-        window.dispatchEvent(new Event('data-changed'))
+        dispatchDataChanged(['bank-imports', 'vouchers'])
         onBooked?.()
       }
       if (failures.length) notify('error', `Bankverknüpfung teilweise fehlgeschlagen: ${failures[0]}`)
@@ -6455,7 +6456,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       existing.add(normalizeLookup(tag))
       created.push(tag)
     }
-    if (created.length) window.dispatchEvent(new Event('data-changed'))
+    if (created.length) dispatchDataChanged(['tags'])
     return created
   }
 

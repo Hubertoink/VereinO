@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { isValidTheme, type ColorTheme } from './uiTheme'
+import { addDataChangedListener } from '../utils/refresh'
 import {
   UIPreferencesContext,
   type BackgroundImage,
@@ -241,11 +242,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const timer = window.setTimeout(() => void applyCashierBackground(), 80)
-    window.addEventListener('data-changed', onDataChanged)
+    const removeDataChangedListener = addDataChangedListener(['settings', 'organizations'], onDataChanged)
     return () => {
       alive = false
       window.clearTimeout(timer)
-      window.removeEventListener('data-changed', onDataChanged)
+      removeDataChangedListener()
     }
   }, [backgroundImage, currentOrgId])
 

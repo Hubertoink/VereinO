@@ -6,6 +6,8 @@ import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdow
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
 import DatePickerButton from '../../components/common/DatePickerButton'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
 type PageShortcutAction = {
     id: string
@@ -24,6 +26,8 @@ interface MembersViewProps {
 
 export default function MembersView({ registerPageShortcuts }: MembersViewProps = {}) {
     const [q, setQ] = useState('')
+    const debouncedQ = useDebouncedValue(q, 250)
+    const loadRequestIdRef = useRef(0)
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
     const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>('ALL')
     const [intervalFilter, setIntervalFilter] = useState<MemberIntervalFilter>('ALL')
@@ -109,8 +113,8 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             }
         })()
         const onChanged = () => setBoardRefresh(v => v + 1)
-        try { window.addEventListener('data-changed', onChanged) } catch {}
-        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+        const removeDataChangedListener = addDataChangedListener(['members'], onChanged)
+        return () => { alive = false; removeDataChangedListener() }
     }, [boardRefresh])
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -187,62 +191,31 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         })
     }, [])
 
-    async function load() {
+    const load = useCallback(async () => {
+        const requestId = ++loadRequestIdRef.current
         setBusy(true)
         try {
-            const hasAdvancedFilters = contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'
-            if (!hasAdvancedFilters) {
-                const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit, offset, sortBy, sort })
-                setRows(res?.rows || []); setTotal(res?.total || 0)
-                return
-            }
-
-            const pageSize = 200
-            let ofs = 0
-            let totalRows = 0
-            const allRows: typeof rows = []
-            do {
-                const res = await (window as any).api?.members?.list?.({ q: q || undefined, status, limit: pageSize, offset: ofs, sortBy, sort })
-                const batch = (res?.rows || []) as typeof rows
-                totalRows = res?.total ?? batch.length
-                allRows.push(...batch)
-                ofs += pageSize
-            } while (ofs < totalRows)
-
-            const dueStateById = new Map<number, any>()
-            const needsDueState = contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE'
-            const filtered: typeof rows = []
-            for (const row of allRows) {
-                const hasPlan = Number(row.contribution_amount || 0) > 0 && !!row.contribution_interval
-                if (intervalFilter !== 'ALL' && row.contribution_interval !== intervalFilter) continue
-                if (boardFilter === 'ANY' && !row.boardRole) continue
-                if (boardFilter === 'NONE' && row.boardRole) continue
-                if (!['ALL', 'ANY', 'NONE'].includes(boardFilter) && row.boardRole !== boardFilter) continue
-
-                if (contributionFilter === 'NO_PLAN' && hasPlan) continue
-                if (contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
-                    let paymentState = dueStateById.get(row.id)
-                    if (!paymentState && hasPlan && needsDueState) {
-                        try {
-                            paymentState = await (window as any).api?.payments?.status?.({ memberId: row.id })
-                        } catch {
-                            paymentState = { state: 'NONE', overdue: 0 }
-                        }
-                        dueStateById.set(row.id, paymentState)
-                    }
-                    const isDue = hasPlan && paymentState?.state === 'OVERDUE' && Number(paymentState?.overdue || 0) > 0
-                    if (contributionFilter === 'DUE' && !isDue) continue
-                    if (contributionFilter === 'NOT_DUE' && (!hasPlan || isDue)) continue
-                }
-                filtered.push(row)
-            }
-            setTotal(filtered.length)
-            setRows(filtered.slice(offset, offset + limit))
+            const res = await (window as any).api?.members?.list?.({
+                q: debouncedQ || undefined,
+                status,
+                contributionFilter,
+                intervalFilter,
+                boardFilter,
+                limit,
+                offset,
+                sortBy,
+                sort
+            })
+            if (requestId !== loadRequestIdRef.current) return
+            setRows(res?.rows || [])
+            setTotal(res?.total || 0)
         } catch (e: any) {
-            console.error('members.list failed', e)
-        } finally { setBusy(false) }
-    }
-    useEffect(() => { load() }, [q, status, contributionFilter, intervalFilter, boardFilter, limit, offset, sortBy, sort])
+            if (requestId === loadRequestIdRef.current) console.error('members.list failed', e)
+        } finally {
+            if (requestId === loadRequestIdRef.current) setBusy(false)
+        }
+    }, [boardFilter, contributionFilter, debouncedQ, intervalFilter, limit, offset, sort, sortBy, status])
+    useEffect(() => { void load() }, [load])
 
     const saveMemberForm = useCallback(async () => {
         if (!form) return
@@ -300,7 +273,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             setMissingRequired([])
             setBoardRoleError(null)
             await load()
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['members'])
         } catch (e: any) {
             alert(e?.message || String(e))
         }
@@ -955,6 +928,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     setDeleteConfirm(null)
                                     setForm(null)
                                     await load()
+                                    dispatchDataChanged(['members'])
                                 } catch (e: any) { alert(e?.message || String(e)) }
                                 finally { setDeleteBusy(false) }
                             }}>Endgültig löschen</button>
@@ -1138,8 +1112,8 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
         }
         loadStatusAndBasics()
         const onChanged = () => loadStatusAndBasics()
-        try { window.addEventListener('data-changed', onChanged) } catch {}
-        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+        const removeDataChangedListener = addDataChangedListener(['members', 'vouchers'], onChanged)
+        return () => { alive = false; removeDataChangedListener() }
     }, [memberId])
 
     // Load suggestions for all due periods
@@ -1245,7 +1219,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
             setManualListByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
             setSearchByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
             setShowManualSearch(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['members'])
         } catch (e: any) { alert(e?.message || String(e)) }
     }
 
@@ -1833,8 +1807,8 @@ function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string
         }
         loadStatus()
         const onChanged = () => loadStatus()
-        try { window.addEventListener('data-changed', onChanged) } catch {}
-        return () => { alive = false; try { window.removeEventListener('data-changed', onChanged) } catch {} }
+        const removeDataChangedListener = addDataChangedListener(['members', 'vouchers'], onChanged)
+        return () => { alive = false; removeDataChangedListener() }
     }, [row.memberId])
 
     useEffect(() => {
@@ -1967,9 +1941,9 @@ function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string
             <td>{row.paid ? (row.verified ? 'bezahlt ✔︎ (verifiziert)' : 'bezahlt') : 'offen'}</td>
             <td style={{ whiteSpace: 'nowrap' }}>
                 {row.paid ? (
-                    <button className="btn" onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.unmark?.({ memberId: row.memberId, periodKey: row.periodKey }); onChanged() } finally { setBusy(false) } }}>Rückgängig</button>
+                    <button className="btn" onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.unmark?.({ memberId: row.memberId, periodKey: row.periodKey }); onChanged(); dispatchDataChanged(['members']) } finally { setBusy(false) } }}>Rückgängig</button>
                 ) : (
-                    <button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.markPaid?.({ memberId: row.memberId, periodKey: row.periodKey, interval: row.interval, amount: row.amount, voucherId: selVoucher || null }); onChanged() } finally { setBusy(false) } }}>Als bezahlt markieren</button>
+                    <button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.markPaid?.({ memberId: row.memberId, periodKey: row.periodKey, interval: row.interval, amount: row.amount, voucherId: selVoucher || null }); onChanged(); dispatchDataChanged(['members']) } finally { setBusy(false) } }}>Als bezahlt markieren</button>
                 )}
             </td>
         </tr>

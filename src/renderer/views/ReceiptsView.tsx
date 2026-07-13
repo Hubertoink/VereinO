@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { addDataChangedListener } from '../utils/refresh'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
 
 type ReceiptTarget = { voucherId: number; voucherNo: string; date: string; description: string }
@@ -29,8 +30,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
 
     useEffect(() => {
         const onChanged = () => { void load() }
-        window.addEventListener('data-changed', onChanged)
-        return () => window.removeEventListener('data-changed', onChanged)
+        return addDataChangedListener(['vouchers'], onChanged)
     }, [page, limit])
 
     useEffect(() => {

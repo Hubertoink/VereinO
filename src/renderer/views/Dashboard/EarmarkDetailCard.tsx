@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react'
+import { addDataChangedListener } from '../../utils/refresh'
 
 type Voucher = {
   id: number
@@ -93,8 +94,8 @@ export default function EarmarkDetailCard({ earmarkId, from, to }: { earmarkId?:
     
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers', 'earmarks'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [earmarkId, from, to])
 
   if (!earmark && !loading) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import BalanceAreaChart from './BalanceAreaChart'
 import IncomeExpenseBars from './IncomeExpenseBars'
 import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
@@ -11,6 +11,7 @@ import BudgetDetailCard from './BudgetDetailCard'
 import SphereShareCard from './SphereShareCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
+import { addDataChangedListener } from '../../utils/refresh'
 
 type GoToVoucherArgs = { voucherId: number; recordDate?: string | null }
 type DashboardTaskTone = 'danger' | 'warning' | 'info' | 'success'
@@ -22,6 +23,84 @@ type DashboardTaskItem = {
   detail: string
   tone: DashboardTaskTone
   onClick?: () => void
+}
+
+function dayBefore(iso: string) {
+  const date = new Date(`${iso}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() - 1)
+  return date.toISOString().slice(0, 10)
+}
+
+function dashboardRange(
+  period: 'MONAT' | 'JAHR' | 'DREI_JAHRE' | 'GESAMT',
+  yearSel: number | null,
+  years: number[],
+  today: string
+) {
+  const now = new Date()
+  const todayIso = String(today || '').slice(0, 10)
+  const clampToToday = (iso: string) => (todayIso && iso > todayIso ? todayIso : iso)
+  const year = ((period === 'JAHR' || period === 'DREI_JAHRE') && yearSel)
+    ? yearSel
+    : now.getUTCFullYear()
+  if (period === 'GESAMT') {
+    const minYear = years.length > 0 ? Math.min(...years) : year
+    const maxYear = years.length > 0 ? Math.max(...years) : year
+    return {
+      from: new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10),
+      to: clampToToday(new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10))
+    }
+  }
+  if (period === 'MONAT') {
+    return {
+      from: new Date(Date.UTC(year, now.getUTCMonth(), 1)).toISOString().slice(0, 10),
+      to: clampToToday(new Date(Date.UTC(year, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10))
+    }
+  }
+  if (period === 'DREI_JAHRE') {
+    return {
+      from: new Date(Date.UTC(year - 2, 0, 1)).toISOString().slice(0, 10),
+      to: clampToToday(new Date(Date.UTC(year, 11, 31)).toISOString().slice(0, 10))
+    }
+  }
+  return {
+    from: new Date(Date.UTC(year, 0, 1)).toISOString().slice(0, 10),
+    to: clampToToday(new Date(Date.UTC(year, 11, 31)).toISOString().slice(0, 10))
+  }
+}
+
+function buildBankImportReminder(
+  status: { total: number; lastBookingDate: string | null; lastImportAt: string | null },
+  today: string
+) {
+  const parseDate = (value?: string | null) => {
+    if (!value) return null
+    const [year, month, day] = value.split('-').map(Number)
+    const parsed = new Date(year, month - 1, day)
+    return year && month && day && !Number.isNaN(parsed.getTime()) ? parsed : null
+  }
+  if (status.total === 0) {
+    return { summary: 'Erster Import offen', detail: 'Es wurden noch keine Bankbelege importiert.' }
+  }
+  const lastDate = parseDate(status.lastBookingDate)
+  const todayDate = parseDate(String(today || '').slice(0, 10)) || new Date()
+  const previousMonthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0)
+  if (!lastDate || lastDate >= previousMonthEnd) return null
+  const from = new Date(lastDate)
+  from.setDate(from.getDate() + 1)
+  if (from > previousMonthEnd) return null
+  const dateFormat = new Intl.DateTimeFormat('de-DE')
+  const monthFormat = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
+  const fromMonth = monthFormat.format(from)
+  const toMonth = monthFormat.format(previousMonthEnd)
+  const lastImport = status.lastImportAt
+    ? new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
+        .format(new Date(status.lastImportAt.replace(' ', 'T') + (status.lastImportAt.includes('T') ? '' : 'Z')))
+    : '—'
+  return {
+    summary: fromMonth === toMonth ? `${fromMonth} fehlt` : `${fromMonth} bis ${toMonth} fehlt`,
+    detail: `Letzter Import: ${lastImport} · fehlender Zeitraum: ${dateFormat.format(from)} bis ${dateFormat.format(previousMonthEnd)}`
+  }
 }
 
 export default function DashboardView({
@@ -47,28 +126,10 @@ export default function DashboardView({
     let cancelled = false
     setLoading(true)
     window.api?.quotes.weekly?.({ date: today }).then((q) => { if (!cancelled) setQuote(q) }).finally(() => { if (!cancelled) setLoading(false) })
-    const load = async () => {
-      try {
-        const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
-        if (!cancelled) setCashier((cn?.value as any) || '')
-        const logo = await (window as any).api?.settings?.get?.({ key: 'org.logoDataUrl' })
-        if (!cancelled) setOrgLogo((logo?.value as any) || '')
-      } catch { }
-    }
-    load()
-    const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
+    return () => { cancelled = true }
   }, [today])
 
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
-  useEffect(() => {
-    let cancelled = false
-    window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) })
-    const onChanged = () => { window.api?.reports.years?.().then(res => { if (!cancelled && res?.years) setYearsAvail(res.years) }) }
-    window.addEventListener('data-changed', onChanged)
-    return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-  }, [])
 
   const [period, setPeriod] = useState<'MONAT' | 'JAHR' | 'DREI_JAHRE' | 'GESAMT'>(() => {
     try { return (localStorage.getItem('dashPeriod') as any) || 'JAHR' } catch { return 'JAHR' }
@@ -89,70 +150,6 @@ export default function DashboardView({
 
   const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
   const [openingSaldo, setOpeningSaldo] = useState<number>(0)
-  const [refreshKey, setRefreshKey] = useState(0)
-  useEffect(() => {
-    const onDataChanged = () => setRefreshKey((k) => k + 1)
-    window.addEventListener('data-changed', onDataChanged)
-    return () => window.removeEventListener('data-changed', onDataChanged)
-  }, [])
-  useEffect(() => {
-    let cancelled = false
-    const now = new Date()
-    const todayIso = String(today || '').slice(0, 10)
-    const clampToToday = (iso: string) => (todayIso && iso > todayIso) ? todayIso : iso
-    const y = ((period === 'JAHR' || period === 'DREI_JAHRE') && yearSel) ? yearSel : now.getUTCFullYear()
-    
-    let from: string, to: string
-    if (period === 'GESAMT') {
-      // Gesamtlaufzeit: vom ersten bis zum letzten verfügbaren Jahr
-      const minYear = yearsAvail.length > 0 ? Math.min(...yearsAvail) : y
-      const maxYear = yearsAvail.length > 0 ? Math.max(...yearsAvail) : y
-      from = new Date(Date.UTC(minYear, 0, 1)).toISOString().slice(0, 10)
-      to = clampToToday(new Date(Date.UTC(maxYear, 11, 31)).toISOString().slice(0, 10))
-    } else if (period === 'MONAT') {
-      from = new Date(Date.UTC(y, now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-      to = clampToToday(new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10))
-    } else if (period === 'DREI_JAHRE') {
-      // 3-year window: (y-2) .. y
-      from = new Date(Date.UTC(y - 2, 0, 1)).toISOString().slice(0, 10)
-      to = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
-    } else {
-      // JAHR
-      from = new Date(Date.UTC(y, 0, 1)).toISOString().slice(0, 10)
-      to = clampToToday(new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10))
-    }
-
-    const dayBefore = (iso: string) => {
-      const d = new Date(iso + 'T00:00:00Z')
-      d.setUTCDate(d.getUTCDate() - 1)
-      return d.toISOString().slice(0, 10)
-    }
-    const diffFromSummary = (res: any) => {
-      const inGross = res?.byType?.find((x: any) => x.key === 'IN')?.gross || 0
-      const outGrossRaw = res?.byType?.find((x: any) => x.key === 'OUT')?.gross || 0
-      const outGross = Math.abs(outGrossRaw)
-      const diff = Math.round((Number(inGross || 0) - Number(outGross || 0)) * 100) / 100
-      return { inGross: Number(inGross || 0), outGross: Number(outGross || 0), diff }
-    }
-
-    ;(async () => {
-      try {
-        const needOpening = includePrevSaldo && period !== 'GESAMT'
-        const [cur, prev] = await Promise.all([
-          window.api?.reports.summary?.({ from, to }),
-          needOpening ? window.api?.reports.summary?.({ to: dayBefore(from) }) : Promise.resolve(null)
-        ])
-        if (cancelled || !cur) return
-        const curD = diffFromSummary(cur)
-        const open = (needOpening && prev) ? diffFromSummary(prev).diff : 0
-        setOpeningSaldo(open)
-        setSum({ inGross: curD.inGross, outGross: curD.outGross, diff: curD.diff })
-      } catch {
-        if (!cancelled) { setOpeningSaldo(0); setSum(null) }
-      }
-    })()
-    return () => { cancelled = true }
-  }, [period, yearSel, refreshKey, yearsAvail, includePrevSaldo, today])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const [invOpenCount, setInvOpenCount] = useState<number>(0)
@@ -170,174 +167,6 @@ export default function DashboardView({
   // Member statistics
   const [memberStats, setMemberStats] = useState<{ total: number; active: number; new: number; paused: number; left: number }>({ total: 0, active: 0, new: 0, paused: 0, left: 0 })
   
-  useEffect(() => {
-    let cancelled = false
-    const loadStats = async () => {
-      try {
-        const [allRes, activeRes, newRes, pausedRes, leftRes] = await Promise.all([
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0 }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'ACTIVE' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'NEW' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'PAUSED' }),
-          (window as any).api?.members?.list?.({ limit: 1, offset: 0, status: 'LEFT' })
-        ])
-        if (!cancelled) {
-          setMemberStats({
-            total: allRes?.total || 0,
-            active: activeRes?.total || 0,
-            new: newRes?.total || 0,
-            paused: pausedRes?.total || 0,
-            left: leftRes?.total || 0
-          })
-        }
-      } catch {}
-    }
-    loadStats()
-    const onChanged = () => loadStats()
-    window.addEventListener('data-changed', onChanged)
-    return () => { cancelled = true; window.removeEventListener('data-changed', onChanged) }
-  }, [])
-
-  const loadInvoiceTiles = useCallback(async () => {
-    try {
-      const now = new Date()
-      const isoToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString().slice(0, 10)
-      const plus5 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 5)).toISOString().slice(0, 10)
-      const yday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1)).toISOString().slice(0, 10)
-      const sumTwo = (a: any, b: any) => ({ count: (a?.count || 0) + (b?.count || 0), remaining: (a?.remaining || 0) + (b?.remaining || 0) })
-      const sOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN' })
-      const sPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL' })
-      const openTot = sumTwo(sOpen, sPart)
-      setInvOpenCount(openTot.count)
-      setInvOpenRemaining(openTot.remaining)
-      const sSoonOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueFrom: isoToday, dueTo: plus5 })
-      const sSoonPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueFrom: isoToday, dueTo: plus5 })
-      const soonTot = sumTwo(sSoonOpen, sSoonPart)
-      setInvDueSoonCount(soonTot.count)
-      setInvDueSoonRemaining(soonTot.remaining)
-      const sOverOpen = await (window as any).api?.invoices?.summary?.({ status: 'OPEN', dueTo: yday })
-      const sOverPart = await (window as any).api?.invoices?.summary?.({ status: 'PARTIAL', dueTo: yday })
-      const overTot = sumTwo(sOverOpen, sOverPart)
-      setInvOverdueCount(overTot.count)
-      setInvOverdueRemaining(overTot.remaining)
-      // Nächste Fälligkeiten: Alle offenen Verbindlichkeiten sortiert nach Fälligkeitsdatum (älteste zuerst)
-      const listOpen = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'OPEN' })
-      const listPart = await (window as any).api?.invoices?.list?.({ limit: 20, offset: 0, sort: 'ASC', sortBy: 'due', status: 'PARTIAL' })
-      const mergedRaw = [ ...(listOpen?.rows || []), ...(listPart?.rows || []) ]
-        .filter((r: any) => !!r && !!r.dueDate)
-        .sort((a: any, b: any) => String(a.dueDate).localeCompare(String(b.dueDate)))
-      const uniq: Map<number, any> = new Map()
-      for (const r of mergedRaw) { if (r && typeof r.id === 'number' && !uniq.has(r.id)) uniq.set(r.id, r) }
-      const merged = Array.from(uniq.values()).slice(0, 5)
-        .map((r: any) => ({ id: r.id, party: r.party, dueDate: r.dueDate, remaining: Math.max(0, Math.round(((Number(r.grossAmount || 0) - Number(r.paidSum || 0)) || 0) * 100) / 100) }))
-      setInvTopDue(merged)
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => { if (alive) await loadInvoiceTiles() })()
-    const onChanged = () => loadInvoiceTiles()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [loadInvoiceTiles])
-
-  const loadTaskSummary = useCallback(async () => {
-    const formatDate = (value?: string | null) => {
-      if (!value) return '—'
-      const parsed = new Date(`${value}T00:00:00`)
-      return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('de-DE').format(parsed)
-    }
-    const formatDateTime = (value?: string | null) => {
-      if (!value) return '—'
-      const normalized = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(value)
-        ? `${value.replace(' ', 'T')}Z`
-        : value
-      const parsed = new Date(normalized)
-      if (Number.isNaN(parsed.getTime())) return value
-      return new Intl.DateTimeFormat('de-DE', {
-        dateStyle: 'short',
-        timeStyle: 'short'
-      }).format(parsed)
-    }
-    const parseLocalDate = (value?: string | null) => {
-      if (!value) return null
-      const [year, month, day] = value.split('-').map(Number)
-      if (!year || !month || !day) return null
-      const parsed = new Date(year, month - 1, day)
-      return Number.isNaN(parsed.getTime()) ? null : parsed
-    }
-    const toISODate = (value: Date) => {
-      const year = value.getFullYear()
-      const month = String(value.getMonth() + 1).padStart(2, '0')
-      const day = String(value.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
-    const addDays = (value: Date, days: number) => {
-      const next = new Date(value)
-      next.setDate(next.getDate() + days)
-      return next
-    }
-    const formatMonthRange = (from: Date, to: Date) => {
-      const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
-      const fromMonth = monthFmt.format(from)
-      const toMonth = monthFmt.format(to)
-      return fromMonth === toMonth ? fromMonth : `${fromMonth} bis ${toMonth}`
-    }
-
-    try {
-      const [bankList, bankStatus, memberDue, submissions] = await Promise.all([
-        (window as any).api?.bankTransactions?.list?.({ status: 'OPEN', limit: 1, page: 1 }),
-        (window as any).api?.bankTransactions?.importStatus?.(),
-        (window as any).api?.payments?.dueSummary?.(),
-        (window as any).api?.submissions?.summary?.()
-      ])
-      setBankOpenCount(bankList?.stats?.open || bankList?.total || 0)
-      setDueMembershipFees({
-        dueMembers: Number(memberDue?.dueMembers || 0),
-        duePeriods: Number(memberDue?.duePeriods || 0)
-      })
-      setPendingSubmissions(Number(submissions?.pending || 0))
-
-      const totalImports = Number(bankStatus?.total || 0)
-      const lastDate = parseLocalDate(bankStatus?.lastBookingDate || null)
-      const todayDate = parseLocalDate(String(today || '').slice(0, 10)) || new Date()
-      const previousMonthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0)
-      if (totalImports === 0) {
-        setBankImportReminder({
-          summary: 'Erster Import offen',
-          detail: 'Es wurden noch keine Bankbelege importiert.'
-        })
-      } else if (lastDate && lastDate < previousMonthEnd) {
-        const from = addDays(lastDate, 1)
-        if (from <= previousMonthEnd) {
-          setBankImportReminder({
-            summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
-            detail: `Letzter Import: ${formatDateTime(bankStatus?.lastImportAt || null)} · fehlender Zeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}`
-          })
-        } else {
-          setBankImportReminder(null)
-        }
-      } else {
-        setBankImportReminder(null)
-      }
-    } catch {
-      setBankOpenCount(0)
-      setDueMembershipFees({ dueMembers: 0, duePeriods: 0 })
-      setPendingSubmissions(0)
-      setBankImportReminder(null)
-    }
-  }, [today])
-
-  useEffect(() => {
-    let alive = true
-    const load = async () => { if (alive) await loadTaskSummary() }
-    void load()
-    const onChanged = () => { void load() }
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [loadTaskSummary])
-
   const taskItems = useMemo<DashboardTaskItem[]>(() => {
     const items: DashboardTaskItem[] = []
     if (bankOpenCount > 0 || bankImportReminder) {
@@ -390,53 +219,50 @@ export default function DashboardView({
   const [activeEarmarks, setActiveEarmarks] = useState<Array<{ id: number; code: string; name: string; endDate?: string | null; color?: string | null }>>([])
   const [activeBudgets, setActiveBudgets] = useState<Array<{ id: number; name?: string | null; amountPlanned: number; sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; startDate?: string | null; endDate?: string | null; color?: string | null }>>([])
   useEffect(() => {
-    let alive = true
-  const todayIso = new Date().toISOString().slice(0,10)
+    let cancelled = false
     const load = async () => {
       try {
-        const earmarkRes = await (window as any).api?.bindings?.list?.({ activeOnly: true })
-        const rawEarmarks = (earmarkRes?.rows || []) as Array<any>
-        const filteredEarmarks = rawEarmarks
-          .filter(e => {
-            const sd = e.startDate ? String(e.startDate) : null
-            const ed = e.endDate ? String(e.endDate) : null
-            const startedOk = !sd || sd <= todayIso
-            const notEnded = !ed || ed >= todayIso
-            return startedOk && notEnded
-          })
-          .sort((a,b)=>{
-            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
-            const be = b.endDate ? String(b.endDate) : '9999-12-31'
-            return ae.localeCompare(be)
-          })
-          .slice(0,2)
-        if (alive) setActiveEarmarks(filteredEarmarks.map(e => ({ id: e.id, code: e.code, name: e.name, endDate: e.endDate || null, color: e.color || null })))
-      } catch { if (alive) setActiveEarmarks([]) }
-      try {
-        const budgetRes = await (window as any).api?.budgets?.list?.({})
-        const rawBudgets = (budgetRes?.rows || []) as Array<any>
-        const filteredBudgets = rawBudgets
-          .filter(b => {
-            const sd = b.startDate ? String(b.startDate) : null
-            const ed = b.endDate ? String(b.endDate) : null
-            const startedOk = !sd || sd <= todayIso
-            const notEnded = !ed || ed >= todayIso
-            return startedOk && notEnded
-          })
-          .sort((a,b)=>{
-            const ae = a.endDate ? String(a.endDate) : '9999-12-31'
-            const be = b.endDate ? String(b.endDate) : '9999-12-31'
-            return ae.localeCompare(be)
-          })
-          .slice(0,2)
-        if (alive) setActiveBudgets(filteredBudgets.map(b => ({ id: b.id, name: b.name || null, amountPlanned: b.amountPlanned || 0, sphere: b.sphere, startDate: b.startDate || null, endDate: b.endDate || null, color: b.color || null })))
-      } catch { if (alive) setActiveBudgets([]) }
+        const range = dashboardRange(period, yearSel, yearsAvail, today)
+        const snapshot = await window.api.app.dashboardSnapshot({
+          ...range,
+          openingTo: includePrevSaldo && period !== 'GESAMT' ? dayBefore(range.from) : undefined,
+          today: String(today || '').slice(0, 10)
+        })
+        if (cancelled) return
+        setSum(snapshot.financial)
+        setOpeningSaldo(snapshot.openingSaldo)
+        setYearsAvail((current) => (
+          current.length === snapshot.years.length && current.every((year, index) => year === snapshot.years[index])
+            ? current
+            : snapshot.years
+        ))
+        setCashier(snapshot.organization.cashier)
+        setOrgLogo(snapshot.organization.logoDataUrl)
+        setMemberStats(snapshot.members)
+        setInvOpenCount(snapshot.invoices.open.count)
+        setInvOpenRemaining(snapshot.invoices.open.remaining)
+        setInvDueSoonCount(snapshot.invoices.dueSoon.count)
+        setInvDueSoonRemaining(snapshot.invoices.dueSoon.remaining)
+        setInvOverdueCount(snapshot.invoices.overdue.count)
+        setInvOverdueRemaining(snapshot.invoices.overdue.remaining)
+        setInvTopDue(snapshot.invoices.topDue)
+        setBankOpenCount(snapshot.tasks.bankOpenCount)
+        setBankImportReminder(buildBankImportReminder(snapshot.tasks.bankImportStatus, today))
+        setDueMembershipFees(snapshot.tasks.dueMembershipFees)
+        setPendingSubmissions(snapshot.tasks.pendingSubmissions)
+        setActiveBudgets(snapshot.activeBudgets)
+        setActiveEarmarks(snapshot.activeEarmarks)
+      } catch {
+        if (!cancelled) setSum(null)
+      }
     }
-    load()
-    const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
-  }, [])
+    void load()
+    const removeDataChangedListener = addDataChangedListener(
+      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'settings', 'organizations'],
+      () => { void load() }
+    )
+    return () => { cancelled = true; removeDataChangedListener() }
+  }, [includePrevSaldo, period, today, yearSel, yearsAvail])
 
   return (
     <div className="card dashboard-card">
@@ -717,8 +543,8 @@ function DashboardRecentActivity({
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [])
   
   // Load earmarks and budgets for lookups
@@ -736,8 +562,8 @@ function DashboardRecentActivity({
     }
     loadMeta()
     const onChanged = () => loadMeta()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['budgets', 'earmarks'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [])
 
   function describe(row: any): { title: string; details?: string; tone?: 'ok' | 'warn' | 'err' } {

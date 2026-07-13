@@ -747,8 +747,34 @@ const MIGRATIONS: Mig[] = [
     -- Optional comment on invoices / liabilities.
     ALTER TABLE invoices ADD COLUMN note TEXT;
     `
+  },
+  {
+    version: 36,
+    up: (db: DB) => {
+      ensureJournalPerformanceIndexes(db)
+    }
   }
 ]
+
+export function ensureJournalPerformanceIndexes(db: DB) {
+  db.exec(`
+    -- Journal pagination and its most common filters/sorts.
+    CREATE INDEX IF NOT EXISTS idx_vouchers_date_id
+      ON vouchers(date, id);
+    CREATE INDEX IF NOT EXISTS idx_vouchers_type_date_id
+      ON vouchers(type, date, id);
+    CREATE INDEX IF NOT EXISTS idx_vouchers_payment_account_date_id
+      ON vouchers(payment_account_id, date, id);
+    CREATE INDEX IF NOT EXISTS idx_vouchers_earmark_date_id
+      ON vouchers(earmark_id, date, id);
+
+    -- Avoid a complete file-table scan for every Journal/Invoice row.
+    CREATE INDEX IF NOT EXISTS idx_voucher_files_voucher
+      ON voucher_files(voucher_id);
+    CREATE INDEX IF NOT EXISTS idx_invoice_files_invoice
+      ON invoice_files(invoice_id);
+  `)
+}
 
 function ensureMigrationsTable(db: DB) {
   db.prepare(

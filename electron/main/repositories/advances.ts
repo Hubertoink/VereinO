@@ -2,6 +2,8 @@ import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { createVoucher, deleteVoucher } from './vouchers'
 import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
+import { normalizeUploadFilesForJson } from '../services/filePayload'
+import type { UploadFilePayload } from '../../../shared/filePayload'
 
 type DB = InstanceType<typeof Database>
 
@@ -297,7 +299,7 @@ export function addAdvancePurchase(input: {
   projectId?: number | null
   budgets?: Array<{ budgetId: number; amount: number }>
   earmarks?: Array<{ earmarkId: number; amount: number }>
-  files?: { name: string; dataBase64: string; mime?: string }[]
+  files?: UploadFilePayload[]
   tags?: string[]
 }) {
   if (!input.advanceId || input.advanceId <= 0) throw new Error('advanceId ist erforderlich')
@@ -345,7 +347,7 @@ export function addAdvancePurchase(input: {
       JSON.stringify(input.budgets ?? []),
       JSON.stringify(input.earmarks ?? []),
       JSON.stringify(input.tags ?? []),
-      JSON.stringify(input.files ?? [])
+      JSON.stringify(normalizeUploadFilesForJson(input.files))
     )
     return { id: Number(info.lastInsertRowid) }
   })
@@ -366,7 +368,7 @@ export function updateAdvancePurchase(input: {
   projectId?: number | null
   budgets?: Array<{ budgetId: number; amount: number }>
   earmarks?: Array<{ earmarkId: number; amount: number }>
-  files?: { name: string; dataBase64: string; mime?: string }[]
+  files?: UploadFilePayload[]
   tags?: string[]
 }) {
   if (!input.id || input.id <= 0) throw new Error('ID ist erforderlich')
@@ -419,7 +421,7 @@ export function updateAdvancePurchase(input: {
       JSON.stringify(input.budgets ?? []),
       JSON.stringify(input.earmarks ?? []),
       JSON.stringify(input.tags ?? []),
-      JSON.stringify(input.files ?? []),
+      JSON.stringify(normalizeUploadFilesForJson(input.files)),
       input.id
     )
     return { id: input.id }

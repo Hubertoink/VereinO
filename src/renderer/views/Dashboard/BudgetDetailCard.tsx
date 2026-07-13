@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { addDataChangedListener } from '../../utils/refresh'
 
 type Voucher = { 
   id: number
@@ -74,8 +75,8 @@ export default function BudgetDetailCard({ budgetId, from, to }: { budgetId: num
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers', 'budgets'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [budgetId, from, to])
 
   if (!budget && !loading) {

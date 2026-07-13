@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import TagsEditor from '../TagsEditor'
 import { useToast } from '../../context/useToast'
-import { bufferToBase64Safe } from '../../utils/fileEncoding'
 import {
   EMPTY_LOCAL_INVOICE_FIELDS,
   extractLocalInvoiceFields,
@@ -546,7 +545,7 @@ export default function LocalInvoiceScanModal({
         const result = await window.api.docling.extract({
           fileName: nextFile.name,
           mimeType,
-          dataBase64: bufferToBase64Safe(await nextFile.arrayBuffer())
+          dataBytes: new Uint8Array(await nextFile.arrayBuffer())
         })
         if (requestRef.current !== requestId) return true
         const doclingText = result.text.trim()
@@ -725,7 +724,7 @@ export default function LocalInvoiceScanModal({
         file: {
           fileName: file.name,
           mimeType,
-          dataBase64: bufferToBase64Safe(await file.arrayBuffer())
+          dataBytes: new Uint8Array(await file.arrayBuffer())
         }
       })
       const result = analyzed.result

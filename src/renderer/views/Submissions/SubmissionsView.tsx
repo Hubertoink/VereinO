@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { ICONS } from '../../utils/icons'
 import TagsEditor from '../../components/TagsEditor'
 import { getInitialPaymentAccount, getPaymentMethodFromAccountKind } from './paymentAccountUtils'
+import { dispatchDataChanged } from '../../utils/refresh'
+import { base64ToUint8Array } from '../../utils/fileEncoding'
 
 // Unicode icons for buttons
 const ICON_IMPORT = '📥'
@@ -645,7 +647,7 @@ function StatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' }
     return <span className={className}>{label}</span>
 }
 
-export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDate, earmarks, budgetsForEdit, tagDefs, paymentAccounts }: SubmissionsViewProps) {
+export default function SubmissionsView({ notify, eurFmt, fmtDate, earmarks, budgetsForEdit, tagDefs, paymentAccounts }: SubmissionsViewProps) {
     const [submissions, setSubmissions] = useState<Submission[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -709,9 +711,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             if (res?.imported > 0) {
                 notify('success', `${res.imported} Einreichung(en) importiert`)
                 loadSubmissions()
-                bumpDataVersion()
-                // Trigger badge updates
-                window.dispatchEvent(new Event('data-changed'))
+                dispatchDataChanged(['submissions'])
             } else if (res?.imported === 0) {
                 notify('info', 'Keine neuen Einreichungen im Import gefunden')
             }
@@ -779,7 +779,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                                 await (window as any).api?.attachments?.add?.({
                                     voucherId: voucherRes.id,
                                     fileName: attData.filename,
-                                    dataBase64: attData.dataBase64,
+                                    dataBytes: base64ToUint8Array(attData.dataBase64),
                                     mimeType: attData.mimeType
                                 })
                             }
@@ -796,7 +796,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
                             await (window as any).api?.attachments?.add?.({
                                 voucherId: voucherRes.id,
                                 fileName: newAtt.filename,
-                                dataBase64: newAtt.dataBase64,
+                                dataBytes: base64ToUint8Array(newAtt.dataBase64),
                                 mimeType: newAtt.mimeType
                             })
                         } catch (attErr) {
@@ -819,8 +819,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             
             setReviewSubmission(null)
             loadSubmissions()
-            bumpDataVersion()
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['submissions', 'vouchers'])
         } catch (e: any) {
             notify('error', 'Genehmigung fehlgeschlagen: ' + (e?.message || e))
         }
@@ -837,8 +836,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             notify('info', 'Einreichung abgelehnt')
             setReviewSubmission(null)
             loadSubmissions()
-            bumpDataVersion()
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['submissions'])
         } catch (e: any) {
             notify('error', 'Ablehnung fehlgeschlagen: ' + (e?.message || e))
         }
@@ -857,8 +855,7 @@ export default function SubmissionsView({ notify, bumpDataVersion, eurFmt, fmtDa
             notify('success', 'Einreichung gelöscht')
             setDeleteConfirm(null)
             loadSubmissions()
-            bumpDataVersion()
-            window.dispatchEvent(new Event('data-changed'))
+            dispatchDataChanged(['submissions'])
         } catch (e: any) {
             notify('error', 'Löschen fehlgeschlagen: ' + (e?.message || e))
         } finally {

@@ -1,27 +1,8 @@
-import type {
-  EncodedAttachment,
-  IDataAdapter
-} from './IDataAdapter'
+import type { IDataAdapter } from './IDataAdapter'
 import type { RendererApi } from '../../../types/api'
 
 function browserApi(): RendererApi {
   return (globalThis as typeof globalThis & { window: { api: RendererApi } }).window.api
-}
-
-async function encodeAttachment(file: File | EncodedAttachment): Promise<EncodedAttachment> {
-  if (!(file instanceof File)) return file
-
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const chunkSize = 0x8000
-  let binary = ''
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
-  }
-  return {
-    name: file.name,
-    dataBase64: btoa(binary),
-    mimeType: file.type || undefined
-  }
 }
 
 /**
@@ -71,12 +52,20 @@ export class LocalAdapter implements IDataAdapter {
     add: async (params) => {
       const files: Array<{ id: number }> = []
       for (const source of params.files) {
-        const file = await encodeAttachment(source)
+        const file = source instanceof File
+          ? {
+              name: source.name,
+              dataBytes: new Uint8Array(await source.arrayBuffer()),
+              mimeType: source.type || undefined
+            }
+          : source
         const result = await this.api.attachments.add({
           voucherId: params.voucherId,
           fileName: file.name || 'Datei',
-          dataBase64: file.dataBase64,
-          mimeType: file.mimeType || file.mime
+          ...('dataBytes' in file
+            ? { dataBytes: file.dataBytes }
+            : { dataBase64: file.dataBase64 }),
+          mimeType: file.mimeType || ('mime' in file ? file.mime : undefined)
         })
         if (typeof result.id !== 'number') {
           throw new Error('Attachment upload returned no file id.')

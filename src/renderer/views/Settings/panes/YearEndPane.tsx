@@ -1,10 +1,11 @@
 import React from 'react'
 import { YearEndPaneProps } from '../types'
+import { dispatchDataChanged } from '../../../utils/refresh'
 
 /**
  * YearEndPane - Year-End Closing: Preview, Export, Close/Reopen
  */
-export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
+export function YearEndPane({ notify }: YearEndPaneProps) {
   const [year, setYear] = React.useState<number>(new Date().getFullYear())
   const [yearsAvail, setYearsAvail] = React.useState<number[]>([])
   const [preview, setPreview] = React.useState<any | null>(null)
@@ -53,13 +54,13 @@ export function YearEndPane({ notify, bumpDataVersion }: YearEndPaneProps) {
 
   async function executeClose() {
     setBusy(true); setErr('')
-    try { const res = await window.api?.yearEnd?.close?.({ year }); if (res?.ok) { notify('success', `Abgeschlossen bis ${res.closedUntil}`); const s = await window.api?.yearEnd?.status?.(); setStatus(s as any); await refresh(); window.dispatchEvent(new Event('data-changed')) } }
+    try { const res = await window.api?.yearEnd?.close?.({ year }); if (res?.ok) { notify('success', `Abgeschlossen bis ${res.closedUntil}`); const s = await window.api?.yearEnd?.status?.(); setStatus(s as any); await refresh(); dispatchDataChanged(['settings', 'vouchers']) } }
     catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
     finally { setBusy(false); setConfirmAction(null) }
   }
   async function executeReopen() {
     setBusy(true); setErr('')
-    try { const res = await window.api?.yearEnd?.reopen?.({ year }); if (res?.ok) { notify('success', 'Periode geöffnet'); const s = await window.api?.yearEnd?.status?.(); setStatus(s as any); await refresh(); window.dispatchEvent(new Event('data-changed')) } }
+    try { const res = await window.api?.yearEnd?.reopen?.({ year }); if (res?.ok) { notify('success', 'Periode geöffnet'); const s = await window.api?.yearEnd?.status?.(); setStatus(s as any); await refresh(); dispatchDataChanged(['settings', 'vouchers']) } }
     catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
     finally { setBusy(false); setConfirmAction(null) }
   }

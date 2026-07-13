@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconBudget, IconEarmark, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
+import { addDataChangedListener } from '../../../utils/refresh'
 import {
     normalizeVoucherBudgetAssignments,
     normalizeVoucherEarmarkAssignments
@@ -494,8 +495,7 @@ export default function JournalTable({
             paymentUsageInFlight.current.clear()
             setUsageRefreshKey((key) => key + 1)
         }
-        window.addEventListener('data-changed', clearUsageCaches)
-        return () => window.removeEventListener('data-changed', clearUsageCaches)
+        return addDataChangedListener(['vouchers', 'budgets', 'earmarks', 'tags'], clearUsageCaches)
     }, [])
 
     const getTagUsage = useCallback(async (tagId: number) => {

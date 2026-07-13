@@ -8,6 +8,8 @@ import { writeAudit } from '../services/audit'
 import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
 import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 import { linkBankTransaction } from './bankTransactions'
+import { filePayloadToBuffer } from '../services/filePayload'
+import type { FileDataPayload, UploadFilePayload } from '../../../shared/filePayload'
 import {
     getVoucherBudgets,
     getVoucherEarmarks,
@@ -286,7 +288,7 @@ export function createVoucher(input: {
     budgets?: Array<{ budgetId: number; amount: number }>
     earmarks?: Array<{ earmarkId: number; amount: number }>
     createdBy?: number | null
-    files?: { name: string; dataBase64: string; mime?: string }[]
+    files?: UploadFilePayload[]
     tags?: string[]
     bankTransactionId?: number
 }) {
@@ -458,7 +460,7 @@ export function createVoucher(input: {
         if (input.files?.length) {
             const { filesDir } = getAppDataDir()
             for (const f of input.files) {
-                const buff = Buffer.from(f.dataBase64, 'base64')
+                const buff = filePayloadToBuffer(f)
                 const safeName = `${id}-${Date.now()}-${f.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
                 const abs = path.join(filesDir, safeName)
                 fs.writeFileSync(abs, buff)
@@ -1794,10 +1796,10 @@ export function getFileById(fileId: number) {
     return row
 }
 
-export function addFileToVoucher(voucherId: number, fileName: string, dataBase64: string, mime?: string) {
+export function addFileToVoucher(voucherId: number, fileName: string, data: FileDataPayload, mime?: string) {
     const d = getDb()
     const { filesDir } = getAppDataDir()
-    const buff = Buffer.from(dataBase64, 'base64')
+    const buff = filePayloadToBuffer(data)
     const safeName = `${voucherId}-${Date.now()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
     const abs = path.join(filesDir, safeName)
     fs.writeFileSync(abs, buff)

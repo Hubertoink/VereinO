@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { addDataChangedListener } from '../../../utils/refresh'
 
 type Bucket = { month: string; gross: number }
 
@@ -98,8 +99,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     }
     load()
     const onChanged = () => load()
-    window.addEventListener('data-changed', onChanged)
-    return () => { alive = false; window.removeEventListener('data-changed', onChanged) }
+    const removeDataChangedListener = addDataChangedListener(['vouchers'], onChanged)
+    return () => { alive = false; removeDataChangedListener() }
   }, [from, to, isDaily, props.activateKey, props.refreshKey])
 
   const labels = rowsAll.map(r => r.month)

@@ -4,7 +4,7 @@
  */
 
 import { BrowserWindow } from 'electron'
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
@@ -656,7 +656,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     }
   })
   
-  fs.writeFileSync(filePath, buff)
+  await fs.writeFile(filePath, buff)
   
   try { win.destroy() } catch { }
 

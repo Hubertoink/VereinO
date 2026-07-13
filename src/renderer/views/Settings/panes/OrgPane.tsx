@@ -4,6 +4,7 @@ import ConfirmSwitchOrgModal from '../../../components/modals/ConfirmSwitchOrgMo
 import NewOrgModal from '../../../components/modals/NewOrgModal'
 import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
+import { dispatchDataChanged } from '../../../utils/refresh'
 
 interface ActiveOrg {
   id: string
@@ -92,7 +93,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
       await (window as any).api?.organizations?.rename?.({ orgId: activeOrg.id, name: activeOrgName.trim() })
       notify('success', 'Organisationsname geändert')
       await loadActiveOrg()
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['organizations', 'settings'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally { setSavingOrg(false) }
@@ -100,7 +101,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
 
   async function handleOrgCreated(org: { id: string; name: string }) {
     setShowNewOrgModal(false)
-    window.dispatchEvent(new Event('data-changed'))
+    dispatchDataChanged(['organizations', 'settings'])
     await loadActiveOrg()
     setShowConfirmSwitch(org)
   }
@@ -128,7 +129,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
       await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
       await (window as any).api?.settings?.set?.({ key: 'org.logoDataUrl', value: orgLogoDataUrl || null })
       notify('success', 'Einstellungen gespeichert')
-      window.dispatchEvent(new Event('data-changed'))
+      dispatchDataChanged(['organizations', 'settings'])
     } catch (e: any) {
       setError(e?.message || String(e))
       notify('error', e?.message || String(e))

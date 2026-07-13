@@ -5,6 +5,25 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.4] - 2026-07-13
+
+### Hinzugefügt
+
+- Buchungserfassung: Der steuerliche Bereich im kompakten Flyout besitzt eine kurze Erklärung per Info-Tooltip.
+
+### Geändert
+
+- Performance: Große Dateioperationen für Exporte, Backups, Anhänge, Speicherortwechsel und Rechnungs-Scans laufen asynchron; Datei-Hashes werden nicht mehr über synchrone Komplettlesevorgänge berechnet.
+- Performance: Das Dashboard lädt seine zentralen Kennzahlen gebündelt als gecachten Snapshot. Beitragsfälligkeiten werden dabei pro Aufruf gesammelt statt je Mitglied einzeln abgefragt.
+- Buchungserfassung und Verbindlichkeiten: Zahlungskonten werden mit ihrer hinterlegten Farbe und nur mit der Kontobezeichnung angezeigt.
+- Budgets und Zweckbindungen: Die Ansichten „Detail“ und „Kompakt“ verwenden die gleiche segmentierte Auswahl wie die Buchungserfassung.
+
+### Behoben
+
+- Oberfläche: Bei deaktiviertem Blur bleiben Fenster und Rahmen opak statt deutlich transparent.
+- Buchungsjournal: Einnahmen-, Ausgaben-, Umbuchungs- und interne Buchungen erhalten in den Buchungsreitern passende Farbakzente.
+- Buchungsdetails: Das Dialogfenster öffnet zentriert im App-Fenster.
+
 ## [2.9.2] - 2026-07-13
 
 ### Hinzugefügt
