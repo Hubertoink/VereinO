@@ -28,7 +28,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 function hasBlockingDialog() {
-  return !!document.querySelector('.modal-overlay, .booking-modal, [role="dialog"][aria-modal="true"]')
+  return !!document.querySelector('.modal-overlay, .booking-modal, .compact-booking-flyout, [role="dialog"][aria-modal="true"]')
 }
 
 export function LeaderShortcuts({ commands, leaderLabel = 'Space' }: LeaderShortcutsProps) {

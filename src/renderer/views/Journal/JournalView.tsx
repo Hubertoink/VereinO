@@ -515,6 +515,28 @@ export default function JournalView({
         closeEditModalNow()
     }, [activeEditTabId, closeEditModalNow, editHasUnsavedChanges, editRow, showBookingEditTabs])
 
+    const activeEditVoucherId = editRow?.id ?? null
+
+    useEffect(() => {
+        if (!activeEditVoucherId) return
+        window.dispatchEvent(new Event('booking-editor-opened'))
+    }, [activeEditVoucherId])
+
+    useEffect(() => {
+        const handleCompactBookingFlyoutOpened = () => {
+            if (!editRow) return
+            // Keep exactly one booking editor active. A clean or tabbed edit is
+            // parked in favour of the new flyout. A dirty non-tabbed edit keeps
+            // priority until its discard prompt has been resolved.
+            if (!showBookingEditTabs && editHasUnsavedChanges) {
+                window.dispatchEvent(new Event('booking-editor-opened'))
+            }
+            requestCloseEditModal()
+        }
+        window.addEventListener('compact-booking-flyout-opened', handleCompactBookingFlyoutOpened)
+        return () => window.removeEventListener('compact-booking-flyout-opened', handleCompactBookingFlyoutOpened)
+    }, [editHasUnsavedChanges, editRow, requestCloseEditModal, showBookingEditTabs])
+
     const closeBookingEditTab = useCallback((tabId: string) => {
         const target = bookingEditTabs.find((tab) => tab.id === tabId)
         if (!target) return

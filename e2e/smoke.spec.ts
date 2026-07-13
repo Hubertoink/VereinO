@@ -8,6 +8,19 @@ let electronApp: ElectronApplication
 let page: Page
 let userDataDir: string
 
+async function openBookingWorkflowSettings() {
+  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
+  return page.getByRole('group', { name: 'Darstellung der Buchungserfassung' })
+}
+
+async function chooseBookingEntryPresentation(name: 'Dialog' | 'Kompakt-Flyout' | 'Eigenes Fenster') {
+  const presentation = await openBookingWorkflowSettings()
+  const option = presentation.getByRole('button', { name, exact: true })
+  await option.click()
+  await expect(option).toHaveClass(/\bactive\b/)
+}
+
 test.beforeEach(async () => {
   userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-e2e-'))
   const mainEntry = path.resolve('dist-electron/main/index.cjs')
@@ -91,6 +104,30 @@ test('loads split application pages on demand', async () => {
   await expect(page.getByRole('textbox', { name: 'Suche', exact: true })).toBeVisible()
 })
 
+test('selects a single invoice in a compact flyout before opening recognition', async () => {
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+
+  await page.locator('.invoice-split-fab__new').click()
+  const uploadFlyout = page.locator('.invoice-single-upload-flyout')
+  await expect(uploadFlyout).toBeVisible()
+  await expect(uploadFlyout).toContainText('Rechnung hier ablegen')
+  await expect(page.locator('.local-invoice-scan')).toHaveCount(0)
+
+  await page.locator('.invoice-batch-control__single-input').setInputFiles({
+    name: 'einzelrechnung.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64'
+    )
+  })
+
+  await expect(uploadFlyout).toHaveCount(0)
+  const recognitionDialog = page.locator('.local-invoice-scan')
+  await expect(recognitionDialog).toBeVisible()
+  await expect(recognitionDialog.getByText('einzelrechnung.png', { exact: true })).toBeVisible()
+})
+
 test('queues batch invoices in the Submit folder and exposes the review flyout', async () => {
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined)
@@ -106,7 +143,7 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
   await expect(flyout).toContainText('KI-Rechnungsentwürfe')
   await expect(flyout).toContainText('KI-API-Key')
 
-  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+  await page.locator('.invoice-batch-control__batch-input').setInputFiles({
     name: 'batch-test.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4\n% VereinO batch queue test\n%%EOF')
@@ -121,7 +158,7 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
   await expect.poll(async () => page.evaluate(async () => (await window.api.ai.invoiceBatch.list()).rows.length)).toBe(0)
 
   const duplicatePdf = Buffer.from('%PDF-1.4\n% VereinO saved duplicate test\n%%EOF')
-  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+  await page.locator('.invoice-batch-control__batch-input').setInputFiles({
     name: 'duplicate-test.pdf',
     mimeType: 'application/pdf',
     buffer: duplicatePdf
@@ -154,7 +191,7 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
   expect(duplicateQueue.rows[0]?.isDuplicate).toBe(true)
   expect(duplicateQueue.rows[0]?.duplicateVoucherId).toBe(savedVoucher.id)
 
-  await page.locator('.invoice-batch-control input[type="file"]').setInputFiles({
+  await page.locator('.invoice-batch-control__batch-input').setInputFiles({
     name: 'duplicate-test.pdf',
     mimeType: 'application/pdf',
     buffer: duplicatePdf
@@ -287,6 +324,211 @@ test('presents the optimized booking workflow', async () => {
   await expect(dialog.getByRole('combobox', { name: 'Transfer von Konto' })).toBeVisible()
   await expect(dialog.getByRole('combobox', { name: 'Sphäre der Buchung' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+})
+
+test('routes new bookings through the configured dialog, flyout, and detached window', async () => {
+  const presentation = await openBookingWorkflowSettings()
+  const dialogOption = presentation.getByRole('button', { name: 'Dialog', exact: true })
+  await expect(dialogOption).toHaveClass(/\bactive\b/)
+
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.locator('.fab-buchung').click()
+  const dialog = page.locator('.quick-add-modal')
+  await expect(dialog).toBeVisible()
+  await expect(page.locator('.compact-booking-flyout')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+
+  await chooseBookingEntryPresentation('Kompakt-Flyout')
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('ui.bookingEntryPresentation'))).toBe('flyout')
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.locator('.fab-buchung').click()
+  const flyout = page.locator('.compact-booking-flyout')
+  await expect(flyout).toBeVisible()
+  await expect(page.locator('.quick-add-modal')).toHaveCount(0)
+  const expandButton = flyout.getByRole('button', { name: 'Vollständigen Buchungsdialog öffnen' })
+  const expandBounds = await expandButton.boundingBox()
+  expect(expandBounds).not.toBeNull()
+  await page.mouse.click(expandBounds!.x + expandBounds!.width / 2, expandBounds!.y + expandBounds!.height / 2)
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+
+  await page.locator('.fab-buchung').click()
+  await expect(flyout).toBeVisible()
+  const closeButton = flyout.getByRole('button', { name: 'Buchungsflyout schließen' })
+  const closeBounds = await closeButton.boundingBox()
+  expect(closeBounds).not.toBeNull()
+  await page.mouse.click(closeBounds!.x + closeBounds!.width / 2, closeBounds!.y + closeBounds!.height / 2)
+  await expect(flyout).toHaveCount(0)
+
+  await chooseBookingEntryPresentation('Eigenes Fenster')
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('ui.bookingEntryPresentation'))).toBe('detached')
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  const detachedWindowPromise = electronApp.waitForEvent('window')
+  await page.locator('.fab-buchung').click()
+  const detachedPage = await detachedWindowPromise
+  await detachedPage.waitForLoadState('domcontentloaded')
+  const detachedDialog = detachedPage.locator('.detached-quick-add-modal')
+  await expect(detachedDialog).toBeVisible()
+  await expect(page.locator('.quick-add-modal')).toHaveCount(0)
+  await expect(page.locator('.compact-booking-flyout')).toHaveCount(0)
+
+  const detachedWindowClosed = detachedPage.waitForEvent('close')
+  await detachedDialog.getByRole('button', { name: 'Schließen' }).click()
+  await detachedWindowClosed
+})
+
+test('parks a compact booking flyout in a tab and restores all entered content', async () => {
+  await chooseBookingEntryPresentation('Kompakt-Flyout')
+  const bookingTabsSwitch = page.locator('#toggle-booking-draft-tabs')
+  await expect(bookingTabsSwitch).not.toBeChecked()
+  await bookingTabsSwitch.check()
+  await expect(bookingTabsSwitch).toBeChecked()
+
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.locator('.fab-buchung').click()
+
+  const flyout = page.locator('.compact-booking-flyout')
+  await expect(flyout).toBeVisible()
+  await expect(flyout).toContainText('Als aktiver Buchungsreiter geöffnet')
+  await flyout.getByPlaceholder('Was wurde gebucht?').fill('Geparkter Reiter-Test')
+  await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('47.50')
+  await flyout.getByRole('button', { name: '+ Kommentar', exact: true }).click()
+  await flyout.getByRole('textbox', { name: 'Kommentar zur Buchung' }).fill('Dieser optionale Inhalt bleibt erhalten.')
+
+  const draftTabs = page.getByLabel('Offene Buchungstabs')
+  const draftTab = draftTabs.locator('.booking-draft-tab').filter({ hasText: 'Geparkter Reiter-Test' })
+  await expect(draftTab).toBeVisible()
+  await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
+  await page.screenshot({ path: 'test-results/compact-booking-flyout-tabs.png', fullPage: true })
+
+  const flyoutTabSwitcher = flyout.getByRole('combobox', { name: 'Buchungsreiter wechseln' })
+  await expect(flyoutTabSwitcher.locator('option')).toHaveCount(1)
+  const firstDraftId = await flyoutTabSwitcher.locator('option').first().getAttribute('value')
+  expect(firstDraftId).toBeTruthy()
+  await flyout.getByRole('button', { name: 'Neuen Buchungsreiter öffnen' }).click()
+  const allDraftTabs = draftTabs.locator('.booking-draft-tab')
+  await expect(allDraftTabs).toHaveCount(2)
+  await expect(flyoutTabSwitcher.locator('option')).toHaveCount(2)
+  const secondDraftTab = allDraftTabs.nth(1)
+  await expect(secondDraftTab).toHaveClass(/booking-draft-tab--active/)
+  await expect(draftTab).not.toHaveClass(/booking-draft-tab--active/)
+  await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('')
+  await expect(flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('')
+
+  await flyoutTabSwitcher.selectOption(firstDraftId!)
+  await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
+  await expect(secondDraftTab).not.toHaveClass(/booking-draft-tab--active/)
+  await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('Geparkter Reiter-Test')
+  await expect(flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('47.5')
+  await expect(flyout.getByRole('textbox', { name: 'Kommentar zur Buchung' })).toHaveValue(
+    'Dieser optionale Inhalt bleibt erhalten.'
+  )
+
+  await flyout.getByRole('button', { name: 'Buchungsflyout parken' }).click()
+  await expect(flyout).toHaveCount(0)
+  await expect(draftTab).not.toHaveClass(/booking-draft-tab--active/)
+
+  await draftTab.locator('.booking-draft-tab__open').click()
+  await expect(flyout).toBeVisible()
+  await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('Geparkter Reiter-Test')
+  await expect(flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('47.5')
+  await expect(flyout.getByRole('textbox', { name: 'Kommentar zur Buchung' })).toHaveValue(
+    'Dieser optionale Inhalt bleibt erhalten.'
+  )
+  await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
+})
+
+test('uses the booking FAB as a close toggle for compact entry without draft tabs', async () => {
+  await chooseBookingEntryPresentation('Kompakt-Flyout')
+  await expect(page.locator('#toggle-booking-draft-tabs')).not.toBeChecked()
+
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  const bookingFab = page.locator('.fab-buchung')
+  const flyout = page.locator('.compact-booking-flyout')
+
+  await bookingFab.click()
+  await expect(flyout).toBeVisible()
+  await flyout.getByPlaceholder('Was wurde gebucht?').fill('Temporärer Toggle-Test')
+
+  await bookingFab.click()
+  await expect(flyout).toHaveCount(0)
+  await expect(page.getByLabel('Offene Buchungstabs')).toHaveCount(0)
+
+  await bookingFab.click()
+  await expect(flyout).toBeVisible()
+  await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('')
+})
+
+test('saves a compact booking exactly once and keeps optional fields progressive', async () => {
+  await chooseBookingEntryPresentation('Kompakt-Flyout')
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.locator('.fab-buchung').click()
+
+  const flyout = page.locator('.compact-booking-flyout')
+  await expect(flyout).toBeVisible()
+  await expect(flyout.getByRole('button', { name: '+ Tag', exact: true })).toBeVisible()
+  await expect(flyout.getByRole('button', { name: '+ Kommentar', exact: true })).toBeVisible()
+  await expect(flyout.getByRole('button', { name: '+ Anhang', exact: true })).toBeVisible()
+  await expect(flyout.getByRole('textbox', { name: 'Kommentar zur Buchung' })).toHaveCount(0)
+
+  await flyout.getByRole('combobox', { name: 'Buchungskonto wählen' }).selectOption({ index: 1 })
+  await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('23.45')
+  await flyout.getByPlaceholder('Was wurde gebucht?').fill('Kompakt gespeichert')
+  await flyout.getByRole('button', { name: '+ Kommentar', exact: true }).click()
+  await flyout.getByRole('textbox', { name: 'Kommentar zur Buchung' }).fill('Optionaler Kommentar')
+
+  await flyout.getByRole('button', { name: 'Buchung speichern', exact: true }).dblclick()
+  await expect(flyout).toHaveCount(0)
+  await expect.poll(async () => page.evaluate(async () => {
+    const result = await window.api.vouchers.recent({ limit: 50 })
+    return result.rows.filter((row) => row.description === 'Kompakt gespeichert').length
+  })).toBe(1)
+})
+
+test('parks the compact draft while an existing booking is edited and restores it afterwards', async () => {
+  await chooseBookingEntryPresentation('Kompakt-Flyout')
+  await page.locator('#toggle-booking-draft-tabs').check()
+  await page.locator('#toggle-voucher-delete-mode').check()
+
+  await page.evaluate(async () => {
+    const bootstrap = await window.api.app.bootstrap()
+    const account = (bootstrap.paymentAccounts as any[])[0]
+    if (!account) throw new Error('Booking editor test needs a payment account')
+    await window.api.vouchers.create({
+      date: '2026-07-13',
+      type: 'IN',
+      sphere: 'IDEELL',
+      description: 'Bestehende Buchung für Editorwechsel',
+      grossAmount: 12,
+      vatRate: 0,
+      paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+      paymentAccountId: account.id
+    })
+  })
+
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await expect(page.getByText('Bestehende Buchung für Editorwechsel', { exact: true })).toBeVisible()
+
+  await page.locator('.fab-buchung').click()
+  const flyout = page.locator('.compact-booking-flyout')
+  await flyout.getByPlaceholder('Was wurde gebucht?').fill('Entwurf bleibt im Reiter')
+  const draftTab = page.getByLabel('Offene Buchungstabs').locator('.booking-draft-tab').filter({ hasText: 'Entwurf bleibt im Reiter' })
+  await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
+
+  const savedRow = page.locator('tr').filter({ hasText: 'Bestehende Buchung für Editorwechsel' })
+  await savedRow.getByTitle('Bearbeiten').click()
+  const editModal = page.locator('.journal-edit-modal')
+  await expect(editModal).toBeVisible()
+  await expect(flyout).toHaveCount(0)
+  await expect(draftTab).not.toHaveClass(/booking-draft-tab--active/)
+
+  await editModal.getByTitle('Schließen (ESC)').click()
+  await expect(editModal).toHaveCount(0)
+  await draftTab.locator('.booking-draft-tab__open').click()
+  await expect(flyout).toBeVisible()
+  await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('Entwurf bleibt im Reiter')
+  await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
 })
 
 test('keeps expanded tags and comments separated in the detached booking window', async () => {

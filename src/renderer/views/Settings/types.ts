@@ -7,6 +7,7 @@
 import type { NavKey } from '../../utils/navItems'
 import type {
   BackgroundImage,
+  BookingEntryPresentation,
   JournalRowDensity,
   JournalRowStyle,
   NavIconColorMode,
@@ -145,8 +146,8 @@ export interface SettingsProps {
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
   setShowBookingEditTabs: (v: boolean) => void
-  bookingsOpenDetached: boolean
-  setBookingsOpenDetached: (v: boolean) => void
+  bookingEntryPresentation: BookingEntryPresentation
+  setBookingEntryPresentation: (v: BookingEntryPresentation) => void
   allowVoucherDeletion: boolean
   setAllowVoucherDeletion: (v: boolean) => void
   quickAddAfterSave: QuickAddAfterSave
@@ -201,8 +202,8 @@ export interface GeneralPaneProps {
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
   setShowBookingEditTabs: (v: boolean) => void
-  bookingsOpenDetached: boolean
-  setBookingsOpenDetached: (v: boolean) => void
+  bookingEntryPresentation: BookingEntryPresentation
+  setBookingEntryPresentation: (v: BookingEntryPresentation) => void
   allowVoucherDeletion: boolean
   setAllowVoucherDeletion: (v: boolean) => void
   quickAddAfterSave: QuickAddAfterSave

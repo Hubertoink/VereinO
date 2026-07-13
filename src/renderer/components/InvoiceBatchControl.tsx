@@ -12,20 +12,32 @@ const STATUS_LABELS: Record<string, string> = {
   FAILED: 'Fehlgeschlagen'
 }
 
+const MAX_SINGLE_INVOICE_BYTES = 25 * 1024 * 1024
+
+function isSupportedSingleInvoice(file: File) {
+  return /\.(pdf|png|jpe?g|webp)$/i.test(file.name)
+    || ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(file.type)
+}
+
 export default function InvoiceBatchControl({
   onNewInvoice,
   onReview,
   notify
 }: {
-  onNewInvoice: () => void
+  onNewInvoice: (file: File) => void | Promise<void>
   onReview: (id: number) => void
   notify: (type: 'success' | 'error' | 'info' | 'warn', text: string) => void
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const singleInputRef = useRef<HTMLInputElement | null>(null)
+  const allowBatchAutoOpenRef = useRef(true)
   const [queue, setQueue] = useState<TAiInvoiceBatchListOutput | null>(null)
   const [open, setOpen] = useState(false)
+  const [singleOpen, setSingleOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [singleDragging, setSingleDragging] = useState(false)
+  const [singleError, setSingleError] = useState('')
 
   const reload = useCallback(async () => {
     try { setQueue(await window.api.ai.invoiceBatch.list()) } catch { /* startup/recovery */ }
@@ -52,6 +64,18 @@ export default function InvoiceBatchControl({
     const interval = window.setInterval(() => void reload(), 15000)
     return () => { off(); window.clearInterval(interval) }
   }, [notify, reload])
+
+  useEffect(() => {
+    const closeForBookingFlyout = () => {
+      allowBatchAutoOpenRef.current = false
+      setOpen(false)
+      setSingleOpen(false)
+      setDragging(false)
+      setSingleDragging(false)
+    }
+    window.addEventListener('compact-booking-flyout-opened', closeForBookingFlyout)
+    return () => window.removeEventListener('compact-booking-flyout-opened', closeForBookingFlyout)
+  }, [])
 
   const importFiles = async (files: File[]) => {
     const pdfs = files.filter((file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name))
@@ -87,7 +111,7 @@ export default function InvoiceBatchControl({
           `${reused.length} PDF${reused.length === 1 ? ' ist' : 's sind'} bereits im Batch und wurde${reused.length === 1 ? '' : 'n'} nicht erneut kopiert.`
         )
       }
-      setOpen(true)
+      if (allowBatchAutoOpenRef.current) setOpen(true)
       await reload()
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -102,27 +126,81 @@ export default function InvoiceBatchControl({
   const duplicateCount = rows.filter((item) => item.isDuplicate).length
   const busyCount = rows.filter((item) => !item.isDuplicate && ['DRAFT', 'QUEUED', 'PROCESSING'].includes(item.status)).length
 
+  const openSingleInvoice = (files: File[]) => {
+    const file = files[0]
+    if (!file) return
+    if (!isSupportedSingleInvoice(file)) {
+      setSingleError('Bitte eine PDF-, PNG-, JPG- oder WebP-Datei auswählen.')
+      return
+    }
+    if (file.size > MAX_SINGLE_INVOICE_BYTES) {
+      setSingleError('Die Rechnung darf maximal 25 MB groß sein.')
+      return
+    }
+    setSingleError('')
+    setSingleDragging(false)
+    setSingleOpen(false)
+    Promise.resolve().then(() => onNewInvoice(file)).catch((error: any) => {
+      notify('error', error?.message || String(error))
+    })
+  }
+
   return (
     <div
-      className={`invoice-batch-control${dragging ? ' invoice-batch-control--dragging' : ''}`}
-      onDragEnter={(event) => { event.preventDefault(); setDragging(true) }}
-      onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
+      className={`invoice-batch-control${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
+      onDragEnter={(event) => {
+        event.preventDefault()
+        if (singleOpen) setSingleDragging(true)
+        else setDragging(true)
+      }}
+      onDragOver={(event) => {
+        event.preventDefault()
+        if (singleOpen) setSingleDragging(true)
+        else setDragging(true)
+      }}
       onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDragging(false)
+          setSingleDragging(false)
+        }
       }}
       onDrop={(event) => {
         event.preventDefault()
         setDragging(false)
-        void importFiles(Array.from(event.dataTransfer.files))
+        setSingleDragging(false)
+        const files = Array.from(event.dataTransfer.files)
+        if (singleOpen) openSingleInvoice(files)
+        else void importFiles(files)
       }}
     >
       <div className="invoice-split-fab" role="group" aria-label="Rechnungen erfassen">
-        <button className="invoice-split-fab__new" onClick={onNewInvoice} title="Einzelne Rechnung erfassen">
+        <button
+          className="invoice-split-fab__new"
+          onClick={() => {
+            if (!singleOpen) {
+              allowBatchAutoOpenRef.current = false
+              window.dispatchEvent(new Event('invoice-upload-flyout-opened'))
+            }
+            setOpen(false)
+            setSingleError('')
+            setSingleOpen((value) => !value)
+          }}
+          title="Einzelne Rechnung erfassen"
+          aria-expanded={singleOpen}
+        >
           <span aria-hidden="true">+</span><span className="invoice-split-fab__label">Rechnung</span>
         </button>
         <button
           className="invoice-split-fab__batch"
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => {
+            if (!open) {
+              allowBatchAutoOpenRef.current = true
+              window.dispatchEvent(new Event('invoice-upload-flyout-opened'))
+            }
+            setSingleOpen(false)
+            setSingleError('')
+            setOpen((value) => !value)
+          }}
           title="Mehrere PDF-Rechnungen vorbereiten"
           aria-expanded={open}
         >
@@ -132,7 +210,77 @@ export default function InvoiceBatchControl({
           {rows.length > 0 && <span className="invoice-split-fab__badge">{rows.length}</span>}
         </button>
       </div>
-      <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(event) => void importFiles(Array.from(event.target.files || []))} />
+      <input
+        ref={singleInputRef}
+        className="invoice-batch-control__single-input"
+        type="file"
+        accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp"
+        hidden
+        onChange={(event) => {
+          openSingleInvoice(Array.from(event.target.files || []))
+          event.currentTarget.value = ''
+        }}
+      />
+      <input
+        ref={inputRef}
+        className="invoice-batch-control__batch-input"
+        type="file"
+        accept="application/pdf,.pdf"
+        multiple
+        hidden
+        onChange={(event) => void importFiles(Array.from(event.target.files || []))}
+      />
+
+      {singleOpen && (
+        <section className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
+          <header>
+            <div>
+              <strong>Rechnung erfassen</strong>
+              <small>Eine Rechnung zur Erkennung auswählen</small>
+            </div>
+            <button className="btn ghost" onClick={() => setSingleOpen(false)} aria-label="Upload-Flyout schließen">✕</button>
+          </header>
+          <button
+            type="button"
+            className={`invoice-single-upload-flyout__dropzone${singleDragging ? ' is-dragging' : ''}`}
+            onClick={() => singleInputRef.current?.click()}
+            onDragEnter={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setSingleDragging(true)
+            }}
+            onDragOver={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setSingleDragging(true)
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              if (event.currentTarget === event.target) setSingleDragging(false)
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setSingleDragging(false)
+              openSingleInvoice(Array.from(event.dataTransfer.files))
+            }}
+          >
+            <span className="invoice-single-upload-flyout__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h7" />
+                <path d="M14 2v6h6M8 13h4M8 17h3" />
+                <circle cx="18" cy="18" r="4" />
+                <path d="M18 16v4M16 18h4" />
+              </svg>
+            </span>
+            <strong>Rechnung hier ablegen</strong>
+            <span>oder Datei auswählen</span>
+            <small>PDF, PNG, JPG oder WebP · maximal 25 MB</small>
+            {singleError && <span className="invoice-single-upload-flyout__error" role="alert">{singleError}</span>}
+          </button>
+        </section>
+      )}
 
       {open && (
         <section className="invoice-batch-flyout" aria-label="KI-Rechnungsentwürfe">

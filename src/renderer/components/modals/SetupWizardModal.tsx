@@ -4,6 +4,7 @@ import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
 import type {
     BackgroundImage,
+    BookingEntryPresentation,
     JournalRowDensity,
     JournalRowStyle,
     NavIconColorMode,
@@ -51,7 +52,7 @@ export default function SetupWizardModal({
     dateFmt, setDateFmt,
     showBookingDraftTabs, setShowBookingDraftTabs,
     showBookingEditTabs, setShowBookingEditTabs,
-    bookingsOpenDetached, setBookingsOpenDetached,
+    bookingEntryPresentation, setBookingEntryPresentation,
     allowVoucherDeletion, setAllowVoucherDeletion,
     quickAddAfterSave, setQuickAddAfterSave,
     existingTags,
@@ -80,8 +81,8 @@ export default function SetupWizardModal({
     setShowBookingDraftTabs: (v: boolean) => void
     showBookingEditTabs: boolean
     setShowBookingEditTabs: (v: boolean) => void
-    bookingsOpenDetached: boolean
-    setBookingsOpenDetached: (v: boolean) => void
+    bookingEntryPresentation: BookingEntryPresentation
+    setBookingEntryPresentation: (v: BookingEntryPresentation) => void
     allowVoucherDeletion: boolean
     setAllowVoucherDeletion: (v: boolean) => void
     quickAddAfterSave: QuickAddAfterSave
@@ -237,7 +238,7 @@ export default function SetupWizardModal({
             try { localStorage.setItem('ui.dateFmt', dateFmt) } catch {}
             try { localStorage.setItem('ui.showBookingDraftTabs', String(showBookingDraftTabs)) } catch {}
             try { localStorage.setItem('ui.showBookingEditTabs', String(allowVoucherDeletion && showBookingEditTabs)) } catch {}
-            try { localStorage.setItem('ui.bookingsOpenDetached', String(bookingsOpenDetached)) } catch {}
+            try { localStorage.setItem('ui.bookingEntryPresentation', bookingEntryPresentation) } catch {}
             try { localStorage.setItem('ui.allowVoucherDeletion', String(allowVoucherDeletion)) } catch {}
             try { localStorage.setItem('ui.quickAddAfterSave', quickAddAfterSave) } catch {}
             try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch {}
@@ -617,7 +618,11 @@ export default function SetupWizardModal({
                         <label className="settings-toggle-card" htmlFor="setup-booking-draft-tabs">
                             <span className="settings-toggle-card__copy">
                                 <strong>Buchungsreiter</strong>
-                                <span>Mehrere offene Buchungsentwürfe im Hauptfenster halten.</span>
+                                <span>
+                                    {bookingEntryPresentation === 'flyout'
+                                        ? 'Flyouts parken, über Reiter wieder öffnen und mit + Buchung parallel weiterarbeiten.'
+                                        : 'Mehrere offene Buchungsentwürfe im Hauptfenster halten.'}
+                                </span>
                             </span>
                             <input
                                 id="setup-booking-draft-tabs"
@@ -645,21 +650,17 @@ export default function SetupWizardModal({
                                 onChange={(e) => setShowBookingEditTabs(e.target.checked)}
                             />
                         </label>
-                        <label className="settings-toggle-card" htmlFor="setup-bookings-open-detached">
-                            <span className="settings-toggle-card__copy">
-                                <strong>Eigenes Buchungsfenster</strong>
-                                <span>Neue und bearbeitete Buchungen in einem separaten Fenster öffnen.</span>
-                            </span>
-                            <input
-                                id="setup-bookings-open-detached"
-                                role="switch"
-                                aria-checked={bookingsOpenDetached}
-                                className="toggle"
-                                type="checkbox"
-                                checked={bookingsOpenDetached}
-                                onChange={(e) => setBookingsOpenDetached(e.target.checked)}
-                            />
-                        </label>
+                        <div className="settings-layout-control settings-booking-presentation">
+                            <div className="settings-layout-label-row">
+                                <label>Buchungserfassung</label>
+                                <span>Wie neue Buchungen geöffnet werden.</span>
+                            </div>
+                            <div className="btn-group" role="group" aria-label="Darstellung der Buchungserfassung im Setup">
+                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'modal' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('modal')}>Dialog</button>
+                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'flyout' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('flyout')}>Kompakt-Flyout</button>
+                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'detached' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('detached')}>Eigenes Fenster</button>
+                            </div>
+                        </div>
                         <div className="settings-layout-control">
                             <div className="settings-layout-label-row">
                                 <label>Nach Speichern</label>
@@ -826,7 +827,7 @@ export default function SetupWizardModal({
                 <div className="setup-summary-grid">
                     <div><span>Organisation</span><strong>{formatSummaryValue(orgName)}</strong></div>
                     <div><span>Darstellung</span><strong>{COLOR_THEME_OPTIONS.find((theme) => theme.id === colorTheme)?.name || colorTheme}</strong></div>
-                    <div><span>Buchungsfenster</span><strong>{bookingsOpenDetached ? 'Eigenes Fenster' : showBookingDraftTabs ? 'Reiter im Hauptfenster' : 'Ein Fenster'}</strong></div>
+                    <div><span>Buchungserfassung</span><strong>{{ modal: 'Dialog', flyout: 'Kompakt-Flyout', detached: 'Eigenes Fenster' }[bookingEntryPresentation]}</strong></div>
                     <div><span>Nach Speichern</span><strong>{quickAddAfterSave === 'new' ? 'Neue Buchung' : 'Schließen'}</strong></div>
                 </div>
                 <div className="row">

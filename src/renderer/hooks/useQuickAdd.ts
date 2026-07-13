@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getInternalAssignmentValidationState } from '../components/modals/voucherMetaValidation'
 import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoiceScanModal'
+import type { BookingEntryPresentation } from '../context/UIPreferencesContextCore'
 
 type QA = {
     date: string
@@ -117,12 +118,19 @@ export function useQuickAdd(
     onOpenFilePicker?: () => void,
     notify?: (type: 'success' | 'error' | 'info', text: string) => void,
     draftTabsEnabled: boolean = true,
-    afterSaveDefault: QuickAddAfterSave = 'close'
+    afterSaveDefault: QuickAddAfterSave = 'close',
+    bookingEntryPresentation: BookingEntryPresentation = 'modal'
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
     const [drafts, setDrafts] = useState<QuickAddDraft[]>([])
     const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
+    const activeDraftIdRef = useRef<string | null>(null)
+    const savingDraftIdsRef = useRef(new Set<string>())
     const nextSequenceRef = useRef(1)
+
+    useEffect(() => {
+        activeDraftIdRef.current = activeDraftId
+    }, [activeDraftId])
 
     const makeDefaults = useCallback((): QA => {
         const habits = getBookingHabits()
@@ -290,6 +298,11 @@ export function useQuickAdd(
     async function onQuickSave(mode: QuickAddSaveMode = 'default') {
         if (!activeDraft) return
 
+        if (!activeDraft.qa.date) {
+            notify?.('error', 'Bitte wähle ein Buchungsdatum aus.')
+            return
+        }
+
         if (!Number.isFinite(bookingGrossAmount(activeDraft.qa)) || bookingGrossAmount(activeDraft.qa) <= 0) {
             notify?.('error', 'Bitte gib einen Betrag größer als 0 € ein.')
             return
@@ -298,6 +311,13 @@ export function useQuickAdd(
         // Validate transfer direction
         if (activeDraft.qa.type === 'TRANSFER' && (!(activeDraft.qa as any).transferFromAccountId || !(activeDraft.qa as any).transferToAccountId)) {
             notify?.('error', 'Bitte wähle Quell- und Zielkonto für den Transfer aus.')
+            return
+        }
+        if (
+            activeDraft.qa.type === 'TRANSFER'
+            && (activeDraft.qa as any).transferFromAccountId === (activeDraft.qa as any).transferToAccountId
+        ) {
+            notify?.('error', 'Quell- und Zielkonto müssen verschieden sein.')
             return
         }
         if (activeDraft.qa.type !== 'TRANSFER' && activeDraft.qa.type !== 'INTERNAL' && !(activeDraft.qa as any).paymentAccountId) {
@@ -320,6 +340,11 @@ export function useQuickAdd(
                 return
             }
         }
+
+        if (savingDraftIdsRef.current.has(activeDraft.id)) return
+        savingDraftIdsRef.current.add(activeDraft.id)
+
+        try {
 
         const payload: any = {
             date: activeDraft.qa.date,
@@ -362,14 +387,16 @@ export function useQuickAdd(
             payload.transferToAccountId = null
         }
         
-        if (activeDraft.qa.mode === 'GROSS') {
-            payload.grossAmount = activeDraft.qa.grossAmount ?? 0
-            payload.vatRate = 0 // Brutto immer ohne Aufteilung
-            delete payload.netAmount
-        } else {
-            payload.netAmount = activeDraft.qa.netAmount ?? 0
-            // vatRate bleibt (0/7/19)
-            delete payload.grossAmount
+        if (activeDraft.qa.type === 'IN' || activeDraft.qa.type === 'OUT') {
+            if (activeDraft.qa.mode === 'GROSS') {
+                payload.grossAmount = activeDraft.qa.grossAmount ?? 0
+                payload.vatRate = 0 // Brutto immer ohne Aufteilung
+                delete payload.netAmount
+            } else {
+                payload.netAmount = activeDraft.qa.netAmount ?? 0
+                // vatRate bleibt (0/7/19)
+                delete payload.grossAmount
+            }
         }
         
         if (typeof (activeDraft.qa as any).earmarkId === 'number') payload.earmarkId = (activeDraft.qa as any).earmarkId
@@ -441,17 +468,26 @@ export function useQuickAdd(
                     files: []
                 }
                 setDrafts((prev) => {
+                    if (!prev.some((draft) => draft.id === activeDraft.id)) return prev
                     const remaining = prev.filter((draft) => draft.id !== activeDraft.id)
                     return draftTabsEnabled ? [...remaining, nextDraft] : [nextDraft]
                 })
-                setActiveDraftId(nextDraft.id)
-                setQuickAdd(true)
+                if (activeDraftIdRef.current === activeDraft.id) {
+                    activeDraftIdRef.current = nextDraft.id
+                    setActiveDraftId(nextDraft.id)
+                    setQuickAdd(true)
+                }
             } else {
-                const remaining = drafts.filter((draft) => draft.id !== activeDraft.id)
-                setDrafts(remaining)
-                setActiveDraftId(remaining.at(-1)?.id ?? null)
-                setQuickAdd(false)
+                setDrafts((prev) => prev.filter((draft) => draft.id !== activeDraft.id))
+                if (activeDraftIdRef.current === activeDraft.id) {
+                    activeDraftIdRef.current = null
+                    setActiveDraftId(null)
+                    setQuickAdd(false)
+                }
             }
+        }
+        } finally {
+            savingDraftIdsRef.current.delete(activeDraft.id)
         }
     }
 
@@ -475,9 +511,7 @@ export function useQuickAdd(
 
             // Open Quick-Add robustly via Ctrl+Shift+N (no bare 'n')
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
-                let openDetached = false
-                try { openDetached = localStorage.getItem('ui.bookingsOpenDetached') === 'true' } catch { }
-                if (openDetached) {
+                if (bookingEntryPresentation === 'detached') {
                     void (async () => {
                         const draft = draftTabsEnabled ? openQuickAdd(undefined, { detached: true, showModal: false }) : null
                         try {
@@ -498,6 +532,13 @@ export function useQuickAdd(
                             else openQuickAdd()
                         }
                     })()
+                } else if (
+                    bookingEntryPresentation === 'flyout'
+                    && quickAdd
+                    && activeDraftKind === 'booking'
+                    && !draftTabsEnabled
+                ) {
+                    parkQuickAdd()
                 } else {
                     openQuickAdd()
                 }
@@ -508,7 +549,11 @@ export function useQuickAdd(
             // Save and Upload hotkeys only when Quick-Add is open
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { 
                 if (quickAdd) { 
-                    onQuickSave()
+                    const compactForm = bookingEntryPresentation === 'flyout' && activeDraftKind === 'booking'
+                        ? document.querySelector<HTMLFormElement>('.compact-booking-flyout form')
+                        : null
+                    if (compactForm) compactForm.requestSubmit()
+                    else onQuickSave()
                     e.preventDefault() 
                 } 
                 return 
@@ -530,7 +575,7 @@ export function useQuickAdd(
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [afterSaveDefault, dockAndOpenDraft, draftTabsEnabled, notify, quickAdd, onQuickSave, onOpenFilePicker, openQuickAdd, parkQuickAdd])
+    }, [activeDraftKind, afterSaveDefault, bookingEntryPresentation, dockAndOpenDraft, draftTabsEnabled, notify, quickAdd, onQuickSave, onOpenFilePicker, openQuickAdd, parkQuickAdd])
 
     const openFilePicker = () => onOpenFilePicker?.()
 

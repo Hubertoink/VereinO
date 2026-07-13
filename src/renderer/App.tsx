@@ -19,6 +19,7 @@ import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
+import CompactBookingFlyout from './components/CompactBookingFlyout'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 import { getNavIcon } from './utils/navIcons'
@@ -1415,13 +1416,14 @@ function AppInner() {
     setShowBookingDraftTabs,
     showBookingEditTabs,
     setShowBookingEditTabs,
-    bookingsOpenDetached,
-    setBookingsOpenDetached,
+    bookingEntryPresentation,
+    setBookingEntryPresentation,
     allowVoucherDeletion,
     setAllowVoucherDeletion,
     quickAddAfterSave,
     setQuickAddAfterSave
   } = useUIPreferences()
+  const bookingsOpenDetached = bookingEntryPresentation === 'detached'
 
   // ── Auto-switch: force side-nav when window is too narrow for top-nav ──
   const NAV_SWITCH_THRESHOLD = 960
@@ -1980,8 +1982,44 @@ function AppInner() {
     () => fileInputRef.current?.click(),
     notify,
     showBookingDraftTabs,
-    quickAddAfterSave
+    quickAddAfterSave,
+    bookingEntryPresentation
   )
+  const [forceFullBookingDialog, setForceFullBookingDialog] = useState(false)
+  const previousBookingEntryPresentationRef = useRef(bookingEntryPresentation)
+
+  useEffect(() => {
+    setForceFullBookingDialog(false)
+  }, [activeDraftId, bookingEntryPresentation])
+
+  useEffect(() => {
+    if (!quickAdd) setForceFullBookingDialog(false)
+  }, [quickAdd])
+
+  useEffect(() => {
+    if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+      window.dispatchEvent(new Event('compact-booking-flyout-opened'))
+    }
+  }, [activeDraftKind, bookingEntryPresentation, quickAdd])
+
+  useEffect(() => {
+    const parkForInvoiceFlyout = () => {
+      if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+        parkQuickAdd()
+      }
+    }
+    const parkForBookingEditor = () => {
+      if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+        parkQuickAdd()
+      }
+    }
+    window.addEventListener('invoice-upload-flyout-opened', parkForInvoiceFlyout)
+    window.addEventListener('booking-editor-opened', parkForBookingEditor)
+    return () => {
+      window.removeEventListener('invoice-upload-flyout-opened', parkForInvoiceFlyout)
+      window.removeEventListener('booking-editor-opened', parkForBookingEditor)
+    }
+  }, [activeDraftKind, bookingEntryPresentation, parkQuickAdd, quickAdd])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -2018,6 +2056,19 @@ function AppInner() {
       notify('error', 'Buchungsfenster konnte nicht geöffnet werden: ' + String(e?.message || e))
     }
   }, [activeDraftId, files, markDraftDetached, notify, qa, quickAddAfterSave])
+
+  useEffect(() => {
+    const previous = previousBookingEntryPresentationRef.current
+    previousBookingEntryPresentationRef.current = bookingEntryPresentation
+    if (
+      previous !== 'detached'
+      && bookingEntryPresentation === 'detached'
+      && quickAdd
+      && activeDraftKind === 'booking'
+    ) {
+      void detachQuickAdd()
+    }
+  }, [activeDraftKind, bookingEntryPresentation, detachQuickAdd, quickAdd])
 
   useEffect(() => {
     const off = window.api?.quickAdd?.onDetachedDraftSync?.((payload: any) => {
@@ -2102,7 +2153,7 @@ function AppInner() {
           id: draft.id,
           label: tabText.label,
           title: tabText.title,
-          isActive: draft.id === activeDraftId,
+          isActive: draft.id === activeDraftId && quickAdd,
           isDetached: !!draft.detached
         }
       }
@@ -2112,11 +2163,11 @@ function AppInner() {
         id: draft.id,
         label: desc ? `${desc} · ${dateLabel}` : `${dateLabel} · #${draft.sequence}`,
         title: `${desc ? `${desc} · ${dateLabel}` : `${dateLabel} · Entwurf ${draft.sequence}`}${draft.detached ? ' · abgedockt' : ''}`,
-        isActive: draft.id === activeDraftId,
+        isActive: draft.id === activeDraftId && quickAdd,
         isDetached: !!draft.detached
       }
     })
-  }, [activeDraftId, bookingDrafts, fmtDate])
+  }, [activeDraftId, bookingDrafts, fmtDate, quickAdd])
 
   const openBookingDraftTab = useCallback(
     (draftId: string) => {
@@ -2238,18 +2289,37 @@ function AppInner() {
     showBookingDraftTabs
   ])
 
-  const openJournalInvoiceScan = useCallback(() => {
-    if (!bookingsOpenDetached) {
-      openQuickAdd(undefined, { kind: 'invoice' })
+  const triggerBookingEntry = useCallback(() => {
+    if (
+      bookingEntryPresentation === 'flyout'
+      && quickAdd
+      && activeDraftKind === 'booking'
+      && !showBookingDraftTabs
+    ) {
+      parkQuickAdd()
       return
     }
-    const draft = openQuickAdd(undefined, { detached: true, showModal: false, kind: 'invoice' })
+    openBookingEntry()
+  }, [activeDraftKind, bookingEntryPresentation, openBookingEntry, parkQuickAdd, quickAdd, showBookingDraftTabs])
+
+  const openJournalInvoiceScan = useCallback((file: File) => {
+    if (!bookingsOpenDetached) {
+      openQuickAdd({ files: [file] }, { kind: 'invoice' })
+      return
+    }
+    const draft = openQuickAdd({ files: [file] }, { detached: true, showModal: false, kind: 'invoice' })
     void (async () => {
       try {
+        const encodedFile = {
+          name: file.name,
+          dataBase64: bufferToBase64Safe(await file.arrayBuffer()),
+          mime: file.type || undefined
+        }
         const response = await window.api?.quickAdd?.openDetached?.({
           draftId: draft.id,
           mode: 'invoice',
           kind: 'invoice',
+          files: [encodedFile],
           afterSaveDefault: quickAddAfterSave
         })
         if (!response?.ok) {
@@ -2303,11 +2373,11 @@ function AppInner() {
         id: 'journal-quick-add',
         key: 'q',
         label: 'Buchung',
-        action: openBookingEntry
+        action: triggerBookingEntry
       })
     }
     return shortcuts
-  }, [activePage, openBookingEntry, registeredPageShortcuts])
+  }, [activePage, registeredPageShortcuts, triggerBookingEntry])
 
   const navigateAndFocus = useCallback((page: NavKey, selector: string) => {
     setActivePage(page)
@@ -2330,7 +2400,7 @@ function AppInner() {
         key: 'n',
         label: 'Neue Buchung',
         description: 'Öffnet einen neuen Buchungsentwurf',
-        action: openBookingEntry
+        action: triggerBookingEntry
       },
       {
         key: 'g',
@@ -2463,9 +2533,13 @@ function AppInner() {
               },
               {
                 key: 'e',
-                label: 'Eigenes Buchungsfenster umschalten',
-                description: `Aktuell: ${bookingsOpenDetached ? 'Ein' : 'Aus'}`,
-                action: () => setBookingsOpenDetached(!bookingsOpenDetached)
+                label: 'Buchungserfassung öffnen als …',
+                description: `Aktuell: ${{ modal: 'Dialog', flyout: 'Kompakt-Flyout', detached: 'Eigenes Fenster' }[bookingEntryPresentation]}`,
+                children: [
+                  { key: 'd', label: 'Dialog', action: () => setBookingEntryPresentation('modal') },
+                  { key: 'f', label: 'Kompakt-Flyout', action: () => setBookingEntryPresentation('flyout') },
+                  { key: 'e', label: 'Eigenes Fenster', action: () => setBookingEntryPresentation('detached') }
+                ]
               },
               {
                 key: 's',
@@ -2474,7 +2548,7 @@ function AppInner() {
                 children: [
                   {
                     key: 's',
-                    label: 'Buchungsmodal schließen',
+                    label: 'Buchungserfassung schließen',
                     action: () => setQuickAddAfterSave('close')
                   },
                   {
@@ -2570,6 +2644,7 @@ function AppInner() {
     activePage,
     activePageShortcuts,
     allowVoucherDeletion,
+    bookingEntryPresentation,
     bookingsOpenDetached,
     dateFmt,
     journalLimit,
@@ -2578,7 +2653,7 @@ function AppInner() {
     navIconColorMode,
     navLayout,
     navigateAndFocus,
-    openBookingEntry,
+    triggerBookingEntry,
     openSettingsTile,
     quickAddAfterSave,
     showBookingDraftTabs,
@@ -3448,8 +3523,8 @@ function AppInner() {
               setShowBookingDraftTabs={setShowBookingDraftTabs}
               showBookingEditTabs={showBookingEditTabs}
               setShowBookingEditTabs={setShowBookingEditTabs}
-              bookingsOpenDetached={bookingsOpenDetached}
-              setBookingsOpenDetached={setBookingsOpenDetached}
+              bookingEntryPresentation={bookingEntryPresentation}
+              setBookingEntryPresentation={setBookingEntryPresentation}
               allowVoucherDeletion={allowVoucherDeletion}
               setAllowVoucherDeletion={setAllowVoucherDeletion}
               quickAddAfterSave={quickAddAfterSave}
@@ -3610,8 +3685,39 @@ function AppInner() {
 
       <LeaderShortcuts commands={shortcutCommands} />
 
-      {/* Quick-Add Modal */}
-      {quickAdd && activeDraftKind === 'booking' && (
+      {/* Quick-Add: full dialog or optional compact flyout */}
+      {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
+        <div className={`compact-booking-flyout-anchor${activePage === 'Buchungen' ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
+          <CompactBookingFlyout
+            key={activeDraftId ?? 'compact-quick-add'}
+            qa={qa}
+            setQa={setQa}
+            onSave={onQuickSave}
+            onClose={parkQuickAdd}
+            onExpand={() => setForceFullBookingDialog(true)}
+            files={files}
+            setFiles={setFiles}
+            openFilePicker={openFilePicker}
+            onDropFiles={onDropFiles}
+            fileInputRef={fileInputRef}
+            budgetsForEdit={budgetsForEdit}
+            earmarks={earmarks}
+            paymentAccounts={paymentAccounts}
+            tagDefs={tagDefs}
+            descSuggest={descSuggest}
+            afterSaveDefault={quickAddAfterSave}
+            draftTabsEnabled={showBookingDraftTabs}
+            draftTabs={bookingDraftTabs.filter((tab) => {
+              const draft = bookingDrafts.find((entry) => entry.id === tab.id)
+              return draft?.kind !== 'invoice' && !draft?.detached
+            })}
+            activeDraftId={activeDraftId}
+            onSelectDraft={openBookingDraftTab}
+            onNewDraft={triggerBookingEntry}
+          />
+        </div>
+      )}
+      {quickAdd && activeDraftKind === 'booking' && (bookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
         <QuickAddModal
           key={activeDraftId ?? 'quick-add'}
           qa={qa}
@@ -3712,7 +3818,7 @@ function AppInner() {
           />
           <button
             className="fab fab-buchung"
-            onClick={openBookingEntry}
+            onClick={triggerBookingEntry}
             title="+ Buchung"
           >
             <span className="fab-buchung-icon">+</span>
@@ -3728,7 +3834,7 @@ function AppInner() {
         activePage !== 'Budgets' &&
         activePage !== 'Zweckbindungen' &&
         activePage !== 'Vorschuesse' && (
-          <button className="fab fab-buchung" onClick={openBookingEntry} title="+ Buchung">
+          <button className="fab fab-buchung" onClick={triggerBookingEntry} title="+ Buchung">
             <span className="fab-buchung-icon">+</span>
             <span className="fab-buchung-text">Buchung</span>
           </button>
@@ -3930,11 +4036,11 @@ function AppInner() {
               localStorage.setItem('ui.showBookingEditTabs', String(v))
             } catch {}
           }}
-          bookingsOpenDetached={bookingsOpenDetached}
-          setBookingsOpenDetached={(v) => {
-            setBookingsOpenDetached(v)
+          bookingEntryPresentation={bookingEntryPresentation}
+          setBookingEntryPresentation={(v) => {
+            setBookingEntryPresentation(v)
             try {
-              localStorage.setItem('ui.bookingsOpenDetached', String(v))
+              localStorage.setItem('ui.bookingEntryPresentation', v)
             } catch {}
           }}
           allowVoucherDeletion={allowVoucherDeletion}

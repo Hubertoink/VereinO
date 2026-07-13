@@ -39,8 +39,8 @@ export function GeneralPane({
   setShowBookingDraftTabs,
   showBookingEditTabs,
   setShowBookingEditTabs,
-  bookingsOpenDetached,
-  setBookingsOpenDetached,
+  bookingEntryPresentation,
+  setBookingEntryPresentation,
   allowVoucherDeletion,
   setAllowVoucherDeletion,
   quickAddAfterSave,
@@ -421,7 +421,11 @@ export function GeneralPane({
               <label className="settings-toggle-card" htmlFor="toggle-booking-draft-tabs">
                 <span className="settings-toggle-card__copy">
                   <strong>Buchungsreiter</strong>
-                  <span>Zeigt mehrere offene Buchungsentwürfe als Reiter im Buchungsfenster.</span>
+                  <span>
+                    {bookingEntryPresentation === 'flyout'
+                      ? 'Parkt geschlossene Flyouts als Reiter. + Buchung öffnet einen weiteren Entwurf; ein Reiter holt ihn zurück.'
+                      : 'Zeigt mehrere offene Buchungsentwürfe als Reiter in der Buchungsansicht.'}
+                  </span>
                 </span>
                 <input
                   id="toggle-booking-draft-tabs"
@@ -451,21 +455,42 @@ export function GeneralPane({
                 />
               </label>
 
-              <label className="settings-toggle-card" htmlFor="toggle-bookings-open-detached">
-                <span className="settings-toggle-card__copy">
-                  <strong>Eigenes Buchungsfenster</strong>
-                  <span>Öffnet neue und bearbeitete Buchungen in einem separaten Fenster.</span>
-                </span>
-                <input
-                  id="toggle-bookings-open-detached"
-                  role="switch"
-                  aria-checked={bookingsOpenDetached}
-                  className="toggle"
-                  type="checkbox"
-                  checked={bookingsOpenDetached}
-                  onChange={(e) => setBookingsOpenDetached(e.target.checked)}
-                />
-              </label>
+              <div className="settings-layout-control settings-booking-presentation">
+                <div className="settings-layout-label-row">
+                  <label>Buchungserfassung</label>
+                  <span>Wähle zwischen vollständigem Dialog, kompaktem Flyout und eigenem Fenster.</span>
+                </div>
+                <div className="btn-group" role="group" aria-label="Darstellung der Buchungserfassung">
+                  <button
+                    type="button"
+                    className={`btn-option ${bookingEntryPresentation === 'modal' ? 'active' : ''}`}
+                    onClick={() => setBookingEntryPresentation('modal')}
+                  >
+                    Dialog
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-option ${bookingEntryPresentation === 'flyout' ? 'active' : ''}`}
+                    onClick={() => setBookingEntryPresentation('flyout')}
+                  >
+                    Kompakt-Flyout
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-option ${bookingEntryPresentation === 'detached' ? 'active' : ''}`}
+                    onClick={() => setBookingEntryPresentation('detached')}
+                  >
+                    Eigenes Fenster
+                  </button>
+                </div>
+                <div className="helper">
+                  {bookingEntryPresentation === 'flyout'
+                    ? 'Zeigt die wichtigsten Felder direkt an der Buchungsliste; weitere Angaben werden bei Bedarf ergänzt.'
+                    : bookingEntryPresentation === 'detached'
+                      ? 'Neue und bearbeitete Buchungen öffnen in einem separaten Fenster.'
+                      : 'Öffnet die vollständige Buchungserfassung als Dialog im Hauptfenster.'}
+                </div>
+              </div>
 
               <div className="settings-layout-control">
                 <div className="settings-layout-label-row">

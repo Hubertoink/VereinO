@@ -130,8 +130,8 @@ export function SettingsView(props: SettingsProps) {
             setShowBookingDraftTabs={props.setShowBookingDraftTabs}
             showBookingEditTabs={props.showBookingEditTabs}
             setShowBookingEditTabs={props.setShowBookingEditTabs}
-            bookingsOpenDetached={props.bookingsOpenDetached}
-            setBookingsOpenDetached={props.setBookingsOpenDetached}
+            bookingEntryPresentation={props.bookingEntryPresentation}
+            setBookingEntryPresentation={props.setBookingEntryPresentation}
             allowVoucherDeletion={props.allowVoucherDeletion}
             setAllowVoucherDeletion={props.setAllowVoucherDeletion}
             quickAddAfterSave={props.quickAddAfterSave}

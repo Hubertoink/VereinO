@@ -3,6 +3,7 @@ import { isValidTheme, type ColorTheme } from './uiTheme'
 import {
   UIPreferencesContext,
   type BackgroundImage,
+  type BookingEntryPresentation,
   type DateFormat,
   type JournalRowDensity,
   type JournalRowStyle,
@@ -301,9 +302,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'true'
   })
 
-  const [bookingsOpenDetached, setBookingsOpenDetached] = useState<boolean>(() => {
-    const stored = localStorage.getItem('ui.bookingsOpenDetached')
-    return stored === 'true'
+  const [bookingEntryPresentation, setBookingEntryPresentation] = useState<BookingEntryPresentation>(() => {
+    const stored = localStorage.getItem('ui.bookingEntryPresentation')
+    if (stored === 'modal' || stored === 'flyout' || stored === 'detached') return stored
+    return localStorage.getItem('ui.bookingsOpenDetached') === 'true' ? 'detached' : 'modal'
   })
 
   const [allowVoucherDeletion, setAllowVoucherDeletion] = useState<boolean>(() => {
@@ -389,8 +391,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [allowVoucherDeletion, showBookingEditTabs])
 
   useEffect(() => {
-    safeLocalStorageSet('ui.bookingsOpenDetached', String(bookingsOpenDetached))
-  }, [bookingsOpenDetached])
+    safeLocalStorageSet('ui.bookingEntryPresentation', bookingEntryPresentation)
+    // Keep the legacy key synchronized for older versions of VereinO.
+    safeLocalStorageSet('ui.bookingsOpenDetached', String(bookingEntryPresentation === 'detached'))
+  }, [bookingEntryPresentation])
 
   useEffect(() => {
     if (allowVoucherDeletionWasUnsetRef.current && !allowVoucherDeletion) return
@@ -442,8 +446,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setShowBookingDraftTabs,
         showBookingEditTabs,
         setShowBookingEditTabs,
-        bookingsOpenDetached,
-        setBookingsOpenDetached,
+        bookingEntryPresentation,
+        setBookingEntryPresentation,
         allowVoucherDeletion,
         setAllowVoucherDeletion,
         quickAddAfterSave,

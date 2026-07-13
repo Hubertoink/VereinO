@@ -8,6 +8,7 @@ export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
 export type JournalRowDensity = 'normal' | 'compact'
 export type BackgroundImage = 'none' | 'cherry-blossom' | 'foggy-forest' | 'mountain-snow' | 'custom' | 'niko-bg'
 export type QuickAddAfterSave = 'close' | 'new'
+export type BookingEntryPresentation = 'modal' | 'flyout' | 'detached'
 
 interface UIPreferencesContextValue {
   navLayout: NavLayout
@@ -28,8 +29,8 @@ interface UIPreferencesContextValue {
   setShowBookingDraftTabs: (val: boolean) => void
   showBookingEditTabs: boolean
   setShowBookingEditTabs: (val: boolean) => void
-  bookingsOpenDetached: boolean
-  setBookingsOpenDetached: (val: boolean) => void
+  bookingEntryPresentation: BookingEntryPresentation
+  setBookingEntryPresentation: (val: BookingEntryPresentation) => void
   allowVoucherDeletion: boolean
   setAllowVoucherDeletion: (val: boolean) => void
   quickAddAfterSave: QuickAddAfterSave

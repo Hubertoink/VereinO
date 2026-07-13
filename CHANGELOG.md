@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.2] - 2026-07-13
+
+### Hinzugefügt
+
+- Buchungserfassung: In den Einstellungen kann zwischen Dialog, kompaktem Flyout und eigenem Fenster gewählt werden. Das Flyout unterstützt Buchungsreiter sowie schrittweise einblendbare Angaben für Budget, Zweckbindung, Tags, Kommentare und Anhänge.
+- Rechnungserfassung: Einzelrechnungen werden vor der Erkennung über ein eigenes Upload-Flyout abgelegt oder ausgewählt.
+
+### Geändert
+
+- Buchungserfassung: Das kompakte Flyout ist dichter gestaltet; Betrags- und Tagfelder folgen nun der Feldhöhe der übrigen Eingaben, und Konten erscheinen in ihrer hinterlegten Farbe.
+- Buchungserfassung: Das Flyout wird mit der App geladen, damit beim ersten Öffnen kein sichtbarer Ladewechsel entsteht.
+
+### Behoben
+
+- Buchungserfassung: Die Kopf-Aktionen zum Erweitern und Schließen reagieren wieder unmittelbar auf den sichtbaren Icons.
+- Einstellungen: Die Auswahl des Buchungslayouts hat nun einen sauber umlaufenden Rahmen.
+- Oberfläche: Kontraste von KI-Rechnungsentwürfen und der Einnahmen-/Ausgabenbilanz sind in hellen und dunklen Themes besser lesbar.
+
 ## [2.9.1] - 2026-07-12
 
 ### Hinzugefügt
