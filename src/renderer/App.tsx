@@ -20,6 +20,7 @@ import { SideNav } from './components/layout/SideNav'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
 import CompactBookingFlyout from './components/CompactBookingFlyout'
+import QuickAddModal from './components/modals/QuickAddModal'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 import { getNavIcon } from './utils/navIcons'
@@ -43,7 +44,6 @@ const MetaFilterModal = lazy(() => import('./components/modals/MetaFilterModal')
 const TimeFilterModal = lazy(() => import('./components/modals/TimeFilterModal'))
 const ExportOptionsModal = lazy(() => import('./components/modals/ExportOptionsModal'))
 const AttachmentsModal = lazy(() => import('./components/modals/AttachmentsModal'))
-const QuickAddModal = lazy(() => import('./components/modals/QuickAddModal'))
 const LocalInvoiceScanModal = lazy(() => import('./components/modals/LocalInvoiceScanModal'))
 const VoucherInfoModal = lazy(() => import('./components/modals/VoucherInfoModal'))
 const SetupWizardModal = lazy(() => import('./components/modals/SetupWizardModal'))
