@@ -5,6 +5,22 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.5] - 2026-07-14
+
+### Hinzugefügt
+
+- Buchungsjournal: Einnahmen und Ausgaben öffnen auf Klick eine Liste der letzten zehn passenden Buchungen; ein Doppelklick öffnet die Buchungsdetails.
+
+### Geändert
+
+- Buchungsjournal: Offene Buchungsreiter liegen platzsparend in der Paginierungsleiste. Die Aktionsspalte und ihre Bearbeiten-Schaltflächen sind kompakter und besitzen einen farbigen Hover-Zustand.
+- Buchungserfassung: Die Kopf-Aktionen für neuen Reiter, Erweitern und Schließen haben klare Hover- und Fokuszustände.
+- Reports: Zeitraum, Filter, Tätigkeitsbericht und Export sind als gemeinsame Aktionsgruppe umrahmt.
+
+### Behoben
+
+- Buchungsjournal: Die Einnahmen-/Ausgaben-Popover behalten bei Ladewechseln eine konstante Hook-Reihenfolge und positionieren sich direkt unter der jeweiligen Summenkachel.
+
 ## [2.9.4] - 2026-07-13
 
 ### Hinzugefügt

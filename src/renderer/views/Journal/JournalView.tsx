@@ -1132,51 +1132,12 @@ export default function JournalView({
                 budgetId={activeFilterBudgetId ?? undefined}
                 q={activeQ || undefined}
                 tag={activeFilterTag || undefined}
+                onOpenVoucher={(row) => { void openVoucherDetails(row) }}
             />
 
             {/* Main Table Card */}
             <div className="journal-table-section">
                 <div className="card journal-table-card">
-                    {bookingTabs.length > 0 && (
-                        <div className="booking-draft-tabs" aria-label="Offene Buchungstabs">
-                            {bookingTabs.map((draft) => (
-                                <div
-                                    key={draft.id}
-                                    className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}${draft.kind === 'edit' ? ' booking-draft-tab--edit' : ''}${draft.type === 'IN' ? ' booking-draft-tab--type-in' : ''}${draft.type === 'OUT' ? ' booking-draft-tab--type-out' : ''}${draft.type === 'TRANSFER' ? ' booking-draft-tab--type-transfer' : ''}${draft.type === 'INTERNAL' ? ' booking-draft-tab--type-internal' : ''}`}
-                                >
-                                    <button
-                                        type="button"
-                                        className="booking-draft-tab__open"
-                                        title={draft.title}
-                                        onClick={() => {
-                                            if (draft.kind === 'edit') {
-                                                const tab = bookingEditTabs.find((entry) => entry.id === draft.id)
-                                                if (!tab) return
-                                                void openBookingEditTab(tab)
-                                            } else {
-                                                onOpenBookingDraft?.(draft.id)
-                                            }
-                                        }}
-                                    >
-                                        <span className="booking-draft-tab__label">{draft.label}</span>
-                                        {draft.kind === 'edit' && <span className="booking-draft-tab__badge">Bearbeitung</span>}
-                                        {draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="booking-draft-tab__close"
-                                        aria-label={`${draft.label} schließen`}
-                                        onClick={() => {
-                                            if (draft.kind === 'edit') closeBookingEditTab(draft.id)
-                                            else onCloseBookingDraft?.(draft.id)
-                                        }}
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                     {/* Pagination controls */}
                     <div className="pagination-bar">
                         <div className="pagination-bar__info">
@@ -1193,6 +1154,28 @@ export default function JournalView({
                                 Doppelklick für Details{!allowVoucherDeletion ? ' – Stornieren in Details' : ''}
                             </div>
                         </div>
+                        {bookingTabs.length > 0 && (
+                            <div className="booking-draft-tabs booking-draft-tabs--pagination" aria-label="Offene Buchungstabs">
+                                {bookingTabs.map((draft) => (
+                                    <div key={draft.id} className={`booking-draft-tab${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}${draft.kind === 'edit' ? ' booking-draft-tab--edit' : ''}${draft.type === 'IN' ? ' booking-draft-tab--type-in' : ''}${draft.type === 'OUT' ? ' booking-draft-tab--type-out' : ''}${draft.type === 'TRANSFER' ? ' booking-draft-tab--type-transfer' : ''}${draft.type === 'INTERNAL' ? ' booking-draft-tab--type-internal' : ''}`}>
+                                        <button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => {
+                                            if (draft.kind === 'edit') {
+                                                const tab = bookingEditTabs.find((entry) => entry.id === draft.id)
+                                                if (tab) void openBookingEditTab(tab)
+                                            } else onOpenBookingDraft?.(draft.id)
+                                        }}>
+                                            <span className="booking-draft-tab__label">{draft.label}</span>
+                                            {draft.kind === 'edit' && <span className="booking-draft-tab__badge">Bearbeitung</span>}
+                                            {draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}
+                                        </button>
+                                        <button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => {
+                                            if (draft.kind === 'edit') closeBookingEditTab(draft.id)
+                                            else onCloseBookingDraft?.(draft.id)
+                                        }}>×</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="pagination-bar__controls">
                             <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
                             <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(Math.max(1, activePage - 1)) }} disabled={activePage <= 1} title="Zurück">‹</button>

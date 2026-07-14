@@ -14,6 +14,7 @@ interface FilterTotalsProps {
     budgetId?: number | null
     q?: string
     tag?: string
+    onOpenVoucher?: (voucher: any) => void
 }
 
 interface SummaryData {
@@ -78,9 +79,15 @@ function TooltipList({
     )
 }
 
-export default function FilterTotals({ refreshKey, from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, budgetId, q, tag }: FilterTotalsProps) {
+export default function FilterTotals({ refreshKey, from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, budgetId, q, tag, onOpenVoucher }: FilterTotalsProps) {
     const [loading, setLoading] = useState(false)
     const [values, setValues] = useState<SummaryData | null>(null)
+    const [recentKind, setRecentKind] = useState<'IN' | 'OUT' | null>(null)
+    const [recentRows, setRecentRows] = useState<any[]>([])
+    const [recentLoading, setRecentLoading] = useState(false)
+    const recentPopoverRef = React.useRef<HTMLDivElement | null>(null)
+    const incomeStatRef = React.useRef<HTMLButtonElement | null>(null)
+    const expenseStatRef = React.useRef<HTMLButtonElement | null>(null)
     
     useEffect(() => {
         let alive = true
@@ -147,6 +154,22 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
     }, [from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, budgetId, q, tag, refreshKey])
     
     const fmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
+
+    useEffect(() => {
+        if (!recentKind) return
+        const closeOnOutsideClick = (event: MouseEvent) => {
+            if (recentPopoverRef.current && !recentPopoverRef.current.contains(event.target as Node)) setRecentKind(null)
+        }
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setRecentKind(null)
+        }
+        document.addEventListener('mousedown', closeOnOutsideClick)
+        document.addEventListener('keydown', closeOnEscape)
+        return () => {
+            document.removeEventListener('mousedown', closeOnOutsideClick)
+            document.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [recentKind])
     
     if (!values && !loading) return null
     
@@ -180,9 +203,29 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
     const transferHint = values?.transferGross && values.transferGross !== 0
         ? `Transfers: ${fmt.format(values.transferGross)} (nicht Teil der Ausgaben)`
         : undefined
+    const recentPopoverLeft = recentKind === 'IN' ? incomeStatRef.current?.offsetLeft : expenseStatRef.current?.offsetLeft
+
+    const toggleRecentBookings = async (kind: 'IN' | 'OUT') => {
+        if (recentKind === kind) {
+            setRecentKind(null)
+            return
+        }
+
+        setRecentKind(kind)
+        setRecentLoading(true)
+        try {
+            const payload = buildFilterTotalsPayload({ from, to, paymentMethod, paymentAccountId, sphere, earmarkId, q, tag })
+            const result = await window.api?.vouchers.list?.({ ...payload, budgetId, type: kind, limit: 10, offset: 0, sort: 'DESC' } as any)
+            setRecentRows((result as any)?.rows || [])
+        } catch {
+            setRecentRows([])
+        } finally {
+            setRecentLoading(false)
+        }
+    }
 
     return (
-        <div className="filter-totals-card">
+        <div className="filter-totals-card" ref={recentPopoverRef}>
             {/* Visual Flow Bar */}
             <div className="filter-totals-flow">
                 <HoverTooltip
@@ -218,13 +261,13 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                     }
                 >
                     {({ ref, props }) => (
-                        <div ref={ref} {...props} tabIndex={0} className="filter-totals-stat filter-totals-stat--in">
+                        <button ref={(node) => { ref(node); incomeStatRef.current = node }} {...props} type="button" onClick={() => void toggleRecentBookings('IN')} className="filter-totals-stat filter-totals-stat--in" aria-expanded={recentKind === 'IN'} aria-controls="recent-income-bookings">
                             <div className="filter-totals-stat__icon">↓</div>
                             <div className="filter-totals-stat__content">
                                 <span className="filter-totals-stat__label">Einnahmen</span>
                                 <span className="filter-totals-stat__value">{fmt.format(inVal)}</span>
                             </div>
-                        </div>
+                        </button>
                     )}
                 </HoverTooltip>
                 
@@ -240,13 +283,13 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                     }
                 >
                     {({ ref, props }) => (
-                        <div ref={ref} {...props} tabIndex={0} className="filter-totals-stat filter-totals-stat--out">
+                        <button ref={(node) => { ref(node); expenseStatRef.current = node }} {...props} type="button" onClick={() => void toggleRecentBookings('OUT')} className="filter-totals-stat filter-totals-stat--out" aria-expanded={recentKind === 'OUT'} aria-controls="recent-expense-bookings">
                             <div className="filter-totals-stat__icon">↑</div>
                             <div className="filter-totals-stat__content">
                                 <span className="filter-totals-stat__label">Ausgaben</span>
                                 <span className="filter-totals-stat__value">{fmt.format(outVal)}</span>
                             </div>
-                        </div>
+                        </button>
                     )}
                 </HoverTooltip>
                 
@@ -336,6 +379,27 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                             )}
                         </HoverTooltip>
                     ))}
+                </div>
+            )}
+            {recentKind && (
+                <div id={recentKind === 'IN' ? 'recent-income-bookings' : 'recent-expense-bookings'} className={`filter-totals-recent-popover filter-totals-recent-popover--${recentKind.toLowerCase()}`} style={{ left: recentPopoverLeft }} role="dialog" aria-label={`Letzte ${recentKind === 'IN' ? 'Einnahmen' : 'Ausgaben'}`}>
+                    <div className="filter-totals-recent-popover__header">
+                        <strong>Letzte 10 {recentKind === 'IN' ? 'Einnahmen' : 'Ausgaben'}</strong>
+                        <span>Doppelklick für Details</span>
+                    </div>
+                    {recentLoading ? <div className="filter-totals-recent-popover__empty">Lade Buchungen …</div> : recentRows.length === 0 ? (
+                        <div className="filter-totals-recent-popover__empty">Keine passenden Buchungen.</div>
+                    ) : (
+                        <div className="filter-totals-recent-popover__list">
+                            {recentRows.map((row) => (
+                                <button key={row.id} type="button" className="filter-totals-recent-row" title="Doppelklick öffnet die Details" onDoubleClick={() => { setRecentKind(null); onOpenVoucher?.(row) }}>
+                                    <span className="filter-totals-recent-row__date">{row.date}</span>
+                                    <span className="filter-totals-recent-row__description">{row.description || 'Ohne Beschreibung'}</span>
+                                    <strong>{fmt.format(Math.abs(Number(row.grossAmount || 0)))}</strong>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

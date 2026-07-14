@@ -157,7 +157,7 @@ export default function ReportsView(props: {
           <p className="helper">Auswertungen für den gewählten Zeitraum und die Filter.</p>
         </div>
 
-        <div className="flex gap-8 items-center">
+        <div className="flex gap-8 items-center report-toolbar-actions">
           <div className="toolbar-icon">
             <TimeFilterDropdown
               yearsAvail={yearsAvail}

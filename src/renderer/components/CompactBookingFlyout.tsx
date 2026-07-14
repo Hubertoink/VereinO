@@ -407,12 +407,12 @@ export default function CompactBookingFlyout({
             >
               {draftTabs.map((draft) => <option key={draft.id} value={draft.id} title={draft.title}>{draft.label}</option>)}
             </select>
-            <button type="button" className="btn ghost" onClick={onNewDraft} aria-label="Neuen Buchungsreiter öffnen" title="Neue Buchung als weiteren Reiter öffnen">+</button>
+            <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--new" onClick={onNewDraft} aria-label="Neuen Buchungsreiter öffnen" title="Neue Buchung als weiteren Reiter öffnen">+</button>
           </div>
         )}
         <div className="compact-booking-flyout__header-actions">
-          <button type="button" className="btn ghost" onClick={onExpand} title="Vollständigen Dialog öffnen" aria-label="Vollständigen Buchungsdialog öffnen">↗</button>
-          <button type="button" className="btn ghost" onClick={onClose} aria-label={draftTabsEnabled ? 'Buchungsflyout parken' : 'Buchungsflyout schließen'}>✕</button>
+          <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--expand" onClick={onExpand} title="Vollständigen Dialog öffnen" aria-label="Vollständigen Buchungsdialog öffnen">↗</button>
+          <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--close" onClick={onClose} aria-label={draftTabsEnabled ? 'Buchungsflyout parken' : 'Buchungsflyout schließen'}>✕</button>
         </div>
       </header>
 
