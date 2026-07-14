@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.7] - 2026-07-14
+
+### Hinzugefügt
+
+- KI: Mittwald AI Hosting kann als OpenAI-kompatibler Anbieter mit den verfügbaren OCR-, Qwen-, Mistral- und gpt-oss-Modellen verwendet werden.
+
+### Geändert
+
+- KI-Rechnungsbatch: Mittwald-PDFs werden mit GLM-OCR extrahiert und danach von Qwen für den Buchungsentwurf bewertet.
+
+### Behoben
+
+- KI-Rechnungsbatch: Qwen erhält keine nicht unterstützten PDF-Inputs mehr; strukturierte Entwürfe tolerieren unvollständige Modellfelder und hängende Anfragen laufen kontrolliert ab.
+
 ## [2.9.6] - 2026-07-14
 
 ### Geändert

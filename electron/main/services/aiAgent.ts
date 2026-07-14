@@ -140,6 +140,44 @@ function responseFunctionCalls(response: any) {
   return (response?.output || []).filter((item: any) => item?.type === 'function_call')
 }
 
+function mittwaldToolDefinitions(tools: any[]) {
+  return tools.map((tool) => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  }))
+}
+
+async function createMittwaldAgentResponse(input: {
+  client: ReturnType<typeof createClient>
+  model: string
+  messages: any[]
+  tools: any[]
+}) {
+  const completion = await input.client.chat.completions.create({
+    model: input.model,
+    messages: input.messages,
+    tools: mittwaldToolDefinitions(input.tools),
+    tool_choice: 'auto',
+    temperature: 0.2
+  } as any)
+  const message = completion.choices[0]?.message
+  return {
+    output_text: message?.content || '',
+    output: (message?.tool_calls || []).map((call: any) => ({
+      type: 'function_call',
+      name: call.function?.name,
+      arguments: call.function?.arguments || '{}',
+      call_id: call.id
+    })),
+    usage: completion.usage,
+    mittwaldMessage: message
+  }
+}
+
 function readJsonResource<T>(resource: any, fallback: T): T {
   const text = resource?.contents?.find((item: any) => typeof item?.text === 'string')?.text
   if (!text) return fallback
@@ -250,6 +288,7 @@ export async function runAiAgent(input: {
       }
     ]
     const client = createClient()
+    const usesMittwaldChatCompletions = settings.provider === 'mittwald'
     const baseRequest = {
       model,
       instructions: instructions || buildAgentInstructions(),
@@ -258,15 +297,28 @@ export async function runAiAgent(input: {
       text: { verbosity: 'medium' }
     }
 
-    let response = await client.responses.create({
-      ...baseRequest,
-      input: [
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: prompt }]
-        }
-      ]
-    } as any)
+    const mittwaldMessages: any[] = usesMittwaldChatCompletions
+      ? [
+          { role: 'system', content: instructions || buildAgentInstructions() },
+          { role: 'user', content: prompt }
+        ]
+      : []
+    let response: any = usesMittwaldChatCompletions
+      ? await createMittwaldAgentResponse({
+          client,
+          model,
+          messages: mittwaldMessages,
+          tools: providerTools
+        })
+      : await client.responses.create({
+          ...baseRequest,
+          input: [
+            {
+              role: 'user',
+              content: [{ type: 'input_text', text: prompt }]
+            }
+          ]
+        } as any)
     usage = mergeUsage(usage, normalizeUsage(response, model))
 
     const maxSteps = Math.max(1, Math.min(8, Number(input.maxSteps || 5)))
@@ -377,11 +429,28 @@ export async function runAiAgent(input: {
         }
       }
 
-      response = await client.responses.create({
-        ...baseRequest,
-        previous_response_id: response.id,
-        input: outputs
-      } as any)
+      if (usesMittwaldChatCompletions) {
+        mittwaldMessages.push(response.mittwaldMessage)
+        mittwaldMessages.push(
+          ...outputs.map((output) => ({
+            role: 'tool',
+            tool_call_id: output.call_id,
+            content: output.output
+          }))
+        )
+        response = await createMittwaldAgentResponse({
+          client,
+          model,
+          messages: mittwaldMessages,
+          tools: providerTools
+        })
+      } else {
+        response = await client.responses.create({
+          ...baseRequest,
+          previous_response_id: response.id,
+          input: outputs
+        } as any)
+      }
       usage = mergeUsage(usage, normalizeUsage(response, model))
     }
 

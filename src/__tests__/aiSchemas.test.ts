@@ -124,6 +124,17 @@ describe('AiSettings schemas', () => {
     expect(update.provider).toBe('minimax')
   })
 
+  it('accepts Mittwald AI Hosting as an OpenAI-compatible provider', () => {
+    const update = AiSettingsSetInput.parse({
+      provider: 'mittwald',
+      model: 'GLM-OCR',
+      textModel: 'Qwen3.5-0.8B'
+    })
+
+    expect(update.provider).toBe('mittwald')
+    expect(update.model).toBe('GLM-OCR')
+  })
+
   it('allows updating only the cheaper text model', () => {
     const update = AiSettingsSetInput.parse({
       textModel: 'gpt-5.4-nano'

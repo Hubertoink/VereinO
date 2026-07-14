@@ -432,6 +432,36 @@ const AI_PROVIDER_CONFIG = {
         hint: 'Klassisches Textmodell für Standardaufgaben'
       }
     ]
+  },
+  mittwald: {
+    label: 'Mittwald AI Hosting',
+    apiBaseUrl: 'https://llm.aihosting.mittwald.de/v1',
+    defaultModel: 'GLM-OCR',
+    defaultTextModel: 'Qwen3.5-0.8B',
+    modelOptions: [
+      { value: 'GLM-OCR', label: 'GLM-OCR', hint: 'Empfohlen für Rechnungen, PDFs und Tabellen' },
+      {
+        value: 'Mistral-Medium-3.5-128B',
+        label: 'Mistral Medium 3.5',
+        hint: 'Starke Beleg- und Bildanalyse'
+      },
+      {
+        value: 'Qwen3.5-122B-A10B-FP8',
+        label: 'Qwen 3.5 122B',
+        hint: 'Empfohlen für Batch: GLM-OCR liest PDFs, Qwen bewertet sie'
+      },
+      {
+        value: 'Qwen3.6-35B-A3B-FP8',
+        label: 'Qwen 3.6 35B',
+        hint: 'Langer Kontext, Reasoning und Vision'
+      },
+      { value: 'gpt-oss-120b', label: 'gpt-oss-120b', hint: 'Präzise Texte und Tool-Aufrufe' },
+      {
+        value: 'Qwen3.5-0.8B',
+        label: 'Qwen 3.5 0.8B',
+        hint: 'Schnell für Standardtexte und Klassifizierung'
+      }
+    ]
   }
 } as const
 
@@ -2544,7 +2574,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [initialChat] = useState(readAiChatSnapshot)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
   const [apiKey, setApiKey] = useState('')
-  const [connectionTest, setConnectionTest] = useState<Awaited<ReturnType<typeof window.api.ai.settings.testConnection>> | null>(null)
+  const [connectionTest, setConnectionTest] = useState<Awaited<
+    ReturnType<typeof window.api.ai.settings.testConnection>
+  > | null>(null)
   const [jobs, setJobs] = useState<TAiJobsListOutput['rows']>([])
   const [selectedJob, setSelectedJob] = useState<TAiJobsGetOutput | null>(null)
   const [selectedJobId, setSelectedJobId] = useState<number | null>(
@@ -3808,8 +3840,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
 
   useEffect(() => {
     const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
-      const agentDraftId =
-        typeof payload?.agentDraftId === 'string' ? payload.agentDraftId : ''
+      const agentDraftId = typeof payload?.agentDraftId === 'string' ? payload.agentDraftId : ''
       if (!agentDraftId) return
       const voucherNo = payload?.voucherNo ? String(payload.voucherNo) : null
       const voucherId = typeof payload?.id === 'number' ? payload.id : null
@@ -5780,26 +5811,35 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         if (Array.isArray(change.newBudgets) && change.newBudgets.length > 0) {
           return change.newBudgets
         }
-        if (change.newBudgetId !== undefined || change.newBudgetLabel || change.newBudgetAmount != null) {
-          return [{
-            budgetId: change.newBudgetId,
-            label: change.newBudgetLabel,
-            amount: change.newBudgetAmount
-          }]
+        if (
+          change.newBudgetId !== undefined ||
+          change.newBudgetLabel ||
+          change.newBudgetAmount != null
+        ) {
+          return [
+            {
+              budgetId: change.newBudgetId,
+              label: change.newBudgetLabel,
+              amount: change.newBudgetAmount
+            }
+          ]
         }
         return []
       }
-      const needsBudgetLookup = selected.some(
-        (change) => budgetTargetsForChange(change).some((budget) => budget.budgetId == null && !!budget.label)
+      const needsBudgetLookup = selected.some((change) =>
+        budgetTargetsForChange(change).some((budget) => budget.budgetId == null && !!budget.label)
       )
       const needsEarmarkLookup = selected.some(
         (change) => change.newEarmarkId == null && !!change.newEarmarkLabel
       )
       const budgetLookup = needsBudgetLookup ? await buildBudgetLookup() : new Map<string, number>()
-      const earmarkLookup = needsEarmarkLookup ? await buildEarmarkLookup() : new Map<string, number>()
+      const earmarkLookup = needsEarmarkLookup
+        ? await buildEarmarkLookup()
+        : new Map<string, number>()
       for (const change of selected) {
         const budgetTargets = budgetTargetsForChange(change)
-        const hasBudgetChange = budgetTargets.length > 0 || change.newBudgetId !== undefined || !!change.newBudgetLabel
+        const hasBudgetChange =
+          budgetTargets.length > 0 || change.newBudgetId !== undefined || !!change.newBudgetLabel
         const hasEarmarkChange = change.newEarmarkId !== undefined || !!change.newEarmarkLabel
         const fullGrossAmount = Math.abs(Number(change.grossAmount || 0))
         const resolvedBudgets = budgetTargets.map((budget) => {
@@ -5818,9 +5858,13 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           hasEarmarkChange && change.newEarmarkId == null && change.newEarmarkLabel
             ? earmarkLookup.get(normalizeLookup(change.newEarmarkLabel))
             : change.newEarmarkId
-        const unresolvedBudget = resolvedBudgets.find((budget) => budget.budgetId == null && budget.label)
+        const unresolvedBudget = resolvedBudgets.find(
+          (budget) => budget.budgetId == null && budget.label
+        )
         if (hasBudgetChange && unresolvedBudget) {
-          throw new Error(`Budget "${unresolvedBudget.label}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`)
+          throw new Error(
+            `Budget "${unresolvedBudget.label}" wurde noch nicht gefunden. Bitte Budget zuerst übernehmen oder Namen prüfen.`
+          )
         }
         if (hasEarmarkChange && resolvedEarmarkId == null && change.newEarmarkLabel) {
           throw new Error(
@@ -5828,11 +5872,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           )
         }
         const earmarkAmount = Math.abs(Number(change.newEarmarkAmount ?? fullGrossAmount))
-        if (hasBudgetChange && resolvedBudgets.some((budget) => budget.budgetId != null && budget.amount <= 0)) {
-          throw new Error(`Budget-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`)
+        if (
+          hasBudgetChange &&
+          resolvedBudgets.some((budget) => budget.budgetId != null && budget.amount <= 0)
+        ) {
+          throw new Error(
+            `Budget-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`
+          )
         }
         if (hasEarmarkChange && resolvedEarmarkId != null && earmarkAmount <= 0) {
-          throw new Error(`Zweckbindungs-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`)
+          throw new Error(
+            `Zweckbindungs-Zuordnung fuer Buchung ${change.voucherNo} hat keinen gueltigen Bruttobetrag.`
+          )
         }
         const payload: TVoucherMetaUpdateInput = {
           id: change.voucherId,
@@ -5845,9 +5896,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             : {}),
           ...(hasEarmarkChange
             ? {
-                earmarks: resolvedEarmarkId != null
-                  ? [{ earmarkId: resolvedEarmarkId, amount: earmarkAmount }]
-                  : []
+                earmarks:
+                  resolvedEarmarkId != null
+                    ? [{ earmarkId: resolvedEarmarkId, amount: earmarkAmount }]
+                    : []
               }
             : {}),
           ...(change.newTags ? { tags: change.newTags } : {})
@@ -5866,9 +5918,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               : change.newBudgetId
           const resolvedBudgets = budgetTargetsForChange(change).map((budget) => ({
             ...budget,
-            budgetId: budget.budgetId == null && budget.label
-              ? budgetLookup.get(normalizeLookup(budget.label)) ?? budget.budgetId
-              : budget.budgetId
+            budgetId:
+              budget.budgetId == null && budget.label
+                ? (budgetLookup.get(normalizeLookup(budget.label)) ?? budget.budgetId)
+                : budget.budgetId
           }))
           const resolvedEarmarkId =
             change.newEarmarkId == null && change.newEarmarkLabel
@@ -6065,7 +6118,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           appliedIds.has(change.id)
             ? { ...change, applied: true, selected: true, error: null }
             : failures.length && selected.some((item) => item.id === change.id)
-              ? { ...change, error: failures.find((failure) => failure.includes(`#${change.bankTransactionId}`)) || null }
+              ? {
+                  ...change,
+                  error:
+                    failures.find((failure) => failure.includes(`#${change.bankTransactionId}`)) ||
+                    null
+                }
               : change
         )
       })
@@ -6082,7 +6140,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         dispatchDataChanged(['bank-imports', 'vouchers'])
         onBooked?.()
       }
-      if (failures.length) notify('error', `Bankverknüpfung teilweise fehlgeschlagen: ${failures[0]}`)
+      if (failures.length)
+        notify('error', `Bankverknüpfung teilweise fehlgeschlagen: ${failures[0]}`)
       else notify('success', `${appliedIds.size} Bankbeleg(e) verknüpft.`)
     } finally {
       setBusy(false)
@@ -7031,7 +7090,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         if (wantsApplyPendingVoucherActions(userPrompt)) {
           await applyPendingBankLinks()
         } else if (!settings.hasApiKey) {
-          notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+          notify('error', 'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
         } else {
           await processText(userPrompt)
@@ -7062,7 +7121,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           // Review was updated from the follow-up correction.
         } else if (wantsVoucherTagAction(userPrompt)) await prepareVoucherTagActions(userPrompt)
         else if (!settings.hasApiKey) {
-          notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+          notify('error', 'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
         } else {
           await processText(userPrompt)
@@ -7089,7 +7148,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -7200,7 +7259,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!handled && settings.hasApiKey) await processText(userPrompt)
         } else if (wantsTagRead(userPrompt)) await processTagRead(userPrompt)
         else if (!settings.hasApiKey) {
-          notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+          notify('error', 'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
         } else {
           await processText(userPrompt)
@@ -7236,7 +7295,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -7268,7 +7327,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -7315,7 +7374,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -7346,7 +7405,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           else if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -7432,7 +7491,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           if (!settings.hasApiKey) {
             notify(
               'error',
-              'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.'
+              'Bitte zuerst einen KI-API-Key in den KI-Einstellungen hinterlegen.'
             )
             setShowSettings(true)
           } else {
@@ -8456,7 +8515,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           )}
 
           {pendingContributionLinks && (
-            <section id="ai-review-contribution-links" className="card ai-contribution-payment-card">
+            <section
+              id="ai-review-contribution-links"
+              className="card ai-contribution-payment-card"
+            >
               <div className="ai-section-head">
                 <strong>Beitrags-Verknüpfungen</strong>
                 <span>
@@ -8715,8 +8777,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                         <strong>Bankbeleg #{change.bankTransactionId}</strong>
                         <em>
                           {formatIsoDate(change.bankBookingDate)} ·{' '}
-                          {[change.bankCounterparty, change.bankPurpose].filter(Boolean).join(' - ') ||
-                            'ohne Beschreibung'}{' '}
+                          {[change.bankCounterparty, change.bankPurpose]
+                            .filter(Boolean)
+                            .join(' - ') || 'ohne Beschreibung'}{' '}
                           · {euro.format(Number(change.bankAmount || 0))}
                         </em>
                       </span>
@@ -9141,7 +9204,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 className={`ai-network-result ai-field-wide ${connectionTest.ok ? 'is-success' : 'is-error'}`}
                 role="status"
               >
-                <strong>{connectionTest.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'}</strong>
+                <strong>
+                  {connectionTest.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'}
+                </strong>
                 {!connectionTest.ok && <span>{connectionTest.error}</span>}
                 <small>
                   Ziel: {connectionTest.targetUrl || settings.apiBaseUrl} · Route:{' '}

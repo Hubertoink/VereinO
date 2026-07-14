@@ -338,7 +338,13 @@ export default function LocalInvoiceScanModal({
       .then((settings) => {
         if (cancelled) return
         setAiAvailable(settings.hasApiKey)
-        setAiProvider(settings.provider === 'openai' ? 'OpenAI' : 'KI')
+        setAiProvider(
+          settings.provider === 'openai'
+            ? 'OpenAI'
+            : settings.provider === 'mittwald'
+              ? 'Mittwald AI'
+              : 'KI'
+        )
       })
       .catch(() => {
         if (!cancelled) setAiAvailable(false)
@@ -553,9 +559,11 @@ export default function LocalInvoiceScanModal({
         setRawText(text)
         if (!restored && text.length >= 20) setFields(extractLocalInvoiceFields(text))
         setAnalysisState(text.length >= 20 ? 'text-found' : 'ocr-needed')
-        setAnalysisMessage(text.length >= 20
-          ? `Mit Docling ${result.version ? `v${result.version} ` : ''}lokal erkannt und vorbefüllt.`
-          : 'Docling konnte keinen ausreichend verwertbaren Text erkennen.')
+        setAnalysisMessage(
+          text.length >= 20
+            ? `Mit Docling ${result.version ? `v${result.version} ` : ''}lokal erkannt und vorbefüllt.`
+            : 'Docling konnte keinen ausreichend verwertbaren Text erkennen.'
+        )
         return true
       } catch (error: any) {
         if (requestRef.current !== requestId) return true
@@ -564,7 +572,9 @@ export default function LocalInvoiceScanModal({
           setAnalysisMessage(`Docling-Analyse fehlgeschlagen: ${error?.message || String(error)}`)
           return true
         }
-        setAnalysisMessage(`Textschicht erkannt; Docling konnte nicht ergänzt werden: ${error?.message || String(error)}`)
+        setAnalysisMessage(
+          `Textschicht erkannt; Docling konnte nicht ergänzt werden: ${error?.message || String(error)}`
+        )
         return false
       }
     }
@@ -582,7 +592,9 @@ export default function LocalInvoiceScanModal({
       const handledByDocling = await applyDocling()
       if (!handledByDocling) {
         setAnalysisState('ocr-needed')
-        setAnalysisMessage('Bildvorschau bereit. Für lokale Texterkennung kann Docling aktiviert werden.')
+        setAnalysisMessage(
+          'Bildvorschau bereit. Für lokale Texterkennung kann Docling aktiviert werden.'
+        )
       }
       return
     }
@@ -611,7 +623,7 @@ export default function LocalInvoiceScanModal({
       const text = pageTexts.join('\n\n').trim()
       setRawText(text)
       if (restored) setFields(restored.fields)
-      if (text.length < 20 && await applyDocling(text)) return
+      if (text.length < 20 && (await applyDocling(text))) return
       if (text.length >= 20) {
         if (!restored) setFields(extractLocalInvoiceFields(text))
         setAnalysisState('text-found')
@@ -662,7 +674,17 @@ export default function LocalInvoiceScanModal({
       bookingMeta,
       visibleSections: Array.from(visibleSections)
     })
-  }, [bookingMeta, budgets, draftReady, earmarkAssignments, fields, file, note, tags, visibleSections])
+  }, [
+    bookingMeta,
+    budgets,
+    draftReady,
+    earmarkAssignments,
+    fields,
+    file,
+    note,
+    tags,
+    visibleSections
+  ])
 
   const addOptionalSection = (section: OptionalSection) => {
     setVisibleSections((current) => new Set([...current, section]))

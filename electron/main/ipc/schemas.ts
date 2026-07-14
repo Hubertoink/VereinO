@@ -756,12 +756,14 @@ export const InvoiceFilesListOutput = z.object({
     })
   )
 })
-export const InvoiceFileAddInput = z.object({
-  invoiceId: z.number(),
-  fileName: z.string(),
-  ...FileDataFields,
-  mimeType: z.string().optional()
-}).refine(hasFileData, { message: 'Dateidaten fehlen.' })
+export const InvoiceFileAddInput = z
+  .object({
+    invoiceId: z.number(),
+    fileName: z.string(),
+    ...FileDataFields,
+    mimeType: z.string().optional()
+  })
+  .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const InvoiceFileAddOutput = z.object({ id: z.number() })
 export const InvoiceFileDeleteInput = z.object({ fileId: z.number() })
 export const InvoiceFileDeleteOutput = z.object({ id: z.number() })
@@ -1316,10 +1318,12 @@ export const ImportPreviewOutput = z.object({
   suggestedMapping: z.record(z.string().nullable()),
   headerRowIndex: z.number()
 })
-export const ImportExecuteInput = z.object({
-  ...ImportFileFields,
-  mapping: z.record(z.string().nullable())
-}).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
+export const ImportExecuteInput = z
+  .object({
+    ...ImportFileFields,
+    mapping: z.record(z.string().nullable())
+  })
+  .refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 export const ImportExecuteOutput = z.object({
   imported: z.number(),
   skipped: z.number(),
@@ -1372,11 +1376,13 @@ const ImportMissingSchema = z.object({
   paymentAccounts: z.array(z.string()).optional()
 })
 
-export const ImportAnalyzeInput = z.object({
-  ...ImportFileFields,
-  mapping: z.record(z.string().nullable()),
-  rules: z.array(ImportRuleSchema).optional()
-}).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
+export const ImportAnalyzeInput = z
+  .object({
+    ...ImportFileFields,
+    mapping: z.record(z.string().nullable()),
+    rules: z.array(ImportRuleSchema).optional()
+  })
+  .refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 
 export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
   rows: z.array(ImportDraftRowSchema),
@@ -1618,12 +1624,14 @@ export const AttachmentReadOutput = z
   .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 
 // Attachments add/delete
-export const AttachmentAddInput = z.object({
-  voucherId: z.number(),
-  fileName: z.string(),
-  ...FileDataFields,
-  mimeType: z.string().optional()
-}).refine(hasFileData, { message: 'Dateidaten fehlen.' })
+export const AttachmentAddInput = z
+  .object({
+    voucherId: z.number(),
+    fileName: z.string(),
+    ...FileDataFields,
+    mimeType: z.string().optional()
+  })
+  .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const AttachmentAddOutput = z.object({ id: z.number() })
 export const AttachmentDeleteInput = z.object({ fileId: z.number() })
 export const AttachmentDeleteOutput = z.object({ id: z.number() })
@@ -1712,7 +1720,9 @@ export const MembersListInput = z
     sort: z.enum(['ASC', 'DESC']).optional(),
     contributionFilter: z.enum(['ALL', 'DUE', 'NOT_DUE', 'NO_PLAN']).optional(),
     intervalFilter: z.enum(['ALL', 'MONTHLY', 'QUARTERLY', 'YEARLY']).optional(),
-    boardFilter: z.enum(['ALL', 'ANY', 'NONE', 'V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT']).optional()
+    boardFilter: z
+      .enum(['ALL', 'ANY', 'NONE', 'V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])
+      .optional()
   })
   .optional()
 const BoardRole = z.enum(['V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])
@@ -2207,12 +2217,7 @@ export const AiUsageSchema = z.object({
   pricingNote: z.string().optional()
 })
 
-const AiInvoiceMimeType = z.enum([
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/webp'
-])
+const AiInvoiceMimeType = z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
 const MAX_AI_INVOICE_BASE64_LENGTH = 4 * Math.ceil((10 * 1024 * 1024) / 3)
 export const AiInvoiceExtractInput = z.object({
   file: z
@@ -2228,10 +2233,9 @@ export const AiInvoiceExtractInput = z.object({
         (file.dataBase64?.length ?? 0) <= MAX_AI_INVOICE_BASE64_LENGTH,
       { message: 'Die Datei ist zu groß.' }
     )
-    .refine(
-      (file) => !file.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(file.dataBase64),
-      { message: 'Ungültige Base64-Datei' }
-    )
+    .refine((file) => !file.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(file.dataBase64), {
+      message: 'Ungültige Base64-Datei'
+    })
 })
 export const AiInvoiceExtractOutput = z.object({
   model: z.string(),
@@ -2258,13 +2262,16 @@ export const AiInvoiceBatchItem = z.object({
   isDuplicate: z.boolean().default(false),
   duplicateVoucherId: z.number().int().positive().nullable().optional(),
   duplicateVoucherNo: z.string().nullable().optional(),
-  packet: z.object({
-    index: z.number().int().positive(),
-    total: z.number().int().positive(),
-    pageNumbers: z.array(z.number().int().positive()).min(1),
-    confidence: z.number().min(0).max(1),
-    warnings: z.array(z.string())
-  }).nullable().optional()
+  packet: z
+    .object({
+      index: z.number().int().positive(),
+      total: z.number().int().positive(),
+      pageNumbers: z.array(z.number().int().positive()).min(1),
+      confidence: z.number().min(0).max(1),
+      warnings: z.array(z.string())
+    })
+    .nullable()
+    .optional()
 })
 export const AiInvoiceBatchListOutput = z.object({
   rows: z.array(AiInvoiceBatchItem),
@@ -2273,15 +2280,19 @@ export const AiInvoiceBatchListOutput = z.object({
   doclingAvailable: z.boolean().default(false)
 })
 export const AiInvoiceBatchGetOutput = AiInvoiceBatchItem.extend({
-  file: z.object({
-    fileName: z.string(),
-    mimeType: z.string().nullable().optional(),
-    dataBase64: z.string().optional()
-  }).nullable()
+  file: z
+    .object({
+      fileName: z.string(),
+      mimeType: z.string().nullable().optional(),
+      dataBase64: z.string().optional()
+    })
+    .nullable()
 })
 export const AiInvoiceBatchActionOutput = z.object({ ok: z.boolean() })
 export const AiInvoiceBatchIdInput = z.object({ id: z.number().int().positive() })
-export const AiInvoiceBatchApproveInput = AiInvoiceBatchIdInput.extend({ voucherId: z.number().int().positive() })
+export const AiInvoiceBatchApproveInput = AiInvoiceBatchIdInput.extend({
+  voucherId: z.number().int().positive()
+})
 
 export const AiAgentDraft = z.object({
   kind: z.enum([
@@ -2430,7 +2441,7 @@ export const AiJobDetailSchema = AiJobSchema.extend({
   )
 })
 
-export const AiProvider = z.enum(['openai', 'minimax'])
+export const AiProvider = z.enum(['openai', 'minimax', 'mittwald'])
 export const AiProxyMode = z.enum(['system', 'direct', 'manual'])
 export const AiSettingsGetOutput = z.object({
   hasApiKey: z.boolean(),

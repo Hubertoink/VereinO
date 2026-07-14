@@ -33,7 +33,7 @@ const PROXY_URL_SETTING = 'ai.network.proxyUrl'
 const PROXY_BYPASS_SETTING = 'ai.network.proxyBypassRules'
 const DEFAULT_PROVIDER = 'openai'
 
-type AiProvider = 'openai' | 'minimax'
+type AiProvider = 'openai' | 'minimax' | 'mittwald'
 type AiProxyMode = 'system' | 'direct' | 'manual'
 
 type AiProviderPreset = {
@@ -55,10 +55,26 @@ const AI_PROVIDER_PRESETS: Record<AiProvider, AiProviderPreset> = {
     defaultModel: 'MiniMax-M3',
     defaultTextModel: 'MiniMax-M3',
     allowedModels: ['MiniMax-M3', 'MiniMax-M1', 'MiniMax-Text-01']
+  },
+  mittwald: {
+    apiBaseUrl: 'https://llm.aihosting.mittwald.de/v1',
+    defaultModel: 'GLM-OCR',
+    defaultTextModel: 'Qwen3.5-0.8B',
+    allowedModels: [
+      'GLM-OCR',
+      'Mistral-Medium-3.5-128B',
+      'Qwen3.5-122B-A10B-FP8',
+      'Qwen3.6-35B-A3B-FP8',
+      'gpt-oss-120b',
+      'Qwen3.5-0.8B'
+    ]
   }
 }
 
-const MODEL_PRICING_USD_PER_MILLION: Record<string, { input: number; cachedInput: number; output: number }> = {
+const MODEL_PRICING_USD_PER_MILLION: Record<
+  string,
+  { input: number; cachedInput: number; output: number }
+> = {
   'gpt-5.5': { input: 5, cachedInput: 0.5, output: 30 },
   'gpt-5.4': { input: 2.5, cachedInput: 0.25, output: 15 },
   'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.5 },
@@ -97,8 +113,25 @@ export type AiUsage = {
 
 export type AiContext = {
   organization?: { name?: string | null; activeName?: string | null }
-  paymentAccounts?: Array<{ id: number; name: string; kind: string; ibanLast4?: string | null; color?: string | null; sortOrder?: number; isActive?: number }>
-  budgets?: Array<{ id: number; label?: string; year?: number; sphere?: string; categoryName?: string | null; projectName?: string | null; amountPlanned?: number | null; isArchived?: number }>
+  paymentAccounts?: Array<{
+    id: number
+    name: string
+    kind: string
+    ibanLast4?: string | null
+    color?: string | null
+    sortOrder?: number
+    isActive?: number
+  }>
+  budgets?: Array<{
+    id: number
+    label?: string
+    year?: number
+    sphere?: string
+    categoryName?: string | null
+    projectName?: string | null
+    amountPlanned?: number | null
+    isArchived?: number
+  }>
   earmarks?: Array<{ id: number; code?: string; name?: string; isActive?: number }>
   tags?: Array<{ id?: number; name: string; color?: string | null; usage?: number }>
   members?: any
@@ -185,10 +218,15 @@ function decryptSecret(stored?: AiStoredSecret | string | null) {
 
 function getProviderPreset(provider?: string | null): AiProviderPreset {
   if (provider === 'minimax') return AI_PROVIDER_PRESETS.minimax
+  if (provider === 'mittwald') return AI_PROVIDER_PRESETS.mittwald
   return AI_PROVIDER_PRESETS.openai
 }
 
-function normalizeProviderModel(provider: AiProvider, model: string | null | undefined, kind: 'model' | 'textModel') {
+function normalizeProviderModel(
+  provider: AiProvider,
+  model: string | null | undefined,
+  kind: 'model' | 'textModel'
+) {
   const preset = getProviderPreset(provider)
   const fallback = kind === 'model' ? preset.defaultModel : preset.defaultTextModel
   const value = model?.trim()
@@ -200,7 +238,11 @@ export function getAiSettings(): AiSettings {
   const effort = getSetting<'low' | 'medium' | 'high'>(EFFORT_SETTING) || 'medium'
   const provider = getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
   const model = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
-  const textModel = normalizeProviderModel(provider, getSetting<string>(TEXT_MODEL_SETTING), 'textModel')
+  const textModel = normalizeProviderModel(
+    provider,
+    getSetting<string>(TEXT_MODEL_SETTING),
+    'textModel'
+  )
   const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
   const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
@@ -235,7 +277,10 @@ export function setAiSettings(input: {
     if (trimmed) setSetting(API_KEY_SETTING, encryptSecret(trimmed))
   }
   setSetting(MODEL_SETTING, normalizeProviderModel(provider, input.model ?? current.model, 'model'))
-  setSetting(TEXT_MODEL_SETTING, normalizeProviderModel(provider, input.textModel ?? current.textModel, 'textModel'))
+  setSetting(
+    TEXT_MODEL_SETTING,
+    normalizeProviderModel(provider, input.textModel ?? current.textModel, 'textModel')
+  )
   if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
   if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
   if (input.proxyMode) setSetting(PROXY_MODE_SETTING, input.proxyMode)
@@ -303,11 +348,13 @@ async function configureAiNetwork(settings: AiSettings) {
   const signature = JSON.stringify(config)
   if (signature === appliedProxySignature && proxyConfiguration) return proxyConfiguration
   appliedProxySignature = signature
-  proxyConfiguration = aiNetworkSession().setProxy(config).catch((error) => {
-    appliedProxySignature = ''
-    proxyConfiguration = null
-    throw error
-  })
+  proxyConfiguration = aiNetworkSession()
+    .setProxy(config)
+    .catch((error) => {
+      appliedProxySignature = ''
+      proxyConfiguration = null
+      throw error
+    })
   return proxyConfiguration
 }
 
@@ -323,8 +370,96 @@ export function createClient() {
   return new OpenAI({
     apiKey: getApiKey(),
     baseURL: settings.apiBaseUrl,
-    fetch: createElectronFetch(settings)
+    fetch: createElectronFetch(settings),
+    // A stalled provider request must not block the invoice batch for many minutes.
+    timeout: 120_000,
+    maxRetries: 1
   })
+}
+
+function mittwaldChatContent(content: any[]) {
+  return content.map((part) => {
+    if (part?.type === 'input_text') return { type: 'text', text: part.text }
+    if (part?.type === 'input_image') {
+      return { type: 'image_url', image_url: { url: part.image_url } }
+    }
+    if (part?.type === 'input_file') {
+      // Mittwalds GLM-OCR Dokument-Proxy erwartet Dokumente als Data-URI im image_url-Feld.
+      return { type: 'image_url', image_url: { url: part.file_data } }
+    }
+    return part
+  })
+}
+
+function mittwaldJsonInstruction(format: any) {
+  if (format?.type !== 'json_schema' || !format?.schema) return ''
+  return [
+    'Antworte ausschließlich mit einem gültigen JSON-Objekt ohne Markdown oder Codeblock.',
+    'Das JSON muss diesem Schema entsprechen; ergänze keine weiteren Felder:',
+    JSON.stringify(format.schema)
+  ].join('\n')
+}
+
+function parseMittwaldJson(text: string) {
+  const normalized = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim()
+  return JSON.parse(normalized)
+}
+
+/**
+ * Mittwald implements Chat Completions as its stable OpenAI-compatible surface.
+ * The Responses API is kept for providers that support OpenAI structured output natively.
+ */
+export async function createAiResponse(request: any): Promise<any> {
+  const settings = getAiSettings()
+  const client = createClient()
+  if (settings.provider !== 'mittwald') return client.responses.create(request)
+
+  const input = Array.isArray(request.input)
+    ? request.input
+    : [{ role: 'user', content: request.input }]
+  const messages: any[] = []
+  const instructions = [request.instructions, mittwaldJsonInstruction(request.text?.format)]
+    .filter(Boolean)
+    .join('\n\n')
+  if (instructions) messages.push({ role: 'system', content: instructions })
+  for (const item of input) {
+    const content = Array.isArray(item?.content)
+      ? mittwaldChatContent(item.content)
+      : (item?.content ?? item)
+    messages.push({ role: item?.role || 'user', content })
+  }
+
+  const usesQwenThinkingModel = /^Qwen3\.(5|6)-/.test(request.model)
+  const completion = await client.chat.completions.create({
+    model: request.model,
+    messages,
+    // Low temperature helps the prompt-enforced JSON fallback stay parseable.
+    temperature: request.text?.format ? 0.1 : undefined,
+    // Qwen's Thinking mode is useful for open-ended chat, but it substantially
+    // increases latency and can leave structured batch results without content.
+    ...(usesQwenThinkingModel ? { chat_template_kwargs: { enable_thinking: false } } : {})
+  } as any)
+  const outputText = completion.choices[0]?.message?.content || ''
+  let outputParsed: unknown
+  if (request.text?.format) {
+    try {
+      outputParsed = parseMittwaldJson(outputText)
+    } catch {
+      throw new Error(
+        'Mittwald hat kein gültiges JSON für die angeforderte strukturierte Antwort geliefert.'
+      )
+    }
+  }
+  return {
+    output_text: outputText,
+    output: [{ type: 'message', content: [{ type: 'output_text', text: outputText }] }],
+    output_parsed: outputParsed,
+    usage: completion.usage
+  }
 }
 
 export function extractOutputText(response: any) {
@@ -342,8 +477,89 @@ function parseStructured<T>(response: any, schema: { parse: (value: unknown) => 
   const parsed = response?.output_parsed
   if (parsed) return schema.parse(parsed)
   const text = extractOutputText(response)
-  if (!text) throw new Error('OpenAI hat keine auswertbare Antwort geliefert.')
+  if (!text) throw new Error('Der KI-Anbieter hat keine auswertbare Antwort geliefert.')
   return schema.parse(JSON.parse(text))
+}
+
+function textOrNull(value: unknown) {
+  if (value == null) return null
+  const text = String(value).trim()
+  return text || null
+}
+
+function textList(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => (typeof item === 'string' ? item.trim() : JSON.stringify(item))).filter(Boolean)
+    : []
+}
+
+function nullableNumber(value: unknown) {
+  if (value == null || value === '') return null
+  const number = typeof value === 'number' ? value : Number(String(value).replace(',', '.'))
+  return Number.isFinite(number) ? number : null
+}
+
+function nonNegativeNumber(value: unknown) {
+  const number = nullableNumber(value)
+  return number != null && number >= 0 ? number : null
+}
+
+function invoiceAssignments(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item: any) => {
+    const id = nullableNumber(item?.id)
+    const amount = nullableNumber(item?.amount)
+    return id != null && Number.isInteger(id) && id > 0 && amount != null && amount >= 0
+      ? [{ id, amount }]
+      : []
+  })
+}
+
+function normalizeInvoiceExtraction(value: unknown) {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const type = raw.type === 'IN' ? 'IN' : 'OUT'
+  const sphere = ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'].includes(String(raw.sphere))
+    ? raw.sphere
+    : 'IDEELL'
+  const paymentMethod = raw.paymentMethod === 'BAR' || raw.paymentMethod === 'BANK'
+    ? raw.paymentMethod
+    : null
+  const warnings = textList(raw.warnings)
+  if (!raw.sphere || !raw.type) {
+    warnings.unshift('Einordnung für Einnahme/Ausgabe oder Sphäre war unvollständig und wurde konservativ vorbelegt. Bitte prüfen.')
+  }
+  const paymentAccountId = nullableNumber(raw.paymentAccountId)
+  const vatRate = nullableNumber(raw.vatRate)
+  return {
+    supplier: textOrNull(raw.supplier),
+    invoiceNumber: textOrNull(raw.invoiceNumber),
+    invoiceDate: textOrNull(raw.invoiceDate),
+    dueDate: textOrNull(raw.dueDate),
+    grossAmount: nonNegativeNumber(raw.grossAmount),
+    netAmount: nonNegativeNumber(raw.netAmount),
+    taxAmount: nonNegativeNumber(raw.taxAmount),
+    vatRate: vatRate != null && vatRate >= 0 && vatRate <= 100 ? vatRate : null,
+    iban: textOrNull(raw.iban),
+    description: textOrNull(raw.description),
+    type,
+    sphere,
+    paymentMethod,
+    paymentAccountId:
+      paymentAccountId != null && Number.isInteger(paymentAccountId) && paymentAccountId > 0
+        ? paymentAccountId
+        : null,
+    budgets: invoiceAssignments(raw.budgets),
+    earmarks: invoiceAssignments(raw.earmarks),
+    tags: textList(raw.tags),
+    confidence: Math.max(0, Math.min(1, nullableNumber(raw.confidence) ?? 0.5)),
+    warnings,
+    evidence: textList(raw.evidence)
+  }
+}
+
+function parseInvoiceExtraction(response: any) {
+  const raw = response?.output_parsed ?? JSON.parse(extractOutputText(response))
+  return AiInvoiceExtractionResult.parse(normalizeInvoiceExtraction(raw))
 }
 
 export function normalizeUsage(response: any, model: string): AiUsage {
@@ -352,19 +568,20 @@ export function normalizeUsage(response: any, model: string): AiUsage {
   const outputTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? 0)
   const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens)
   const cachedInputTokens = Number(
-    usage.input_tokens_details?.cached_tokens
-    ?? usage.prompt_tokens_details?.cached_tokens
-    ?? 0
+    usage.input_tokens_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens ?? 0
   )
   const reasoningTokens = Number(
-    usage.output_tokens_details?.reasoning_tokens
-    ?? usage.completion_tokens_details?.reasoning_tokens
-    ?? 0
+    usage.output_tokens_details?.reasoning_tokens ??
+      usage.completion_tokens_details?.reasoning_tokens ??
+      0
   )
   const pricing = MODEL_PRICING_USD_PER_MILLION[model]
   const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens)
   const estimatedCostUsd = pricing
-    ? ((billableInputTokens * pricing.input) + (cachedInputTokens * pricing.cachedInput) + (outputTokens * pricing.output)) / 1_000_000
+    ? (billableInputTokens * pricing.input +
+        cachedInputTokens * pricing.cachedInput +
+        outputTokens * pricing.output) /
+      1_000_000
     : null
   return {
     inputTokens,
@@ -372,7 +589,8 @@ export function normalizeUsage(response: any, model: string): AiUsage {
     outputTokens,
     reasoningTokens,
     totalTokens,
-    estimatedCostUsd: estimatedCostUsd == null ? null : Math.round(estimatedCostUsd * 1_000_000) / 1_000_000,
+    estimatedCostUsd:
+      estimatedCostUsd == null ? null : Math.round(estimatedCostUsd * 1_000_000) / 1_000_000,
     pricingNote: pricing
       ? 'Geschaetzt mit OpenAI Standard API-Preisen pro 1M Token, ohne Batch/Flex/Priority/Data-Residency-Aufschlaege.'
       : `Keine lokale Preistabelle fuer Modell ${model}.`
@@ -385,14 +603,31 @@ export function compactContext(context: AiContext) {
     generatedAt: context.generatedAt,
     paymentAccounts: (context.paymentAccounts || [])
       .filter((account) => account.isActive !== 0)
-      .map((account) => ({ id: account.id, name: account.name, kind: account.kind, ibanLast4: account.ibanLast4, color: account.color, sortOrder: account.sortOrder })),
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        kind: account.kind,
+        ibanLast4: account.ibanLast4,
+        color: account.color,
+        sortOrder: account.sortOrder
+      })),
     budgets: (context.budgets || [])
       .filter((budget) => budget.isArchived !== 1)
-      .map((budget) => ({ id: budget.id, label: budget.label, year: budget.year, sphere: budget.sphere, categoryName: budget.categoryName, projectName: budget.projectName, amountPlanned: budget.amountPlanned })),
+      .map((budget) => ({
+        id: budget.id,
+        label: budget.label,
+        year: budget.year,
+        sphere: budget.sphere,
+        categoryName: budget.categoryName,
+        projectName: budget.projectName,
+        amountPlanned: budget.amountPlanned
+      })),
     earmarks: (context.earmarks || [])
       .filter((earmark) => earmark.isActive !== 0)
       .map((earmark) => ({ id: earmark.id, code: earmark.code, name: earmark.name })),
-    tags: (context.tags || []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, usage: tag.usage })).slice(0, 120),
+    tags: (context.tags || [])
+      .map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, usage: tag.usage }))
+      .slice(0, 120),
     members: context.members,
     reports: context.reports,
     invoices: context.invoices
@@ -401,7 +636,9 @@ export function compactContext(context: AiContext) {
 
 function isVereinRelevantPrompt(prompt: string) {
   const normalized = prompt.toLowerCase()
-  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/.test(normalized)
+  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/.test(
+    normalized
+  )
 }
 
 function outOfScopeDraft(): TAiTextDraftResult {
@@ -433,7 +670,8 @@ function inferInputFileMimeType(file: AiInputFile) {
   if (name.endsWith('.webp')) return 'image/webp'
   if (name.endsWith('.gif')) return 'image/gif'
   if (name.endsWith('.pdf')) return 'application/pdf'
-  if (name.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  if (name.endsWith('.xlsx'))
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   if (name.endsWith('.xls')) return 'application/vnd.ms-excel'
   if (name.endsWith('.csv')) return 'text/csv'
   if (name.endsWith('.tsv')) return 'text/tab-separated-values'
@@ -458,7 +696,8 @@ function toResponseFileContent(file: AiInputFile) {
 }
 
 function buildAnalysisSourceLabel(fileName: string, pageNumber?: number, pageCount?: number) {
-  if (pageNumber && pageCount && pageCount > 1) return `${fileName} · Seite ${pageNumber} von ${pageCount}`
+  if (pageNumber && pageCount && pageCount > 1)
+    return `${fileName} · Seite ${pageNumber} von ${pageCount}`
   return fileName
 }
 
@@ -474,15 +713,21 @@ async function splitPdfIntoAnalysisFiles(file: AiInputFile): Promise<ExpandedAiI
   const loaded = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
   const pageCount = loaded.getPageCount()
   if (pageCount <= 1) {
-    return [{
-      file,
-      source: {
-        fileName: file.fileName,
-        pageNumber: 1,
-        pageCount,
-        label: buildAnalysisSourceLabel(file.fileName, pageCount > 1 ? 1 : undefined, pageCount > 1 ? pageCount : undefined)
+    return [
+      {
+        file,
+        source: {
+          fileName: file.fileName,
+          pageNumber: 1,
+          pageCount,
+          label: buildAnalysisSourceLabel(
+            file.fileName,
+            pageCount > 1 ? 1 : undefined,
+            pageCount > 1 ? pageCount : undefined
+          )
+        }
       }
-    }]
+    ]
   }
 
   const pages: ExpandedAiInputFile[] = []
@@ -514,7 +759,7 @@ async function expandInputFilesForAnalysis(files: AiInputFile[]): Promise<Expand
   for (const file of files) {
     const mimeType = inferInputFileMimeType(file)
     if (mimeType === 'application/pdf') {
-      expanded.push(...await splitPdfIntoAnalysisFiles(file))
+      expanded.push(...(await splitPdfIntoAnalysisFiles(file)))
       continue
     }
     expanded.push({
@@ -534,20 +779,35 @@ export async function testAiConnection() {
   try {
     await configureAiNetwork(settings)
     resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
-    const client = createClient()
-    await client.responses.create({
-      model: settings.model,
-      input: 'Antworte nur mit OK.',
-      text: { verbosity: 'low' },
-      reasoning: { effort: 'low' }
-    } as any)
-    if (settings.textModel !== settings.model) {
-      await client.responses.create({
+    if (settings.provider === 'mittwald') {
+      const availableModels = new Set((await createClient().models.list()).data.map((model) => model.id))
+      const missingModels = [settings.model, settings.textModel].filter(
+        (model, index, all) => !availableModels.has(model) && all.indexOf(model) === index
+      )
+      if (missingModels.length) {
+        throw new Error(`Die Mittwald-Modelle sind für diesen API-Key nicht verfügbar: ${missingModels.join(', ')}.`)
+      }
+      await createAiResponse({
         model: settings.textModel,
         input: 'Antworte nur mit OK.',
         text: { verbosity: 'low' },
         reasoning: { effort: 'low' }
       } as any)
+    } else {
+      await createAiResponse({
+        model: settings.model,
+        input: 'Antworte nur mit OK.',
+        text: { verbosity: 'low' },
+        reasoning: { effort: 'low' }
+      } as any)
+      if (settings.textModel !== settings.model) {
+        await createAiResponse({
+          model: settings.textModel,
+          input: 'Antworte nur mit OK.',
+          text: { verbosity: 'low' },
+          reasoning: { effort: 'low' }
+        } as any)
+      }
     }
     return {
       ok: true,
@@ -561,13 +821,25 @@ export async function testAiConnection() {
     const combined = `${errorCode} ${rawMessage}`.toUpperCase()
     let errorMessage = rawMessage
     if (combined.includes('407') || combined.includes('PROXY_AUTH')) {
-      errorMessage = 'Der Proxy verlangt eine Anmeldung (HTTP 407). Bitte Windows-/Firmenanmeldung oder Proxy-Richtlinie prüfen.'
-    } else if (combined.includes('CERT') || combined.includes('SELF_SIGNED') || combined.includes('UNABLE_TO_VERIFY')) {
-      errorMessage = 'Die TLS-Zertifikatsprüfung ist fehlgeschlagen. Vermutlich fehlt das Firmen-CA-Zertifikat im Windows-Zertifikatsspeicher.'
-    } else if (combined.includes('TIMEDOUT') || combined.includes('TIMEOUT') || combined.includes('ABORT')) {
-      errorMessage = 'Die Verbindung ist abgelaufen. Proxy oder Firewall haben die Anfrage möglicherweise nicht weitergeleitet.'
+      errorMessage =
+        'Der Proxy verlangt eine Anmeldung (HTTP 407). Bitte Windows-/Firmenanmeldung oder Proxy-Richtlinie prüfen.'
+    } else if (
+      combined.includes('CERT') ||
+      combined.includes('SELF_SIGNED') ||
+      combined.includes('UNABLE_TO_VERIFY')
+    ) {
+      errorMessage =
+        'Die TLS-Zertifikatsprüfung ist fehlgeschlagen. Vermutlich fehlt das Firmen-CA-Zertifikat im Windows-Zertifikatsspeicher.'
+    } else if (
+      combined.includes('TIMEDOUT') ||
+      combined.includes('TIMEOUT') ||
+      combined.includes('ABORT')
+    ) {
+      errorMessage =
+        'Die Verbindung ist abgelaufen. Proxy oder Firewall haben die Anfrage möglicherweise nicht weitergeleitet.'
     } else if (combined.includes('ENOTFOUND') || combined.includes('NAME_NOT_RESOLVED')) {
-      errorMessage = 'Der API-Host konnte nicht aufgelöst werden. Bitte DNS- und Proxy-Konfiguration prüfen.'
+      errorMessage =
+        'Der API-Host konnte nicht aufgelöst werden. Bitte DNS- und Proxy-Konfiguration prüfen.'
     } else if (combined.includes('401') || combined.includes('UNAUTHORIZED')) {
       errorMessage = 'Die API hat den Schlüssel abgelehnt (HTTP 401).'
     } else if (combined.includes('403') || combined.includes('FORBIDDEN')) {
@@ -590,11 +862,14 @@ export async function analyzeBookingDocuments(input: {
   model?: string | null
   reasoningEffort?: 'low' | 'medium' | 'high'
 }): Promise<{ model: string; result: TAiBookingAnalysisResult; usage: AiUsage }> {
-  if (!input.files.length) throw new Error('Bitte mindestens eine Rechnung oder einen Beleg hochladen.')
+  if (!input.files.length)
+    throw new Error('Bitte mindestens eine Rechnung oder einen Beleg hochladen.')
   const settings = getAiSettings()
   const model = input.model || settings.model
   const expandedFiles = await expandInputFilesForAnalysis(input.files)
-  const sourceManifest = expandedFiles.map((item, idx) => `${idx + 1}. ${item.source.label}`).join('\n')
+  const sourceManifest = expandedFiles
+    .map((item, idx) => `${idx + 1}. ${item.source.label}`)
+    .join('\n')
   const prompt = [
     'Du bist ein vorsichtiger Buchungsassistent fuer einen deutschen Verein.',
     'Extrahiere aus den angehaengten Belegen, Rechnungen oder Tabellen Buchungsvorschlaege fuer VereinO.',
@@ -616,7 +891,7 @@ export async function analyzeBookingDocuments(input: {
     'VereinO-Kontext:',
     JSON.stringify(compactContext(input.context))
   ].join('\n')
-  const response = await createClient().responses.create({
+  const response = await createAiResponse({
     model,
     reasoning: { effort: input.reasoningEffort || settings.defaultReasoningEffort },
     text: { format: zodTextFormat(AiBookingAnalysisResultStructured, 'vereino_booking_analysis') },
@@ -625,27 +900,37 @@ export async function analyzeBookingDocuments(input: {
         role: 'user',
         content: [
           { type: 'input_text', text: prompt },
-          ...expandedFiles.flatMap((item, idx) => ([
+          ...expandedFiles.flatMap((item, idx) => [
             { type: 'input_text', text: `Quelle ${idx + 1}: ${item.source.label}` },
             toResponseFileContent(item.file)
-          ]))
+          ])
         ]
       }
     ]
   } as any)
-  return { model, result: AiBookingAnalysisResult.parse(parseStructured(response, AiBookingAnalysisResultStructured)), usage: normalizeUsage(response, model) } as any
+  return {
+    model,
+    result: AiBookingAnalysisResult.parse(
+      parseStructured(response, AiBookingAnalysisResultStructured)
+    ),
+    usage: normalizeUsage(response, model)
+  } as any
 }
 
 const MAX_TRANSIENT_INVOICE_BYTES = 10 * 1024 * 1024
 const MAX_TRANSIENT_INVOICE_PAGES = 50
 
 const InvoicePacketSegmentationStructured = z.object({
-  groups: z.array(z.object({
-    pageNumbers: z.array(z.number().int().positive()),
-    confidence: z.number().min(0).max(1),
-    reason: z.string(),
-    warnings: z.array(z.string())
-  })).min(1),
+  groups: z
+    .array(
+      z.object({
+        pageNumbers: z.array(z.number().int().positive()),
+        confidence: z.number().min(0).max(1),
+        reason: z.string(),
+        warnings: z.array(z.string())
+      })
+    )
+    .min(1),
   warnings: z.array(z.string())
 })
 
@@ -659,7 +944,10 @@ export type InvoicePacketGroup = {
 
 async function pdfForPages(source: PDFDocument, pageNumbers: number[]) {
   const output = await PDFDocument.create()
-  const pages = await output.copyPages(source, pageNumbers.map((page) => page - 1))
+  const pages = await output.copyPages(
+    source,
+    pageNumbers.map((page) => page - 1)
+  )
   for (const page of pages) output.addPage(page)
   return Buffer.from(await output.save()).toString('base64')
 }
@@ -674,51 +962,72 @@ export async function segmentInvoicePacket(file: AiInputFile): Promise<{
   const pageCount = pdf.getPageCount()
   if (pageCount <= 1) {
     return {
-      groups: [{ pageNumbers: [1], confidence: 1, reason: 'Einseitige PDF', warnings: [], dataBase64: file.dataBase64 }],
+      groups: [
+        {
+          pageNumbers: [1],
+          confidence: 1,
+          reason: 'Einseitige PDF',
+          warnings: [],
+          dataBase64: file.dataBase64
+        }
+      ],
       warnings: []
     }
   }
 
   const pageFiles = await splitPdfIntoAnalysisFiles(file)
   const settings = getAiSettings()
-  const response = await createClient().responses.create({
-    model: settings.model,
+  const model = settings.provider === 'mittwald' ? 'GLM-OCR' : settings.model
+  const response = await createAiResponse({
+    // Mittwald's document proxy only runs with GLM-OCR. Qwen receives the
+    // extracted text in the next analysis step rather than raw PDF data.
+    model,
     reasoning: { effort: settings.defaultReasoningEffort },
-    text: { format: zodTextFormat(InvoicePacketSegmentationStructured, 'vereino_invoice_packet_segmentation') },
-    input: [{
-      role: 'user',
-      content: [
-        {
-          type: 'input_text',
-          text: [
-            `Diese PDF hat ${pageCount} Seiten und kann mehrere hintereinander gescannte Rechnungen enthalten.`,
-            'Gruppiere ausschließlich aufeinanderfolgende Seiten, die zu derselben Rechnung gehören.',
-            'Nutze Rechnungsnummer, Lieferant, Datum, Seitennummern, Überträge, Summen und Layout als Indizien.',
-            'Jede Seite von 1 bis zur letzten Seite muss exakt einmal vorkommen; keine Seite auslassen oder doppelt verwenden.',
-            'Eine neue Rechnungsnummer oder ein klar neuer Rechnungskopf beginnt normalerweise eine neue Gruppe.',
-            'Folgeseiten, Anlagen und Seitenangaben wie Seite 2 von 3 bleiben bei ihrer Rechnung.',
-            'Bei unsicheren Grenzen senke confidence und erkläre die Unsicherheit in warnings.',
-            'Extrahiere noch keine Buchungsdaten.'
-          ].join('\n')
-        },
-        ...pageFiles.flatMap((page, index) => ([
-          { type: 'input_text', text: `Seite ${index + 1} von ${pageCount}` },
-          toResponseFileContent(page.file)
-        ]))
-      ]
-    }]
+    text: {
+      format: zodTextFormat(
+        InvoicePacketSegmentationStructured,
+        'vereino_invoice_packet_segmentation'
+      )
+    },
+    input: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: [
+              `Diese PDF hat ${pageCount} Seiten und kann mehrere hintereinander gescannte Rechnungen enthalten.`,
+              'Gruppiere ausschließlich aufeinanderfolgende Seiten, die zu derselben Rechnung gehören.',
+              'Nutze Rechnungsnummer, Lieferant, Datum, Seitennummern, Überträge, Summen und Layout als Indizien.',
+              'Jede Seite von 1 bis zur letzten Seite muss exakt einmal vorkommen; keine Seite auslassen oder doppelt verwenden.',
+              'Eine neue Rechnungsnummer oder ein klar neuer Rechnungskopf beginnt normalerweise eine neue Gruppe.',
+              'Folgeseiten, Anlagen und Seitenangaben wie Seite 2 von 3 bleiben bei ihrer Rechnung.',
+              'Bei unsicheren Grenzen senke confidence und erkläre die Unsicherheit in warnings.',
+              'Extrahiere noch keine Buchungsdaten.'
+            ].join('\n')
+          },
+          ...pageFiles.flatMap((page, index) => [
+            { type: 'input_text', text: `Seite ${index + 1} von ${pageCount}` },
+            toResponseFileContent(page.file)
+          ])
+        ]
+      }
+    ]
   } as any)
   const segmented = InvoicePacketSegmentationStructured.parse(
     parseStructured(response, InvoicePacketSegmentationStructured)
   )
   const normalized = normalizeInvoicePacketGroups(segmented.groups, pageCount)
   return {
-    groups: await Promise.all(normalized.map(async (group) => ({
-      ...group,
-      dataBase64: normalized.length === 1 && group.pageNumbers.length === pageCount
-        ? file.dataBase64
-        : await pdfForPages(pdf, group.pageNumbers)
-    }))),
+    groups: await Promise.all(
+      normalized.map(async (group) => ({
+        ...group,
+        dataBase64:
+          normalized.length === 1 && group.pageNumbers.length === pageCount
+            ? file.dataBase64
+            : await pdfForPages(pdf, group.pageNumbers)
+      }))
+    ),
     warnings: segmented.warnings
   }
 }
@@ -726,11 +1035,19 @@ export async function segmentInvoicePacket(file: AiInputFile): Promise<{
 function hasInvoiceMagic(bytes: Buffer, mimeType: string) {
   if (mimeType === 'application/pdf') return bytes.subarray(0, 5).toString('ascii') === '%PDF-'
   if (mimeType === 'image/png') {
-    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    return (
+      bytes.length >= 8 &&
+      bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    )
   }
-  if (mimeType === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  if (mimeType === 'image/jpeg')
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
   if (mimeType === 'image/webp') {
-    return bytes.length >= 12 && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP'
+    return (
+      bytes.length >= 12 &&
+      bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      bytes.subarray(8, 12).toString('ascii') === 'WEBP'
+    )
   }
   return false
 }
@@ -760,6 +1077,28 @@ export async function analyzeInvoiceDocument(input: {
   await validateTransientInvoiceFile(input.file)
   const settings = getAiSettings()
   const model = settings.model
+  let mittwaldOcrText = ''
+  if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
+    const ocrResponse = await createAiResponse({
+      model: 'GLM-OCR',
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: 'Extrahiere den vollständigen, quellengetreuen Text aus diesem Dokument. Bewahre Zahlen, Daten, Rechnungsnummern und IBAN exakt.'
+            },
+            toResponseFileContent(input.file)
+          ]
+        }
+      ]
+    } as any)
+    mittwaldOcrText = extractOutputText(ocrResponse)
+    if (!mittwaldOcrText.trim()) {
+      throw new Error('Mittwald GLM-OCR hat keinen auswertbaren Dokumenttext geliefert.')
+    }
+  }
   const context = {
     generatedAt: input.context.generatedAt,
     paymentAccounts: (input.context.paymentAccounts || [])
@@ -767,7 +1106,12 @@ export async function analyzeInvoiceDocument(input: {
       .map((account) => ({ id: account.id, name: account.name, kind: account.kind })),
     budgets: (input.context.budgets || [])
       .filter((budget) => budget.isArchived !== 1)
-      .map((budget) => ({ id: budget.id, label: budget.label, year: budget.year, sphere: budget.sphere })),
+      .map((budget) => ({
+        id: budget.id,
+        label: budget.label,
+        year: budget.year,
+        sphere: budget.sphere
+      })),
     earmarks: (input.context.earmarks || [])
       .filter((earmark) => earmark.isActive !== 0)
       .map((earmark) => ({ id: earmark.id, code: earmark.code, name: earmark.name })),
@@ -784,30 +1128,39 @@ export async function analyzeInvoiceDocument(input: {
     input.localDocumentText?.trim()
       ? 'Docling hat lokal bereits strukturierten Dokumenttext erkannt. Nutze ihn als zusätzliche Evidenz, prüfe Werte aber weiterhin gegen das Originaldokument.'
       : '',
-    input.localDocumentText?.trim() ? `Lokaler Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}` : '',
+    input.localDocumentText?.trim()
+      ? `Lokaler Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}`
+      : '',
+    mittwaldOcrText
+      ? `Mittwald GLM-OCR-Text:\n${mittwaldOcrText.slice(0, 80_000)}`
+      : '',
     '',
     'Minimaler VereinO-Stammdatenkontext:',
     JSON.stringify(context)
   ].join('\n')
-  const response = await createClient().responses.create({
+  const response = await createAiResponse({
     model,
     reasoning: { effort: settings.defaultReasoningEffort },
-    text: { format: zodTextFormat(AiInvoiceExtractionResultStructured, 'vereino_invoice_extraction') },
+    text: {
+      format: zodTextFormat(AiInvoiceExtractionResultStructured, 'vereino_invoice_extraction')
+    },
     input: [
       {
         role: 'user',
         content: [
           { type: 'input_text', text: prompt },
-          toResponseFileContent(input.file)
+          // Qwen receives text from GLM-OCR: it supports images but not the
+          // PDF document proxy used by Mittwald's batch submission files.
+          ...(settings.provider === 'mittwald' && model !== 'GLM-OCR'
+            ? []
+            : [toResponseFileContent(input.file)])
         ]
       }
     ]
   } as any)
   return {
     model,
-    result: AiInvoiceExtractionResult.parse(
-      parseStructured(response, AiInvoiceExtractionResultStructured)
-    ),
+    result: parseInvoiceExtraction(response),
     usage: normalizeUsage(response, model)
   }
 }
@@ -830,13 +1183,27 @@ export async function planAiAction(input: {
       entity: 'vouchers',
       operations: ['read', 'create', 'update'],
       filters: ['tag', 'q', 'date', 'type', 'sphere', 'paymentMethod', 'amount'],
-      changes: ['tags add/remove/set', 'description set', 'note append', 'paymentAccountId set', 'budget/earmark via review']
+      changes: [
+        'tags add/remove/set',
+        'description set',
+        'note append',
+        'paymentAccountId set',
+        'budget/earmark via review'
+      ]
     },
     {
       entity: 'members',
       operations: ['read', 'create', 'update'],
       filters: ['name', 'status', 'boardRole', 'contribution'],
-      changes: ['contribution_amount', 'contribution_interval', 'boardRole', 'status', 'join_date', 'leave_date', 'next_due_date']
+      changes: [
+        'contribution_amount',
+        'contribution_interval',
+        'boardRole',
+        'status',
+        'join_date',
+        'leave_date',
+        'next_due_date'
+      ]
     },
     {
       entity: 'payments',
@@ -861,48 +1228,53 @@ export async function planAiAction(input: {
     }
   ]
 
-  const response = await createClient().responses.create({
+  const response = await createAiResponse({
     model,
     reasoning: { effort: 'low' },
-    text: { format: zodTextFormat(AiActionPlanStructured, 'vereino_action_plan'), verbosity: 'low' },
+    text: {
+      format: zodTextFormat(AiActionPlanStructured, 'vereino_action_plan'),
+      verbosity: 'low'
+    },
     input: [
       {
         role: 'user',
-        content: [{
-          type: 'input_text',
-          text: [
-            'Du bist der Aktionsplaner fuer VereinO. Analysiere, was der Nutzer will, und liefere ausschliesslich einen strukturierten Action Plan.',
-            'Du fuehrst keine finalen Schreibaktionen aus. Schreibende Aktionen muessen safety REVIEW_REQUIRED haben.',
-            'Wenn die Anfrage ausserhalb von VereinO/Vereinsverwaltung liegt, setze entity unknown, operation none, safety BLOCKED und erklaere kurz in answer.',
-            'Denke wie ein Kassier: Belege, Bankimporte, Buchungen und Zahlungskonten muessen nachvollziehbar zusammenpassen. Plane keine Aktion, die Duplikate erzeugt oder Bankbelege unverbunden laesst.',
-            'Wenn der Nutzer eine fachliche Aktion verlangt, die im erlaubten Toolset nicht sicher abbildbar ist, waehle keine ungefaehr passende Ersatzaktion. Setze safety BLOCKED oder REVIEW_REQUIRED mit einer klaren Rueckfrage in answer.',
-            'Nutze echte Namen aus dem Kontext, z.B. vorhandene Tags, Mitglieder, Zahlungskonten, Budgets und Zweckbindungen.',
-            'Bei Folgefragen nutze die Unterhaltung. Korrigiere fruehere Annahmen, wenn der Nutzer sie verbessert.',
-            'Fuer Beispiele wie "alle Buchungen mit Tag X bekommen Tag Y": entity vouchers, operation update, filter field tag eq X, change field tags mode add value [Y].',
-            'Fuer "lege Tags X, Y an": entity tags, operation create, changes field name mode add value [X,Y].',
-            'Fuer "lege Mitglieder an": entity members, operation create, jedes Mitglied als items.values mit keys name, birthDate, joinDate, boardRole, contributionAmount, contributionInterval, nextDueDate. Datumswerte als YYYY-MM-DD, contributionAmount als Zahl.',
-            'Fuer "Mitglieder bearbeiten": entity members, operation update, Zielgruppe als filters und Aenderungen als changes, z.B. contribution_amount set 20 und contribution_interval set MONTHLY.',
-            'Fuer "offene/faellige Mitgliedsbeitraege, ausstehende Beitragszahlungen, wer schuldet Beitrag": entity payments, operation read, safety READ_ONLY.',
-            'Fuer "erstelle eine Buchung fuer Mitgliedsbeitrag und verknuepfe sie": entity payments, operation create, filter memberName, change amount/date/paymentAccountName/tags. Das lokale Tool erstellt danach einen Review mit Buchung und Beitragsverknuepfung.',
-            'Wenn vorher offene Mitgliedsbeitraege genannt wurden und der Nutzer danach "hierzu/dazu eine Buchung anlegen/verknuepfen" schreibt, ist das payments create, nicht members create.',
-            'Fuer "Bankbeleg/Bankimport mit bestehender Buchung verknuepfen": entity bankImport, operation linkExisting, safety REVIEW_REQUIRED. Das ist kein Storno und keine Ersatzbuchung.',
-            'Wenn vorher ein Report/Controllingbericht besprochen wurde und der Nutzer einen anderen Zeitraum, "letzte X Monate", "was sticht heraus" oder weitere KPIs nennt, ist das entity reports, operation export/generateText, nicht members.',
-            'Fuer "Report/Bericht fuer die letzten X Monate" oder "Controlling fuer Zeitraum" ist entity reports, operation export, safety REVIEW_REQUIRED.',
-            'Fuer reine Fragen: operation read, safety READ_ONLY, answer nur wenn eine direkte kurze Antwort ohne Tool reicht.',
-            '',
-            'Erlaubtes Toolset:',
-            JSON.stringify(toolCatalog),
-            '',
-            'VereinO-Kontext:',
-            JSON.stringify(compactContext(input.context)),
-            '',
-            'Unterhaltung:',
-            JSON.stringify(conversation),
-            '',
-            'Aktuelle Nutzernachricht:',
-            input.prompt
-          ].join('\n')
-        }]
+        content: [
+          {
+            type: 'input_text',
+            text: [
+              'Du bist der Aktionsplaner fuer VereinO. Analysiere, was der Nutzer will, und liefere ausschliesslich einen strukturierten Action Plan.',
+              'Du fuehrst keine finalen Schreibaktionen aus. Schreibende Aktionen muessen safety REVIEW_REQUIRED haben.',
+              'Wenn die Anfrage ausserhalb von VereinO/Vereinsverwaltung liegt, setze entity unknown, operation none, safety BLOCKED und erklaere kurz in answer.',
+              'Denke wie ein Kassier: Belege, Bankimporte, Buchungen und Zahlungskonten muessen nachvollziehbar zusammenpassen. Plane keine Aktion, die Duplikate erzeugt oder Bankbelege unverbunden laesst.',
+              'Wenn der Nutzer eine fachliche Aktion verlangt, die im erlaubten Toolset nicht sicher abbildbar ist, waehle keine ungefaehr passende Ersatzaktion. Setze safety BLOCKED oder REVIEW_REQUIRED mit einer klaren Rueckfrage in answer.',
+              'Nutze echte Namen aus dem Kontext, z.B. vorhandene Tags, Mitglieder, Zahlungskonten, Budgets und Zweckbindungen.',
+              'Bei Folgefragen nutze die Unterhaltung. Korrigiere fruehere Annahmen, wenn der Nutzer sie verbessert.',
+              'Fuer Beispiele wie "alle Buchungen mit Tag X bekommen Tag Y": entity vouchers, operation update, filter field tag eq X, change field tags mode add value [Y].',
+              'Fuer "lege Tags X, Y an": entity tags, operation create, changes field name mode add value [X,Y].',
+              'Fuer "lege Mitglieder an": entity members, operation create, jedes Mitglied als items.values mit keys name, birthDate, joinDate, boardRole, contributionAmount, contributionInterval, nextDueDate. Datumswerte als YYYY-MM-DD, contributionAmount als Zahl.',
+              'Fuer "Mitglieder bearbeiten": entity members, operation update, Zielgruppe als filters und Aenderungen als changes, z.B. contribution_amount set 20 und contribution_interval set MONTHLY.',
+              'Fuer "offene/faellige Mitgliedsbeitraege, ausstehende Beitragszahlungen, wer schuldet Beitrag": entity payments, operation read, safety READ_ONLY.',
+              'Fuer "erstelle eine Buchung fuer Mitgliedsbeitrag und verknuepfe sie": entity payments, operation create, filter memberName, change amount/date/paymentAccountName/tags. Das lokale Tool erstellt danach einen Review mit Buchung und Beitragsverknuepfung.',
+              'Wenn vorher offene Mitgliedsbeitraege genannt wurden und der Nutzer danach "hierzu/dazu eine Buchung anlegen/verknuepfen" schreibt, ist das payments create, nicht members create.',
+              'Fuer "Bankbeleg/Bankimport mit bestehender Buchung verknuepfen": entity bankImport, operation linkExisting, safety REVIEW_REQUIRED. Das ist kein Storno und keine Ersatzbuchung.',
+              'Wenn vorher ein Report/Controllingbericht besprochen wurde und der Nutzer einen anderen Zeitraum, "letzte X Monate", "was sticht heraus" oder weitere KPIs nennt, ist das entity reports, operation export/generateText, nicht members.',
+              'Fuer "Report/Bericht fuer die letzten X Monate" oder "Controlling fuer Zeitraum" ist entity reports, operation export, safety REVIEW_REQUIRED.',
+              'Fuer reine Fragen: operation read, safety READ_ONLY, answer nur wenn eine direkte kurze Antwort ohne Tool reicht.',
+              '',
+              'Erlaubtes Toolset:',
+              JSON.stringify(toolCatalog),
+              '',
+              'VereinO-Kontext:',
+              JSON.stringify(compactContext(input.context)),
+              '',
+              'Unterhaltung:',
+              JSON.stringify(conversation),
+              '',
+              'Aktuelle Nutzernachricht:',
+              input.prompt
+            ].join('\n')
+          }
+        ]
       }
     ]
   } as any)
@@ -926,19 +1298,27 @@ export async function generateAiText(input: {
   if (!input.files?.length && !isVereinRelevantPrompt(input.prompt)) {
     const settings = getAiSettings()
     const model = input.model || settings.textModel
-    return { model, result: outOfScopeDraft(), usage: emptyUsage('Lokal abgelehnt, kein OpenAI API-Call.') }
+    return {
+      model,
+      result: outOfScopeDraft(),
+      usage: emptyUsage('Lokal abgelehnt, kein OpenAI API-Call.')
+    }
   }
   const settings = getAiSettings()
   const model = input.model || settings.textModel
-  const taskLabel = input.type === 'INVITATION'
-    ? 'Einladung oder Ankuendigung fuer Vereinsmitglieder'
-    : input.type === 'MEMBER_MESSAGE'
-      ? 'Mitgliederkommunikation'
-      : 'Berichtstext fuer Kassierbericht oder Vereinsbericht'
-  const response = await createClient().responses.create({
+  const taskLabel =
+    input.type === 'INVITATION'
+      ? 'Einladung oder Ankuendigung fuer Vereinsmitglieder'
+      : input.type === 'MEMBER_MESSAGE'
+        ? 'Mitgliederkommunikation'
+        : 'Berichtstext fuer Kassierbericht oder Vereinsbericht'
+  const response = await createAiResponse({
     model,
     reasoning: { effort: 'low' },
-    text: { format: zodTextFormat(AiTextDraftResultStructured, 'vereino_text_draft'), verbosity: 'low' },
+    text: {
+      format: zodTextFormat(AiTextDraftResultStructured, 'vereino_text_draft'),
+      verbosity: 'low'
+    },
     input: [
       {
         role: 'user',
@@ -954,7 +1334,9 @@ export async function generateAiText(input: {
               'Nutze die bereitgestellten VereinO-Daten aktiv. Bei Fragen nach Mitgliedern, Einnahmen, Ausgaben, Salden, Reports oder offenen Punkten antworte mit konkreten Zahlen/Namen aus dem Kontext.',
               'Erfinde keine Daten. Wenn ein Detail im Kontext fehlt, sage konkret, welche Information fehlt.',
               'Schreibe auf Deutsch. Liefere direkt nutzbare Antworten oder Entwuerfe ohne Platzhalter, ausser fehlende Daten sind unvermeidbar.',
-              input.files?.length ? 'Beruecksichtige die angehaengten Dateien. Bei Excel/CSV/Tabellen: analysiere Spalten, erkannte Stammdaten, moegliche Importzuordnung, Dublettenrisiken und fehlende Felder.' : '',
+              input.files?.length
+                ? 'Beruecksichtige die angehaengten Dateien. Bei Excel/CSV/Tabellen: analysiere Spalten, erkannte Stammdaten, moegliche Importzuordnung, Dublettenrisiken und fehlende Felder.'
+                : '',
               '',
               'VereinO-Datenkontext:',
               JSON.stringify(compactContext(input.context || {})),
@@ -980,7 +1362,11 @@ export async function reviewBankImportTransactions(input: {
   model?: string | null
 }): Promise<{ model: string; result: TAiBankImportReviewResult; usage: AiUsage | null }> {
   if (!input.transactions.length) {
-    return { model: getAiSettings().textModel, result: { suggestions: [], summary: 'Keine offenen Bankbelege vorhanden.', warnings: [] }, usage: null } as any
+    return {
+      model: getAiSettings().textModel,
+      result: { suggestions: [], summary: 'Keine offenen Bankbelege vorhanden.', warnings: [] },
+      usage: null
+    } as any
   }
   const settings = getAiSettings()
   const model = input.model || settings.textModel
@@ -1010,10 +1396,13 @@ export async function reviewBankImportTransactions(input: {
     JSON.stringify(input.transactions)
   ].join('\n')
 
-  const response = await createClient().responses.create({
+  const response = await createAiResponse({
     model,
     reasoning: { effort: 'low' },
-    text: { format: zodTextFormat(AiBankImportReviewResultStructured, 'vereino_bank_import_review'), verbosity: 'low' },
+    text: {
+      format: zodTextFormat(AiBankImportReviewResultStructured, 'vereino_bank_import_review'),
+      verbosity: 'low'
+    },
     input: [
       {
         role: 'user',
@@ -1022,5 +1411,11 @@ export async function reviewBankImportTransactions(input: {
     ]
   } as any)
 
-  return { model, result: AiBankImportReviewResult.parse(parseStructured(response, AiBankImportReviewResultStructured)), usage: normalizeUsage(response, model) } as any
+  return {
+    model,
+    result: AiBankImportReviewResult.parse(
+      parseStructured(response, AiBankImportReviewResultStructured)
+    ),
+    usage: normalizeUsage(response, model)
+  } as any
 }
