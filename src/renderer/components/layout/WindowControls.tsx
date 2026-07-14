@@ -1,10 +1,27 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 type WindowControlsProps = {
     onClose?: () => void
 }
 
 export default function WindowControls({ onClose }: WindowControlsProps) {
+    const [isMaximized, setIsMaximized] = useState(false)
+
+    useEffect(() => {
+        let mounted = true
+        const windowApi = window.api?.window
+        const unsubscribe = windowApi?.onMaximizeChanged?.(setIsMaximized)
+
+        void windowApi?.isMaximized?.().then((maximized) => {
+            if (mounted) setIsMaximized(maximized)
+        }).catch(() => {})
+
+        return () => {
+            mounted = false
+            unsubscribe?.()
+        }
+    }, [])
+
     return (
         <div className="window-controls" style={{ WebkitAppRegion: 'no-drag' } as any}>
             <button
@@ -19,13 +36,20 @@ export default function WindowControls({ onClose }: WindowControlsProps) {
             </button>
             <button
                 className="btn ghost window-controls__btn"
-                title="Maximieren / Wiederherstellen"
-                aria-label="Maximieren"
+                title={isMaximized ? 'Wiederherstellen' : 'Maximieren'}
+                aria-label={isMaximized ? 'Wiederherstellen' : 'Maximieren'}
                 onClick={() => window.api?.window?.toggleMaximize?.()}
             >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M6 6h12v12H6z" />
-                </svg>
+                {isMaximized ? (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="9" y="4" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="4" y="9" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
+                    </svg>
+                ) : (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="6" y="6" width="12" height="12" stroke="currentColor" strokeWidth="1.8" />
+                    </svg>
+                )}
             </button>
             <button
                 className="btn danger window-controls__btn"

@@ -705,7 +705,7 @@ label.settings-toggle-card {
   position: relative;
 }
 
-/* Space leader / which-key command guide */
+/* Alt leader / which-key command guide */
 .leader-shortcut-trigger {
   position: fixed;
   left: 72px;

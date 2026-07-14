@@ -31,7 +31,7 @@ function hasBlockingDialog() {
   return !!document.querySelector('.modal-overlay, .booking-modal, .compact-booking-flyout, [role="dialog"][aria-modal="true"]')
 }
 
-export function LeaderShortcuts({ commands, leaderLabel = 'Space' }: LeaderShortcutsProps) {
+export function LeaderShortcuts({ commands, leaderLabel = 'Alt' }: LeaderShortcutsProps) {
   const [path, setPath] = useState<ShortcutCommand[]>([])
   const [open, setOpen] = useState(false)
   const [invalidKey, setInvalidKey] = useState('')
@@ -62,7 +62,7 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Space' }: LeaderShort
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!open) {
-        if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+        if (event.key !== 'Alt' || event.repeat || event.ctrlKey || event.metaKey) return
         if (isEditableTarget(event.target) || hasBlockingDialog()) return
         event.preventDefault()
         setOpen(true)
@@ -112,9 +112,9 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Space' }: LeaderShort
           else if (!hasBlockingDialog()) setOpen(true)
         }}
         aria-label="Tastaturbefehle öffnen"
-        title="Tastaturbefehle (Leertaste)"
+        title="Tastaturbefehle (Alt)"
       >
-        <kbd>Space</kbd>
+        <kbd>Alt</kbd>
         <span>Befehle</span>
       </button>
 

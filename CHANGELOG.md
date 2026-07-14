@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.6] - 2026-07-14
+
+### Geändert
+
+- Tastaturbefehle: „Gehe zu …“ wird nun mit `Alt` statt mit der Leertaste geöffnet.
+- Oberfläche: Der Maximieren-Button zeigt bei maximiertem Fenster ein separates Wiederherstellen-Icon mit klarerem Abstand der überlappenden Quadrate.
+
+### Behoben
+
+- Tastaturbefehle: „Gehe zu …“ bleibt funktionsfähig, wenn der Navigationspunkt „KI“ eingeblendet ist.
+
 ## [2.9.5] - 2026-07-14
 
 ### Hinzugefügt

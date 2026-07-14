@@ -139,6 +139,35 @@ type PageShortcutAction = {
   action: () => void
 }
 
+const goToShortcutKeys = {
+  Dashboard: 'd',
+  Buchungen: 'b',
+  Bankimport: 'k',
+  Verbindlichkeiten: 'v',
+  Mitglieder: 'm',
+  Vorschuesse: 'o',
+  Budgets: 'p',
+  Zweckbindungen: 'z',
+  Einreichungen: 'i',
+  KI: 'a',
+  Belege: 'l',
+  Reports: 'r',
+  Einstellungen: 'e'
+} satisfies Record<NavKey, string>
+
+function MaximizeWindowIcon({ isMaximized }: { isMaximized: boolean }) {
+  return isMaximized ? (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="4" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="4" y="9" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  ) : (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 type SetOptionalNumber = (value: number | null) => void
 type SetOptionalText = (value: string | null) => void
 type ClearOptionalText = (value: null) => void
@@ -2378,22 +2407,7 @@ function AppInner() {
         label: 'Gehe zu …',
         description: 'Bereich in VereinO öffnen',
         children: visibleNavigationItems.map((item) => ({
-          key: (
-            {
-              Dashboard: 'd',
-              Buchungen: 'b',
-              Bankimport: 'k',
-              Verbindlichkeiten: 'v',
-              Mitglieder: 'm',
-              Vorschuesse: 'o',
-              Budgets: 'p',
-              Zweckbindungen: 'z',
-              Einreichungen: 'i',
-              Belege: 'l',
-              Reports: 'r',
-              Einstellungen: 'e'
-            } as Record<NavKey, string>
-          )[item.key],
+          key: goToShortcutKeys[item.key],
           label: item.label,
           icon: (
             <span className={navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}>
@@ -3234,6 +3248,23 @@ function AppInner() {
   // (earmarks loaded above)
 
   const isTopNav = effectiveNavLayout === 'top'
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    const windowApi = window.api?.window
+    const unsubscribe = windowApi?.onMaximizeChanged?.(setIsWindowMaximized)
+
+    void windowApi?.isMaximized?.().then((isMaximized) => {
+      if (mounted) setIsWindowMaximized(isMaximized)
+    }).catch(() => {})
+
+    return () => {
+      mounted = false
+      unsubscribe?.()
+    }
+  }, [])
+
   return (
     <div className={`app-root-grid ${isTopNav ? 'app-root-grid--top' : 'app-root-grid--side'}`}>
       {/* Topbar with organisation header line */}
@@ -3282,13 +3313,11 @@ function AppInner() {
           </button>
           <button
             className="btn ghost icon-btn"
-            title="Maximieren / Wiederherstellen"
-            aria-label="Maximieren"
+            title={isWindowMaximized ? 'Wiederherstellen' : 'Maximieren'}
+            aria-label={isWindowMaximized ? 'Wiederherstellen' : 'Maximieren'}
             onClick={() => window.api?.window?.toggleMaximize?.()}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M6 6h12v12H6z" />
-            </svg>
+            <MaximizeWindowIcon isMaximized={isWindowMaximized} />
           </button>
           <button
             className="btn danger icon-btn"
