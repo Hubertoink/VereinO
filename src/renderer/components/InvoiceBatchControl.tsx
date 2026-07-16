@@ -325,9 +325,14 @@ export default function InvoiceBatchControl({
                 {item.status === 'FAILED' && (
                   <button className="btn ghost invoice-batch-item__retry" onClick={async () => { await window.api.ai.invoiceBatch.retry({ id: item.id }); await reload() }}>↻</button>
                 )}
-                {item.status !== 'PROCESSING' && (
-                  <button className="btn ghost invoice-batch-item__discard" title="PDF verwerfen" aria-label={`${item.fileName} verwerfen`} onClick={async () => { await window.api.ai.invoiceBatch.discard({ id: item.id }); await reload() }}>×</button>
-                )}
+                <button
+                  className={`btn ghost invoice-batch-item__discard${item.status === 'PROCESSING' ? ' invoice-batch-item__discard--processing' : ''}`}
+                  title={item.status === 'PROCESSING' ? 'KI-Auswertung abbrechen und PDF verwerfen' : 'PDF verwerfen'}
+                  aria-label={`${item.fileName} ${item.status === 'PROCESSING' ? 'KI-Auswertung abbrechen und verwerfen' : 'verwerfen'}`}
+                  onClick={async () => { await window.api.ai.invoiceBatch.discard({ id: item.id }); await reload() }}
+                >
+                  ×
+                </button>
               </article>
             ))}
             {!rows.length && <div className="invoice-batch-flyout__empty">Lege PDFs im Submit-Ordner ab oder wähle sie hier aus.</div>}

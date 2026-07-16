@@ -850,17 +850,33 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     if (!isTrustedRenderer) throw new Error('Nicht erlaubter KI-Aufruf.')
 
     const parsed = AiInvoiceExtractInput.parse(payload)
-    const [{ analyzeInvoiceDocument }, { buildAiInvoiceContext }] = await Promise.all([
+    const [{ analyzeInvoiceDocument }, { buildAiInvoiceContext }, { extractWithDocling, getDoclingStatus }] = await Promise.all([
       loadAiService(),
-      loadAiContextService()
+      loadAiContextService(),
+      import('../services/docling')
     ])
+    let localDocumentText = ''
+    try {
+      if ((await getDoclingStatus()).enabled) {
+        localDocumentText = (await extractWithDocling({
+          fileName: parsed.file.fileName,
+          mimeType: parsed.file.mimeType,
+          dataBase64: filePayloadToBase64(parsed.file)
+        })).text
+      }
+    } catch (error) {
+      // Docling is supplementary. The normal document/OCR path can still
+      // analyze the invoice when a local extraction fails.
+      console.warn('[Invoice] Optionale Docling-Vorverarbeitung fehlgeschlagen:', error)
+    }
     const analyzed = await analyzeInvoiceDocument({
       file: {
         fileName: parsed.file.fileName,
         mimeType: parsed.file.mimeType,
         dataBase64: filePayloadToBase64(parsed.file)
       },
-      context: buildAiInvoiceContext()
+      context: buildAiInvoiceContext(),
+      localDocumentText
     })
     return AiInvoiceExtractOutput.parse(analyzed)
   })

@@ -25,6 +25,7 @@ const POLL_MS = 4000
 let timer: NodeJS.Timeout | null = null
 let processing = false
 let scanPromise: Promise<{ added: number; duplicates: Array<{ fileName: string; voucherNo?: string | null }> }> | null = null
+const cancelledJobIds = new Set<number>()
 const savedFileHashCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>()
 const DUPLICATE_ERROR_PREFIX = 'INVOICE_DUPLICATE:'
 const DUPLICATE_OVERRIDE_ERROR = 'INVOICE_DUPLICATE_OVERRIDE'
@@ -254,6 +255,7 @@ export async function processInvoiceBatchQueue() {
       setAiJobStatus(next.id, 'PROCESSING')
       notifyQueueChanged()
       try {
+        if (cancelledJobIds.has(next.id)) continue
         const job = getAiJob(next.id)
         const file = job.files[0]
         if (!file?.dataBase64) throw new Error('PDF-Daten fehlen.')
@@ -267,6 +269,7 @@ export async function processInvoiceBatchQueue() {
             dataBase64: file.dataBase64
           })
           const fields = extractLocalInvoiceFields(local.text)
+          if (cancelledJobIds.has(next.id)) continue
           const amount = (value: string) => {
             const parsed = value.trim() ? Number(value) : Number.NaN
             return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
@@ -306,6 +309,7 @@ export async function processInvoiceBatchQueue() {
             mimeType: file.mimeType || 'application/pdf',
             dataBase64: file.dataBase64
           })
+          if (cancelledJobIds.has(next.id)) continue
           if (packet.groups.length > 1) {
             const originalName = path.basename(source.path)
             let duplicateCount = 0
@@ -364,6 +368,9 @@ export async function processInvoiceBatchQueue() {
           context: buildAiInvoiceContext(),
           localDocumentText
         })
+        // Discarding a processing item cannot necessarily abort the provider
+        // request, but it must guarantee that a late response is never saved.
+        if (cancelledJobIds.has(next.id)) continue
         if (source.segment) {
           const groupingWarnings = [...source.segment.warnings]
           if (source.segment.confidence < 0.75) {
@@ -374,7 +381,10 @@ export async function processInvoiceBatchQueue() {
         saveAiJobResult(job.id, 'BOOKING_CANDIDATE', analyzed.result)
         setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
       } catch (error: any) {
+        if (cancelledJobIds.has(next.id)) continue
         setAiJobStatus(next.id, 'FAILED', { error: error?.message || String(error) })
+      } finally {
+        cancelledJobIds.delete(next.id)
       }
       notifyQueueChanged()
     }
@@ -487,6 +497,7 @@ export async function approveInvoiceBatchItem(id: number, voucherId: number) {
 export async function discardInvoiceBatchItem(id: number) {
   const job = getAiJob(id)
   if (job.type !== 'BOOKING_FROM_DOCUMENTS' || !job.prompt?.startsWith('invoice-batch:')) throw new Error('Batch-Rechnung nicht gefunden.')
+  if (job.status === 'PROCESSING') cancelledJobIds.add(id)
   await removeSourceFile(job)
   deleteAiJob(id)
   notifyQueueChanged()

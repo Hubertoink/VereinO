@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.8] - 2026-07-16
+
+### Geändert
+
+- KI-Rechnungserfassung: Die direkte KI-Auslesung verwendet bei aktivem Docling nun denselben lokalen Dokumenttext als zusätzliche Evidenz wie der Rechnungsbatch.
+
+### Behoben
+
+- KI-Rechnungsbatch: Laufende Auswertungen können über das beim Darüberfahren sichtbare × verworfen werden; verspätete KI-Ergebnisse werden danach nicht gespeichert.
+
 ## [2.9.7] - 2026-07-14
 
 ### Hinzugefügt

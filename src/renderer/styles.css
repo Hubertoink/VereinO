@@ -6325,6 +6325,9 @@ textarea:focus {
 .invoice-batch-item__manual-run { width: 30px; height: 30px; padding: 0; color: color-mix(in oklab, #b475ff 75%, white); }
 .invoice-batch-item__manual-run svg { width: 17px; height: 17px; }
 .invoice-batch-item__discard { width: 28px; height: 28px; padding: 0; opacity: .62; }
+.invoice-batch-item__discard--processing { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.invoice-batch-item:hover .invoice-batch-item__discard--processing,
+.invoice-batch-item:focus-within .invoice-batch-item__discard--processing { opacity: .8; pointer-events: auto; }
 .invoice-batch-flyout__empty { padding: 22px 15px; text-align: center; color: var(--text-dim); font-size: 13px; line-height: 1.45; }
 .invoice-batch-flyout footer { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
 .invoice-batch-flyout footer .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
