@@ -23,6 +23,8 @@ import type {
   TAiJobsUpdateCandidateInput,
   TAiInvoiceExtractInput,
   TAiInvoiceExtractOutput,
+  TAiInvoiceDuplicateCheckInput,
+  TAiInvoiceDuplicateCheckOutput,
   TAiInvoiceBatchApproveInput,
   TAiInvoiceBatchGetOutput,
   TAiInvoiceBatchImportInput,
@@ -49,6 +51,7 @@ export interface AiApi {
     }
     invoice: {
       extract: (payload: TAiInvoiceExtractInput) => Promise<TAiInvoiceExtractOutput>
+      checkDuplicate: (payload: TAiInvoiceDuplicateCheckInput) => Promise<TAiInvoiceDuplicateCheckOutput>
     }
     invoiceBatch: {
       list: () => Promise<TAiInvoiceBatchListOutput>

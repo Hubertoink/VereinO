@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [2.9.9] - 2026-07-18
+
+### Hinzugefügt
+
+- Mitglieder: Die Empfänger eines Einladungs-Batches können vor dem Versand in einer eigenen Liste geprüft werden.
+- Rechnungserfassung: Einzelrechnungen werden wie Batch-PDFs anhand des gespeicherten Belegs auf mögliche Duplikate geprüft.
+
+### Geändert
+
+- Buchungserfassung: Das Kompakt-Flyout ist für neue Profile die Standarddarstellung; vorhandene Einstellungen bleiben erhalten.
+- Buchungs-Flyout: Budget- und Zweckbindungszeilen verwenden einheitliche Feldhöhen, und bei Nettobeträgen steht die USt-Auswahl in derselben Zeile.
+- Rechnungserfassung: Tag-Badges und Tag-Vorschläge sind kompakter dargestellt.
+- Bankimport: „Ohne Buchung erledigen“ verwendet einen eigenen Bestätigungsdialog mit optionalem Prüfhinweis.
+
 ## [2.9.8] - 2026-07-16
 
 ### Geändert

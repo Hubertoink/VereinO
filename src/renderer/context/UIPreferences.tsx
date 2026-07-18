@@ -306,7 +306,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [bookingEntryPresentation, setBookingEntryPresentation] = useState<BookingEntryPresentation>(() => {
     const stored = localStorage.getItem('ui.bookingEntryPresentation')
     if (stored === 'modal' || stored === 'flyout' || stored === 'detached') return stored
-    return localStorage.getItem('ui.bookingsOpenDetached') === 'true' ? 'detached' : 'modal'
+    return localStorage.getItem('ui.bookingsOpenDetached') === 'true' ? 'detached' : 'flyout'
   })
 
   const [allowVoucherDeletion, setAllowVoucherDeletion] = useState<boolean>(() => {

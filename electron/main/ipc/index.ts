@@ -1,7 +1,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataChange'
 import type { DashboardSnapshotInput } from '../../../shared/dashboard'
-import { filePayloadToBase64 } from '../services/filePayload'
+import { filePayloadToBase64, filePayloadToBuffer } from '../services/filePayload'
 import {
   clearDashboardSnapshotCache,
   getDashboardSnapshot
@@ -196,6 +196,8 @@ import {
   AiBankImportReviewInput,
   AiBankImportReviewOutput,
   AiBookingAnalysisResult,
+  AiInvoiceDuplicateCheckInput,
+  AiInvoiceDuplicateCheckOutput,
   AiInvoiceExtractInput,
   AiInvoiceExtractOutput,
   AiInvoiceBatchActionOutput,
@@ -879,6 +881,24 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       localDocumentText
     })
     return AiInvoiceExtractOutput.parse(analyzed)
+  })
+  ipcMain.handle('ai.invoice.checkDuplicate', async (event, payload) => {
+    const senderFrame = event.senderFrame
+    const senderUrl = senderFrame?.url || ''
+    const isTrustedRenderer =
+      senderFrame === event.sender.mainFrame &&
+      (senderUrl.startsWith('file:') ||
+        /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(senderUrl))
+    if (!isTrustedRenderer) throw new Error('Nicht erlaubter KI-Aufruf.')
+
+    const parsed = AiInvoiceDuplicateCheckInput.parse(payload)
+    const { findSavedVoucherDuplicate } = await import('../services/invoiceBatchQueue')
+    const duplicate = await findSavedVoucherDuplicate(filePayloadToBuffer(parsed.file))
+    return AiInvoiceDuplicateCheckOutput.parse({
+      isDuplicate: !!duplicate,
+      duplicateVoucherId: duplicate?.voucherId ?? null,
+      duplicateVoucherNo: duplicate?.voucherNo ?? null
+    })
   })
   ipcMain.handle('ai.invoiceBatch.list', async () => {
     const { listInvoiceBatchItems, scanInvoiceSubmitDirectory } = await import('../services/invoiceBatchQueue')

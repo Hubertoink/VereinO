@@ -516,7 +516,7 @@ export default function CompactBookingFlyout({
 
             <label className="compact-booking-field compact-booking-field--amount">
               <span>Betrag *</span>
-              <span className="compact-booking-amount-control">
+              <span className={`compact-booking-amount-control${qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' ? ' compact-booking-amount-control--with-vat' : ''}`}>
                 {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && (
                   <select className="input" value={qa.mode ?? 'GROSS'} onChange={(event) => {
                     const mode = event.target.value as 'NET' | 'GROSS'
@@ -543,17 +543,13 @@ export default function CompactBookingFlyout({
                   }} aria-label={(qa.type === 'TRANSFER' || qa.type === 'INTERNAL' || qa.mode === 'GROSS') ? 'Brutto-Betrag' : 'Netto-Betrag'} />
                   <span className="adorn-suffix">€</span>
                 </span>
+                {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' && (
+                  <select className="input compact-booking-vat-select" value={String(qa.vatRate)} onChange={(event) => patchQa({ vatRate: Number(event.target.value) })} aria-label="Umsatzsteuer Prozentsatz" title="Umsatzsteuer">
+                    <option value="0">0 % USt</option><option value="7">7 % USt</option><option value="19">19 % USt</option>
+                  </select>
+                )}
               </span>
             </label>
-
-            {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' && (
-              <label className="compact-booking-field">
-                <span>USt</span>
-                <select className="input" value={String(qa.vatRate)} onChange={(event) => patchQa({ vatRate: Number(event.target.value) })} aria-label="Umsatzsteuer Prozentsatz">
-                  <option value="0">0 %</option><option value="7">7 %</option><option value="19">19 %</option>
-                </select>
-              </label>
-            )}
           </div>
 
           <label className="compact-booking-field compact-booking-field--description">

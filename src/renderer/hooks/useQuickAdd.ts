@@ -120,7 +120,7 @@ export function useQuickAdd(
     notify?: (type: 'success' | 'error' | 'info', text: string) => void,
     draftTabsEnabled: boolean = true,
     afterSaveDefault: QuickAddAfterSave = 'close',
-    bookingEntryPresentation: BookingEntryPresentation = 'modal'
+    bookingEntryPresentation: BookingEntryPresentation = 'flyout'
 ) {
     const [quickAdd, setQuickAdd] = useState(false)
     const [drafts, setDrafts] = useState<QuickAddDraft[]>([])

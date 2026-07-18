@@ -135,7 +135,8 @@ const rendererApi = {
       testConnection: () => cleanInvoke('ai.settings.testConnection')
     },
     invoice: {
-      extract: (payload) => cleanInvoke('ai.invoice.extract', payload)
+      extract: (payload) => cleanInvoke('ai.invoice.extract', payload),
+      checkDuplicate: (payload) => cleanInvoke('ai.invoice.checkDuplicate', payload)
     },
     invoiceBatch: {
       list: () => invoke('ai.invoiceBatch.list'),

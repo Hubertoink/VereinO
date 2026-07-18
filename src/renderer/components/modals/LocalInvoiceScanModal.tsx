@@ -20,6 +20,7 @@ type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf')
 type OptionalSection = 'budgets' | 'earmarks' | 'tags' | 'comment'
 type BudgetAssignment = NonNullable<QA['budgets']>[number]
 type EarmarkAssignment = NonNullable<QA['earmarksAssigned']>[number]
+type InvoiceDuplicate = { voucherId: number; voucherNo: string | null }
 
 type BudgetOption = {
   id: number
@@ -293,6 +294,8 @@ export default function LocalInvoiceScanModal({
   const [imageUrl, setImageUrl] = useState('')
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle')
   const [analysisMessage, setAnalysisMessage] = useState('')
+  const [duplicate, setDuplicate] = useState<InvoiceDuplicate | null>(null)
+  const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false)
   const [rawText, setRawText] = useState('')
   const [fields, setFields] = useState<LocalInvoiceFields>(EMPTY_LOCAL_INVOICE_FIELDS)
   const [pdfPage, setPdfPage] = useState(1)
@@ -488,6 +491,8 @@ export default function LocalInvoiceScanModal({
     setPreviewKind('none')
     setAnalysisState('idle')
     setAnalysisMessage('')
+    setDuplicate(null)
+    setDuplicateCheckInProgress(false)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setPdfPage(1)
@@ -530,6 +535,23 @@ export default function LocalInvoiceScanModal({
     setPickerText('')
     setAnalysisState('analyzing')
     setAnalysisMessage('Dokument wird gelesen …')
+    setDuplicate(null)
+    setDuplicateCheckInProgress(true)
+    void window.api.ai.invoice.checkDuplicate({
+      file: {
+        fileName: nextFile.name,
+        mimeType,
+        dataBytes: new Uint8Array(await nextFile.arrayBuffer())
+      }
+    }).then((result) => {
+      if (requestRef.current !== requestId || !result.isDuplicate || !result.duplicateVoucherId) return
+      setDuplicate({ voucherId: result.duplicateVoucherId, voucherNo: result.duplicateVoucherNo })
+      notify('warn', `Mögliches Duplikat${result.duplicateVoucherNo ? ` von ${result.duplicateVoucherNo}` : ''} erkannt.`)
+    }).catch(() => {
+      // Die Rechnungserfassung bleibt verfügbar, falls die optionale Prüfung nicht möglich ist.
+    }).finally(() => {
+      if (requestRef.current === requestId) setDuplicateCheckInProgress(false)
+    })
     if (restored) {
       setFields(restored.fields)
       setBudgets(restored.budgets)
@@ -795,6 +817,7 @@ export default function LocalInvoiceScanModal({
 
   const createInvoice = async () => {
     if (!file) return
+    if (duplicateCheckInProgress) return
     const created = await onCreateInvoice({
       file,
       fields,
@@ -1014,6 +1037,14 @@ export default function LocalInvoiceScanModal({
                   <span className="local-invoice-scan__status-dot" aria-hidden="true" />
                   <span>{analysisMessage}</span>
                 </div>
+                {duplicate && (
+                  <div className="local-invoice-scan__duplicate-warning" role="alert">
+                    <div>
+                      <strong>Mögliches Duplikat{duplicate.voucherNo ? ` von ${duplicate.voucherNo}` : ''}</strong>
+                      <span>Dieser Beleg ist bereits an einer Buchung gespeichert.</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="local-invoice-scan__fields">
                   <Field
@@ -1375,7 +1406,7 @@ export default function LocalInvoiceScanModal({
         <footer className="local-invoice-scan__footer">
           <div className="local-invoice-scan__footer-actions">
             {file && (
-              <button type="button" className="btn primary" onClick={() => void createInvoice()}>
+              <button type="button" className="btn primary" onClick={() => void createInvoice()} disabled={duplicateCheckInProgress}>
                 {submitLabel}
               </button>
             )}

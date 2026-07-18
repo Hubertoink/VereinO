@@ -57,14 +57,13 @@ async function hashSavedFile(filePath: string) {
   return sha256
 }
 
-async function findSavedVoucherDuplicate(data: Buffer, dataSha256?: string): Promise<InvoiceDuplicate | null> {
+export async function findSavedVoucherDuplicate(data: Buffer, dataSha256?: string): Promise<InvoiceDuplicate | null> {
   const sha256 = dataSha256 || await sha256Buffer(data)
   const rows = getDb().prepare(`
     SELECT vf.file_path as filePath, vf.voucher_id as voucherId, v.voucher_no as voucherNo
     FROM voucher_files vf
     JOIN vouchers v ON v.id = vf.voucher_id
     WHERE vf.size = ?
-      AND (LOWER(vf.file_name) LIKE '%.pdf' OR LOWER(IFNULL(vf.mime_type, '')) = 'application/pdf')
     ORDER BY vf.id DESC
   `).all(data.length) as Array<{ filePath: string; voucherId: number; voucherNo?: string | null }>
   for (const row of rows) {

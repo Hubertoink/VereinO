@@ -1117,11 +1117,102 @@ function BankImportModal({
   )
 }
 
+function BankCheckModal({
+  transaction,
+  notify,
+  onClose,
+  onChecked
+}: {
+  transaction: BankTransaction
+  notify: Props['notify']
+  onClose: () => void
+  onChecked: () => void
+}) {
+  const [checkedNote, setCheckedNote] = useState(transaction.checkedNote || '')
+  const [busy, setBusy] = useState(false)
+
+  const check = async () => {
+    setBusy(true)
+    try {
+      await window.api.bankTransactions.check({ id: transaction.id, note: checkedNote || null })
+      notify('success', 'Bankbeleg wurde als geprüft abgeschlossen.')
+      onChecked()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return createPortal(
+    <div
+      className="modal-overlay bank-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="bank-check-modal-title"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <div className="modal bank-check-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2 id="bank-check-modal-title">Ohne Buchung erledigen</h2>
+            <p>Bankbeleg #{transaction.id}</p>
+          </div>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
+            ×
+          </button>
+        </header>
+
+        <section className="bank-check-modal__content">
+          <p>
+            Die Bewegung wird als geprüft abgeschlossen, ohne eine Buchung anzulegen oder zuzuordnen.
+          </p>
+          <dl>
+            <div>
+              <dt>Datum</dt>
+              <dd>{formatDate(transaction.bookingDate)}</dd>
+            </div>
+            <div>
+              <dt>Summe</dt>
+              <dd>{euro.format(transaction.amount)}</dd>
+            </div>
+            <div>
+              <dt>Gegenpartei</dt>
+              <dd>{transaction.counterparty || '–'}</dd>
+            </div>
+          </dl>
+          <label className="field">
+            <span>Prüfhinweis <small>(optional)</small></span>
+            <textarea
+              className="input booking-note-textarea"
+              value={checkedNote}
+              onChange={(event) => setCheckedNote(event.target.value)}
+              placeholder="Warum wird der Bankbeleg ohne Buchung erledigt?"
+            />
+          </label>
+        </section>
+
+        <footer className="bank-modal-footer">
+          <button className="btn" onClick={onClose} disabled={busy}>
+            Abbrechen
+          </button>
+          <button className="btn primary" disabled={busy} onClick={() => void check()}>
+            {busy ? 'Markiere …' : 'Als geprüft markieren'}
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function BankReviewModal({
   transaction,
   onClose,
   onChanged,
   onCreateBooking,
+  onCheckWithoutBooking,
   onOpenVoucher,
   notify
 }: {
@@ -1129,16 +1220,15 @@ function BankReviewModal({
   onClose: () => void
   onChanged: () => void
   onCreateBooking: Props['onCreateBooking']
+  onCheckWithoutBooking: (transaction: BankTransaction) => void
   onOpenVoucher: Props['onOpenVoucher']
   notify: Props['notify']
 }) {
   const [matches, setMatches] = useState<BankTransactionMatch[]>([])
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
   const [includeAllDates, setIncludeAllDates] = useState(false)
-  const [checkedNote, setCheckedNote] = useState(transaction.checkedNote || '')
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
-  const [showCheckForm, setShowCheckForm] = useState(false)
   const [showManualAssign, setShowManualAssign] = useState(false)
   const actionMenuRef = React.useRef<HTMLDivElement | null>(null)
 
@@ -1176,20 +1266,6 @@ function BankReviewModal({
     try {
       await window.api.bankTransactions.link({ id: transaction.id, voucherId })
       notify('success', 'Bankbeleg wurde der Buchung zugeordnet.')
-      onChanged()
-      onClose()
-    } catch (reason: any) {
-      notify('error', reason?.message || String(reason))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const check = async () => {
-    setBusy(true)
-    try {
-      await window.api.bankTransactions.check({ id: transaction.id, note: checkedNote || null })
-      notify('success', 'Bankbeleg wurde als geprüft abgeschlossen.')
       onChanged()
       onClose()
     } catch (reason: any) {
@@ -1263,7 +1339,8 @@ function BankReviewModal({
                         className="btn"
                         onClick={() => {
                           setActionMenuOpen(false)
-                          setShowCheckForm(true)
+                          onCheckWithoutBooking(transaction)
+                          onClose()
                         }}
                       >
                         Ohne Buchung erledigen
@@ -1390,29 +1467,6 @@ function BankReviewModal({
                 )}
               </div>
             </section>
-
-            {showCheckForm && (
-              <section className="bank-check-panel">
-                <div>
-                  <strong>Ohne Buchung erledigen</strong>
-                  <span>Nicht buchungsrelevante oder bereits extern geprüfte Bewegung.</span>
-                </div>
-                <div className="bank-check-panel__controls">
-                  <textarea
-                    className="input booking-note-textarea"
-                    value={checkedNote}
-                    onChange={(event) => setCheckedNote(event.target.value)}
-                    placeholder="Optionaler Prüfhinweis …"
-                  />
-                  <button className="btn" onClick={() => setShowCheckForm(false)}>
-                    Abbrechen
-                  </button>
-                  <button className="btn primary" disabled={busy} onClick={() => void check()}>
-                    Als geprüft markieren
-                  </button>
-                </div>
-              </section>
-            )}
           </div>
         ) : (
           <section className="bank-resolution-card">
@@ -1489,6 +1543,7 @@ export default function BankImportView({
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(false)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
+  const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const limit = 50
 
@@ -1809,7 +1864,19 @@ export default function BankImportView({
             void load()
           }}
           onCreateBooking={onCreateBooking}
+          onCheckWithoutBooking={setCheckTransaction}
           onOpenVoucher={onOpenVoucher}
+        />
+      )}
+      {checkTransaction && (
+        <BankCheckModal
+          transaction={checkTransaction}
+          notify={notify}
+          onClose={() => setCheckTransaction(null)}
+          onChecked={() => {
+            dispatchDataChanged(['bank-imports', 'vouchers'])
+            void load()
+          }}
         />
       )}
     </div>

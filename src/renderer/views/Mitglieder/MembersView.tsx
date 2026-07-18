@@ -52,10 +52,12 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     const [showExport, setShowExport] = useState(false)
     const [inviteBusy, setInviteBusy] = useState(false)
     const [inviteEmails, setInviteEmails] = useState<string[]>([])
+    const [inviteRecipientNames, setInviteRecipientNames] = useState<Record<string, string>>({})
     const inviteSubjectRef = useRef<HTMLInputElement | null>(null)
     const [inviteFeedback, setInviteFeedback] = useState<null | { type: 'info' | 'success' | 'error'; text: string }>(null)
     const [inviteStats, setInviteStats] = useState<{ candidates: number; withoutEmail: number }>({ candidates: 0, withoutEmail: 0 })
     const [inviteBatchIndex, setInviteBatchIndex] = useState(0)
+    const [showInviteRecipients, setShowInviteRecipients] = useState(false)
     const [inviteSubject, setInviteSubject] = useState<string>(() => { try { return localStorage.getItem('invite.subject') || 'Einladung zur Sitzung' } catch { return 'Einladung zur Sitzung' } })
     const [inviteBody, setInviteBody] = useState<string>(() => { try { return localStorage.getItem('invite.body') || 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } catch { return 'Hallo zusammen,\n\nwir laden euch zur Sitzung ein.\n\nViele Grüße' } })
     const [inviteActiveOnly, setInviteActiveOnly] = useState<boolean>(() => { try { return localStorage.getItem('invite.activeOnly') === '1' } catch { return false } })
@@ -298,6 +300,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 const pageSize = 200
                 let ofs = 0
                 let emails: string[] = []
+                const recipientNames: Record<string, string> = {}
                 let totalCount = 0
                 let candidateCount = 0
                 let withoutEmailCount = 0
@@ -309,7 +312,13 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     candidateCount += rows.length
                     rows.forEach((r: any) => {
                         const email = String(r.email || '').trim()
-                        if (!!email && /@/.test(email)) emails.push(email)
+                        if (!!email && /@/.test(email)) {
+                            emails.push(email)
+                            const key = email.toLowerCase()
+                            if (!recipientNames[key] && String(r.name || '').trim()) {
+                                recipientNames[key] = String(r.name).trim()
+                            }
+                        }
                         else withoutEmailCount += 1
                     })
                     ofs += pageSize
@@ -318,11 +327,13 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 const unique = emails.filter(e => { const k = e.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
                 if (alive) {
                     setInviteEmails(unique)
+                    setInviteRecipientNames(recipientNames)
                     setInviteStats({ candidates: candidateCount, withoutEmail: withoutEmailCount })
                 }
             } catch {
                 if (alive) {
                     setInviteEmails([])
+                    setInviteRecipientNames({})
                     setInviteStats({ candidates: 0, withoutEmail: 0 })
                 }
             }
@@ -330,6 +341,10 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         })()
         return () => { alive = false }
     }, [showInvite, q, status, inviteActiveOnly])
+
+    useEffect(() => {
+        if (!showInvite) setShowInviteRecipients(false)
+    }, [showInvite])
 
     const inviteEmailBatches = useMemo(() => {
         if (!inviteEmails.length) return [] as string[][]
@@ -354,7 +369,8 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         function onKeydown(e: KeyboardEvent) {
             if (e.key === 'Escape') {
                 e.preventDefault()
-                setShowInvite(false)
+                if (showInviteRecipients) setShowInviteRecipients(false)
+                else setShowInvite(false)
             }
         }
         window.addEventListener('keydown', onKeydown)
@@ -362,7 +378,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             window.clearTimeout(timer)
             window.removeEventListener('keydown', onKeydown)
         }
-    }, [showInvite])
+    }, [showInvite, showInviteRecipients])
 
     const copyInviteBcc = useCallback(async (emails: string[]) => {
         if (!emails.length) {
@@ -836,12 +852,21 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     <label htmlFor="member-invite-subject">Betreff</label>
                                     <input id="member-invite-subject" ref={inviteSubjectRef} className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
                                 </div>
-                                <div className="field">
-                                    <label>Empfänger im Batch (BCC)</label>
-                                    <div className="invite-batch-count-display" aria-live="polite">
+                                <div className="field standard-floating-field standard-floating-field--filled invite-batch-field">
+                                    <label htmlFor="member-invite-batch">Empfänger im Batch (BCC)</label>
+                                    <button
+                                        id="member-invite-batch"
+                                        type="button"
+                                        className="invite-batch-count-display invite-batch-count-button"
+                                        onClick={() => setShowInviteRecipients(true)}
+                                        disabled={!inviteCurrentBatch.length}
+                                        aria-haspopup="dialog"
+                                        aria-label={`${inviteCurrentBatch.length || 0} Empfänger im aktuellen Batch anzeigen`}
+                                        title="Empfänger im aktuellen Batch anzeigen"
+                                    >
                                         <strong>{inviteCurrentBatch.length || 0}</strong>
                                         <span>automatisch aus aktueller Auswahl</span>
-                                    </div>
+                                    </button>
                                 </div>
                                 <div className={`field invite-grid-span standard-floating-field${inviteBody.trim() ? ' standard-floating-field--filled' : ''}`}>
                                     <label htmlFor="member-invite-message">Nachricht</label>
@@ -873,6 +898,55 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         </div>
                     </div>
                 </div>
+            )}
+            {showInvite && showInviteRecipients && createPortal(
+                <div
+                    className="modal-overlay invite-recipient-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="invite-recipient-modal-title"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (e.target === e.currentTarget) setShowInviteRecipients(false)
+                    }}
+                >
+                    <div className="modal invite-recipient-modal" onClick={(e) => e.stopPropagation()}>
+                        <header className="invite-modal-header">
+                            <div>
+                                <h3 id="invite-recipient-modal-title">Empfänger im Batch</h3>
+                                <div className="helper">{inviteCurrentBatch.length} E-Mail-Adresse{inviteCurrentBatch.length === 1 ? '' : 'n'}</div>
+                            </div>
+                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setShowInviteRecipients(false)} aria-label="Schließen">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                            </button>
+                        </header>
+                        <div className="invite-recipient-modal__content">
+                            <table className="invite-recipient-table">
+                                <thead>
+                                    <tr><th>#</th><th>E-Mail-Adresse</th></tr>
+                                </thead>
+                                <tbody>
+                                    {inviteCurrentBatch.map((email, index) => (
+                                        <tr key={email.toLowerCase()}>
+                                            <td>{index + 1}</td>
+                                            <td>
+                                                {email}
+                                                {inviteRecipientNames[email.toLowerCase()] && (
+                                                    <span className="invite-recipient-name"> ({inviteRecipientNames[email.toLowerCase()]})</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <footer className="invite-modal-footer">
+                            <span className="helper">Diese Adressen werden im BCC-Feld verwendet.</span>
+                            <button className="btn primary" onClick={() => setShowInviteRecipients(false)}>Fertig</button>
+                        </footer>
+                    </div>
+                </div>,
+                document.body
             )}
             {showPayments && (
                 <PaymentsAssignModal onClose={() => setShowPayments(false)} />

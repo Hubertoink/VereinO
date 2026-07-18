@@ -4855,16 +4855,37 @@ body.detached-quick-add-body #root {
 .invite-grid-span {
   grid-column: 1 / span 2;
 }
+.invite-batch-field {
+  --standard-floating-label-notch: 158px;
+}
 .invite-batch-count-display {
-  height: 38px;
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in oklab, var(--muted) 35%, transparent);
-  padding: 0 10px;
+  padding: 17px 10px 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  color: var(--text);
+  text-align: left;
+}
+.invite-batch-count-button {
+  cursor: pointer;
+}
+.invite-batch-count-button:hover:not(:disabled),
+.invite-batch-count-button:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 11%, var(--surface));
+  outline: none;
+}
+.invite-batch-count-button:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 .invite-batch-count-display strong {
   font-size: 1rem;
@@ -4923,6 +4944,50 @@ body.detached-quick-add-body #root {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.invite-recipient-overlay {
+  z-index: 5100;
+}
+.invite-recipient-modal {
+  width: min(620px, 94vw);
+  max-height: min(620px, 88vh);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: auto;
+}
+.invite-recipient-modal__content {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.invite-recipient-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.invite-recipient-table th,
+.invite-recipient-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.invite-recipient-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+.invite-recipient-table td:first-child,
+.invite-recipient-table th:first-child {
+  width: 42px;
+  color: var(--text-dim);
+}
+.invite-recipient-table tr:last-child td {
+  border-bottom: 0;
+}
+.invite-recipient-name {
+  color: var(--text-dim);
 }
 @media (max-width: 920px) {
   .invite-grid {
@@ -6522,8 +6587,10 @@ textarea:focus {
 }
 .compact-booking-field--amount { grid-column: 1 / -1; }
 .compact-booking-amount-control { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 7px; }
+.compact-booking-amount-control--with-vat { grid-template-columns: 112px minmax(0, 1fr) 96px; }
 .compact-booking-amount-control > .adorn-wrap { width: 100%; }
 .compact-booking-amount-control > .adorn-wrap > .input { min-height: 36px; max-height: 36px; }
+.compact-booking-vat-select { min-width: 0; }
 .compact-booking-flyout input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
 .compact-booking-flyout input[type='number']::-webkit-outer-spin-button,
 .compact-booking-flyout input[type='number']::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
@@ -6576,7 +6643,13 @@ textarea:focus {
 .compact-booking-section-title button:hover,
 .compact-booking-remove-row:hover { color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); }
 .compact-booking-assignment-row { display: grid; grid-template-columns: minmax(0, 1fr) 122px 26px; align-items: center; gap: 6px; }
-.compact-booking-assignment-row .input { height: 34px; min-width: 0; font-size: 11px; }
+.compact-booking-assignment-row > select,
+.compact-booking-assignment-row .input {
+  box-sizing: border-box;
+  height: 36px;
+  min-width: 0;
+  font-size: 11px;
+}
 .compact-booking-add-row {
   justify-self: start;
   padding: 5px 8px;
@@ -6995,6 +7068,26 @@ textarea:focus {
 .local-invoice-scan__status.is-error .local-invoice-scan__status-dot {
   background: var(--danger);
 }
+
+.local-invoice-scan__duplicate-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in oklab, var(--danger) 38%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--danger) 9%, var(--surface));
+}
+
+.local-invoice-scan__duplicate-warning > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.local-invoice-scan__duplicate-warning strong { color: var(--danger); font-size: 12px; }
+.local-invoice-scan__duplicate-warning span { color: var(--text-dim); font-size: 11px; }
 
 @keyframes localInvoicePulse {
   50% {
@@ -7518,9 +7611,35 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   box-sizing: border-box;
 }
 
+.local-invoice-scan__tags .tags-editor-input {
+  min-height: 32px;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.local-invoice-scan__tags .tags-editor-input .chip {
+  min-height: 20px;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.local-invoice-scan__tags .tags-editor-input .chip .chip-x { font-size: 11px; }
+.local-invoice-scan__tags .tags-editor-text-input { min-height: 20px; font-size: 11px; }
+
 .local-invoice-scan__tags .tags-suggestions {
-  max-height: 104px;
+  max-height: 96px;
+  margin-top: 4px;
+  padding: 4px;
+  gap: 4px;
   overflow-y: auto;
+}
+
+.local-invoice-scan__tags .tag-suggestion-btn {
+  min-height: 24px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.1;
 }
 
 .local-invoice-scan__comment {
@@ -14958,7 +15077,8 @@ button.filter-totals-stat {
 .bank-import-modal,
 .bank-review-modal,
 .bank-import-result-modal,
-.bank-manual-assign-modal {
+.bank-manual-assign-modal,
+.bank-check-modal {
   width: min(1080px, 96vw);
   max-height: 92vh;
   overflow: auto;
@@ -14973,6 +15093,10 @@ button.filter-totals-stat {
 
 .bank-manual-assign-modal {
   width: min(920px, 94vw);
+}
+
+.bank-check-modal {
+  width: min(600px, 94vw);
 }
 
 .bank-import-result-modal {
@@ -15327,11 +15451,9 @@ button.filter-totals-stat {
   background: color-mix(in oklab, var(--accent) 14%, var(--surface));
 }
 
-.bank-check-panel {
+.bank-check-modal__content {
   display: grid;
-  grid-template-columns: minmax(190px, 0.5fr) minmax(0, 1.5fr);
   gap: 14px;
-  align-items: center;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -15339,24 +15461,34 @@ button.filter-totals-stat {
   color: var(--text);
 }
 
-.bank-check-panel > div:first-child {
-  display: grid;
-  gap: 4px;
+.bank-check-modal__content > p {
+  margin: 0;
+  color: var(--text-dim);
 }
 
-.bank-check-panel > div:first-child span {
+.bank-check-modal__content dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.bank-check-modal__content dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.bank-check-modal__content dt {
   color: var(--text-dim);
   font-size: 12px;
 }
 
-.bank-check-panel__controls {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
-  gap: 8px;
-  align-items: end;
+.bank-check-modal__content dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
-.bank-check-panel__controls textarea {
+.bank-check-modal__content textarea {
   min-height: 58px;
   max-height: 90px;
   color: var(--text);
@@ -15585,8 +15717,7 @@ button.filter-totals-stat {
   .bank-mapping-grid,
   .bank-detail-card,
   .bank-review-layout,
-  .bank-check-panel,
-  .bank-check-panel__controls,
+  .bank-check-modal__content dl,
   .bank-duplicate-compact,
   .bank-duplicate-grid,
   .bank-duplicate-record__grid {

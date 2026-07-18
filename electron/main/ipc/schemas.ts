@@ -2219,6 +2219,7 @@ export const AiUsageSchema = z.object({
 
 const AiInvoiceMimeType = z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
 const MAX_AI_INVOICE_BASE64_LENGTH = 4 * Math.ceil((10 * 1024 * 1024) / 3)
+const MAX_LOCAL_INVOICE_BASE64_LENGTH = 4 * Math.ceil((25 * 1024 * 1024) / 3)
 export const AiInvoiceExtractInput = z.object({
   file: z
     .object({
@@ -2241,6 +2242,29 @@ export const AiInvoiceExtractOutput = z.object({
   model: z.string(),
   result: AiInvoiceExtractionResult,
   usage: AiUsageSchema
+})
+export const AiInvoiceDuplicateCheckInput = z.object({
+  file: z
+    .object({
+      fileName: z.string().trim().min(1).max(255),
+      mimeType: AiInvoiceMimeType,
+      ...FileDataFields
+    })
+    .refine(hasFileData, { message: 'Dateidaten fehlen.' })
+    .refine(
+      (file) =>
+        (file.dataBytes?.byteLength ?? 0) <= 25 * 1024 * 1024 &&
+        (file.dataBase64?.length ?? 0) <= MAX_LOCAL_INVOICE_BASE64_LENGTH,
+      { message: 'Die Datei ist zu groß.' }
+    )
+    .refine((file) => !file.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(file.dataBase64), {
+      message: 'Ungültige Base64-Datei'
+    })
+})
+export const AiInvoiceDuplicateCheckOutput = z.object({
+  isDuplicate: z.boolean(),
+  duplicateVoucherId: z.number().int().positive().nullable(),
+  duplicateVoucherNo: z.string().nullable()
 })
 
 export const AiInvoiceBatchFileInput = z
@@ -2594,6 +2618,8 @@ export type TAiAgentAutoRuleUpsertInput = z.infer<typeof AiAgentAutoRuleUpsertIn
 export type TAiUsage = z.infer<typeof AiUsageSchema>
 export type TAiInvoiceExtractInput = z.infer<typeof AiInvoiceExtractInput>
 export type TAiInvoiceExtractOutput = z.infer<typeof AiInvoiceExtractOutput>
+export type TAiInvoiceDuplicateCheckInput = z.infer<typeof AiInvoiceDuplicateCheckInput>
+export type TAiInvoiceDuplicateCheckOutput = z.infer<typeof AiInvoiceDuplicateCheckOutput>
 export type TAiInvoiceBatchImportInput = z.infer<typeof AiInvoiceBatchImportInput>
 export type TAiInvoiceBatchListOutput = z.infer<typeof AiInvoiceBatchListOutput>
 export type TAiInvoiceBatchGetOutput = z.infer<typeof AiInvoiceBatchGetOutput>
