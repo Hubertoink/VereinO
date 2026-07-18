@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { addDataChangedListener } from '../../../utils/refresh'
 
 type Bucket = { month: string; gross: number }
@@ -25,6 +25,12 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const ditherId = useId().replace(/:/g, '')
+  const incomeGradientId = `monthly-income-gradient-${ditherId}`
+  const expenseGradientId = `monthly-expense-gradient-${ditherId}`
+  const incomePatternId = `monthly-income-dither-${ditherId}`
+  const expensePatternId = `monthly-expense-dither-${ditherId}`
+  const auraId = `monthly-bars-aura-${ditherId}`
 
   // Resolve date range (fallback: current year to date)
   const { from, to } = (() => {
@@ -228,13 +234,20 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   })()
 
   return (
-    <section className="card chart-card-overflow">
+    <section className="card chart-card-overflow dashboard-dither-chart">
       <header className="chart-header-baseline">
         <strong>{isDaily ? 'Tagesverlauf' : 'Monatsverlauf'} (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <span className="helper">{from} → {to}</span>
       </header>
       <div className="chart-overflow-container">
   <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Monatsverlauf">
+          <defs>
+            <linearGradient id={incomeGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--success)" stopOpacity="0.4" /><stop offset="100%" stopColor="var(--success)" stopOpacity="0.92" /></linearGradient>
+            <linearGradient id={expenseGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity="0.38" /><stop offset="100%" stopColor="var(--danger)" stopOpacity="0.88" /></linearGradient>
+            <pattern id={incomePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.65" fill="var(--success)" opacity="0.94" /><circle cx="4" cy="2.5" r="0.5" fill="var(--success)" opacity="0.6" /><circle cx="2.5" cy="5" r="0.45" fill="var(--success)" opacity="0.42" /></pattern>
+            <pattern id={expensePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M -2 6 L 6 -2 M 0 8 L 8 0 M 4 10 L 10 4" stroke="var(--danger)" strokeWidth="1.1" opacity="0.85" /></pattern>
+            <filter id={auraId} x="-50%" y="-25%" width="200%" height="150%"><feGaussianBlur stdDeviation="5" /></filter>
+          </defs>
           {/* Axes */}
           <line x1={P} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -248,12 +261,17 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           {/* Bars */}
           {labels.map((m, i) => (
             <g key={m}>
-              <rect x={xs(i, labels.length) - barW - barGap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill="var(--success)" rx={2} />
-              <rect x={xs(i, labels.length) + barGap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill="var(--danger)" rx={2} />
+              <rect x={xs(i, labels.length) - barW - barGap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill="var(--success)" opacity="0.18" filter={`url(#${auraId})`} rx={2} />
+              <rect x={xs(i, labels.length) - barW - barGap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill={`url(#${incomeGradientId})`} rx={2} />
+              <rect x={xs(i, labels.length) - barW - barGap/2} y={yBar(rowsIn[i]?.gross || 0)} width={barW} height={(rowsIn[i]?.gross||0) ? (baseY - yBar(rowsIn[i]?.gross||0)) : 0} fill={`url(#${incomePatternId})`} opacity="0.76" rx={2} />
+              <rect x={xs(i, labels.length) + barGap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill="var(--danger)" opacity="0.16" filter={`url(#${auraId})`} rx={2} />
+              <rect x={xs(i, labels.length) + barGap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill={`url(#${expenseGradientId})`} rx={2} />
+              <rect x={xs(i, labels.length) + barGap/2} y={yBar(rowsOut[i]?.gross || 0)} width={barW} height={(rowsOut[i]?.gross||0) ? (baseY - yBar(rowsOut[i]?.gross||0)) : 0} fill={`url(#${expensePatternId})`} opacity="0.8" rx={2} />
             </g>
           ))}
-          {/* Cumulative line */}
-          <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2} />
+          {/* Cumulative line: aura underlay + crisp foreground. */}
+          <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={6} opacity="0.2" filter={`url(#${auraId})`} />
+          <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
           {/* X labels */}
           {labels.map((m,i)=>{
             if (!visibleTickIndexes.has(i)) return null

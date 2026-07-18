@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Sphere, PaymentMethod } from './types'
 
 export default function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
@@ -9,6 +9,9 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [containerW, setContainerW] = useState<number>(0)
+  const ditherId = useId().replace(/:/g, '')
+  const incomeAuraId = `in-line-aura-${ditherId}`
+  const expenseAuraId = `out-line-aura-${ditherId}`
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -106,7 +109,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     return arr
   })()
   return (
-    <div className="card" style={{ marginTop: 12, padding: 12 }}>
+    <div className="card dither-chart-card" style={{ marginTop: 12, padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Linienverlauf Einnahmen (IN) vs. Ausgaben (OUT) – Brutto</strong>
         <div className="legend">
@@ -134,6 +137,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
             )
           })()}
           <svg width={width} height={height} role="img" aria-label="IN vs OUT">
+            <defs>
+              <filter id={incomeAuraId} x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
+              <filter id={expenseAuraId} x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
+            </defs>
             {/* Y-Achse Grid + Labels */}
             {yTicks.map((v, i) => (
               <g key={i}>
@@ -141,8 +148,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                 <text x={margin.left - 6} y={yFor(v) + 4} fill="var(--text-dim)" fontSize={11} fontWeight={500} textAnchor="end">{eurFmt.format(v)}</text>
               </g>
             ))}
-            <polyline fill="none" stroke="#2e7d32" strokeWidth="2" points={points(inBuckets)} />
-            <polyline fill="none" stroke="#c62828" strokeWidth="2" points={points(outBuckets)} />
+            <polyline fill="none" stroke="var(--success)" strokeWidth="6" opacity="0.22" filter={`url(#${incomeAuraId})`} points={points(inBuckets)} />
+            <polyline fill="none" stroke="var(--danger)" strokeWidth="6" opacity="0.2" filter={`url(#${expenseAuraId})`} points={points(outBuckets)} />
+            <polyline fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={points(inBuckets)} />
+            <polyline fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 5" points={points(outBuckets)} />
             {months.map((m, i) => (
               <g key={m} style={{ cursor: 'pointer' }}>
                 {(() => {
@@ -162,10 +171,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                       }} />
                   )
                 })()}
-                <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="#2e7d32">
+                <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--success)">
                   <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(inBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
                 </circle>
-                <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="#c62828">
+                <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--danger)">
                   <title>{`OUT ${monthLabel(m, true)}: ${eurFmt.format(outBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
                 </circle>
                 <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, false)}</text>

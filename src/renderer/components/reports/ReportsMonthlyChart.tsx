@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
 function monthKeys(from?: string, to?: string): string[] {
@@ -30,6 +30,12 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [containerW, setContainerW] = useState<number>(0)
+  const ditherId = useId().replace(/:/g, '')
+  const incomeGradientId = `report-income-gradient-${ditherId}`
+  const expenseGradientId = `report-expense-gradient-${ditherId}`
+  const incomePatternId = `report-income-dither-${ditherId}`
+  const expensePatternId = `report-expense-dither-${ditherId}`
+  const saldoAuraId = `report-saldo-aura-${ditherId}`
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -203,7 +209,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }
 
   return (
-    <div className="card" style={{ marginTop: 12, padding: 12 }}>
+    <div className="card dither-chart-card" style={{ marginTop: 12, padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <div className="legend">
@@ -234,6 +240,13 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             )
           })()}
           <svg ref={svgRef} width={width} height={height} role="img" aria-label="Monatsverlauf" onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)}>
+            <defs>
+              <linearGradient id={incomeGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--success)" stopOpacity="0.4" /><stop offset="100%" stopColor="var(--success)" stopOpacity="0.92" /></linearGradient>
+              <linearGradient id={expenseGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity="0.38" /><stop offset="100%" stopColor="var(--danger)" stopOpacity="0.88" /></linearGradient>
+              <pattern id={incomePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.65" fill="var(--success)" opacity="0.94" /><circle cx="4" cy="2.5" r="0.5" fill="var(--success)" opacity="0.6" /><circle cx="2.5" cy="5" r="0.45" fill="var(--success)" opacity="0.42" /></pattern>
+              <pattern id={expensePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M -2 6 L 6 -2 M 0 8 L 8 0 M 4 10 L 10 4" stroke="var(--danger)" strokeWidth="1.1" opacity="0.85" /></pattern>
+              <filter id={saldoAuraId} x="-20%" y="-30%" width="140%" height="160%"><feGaussianBlur stdDeviation="4" /></filter>
+            </defs>
             {/* Y-Achse Grid + Labels */}
             {yTicks.map((v, i) => (
               <g key={`ytick-${i}`}>
@@ -250,8 +263,10 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               const saldoMonth = s.inGross + s.outGross
               return (
                 <g key={i}>
-                  <rect x={gx} y={yIn} width={barW} height={hIn} fill="#2e7d32" rx={3} />
-                  <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill="#c62828" rx={3} />
+                  <rect x={gx} y={yIn} width={barW} height={hIn} fill={`url(#${incomeGradientId})`} rx={3} />
+                  <rect x={gx} y={yIn} width={barW} height={hIn} fill={`url(#${incomePatternId})`} opacity="0.76" rx={3} />
+                  <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill={`url(#${expenseGradientId})`} rx={3} />
+                  <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill={`url(#${expensePatternId})`} opacity="0.8" rx={3} />
                   {(() => {
                     const hNet = Math.round((Math.abs(saldoMonth) / maxVal) * innerH)
                     const yNet = yBase + (innerH - hNet)
@@ -274,7 +289,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
                   const y1 = yFor(saldo[i - 1])
                   const x2 = xFor(i) + barW
                   const y2 = yFor(v)
-                  return <line key={`l-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={'var(--accent)'} strokeWidth={2} />
+                  return <g key={`l-${i}`}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--accent)" strokeWidth={6} opacity="0.2" filter={`url(#${saldoAuraId})`} /><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--accent)" strokeWidth={2.2} strokeLinecap="round" /></g>
                 })}
               </g>
             )}

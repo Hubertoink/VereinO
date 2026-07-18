@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { BalanceAreaChartProps } from './types'
 import { addDataChangedListener } from '../../utils/refresh'
 
@@ -40,6 +40,10 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const ditherId = useId().replace(/:/g, '')
+  const areaPatternId = `balance-dither-${ditherId}`
+  const areaGradientId = `balance-gradient-${ditherId}`
+  const auraId = `balance-aura-${ditherId}`
   useEffect(() => {
     let alive = true
     setLoading(true)
@@ -211,13 +215,25 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
   
 
   return (
-  <section className="card chart-card-overflow">
+  <section className="card chart-card-overflow dashboard-dither-chart">
       <header className="chart-header-baseline">
         <strong>{isDaily ? 'Kassenstand Entwicklung (Saldo kumuliert täglich)' : 'Kassenstand Entwicklung (Saldo kumuliert monatlich)'}</strong>
         <span className="helper">{from} → {to}</span>
       </header>
       <div className="chart-overflow-container">
   <svg ref={svgRef} onMouseMove={onMouseMove} onMouseLeave={onLeave} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Monatlicher Saldo">
+          <defs>
+            <linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.72" />
+            </linearGradient>
+            <pattern id={areaPatternId} width="7" height="7" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.65" fill="var(--accent)" opacity="0.86" />
+              <circle cx="4.5" cy="2.5" r="0.52" fill="var(--accent)" opacity="0.64" />
+              <circle cx="2.5" cy="5.5" r="0.45" fill="var(--accent)" opacity="0.4" />
+            </pattern>
+            <filter id={auraId} x="-15%" y="-20%" width="130%" height="140%"><feGaussianBlur stdDeviation="11" /></filter>
+          </defs>
           {/* Zero/baseline axis */}
           {(yMin <= 0 && yMax >= 0) && (<line x1={P/2} x2={W-P/2} y1={ys(0)} y2={ys(0)} stroke="var(--border)" strokeWidth={1} />)}
           {/* Y axis */}
@@ -232,9 +248,12 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
             </g>
           ))}
           {/* Area fill */}
-          <path d={areaPath} fill="color-mix(in oklab, var(--accent) 22%, transparent)" />
-          {/* Line - thicker stroke for better visibility */}
-          <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+          <path d={areaPath} fill="var(--accent)" opacity="0.15" filter={`url(#${auraId})`} />
+          <path d={areaPath} fill={`url(#${areaGradientId})`} />
+          <path d={areaPath} fill={`url(#${areaPatternId})`} opacity="0.8" />
+          {/* Dither Kit-style line glow, then a crisp foreground stroke. */}
+          <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={7} opacity="0.2" filter={`url(#${auraId})`} />
+          <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
           {/* Ticks and labels */}
           {labels.map((m, i) => {
             if (i % tickEvery !== 0 && i !== labels.length - 1) return null

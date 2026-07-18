@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { IncomeExpenseBarsProps } from './types'
 import { addDataChangedListener } from '../../utils/refresh'
 
@@ -13,6 +13,13 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const ditherId = useId().replace(/:/g, '')
+  const incomePatternId = `income-dither-${ditherId}`
+  const expensePatternId = `expense-dither-${ditherId}`
+  const incomeGradientId = `income-gradient-${ditherId}`
+  const expenseGradientId = `expense-gradient-${ditherId}`
+  const incomeAuraId = `income-aura-${ditherId}`
+  const expenseAuraId = `expense-aura-${ditherId}`
 
   useEffect(() => {
     let alive = true
@@ -62,6 +69,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const maxVal = Math.max(1,
     ...rowsIn.map(r => r.gross),
     ...rowsOut.map(r => r.gross),
+    ...rowsIn.map((row, index) => row.gross + (rowsOut[index]?.gross || 0)),
     ...rowsNet.map(r => Math.abs(r.gross))
   )
 
@@ -76,10 +84,6 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   }
   const baseY = H - 28
   const maxH = baseY - 16
-  // Slightly wider bars for better visibility
-  const barW = 10
-  const gap = 5
-
   // Y-axis ticks (nice numbers)
   function niceStep(max: number) {
     if (max <= 0) return 1
@@ -98,6 +102,30 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const yTicks: number[] = []
   for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))
   const yFor = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxVal)) * maxH
+
+  const smoothLine = (points: Array<{ x: number; y: number }>) => {
+    if (!points.length) return ''
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
+    let path = `M ${points[0].x} ${points[0].y}`
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const previous = points[Math.max(0, i - 1)]
+      const current = points[i]
+      const next = points[i + 1]
+      const after = points[Math.min(points.length - 1, i + 2)]
+      path += ` C ${current.x + (next.x - previous.x) / 6} ${current.y + (next.y - previous.y) / 6}, ${next.x - (after.x - current.x) / 6} ${next.y - (after.y - current.y) / 6}, ${next.x} ${next.y}`
+    }
+    return path
+  }
+  const areaPath = (top: number[], bottom: number[]) => {
+    if (!labels.length) return ''
+    const topPoints = top.map((value, index) => ({ x: xs(index, labels.length), y: yFor(value) }))
+    const bottomPoints = bottom.map((value, index) => ({ x: xs(index, labels.length), y: yFor(value) })).reverse()
+    return `${smoothLine(topPoints)} L ${bottomPoints[0].x} ${bottomPoints[0].y} ${smoothLine(bottomPoints).replace(/^M[^C]*/, '')} Z`
+  }
+  const incomeValues = rowsIn.map(row => row.gross)
+  const stackedValues = rowsIn.map((row, index) => row.gross + (rowsOut[index]?.gross || 0))
+  const incomeAreaPath = areaPath(incomeValues, incomeValues.map(() => 0))
+  const expenseAreaPath = areaPath(stackedValues, incomeValues)
 
   const mouseMove = (ev: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current
@@ -126,13 +154,33 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   }
 
   return (
-  <section className="card chart-card-overflow">
+  <section className="card chart-card-overflow dashboard-dither-chart">
       <header className="chart-header-baseline">
         <strong>Einnahmen vs. Ausgaben</strong>
         <span className="helper">{from} → {to}</span>
       </header>
       <div className="chart-overflow-container">
   <svg ref={svgRef} onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)} viewBox={`0 0 ${W} ${H}`} width="100%" className="chart-svg-responsive" role="img" aria-label="Einnahmen vs Ausgaben">
+          <defs>
+            <linearGradient id={incomeGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--success)" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="var(--success)" stopOpacity="0.82" />
+            </linearGradient>
+            <linearGradient id={expenseGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="var(--danger)" stopOpacity="0.72" />
+            </linearGradient>
+            <pattern id={incomePatternId} width="6" height="6" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.65" fill="var(--success)" opacity="0.9" />
+              <circle cx="4" cy="2.5" r="0.55" fill="var(--success)" opacity="0.62" />
+              <circle cx="2.5" cy="5" r="0.5" fill="var(--success)" opacity="0.44" />
+            </pattern>
+            <pattern id={expensePatternId} width="6" height="6" patternUnits="userSpaceOnUse">
+              <path d="M -2 6 L 6 -2 M 0 8 L 8 0 M 4 10 L 10 4" stroke="var(--danger)" strokeWidth="1.1" opacity="0.82" />
+            </pattern>
+            <filter id={incomeAuraId} x="-15%" y="-20%" width="130%" height="140%"><feGaussianBlur stdDeviation="9" /></filter>
+            <filter id={expenseAuraId} x="-15%" y="-20%" width="130%" height="140%"><feGaussianBlur stdDeviation="9" /></filter>
+          </defs>
           {/* Axes */}
           <line x1={P/2} x2={W-P/2} y1={baseY} y2={baseY} stroke="var(--border)" />
           <line x1={P} x2={P} y1={16} y2={baseY} stroke="var(--border)" />
@@ -143,21 +191,15 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
               <text x={P-6} y={yFor(v)+4} fill="var(--text-dim)" fontSize={10} textAnchor="end">{eurShort.format(v)}</text>
             </g>
           ))}
-          {/* Bars */}
-          {labels.map((m, i) => {
-            const xCenter = xs(i, labels.length)
-            const hIn = Math.round((rowsIn[i]?.gross || 0) / maxVal * maxH)
-            const hOut = Math.round((rowsOut[i]?.gross || 0) / maxVal * maxH)
-            // Netto wird nur im Tooltip angezeigt, nicht als eigener Balken
-            return (
-              <g key={m}>
-                {/* IN bar (left) */}
-                <rect x={xCenter - barW * 1.5 - gap} y={baseY - hIn} width={barW} height={hIn} fill="var(--success)" rx={2} />
-                {/* OUT bar (center) */}
-                <rect x={xCenter - barW / 2} y={baseY - hOut} width={barW} height={hOut} fill="var(--danger)" rx={2} />
-              </g>
-            )
-          })}
+          {/* Dither Kit-inspired stacked areas: income gradient + expense hatch, with an aura bloom. */}
+          <path d={incomeAreaPath} fill="var(--success)" opacity="0.15" filter={`url(#${incomeAuraId})`} />
+          <path d={expenseAreaPath} fill="var(--danger)" opacity="0.13" filter={`url(#${expenseAuraId})`} />
+          <path d={incomeAreaPath} fill={`url(#${incomeGradientId})`} />
+          <path d={incomeAreaPath} fill={`url(#${incomePatternId})`} opacity="0.76" />
+          <path d={expenseAreaPath} fill={`url(#${expenseGradientId})`} />
+          <path d={expenseAreaPath} fill={`url(#${expensePatternId})`} opacity="0.8" />
+          {incomeValues.length > 1 && <path d={smoothLine(incomeValues.map((value, index) => ({ x: xs(index, labels.length), y: yFor(value) })))} fill="none" stroke="var(--success)" strokeWidth="1.3" opacity="0.9" />}
+          {stackedValues.length > 1 && <path d={smoothLine(stackedValues.map((value, index) => ({ x: xs(index, labels.length), y: yFor(value) })))} fill="none" stroke="var(--danger)" strokeWidth="1.3" opacity="0.9" />}
           {/* X labels with dynamic thinning (align with BalanceAreaChart) */}
           {(() => {
             let tickEvery = 1

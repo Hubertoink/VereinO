@@ -30,7 +30,7 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
   const maxVal = Math.max(100, ...accounts.map((account) => Math.abs(account.balance)))
   
   return (
-    <div className="card" style={{ padding: 12, overflow: 'hidden' }}>
+    <div className="card dither-chart-card" style={{ padding: 12, overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <strong>Kassenstand nach Zahlungskonto</strong>
         <div style={{ fontSize: 15, fontWeight: 600, color: total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
@@ -50,15 +50,16 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
                 onMouseLeave={() => setHoverIdx(null)}
               >
                 <span style={{ width: 86, fontSize: 12, fontWeight: 500, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.name}</span>
-                <div style={{ flex: 1, height: 24, background: 'var(--muted)', borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+                <div className="dither-bar-track" style={{ flex: 1, height: 24 }}>
                   <div
+                    className={`dither-bar-fill ${index % 2 === 0 ? 'dither-bar-fill--dotted' : 'dither-bar-fill--hatched'}`}
                     style={{
                       height: '100%',
                       width: `${Math.max(2, (Math.abs(account.balance) / Math.max(1, maxVal)) * 100)}%`,
-                      background: color,
                       borderRadius: 6,
-                      transition: 'width 0.3s ease'
-                    }}
+                      transition: 'width 0.3s ease',
+                      '--dither-color': color
+                    } as React.CSSProperties}
                   />
                   <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                     {eurFmt.format(account.balance)}

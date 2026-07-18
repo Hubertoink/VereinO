@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType } from './types'
 
 type PaymentAccountSummaryRow = {
@@ -22,6 +22,11 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const ditherId = useId().replace(/:/g, '')
+  const incomeGradientId = `payment-income-gradient-${ditherId}`
+  const expenseGradientId = `payment-expense-gradient-${ditherId}`
+  const incomePatternId = `payment-income-dither-${ditherId}`
+  const expensePatternId = `payment-expense-dither-${ditherId}`
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -83,7 +88,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
     return arr
   })()
   return (
-    <div className="card report-chart-card">
+    <div className="card report-chart-card dither-chart-card">
       <div className="report-chart-header">
         <strong>Nach Zahlweg (IN/OUT)</strong>
         <div className="legend">
@@ -107,6 +112,12 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
             )
           })()}
           <svg ref={svgRef} width={width} height={height} role="img" aria-label="Nach Zahlweg">
+            <defs>
+              <linearGradient id={incomeGradientId} x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="var(--success)" stopOpacity="0.42" /><stop offset="100%" stopColor="var(--success)" stopOpacity="0.92" /></linearGradient>
+              <linearGradient id={expenseGradientId} x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="var(--danger)" stopOpacity="0.38" /><stop offset="100%" stopColor="var(--danger)" stopOpacity="0.88" /></linearGradient>
+              <pattern id={incomePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.65" fill="var(--success)" opacity="0.94" /><circle cx="4" cy="2.5" r="0.5" fill="var(--success)" opacity="0.6" /><circle cx="2.5" cy="5" r="0.45" fill="var(--success)" opacity="0.42" /></pattern>
+              <pattern id={expensePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M -2 6 L 6 -2 M 0 8 L 8 0 M 4 10 L 10 4" stroke="var(--danger)" strokeWidth="1.1" opacity="0.85" /></pattern>
+            </defs>
             {/* X-Achse Grid + Labels */}
             {xTicks.map((v, i) => (
               <g key={i}>
@@ -122,8 +133,10 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
               return (
                 <g key={(r.key ?? 'NULL') + i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
                   <text x={margin.left - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle" fontSize="12">{r.label}</text>
-                  <rect x={margin.left} y={yBar} width={Math.max(0, inX - margin.left)} height={10} fill="#2e7d32" rx={3} />
-                  <rect x={margin.left} y={yBar + 12} width={Math.max(0, outX - margin.left)} height={10} fill="#c62828" rx={3} />
+                  <rect x={margin.left} y={yBar} width={Math.max(0, inX - margin.left)} height={10} fill={`url(#${incomeGradientId})`} rx={3} />
+                  <rect x={margin.left} y={yBar} width={Math.max(0, inX - margin.left)} height={10} fill={`url(#${incomePatternId})`} opacity="0.76" rx={3} />
+                  <rect x={margin.left} y={yBar + 12} width={Math.max(0, outX - margin.left)} height={10} fill={`url(#${expenseGradientId})`} rx={3} />
+                  <rect x={margin.left} y={yBar + 12} width={Math.max(0, outX - margin.left)} height={10} fill={`url(#${expensePatternId})`} opacity="0.8" rx={3} />
                 </g>
               )
             })}

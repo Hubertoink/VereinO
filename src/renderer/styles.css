@@ -9298,6 +9298,56 @@ label .req-asterisk {
   overflow: hidden;
 }
 
+/* Dither-kit-inspired chart treatment for the interactive dashboard only.
+   The pattern stays within SVG charts so report exports remain print-friendly. */
+.dashboard-dither-chart,
+.dither-chart-card {
+  position: relative;
+  border-color: color-mix(in oklab, var(--accent) 26%, var(--border));
+  background: linear-gradient(145deg, color-mix(in oklab, var(--accent) 5%, var(--surface)), var(--surface) 34%);
+}
+
+.dashboard-dither-chart .chart-header-baseline,
+.dashboard-dither-chart .chart-overflow-container,
+.dashboard-dither-chart .helper-mt-6,
+.dither-chart-card .chart-header-baseline,
+.dither-chart-card .chart-overflow-container {
+  position: relative;
+}
+
+.dither-bar-track {
+  background: color-mix(in oklab, var(--muted) 84%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dither-bar-fill {
+  --dither-color: var(--accent);
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--dither-color) 45%, transparent), color-mix(in oklab, var(--dither-color) 92%, transparent));
+  box-shadow: 0 0 12px color-mix(in oklab, var(--dither-color) 38%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.dither-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dither-bar-fill--dotted::after {
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--dither-color) 92%, transparent) 0.8px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+.dither-bar-fill--hatched::after {
+  background: repeating-linear-gradient(-45deg, color-mix(in oklab, var(--dither-color) 86%, transparent) 0 1px, transparent 1px 5px);
+}
+
 .dashboard-chart-stack {
   display: grid;
   gap: 12px;
