@@ -44,6 +44,14 @@ import type {
     TPaymentAccountsListOutput,
     TPaymentAccountUpsertInput,
     TPaymentAccountUpsertOutput,
+    TPartiesListInput,
+    TPartiesListOutput,
+    TPartyGetInput,
+    TPartyGetOutput,
+    TPartyUpsertInput,
+    TPartyUpsertOutput,
+    TPartyArchiveInput,
+    TPartyArchiveOutput,
     TTagDeleteInput,
     TTagDeleteOutput,
     TTagsListInput,
@@ -99,6 +107,12 @@ export interface FinanceApi {
         list: (payload?: TPaymentAccountsListInput) => Promise<TPaymentAccountsListOutput>
         upsert: (payload: TPaymentAccountUpsertInput) => Promise<TPaymentAccountUpsertOutput>
         delete: (payload: TPaymentAccountDeleteInput) => Promise<TPaymentAccountDeleteOutput>
+    }
+    parties: {
+        list: (payload?: TPartiesListInput) => Promise<TPartiesListOutput>
+        get: (payload: TPartyGetInput) => Promise<TPartyGetOutput>
+        upsert: (payload: TPartyUpsertInput) => Promise<TPartyUpsertOutput>
+        archive: (payload: TPartyArchiveInput) => Promise<TPartyArchiveOutput>
     }
     tags: {
         list: (payload?: TTagsListInput) => Promise<TTagsListOutput>

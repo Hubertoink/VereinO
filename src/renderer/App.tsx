@@ -449,6 +449,8 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
         grossAmount,
         vatRate: 0,
         description: result.fields.description.trim() || result.fields.supplier.trim(),
+        counterparty: result.fields.supplier.trim() || null,
+        partyId: result.partyId,
         note: invoiceDetails,
         paymentMethod: result.bookingMeta.paymentMethod || 'BANK',
         paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
@@ -473,6 +475,7 @@ function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
     : []
   const tags = Array.isArray(result?.tags) ? result.tags.map(String) : []
   return {
+    partyId: typeof result?.partyId === 'number' ? result.partyId : null,
     fields: {
       supplier: result?.supplier || '',
       invoiceNumber: result?.invoiceNumber || '',
@@ -4065,7 +4068,8 @@ function AppInner() {
 
       {/* Reports: Export Options Modal */}
       {activePage === 'Reports' && showExportOptions && (
-        <ExportOptionsModal
+        <Suspense fallback={null}>
+          <ExportOptionsModal
           open={showExportOptions}
           onClose={() => setShowExportOptions(false)}
           fields={exportFields}
@@ -4174,19 +4178,22 @@ function AppInner() {
               notify('error', e?.message || String(e))
             }
           }}
-        />
+          />
+        </Suspense>
       )}
 
       {activePage === 'Reports' && showActivityReportEditor && (
-        <ActivityReportEditorModal
-          open={showActivityReportEditor}
-          onClose={() => setShowActivityReportEditor(false)}
-          fiscalYear={fiscalYear}
-          setFiscalYear={setFiscalYear}
-          yearsAvail={yearsAvail}
-          budgets={budgets}
-          notify={notify}
-        />
+        <Suspense fallback={null}>
+          <ActivityReportEditorModal
+            open={showActivityReportEditor}
+            onClose={() => setShowActivityReportEditor(false)}
+            fiscalYear={fiscalYear}
+            setFiscalYear={setFiscalYear}
+            yearsAvail={yearsAvail}
+            budgets={budgets}
+            notify={notify}
+          />
+        </Suspense>
       )}
     </div>
   )

@@ -31,6 +31,7 @@ import {
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { encodeFileForUpload } from '../../utils/fileEncoding'
+import PartySelector from '../../components/common/PartySelector'
 
 type EditVoucherRow = SharedEditVoucherRow
 
@@ -1517,6 +1518,18 @@ export default function JournalView({
                                                         <option value="">Konto wählen</option>
                                                         {activePaymentAccounts.map((account) => <option key={`edit-account-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
                                                     </select>
+                                                </div>
+                                            )}
+                                            {(editRow.type === 'IN' || editRow.type === 'OUT') && (
+                                                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                                                    <label>{editRow.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</label>
+                                                    <PartySelector
+                                                        valueId={editRow.partyId}
+                                                        valueName={editRow.counterparty || ''}
+                                                        role={editRow.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
+                                                        inputId="journal-edit-party"
+                                                        onChange={(selection) => setEditRow({ ...editRow, partyId: selection.partyId, counterparty: selection.name })}
+                                                    />
                                                 </div>
                                             )}
                                         </div>

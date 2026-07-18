@@ -27,6 +27,7 @@ const settingsIconColors: Record<TileKey, string> = {
   org: '#26A69A',
   donations: '#FF7043',
   paymentAccounts: '#1976D2',
+  parties: '#26A69A',
   tags: '#FFD600',
   aiPatterns: '#EC4899',
   cashCheck: '#00C853',
@@ -111,6 +112,15 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
           <path d="M2 12l10 5 10-5" />
+        </svg>
+      )
+    case 'parties':
+      return (
+        <svg {...iconProps}>
+          <circle cx="8" cy="8" r="3" />
+          <circle cx="17" cy="9" r="2.5" />
+          <path d="M2.5 20c.5-4 2.5-6 5.5-6s5 2 5.5 6" />
+          <path d="M13.5 15c1-.8 2.1-1.2 3.5-1.2 2.6 0 4.2 1.7 4.5 4.7" />
         </svg>
       )
     case 'docling':
@@ -211,6 +221,7 @@ const GROUPS: SettingsGroup[] = [
     items: [
       { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
       { key: 'paymentAccounts', label: 'Konten', shortLabel: 'Konten' },
+      { key: 'parties', label: 'Geschäftspartner', shortLabel: 'Partner' },
       { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
       { key: 'aiPatterns', label: 'KI-Muster', shortLabel: 'KI' },
     ],

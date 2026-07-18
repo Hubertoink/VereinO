@@ -270,6 +270,8 @@ export function createVoucher(input: {
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string
     note?: string | null
+    counterparty?: string | null
+    partyId?: number | null
     netAmount?: number
     grossAmount?: number
     vatRate: number
@@ -384,8 +386,8 @@ export function createVoucher(input: {
         const stmt = d.prepare(`
       INSERT INTO vouchers (
         year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id, earmark_id, earmark_amount, budget_id, budget_amount, description, note,
-                                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, created_by
-                                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                                net_amount, vat_rate, vat_amount, gross_amount, amount_mode, payment_method, transfer_from, transfer_to, payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, party_id, created_by
+                                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
         let id: number | null = null
@@ -422,6 +424,8 @@ export function createVoucher(input: {
                     paymentFields.paymentAccountId,
                     paymentFields.transferFromAccountId,
                     paymentFields.transferToAccountId,
+                    input.counterparty?.trim() || null,
+                    input.partyId ?? null,
                     input.createdBy ?? null
                 )
                 id = Number(info.lastInsertRowid)
@@ -512,8 +516,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         year, seq_no, voucher_no, date, type, sphere, account_id, category_id, project_id,
         earmark_id, earmark_amount, budget_id, budget_amount, description, note,
         net_amount, vat_rate, vat_amount, gross_amount, amount_mode,
-        payment_method, transfer_from, transfer_to, counterparty, created_by, original_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        payment_method, transfer_from, transfer_to, counterparty, party_id, created_by, original_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
         const info = stmt.run(
             year,
@@ -539,6 +543,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
             reversePaymentMethod,
             reverseTransferFrom,
             reverseTransferTo,
+            original.counterparty ?? null,
+            original.party_id ?? null,
             userId ?? null,
             originalId
         )
@@ -650,7 +656,7 @@ export function listVouchersAdvanced(filters: {
                                         (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
                                         (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
                                         (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-                                        v.description, v.note, v.counterparty,
+                                        v.description, v.note, v.counterparty, v.party_id as partyId,
                                         v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                                         v.original_id as originalId,
                                         (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -790,7 +796,7 @@ export function listVouchersAdvancedPaged(filters: {
             (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
             (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
             (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-            v.description, v.note, v.counterparty,
+            v.description, v.note, v.counterparty, v.party_id as partyId,
             v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
                 v.original_id as originalId,
                 (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
@@ -1265,6 +1271,8 @@ export function updateVoucher(input: {
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
     description?: string | null
     note?: string | null
+    counterparty?: string | null
+    partyId?: number | null
     paymentMethod?: 'BAR' | 'BANK' | null
     transferFrom?: 'BAR' | 'BANK' | null
     transferTo?: 'BAR' | 'BANK' | null
@@ -1294,7 +1302,7 @@ export function updateVoucher(input: {
                transfer_from_account_id as transferFromAccountId,
                transfer_to_account_id as transferToAccountId,
                payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-               description, note, amount_mode as amountMode,
+               description, note, counterparty, party_id as partyId, amount_mode as amountMode,
                original_id as originalId, reversed_by_id as reversedById
         FROM vouchers WHERE id=?
     `).get(input.id) as any
@@ -1373,6 +1381,8 @@ export function updateVoucher(input: {
     if (input.sphere != null) { fields.push('sphere = ?'); params.push(input.sphere) }
     if (input.description !== undefined) { fields.push('description = ?'); params.push(input.description) }
     if (input.note !== undefined) { fields.push('note = ?'); params.push(input.note) }
+    if (input.counterparty !== undefined) { fields.push('counterparty = ?'); params.push(input.counterparty?.trim() || null) }
+    if (input.partyId !== undefined) { fields.push('party_id = ?'); params.push(input.partyId) }
     if (input.paymentMethod !== undefined || input.paymentAccountId !== undefined || input.type === 'TRANSFER' || current.type === 'TRANSFER') { fields.push('payment_method = ?'); params.push(paymentFields.paymentMethod) }
     if (input.earmarkId !== undefined) { fields.push('earmark_id = ?'); params.push(input.earmarkId) }
     if (input.earmarkAmount !== undefined) { fields.push('earmark_amount = ?'); params.push(input.earmarkAmount) }

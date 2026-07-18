@@ -753,8 +753,58 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensureJournalPerformanceIndexes(db)
     }
+  },
+  {
+    version: 37,
+    up: (db: DB) => {
+      ensurePartyTables(db)
+    }
   }
 ]
+
+export function ensurePartyTables(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS parties (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      legal_name TEXT,
+      role TEXT CHECK(role IN ('SUPPLIER','CUSTOMER','BOTH','OTHER')) NOT NULL DEFAULT 'BOTH',
+      contact_name TEXT,
+      email TEXT,
+      phone TEXT,
+      street TEXT,
+      postal_code TEXT,
+      city TEXT,
+      country TEXT NOT NULL DEFAULT 'DE',
+      iban TEXT,
+      bic TEXT,
+      tax_number TEXT,
+      vat_id TEXT,
+      payment_term_days INTEGER,
+      note TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_parties_name ON parties(name COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_parties_iban ON parties(iban);
+    CREATE INDEX IF NOT EXISTS idx_parties_active_role ON parties(is_active, role);
+  `)
+
+  const ensurePartyColumn = (table: string) => {
+    const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(table)
+    if (!exists) return
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'party_id')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL;`)
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_party ON ${table}(party_id);`)
+  }
+
+  ensurePartyColumn('vouchers')
+  ensurePartyColumn('invoices')
+  ensurePartyColumn('submissions')
+}
 
 export function ensureJournalPerformanceIndexes(db: DB) {
   db.exec(`
@@ -1495,6 +1545,7 @@ export function applyMigrations(db: DB) {
   ensureAdvanceTables(db)
   ensureSubmissionColumns(db)
   ensureBankImportTables(db)
+  ensurePartyTables(db)
 
   const applied = getAppliedVersions(db)
   let migrationApplied = false
@@ -1578,5 +1629,6 @@ export function applyMigrations(db: DB) {
     ensureAdvanceTables(db)
     ensureSubmissionColumns(db)
     ensureBankImportTables(db)
+    ensurePartyTables(db)
   }
 }

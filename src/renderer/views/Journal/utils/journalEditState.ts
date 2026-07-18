@@ -8,6 +8,8 @@ export type VoucherUpdatePayload = {
     date: string
     description: string | null
     note: string | null
+    counterparty: string | null
+    partyId: number | null
     type: EditVoucherRow['type']
     sphere: EditVoucherRow['sphere']
     earmarkId: number | null
@@ -38,6 +40,8 @@ export function serializeEditRow(row: EditVoucherRow | null): string | null {
         sphere: row.sphere || null,
         description: (row.description || '').trim(),
         note: (row.note || '').trim(),
+        counterparty: (row.counterparty || '').trim(),
+        partyId: row.partyId ?? null,
         paymentMethod: row.paymentMethod || null,
         paymentAccountId: row.paymentAccountId || null,
         transferFrom: row.transferFrom || null,
@@ -88,6 +92,8 @@ export function buildVoucherUpdatePayloadFromEditRow(
         date: editRow.date,
         description: editRow.description ?? null,
         note: editRow.note?.trim() ? editRow.note.trim() : null,
+        counterparty: editRow.counterparty?.trim() || null,
+        partyId: editRow.partyId ?? null,
         type: editRow.type,
         sphere: editRow.sphere,
         earmarkId: earmarks.length > 0 ? earmarks[0].earmarkId : null,

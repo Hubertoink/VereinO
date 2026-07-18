@@ -25,6 +25,8 @@ describe('buildInvoiceVoucherCreationInput', () => {
         gross_amount: 180,
         payment_method: 'BANK',
         payment_account_id: 7,
+        party: 'Test GmbH',
+        party_id: 9,
         earmark_id: 3,
         budget_id: 5
       },
@@ -41,6 +43,8 @@ describe('buildInvoiceVoucherCreationInput', () => {
 
     expect(result.paymentAccountId).toBe(7)
     expect(result.paymentMethod).toBe('BANK')
+    expect(result.counterparty).toBe('Test GmbH')
+    expect(result.partyId).toBe(9)
     expect(result.budgets).toEqual([
       { budgetId: 5, amount: 120 },
       { budgetId: 6, amount: 60 }

@@ -2166,7 +2166,7 @@ label.settings-toggle-card {
 }
 
 .invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-party']) {
-  --invoice-floating-label-notch: 58px;
+  --invoice-floating-label-notch: 232px;
 }
 
 .invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-number']) {
@@ -3904,6 +3904,129 @@ svg text {
 
 .activity-report-editor-layout__sidebar {
   align-content: start;
+}
+
+.activity-report-reference-item {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: help;
+}
+
+.activity-report-reference-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-report-reference-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.activity-report-reference-tooltip-portal {
+  width: min(330px, calc(100vw - 24px));
+  padding: 10px;
+}
+
+.activity-report-reference-tooltip__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.activity-report-reference-tooltip__metrics > span {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--surface) 90%, var(--bg) 10%);
+}
+
+.activity-report-reference-tooltip__metrics > .is-income {
+  border-color: color-mix(in oklab, var(--success) 48%, var(--border));
+  background: color-mix(in oklab, var(--success) 13%, var(--surface));
+}
+
+.activity-report-reference-tooltip__metrics > .is-income strong {
+  color: var(--success);
+}
+
+.activity-report-reference-tooltip__metrics > .is-expense {
+  border-color: color-mix(in oklab, var(--danger) 48%, var(--border));
+  background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+}
+
+.activity-report-reference-tooltip__metrics > .is-expense strong {
+  color: var(--danger);
+}
+
+.activity-report-reference-tooltip__metrics > .is-positive {
+  border-color: color-mix(in oklab, var(--accent) 48%, var(--border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+}
+
+.activity-report-reference-tooltip__metrics > .is-positive strong {
+  color: var(--accent);
+}
+
+.activity-report-reference-tooltip__metrics > .is-negative {
+  border-color: color-mix(in oklab, var(--danger) 54%, var(--border));
+  background: color-mix(in oklab, var(--danger) 15%, var(--surface));
+}
+
+.activity-report-reference-tooltip__metrics > .is-negative strong {
+  color: var(--danger);
+}
+
+.activity-report-reference-tooltip__metrics small,
+.activity-report-reference-tooltip__meta {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.activity-report-reference-tooltip__metrics strong {
+  font-size: 12px;
+}
+
+.activity-report-reference-tooltip__meta {
+  display: grid;
+  gap: 3px;
+  margin-top: 9px;
+}
+
+.activity-report-reference-tooltip__meta > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-report-reference-tooltip__meta > span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.activity-report-reference-tooltip__meta > .is-planned::before {
+  background: var(--accent);
+}
+
+.activity-report-reference-tooltip__meta > .is-period::before {
+  background: var(--info);
+}
+
+.activity-report-reference-tooltip__meta > .is-warning {
+  color: var(--warning);
+}
+
+.activity-report-reference-tooltip__meta > .is-warning::before {
+  background: var(--warning);
 }
 
 @media (max-width: 900px) {
@@ -11116,6 +11239,502 @@ html[data-glass-modals='true'] .modal-content {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.parties-pane {
+  display: grid;
+  gap: 16px;
+}
+
+.parties-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 240px) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+}
+
+.parties-toolbar__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.parties-table-wrap {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.parties-table {
+  min-width: 900px;
+}
+
+.parties-table th,
+.parties-table td {
+  vertical-align: middle;
+}
+
+.parties-table td > span:not(.chip) {
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.parties-table td > .chip + .chip {
+  margin-left: 6px;
+}
+
+.parties-table tbody tr.is-archived {
+  opacity: .68;
+}
+
+.parties-table__usage {
+  text-align: center !important;
+  white-space: nowrap;
+}
+
+.parties-table__actions {
+  white-space: nowrap;
+}
+
+.parties-table__action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.parties-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.party-editor-overlay {
+  z-index: 6200;
+}
+
+.party-editor-modal {
+  width: min(820px, calc(100vw - 28px));
+  max-height: min(820px, calc(100vh - 40px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0;
+  overflow: hidden;
+}
+
+.party-editor-modal__header,
+.party-editor-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.party-editor-modal__header {
+  border-bottom: 1px solid var(--border);
+}
+
+.party-editor-modal__header h2 {
+  margin: 0 0 3px;
+}
+
+.party-editor-modal__body {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.party-editor-modal__footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.party-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.party-editor-grid__wide {
+  grid-column: span 2;
+}
+
+.party-editor-grid__full {
+  grid-column: 1 / -1;
+}
+
+.party-editor-modal {
+  --party-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
+  --party-field-focus-bg: color-mix(in oklab, var(--party-field-bg) 92%, var(--accent) 8%);
+}
+
+.party-floating-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+  --party-floating-label-notch: 90px;
+}
+
+.party-floating-field > span {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 1px 3px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: .88rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: top .16s ease, transform .16s ease, color .16s ease, font-size .16s ease;
+}
+
+.party-floating-field::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 7px;
+  z-index: 1;
+  width: var(--party-floating-label-notch);
+  height: 2px;
+  background: var(--party-field-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.party-floating-field > .input {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding-top: 16px;
+  padding-bottom: 4px;
+  background: var(--party-field-bg);
+}
+
+.party-floating-field--textarea > .input {
+  height: 82px;
+  padding-top: 19px;
+  resize: none;
+}
+
+.party-floating-field:focus-within > span,
+.party-floating-field--filled > span {
+  top: 0;
+  color: var(--accent);
+  font-size: .71rem;
+  background: var(--party-field-bg);
+  transform: translateY(-50%);
+}
+
+.party-floating-field:focus-within::before,
+.party-floating-field--filled::before {
+  opacity: 1;
+}
+
+.party-floating-field:focus-within > .input {
+  background: var(--party-field-focus-bg);
+  box-shadow: none;
+}
+
+.party-floating-field:focus-within::before,
+.party-floating-field:focus-within > span {
+  background: var(--party-field-focus-bg);
+}
+
+.party-selector {
+  position: relative;
+  min-width: 0;
+  z-index: 1;
+}
+
+.party-selector:focus-within {
+  z-index: 90;
+}
+
+.party-selector__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  position: relative;
+}
+
+.party-selector__control .input {
+  min-width: 0;
+  padding-right: 30px;
+}
+
+.party-selector__clear {
+  position: absolute;
+  right: 42px;
+  top: 50%;
+  translate: 0 -50%;
+  min-width: 24px;
+  padding: 2px 5px;
+}
+
+.party-selector__add {
+  min-width: 36px;
+  padding-inline: 10px;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.party-selector__add:hover {
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--border));
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.party-selector__menu,
+.select-dropdown__menu {
+  position: absolute;
+  z-index: 250;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 42px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, .35);
+  padding: 5px;
+}
+
+.party-selector__menu--portal,
+.select-dropdown__menu--portal {
+  position: fixed;
+  z-index: 6100;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+}
+
+.party-selector__menu > button,
+.select-dropdown__menu > button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.party-selector__menu > button:hover,
+.party-selector__menu > button.is-selected,
+.select-dropdown__menu > button:hover,
+.select-dropdown__menu > button.is-selected {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.party-selector__menu span,
+.select-dropdown__menu span {
+  display: grid;
+  min-width: 0;
+}
+
+.party-selector__menu small,
+.select-dropdown__menu small {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.party-selector__menu > button > small {
+  font-weight: 600;
+}
+
+.party-selector__empty {
+  padding: 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.select-dropdown__empty {
+  padding: 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.select-dropdown__trigger {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.select-dropdown__trigger:disabled {
+  cursor: not-allowed;
+}
+
+.select-dropdown__placeholder {
+  color: var(--text-dim);
+}
+
+.select-dropdown__chevron {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  color: var(--text-dim);
+  rotate: 45deg;
+  translate: 0 -2px;
+}
+
+.suggestion-input {
+  display: block;
+  position: relative;
+}
+
+.suggestion-input > .input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.suggestion-input__toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  translate: 0 -50%;
+}
+
+.suggestion-input__toggle:hover {
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.party-selector__menu .party-selector__create {
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 6px 6px;
+  color: var(--accent);
+}
+
+/* Party controls sit inside floating booking fields. Their nested input needs
+   the same geometry as the direct input controls to keep label and border in
+   one clean line. */
+.quick-add-modal .booking-floating-field > .party-selector .party-selector__control > .input {
+  height: 42px;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding-top: 15px;
+  padding-bottom: 3px;
+}
+
+.quick-add-modal .booking-finance-party {
+  margin-top: 10px;
+  --booking-floating-label-notch: 232px;
+}
+
+.quick-add-modal .booking-finance-party .party-selector__add {
+  min-height: 42px;
+  height: 42px;
+  min-width: 42px;
+  padding-inline: 12px;
+}
+
+.quick-add-modal .booking-finance-party .party-selector__control > .input {
+  padding-right: 40px;
+}
+
+.quick-add-modal .booking-finance-party .party-selector__clear {
+  right: 50px;
+}
+
+.quick-add-modal .booking-floating-field:focus-within {
+  z-index: 80;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-party']) {
+  z-index: 20;
+}
+
+.invoices-modal-redesign .invoice-finance-party {
+  --invoice-floating-label-notch: 232px;
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-party']) > .party-selector .party-selector__control > .input {
+  height: 42px;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding-top: 17px;
+  padding-bottom: 5px;
+  background: var(--invoice-field-bg);
+  border-color: var(--invoice-field-border);
+}
+
+.invoices-modal-redesign .invoice-floating-field:has(> label[for='invoice-party']):focus-within > .party-selector .party-selector__control > .input {
+  background: var(--invoice-field-focus-bg);
+  box-shadow: none;
+}
+
+.invoices-modal-redesign .invoice-finance-party::before {
+  z-index: 3;
+  top: -1px;
+  height: 3px;
+}
+
+.invoices-modal-redesign .invoice-finance-party > label {
+  z-index: 4;
+}
+
+.invoices-modal-redesign .invoice-finance-party > .party-selector,
+.invoices-modal-redesign .invoice-finance-party > .party-selector:focus-within {
+  z-index: 1;
+}
+
+.invoices-modal-redesign .invoice-finance-party .party-selector__add {
+  min-width: 42px;
+  min-height: 42px;
+  height: 42px;
+  padding-inline: 12px;
+}
+
+.invoices-modal-redesign .invoice-finance-party .party-selector__control > .input {
+  padding-right: 40px;
+}
+
+.invoices-modal-redesign .invoice-finance-party .party-selector__clear {
+  right: 50px;
+}
+
+@media (max-width: 760px) {
+  .parties-toolbar,
+  .party-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .party-editor-grid__wide,
+  .party-editor-grid__full {
+    grid-column: auto;
+  }
+}
+
 html[data-glass-modals='true'] .modal-header,
 html[data-glass-modals='true'] .activity-report-modal__header,
 html[data-glass-modals='true'] .app-header {
@@ -15931,6 +16550,11 @@ button.filter-totals-stat {
   height: 100%;
 }
 
+.quick-add-modal .booking-select-shell > .select-dropdown__trigger {
+  height: 100%;
+  min-height: 46px;
+}
+
 .quick-add-modal :is(input, textarea)::placeholder {
   color: color-mix(in oklab, var(--text-dim) 82%, var(--text) 18%);
   opacity: 0.9;
@@ -16116,6 +16740,7 @@ button.filter-totals-stat {
 
 .quick-add-modal .booking-floating-field > :is(.input, select),
 .quick-add-modal .booking-floating-field > .booking-date-input-wrap > .input,
+.quick-add-modal .booking-floating-field > .suggestion-input > .input,
 .quick-add-modal .booking-floating-control > .input {
   height: 46px;
   min-height: 46px;
@@ -16157,6 +16782,23 @@ button.filter-totals-stat {
 .quick-add-modal .booking-floating-field:focus-within::before,
 .quick-add-modal .booking-floating-control:focus-within::before {
   background: var(--booking-field-bg);
+}
+
+/* PartySelector wraps its input in an extra stacking context. Keep that
+   wrapper below the floating-label notch; its menu is rendered in a portal. */
+.quick-add-modal .booking-finance-party::before {
+  z-index: 3;
+  top: -1px;
+  height: 3px;
+}
+
+.quick-add-modal .booking-finance-party > label {
+  z-index: 4;
+}
+
+.quick-add-modal .booking-finance-party > .party-selector,
+.quick-add-modal .booking-finance-party > .party-selector:focus-within {
+  z-index: 1;
 }
 
 .quick-add-modal .booking-floating-field:has(.input-error):focus-within::before,

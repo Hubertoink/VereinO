@@ -1,6 +1,8 @@
 import React from 'react'
 import TagsEditor from '../TagsEditor'
 import HoverTooltip from '../common/HoverTooltip'
+import PartySelector from '../common/PartySelector'
+import SelectDropdown, { SuggestionInput } from '../common/SelectDropdown'
 import type { QA } from '../../hooks/useQuickAdd'
 import WindowControls from '../layout/WindowControls'
 import { getInternalAssignmentValidationState } from './voucherMetaValidation'
@@ -167,7 +169,6 @@ export default function QuickAddModal({
 }: QuickAddModalProps) {
     const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const amountInputRef = React.useRef<HTMLInputElement | null>(null)
-    const descriptionInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
     const aiAssistRef = React.useRef<HTMLDivElement | null>(null)
@@ -1008,25 +1009,30 @@ export default function QuickAddModal({
                                                 </button>
                                             )}
                                         </HoverTooltip>
-                                        <select id="quick-add-sphere" value={qa.sphere} onChange={(e) => setQa({ ...qa, sphere: e.target.value as any })} aria-label="Sphäre der Buchung">
-                                            <option value="IDEELL">Ideeller Bereich</option>
-                                            <option value="ZWECK">Zweckbetrieb</option>
-                                            <option value="VERMOEGEN">Vermögensverwaltung</option>
-                                            <option value="WGB">Wirtschaftlicher Geschäftsbetrieb</option>
-                                        </select>
+                                        <SelectDropdown
+                                            id="quick-add-sphere"
+                                            value={qa.sphere}
+                                            onChange={(value) => setQa({ ...qa, sphere: value as any })}
+                                            ariaLabel="Sphäre der Buchung"
+                                            options={[
+                                                { value: 'IDEELL', label: 'Ideeller Bereich' },
+                                                { value: 'ZWECK', label: 'Zweckbetrieb' },
+                                                { value: 'VERMOEGEN', label: 'Vermögensverwaltung' },
+                                                { value: 'WGB', label: 'Wirtschaftlicher Geschäftsbetrieb' },
+                                            ]}
+                                        />
                                     </div>
                                 )}
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field field-full-width">
                                         <label>Kontotransfer <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <div className="flex gap-8">
-                                            <select
-                                                className="input"
+                                            <SelectDropdown
                                                 value={String((qa as any).transferFromAccountId ?? '')}
-                                                required
+                                                placeholder="Von Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color || undefined }}
-                                                onChange={(e) => {
-                                                    const nextId = e.target.value ? Number(e.target.value) : null
+                                                onChange={(value) => {
+                                                    const nextId = value ? Number(value) : null
                                                     const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
                                                     setQa({
                                                         ...(qa as any),
@@ -1036,20 +1042,15 @@ export default function QuickAddModal({
                                                         paymentMethod: undefined,
                                                     } as any)
                                                 }}
-                                                aria-label="Transfer von Konto"
-                                            >
-                                                <option value="">Von Konto wählen</option>
-                                                {activePaymentAccounts.map((account) => (
-                                                    <option key={`from-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
-                                                ))}
-                                            </select>
-                                            <select
-                                                className="input"
+                                                ariaLabel="Transfer von Konto"
+                                                options={activePaymentAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))}
+                                            />
+                                            <SelectDropdown
                                                 value={String((qa as any).transferToAccountId ?? '')}
-                                                required
+                                                placeholder="Nach Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.color || undefined }}
-                                                onChange={(e) => {
-                                                    const nextId = e.target.value ? Number(e.target.value) : null
+                                                onChange={(value) => {
+                                                    const nextId = value ? Number(value) : null
                                                     const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
                                                     setQa({
                                                         ...(qa as any),
@@ -1059,13 +1060,9 @@ export default function QuickAddModal({
                                                         paymentMethod: undefined,
                                                     } as any)
                                                 }}
-                                                aria-label="Transfer nach Konto"
-                                            >
-                                                <option value="">Nach Konto wählen</option>
-                                                {activePaymentAccounts.map((account) => (
-                                                    <option key={`to-${account.id}`} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
-                                                ))}
-                                            </select>
+                                                ariaLabel="Transfer nach Konto"
+                                                options={activePaymentAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))}
+                                            />
                                         </div>
                                     </div>
                                 ) : qa.type === 'INTERNAL' ? (
@@ -1074,16 +1071,15 @@ export default function QuickAddModal({
                                         <div className="badge pm-account-badge pm-internal">intern</div>
                                     </div>
                                 ) : (
-                                    <div className={`field booking-floating-field${(qa as any).paymentAccountId ? ' booking-floating-field--filled' : ''}`}>
+                                    <div className="field booking-floating-field booking-floating-field--filled">
                                         <label htmlFor="quick-add-account">Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                        <select
+                                        <SelectDropdown
                                             id="quick-add-account"
-                                            className="input"
                                             value={String((qa as any).paymentAccountId ?? '')}
-                                            required
+                                            placeholder="Konto wählen"
                                             style={{ color: paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.color || undefined }}
-                                            onChange={(e) => {
-                                                const nextId = e.target.value ? Number(e.target.value) : null
+                                            onChange={(value) => {
+                                                const nextId = value ? Number(value) : null
                                                 const nextAccount = nextId ? paymentAccountsById.get(nextId) : undefined
                                                 setQa({
                                                     ...(qa as any),
@@ -1092,13 +1088,9 @@ export default function QuickAddModal({
                                                     paymentMethod: accountMethod(nextAccount?.kind) ?? undefined,
                                                 } as any)
                                             }}
-                                            aria-label="Buchungskonto wählen"
-                                        >
-                                            <option value="" />
-                                            {activePaymentAccounts.map((account) => (
-                                                <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>
-                                            ))}
-                                        </select>
+                                            ariaLabel="Buchungskonto wählen"
+                                            options={activePaymentAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -1129,11 +1121,10 @@ export default function QuickAddModal({
                                         <div className="field finance-amount-highlight">
                                             <div className="flex-gap-8">
                                                 <span className="booking-select-shell">
-                                                    <select
-                                                        className="input"
+                                                    <SelectDropdown
                                                         value={(qa as any).mode ?? 'NET'}
-                                                        onChange={(e) => {
-                                                            const newMode = e.target.value as 'NET' | 'GROSS'
+                                                        onChange={(value) => {
+                                                            const newMode = value as 'NET' | 'GROSS'
                                                             const next = { ...qa, mode: newMode } as any
                                                             if (newMode === 'NET') {
                                                                 // Falls kein Netto gesetzt ist, aus Brutto übernehmen
@@ -1153,11 +1144,12 @@ export default function QuickAddModal({
                                                             }
                                                             setQa(next)
                                                         }}
-                                                        aria-label="Netto oder Brutto Modus"
-                                                    >
-                                                        <option value="NET">Netto</option>
-                                                        <option value="GROSS">Brutto</option>
-                                                    </select>
+                                                        ariaLabel="Netto oder Brutto Modus"
+                                                        options={[
+                                                            { value: 'NET', label: 'Netto' },
+                                                            { value: 'GROSS', label: 'Brutto' },
+                                                        ]}
+                                                    />
                                                 </span>
                                                 <span className={`adorn-wrap flex-1 booking-floating-control${((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== null && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== undefined && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== '' ? ' booking-floating-control--filled' : ''}`}>
                                                     <label htmlFor="quick-add-amount">{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -1178,22 +1170,34 @@ export default function QuickAddModal({
                                         {(qa as any).mode === 'NET' && (
                                             <div className="field booking-floating-field booking-floating-field--filled">
                                                 <label htmlFor="quick-add-vat-rate">USt %</label>
-                                                <select
+                                                <SelectDropdown
                                                     id="quick-add-vat-rate"
-                                                    className="input"
                                                     value={String(qa.vatRate)}
-                                                    onChange={(e) => setQa({ ...qa, vatRate: Number(e.target.value) })}
-                                                    aria-label="Umsatzsteuer Prozentsatz"
-                                                >
-                                                    <option value="0">0% (steuerfrei)</option>
-                                                    <option value="7">7%</option>
-                                                    <option value="19">19%</option>
-                                                </select>
+                                                    onChange={(value) => setQa({ ...qa, vatRate: Number(value) })}
+                                                    ariaLabel="Umsatzsteuer Prozentsatz"
+                                                    options={[
+                                                        { value: '0', label: '0% (steuerfrei)' },
+                                                        { value: '7', label: '7%' },
+                                                        { value: '19', label: '19%' },
+                                                    ]}
+                                                />
                                             </div>
                                         )}
                                     </>
                                 )}
                             </div>
+                            {(qa.type === 'IN' || qa.type === 'OUT') && (
+                                <div className="field field-full-width booking-floating-field booking-floating-field--filled booking-finance-party">
+                                    <label htmlFor="quick-add-party">{qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</label>
+                                    <PartySelector
+                                        valueId={qa.partyId}
+                                        valueName={qa.counterparty || ''}
+                                        role={qa.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
+                                        inputId="quick-add-party"
+                                        onChange={(selection) => setQa({ ...qa, partyId: selection.partyId, counterparty: selection.name })}
+                                    />
+                                </div>
+                            )}
                             <div className="row">
                                 <div className="field" style={{ gridColumn: '1 / -1' }}>
                                     {hasOutOfRange && (
@@ -1205,12 +1209,15 @@ export default function QuickAddModal({
                     </div>
 
                     <div className="card form-card booking-description-card">
-                        <div className={`field field-full-width booking-floating-field${qa.description.trim() ? ' booking-floating-field--filled' : ''}`}>
+                        <div className="field field-full-width booking-floating-field booking-floating-field--filled">
                             <label htmlFor="quick-add-description">Beschreibung</label>
-                            <input id="quick-add-description" ref={descriptionInputRef} className="input" list="desc-suggestions" value={qa.description} onChange={(e) => setQa({ ...qa, description: e.target.value })} placeholder="Was wurde gebucht? z. B. Mitgliedsbeitrag Juli" />
-                            <datalist id="desc-suggestions">
-                                {descSuggest.map((description, index) => (<option key={index} value={description} />))}
-                            </datalist>
+                            <SuggestionInput
+                                id="quick-add-description"
+                                value={qa.description}
+                                suggestions={descSuggest}
+                                onChange={(value) => setQa({ ...qa, description: value })}
+                                placeholder="Was wurde gebucht? z. B. Mitgliedsbeitrag Juli"
+                            />
                         </div>
                     </div>
 
@@ -1259,40 +1266,35 @@ export default function QuickAddModal({
                                                     const isInvalid = ba.budgetId && invalidBudgetIds.has(ba.budgetId)
                                                     return (
                                                         <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                            <select
-                                                                style={{ flex: 1, borderColor: (isDuplicate || isInvalid) ? 'var(--danger)' : undefined, opacity: isInvalid ? 0.8 : 1 }}
-                                                                value={ba.budgetId || ''}
-                                                                onChange={(e) => {
+                                                            <SelectDropdown
+                                                                style={{ flex: 1, opacity: isInvalid ? 0.8 : 1 }}
+                                                                value={ba.budgetId ? String(ba.budgetId) : ''}
+                                                                invalid={!!(isDuplicate || isInvalid)}
+                                                                placeholder="— Budget wählen —"
+                                                                onChange={(value) => {
                                                                     const next = [...budgetsList]
-                                                                    next[idx] = { ...next[idx], budgetId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    next[idx] = { ...next[idx], budgetId: value ? Number(value) : 0 }
                                                                     setQa({ ...(qa as any), budgets: next } as any)
                                                                 }}
-                                                            >
-                                                                <option value="">— Budget wählen —</option>
-                                                                {(() => {
+                                                                options={[
+                                                                    { value: '', label: '— Budget wählen —' },
+                                                                    ...(() => {
                                                                     const activeIds = new Set(availableBudgets.map((b: any) => b.id))
                                                                     const selectedId = Number(ba.budgetId || 0)
                                                                     const selectedMissing = selectedId && !activeIds.has(selectedId)
                                                                     const selected = selectedMissing ? (budgetsForEdit || []).find((b: any) => b.id === selectedId) : null
-                                                                    return (
-                                                                        <>
-                                                                            {selectedMissing ? (
-                                                                                <option value={selectedId} disabled>
-                                                                                    {(selected as any)?.label ?? `Budget #${selectedId}`} (archiviert)
-                                                                                </option>
-                                                                            ) : null}
-                                                                            {availableBudgets.map((b: any) => {
+                                                                    return [
+                                                                        ...(selectedMissing ? [{ value: String(selectedId), label: `${(selected as any)?.label ?? `Budget #${selectedId}`} (archiviert)`, disabled: true }] : []),
+                                                                        ...availableBudgets.map((b: any) => {
                                                                     const eff = budgetEffectiveRange(b)
                                                                     const disabled = eff.enforce ? !inRange(qa.date, eff.start, eff.end) : false
                                                                     const suffix = eff.enforce ? ` (${fmtRange(eff.start, eff.end) || 'Zeitraum'})` : ''
-                                                                    return (
-                                                                        <option key={b.id} value={b.id} disabled={disabled}>{b.label}{suffix}</option>
-                                                                    )
-                                                                            })}
-                                                                        </>
-                                                                    )
-                                                                })()}
-                                                            </select>
+                                                                    return { value: String(b.id), label: `${b.label}${suffix}`, disabled }
+                                                                        })
+                                                                    ]
+                                                                })()
+                                                                ]}
+                                                            />
                                                             <span className="adorn-wrap" style={{ width: 110 }}>
                                                                 <input
                                                                     className="input"
@@ -1384,24 +1386,25 @@ export default function QuickAddModal({
                                                     const isInvalid = ea.earmarkId && invalidEarmarkIds.has(ea.earmarkId)
                                                     return (
                                                         <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                            <select
-                                                                style={{ flex: 1, borderColor: (isDuplicate || isInvalid) ? 'var(--danger)' : undefined, opacity: isInvalid ? 0.8 : 1 }}
-                                                                value={ea.earmarkId || ''}
-                                                                onChange={(e) => {
+                                                            <SelectDropdown
+                                                                style={{ flex: 1, opacity: isInvalid ? 0.8 : 1 }}
+                                                                value={ea.earmarkId ? String(ea.earmarkId) : ''}
+                                                                invalid={!!(isDuplicate || isInvalid)}
+                                                                placeholder="— Zweckbindung wählen —"
+                                                                onChange={(value) => {
                                                                     const next = [...earmarksList]
-                                                                    next[idx] = { ...next[idx], earmarkId: e.target.value ? Number(e.target.value) : 0 }
+                                                                    next[idx] = { ...next[idx], earmarkId: value ? Number(value) : 0 }
                                                                     setQa({ ...(qa as any), earmarksAssigned: next } as any)
                                                                 }}
-                                                            >
-                                                                <option value="">— Zweckbindung wählen —</option>
-                                                                {activeEarmarks.map((em) => {
+                                                                options={[
+                                                                    { value: '', label: '— Zweckbindung wählen —' },
+                                                                    ...activeEarmarks.map((em) => {
                                                                     const disabled = em.enforceTimeRange ? !inRange(qa.date, em.startDate ?? null, em.endDate ?? null) : false
                                                                     const suffix = em.enforceTimeRange ? ` (${fmtRange(em.startDate ?? null, em.endDate ?? null) || 'Zeitraum'})` : ''
-                                                                    return (
-                                                                        <option key={em.id} value={em.id} disabled={disabled}>{em.code} – {em.name}{suffix}</option>
-                                                                    )
-                                                                })}
-                                                            </select>
+                                                                    return { value: String(em.id), label: `${em.code} – ${em.name}${suffix}`, disabled }
+                                                                    })
+                                                                ]}
+                                                            />
                                                             <span className="adorn-wrap" style={{ width: 110 }}>
                                                                 <input
                                                                     className="input"

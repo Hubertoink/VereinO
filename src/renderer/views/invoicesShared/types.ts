@@ -46,6 +46,7 @@ export type InvoiceListRow = {
   dueDate?: string | null
   invoiceNo?: string | null
   party: string
+  partyId?: number | null
   description?: string | null
   note?: string | null
   grossAmount: number
@@ -72,6 +73,7 @@ export type InvoiceDraft = {
   dueDate?: string | null
   invoiceNo?: string | null
   party: string
+  partyId?: number | null
   description?: string | null
   note?: string | null
   grossAmount: string
@@ -106,6 +108,7 @@ export type InvoiceDetail = {
   dueDate?: string | null
   invoiceNo?: string | null
   party: string
+  partyId?: number | null
   description?: string | null
   note?: string | null
   grossAmount: number

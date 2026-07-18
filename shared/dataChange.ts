@@ -7,6 +7,7 @@ export const DATA_CHANGE_SCOPES = [
   'budgets',
   'earmarks',
   'tags',
+  'parties',
   'organizations',
   'settings'
 ] as const

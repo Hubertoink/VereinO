@@ -29,6 +29,7 @@ export type TileKey =
   | 'org'
   | 'donations'
   | 'paymentAccounts'
+  | 'parties'
   | 'tags'
   | 'aiPatterns'
   | 'cashCheck'

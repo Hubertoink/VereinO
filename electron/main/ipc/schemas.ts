@@ -50,6 +50,8 @@ export const VoucherCreateInput = z
     sphere: Sphere,
     description: z.string().optional(),
     note: z.string().nullable().optional(),
+    counterparty: z.string().nullable().optional(),
+    partyId: z.number().int().positive().nullable().optional(),
     // allow either net or gross entry
     netAmount: z.number().optional(),
     grossAmount: z.number().optional(),
@@ -511,6 +513,8 @@ export const VouchersListOutput = z.object({
       transferToAccountColor: z.string().nullable().optional(),
       description: z.string().nullable().optional(),
       note: z.string().nullable().optional(),
+      counterparty: z.string().nullable().optional(),
+      partyId: z.number().int().positive().nullable().optional(),
       netAmount: z.number(),
       vatRate: z.number(),
       vatAmount: z.number(),
@@ -566,6 +570,7 @@ export const InvoiceCreateInput = z.object({
   dueDate: z.string().nullable().optional(),
   invoiceNo: z.string().nullable().optional(),
   party: z.string(),
+  partyId: z.number().int().positive().nullable().optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   grossAmount: z.number(),
@@ -589,6 +594,7 @@ export const InvoiceUpdateInput = z.object({
   dueDate: z.string().nullable().optional(),
   invoiceNo: z.string().nullable().optional(),
   party: z.string().optional(),
+  partyId: z.number().int().positive().nullable().optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   grossAmount: z.number().optional(),
@@ -631,6 +637,7 @@ export const InvoicesListOutput = z.object({
       dueDate: z.string().nullable().optional(),
       invoiceNo: z.string().nullable().optional(),
       party: z.string(),
+      partyId: z.number().int().positive().nullable().optional(),
       description: z.string().nullable().optional(),
       note: z.string().nullable().optional(),
       grossAmount: z.number(),
@@ -682,6 +689,7 @@ export const InvoiceByIdOutput = z.object({
   dueDate: z.string().nullable().optional(),
   invoiceNo: z.string().nullable().optional(),
   party: z.string(),
+  partyId: z.number().int().positive().nullable().optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   grossAmount: z.number(),
@@ -790,6 +798,8 @@ export const VouchersRecentOutput = z.object({
       transferFrom: PaymentMethod.nullable().optional(),
       transferTo: PaymentMethod.nullable().optional(),
       description: z.string().nullable().optional(),
+      counterparty: z.string().nullable().optional(),
+      partyId: z.number().int().positive().nullable().optional(),
       netAmount: z.number(),
       vatRate: z.number(),
       vatAmount: z.number(),
@@ -820,6 +830,8 @@ export const VoucherUpdateInput = z.object({
   sphere: Sphere.optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  counterparty: z.string().nullable().optional(),
+  partyId: z.number().int().positive().nullable().optional(),
   paymentMethod: PaymentMethod.nullable().optional(),
   transferFrom: PaymentMethod.nullable().optional(),
   transferTo: PaymentMethod.nullable().optional(),
@@ -893,6 +905,82 @@ export type TPaymentAccountUpsertInput = z.infer<typeof PaymentAccountUpsertInpu
 export type TPaymentAccountUpsertOutput = z.infer<typeof PaymentAccountUpsertOutput>
 export type TPaymentAccountDeleteInput = z.infer<typeof PaymentAccountDeleteInput>
 export type TPaymentAccountDeleteOutput = z.infer<typeof PaymentAccountDeleteOutput>
+
+export const PartyRole = z.enum(['SUPPLIER', 'CUSTOMER', 'BOTH', 'OTHER'])
+export const PartyShape = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+  legalName: z.string().nullable().optional(),
+  role: PartyRole,
+  contactName: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  street: z.string().nullable().optional(),
+  postalCode: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  country: z.string(),
+  iban: z.string().nullable().optional(),
+  bic: z.string().nullable().optional(),
+  taxNumber: z.string().nullable().optional(),
+  vatId: z.string().nullable().optional(),
+  paymentTermDays: z.number().int().nonnegative().nullable().optional(),
+  note: z.string().nullable().optional(),
+  isActive: z.number().int(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().nullable().optional(),
+  voucherCount: z.number().int().nonnegative().default(0),
+  invoiceCount: z.number().int().nonnegative().default(0),
+  submissionCount: z.number().int().nonnegative().default(0),
+  lastUsedAt: z.string().nullable().optional()
+})
+export const PartiesListInput = z.object({
+  q: z.string().optional(),
+  activeOnly: z.boolean().optional(),
+  role: PartyRole.optional(),
+  limit: z.number().int().positive().max(500).optional()
+}).optional()
+export const PartiesListOutput = z.object({ rows: z.array(PartyShape) })
+export const PartyGetInput = z.object({ id: z.number().int().positive() })
+export const PartyGetOutput = PartyShape
+export const PartyUpsertInput = z.object({
+  id: z.number().int().positive().optional(),
+  name: z.string().trim().min(1).max(200),
+  legalName: z.string().max(250).nullable().optional(),
+  role: PartyRole.default('BOTH'),
+  contactName: z.string().max(200).nullable().optional(),
+  email: z.string().max(254).nullable().optional(),
+  phone: z.string().max(80).nullable().optional(),
+  street: z.string().max(250).nullable().optional(),
+  postalCode: z.string().max(30).nullable().optional(),
+  city: z.string().max(120).nullable().optional(),
+  country: z.string().max(80).nullable().optional(),
+  iban: z.string().max(50).nullable().optional(),
+  bic: z.string().max(20).nullable().optional(),
+  taxNumber: z.string().max(80).nullable().optional(),
+  vatId: z.string().max(40).nullable().optional(),
+  paymentTermDays: z.number().int().min(0).max(3650).nullable().optional(),
+  note: z.string().max(4000).nullable().optional(),
+  isActive: z.boolean().optional()
+})
+export const PartyUpsertOutput = z.object({ id: z.number().int().positive() })
+export const PartyArchiveInput = z.object({
+  id: z.number().int().positive(),
+  isActive: z.boolean()
+})
+export const PartyArchiveOutput = z.object({
+  id: z.number().int().positive(),
+  isActive: z.number().int()
+})
+export type TPartyRole = z.infer<typeof PartyRole>
+export type TParty = z.infer<typeof PartyShape>
+export type TPartiesListInput = z.infer<typeof PartiesListInput>
+export type TPartiesListOutput = z.infer<typeof PartiesListOutput>
+export type TPartyGetInput = z.infer<typeof PartyGetInput>
+export type TPartyGetOutput = z.infer<typeof PartyGetOutput>
+export type TPartyUpsertInput = z.infer<typeof PartyUpsertInput>
+export type TPartyUpsertOutput = z.infer<typeof PartyUpsertOutput>
+export type TPartyArchiveInput = z.infer<typeof PartyArchiveInput>
+export type TPartyArchiveOutput = z.infer<typeof PartyArchiveOutput>
 
 // Batch assign earmark to vouchers
 export const VouchersBatchAssignEarmarkInput = z.object({
@@ -2007,6 +2095,8 @@ export const AiBookingAnalysisResultStructured = z.object({
 
 export const AiInvoiceExtractionResult = z.object({
   supplier: z.string().nullable(),
+  // A matching entry from the central business-partner registry, never a new suggestion.
+  partyId: z.number().int().positive().nullable().optional(),
   invoiceNumber: z.string().nullable(),
   invoiceDate: z.string().nullable(),
   dueDate: z.string().nullable(),
@@ -2115,6 +2205,7 @@ export const AiBankImportReviewResultStructured = z.object({
 
 export const AiActionEntity = z.enum([
   'vouchers',
+  'parties',
   'members',
   'payments',
   'tags',
@@ -2321,6 +2412,7 @@ export const AiInvoiceBatchApproveInput = AiInvoiceBatchIdInput.extend({
 export const AiAgentDraft = z.object({
   kind: z.enum([
     'booking',
+    'partyChange',
     'voucherUpdate',
     'voucherReverse',
     'voucherRebook',

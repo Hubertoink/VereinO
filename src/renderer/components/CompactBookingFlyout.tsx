@@ -4,9 +4,11 @@ import { rememberBookingAIPattern } from '../utils/bookingAiPatterns'
 import TagsEditor from './TagsEditor'
 import DatePickerButton from './common/DatePickerButton'
 import HoverTooltip from './common/HoverTooltip'
+import PartySelector from './common/PartySelector'
+import SelectDropdown, { SuggestionInput } from './common/SelectDropdown'
 import { getInternalAssignmentValidationState } from './modals/voucherMetaValidation'
 
-type OptionalSection = 'budget' | 'earmark' | 'tags' | 'comment' | 'attachments'
+type OptionalSection = 'budget' | 'earmark' | 'party' | 'tags' | 'comment' | 'attachments'
 type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
 
@@ -113,6 +115,7 @@ function initialSections(qa: QA, files: File[]) {
   const sections = new Set<OptionalSection>()
   if (qa.budgets?.length) sections.add('budget')
   if (qa.earmarksAssigned?.length) sections.add('earmark')
+  if (qa.counterparty?.trim() || qa.partyId) sections.add('party')
   if (qa.tags?.length) sections.add('tags')
   if (qa.note?.trim()) sections.add('comment')
   if (files.length) sections.add('attachments')
@@ -319,6 +322,7 @@ export default function CompactBookingFlyout({
     if (section === 'budget') patchQa({ budgets: [] })
     if (section === 'earmark') patchQa({ earmarksAssigned: [] })
     if (section === 'tags') patchQa({ tags: [] })
+    if (section === 'party') patchQa({ partyId: null, counterparty: '' })
     if (section === 'comment') patchQa({ note: '' })
     if (section === 'attachments') setFiles([])
     if (qa.type !== 'INTERNAL' || (section !== 'budget' && section !== 'earmark')) {
@@ -384,6 +388,7 @@ export default function CompactBookingFlyout({
   const optionalButtons: Array<{ key: OptionalSection; label: string; count?: number; disabled?: boolean }> = [
     { key: 'budget', label: 'Budget', count: budgets.length, disabled: !activeBudgets.length },
     { key: 'earmark', label: 'Zweckbindung', count: assignedEarmarks.length, disabled: !activeEarmarks.length },
+    ...(qa.type === 'IN' || qa.type === 'OUT' ? [{ key: 'party' as const, label: qa.type === 'OUT' ? 'Lieferant' : 'Kunde', count: qa.counterparty?.trim() ? 1 : 0 }] : []),
     { key: 'tags', label: 'Tag', count: qa.tags?.length },
     { key: 'comment', label: 'Kommentar', count: qa.note?.trim() ? 1 : 0 },
     { key: 'attachments', label: 'Anhang', count: files.length }
@@ -398,15 +403,12 @@ export default function CompactBookingFlyout({
         </div>
         {draftTabsEnabled && draftTabs.length > 0 && (
           <div className="compact-booking-flyout__tab-switcher">
-            <select
-              className="input"
+            <SelectDropdown
               value={activeDraftId ?? ''}
-              onChange={(event) => onSelectDraft(event.target.value)}
-              aria-label="Buchungsreiter wechseln"
-              title="Offenen Buchungsentwurf wechseln"
-            >
-              {draftTabs.map((draft) => <option key={draft.id} value={draft.id} title={draft.title}>{draft.label}</option>)}
-            </select>
+              onChange={onSelectDraft}
+              ariaLabel="Buchungsreiter wechseln"
+              options={draftTabs.map((draft) => ({ value: draft.id, label: draft.label, description: draft.title }))}
+            />
             <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--new" onClick={onNewDraft} aria-label="Neuen Buchungsreiter öffnen" title="Neue Buchung als weiteren Reiter öffnen">+</button>
           </div>
         )}
@@ -464,12 +466,17 @@ export default function CompactBookingFlyout({
                     )}
                   </HoverTooltip>
                 </span>
-                <select className="input" value={qa.sphere} onChange={(event) => patchQa({ sphere: event.target.value as QA['sphere'] })} aria-label="Sphäre der Buchung">
-                  <option value="IDEELL">Ideeller Bereich</option>
-                  <option value="ZWECK">Zweckbetrieb</option>
-                  <option value="VERMOEGEN">Vermögensverwaltung</option>
-                  <option value="WGB">Wirtschaftlicher Geschäftsbetrieb</option>
-                </select>
+                <SelectDropdown
+                  value={qa.sphere}
+                  onChange={(value) => patchQa({ sphere: value as QA['sphere'] })}
+                  ariaLabel="Sphäre der Buchung"
+                  options={[
+                    { value: 'IDEELL', label: 'Ideeller Bereich' },
+                    { value: 'ZWECK', label: 'Zweckbetrieb' },
+                    { value: 'VERMOEGEN', label: 'Vermögensverwaltung' },
+                    { value: 'WGB', label: 'Wirtschaftlicher Geschäftsbetrieb' },
+                  ]}
+                />
               </label>
             )}
 
@@ -477,38 +484,29 @@ export default function CompactBookingFlyout({
               <>
                 <label className="compact-booking-field">
                   <span>Von Konto *</span>
-                  <select className={`input${hasSameTransferAccount ? ' input-error' : ''}`} style={{ color: accountsById.get(Number(qa.transferFromAccountId || 0))?.color || undefined }} value={String(qa.transferFromAccountId ?? '')} onChange={(event) => {
-                    const id = event.target.value ? Number(event.target.value) : null
+                  <SelectDropdown invalid={hasSameTransferAccount} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferFromAccountId || 0))?.color || undefined }} value={String(qa.transferFromAccountId ?? '')} onChange={(value) => {
+                    const id = value ? Number(value) : null
                     const account = accountsById.get(Number(id || 0))
                     patchQa({ transferFromAccountId: id, transferFromAccountName: account?.name ?? null, transferFrom: accountMethod(account?.kind) })
-                  }} aria-label="Transfer von Konto" aria-invalid={hasSameTransferAccount}>
-                    <option value="">Konto wählen</option>
-                    {activeAccounts.map((account) => <option key={account.id} value={account.id} disabled={account.id === qa.transferToAccountId} style={{ color: account.color || undefined }}>{account.name}</option>)}
-                  </select>
+                  }} ariaLabel="Transfer von Konto" options={activeAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined, disabled: account.id === qa.transferToAccountId }))} />
                 </label>
                 <label className="compact-booking-field">
                   <span>Nach Konto *</span>
-                  <select className={`input${hasSameTransferAccount ? ' input-error' : ''}`} style={{ color: accountsById.get(Number(qa.transferToAccountId || 0))?.color || undefined }} value={String(qa.transferToAccountId ?? '')} onChange={(event) => {
-                    const id = event.target.value ? Number(event.target.value) : null
+                  <SelectDropdown invalid={hasSameTransferAccount} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferToAccountId || 0))?.color || undefined }} value={String(qa.transferToAccountId ?? '')} onChange={(value) => {
+                    const id = value ? Number(value) : null
                     const account = accountsById.get(Number(id || 0))
                     patchQa({ transferToAccountId: id, transferToAccountName: account?.name ?? null, transferTo: accountMethod(account?.kind) })
-                  }} aria-label="Transfer nach Konto" aria-invalid={hasSameTransferAccount}>
-                    <option value="">Konto wählen</option>
-                    {activeAccounts.map((account) => <option key={account.id} value={account.id} disabled={account.id === qa.transferFromAccountId} style={{ color: account.color || undefined }}>{account.name}</option>)}
-                  </select>
+                  }} ariaLabel="Transfer nach Konto" options={activeAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined, disabled: account.id === qa.transferFromAccountId }))} />
                 </label>
               </>
             ) : qa.type !== 'INTERNAL' ? (
               <label className="compact-booking-field">
                 <span>Konto *</span>
-                <select className="input" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(event) => {
-                  const id = event.target.value ? Number(event.target.value) : null
+                <SelectDropdown placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
+                  const id = value ? Number(value) : null
                   const account = accountsById.get(Number(id || 0))
                   patchQa({ paymentAccountId: id, paymentAccountName: account?.name ?? null, paymentMethod: accountMethod(account?.kind) })
-                }} aria-label="Buchungskonto wählen">
-                  <option value="">Konto wählen</option>
-                  {activeAccounts.map((account) => <option key={account.id} value={account.id} style={{ color: account.color || undefined }}>{account.name}</option>)}
-                </select>
+                }} ariaLabel="Buchungskonto wählen" options={activeAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))} />
               </label>
             ) : (
               <div className="compact-booking-field compact-booking-field--readonly"><span>Zahlweg</span><strong>Intern</strong></div>
@@ -518,14 +516,11 @@ export default function CompactBookingFlyout({
               <span>Betrag *</span>
               <span className={`compact-booking-amount-control${qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' ? ' compact-booking-amount-control--with-vat' : ''}`}>
                 {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && (
-                  <select className="input" value={qa.mode ?? 'GROSS'} onChange={(event) => {
-                    const mode = event.target.value as 'NET' | 'GROSS'
+                  <SelectDropdown value={qa.mode ?? 'GROSS'} onChange={(value) => {
+                    const mode = value as 'NET' | 'GROSS'
                     if (mode === 'NET') patchQa({ mode, netAmount: qa.netAmount ?? qa.grossAmount ?? 0, vatRate: qa.vatRate || 19 })
                     else patchQa({ mode, grossAmount: qa.grossAmount ?? gross, vatRate: 0 })
-                  }} aria-label="Netto oder Brutto Modus">
-                    <option value="GROSS">Brutto</option>
-                    <option value="NET">Netto</option>
-                  </select>
+                  }} ariaLabel="Netto oder Brutto Modus" options={[{ value: 'GROSS', label: 'Brutto' }, { value: 'NET', label: 'Netto' }]} />
                 )}
                 <span className="adorn-wrap">
                   <input ref={amountInputRef} className={`input amount-input${hasInvalidAmount ? ' input-error' : ''}`} type="number" step="0.01" value={(qa.type === 'TRANSFER' || qa.type === 'INTERNAL' || qa.mode === 'GROSS') ? qa.grossAmount ?? '' : qa.netAmount ?? ''} onFocus={(event) => event.currentTarget.select()} onChange={(event) => {
@@ -544,9 +539,7 @@ export default function CompactBookingFlyout({
                   <span className="adorn-suffix">€</span>
                 </span>
                 {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' && (
-                  <select className="input compact-booking-vat-select" value={String(qa.vatRate)} onChange={(event) => patchQa({ vatRate: Number(event.target.value) })} aria-label="Umsatzsteuer Prozentsatz" title="Umsatzsteuer">
-                    <option value="0">0 % USt</option><option value="7">7 % USt</option><option value="19">19 % USt</option>
-                  </select>
+                  <SelectDropdown className="compact-booking-vat-select" value={String(qa.vatRate)} onChange={(value) => patchQa({ vatRate: Number(value) })} ariaLabel="Umsatzsteuer Prozentsatz" options={[{ value: '0', label: '0 % USt' }, { value: '7', label: '7 % USt' }, { value: '19', label: '19 % USt' }]} />
                 )}
               </span>
             </label>
@@ -554,8 +547,7 @@ export default function CompactBookingFlyout({
 
           <label className="compact-booking-field compact-booking-field--description">
             <span>Beschreibung</span>
-            <input className="input" list="compact-booking-descriptions" value={qa.description} onChange={(event) => patchQa({ description: event.target.value })} placeholder="Was wurde gebucht?" />
-            <datalist id="compact-booking-descriptions">{descSuggest.map((description) => <option key={description} value={description} />)}</datalist>
+            <SuggestionInput value={qa.description} suggestions={descSuggest} onChange={(value) => patchQa({ description: value })} placeholder="Was wurde gebucht?" />
           </label>
 
           <div className="compact-booking-optional-bar" aria-label="Weitere Buchungsfelder">
@@ -573,13 +565,31 @@ export default function CompactBookingFlyout({
             <div className="compact-booking-required-note">Interne Buchungen benötigen ausgeglichene Zuordnungen: Quelle negativ, Ziel positiv.</div>
           )}
 
+          {visibleSections.has('party') && (qa.type === 'IN' || qa.type === 'OUT') && (
+            <div className="compact-booking-optional-section compact-booking-party-section" aria-label="Geschäftspartner">
+              <div className="compact-booking-section-title">
+                <strong>{qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</strong>
+                <button type="button" onClick={() => removeSection('party')} aria-label="Geschäftspartner entfernen">×</button>
+              </div>
+              <PartySelector
+                valueId={qa.partyId}
+                valueName={qa.counterparty || ''}
+                role={qa.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
+                inputId="compact-booking-party"
+                ariaLabel={qa.type === 'OUT' ? 'Lieferant oder Zahlungsempfänger' : 'Kunde oder Zahlungspflichtiger'}
+                menuPlacement="top"
+                onChange={(selection) => patchQa({ partyId: selection.partyId, counterparty: selection.name })}
+              />
+            </div>
+          )}
+
           {visibleSections.has('budget') && (
             <div className="compact-booking-optional-section" aria-label="Budget-Zuordnungen">
               <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Budget (erforderlich, alternativ Zweckbindung)' : 'Budget'}</strong>{qa.type !== 'INTERNAL' && <button type="button" onClick={() => removeSection('budget')} aria-label="Budget-Feld entfernen">×</button>}</div>
               {budgets.map((assignment, index) => (
                 <div className="compact-booking-assignment-row" key={`budget-${index}`}>
-                  <select className={`input${(!assignment.budgetId || chosenBudgetIds.filter((id) => id === assignment.budgetId).length > 1 || invalidBudgetIds.has(assignment.budgetId)) ? ' input-error' : ''}`} value={assignment.budgetId || ''} onChange={(event) => {
-                    const budgetId = event.target.value ? Number(event.target.value) : 0
+                  <SelectDropdown invalid={!assignment.budgetId || chosenBudgetIds.filter((id) => id === assignment.budgetId).length > 1 || invalidBudgetIds.has(assignment.budgetId)} value={assignment.budgetId ? String(assignment.budgetId) : ''} placeholder="Budget wählen" onChange={(value) => {
+                    const budgetId = value ? Number(value) : 0
                     const amount = budgetId && assignmentAmountIsInvalid(assignment.amount) && gross > 0
                       ? qa.type === 'INTERNAL'
                         ? nextInternalAssignmentAmount()
@@ -588,14 +598,14 @@ export default function CompactBookingFlyout({
                     const next = [...budgets]
                     next[index] = { ...assignment, budgetId, amount }
                     patchQa({ budgets: next })
-                  }} aria-label={`Budget ${index + 1}`} aria-invalid={!assignment.budgetId || chosenBudgetIds.filter((id) => id === assignment.budgetId).length > 1 || invalidBudgetIds.has(assignment.budgetId)}>
-                    <option value="">Budget wählen</option>
-                    {activeBudgets.map((budget) => {
+                  }} ariaLabel={`Budget ${index + 1}`} options={[
+                    { value: '', label: 'Budget wählen' },
+                    ...activeBudgets.map((budget) => {
                       const range = budgetRange(budget)
                       const disabled = budget.enforceTimeRange ? !inRange(qa.date, range.start, range.end) : false
-                      return <option key={budget.id} value={budget.id} disabled={disabled}>{budget.label}{disabled ? ' (außerhalb Zeitraum)' : ''}</option>
-                    })}
-                  </select>
+                      return { value: String(budget.id), label: `${budget.label}${disabled ? ' (außerhalb Zeitraum)' : ''}`, disabled }
+                    })
+                  ]} />
                   <span className="adorn-wrap"><input className={`input${assignmentAmountIsInvalid(assignment.amount) ? ' input-error' : ''}`} type="number" step="0.01" min={qa.type === 'INTERNAL' ? undefined : '0.01'} value={assignment.amount ?? ''} onChange={(event) => {
                     const next = [...budgets]
                     next[index] = { ...assignment, amount: event.target.value === '' ? 0 : Number(event.target.value) }
@@ -617,8 +627,8 @@ export default function CompactBookingFlyout({
               <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Zweckbindung (erforderlich, alternativ Budget)' : 'Zweckbindung'}</strong>{qa.type !== 'INTERNAL' && <button type="button" onClick={() => removeSection('earmark')} aria-label="Zweckbindungs-Feld entfernen">×</button>}</div>
               {assignedEarmarks.map((assignment, index) => (
                 <div className="compact-booking-assignment-row" key={`earmark-${index}`}>
-                  <select className={`input${(!assignment.earmarkId || chosenEarmarkIds.filter((id) => id === assignment.earmarkId).length > 1 || invalidEarmarkIds.has(assignment.earmarkId)) ? ' input-error' : ''}`} value={assignment.earmarkId || ''} onChange={(event) => {
-                    const earmarkId = event.target.value ? Number(event.target.value) : 0
+                  <SelectDropdown invalid={!assignment.earmarkId || chosenEarmarkIds.filter((id) => id === assignment.earmarkId).length > 1 || invalidEarmarkIds.has(assignment.earmarkId)} value={assignment.earmarkId ? String(assignment.earmarkId) : ''} placeholder="Zweckbindung wählen" onChange={(value) => {
+                    const earmarkId = value ? Number(value) : 0
                     const amount = earmarkId && assignmentAmountIsInvalid(assignment.amount) && gross > 0
                       ? qa.type === 'INTERNAL'
                         ? nextInternalAssignmentAmount()
@@ -627,13 +637,13 @@ export default function CompactBookingFlyout({
                     const next = [...assignedEarmarks]
                     next[index] = { ...assignment, earmarkId, amount }
                     patchQa({ earmarksAssigned: next })
-                  }} aria-label={`Zweckbindung ${index + 1}`} aria-invalid={!assignment.earmarkId || chosenEarmarkIds.filter((id) => id === assignment.earmarkId).length > 1 || invalidEarmarkIds.has(assignment.earmarkId)}>
-                    <option value="">Zweckbindung wählen</option>
-                    {activeEarmarks.map((earmark) => {
+                  }} ariaLabel={`Zweckbindung ${index + 1}`} options={[
+                    { value: '', label: 'Zweckbindung wählen' },
+                    ...activeEarmarks.map((earmark) => {
                       const disabled = !!earmark.enforceTimeRange && !inRange(qa.date, earmark.startDate, earmark.endDate)
-                      return <option key={earmark.id} value={earmark.id} disabled={disabled}>{earmark.code} – {earmark.name}{disabled ? ' (außerhalb Zeitraum)' : ''}</option>
-                    })}
-                  </select>
+                      return { value: String(earmark.id), label: `${earmark.code} – ${earmark.name}${disabled ? ' (außerhalb Zeitraum)' : ''}`, disabled }
+                    })
+                  ]} />
                   <span className="adorn-wrap"><input className={`input${assignmentAmountIsInvalid(assignment.amount) ? ' input-error' : ''}`} type="number" step="0.01" min={qa.type === 'INTERNAL' ? undefined : '0.01'} value={assignment.amount ?? ''} onChange={(event) => {
                     const next = [...assignedEarmarks]
                     next[index] = { ...assignment, amount: event.target.value === '' ? 0 : Number(event.target.value) }

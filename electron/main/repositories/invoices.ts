@@ -134,6 +134,8 @@ export function buildInvoiceVoucherCreationInput(input: {
     vatRate: 0,
     paymentMethod: paymentMethod as 'BAR' | 'BANK' | null,
     paymentAccountId: paymentAccountId != null ? Number(paymentAccountId) : null,
+    counterparty: invoice.party && String(invoice.party).trim() ? String(invoice.party).trim() : null,
+    partyId: invoice.party_id ?? invoice.partyId ?? null,
     budgets,
     earmarks,
     tags: Array.isArray(input.tags) ? input.tags : []
@@ -145,6 +147,7 @@ export function createInvoice(input: {
   dueDate?: string | null
   invoiceNo?: string | null
   party: string
+  partyId?: number | null
   description?: string | null
   note?: string | null
   grossAmount: number
@@ -167,12 +170,13 @@ export function createInvoice(input: {
     const normalizedEarmarks = normalizeInvoiceEarmarkAssignments(input, clamp2(input.grossAmount))
     const normalizedBudgetId = normalizedBudgets[0]?.budgetId ?? input.budgetId ?? null
     const normalizedEarmarkId = normalizedEarmarks[0]?.earmarkId ?? input.earmarkId ?? null
-    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, description, note, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, party_id, description, note, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         input.date,
         input.dueDate ?? null,
         input.invoiceNo ?? null,
         input.party,
+        input.partyId ?? null,
         input.description ?? null,
         input.note ?? null,
         clamp2(input.grossAmount),
@@ -209,6 +213,7 @@ export function updateInvoice(input: {
   dueDate?: string | null
   invoiceNo?: string | null
   party?: string
+  partyId?: number | null
   description?: string | null
   note?: string | null
   grossAmount?: number
@@ -245,6 +250,7 @@ export function updateInvoice(input: {
       due_date=COALESCE(?, due_date),
       invoice_no=COALESCE(?, invoice_no),
       party=COALESCE(?, party),
+      party_id=CASE WHEN ? THEN ? ELSE party_id END,
       description=COALESCE(?, description),
       note=COALESCE(?, note),
       gross_amount=COALESCE(?, gross_amount),
@@ -261,6 +267,8 @@ export function updateInvoice(input: {
       input.dueDate ?? null,
       input.invoiceNo ?? null,
       input.party ?? null,
+      input.partyId !== undefined ? 1 : 0,
+      input.partyId ?? null,
       input.description ?? null,
       input.note ?? null,
       input.grossAmount != null ? clamp2(input.grossAmount) : null,
@@ -336,7 +344,7 @@ export function listInvoicesPaged(filters: {
   const orderDir = sort ?? 'ASC'
 
   const rows = d.prepare(`
-    SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description, i.note,
+    SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.party_id as partyId, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.sphere,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
@@ -440,7 +448,7 @@ export function summarizeInvoices(filters: {
 
 export function getInvoiceById(id: number) {
   const d = getDb()
-  const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.description, i.note,
+  const r = d.prepare(`SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.party_id as partyId, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId,
            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountName,
            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountKind,

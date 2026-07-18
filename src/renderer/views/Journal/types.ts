@@ -29,6 +29,8 @@ export type VoucherRow = {
     sphere: VoucherSphere
     description?: string | null
     note?: string | null
+    counterparty?: string | null
+    partyId?: number | null
     isAdvancePlaceholder?: boolean
     isCashCheck?: boolean
     paymentMethod?: PaymentMethod | null

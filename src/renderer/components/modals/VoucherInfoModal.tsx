@@ -17,6 +17,7 @@ type VoucherInfo = {
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   description?: string | null
   note?: string | null
+  counterparty?: string | null
   paymentMethod?: 'BAR' | 'BANK' | null
   paymentAccountName?: string | null
   paymentAccountKind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null
@@ -261,6 +262,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     const text = `Datum: ${fmtDate(voucher.date)}
 Belegnummer: ${voucher.voucherNo}
 Beschreibung: ${voucher.description || '-'}
+Geschäftspartner: ${voucher.counterparty || '-'}
 Kommentar: ${voucher.note || '-'}
 Brutto: ${eurFmt.format(voucher.grossAmount)}
 Art: ${typeLabel}
@@ -409,6 +411,12 @@ Status: ${statusLabel}`
                   <span className="voucher-info-row__label">Beschreibung:</span>
                   <span className="voucher-info-row__value" style={{ wordBreak: 'break-word' }}>{voucher.description || '-'}</span>
                 </div>
+                {voucher.counterparty ? (
+                  <div className="voucher-info-row">
+                    <span className="voucher-info-row__label">Geschäftspartner:</span>
+                    <span className="voucher-info-row__value" style={{ wordBreak: 'break-word' }}>{voucher.counterparty}</span>
+                  </div>
+                ) : null}
               </div>
               <div className="voucher-info-primary-grid__right">
                 <div className={`voucher-info-row voucher-info-note-row${editingMeta ? ' voucher-info-note-row--editing' : ''}`}>

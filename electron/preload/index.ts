@@ -206,6 +206,12 @@ const rendererApi = {
     upsert: (payload) => invoke('paymentAccounts.upsert', payload),
     delete: (payload) => invoke('paymentAccounts.delete', payload)
   },
+  parties: {
+    list: (payload) => invoke('parties.list', payload),
+    get: (payload) => invoke('parties.get', payload),
+    upsert: (payload) => cleanInvoke('parties.upsert', payload),
+    archive: (payload) => cleanInvoke('parties.archive', payload)
+  },
   tags: {
     list: (payload) => invoke('tags.list', payload),
     upsert: (payload) => invoke('tags.upsert', payload),

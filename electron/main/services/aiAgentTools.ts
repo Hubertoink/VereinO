@@ -12,12 +12,13 @@ import { listMembers } from '../repositories/members'
 import { listAiAgentAutoRules, listAiAgentMemory, upsertAiAgentAutoRule, upsertAiAgentMemory } from '../repositories/aiAgentKnowledge'
 import * as mp from '../repositories/members_payments'
 import { listPaymentAccounts } from '../repositories/paymentAccounts'
+import { listParties } from '../repositories/parties'
 import { listTags } from '../repositories/tags'
 import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVouchers, summarizeVouchers } from '../repositories/vouchers'
 import type { AiContext } from './ai'
 
 export type AiAgentDraft = {
-  kind: 'booking' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
+  kind: 'booking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
   title: string
   payload: unknown
   autoApproval?: {
@@ -230,6 +231,27 @@ function earmarkPayloadDisplay(payload: any) {
     payload.code && payload.name ? `${payload.code} · ${payload.name}` : payload.name || payload.code,
     payload.budget != null ? `${roundMoney(payload.budget)} EUR` : null,
     payload.isActive === false ? 'inaktiv' : 'aktiv'
+  ].filter(Boolean).join(' · ')
+}
+
+function partyDisplay(row: any) {
+  if (!row) return 'nicht vorhanden'
+  return [
+    row.name,
+    row.legalName && row.legalName !== row.name ? row.legalName : null,
+    row.role,
+    row.email || row.phone || row.city || null,
+    row.isActive === 0 ? 'archiviert' : 'aktiv'
+  ].filter(Boolean).join(' · ')
+}
+
+function partyPayloadDisplay(payload: any) {
+  return [
+    payload.name,
+    payload.legalName && payload.legalName !== payload.name ? payload.legalName : null,
+    payload.role,
+    payload.email || payload.phone || payload.city || null,
+    payload.isActive === false ? 'archiviert' : 'aktiv'
   ].filter(Boolean).join(' · ')
 }
 
@@ -592,7 +614,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'master_data_list',
-      description: 'Listet aktive Zahlungskonten, Tags, Budgets/Kategorien und Zweckbindungen für genaue ID-Zuordnungen.',
+      description: 'Listet aktive Zahlungskonten, Geschäftspartner, Tags, Budgets/Kategorien und Zweckbindungen für genaue ID-Zuordnungen.',
       readOnly: true,
       parameters: toolParameters({
         includeArchived: { type: 'boolean', description: 'Archivierte Budgets und inaktive Zweckbindungen einbeziehen.' }
@@ -603,6 +625,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           ok: true,
           data: {
             paymentAccounts: listPaymentAccounts({ activeOnly: true } as any),
+            parties: listParties({ activeOnly: true, limit: 200 } as any),
             tags: listTags({ includeUsage: true } as any),
             budgets: listBudgets({ includeArchived: !!args.includeArchived } as any),
             earmarks: listBindings({ activeOnly: !args.includeArchived } as any)
@@ -852,6 +875,36 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           data: {
             summary: mp.dueSummary(),
             rows
+          }
+        }
+      }
+    },
+    {
+      name: 'parties_list',
+      description: 'Sucht in der zentralen Geschäftspartnerkartei nach Lieferanten, Kunden, Händlern oder Zahlungsempfängern. Vor dem Anlegen immer zur Dublettenprüfung verwenden.',
+      readOnly: true,
+      parameters: toolParameters({
+        q: nullableString,
+        includeArchived: { type: 'boolean' },
+        role: { type: ['string', 'null'], enum: ['SUPPLIER', 'CUSTOMER', 'BOTH', 'OTHER', null] },
+        limit: { type: 'number', description: 'Maximal 200.' }
+      }),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          q: z.string().nullable().optional(),
+          includeArchived: z.boolean().optional(),
+          role: z.enum(['SUPPLIER', 'CUSTOMER', 'BOTH', 'OTHER']).nullable().optional(),
+          limit: z.number().optional()
+        }), rawArgs)
+        return {
+          ok: true,
+          data: {
+            rows: listParties({
+              q: args.q || undefined,
+              activeOnly: !args.includeArchived,
+              role: args.role || undefined,
+              limit: limitNumber(args.limit, 80, 200)
+            })
           }
         }
       }
@@ -1182,6 +1235,143 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
               changes,
               reason: args.reason || null
             }
+          }
+        }
+      }
+    },
+    {
+      name: 'party_change_draft_prepare',
+      description: 'Bereitet einen Review-Entwurf vor, um zentrale Geschäftspartner anzulegen oder zu ändern. Vor dem Anlegen immer parties_list zur Dublettenprüfung nutzen. Speichert nichts direkt und erzeugt keine Buchung.',
+      readOnly: false,
+      parameters: toolParameters({
+        changes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              action: { type: 'string', enum: ['CREATE', 'UPDATE'] },
+              partyId: nullableNumber,
+              name: { type: 'string' },
+              legalName: nullableString,
+              role: { type: ['string', 'null'], enum: ['SUPPLIER', 'CUSTOMER', 'BOTH', 'OTHER', null] },
+              contactName: nullableString,
+              email: nullableString,
+              phone: nullableString,
+              street: nullableString,
+              postalCode: nullableString,
+              city: nullableString,
+              country: nullableString,
+              iban: nullableString,
+              bic: nullableString,
+              taxNumber: nullableString,
+              vatId: nullableString,
+              paymentTermDays: nullableNumber,
+              note: nullableString,
+              isActive: { type: ['boolean', 'null'] }
+            },
+            required: ['action', 'name']
+          }
+        },
+        reason: nullableString
+      }, ['changes']),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          changes: z.array(z.object({
+            action: z.enum(['CREATE', 'UPDATE']),
+            partyId: z.number().int().positive().nullable().optional(),
+            name: z.string().min(1).max(200),
+            legalName: z.string().nullable().optional(),
+            role: z.enum(['SUPPLIER', 'CUSTOMER', 'BOTH', 'OTHER']).nullable().optional(),
+            contactName: z.string().nullable().optional(),
+            email: z.string().nullable().optional(),
+            phone: z.string().nullable().optional(),
+            street: z.string().nullable().optional(),
+            postalCode: z.string().nullable().optional(),
+            city: z.string().nullable().optional(),
+            country: z.string().nullable().optional(),
+            iban: z.string().nullable().optional(),
+            bic: z.string().nullable().optional(),
+            taxNumber: z.string().nullable().optional(),
+            vatId: z.string().nullable().optional(),
+            paymentTermDays: z.number().int().min(0).max(3650).nullable().optional(),
+            note: z.string().nullable().optional(),
+            isActive: z.boolean().nullable().optional()
+          })).min(1).max(50),
+          reason: z.string().nullable().optional()
+        }), rawArgs)
+        const existing = (listParties({ activeOnly: false, limit: 500 } as any) || []) as any[]
+        const byId = new Map(existing.map((party: any) => [Number(party.id), party]))
+        const byName = new Map<string, any>()
+        for (const party of existing) {
+          for (const name of [party.name, party.legalName]) {
+            const normalized = normalizeLookup(name)
+            if (normalized) byName.set(normalized, party)
+          }
+        }
+        const skipped: string[] = []
+        const changes = args.changes.flatMap((change, idx) => {
+          const requestedName = change.name.trim()
+          const current = change.partyId ? byId.get(change.partyId) : byName.get(normalizeLookup(requestedName))
+          if (change.action === 'CREATE' && current) {
+            skipped.push(`${requestedName} existiert bereits als ${partyDisplay(current)}`)
+            return []
+          }
+          if (change.action === 'UPDATE' && !current) {
+            skipped.push(`${requestedName} wurde zum Ändern nicht gefunden`)
+            return []
+          }
+          const payload = {
+            ...(change.action === 'UPDATE' && current?.id ? { id: Number(current.id) } : {}),
+            name: requestedName,
+            legalName: change.legalName ?? current?.legalName ?? null,
+            role: change.role ?? current?.role ?? 'BOTH',
+            contactName: change.contactName ?? current?.contactName ?? null,
+            email: change.email ?? current?.email ?? null,
+            phone: change.phone ?? current?.phone ?? null,
+            street: change.street ?? current?.street ?? null,
+            postalCode: change.postalCode ?? current?.postalCode ?? null,
+            city: change.city ?? current?.city ?? null,
+            country: change.country ?? current?.country ?? 'DE',
+            iban: change.iban ?? current?.iban ?? null,
+            bic: change.bic ?? current?.bic ?? null,
+            taxNumber: change.taxNumber ?? current?.taxNumber ?? null,
+            vatId: change.vatId ?? current?.vatId ?? null,
+            paymentTermDays: change.paymentTermDays ?? current?.paymentTermDays ?? null,
+            note: change.note ?? current?.note ?? null,
+            isActive: change.isActive ?? (current ? current.isActive !== 0 : true)
+          }
+          return [{
+            id: `agent-party-${change.action.toLowerCase()}-${change.partyId || normalizeLookup(requestedName)}-${idx}`,
+            action: change.action,
+            partyId: current?.id ?? null,
+            name: requestedName,
+            oldDisplay: partyDisplay(current),
+            newDisplay: partyPayloadDisplay(payload),
+            payload,
+            selected: true
+          }]
+        })
+        if (!changes.length) {
+          return {
+            ok: false,
+            warning: skipped.length
+              ? `Kein neuer Geschäftspartner vorbereitet: ${skipped.join('; ')}.`
+              : 'Keine gültige Geschäftspartner-Änderung erkannt.'
+          }
+        }
+        return {
+          ok: true,
+          data: {
+            message: `${changes.length} Geschäftspartner-Änderung(en) als Review-Entwurf vorbereitet.`,
+            reason: args.reason || null,
+            changes,
+            warnings: skipped
+          },
+          draft: {
+            kind: 'partyChange',
+            title: args.reason || `${changes.length} Geschäftspartner-Änderung(en)`,
+            payload: { changes, reason: args.reason || null, warnings: skipped }
           }
         }
       }

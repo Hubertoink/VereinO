@@ -85,6 +85,7 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
     dueDate: row?.dueDate ?? null,
     invoiceNo: row?.invoiceNo ?? '',
     party: row?.party ?? '',
+    partyId: row?.partyId ?? null,
     description: row?.description ?? '',
     note: row?.note ?? '',
     grossAmount: row?.grossAmount != null ? String(row.grossAmount) : '',
@@ -509,6 +510,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         dueDate: result.fields.dueDate || null,
         invoiceNo: result.fields.invoiceNumber.trim(),
         party: result.fields.supplier.trim(),
+        partyId: result.partyId,
         description: result.fields.description.trim() || null,
         note: invoiceFacts || null,
         grossAmount: normalizedGrossAmount,
@@ -591,6 +593,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           dueDate: draft.dueDate || null,
           invoiceNo: (draft.invoiceNo || '').trim() || null,
           party: draft.party.trim(),
+          partyId: draft.partyId ?? null,
           description: (draft.description || '').trim() || null,
           note: (draft.note || '').trim() || null,
           grossAmount: amount,
@@ -622,6 +625,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           dueDate: draft.dueDate || null,
           invoiceNo: (draft.invoiceNo || '').trim() || null,
           party: draft.party.trim(),
+          partyId: draft.partyId ?? null,
           description: (draft.description || '').trim() || null,
           note: (draft.note || '').trim() || null,
           grossAmount: amount,
@@ -653,12 +657,6 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   function removeFileAt(index: number) {
     setFormFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
   }
-
-  const partySuggestions = useMemo(() => {
-    const values = new Set<string>()
-    for (const row of rows) if (row?.party) values.add(String(row.party))
-    return Array.from(values).sort().slice(0, 30)
-  }, [rows])
 
   const descSuggestions = useMemo(() => {
     const values = new Set<string>()
@@ -966,7 +964,6 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           budgets={budgets}
           earmarks={earmarks}
           paymentAccounts={paymentAccounts}
-          partySuggestions={partySuggestions}
           descSuggestions={descSuggestions}
           formFiles={formFiles}
           editInvoiceFiles={editInvoiceFiles}

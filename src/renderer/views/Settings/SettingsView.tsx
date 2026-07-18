@@ -8,6 +8,7 @@ import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
 import { DonationsPane } from './panes/DonationsPane'
 import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
+import { PartiesPane } from './panes/PartiesPane'
 import { TagsPane } from './panes/TagsPane'
 import { AIPatternsPane } from './panes/AIPatternsPane'
 import { CashCheckPane } from './panes/CashCheckPane'
@@ -25,6 +26,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'org',
   'donations',
   'paymentAccounts',
+  'parties',
   'tags',
   'aiPatterns',
   'cashCheck',
@@ -177,6 +179,8 @@ export function SettingsView(props: SettingsProps) {
           bumpDataVersion={props.bumpDataVersion}
         />
       )}
+
+      {activeTile === 'parties' && <PartiesPane notify={props.notify} />}
         
         {activeTile === 'tags' && (
           <TagsPane

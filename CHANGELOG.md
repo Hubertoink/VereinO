@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.0.0] - 2026-07-18
+
+### Hinzugefügt
+
+- Geschäftspartner: Zentrale Lieferanten- und Kundenkartei mit Kontaktdaten, Rollen, Archivierung und Verwendungsübersicht. Geschäftspartner können in Buchungen und Rechnungen ausgewählt werden.
+- KI: Geschäftspartner können als prüfbare Stammdatenänderungen vorbereitet und aus der Agent-Review-Queue übernommen werden.
+- Buchungserfassung: Lieferanten und Kunden lassen sich optional direkt in der kompakten Buchungsmaske zuordnen.
+
+### Geändert
+
+- Einstellungen: Die Geschäftspartner-Übersicht verwendet eine kompakte Tabelle mit den wichtigsten Daten und Icon-Aktionen im Stil der Budget-Tabelle.
+- Auswahlfelder in der Buchungserfassung verwenden einheitliche, durchsuchbare Dropdowns.
+- Tätigkeitsberichte: Budgets und Zweckbindungen zeigen beim Darüberfahren aktuelle Kennzahlen, Laufzeit und Hinweise zu Buchungen außerhalb des Zeitraums.
+
+### Behoben
+
+- KI: Ein neuer Chat entfernt nun auch abgeschlossene Geschäftspartner-Reviews vollständig aus der Ansicht.
+
 ## [2.9.9] - 2026-07-18
 
 ### Hinzugefügt

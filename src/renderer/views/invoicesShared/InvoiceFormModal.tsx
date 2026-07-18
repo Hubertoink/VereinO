@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../../components/TagsEditor'
 import DatePickerButton from '../../components/common/DatePickerButton'
+import PartySelector from '../../components/common/PartySelector'
 import type {
   InvoiceBudgetAssignment,
   EditInvoiceFile,
@@ -22,7 +23,6 @@ type Props = {
   budgets: InvoiceBudgetOption[]
   earmarks: InvoiceEarmarkOption[]
   paymentAccounts: InvoicePaymentAccountOption[]
-  partySuggestions: string[]
   descSuggestions: string[]
   formFiles: File[]
   editInvoiceFiles: EditInvoiceFile[]
@@ -46,7 +46,6 @@ export default function InvoiceFormModal({
   budgets,
   earmarks,
   paymentAccounts,
-  partySuggestions,
   descSuggestions,
   formFiles,
   editInvoiceFiles,
@@ -65,7 +64,6 @@ export default function InvoiceFormModal({
   const editInvoiceFileInputRef = useRef<HTMLInputElement | null>(null)
   const invoiceDateInputRef = useRef<HTMLInputElement | null>(null)
   const invoiceDueDateInputRef = useRef<HTMLInputElement | null>(null)
-  const invoicePartyInputRef = useRef<HTMLInputElement | null>(null)
   const invoiceNoInputRef = useRef<HTMLInputElement | null>(null)
   const invoiceAmountInputRef = useRef<HTMLInputElement | null>(null)
   const invoiceDescriptionInputRef = useRef<HTMLInputElement | null>(null)
@@ -296,17 +294,16 @@ export default function InvoiceFormModal({
               <div className="invoices-modal-right">
                 <div className="card invoice-form-card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Finanzen</div>
-                  <div className={`field invoice-floating-field${form.draft.party?.trim() ? ' invoice-floating-field--filled' : ''}`}>
-                    <label htmlFor="invoice-party">Partei <span className="req-asterisk">*</span></label>
-                    <input
-                      id="invoice-party"
-                      ref={invoicePartyInputRef}
-                      className="input"
-                      list="party-suggestions"
-                      value={form.draft.party}
-                      onChange={(e) => setDraft({ party: e.target.value })}
-                      placeholder="Name der Partei"
-                      style={requiredTouched && !form.draft.party?.trim() ? { borderColor: 'var(--danger)' } : undefined}
+                  <div className="field invoice-floating-field invoice-floating-field--filled invoice-finance-party">
+                    <label htmlFor="invoice-party">{form.draft.voucherType === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'} <span className="req-asterisk">*</span></label>
+                    <PartySelector
+                      valueId={form.draft.partyId}
+                      valueName={form.draft.party}
+                      role={form.draft.voucherType === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
+                      inputId="invoice-party"
+                      placeholder={form.draft.voucherType === 'OUT' ? 'Lieferant wählen oder eingeben' : 'Kunde wählen oder eingeben'}
+                      invalid={requiredTouched && !form.draft.party?.trim()}
+                      onChange={(selection) => setDraft({ party: selection.name, partyId: selection.partyId })}
                     />
                   </div>
                   <div className="row">
@@ -492,7 +489,6 @@ export default function InvoiceFormModal({
               </div>
             </div>
 
-            <datalist id="party-suggestions">{partySuggestions.map((party, index) => <option key={index} value={party} />)}</datalist>
             <datalist id="desc-suggestions">{descSuggestions.map((desc, index) => <option key={index} value={desc} />)}</datalist>
           </div>
         </div>,

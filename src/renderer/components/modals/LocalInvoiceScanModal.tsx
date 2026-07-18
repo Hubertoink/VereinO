@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import TagsEditor from '../TagsEditor'
+import PartySelector from '../common/PartySelector'
 import { useToast } from '../../context/useToast'
 import {
   EMPTY_LOCAL_INVOICE_FIELDS,
@@ -49,6 +50,7 @@ type BookingMeta = Pick<QA, 'type' | 'sphere' | 'paymentMethod' | 'paymentAccoun
 export type LocalInvoiceScanResult = {
   file: File
   fields: LocalInvoiceFields
+  partyId: number | null
   budgets: BudgetAssignment[]
   earmarksAssigned: EarmarkAssignment[]
   tags: string[]
@@ -58,6 +60,7 @@ export type LocalInvoiceScanResult = {
 
 export type LocalInvoiceScanDraftState = {
   fields: LocalInvoiceFields
+  partyId: number | null
   budgets: BudgetAssignment[]
   earmarksAssigned: EarmarkAssignment[]
   tags: string[]
@@ -298,6 +301,7 @@ export default function LocalInvoiceScanModal({
   const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false)
   const [rawText, setRawText] = useState('')
   const [fields, setFields] = useState<LocalInvoiceFields>(EMPTY_LOCAL_INVOICE_FIELDS)
+  const [partyId, setPartyId] = useState<number | null>(initialState?.partyId ?? null)
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfPages, setPdfPages] = useState(0)
   const [pdfPageSize, setPdfPageSize] = useState({ width: 595, height: 842 })
@@ -455,6 +459,7 @@ export default function LocalInvoiceScanModal({
 
   const updateField = (key: keyof LocalInvoiceFields, value: string) => {
     manuallyEditedRef.current.add(key)
+    if (key === 'supplier') setPartyId(null)
     setFields((current) => ({ ...current, [key]: value }))
   }
 
@@ -495,6 +500,7 @@ export default function LocalInvoiceScanModal({
     setDuplicateCheckInProgress(false)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
+    setPartyId(null)
     setPdfPage(1)
     setPdfPages(0)
     setPdfPageSize({ width: 595, height: 842 })
@@ -530,6 +536,7 @@ export default function LocalInvoiceScanModal({
     onFileChangeRef.current?.(nextFile)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
+    setPartyId(null)
     setPdfPage(1)
     setPdfPages(0)
     setPickerText('')
@@ -554,6 +561,7 @@ export default function LocalInvoiceScanModal({
     })
     if (restored) {
       setFields(restored.fields)
+      setPartyId(restored.partyId ?? null)
       setBudgets(restored.budgets)
       setEarmarkAssignments(restored.earmarksAssigned)
       setTags(restored.tags)
@@ -689,6 +697,7 @@ export default function LocalInvoiceScanModal({
     onDraftChangeRef.current?.({
       file,
       fields,
+      partyId,
       budgets,
       earmarksAssigned: earmarkAssignments,
       tags,
@@ -704,6 +713,7 @@ export default function LocalInvoiceScanModal({
     fields,
     file,
     note,
+    partyId,
     tags,
     visibleSections
   ])
@@ -772,6 +782,7 @@ export default function LocalInvoiceScanModal({
         }
       })
       const result = analyzed.result
+      if (!manuallyEditedRef.current.has('supplier')) setPartyId(result.partyId ?? null)
       setFields((current) => mergeInvoiceFields(current, result, manuallyEditedRef.current))
       setBookingMeta({
         type: result.type,
@@ -821,6 +832,7 @@ export default function LocalInvoiceScanModal({
     const created = await onCreateInvoice({
       file,
       fields,
+      partyId,
       budgets: budgets.filter((assignment) => assignment.budgetId > 0),
       earmarksAssigned: earmarkAssignments.filter((assignment) => assignment.earmarkId > 0),
       tags,
@@ -1047,12 +1059,21 @@ export default function LocalInvoiceScanModal({
                 )}
 
                 <div className="local-invoice-scan__fields">
-                  <Field
-                    label="Lieferant / Rechnungsteller"
-                    value={fields.supplier}
-                    onChange={(value) => updateField('supplier', value)}
-                    placeholder="Noch nicht erkannt"
-                  />
+                  <div className="local-invoice-scan__field">
+                    <span>Lieferant / Rechnungsteller</span>
+                    <PartySelector
+                      valueId={partyId}
+                      valueName={fields.supplier}
+                      role="SUPPLIER"
+                      inputId="local-invoice-party"
+                      placeholder="Wählen, eingeben oder neu anlegen"
+                      onChange={(selection) => {
+                        manuallyEditedRef.current.add('supplier')
+                        setPartyId(selection.partyId)
+                        setFields((current) => ({ ...current, supplier: selection.name }))
+                      }}
+                    />
+                  </div>
                   <Field
                     label="Rechnungsnummer"
                     value={fields.invoiceNumber}

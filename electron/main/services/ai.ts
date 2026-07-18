@@ -134,6 +134,17 @@ export type AiContext = {
   }>
   earmarks?: Array<{ id: number; code?: string; name?: string; isActive?: number }>
   tags?: Array<{ id?: number; name: string; color?: string | null; usage?: number }>
+  parties?: Array<{
+    id: number
+    name: string
+    legalName?: string | null
+    role?: string
+    city?: string | null
+    email?: string | null
+    ibanLast4?: string | null
+    vatId?: string | null
+    isActive?: number
+  }>
   members?: any
   reports?: any
   invoices?: any
@@ -529,9 +540,11 @@ function normalizeInvoiceExtraction(value: unknown) {
     warnings.unshift('Einordnung für Einnahme/Ausgabe oder Sphäre war unvollständig und wurde konservativ vorbelegt. Bitte prüfen.')
   }
   const paymentAccountId = nullableNumber(raw.paymentAccountId)
+  const partyId = nullableNumber(raw.partyId)
   const vatRate = nullableNumber(raw.vatRate)
   return {
     supplier: textOrNull(raw.supplier),
+    partyId: partyId != null && Number.isInteger(partyId) && partyId > 0 ? partyId : null,
     invoiceNumber: textOrNull(raw.invoiceNumber),
     invoiceDate: textOrNull(raw.invoiceDate),
     dueDate: textOrNull(raw.dueDate),
@@ -628,6 +641,19 @@ export function compactContext(context: AiContext) {
     tags: (context.tags || [])
       .map((tag) => ({ id: tag.id, name: tag.name, color: tag.color, usage: tag.usage }))
       .slice(0, 120),
+    parties: (context.parties || [])
+      .filter((party) => party.isActive !== 0)
+      .map((party) => ({
+        id: party.id,
+        name: party.name,
+        legalName: party.legalName,
+        role: party.role,
+        city: party.city,
+        email: party.email,
+        ibanLast4: party.ibanLast4,
+        vatId: party.vatId
+      }))
+      .slice(0, 500),
     members: context.members,
     reports: context.reports,
     invoices: context.invoices
@@ -1071,7 +1097,7 @@ async function validateTransientInvoiceFile(file: AiInputFile) {
 
 export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
-  context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'generatedAt'>
+  context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
   localDocumentText?: string | null
 }): Promise<{ model: string; result: TAiInvoiceExtractionResult; usage: AiUsage }> {
   await validateTransientInvoiceFile(input.file)
@@ -1115,7 +1141,20 @@ export async function analyzeInvoiceDocument(input: {
     earmarks: (input.context.earmarks || [])
       .filter((earmark) => earmark.isActive !== 0)
       .map((earmark) => ({ id: earmark.id, code: earmark.code, name: earmark.name })),
-    tags: (input.context.tags || []).map((tag) => ({ id: tag.id, name: tag.name })).slice(0, 120)
+    tags: (input.context.tags || []).map((tag) => ({ id: tag.id, name: tag.name })).slice(0, 120),
+    parties: (input.context.parties || [])
+      .filter((party) => party.isActive !== 0)
+      .map((party) => ({
+        id: party.id,
+        name: party.name,
+        legalName: party.legalName,
+        role: party.role,
+        city: party.city,
+        email: party.email,
+        ibanLast4: party.ibanLast4,
+        vatId: party.vatId
+      }))
+      .slice(0, 500)
   }
   const prompt = [
     'Analysiere genau diese eine Rechnung fuer einen deutschen Verein.',
@@ -1123,7 +1162,8 @@ export async function analyzeInvoiceDocument(input: {
     'Erfinde keine Werte: Nutze null, leere Arrays und Warnungen, wenn etwas nicht sicher erkennbar ist.',
     'Bewahre Rechnungsnummer und IBAN exakt; Datumswerte muessen YYYY-MM-DD sein.',
     'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt Einnahme oder Ausgabe.',
-    'Nutze Konto-, Budget- und Zweckbindungs-IDs nur aus dem folgenden Stammdatenkontext.',
+    'Nutze Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
+    'Setze partyId nur bei einem eindeutig passenden vorhandenen Geschäftspartner (Name, rechtlicher Name, E-Mail, IBAN-Endziffern oder USt-IdNr.). Erfinde niemals einen Partner oder eine ID; bei keinem sicheren Treffer ist partyId null.',
     'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
     input.localDocumentText?.trim()
       ? 'Docling hat lokal bereits strukturierten Dokumenttext erkannt. Nutze ihn als zusätzliche Evidenz, prüfe Werte aber weiterhin gegen das Originaldokument.'

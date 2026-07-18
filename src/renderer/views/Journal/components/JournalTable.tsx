@@ -227,6 +227,7 @@ function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, ch
         { key: 'Beleg', value: `#${voucher.voucherNo || voucher.id}` },
         { key: 'Datum', value: fmtDate(voucher.date) },
         { key: 'Beschreibung', value: voucher.description || '—' },
+        ...(voucher.counterparty ? [{ key: 'Geschäftspartner', value: voucher.counterparty }] : []),
         { key: 'Betrag', value: eurFmt.format(Number(voucher.grossAmount || 0)), dotColor: voucher.type === 'IN' ? 'var(--success)' : 'var(--danger)' }
     ] : []
     return (
@@ -355,6 +356,8 @@ interface JournalTableProps {
         id: number
         date: string
         description: string | null
+        counterparty?: string | null
+        partyId?: number | null
         paymentMethod: 'BAR' | 'BANK' | null
         paymentAccountId?: number | null
         paymentAccountName?: string | null
@@ -753,7 +756,7 @@ export default function JournalTable({
                 ) : isReversedOriginal(r) ? (
                     <button className="btn btn-edit" title="Stornieren" onClick={() => onDelete?.({ id: r.id, voucherNo: r.voucherNo, description: r.description ?? null })}>↺</button>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, paymentAccountName: r.paymentAccountName ?? null, paymentAccountKind: r.paymentAccountKind ?? null, paymentAccountColor: r.paymentAccountColor ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferFromAccountName: r.transferFromAccountName ?? null, transferFromAccountKind: r.transferFromAccountKind ?? null, transferFromAccountColor: r.transferFromAccountColor ?? null, transferToAccountId: r.transferToAccountId ?? null, transferToAccountName: r.transferToAccountName ?? null, transferToAccountKind: r.transferToAccountKind ?? null, transferToAccountColor: r.transferToAccountColor ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', counterparty: r.counterparty ?? null, partyId: r.partyId ?? null, paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, paymentAccountName: r.paymentAccountName ?? null, paymentAccountKind: r.paymentAccountKind ?? null, paymentAccountColor: r.paymentAccountColor ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferFromAccountName: r.transferFromAccountName ?? null, transferFromAccountKind: r.transferFromAccountKind ?? null, transferFromAccountColor: r.transferFromAccountColor ?? null, transferToAccountId: r.transferToAccountId ?? null, transferToAccountName: r.transferToAccountName ?? null, transferToAccountKind: r.transferToAccountKind ?? null, transferToAccountColor: r.transferToAccountColor ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
                 )}
             </td>
         ) : k === 'date' ? (
@@ -774,7 +777,7 @@ export default function JournalTable({
                         }
                         return (
                             <HoverTooltip<HTMLSpanElement>
-                                content={<div className="journal-description-tooltip">{fullText}</div>}
+                                content={<div className="journal-description-tooltip">{r.counterparty && <><strong>{r.counterparty}</strong><br /></>}{fullText}</div>}
                                 className="tooltip-modal"
                                 preferredPlacement="top"
                                 delayMs={1000}

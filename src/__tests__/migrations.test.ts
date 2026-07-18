@@ -3,6 +3,7 @@ import {
   ensureAiTables,
   ensureBankImportTables,
   ensureJournalPerformanceIndexes,
+  ensurePartyTables,
   expandVoucherTypeConstraint
 } from '../../electron/main/db/migrations'
 
@@ -74,5 +75,26 @@ describe('ensureJournalPerformanceIndexes', () => {
     expect(sql).toContain('idx_vouchers_earmark_date_id')
     expect(sql).toContain('idx_voucher_files_voucher')
     expect(sql).toContain('idx_invoice_files_invoice')
+  })
+})
+
+describe('ensurePartyTables', () => {
+  it('creates central partners and adds nullable links to existing business records', () => {
+    const exec = jest.fn()
+    const prepare = jest.fn((sql: string) => {
+      if (sql.includes('sqlite_master')) return { get: () => ({ exists: 1 }) }
+      if (sql.includes('PRAGMA table_info')) return { all: () => [] }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    ensurePartyTables({ exec, prepare } as any)
+
+    const sql = exec.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS parties')
+    expect(sql).toContain("CHECK(role IN ('SUPPLIER','CUSTOMER','BOTH','OTHER'))")
+    expect(sql).toContain('payment_term_days INTEGER')
+    expect(sql).toContain('ALTER TABLE vouchers ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
+    expect(sql).toContain('ALTER TABLE invoices ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
+    expect(sql).toContain('ALTER TABLE submissions ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
   })
 })

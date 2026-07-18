@@ -34,6 +34,7 @@ import type {
   TTagsListOutput,
   TBudgetUpsertInput,
   TBindingUpsertInput,
+  TPartyUpsertInput,
   TMemberCreateInput,
   TMemberUpdateInput,
   TMembersListOutput,
@@ -149,6 +150,7 @@ type AiChatSnapshot = {
   pendingContributionPayment?: AiContributionPaymentState | null
   pendingContributionLinks?: AiContributionLinkState | null
   pendingTagActions?: AiTagActionState | null
+  pendingPartyActions?: AiPartyActionState | null
   pendingVoucherTagActions?: AiVoucherTagActionState | null
   pendingVoucherUpdates?: AiVoucherUpdateState | null
   pendingVoucherReverse?: AiVoucherReverseState | null
@@ -307,6 +309,18 @@ type AiTagActionChange = {
 
 type AiTagActionState = {
   changes: AiTagActionChange[]
+  sourcePrompt: string
+  status: 'DRAFT' | 'APPLIED'
+}
+
+type AiPartyActionChange = AgentMasterDataChange & {
+  partyId?: number | null
+  payload?: TPartyUpsertInput | null
+}
+
+type AiPartyActionState = {
+  changes: AiPartyActionChange[]
+  reason?: string | null
   sourcePrompt: string
   status: 'DRAFT' | 'APPLIED'
 }
@@ -1852,7 +1866,7 @@ function routeTextType(prompt: string): TAiTextGenerateInput['type'] {
 }
 
 function isVereinRelevantPrompt(prompt: string) {
-  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/i.test(
+  return /verein|vereino|geschaeftspartner|geschäftspartner|lieferant|kunde|kunden|händler|handler|zahlungsempfaenger|zahlungsempfänger|zahlungspflichtiger|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/i.test(
     prompt
   )
 }
@@ -2607,6 +2621,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [pendingTagActions, setPendingTagActions] = useState<AiTagActionState | null>(
     initialChat.pendingTagActions || null
   )
+  const [pendingPartyActions, setPendingPartyActions] = useState<AiPartyActionState | null>(
+    initialChat.pendingPartyActions || null
+  )
   const [pendingVoucherTagActions, setPendingVoucherTagActions] =
     useState<AiVoucherTagActionState | null>(initialChat.pendingVoucherTagActions || null)
   const [pendingVoucherUpdates, setPendingVoucherUpdates] = useState<AiVoucherUpdateState | null>(
@@ -2721,6 +2738,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     (!!pendingContributionPayment && pendingContributionPayment.status !== 'CREATED') ||
     (!!pendingContributionLinks && pendingContributionLinks.status !== 'APPLIED') ||
     (!!pendingTagActions && pendingTagActions.status !== 'APPLIED') ||
+    (!!pendingPartyActions && pendingPartyActions.status !== 'APPLIED') ||
     (!!pendingVoucherTagActions && pendingVoucherTagActions.status !== 'APPLIED') ||
     (!!pendingVoucherUpdates && pendingVoucherUpdates.status !== 'APPLIED') ||
     (!!pendingVoucherReverse && pendingVoucherReverse.status !== 'APPLIED') ||
@@ -2887,6 +2905,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
       return
     }
+    if (draft.kind === 'partyChange') {
+      const changes = (payload?.changes || []) as AiPartyActionChange[]
+      if (!changes.length) return
+      setPendingPartyActions({
+        changes: changes.map((change) => ({ ...change, selected: change.selected !== false })),
+        reason: payload?.reason || draft.title,
+        sourcePrompt: userPrompt,
+        status: 'DRAFT'
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Geschäftspartner vorbereitet',
+        body: `${changes.length} Geschäftspartner-Änderung(en) wurden als Review vorbereitet. Bitte prüfe die Vorschau unten.`,
+        meta: `Agent-Review${autoMeta}`
+      })
+      return
+    }
     if (draft.kind === 'budgetChange') {
       const changes = (payload?.changes || []) as AiBudgetActionChange[]
       if (!changes.length) return
@@ -3029,6 +3064,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         tagActions: pendingTagActions
           ? { status: pendingTagActions.status, count: pendingTagActions.changes.length }
           : null,
+        partyActions: pendingPartyActions
+          ? {
+              status: pendingPartyActions.status,
+              count: pendingPartyActions.changes.length,
+              sample: pendingPartyActions.changes.slice(0, 30).map((change) => ({
+                action: change.action,
+                partyId: change.partyId,
+                name: change.name,
+                selected: change.selected,
+                applied: !!change.applied
+              }))
+            }
+          : null,
         voucherTagActions: pendingVoucherTagActions
           ? {
               status: pendingVoucherTagActions.status,
@@ -3158,6 +3206,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     pendingInvoiceActions,
     pendingMembers,
     pendingMemberUpdates,
+    pendingPartyActions,
     pendingPlannerQuestion,
     pendingTagActions,
     pendingVoucherRebook,
@@ -3393,6 +3442,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingContributionPayment,
       pendingContributionLinks,
       pendingTagActions,
+      pendingPartyActions,
       pendingVoucherTagActions,
       pendingVoucherUpdates,
       pendingVoucherReverse,
@@ -3417,6 +3467,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     pendingInvoiceActions,
     pendingMembers,
     pendingMemberUpdates,
+    pendingPartyActions,
     pendingPlannerQuestion,
     pendingTagActions,
     pendingVoucherRebook,
@@ -3558,6 +3609,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         anchorId: 'ai-review-tag-actions'
       })
     }
+    if (pendingPartyActions) {
+      items.push({
+        id: 'party-actions',
+        title: 'Geschäftspartner',
+        summary:
+          pendingPartyActions.status === 'APPLIED'
+            ? 'Geschäftspartner-Änderungen wurden übernommen.'
+            : pendingPartyActions.reason || 'Geschäftspartner warten auf Freigabe.',
+        status: pendingPartyActions.status === 'APPLIED' ? 'DONE' : 'OPEN',
+        count: pendingPartyActions.changes.length,
+        anchorId: 'ai-review-party-actions'
+      })
+    }
     if (pendingVoucherTagActions) {
       items.push({
         id: 'voucher-tag-actions',
@@ -3686,6 +3750,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     pendingInvoiceActions,
     pendingMembers,
     pendingMemberUpdates,
+    pendingPartyActions,
     pendingPlannerQuestion,
     pendingTagActions,
     pendingVoucherRebook,
@@ -3717,6 +3782,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     !!pendingContributionPayment ||
     !!pendingContributionLinks ||
     !!pendingTagActions ||
+    !!pendingPartyActions ||
     !!pendingVoucherTagActions ||
     !!pendingVoucherUpdates ||
     !!pendingVoucherReverse ||
@@ -3939,6 +4005,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setPendingContributionPayment(null)
     setPendingContributionLinks(null)
     setPendingTagActions(null)
+    setPendingPartyActions(null)
     setPendingVoucherTagActions(null)
     setPendingVoucherUpdates(null)
     setPendingVoucherReverse(null)
@@ -5359,6 +5426,21 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     )
   }
 
+  const togglePartyAction = (id: string) => {
+    setPendingPartyActions((current) =>
+      current
+        ? {
+            ...current,
+            changes: current.changes.map((change) =>
+              change.id === id && !change.applied
+                ? { ...change, selected: !change.selected }
+                : change
+            )
+          }
+        : current
+    )
+  }
+
   const toggleBudgetAction = (id: string) => {
     setPendingBudgetActions((current) =>
       current
@@ -5448,6 +5530,53 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pushMessage({
         role: 'assistant',
         title: 'Tag-Änderung fehlgeschlagen',
+        body: error?.message || String(error)
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyPendingPartyActions = async () => {
+    if (!pendingPartyActions || pendingPartyActions.status === 'APPLIED') return
+    const selected = pendingPartyActions.changes.filter(
+      (change) => change.selected && !change.applied
+    )
+    if (!selected.length) {
+      notify('info', 'Keine Geschäftspartner-Änderungen ausgewählt.')
+      return
+    }
+    setBusy(true)
+    try {
+      const created = new Map<string, number>()
+      for (const change of selected) {
+        if (!change.payload) continue
+        const result = await window.api.parties.upsert(change.payload)
+        if (result?.id) created.set(change.id, result.id)
+      }
+      const appliedIds = new Set(selected.map((change) => change.id))
+      setPendingPartyActions({
+        ...pendingPartyActions,
+        status: 'APPLIED',
+        changes: pendingPartyActions.changes.map((change) =>
+          appliedIds.has(change.id)
+            ? { ...change, partyId: created.get(change.id) ?? change.partyId ?? null, applied: true }
+            : change
+        )
+      })
+      pushMessage({
+        role: 'assistant',
+        title: 'Geschäftspartner übernommen',
+        body: `${selected.length} Geschäftspartner-Änderung(en) übernommen.`,
+        meta: 'VereinO-Daten geändert'
+      })
+      dispatchDataChanged(['parties', 'vouchers', 'invoices'])
+      notify('success', `${selected.length} Geschäftspartner-Änderungen übernommen.`)
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+      pushMessage({
+        role: 'assistant',
+        title: 'Geschäftspartner-Änderung fehlgeschlagen',
         body: error?.message || String(error)
       })
     } finally {
@@ -6816,6 +6945,16 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     if (
       !modifiesPendingReview &&
       !files.length &&
+      pendingPartyActions &&
+      pendingPartyActions.status !== 'APPLIED' &&
+      wantsApplyPendingTagActions(userPrompt)
+    ) {
+      await applyPendingPartyActions()
+      return true
+    }
+    if (
+      !modifiesPendingReview &&
+      !files.length &&
       pendingBudgetActions &&
       pendingBudgetActions.status !== 'APPLIED' &&
       wantsApplyPendingTagActions(userPrompt)
@@ -7188,6 +7327,33 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         pushMessage({
           role: 'assistant',
           title: 'Buchungsänderung fehlgeschlagen',
+          body: error?.message || String(error)
+        })
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+    if (!files.length && pendingPartyActions && pendingPartyActions.status !== 'APPLIED') {
+      setBusy(true)
+      pushMessage({ role: 'user', body: userPrompt })
+      try {
+        if (wantsApplyPendingTagActions(userPrompt)) await applyPendingPartyActions()
+        else if (!settings.hasApiKey) {
+          pushMessage({
+            role: 'assistant',
+            title: 'Geschäftspartner-Review offen',
+            body: 'Der Geschäftspartner-Review ist noch offen. Bitte bestätige die Übernahme oder wähle die Änderungen unten aus.'
+          })
+        } else {
+          await processText(userPrompt)
+        }
+        setPrompt('')
+      } catch (error: any) {
+        notify('error', error?.message || String(error))
+        pushMessage({
+          role: 'assistant',
+          title: 'Geschäftspartner-Änderung fehlgeschlagen',
           body: error?.message || String(error)
         })
       } finally {
@@ -8843,6 +9009,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               busy={busy}
               onToggle={toggleInvoiceAction}
               onApply={() => void applyPendingInvoiceActions()}
+            />
+          )}
+
+          {pendingPartyActions && (
+            <AgentMasterDataChangeCard
+              anchorId="ai-review-party-actions"
+              title="Geschäftspartner"
+              entityLabel="Geschäftspartner-Änderungen"
+              state={pendingPartyActions}
+              busy={busy}
+              onToggle={togglePartyAction}
+              onApply={() => void applyPendingPartyActions()}
             />
           )}
 

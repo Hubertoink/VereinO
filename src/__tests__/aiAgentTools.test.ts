@@ -73,6 +73,10 @@ jest.mock('../../electron/main/repositories/paymentAccounts', () => ({
   listPaymentAccounts: jest.fn(() => [])
 }))
 
+jest.mock('../../electron/main/repositories/parties', () => ({
+  listParties: jest.fn(() => [])
+}))
+
 jest.mock('../../electron/main/repositories/tags', () => ({
   listTags: jest.fn(() => [])
 }))
@@ -114,6 +118,32 @@ jest.mock('../../electron/main/repositories/vouchers', () => ({
 import { createAiAgentTools } from '../../electron/main/services/aiAgentTools'
 
 describe('createAiAgentTools', () => {
+  it('prepares a business partner review draft instead of a booking', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'party_change_draft_prepare')
+
+    expect(tool).toBeTruthy()
+
+    const result = await tool!.run({
+      changes: [{
+        action: 'CREATE',
+        name: 'Musterhandel GmbH',
+        role: 'SUPPLIER',
+        city: 'Köln'
+      }]
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.draft?.kind).toBe('partyChange')
+    expect(result.draft?.payload).toMatchObject({
+      changes: [{
+        action: 'CREATE',
+        name: 'Musterhandel GmbH',
+        payload: { role: 'SUPPLIER', city: 'Köln' }
+      }]
+    })
+  })
+
   it('prepares a contribution payment link draft for existing vouchers', async () => {
     const tools = createAiAgentTools({ context: {} as any })
     const tool = tools.find((item) => item.name === 'contribution_payment_link_draft_prepare')

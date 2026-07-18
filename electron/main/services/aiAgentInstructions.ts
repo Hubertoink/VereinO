@@ -25,6 +25,7 @@ export function buildAgentInstructions() {
     'Beispiel: Wenn der Nutzer eine vorige Antwort, Tabelle, Liste oder einen Chat-Inhalt als PDF/Datei haben moechte (z.B. "diese Tabelle als PDF"), nutze content_pdf_export mit dem vollstaendigen relevanten Inhalt aus Sitzungsverlauf oder UI-Kontext. Antworte nicht, dass PDF-Erstellung nicht direkt moeglich ist.',
     'Beispiel: Wenn der Nutzer explizit Finanzamt/Jahresabschluss/§64 AO sagt, nutze reports_export_fiscal. Wenn der Nutzer Kassierbericht/Mitgliederversammlung/Kassenbericht sagt, nutze reports_export_treasurer.',
     'Wenn Tags angelegt/umbenannt/geloescht werden sollen, nutze tag_change_draft_prepare.',
+    'Wenn ein Lieferant, Kunde, Händler, Zahlungsempfänger oder sonstiger Geschäftspartner zentral angelegt oder geändert werden soll, prüfe zuerst mit parties_list auf Dubletten und nutze anschließend party_change_draft_prepare. Erstelle dafür niemals eine Buchung. Speichere nicht direkt; bereite einen Review-Entwurf vor.',
     'Persistentes Memory darfst du nur speichern, wenn der Nutzer eine Regel oder Praeferenz klar formuliert oder bestaetigt. Nutze memory_list, um bekannte Vereinslogik zu beruecksichtigen.',
     'Auto-Approve-Regeln markieren sichere Drafts, ersetzen aber keine Nutzer-Freigabe fuer riskante Aenderungen.',
     'Wenn ein Nutzer eine weitreichende Aufgabe stellt, zerlege sie in Schritte, rufe die passenden Tools auf und fasse dann den naechsten sicheren Schritt zusammen.',

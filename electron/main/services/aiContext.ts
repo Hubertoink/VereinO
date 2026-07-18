@@ -5,6 +5,7 @@ import { listInvoicesPaged, summarizeInvoices } from '../repositories/invoices'
 import { listMembers } from '../repositories/members'
 import * as mp from '../repositories/members_payments'
 import { listPaymentAccounts } from '../repositories/paymentAccounts'
+import { listParties } from '../repositories/parties'
 import { listTags } from '../repositories/tags'
 import {
   cashBalance,
@@ -82,11 +83,26 @@ function compactVoucherForAi(row: any) {
   }
 }
 
+function compactPartyForAi(party: any) {
+  return {
+    id: party.id,
+    name: party.name,
+    legalName: party.legalName,
+    role: party.role,
+    city: party.city,
+    email: party.email,
+    ibanLast4: party.iban ? String(party.iban).replace(/\s+/g, '').slice(-4) : null,
+    vatId: party.vatId,
+    isActive: party.isActive
+  }
+}
+
 export function buildAiInvoiceContext(): AiContext {
   const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
   const budgets = listBudgets({ includeArchived: true } as any) || []
   const earmarks = listBindings({ activeOnly: true } as any) || []
   const tags = listTags({ includeUsage: true } as any) || []
+  const parties = listParties({ activeOnly: true, limit: 500 }) || []
 
   return {
     generatedAt: new Date().toISOString().slice(0, 10),
@@ -124,7 +140,8 @@ export function buildAiInvoiceContext(): AiContext {
       name: tag.name,
       color: tag.color,
       usage: Number(tag.usage || 0)
-    }))
+    })),
+    parties: parties.map(compactPartyForAi)
   }
 }
 
@@ -146,6 +163,7 @@ export function buildAiContext(): AiContext {
   const budgets = listBudgets({ includeArchived: true } as any) || []
   const earmarks = listBindings({} as any) || []
   const tags = listTags({ includeUsage: true } as any) || []
+  const parties = listParties({ activeOnly: true, limit: 500 }) || []
   const members = listMembers({ status: 'ALL', limit: 2000, sortBy: 'name', sort: 'ASC' } as any)
   const memberStatusCounts = members.rows.reduce<Record<string, number>>((acc, member: any) => {
     acc[member.status] = (acc[member.status] || 0) + 1
@@ -223,6 +241,7 @@ export function buildAiContext(): AiContext {
       color: tag.color,
       usage: Number(tag.usage || 0)
     })),
+    parties: parties.map(compactPartyForAi),
     members: {
       total: members.total,
       byStatus: memberStatusCounts,

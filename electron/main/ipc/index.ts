@@ -346,7 +346,15 @@ import {
   PaymentAccountUpsertInput,
   PaymentAccountUpsertOutput,
   PaymentAccountDeleteInput,
-  PaymentAccountDeleteOutput
+  PaymentAccountDeleteOutput,
+  PartiesListInput,
+  PartiesListOutput,
+  PartyGetInput,
+  PartyGetOutput,
+  PartyUpsertInput,
+  PartyUpsertOutput,
+  PartyArchiveInput,
+  PartyArchiveOutput
 } from './schemas'
 import {
   applyMigrations,
@@ -415,6 +423,7 @@ import {
   listPaymentAccounts,
   upsertPaymentAccount
 } from '../repositories/paymentAccounts'
+import { archiveParty, getParty, listParties, upsertParty } from '../repositories/parties'
 import { requireSafetyBackup } from '../services/safetyBackup'
 import { registerBackupAndShellHandlers } from './backupAndShellHandlers'
 import {
@@ -2134,6 +2143,24 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
     const parsed = PaymentAccountDeleteInput.parse(payload)
     return PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
+  })
+  ipcMain.handle('parties.list', async (_e, payload) => {
+    const parsed = PartiesListInput.parse(payload)
+    return PartiesListOutput.parse({ rows: listParties(parsed ?? undefined) })
+  })
+  ipcMain.handle('parties.get', async (_e, payload) => {
+    const parsed = PartyGetInput.parse(payload)
+    const party = getParty(parsed.id)
+    if (!party) throw new Error('Geschäftspartner wurde nicht gefunden.')
+    return PartyGetOutput.parse(party)
+  })
+  ipcMain.handle('parties.upsert', async (_e, payload) => {
+    const parsed = PartyUpsertInput.parse(payload)
+    return PartyUpsertOutput.parse(upsertParty(parsed))
+  })
+  ipcMain.handle('parties.archive', async (_e, payload) => {
+    const parsed = PartyArchiveInput.parse(payload)
+    return PartyArchiveOutput.parse(archiveParty(parsed.id, parsed.isActive))
   })
 
   ipcMain.handle('vouchers.delete', async (_e, payload) => {

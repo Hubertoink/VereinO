@@ -13,6 +13,8 @@ type QA = {
     vatRate: number
     description: string
     note?: string | null
+    counterparty?: string | null
+    partyId?: number | null
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     paymentAccountName?: string | null
@@ -353,6 +355,8 @@ export function useQuickAdd(
             sphere: activeDraft.qa.sphere,
             description: activeDraft.qa.description || undefined,
             note: activeDraft.qa.note?.trim() ? activeDraft.qa.note.trim() : null,
+            counterparty: activeDraft.qa.counterparty?.trim() || null,
+            partyId: activeDraft.qa.partyId ?? null,
             vatRate: activeDraft.qa.vatRate
         }
         if (typeof (activeDraft.qa as any).agentDraftId === 'string') {

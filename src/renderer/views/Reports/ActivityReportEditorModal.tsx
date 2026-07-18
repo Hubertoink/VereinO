@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { IconTrash } from '../../utils/icons'
+import HoverTooltip from '../../components/common/HoverTooltip'
 
 type ActivityReportDraft = {
   fiscalYear: number
@@ -47,6 +48,19 @@ type ActivityReportListItem = {
   isEmpty: boolean
 }
 
+type ReferenceUsage = {
+  inflow: number
+  spent: number
+  balance: number
+  planned: number
+  remaining: number
+  count: number
+  insideCount: number
+  outsideCount: number
+  startDate?: string | null
+  endDate?: string | null
+}
+
 const REPORT_FIELDS: Array<{ key: keyof Pick<ActivityReportDraft, 'activities' | 'purposeImpact' | 'targetGroups' | 'volunteerWork' | 'highlights' | 'notes'>; label: string; placeholder: string; required?: boolean }> = [
   { key: 'activities', label: 'Aktivitäten/Projekte', placeholder: 'Welche Aktivitäten, Angebote oder Projekte wurden im Geschäftsjahr durchgeführt?', required: true },
   { key: 'purposeImpact', label: 'Förderung der gemeinnützigen Zwecke', placeholder: 'Wie haben diese Aktivitäten eure Satzungszwecke bzw. gemeinnützigen Zwecke gefördert?', required: true },
@@ -78,6 +92,33 @@ function euro(value?: number | null) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
 }
 
+function rangeLabel(startDate?: string | null, endDate?: string | null) {
+  if (!startDate && !endDate) return 'Nicht begrenzt'
+  return `${formatDate(startDate) || 'offen'} – ${formatDate(endDate) || 'offen'}`
+}
+
+function ReferenceTooltip({ usage, fallbackPlanned }: { usage?: ReferenceUsage; fallbackPlanned?: number | null }) {
+  const planned = usage?.planned ?? Number(fallbackPlanned || 0)
+  const balance = Number(usage?.balance || 0)
+  const remaining = Number(usage?.remaining ?? planned)
+  const hasOutsideAssignments = Number(usage?.outsideCount || 0) > 0
+  return (
+    <div className="activity-report-reference-tooltip">
+      <div className="activity-report-reference-tooltip__metrics">
+        <span className="is-income"><small>Einnahmen</small><strong>{euro(usage?.inflow)}</strong></span>
+        <span className="is-expense"><small>Ausgaben</small><strong>{euro(usage?.spent)}</strong></span>
+        <span className={balance >= 0 ? 'is-positive' : 'is-negative'}><small>Saldo</small><strong>{euro(balance)}</strong></span>
+        <span className={remaining >= 0 ? 'is-positive' : 'is-negative'}><small>Verfügbar</small><strong>{euro(remaining)}</strong></span>
+      </div>
+      <div className="activity-report-reference-tooltip__meta">
+        <span className="is-planned">Geplant: {euro(planned)}</span>
+        <span className={hasOutsideAssignments ? 'is-warning' : 'is-period'}>Zeitraum: {rangeLabel(usage?.startDate, usage?.endDate)}</span>
+        <span className={hasOutsideAssignments ? 'is-warning' : ''}>Buchungen: {usage?.count ?? 0}{hasOutsideAssignments ? ` · ${usage?.outsideCount} außerhalb Zeitraum` : ''}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function ActivityReportEditorModal({ open, onClose, fiscalYear, setFiscalYear, yearsAvail, budgets, notify }: {
   open: boolean
   onClose: () => void
@@ -98,6 +139,8 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   const [status, setStatus] = useState('')
   const [newYear, setNewYear] = useState<number>(fiscalYear)
   const [deleteConfirm, setDeleteConfirm] = useState<null | { fiscalYear: number }>(null)
+  const [budgetUsage, setBudgetUsage] = useState<Record<number, ReferenceUsage>>({})
+  const [bindingUsage, setBindingUsage] = useState<Record<number, ReferenceUsage>>({})
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear()
@@ -120,6 +163,46 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
       .filter((binding) => binding.isActive)
       .sort((a, b) => a.code.localeCompare(b.code, 'de'))
   }, [bindings])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    const from = `${fiscalYear}-01-01`
+    const to = `${fiscalYear}-12-31`
+    async function loadUsage() {
+      const [budgetResults, bindingResults] = await Promise.all([
+        Promise.all(yearBudgets.map(async (budget) => [budget.id, await window.api?.budgets?.usage?.({ budgetId: budget.id, from, to })] as const)),
+        Promise.all(activeBindings.map(async (binding) => [binding.id, await window.api?.bindings?.usage?.({ earmarkId: binding.id, from, to })] as const))
+      ])
+      if (cancelled) return
+      setBudgetUsage(Object.fromEntries(budgetResults.filter(([, usage]) => usage).map(([id, usage]) => [id, {
+        inflow: Number((usage as any).inflow || 0),
+        spent: Number((usage as any).spent || 0),
+        balance: Number((usage as any).balance || 0),
+        planned: Number((usage as any).planned || 0),
+        remaining: Number((usage as any).remaining || 0),
+        count: Number((usage as any).count || 0),
+        insideCount: Number((usage as any).countInside || 0),
+        outsideCount: Number((usage as any).countOutside || 0),
+        startDate: (usage as any).startDate ?? null,
+        endDate: (usage as any).endDate ?? null
+      }])))
+      setBindingUsage(Object.fromEntries(bindingResults.filter(([, usage]) => usage).map(([id, usage]) => [id, {
+        inflow: Number((usage as any).allocated || 0),
+        spent: Number((usage as any).released || 0),
+        balance: Number((usage as any).balance || 0),
+        planned: Number((usage as any).budget || 0),
+        remaining: Number((usage as any).remaining || 0),
+        count: Number((usage as any).totalCount || 0),
+        insideCount: Number((usage as any).insideCount || 0),
+        outsideCount: Number((usage as any).outsideCount || 0),
+        startDate: (usage as any).startDate ?? null,
+        endDate: (usage as any).endDate ?? null
+      }])))
+    }
+    void loadUsage()
+    return () => { cancelled = true }
+  }, [open, fiscalYear, yearBudgets, activeBindings])
 
   useEffect(() => {
     if (!open) return
@@ -386,10 +469,19 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                   <div className="helper" style={{ marginTop: 8 }}>Anhaltspunkte für Aktivitäten, Projekte und Förderzwecke.</div>
                   <div className="grid gap-8" style={{ marginTop: 10 }}>
                     {yearBudgets.length ? yearBudgets.map((budget) => (
-                      <div key={budget.id} className="chip" style={{ justifyContent: 'space-between', gap: 8 }}>
-                        <span>{budgetLabel(budget)} · {budget.sphere}</span>
-                        <strong>{euro(budget.amountPlanned)}</strong>
-                      </div>
+                      <HoverTooltip
+                        key={budget.id}
+                        preferredPlacement="top"
+                        className="activity-report-reference-tooltip-portal"
+                        content={<ReferenceTooltip usage={budgetUsage[budget.id]} fallbackPlanned={budget.amountPlanned} />}
+                      >
+                        {({ ref, props }) => (
+                          <div ref={ref} {...props} tabIndex={0} className="chip activity-report-reference-item">
+                            <span>{budgetLabel(budget)} · {budget.sphere}</span>
+                            <strong>{euro(budgetUsage[budget.id]?.planned ?? budget.amountPlanned)}</strong>
+                          </div>
+                        )}
+                      </HoverTooltip>
                     )) : <div className="helper">Keine Budgets für dieses Jahr gefunden.</div>}
                   </div>
                 </details>
@@ -399,17 +491,19 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                   <div className="helper" style={{ marginTop: 8 }}>Hilfreich für Zweckbezug, Förderbereiche und Projektbeschreibungen.</div>
                   <div className="grid gap-8" style={{ marginTop: 10 }}>
                     {activeBindings.length ? activeBindings.map((binding) => (
-                      <div key={binding.id} className="card" style={{ padding: 10 }}>
-                        <div className="flex justify-between gap-8">
-                          <strong>{binding.code}</strong>
-                          {binding.budget != null && <span className="helper">{euro(binding.budget)}</span>}
-                        </div>
-                        <div>{binding.name}</div>
-                        {binding.description && <div className="helper" style={{ marginTop: 4 }}>{binding.description}</div>}
-                        {(binding.startDate || binding.endDate) && (
-                          <div className="helper" style={{ marginTop: 4 }}>{formatDate(binding.startDate)} – {formatDate(binding.endDate)}</div>
+                      <HoverTooltip
+                        key={binding.id}
+                        preferredPlacement="top"
+                        className="activity-report-reference-tooltip-portal"
+                        content={<ReferenceTooltip usage={bindingUsage[binding.id]} fallbackPlanned={binding.budget} />}
+                      >
+                        {({ ref, props }) => (
+                          <div ref={ref} {...props} tabIndex={0} className="chip activity-report-reference-item">
+                            <span>{binding.code} · {binding.name}</span>
+                            <strong>{euro(bindingUsage[binding.id]?.planned ?? binding.budget)}</strong>
+                          </div>
                         )}
-                      </div>
+                      </HoverTooltip>
                     )) : <div className="helper">Keine aktiven Zweckbindungen gefunden.</div>}
                   </div>
                 </details>
