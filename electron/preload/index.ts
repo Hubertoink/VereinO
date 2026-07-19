@@ -248,6 +248,15 @@ const rendererApi = {
     delete: (payload) => invoke('budgets.delete', payload),
     usage: (payload) => invoke('budgets.usage', payload)
   },
+  recurringBookings: {
+    list: (payload) => invoke('recurringBookings.list', payload),
+    summary: () => invoke('recurringBookings.summary'),
+    upsert: (payload) => cleanInvoke('recurringBookings.upsert', payload),
+    setStatus: (payload) => cleanInvoke('recurringBookings.setStatus', payload),
+    skip: (payload) => cleanInvoke('recurringBookings.skip', payload),
+    book: (payload) => cleanInvoke('recurringBookings.book', payload),
+    link: (payload) => cleanInvoke('recurringBookings.link', payload)
+  },
   advances: {
     list: (payload) => invoke('advances.list', payload),
     create: (payload) => invoke('advances.create', payload),

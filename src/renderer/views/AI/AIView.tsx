@@ -178,6 +178,7 @@ type AiBankReviewState = Omit<TAiBankImportReviewOutput, 'suggestions'> & {
 
 type AiBankLinkChange = {
   id: string
+  targetKind?: 'VOUCHER' | 'RECURRING'
   bankTransactionId: number
   bankBookingDate?: string | null
   bankDirection?: 'IN' | 'OUT' | string | null
@@ -186,12 +187,16 @@ type AiBankLinkChange = {
   bankPurpose?: string | null
   bankReference?: string | null
   paymentAccountName?: string | null
-  voucherId: number
+  voucherId?: number | null
   voucherNo?: string | null
   voucherDate?: string | null
   voucherType?: 'IN' | 'OUT' | string | null
   voucherDescription?: string | null
   voucherGrossAmount: number
+  recurringBookingId?: number | null
+  recurringBookingName?: string | null
+  occurrenceId?: number | null
+  scheduledDate?: string | null
   selected: boolean
   applied?: boolean
   error?: string | null
@@ -2165,6 +2170,7 @@ function bankReviewBody(result: TAiBankImportReviewOutput) {
   const lines = [
     result.summary || `${result.suggestions.length} offene Bankbelege geprüft.`,
     `Zuordnen: ${grouped.LINK_EXISTING || 0}`,
+    `Dauerbuchungen: ${grouped.APPLY_RECURRING || 0}`,
     `Neu anlegen: ${grouped.CREATE_BOOKING || 0}`,
     `Geprüft markieren: ${grouped.MARK_CHECKED || 0}`,
     `Manuell prüfen: ${grouped.NEEDS_MANUAL_REVIEW || 0}`
@@ -2177,6 +2183,7 @@ function bankSuggestionLabel(suggestion: AiBankReviewSuggestion) {
   if (suggestion.resolved === 'CREATED') return 'Gebucht'
   if (suggestion.resolved === 'CHECKED') return 'Geprüft'
   if (suggestion.action === 'LINK_EXISTING') return 'Treffer'
+  if (suggestion.action === 'APPLY_RECURRING') return 'Dauerbuchung'
   if (suggestion.action === 'CREATE_BOOKING') return 'Neue Buchung'
   if (suggestion.action === 'MARK_CHECKED') return 'Ohne Buchung'
   return 'Manuell prüfen'
@@ -2193,6 +2200,7 @@ function candidateSourceStateLabel(candidate: TAiBookingCandidate, job: TAiJobsG
 function bankSuggestionTone(suggestion: AiBankReviewSuggestion) {
   if (suggestion.resolved) return 'done'
   if (suggestion.action === 'LINK_EXISTING') return 'match'
+  if (suggestion.action === 'APPLY_RECURRING') return 'match'
   if (suggestion.action === 'CREATE_BOOKING') return 'create'
   if (suggestion.action === 'MARK_CHECKED') return 'check'
   return 'manual'
@@ -2254,6 +2262,8 @@ function bankSuggestionSearchText(suggestion: AiBankReviewSuggestion) {
       candidate.grossAmount,
       (candidate.tags || []).join(' '),
       suggestion.reason,
+      suggestion.recurringBookingName,
+      suggestion.scheduledDate,
       (suggestion.warnings || []).join(' ')
     ]
       .filter(Boolean)
@@ -2800,8 +2810,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       })
       pushMessage({
         role: 'assistant',
-        title: 'Bankbeleg-Verknüpfung vorbereitet',
-        body: `${changes.length} Bankbeleg(e) werden mit bestehenden Buchungen verknüpft. Es wird nichts storniert und keine Ersatzbuchung angelegt.`,
+        title: 'Bankbeleg-Zuordnung vorbereitet',
+        body: `${changes.length} Bankbeleg(e) werden mit bestehenden Buchungen oder passenden Dauerbuchungen zusammengeführt. Es wird nichts storniert.`,
         meta: `Agent-Review${autoMeta}`
       })
       return
@@ -3127,6 +3137,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 voucherId: change.voucherId,
                 voucherNo: change.voucherNo,
                 voucherDescription: change.voucherDescription,
+                targetKind: change.targetKind,
+                recurringBookingId: change.recurringBookingId,
+                recurringBookingName: change.recurringBookingName,
+                occurrenceId: change.occurrenceId,
+                scheduledDate: change.scheduledDate,
                 selected: change.selected,
                 applied: !!change.applied
               }))
@@ -3519,7 +3534,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     const suggestions = bankReview?.suggestions || []
     return {
       matches: suggestions.filter(
-        (suggestion) => !suggestion.resolved && suggestion.action === 'LINK_EXISTING'
+        (suggestion) => !suggestion.resolved && (suggestion.action === 'LINK_EXISTING' || suggestion.action === 'APPLY_RECURRING')
       ),
       create: suggestions.filter(
         (suggestion) => !suggestion.resolved && suggestion.action === 'CREATE_BOOKING'
@@ -6223,14 +6238,23 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     try {
       for (const change of selected) {
         try {
-          const linked = await window.api.bankTransactions.link({
-            id: change.bankTransactionId,
-            voucherId: change.voucherId
-          })
+          const linked = change.targetKind === 'RECURRING' && change.recurringBookingId
+            ? await window.api.recurringBookings.book({
+                recurringBookingId: change.recurringBookingId,
+                occurrenceId: change.occurrenceId || undefined,
+                scheduledDate: change.scheduledDate || undefined,
+                bookingDate: change.bankBookingDate || change.scheduledDate || new Date().toISOString().slice(0, 10),
+                amount: change.bankAmount,
+                bankTransactionId: change.bankTransactionId
+              })
+            : await window.api.bankTransactions.link({
+                id: change.bankTransactionId,
+                voucherId: Number(change.voucherId)
+              })
           appliedIds.add(change.id)
           updateBankSuggestion(change.bankTransactionId, {
             resolved: 'LINKED',
-            resolvedVoucherId: change.voucherId,
+            resolvedVoucherId: change.targetKind === 'RECURRING' ? linked.id : change.voucherId,
             resolvedVoucherNo: change.voucherNo || linked.voucherNo || null
           })
         } catch (error: any) {
@@ -6263,10 +6287,10 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           title: failures.length ? 'Bankbelege teilweise verknüpft' : 'Bankbelege verknüpft',
           body: failures.length
             ? `${appliedIds.size} Bankbeleg(e) wurden verknüpft. Offen: ${failures.join(' ')}`
-            : `${appliedIds.size} Bankbeleg(e) wurden mit bestehenden Buchungen verknüpft.`,
+            : `${appliedIds.size} Bankbeleg(e) wurden mit bestehenden Buchungen oder Dauerbuchungen zusammengeführt.`,
           meta: 'VereinO-Daten geändert'
         })
-        dispatchDataChanged(['bank-imports', 'vouchers'])
+        dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
         onBooked?.()
       }
       if (failures.length)
@@ -6294,6 +6318,37 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         resolvedVoucherNo: suggestion.voucherNo || linked.voucherNo || null
       })
       notify('success', `Bankbeleg #${suggestion.transactionId} wurde verknüpft.`)
+      onBooked?.()
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyRecurringBankSuggestion = async (suggestion: AiBankReviewSuggestion) => {
+    if (!suggestion.recurringBookingId || (!suggestion.occurrenceId && !suggestion.scheduledDate)) {
+      notify('error', 'Für diesen Treffer fehlen Dauerbuchungs-ID oder Fälligkeit.')
+      return
+    }
+    setBusy(true)
+    try {
+      const transaction = suggestion.transaction || {}
+      const created = await window.api.recurringBookings.book({
+        recurringBookingId: suggestion.recurringBookingId,
+        occurrenceId: suggestion.occurrenceId || undefined,
+        scheduledDate: suggestion.scheduledDate || undefined,
+        bookingDate: transaction.bookingDate || suggestion.scheduledDate || new Date().toISOString().slice(0, 10),
+        amount: Number(transaction.amount || 0) || undefined,
+        bankTransactionId: suggestion.transactionId
+      })
+      updateBankSuggestion(suggestion.transactionId, {
+        resolved: 'LINKED',
+        resolvedVoucherId: created.id,
+        resolvedVoucherNo: created.voucherNo
+      })
+      dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
+      notify('success', `Bankbeleg #${suggestion.transactionId} wurde mit der Dauerbuchung zusammengeführt.`)
       onBooked?.()
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -8032,6 +8087,18 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         </button>
       )
     }
+    if (suggestion.action === 'APPLY_RECURRING') {
+      return (
+        <button
+          className="btn primary"
+          type="button"
+          disabled={busy || !suggestion.recurringBookingId || (!suggestion.occurrenceId && !suggestion.scheduledDate)}
+          onClick={() => void applyRecurringBankSuggestion(suggestion)}
+        >
+          Dauerbuchung zuordnen
+        </button>
+      )
+    }
     if (suggestion.action === 'CREATE_BOOKING') {
       return (
         <>
@@ -8094,6 +8161,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           <small>
             {transaction.bookingDate || ''}
             {voucherLabel ? ` · Buchung ${voucherLabel}` : ''}
+            {suggestion.recurringBookingName
+              ? ` · Dauerbuchung ${suggestion.recurringBookingName}${suggestion.scheduledDate ? ` (${formatIsoDate(suggestion.scheduledDate)})` : ''}`
+              : ''}
           </small>
         </div>
         <div className="ai-bank-suggestion-detail">
@@ -8952,7 +9022,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                     </label>
                     <div className="ai-voucher-tag-diff">
                       <span>
-                        {change.voucherNo || `#${change.voucherId}`} ·{' '}
+                        {change.targetKind === 'RECURRING'
+                          ? `Dauerbuchung: ${change.recurringBookingName || `#${change.recurringBookingId}`}`
+                          : change.voucherNo || `#${change.voucherId}`} ·{' '}
                         {change.voucherDescription || 'ohne Beschreibung'}
                       </span>
                       <b aria-hidden="true">→</b>
@@ -8966,7 +9038,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
                 <span className="helper">
                   {pendingBankLinks.status === 'APPLIED'
                     ? 'Diese Bankbelege wurden bereits verknüpft.'
-                    : 'Es werden nur Bankbelege mit bestehenden Buchungen verknüpft; es wird nichts storniert.'}
+                    : 'Bankbelege werden mit bestehenden Buchungen oder passenden Dauerbuchungs-Fälligkeiten zusammengeführt; es wird nichts storniert.'}
                 </span>
                 <button
                   className="btn primary"

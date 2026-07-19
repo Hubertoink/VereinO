@@ -146,6 +146,7 @@ export function normalizeInvoiceExtractionText(text: string) {
 const DATE_PATTERN = /\b(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}-\d{2}-\d{2})\b/
 const MONEY_PATTERN =
   /-?(?:\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\.\d{3})+,\d{2}|\d{1,3}(?:[ \u00a0]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?!\d)/
+const PICKER_MONEY_PATTERN = new RegExp(`(?:${MONEY_PATTERN.source})|-?\\d+(?![\\d.,])`)
 
 function cleanValue(value: string) {
   return value
@@ -199,8 +200,8 @@ function toIsoDate(value: string) {
   return normalized
 }
 
-function normalizeAmount(value: string) {
-  const match = value.match(MONEY_PATTERN)
+function normalizeAmount(value: string, pattern = MONEY_PATTERN) {
+  const match = value.match(pattern)
   if (!match) return ''
   let amount = match[0].replace(/\s/g, '')
   const comma = amount.lastIndexOf(',')
@@ -213,7 +214,7 @@ function normalizeAmount(value: string) {
   } else if (comma >= 0) {
     amount = amount.replace(',', '.')
   }
-  return amount
+  return /[.,]/.test(match[0]) ? amount : `${amount}.00`
 }
 
 function findLabeledAmount(lines: string[], labels: RegExp) {
@@ -247,7 +248,7 @@ function findSummaryAmountFallbacks(lines: string[]) {
   const amounts = lines
     .slice(Math.max(0, firstLabelIndex - 8), firstLabelIndex)
     .flatMap((line) => line.match(new RegExp(MONEY_PATTERN.source, 'g')) ?? [])
-    .map(normalizeAmount)
+    .map((amount) => normalizeAmount(amount))
     .filter(Boolean)
   if (amounts.length < 3) return { net: '', tax: '', gross: '' }
   const [net, tax, gross] = amounts.slice(-3)
@@ -350,7 +351,7 @@ export function normalizeInvoicePickerValue(field: LocalInvoicePickerField, sele
 
   if (field === 'invoiceDate' || field === 'dueDate') return toIsoDate(normalized)
   if (field === 'grossAmount' || field === 'netAmount' || field === 'taxAmount') {
-    return normalizeAmount(normalized)
+    return normalizeAmount(normalized, PICKER_MONEY_PATTERN)
   }
   if (field === 'iban') {
     return normalized

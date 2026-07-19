@@ -1,4 +1,4 @@
-export type NavKey = 'Dashboard' | 'Buchungen' | 'Bankimport' | 'Verbindlichkeiten' | 'Mitglieder' | 'Vorschuesse' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'KI' | 'Belege' | 'Reports' | 'Einstellungen'
+export type NavKey = 'Dashboard' | 'Buchungen' | 'Dauerbuchungen' | 'Bankimport' | 'Verbindlichkeiten' | 'Mitglieder' | 'Vorschuesse' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'KI' | 'Belege' | 'Reports' | 'Einstellungen'
 
 /**
  * Navigation groups for visual separation:
@@ -23,6 +23,7 @@ export const navItems: NavItem[] = [
   { key: 'Dashboard', label: 'Dashboard', group: 'overview' },
   // Kernbereiche Geldfluss
   { key: 'Buchungen', label: 'Buchungen', group: 'transactions' },
+  { key: 'Dauerbuchungen', label: 'Dauerbuchungen', group: 'transactions' },
   { key: 'Bankimport', label: 'Bankimport', group: 'transactions' },
   { key: 'Verbindlichkeiten', label: 'Verbindlichkeiten', group: 'transactions' },
   // Vereinsstruktur & Planung

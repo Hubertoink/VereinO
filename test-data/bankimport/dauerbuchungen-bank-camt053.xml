@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>VEREINO-TEST-BANK-20260720</MsgId>
+      <CreDtTm>2026-07-20T18:00:00+02:00</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>VEREINO-DAUERBUCHUNGEN-BANK</Id>
+      <CreDtTm>2026-07-20T18:00:00+02:00</CreDtTm>
+      <Acct>
+        <Id><IBAN>DE02120300000000202608</IBAN></Id>
+        <Ccy>EUR</Ccy>
+        <Ownr><Nm>JH Hochstaett Testkonto Bank</Nm></Ownr>
+      </Acct>
+      <Ntry>
+        <Amt Ccy="EUR">20.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-07-20</Dt></BookgDt>
+        <ValDt><Dt>2026-07-20</Dt></ValDt>
+        <NtryRef>VEREINO-TEST-ZEITUNG-2026-07</NtryRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>ABO-ZEITUNG-2026-07</EndToEndId></Refs>
+          <RltdPties>
+            <Cdtr><Nm>Mannheimer Morgen</Nm></Cdtr>
+            <CdtrAcct><Id><IBAN>DE12500105170648489890</IBAN></Id></CdtrAcct>
+          </RltdPties>
+          <RmtInf><Ustrd>Zeitungsabo Mannheimer Morgen Juli 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="EUR">6.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-07-20</Dt></BookgDt>
+        <ValDt><Dt>2026-07-20</Dt></ValDt>
+        <NtryRef>VEREINO-TEST-INTUNE-2026-07</NtryRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>ADOBE-INTUNE-2026-07</EndToEndId></Refs>
+          <RltdPties>
+            <Cdtr><Nm>Adobe Inc.</Nm></Cdtr>
+            <CdtrAcct><Id><IBAN>DE75512108001245126199</IBAN></Id></CdtrAcct>
+          </RltdPties>
+          <RmtInf><Ustrd>Adobe Intune Abo Juli 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="EUR">14.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-07-20</Dt></BookgDt>
+        <ValDt><Dt>2026-07-20</Dt></ValDt>
+        <NtryRef>VEREINO-TEST-CANVA-2026-07</NtryRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>CANVA-2026-07</EndToEndId></Refs>
+          <RltdPties>
+            <Cdtr><Nm>Canva Pty Ltd.</Nm></Cdtr>
+            <CdtrAcct><Id><IBAN>DE89370400440532013000</IBAN></Id></CdtrAcct>
+          </RltdPties>
+          <RmtInf><Ustrd>Canva Abo Juli 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

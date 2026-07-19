@@ -4,7 +4,17 @@ jest.mock('electron', () => ({
 
 jest.mock('../../electron/main/repositories/bankTransactions', () => ({
   listBankTransactions: jest.fn(),
-  findBankTransactionMatches: jest.fn(() => []),
+  findBankTransactionMatches: jest.fn(({ id }: { id: number }) => id === 24 ? [{
+    matchKind: 'RECURRING',
+    recurringBookingId: 7,
+    recurringBookingName: 'Vereinssoftware',
+    occurrenceId: 71,
+    scheduledDate: '2026-07-07',
+    date: '2026-07-07',
+    type: 'OUT',
+    description: 'Software-Abo',
+    score: 95
+  }] : []),
   getBankTransaction: jest.fn((id: number) => ({
     id,
     status: 'OPEN',
@@ -75,6 +85,17 @@ jest.mock('../../electron/main/repositories/paymentAccounts', () => ({
 
 jest.mock('../../electron/main/repositories/parties', () => ({
   listParties: jest.fn(() => [])
+}))
+
+jest.mock('../../electron/main/repositories/recurringBookings', () => ({
+  listRecurringBookings: jest.fn(() => [{
+    id: 7,
+    name: 'Vereinssoftware',
+    status: 'ACTIVE',
+    nextDueDate: '2026-08-07',
+    dueCount: 1
+  }]),
+  recurringBookingsSummary: jest.fn(() => ({ due: 1, upcoming: 1, active: 1, paused: 0 }))
 }))
 
 jest.mock('../../electron/main/repositories/tags', () => ({
@@ -249,6 +270,43 @@ describe('createAiAgentTools', () => {
         selected: true
       }
     ])
+  })
+
+  it('lists recurring bookings with their due summary', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'recurring_bookings_list')
+
+    expect(tool).toBeTruthy()
+    const result = await tool!.run({ status: 'ACTIVE' })
+
+    expect(result.ok).toBe(true)
+    expect(result.data).toMatchObject({
+      summary: { due: 1, active: 1 },
+      count: 1,
+      rows: [{ id: 7, name: 'Vereinssoftware' }]
+    })
+  })
+
+  it('prepares a recurring occurrence and bank transaction as one review', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'bank_transaction_link_draft_prepare')
+
+    const result = await tool!.run({
+      links: [{ bankTransactionId: 24, recurringBookingId: 7, occurrenceId: 71 }],
+      reason: 'Bankbeleg mit Dauerbuchung zusammenführen'
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.draft?.kind).toBe('bankLink')
+    expect((result.draft?.payload as any).changes).toMatchObject([{
+      targetKind: 'RECURRING',
+      bankTransactionId: 24,
+      recurringBookingId: 7,
+      recurringBookingName: 'Vereinssoftware',
+      occurrenceId: 71,
+      scheduledDate: '2026-07-07',
+      selected: true
+    }])
   })
 
   it('blocks rebook drafts for pure bank transaction linking requests', async () => {

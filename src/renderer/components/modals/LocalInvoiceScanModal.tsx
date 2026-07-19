@@ -23,6 +23,12 @@ type BudgetAssignment = NonNullable<QA['budgets']>[number]
 type EarmarkAssignment = NonNullable<QA['earmarksAssigned']>[number]
 type InvoiceDuplicate = { voucherId: number; voucherNo: string | null }
 
+function formatAnalysisDuration(milliseconds: number) {
+  return milliseconds >= 1_000
+    ? `${(milliseconds / 1_000).toFixed(1).replace('.', ',')} s`
+    : `${milliseconds} ms`
+}
+
 type BudgetOption = {
   id: number
   label: string
@@ -816,8 +822,17 @@ export default function LocalInvoiceScanModal({
         setVisibleSections((current) => new Set([...current, 'tags']))
       }
       const warning = result.warnings[0] ? ` ${result.warnings[0]}` : ''
+      const timings = analyzed.timings
+      const timingDetails = [
+        `Gesamt ${formatAnalysisDuration(timings.totalMs)}`,
+        timings.doclingMs !== null && `Docling ${formatAnalysisDuration(timings.doclingMs)}`,
+        timings.ocrMs !== null && `OCR ${formatAnalysisDuration(timings.ocrMs)}`,
+        `KI ${formatAnalysisDuration(timings.analysisMs)}`
+      ]
+        .filter(Boolean)
+        .join(' · ')
       setAnalysisState('text-found')
-      setAnalysisMessage(`KI-Auswertung übernommen.${warning}`)
+      setAnalysisMessage(`KI-Auswertung übernommen (${timingDetails}).${warning}`)
     } catch (error: any) {
       setAnalysisState('error')
       setAnalysisMessage(`KI-Auswertung fehlgeschlagen: ${error?.message || String(error)}`)

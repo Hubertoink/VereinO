@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
 type PaymentAccount = {
@@ -35,12 +36,25 @@ type BankTransaction = {
   checkedNote?: string | null
   resolvedAt?: string | null
   sourceFileName: string
+  matchScore?: number | null
 }
 
 type BankImportStatus = {
   lastBookingDate: string | null
   lastImportAt?: string | null
   total: number
+  recentImports?: Array<{
+    id: number
+    fileName: string
+    format: 'CAMT' | 'CSV'
+    paymentAccountId: number
+    paymentAccountName?: string | null
+    paymentAccountColor?: string | null
+    imported: number
+    duplicates: number
+    errors: number
+    importedAt: string
+  }>
   accounts: Array<{
     id: number
     name: string
@@ -121,6 +135,7 @@ type ImportCommitResult = {
 
 type BankTransactionMatch = {
   id: number
+  matchKind?: 'VOUCHER' | 'RECURRING'
   voucherNo?: string | null
   date?: string | null
   description?: string | null
@@ -130,6 +145,12 @@ type BankTransactionMatch = {
   paymentAccountMismatch?: boolean
   paymentAccountWarning?: string | null
   score?: number
+  occurrenceId?: number
+  scheduledDate?: string
+  recurringBookingId?: number
+  recurringBookingName?: string | null
+  expectedGrossAmount?: number
+  variableAmount?: boolean
 }
 
 type Props = {
@@ -141,6 +162,14 @@ type Props = {
 
 const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const date = new Intl.DateTimeFormat('de-DE')
+
+function matchScorePresentation(score?: number | null) {
+  const value = Number(score || 0)
+  if (value >= 60) return { level: 'high', stars: '★★★', label: 'Hohe Übereinstimmung' }
+  if (value >= 30) return { level: 'medium', stars: '★★', label: 'Mittlere Übereinstimmung' }
+  if (value >= 15) return { level: 'low', stars: '★', label: 'Geringe Übereinstimmung' }
+  return { level: 'none', stars: '–', label: 'Keine passende Buchung gefunden' }
+}
 
 function formatDate(value?: string | null) {
   if (!value) return '–'
@@ -217,6 +246,249 @@ function statusLabel(status: BankTransaction['status']) {
   if (status === 'LINKED') return 'Zugeordnet'
   if (status === 'CHECKED') return 'Geprüft'
   return 'Offen'
+}
+
+function BankAccountFilterDropdown({
+  accounts,
+  value,
+  onApply
+}: {
+  accounts: PaymentAccount[]
+  value: number | null
+  onApply: (value: number | null) => void
+}) {
+  const closeRef = React.useRef<(() => void) | null>(null)
+  const [draftValue, setDraftValue] = useState<number | null>(value)
+
+  useEffect(() => {
+    setDraftValue(value)
+  }, [value])
+
+  const apply = () => {
+    onApply(draftValue)
+    closeRef.current?.()
+  }
+
+  const reset = () => {
+    setDraftValue(null)
+    onApply(null)
+  }
+
+  return (
+    <FilterDropdown
+      trigger={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
+        </svg>
+      }
+      title="Zahlkonto filtern"
+      hasActiveFilters={value != null}
+      alignRight
+      width={340}
+      ariaLabel="Nach Zahlkonto filtern"
+      buttonTitle="Nach Zahlkonto filtern"
+      colorVariant="filter"
+      closeRef={closeRef}
+    >
+      <div className="filter-dropdown__field">
+        <label className="filter-dropdown__label">Zahlkonto</label>
+        <div className="bank-account-badge-list" role="listbox" aria-label="Zahlkonto auswählen">
+          <button
+            type="button"
+            className={`bank-account-filter-badge ${draftValue == null ? 'is-selected' : ''}`}
+            onClick={() => setDraftValue(null)}
+            role="option"
+            aria-selected={draftValue == null}
+          >
+            Alle Zahlkonten
+          </button>
+          {accounts.map((account) => (
+            <button
+              key={account.id}
+              type="button"
+              className={`bank-account-filter-badge ${draftValue === account.id ? 'is-selected' : ''}`}
+              style={{ color: account.color || undefined }}
+              onClick={() => setDraftValue(account.id)}
+              role="option"
+              aria-selected={draftValue === account.id}
+            >
+              <span
+                className="bank-account-filter-badge__dot"
+                style={{ background: account.color || 'var(--accent)' }}
+                aria-hidden="true"
+              />
+              {account.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="filter-dropdown__actions">
+        <button className="btn" type="button" onClick={reset}>
+          Zurücksetzen
+        </button>
+        <div className="filter-dropdown__actions-right">
+          <button className="btn primary" type="button" onClick={apply}>
+            Übernehmen
+          </button>
+        </div>
+      </div>
+    </FilterDropdown>
+  )
+}
+
+function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null }) {
+  const recentImports = status?.recentImports || []
+  const latestImport = recentImports.at(0)
+  const previousImports = recentImports.slice(1)
+
+  return (
+    <FilterDropdown
+      trigger={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7" />
+          <path d="M3 3v6h6" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      }
+      title="Importhistorie"
+      alignRight
+      width={390}
+      ariaLabel="Importhistorie anzeigen"
+      buttonTitle="Importhistorie"
+      colorVariant="time"
+    >
+      <div className="bank-history-summary">
+        <span>Letzter Import</span>
+        {latestImport ? (
+          <>
+            <strong>{latestImport.fileName}</strong>
+            <span>{latestImport.format} importiert am {formatDateTime(latestImport.importedAt)}</span>
+            <div className="bank-history-summary__footer">
+              <span style={{ color: latestImport.paymentAccountColor || undefined }}>
+                {latestImport.paymentAccountName || 'Zahlkonto'}
+              </span>
+              <div className="bank-history-item__stats">
+                <span>{latestImport.imported} neu</span>
+                {latestImport.duplicates > 0 && <span>{latestImport.duplicates} Duplikat(e)</span>}
+                {latestImport.errors > 0 && <span>{latestImport.errors} Fehler</span>}
+              </div>
+            </div>
+          </>
+        ) : (
+          <strong>{formatDateTime(status?.lastImportAt)}</strong>
+        )}
+      </div>
+
+      <div className="bank-history-list">
+        {previousImports.map((entry) => (
+          <div className="bank-history-item" key={entry.id}>
+            <div className="bank-history-item__main">
+              <strong>{entry.fileName}</strong>
+              <span>
+                {entry.format} importiert am {formatDateTime(entry.importedAt)}
+              </span>
+              <span style={{ color: entry.paymentAccountColor || undefined }}>
+                {entry.paymentAccountName || 'Zahlkonto'}
+              </span>
+            </div>
+            <div className="bank-history-item__stats">
+              <span>{entry.imported} neu</span>
+              {entry.duplicates > 0 && <span>{entry.duplicates} Duplikat(e)</span>}
+              {entry.errors > 0 && <span>{entry.errors} Fehler</span>}
+            </div>
+          </div>
+        ))}
+        {recentImports.length === 0 && status?.lastImportAt && (
+          <div className="bank-history-empty">
+            Dateiname wird bei zukünftigen Importen in dieser Historie angezeigt.
+          </div>
+        )}
+        {recentImports.length === 0 && !status?.lastImportAt && (
+          <div className="bank-history-empty">Noch kein Bankimport vorhanden.</div>
+        )}
+      </div>
+    </FilterDropdown>
+  )
+}
+
+function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File) => void }) {
+  const closeRef = React.useRef<(() => void) | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const [dragActive, setDragActive] = useState(false)
+  const [error, setError] = useState('')
+
+  const selectFile = (fileList: FileList | null) => {
+    const nextFile = fileList?.[0]
+    if (!nextFile) return
+    if (!/\.(xml|csv)$/i.test(nextFile.name)) {
+      setError('Bitte eine CAMT-XML- oder CSV-Datei auswählen.')
+      return
+    }
+    setError('')
+    closeRef.current?.()
+    onOpenImport(nextFile)
+  }
+
+  return (
+    <FilterDropdown
+      trigger={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+      }
+      title="Import"
+      alignRight
+      width={320}
+      ariaLabel="Bankdaten importieren"
+      buttonTitle="Import"
+      colorVariant="action"
+      closeRef={closeRef}
+    >
+      <div className="bank-import-action-dropdown">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xml,.csv,text/csv,application/xml,text/xml"
+          hidden
+          onChange={(event) => selectFile(event.target.files)}
+        />
+        <button
+          className={`bank-import-action-dropzone ${dragActive ? 'is-dragging' : ''}`}
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          onDragEnter={(event) => {
+            event.preventDefault()
+            setDragActive(true)
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={(event) => {
+            event.preventDefault()
+            if (event.currentTarget === event.target) setDragActive(false)
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            setDragActive(false)
+            selectFile(event.dataTransfer.files)
+          }}
+        >
+          <span className="bank-import-action-dropzone__icon" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M12 18v-6" />
+              <path d="M9 15l3-3 3 3" />
+            </svg>
+          </span>
+          <strong>Bankdatei hier ablegen</strong>
+          <span>oder Datei auswählen</span>
+          <small>CAMT-XML oder CSV</small>
+          {error && <span className="bank-import-action-dropzone__error">{error}</span>}
+        </button>
+      </div>
+    </FilterDropdown>
+  )
 }
 
 function MappingSelect({
@@ -325,24 +597,34 @@ function DuplicateRecordCard({
 function BankMatchRow({
   match,
   busy,
-  onLink
+  onLink,
+  onApplyRecurring
 }: {
   match: BankTransactionMatch
   busy: boolean
   onLink: (voucherId: number) => void
+  onApplyRecurring: (match: BankTransactionMatch) => void
 }) {
   const scoreValue = Number(match.score || 0)
-  const scoreLevel = scoreValue >= 60 ? 'high' : scoreValue >= 30 ? 'medium' : 'low'
-  const scoreLabel =
-    scoreValue >= 60 ? '★★★' : scoreValue >= 30 ? '★★' : scoreValue >= 15 ? '★' : '–'
+  const score = matchScorePresentation(scoreValue)
 
   return (
     <div className="bank-match-row">
       <div>
-        <strong>{match.voucherNo}</strong>
+        <strong>
+          {match.matchKind === 'RECURRING'
+            ? `Dauerbuchung: ${match.recurringBookingName || match.description || 'Ohne Bezeichnung'}`
+            : match.voucherNo}
+        </strong>
         <span>
           {formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}
         </span>
+        {match.matchKind === 'VOUCHER' && match.recurringBookingName && (
+          <span>Bereits aus Dauerbuchung „{match.recurringBookingName}“ gebucht</span>
+        )}
+        {match.matchKind === 'RECURRING' && match.variableAmount && (
+          <span>Betrag wird mit dem Bankbeleg aktualisiert</span>
+        )}
         {!match.paymentAccountMismatch && match.paymentAccountName ? (
           <span style={{ color: match.paymentAccountColor || undefined }}>
             Zahlkonto: {match.paymentAccountName}
@@ -356,7 +638,7 @@ function BankMatchRow({
         )}
       </div>
       <span
-        className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}
+        className={`fee-suggestion__score fee-suggestion__score--${score.level}`}
         title={
           scoreValue >= 15
             ? `Übereinstimmung: ${Math.round(scoreValue)} %`
@@ -364,14 +646,18 @@ function BankMatchRow({
         }
         aria-label={
           scoreValue >= 15
-            ? `${scoreLevel === 'high' ? 'Hohe' : scoreLevel === 'medium' ? 'Mittlere' : 'Geringe'} Übereinstimmung`
+            ? score.label
             : 'Sehr schwacher Treffer'
         }
       >
-        {scoreLabel}
+        {score.stars}
       </span>
-      <button className="btn" disabled={busy} onClick={() => onLink(match.id)}>
-        Zuordnen
+      <button
+        className="btn bank-match-link-button"
+        disabled={busy}
+        onClick={() => match.matchKind === 'RECURRING' ? onApplyRecurring(match) : onLink(match.id)}
+      >
+        {match.matchKind === 'RECURRING' ? 'Buchen & zuordnen' : 'Zuordnen'}
       </button>
     </div>
   )
@@ -379,14 +665,12 @@ function BankMatchRow({
 
 function ManualAssignmentModal({
   transaction,
-  includeAllDates,
   busy,
   onClose,
   onLink,
   notify
 }: {
   transaction: BankTransaction
-  includeAllDates: boolean
   busy: boolean
   onClose: () => void
   onLink: (voucherId: number) => void
@@ -403,7 +687,6 @@ function ManualAssignmentModal({
       const result = await window.api.bankTransactions.matches({
         id: transaction.id,
         q: query || undefined,
-        includeAllDates,
         manual: true
       })
       setResults(result.rows as BankTransactionMatch[])
@@ -412,7 +695,7 @@ function ManualAssignmentModal({
     } finally {
       setLoading(false)
     }
-  }, [includeAllDates, notify, query, transaction.id])
+  }, [notify, query, transaction.id])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -736,11 +1019,13 @@ function BankImportResultModal({
 
 function BankImportModal({
   accounts,
+  initialFile,
   onClose,
   onImported,
   notify
 }: {
   accounts: PaymentAccount[]
+  initialFile?: File | null
   onClose: () => void
   onImported: () => void
   notify: Props['notify']
@@ -791,6 +1076,11 @@ function BankImportModal({
     setFileBytes(nextBytes)
     await loadPreview(nextFile, nextBytes)
   }
+
+  useEffect(() => {
+    if (!initialFile) return
+    void chooseFile(initialFile)
+  }, [initialFile])
 
   const commit = async () => {
     if (!file || !fileBytes) return
@@ -1226,7 +1516,6 @@ function BankReviewModal({
 }) {
   const [matches, setMatches] = useState<BankTransactionMatch[]>([])
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
-  const [includeAllDates, setIncludeAllDates] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [showManualAssign, setShowManualAssign] = useState(false)
@@ -1237,8 +1526,7 @@ function BankReviewModal({
     setLoading(true)
     try {
       const result = await window.api.bankTransactions.matches({
-        id: transaction.id,
-        includeAllDates
+        id: transaction.id
       })
       setMatches(result.rows as BankTransactionMatch[])
     } catch (reason: any) {
@@ -1246,7 +1534,7 @@ function BankReviewModal({
     } finally {
       setLoading(false)
     }
-  }, [includeAllDates, notify, transaction.id, transaction.status])
+  }, [notify, transaction.id, transaction.status])
 
   useEffect(() => {
     void loadMatches()
@@ -1266,6 +1554,28 @@ function BankReviewModal({
     try {
       await window.api.bankTransactions.link({ id: transaction.id, voucherId })
       notify('success', 'Bankbeleg wurde der Buchung zugeordnet.')
+      onChanged()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyRecurring = async (match: BankTransactionMatch) => {
+    if (!match.recurringBookingId || (!match.occurrenceId && !match.scheduledDate)) return
+    setBusy(true)
+    try {
+      const result = await window.api.recurringBookings.book({
+        recurringBookingId: match.recurringBookingId,
+        occurrenceId: match.occurrenceId,
+        scheduledDate: match.scheduledDate || match.date || undefined,
+        bookingDate: transaction.bookingDate,
+        amount: transaction.amount,
+        bankTransactionId: transaction.id
+      })
+      notify('success', `Dauerbuchung und Bankbeleg wurden als ${result.voucherNo} zusammengeführt.`)
       onChanged()
       onClose()
     } catch (reason: any) {
@@ -1301,17 +1611,17 @@ function BankReviewModal({
       role="dialog"
       aria-modal="true"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-    >
+      >
       <div className="modal bank-review-modal">
         <header className="bank-modal-header">
-          <div>
+          <div className="bank-review-heading">
             <h2>Bankbeleg #{transaction.id}</h2>
             <p>{transaction.counterparty || 'Ohne Gegenpartei'}</p>
-          </div>
-          <div className="bank-header-actions">
-            <span className={`bank-status bank-status--${transaction.status.toLowerCase()}`}>
+            <span className={`bank-status bank-review-status-badge bank-status--${transaction.status.toLowerCase()}`}>
               {statusLabel(transaction.status)}
             </span>
+          </div>
+          <div className="bank-header-actions">
             <div className="bank-action-menu" ref={actionMenuRef}>
               <button
                 className="btn bank-action-menu__trigger"
@@ -1373,8 +1683,16 @@ function BankReviewModal({
                 </div>
               )}
             </div>
-            <button className="btn ghost" onClick={onClose} aria-label="Schließen">
-              ×
+            <button
+              className="btn ghost booking-modal-icon-btn booking-modal-close-btn"
+              type="button"
+              onClick={onClose}
+              title="Schließen (ESC)"
+              aria-label="Schließen"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
             </button>
           </div>
         </header>
@@ -1431,22 +1749,12 @@ function BankReviewModal({
             <section className="bank-review-section">
               <div className="bank-section-title">
                 <div className="bank-section-title__label">
-                  <strong>Passende Buchungen</strong>
+                  <strong>Passende Buchungen und Dauerbuchungen</strong>
                 </div>
                 <div className="bank-match-toolbar">
                   <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>
                     Manuell zuweisen
                   </button>
-                  <div className="bank-check-toggle">
-                    <label className="bank-check-label">
-                      <input
-                        type="checkbox"
-                        checked={includeAllDates}
-                        onChange={(event) => setIncludeAllDates(event.target.checked)}
-                      />{' '}
-                      Alle Daten
-                    </label>
-                  </div>
                 </div>
               </div>
               <div className="bank-match-list">
@@ -1454,11 +1762,14 @@ function BankReviewModal({
                 {!loading &&
                   matches.map((match) => (
                     <BankMatchRow
-                      key={match.id}
+                      key={`${match.matchKind || 'VOUCHER'}-${match.id}`}
                       match={match}
                       busy={busy}
                       onLink={(voucherId) => {
-                        void link(voucherId)
+                          void link(voucherId)
+                      }}
+                      onApplyRecurring={(candidate) => {
+                        void applyRecurring(candidate)
                       }}
                     />
                   ))}
@@ -1502,7 +1813,6 @@ function BankReviewModal({
         {showManualAssign && (
           <ManualAssignmentModal
             transaction={transaction}
-            includeAllDates={includeAllDates}
             busy={busy}
             onClose={() => setShowManualAssign(false)}
             onLink={(voucherId) => {
@@ -1542,6 +1852,7 @@ export default function BankImportView({
   >('date')
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(false)
+  const [initialImportFile, setInitialImportFile] = useState<File | null>(null)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
@@ -1623,10 +1934,6 @@ export default function BankImportView({
     () => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'),
     [paymentAccounts]
   )
-  const paymentAccountsById = useMemo(
-    () => new Map(activeAccounts.map((account) => [account.id, account])),
-    [activeAccounts]
-  )
   const pageCount = Math.max(1, Math.ceil(total / limit))
   const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
 
@@ -1660,31 +1967,22 @@ export default function BankImportView({
               </button>
             )}
           </div>
-          <select
-            className="input bank-account-filter"
-            value={accountId ?? ''}
-            style={{ color: paymentAccountsById.get(Number(accountId || 0))?.color || undefined }}
-            onChange={(event) => {
-              setAccountId(event.target.value ? Number(event.target.value) : null)
+          <BankImportHistoryDropdown status={importStatus} />
+          <BankAccountFilterDropdown
+            accounts={activeAccounts}
+            value={accountId}
+            onApply={(nextAccountId) => {
+              setAccountId(nextAccountId)
               setPage(1)
             }}
-            aria-label="Nach Zahlkonto filtern"
-          >
-            <option value="">Alle Zahlkonten</option>
-            {activeAccounts.map((account) => (
-              <option
-                key={account.id}
-                value={account.id}
-                style={{ color: account.color || undefined }}
-              >
-                {account.name}
-              </option>
-            ))}
-          </select>
+          />
           <div className="filter-divider" />
-          <button className="btn primary" onClick={() => setShowImport(true)}>
-            + Import
-          </button>
+          <BankImportActionDropdown
+            onOpenImport={(file) => {
+              setInitialImportFile(file || null)
+              setShowImport(true)
+            }}
+          />
         </div>
       </div>
 
@@ -1747,6 +2045,7 @@ export default function BankImportView({
               <th className="sortable" onClick={() => toggleSort('description')}>
                 Beschreibung {renderSort('description')}
               </th>
+              <th>Zuordnung</th>
               <th className="sortable" onClick={() => toggleSort('account')}>
                 Zahlkonto {renderSort('account')}
               </th>
@@ -1784,6 +2083,20 @@ export default function BankImportView({
                     {row.counterparty && row.purpose && <span>{row.purpose}</span>}
                   </div>
                 </td>
+                <td>
+                  {(() => {
+                    const match = matchScorePresentation(row.matchScore)
+                    return (
+                      <span
+                        className={`bank-match-indicator bank-match-indicator--${match.level}`}
+                        title={match.level === 'none' ? match.label : `${match.label}: ${Math.round(Number(row.matchScore))} %`}
+                        aria-label={match.label}
+                      >
+                        {match.stars}
+                      </span>
+                    )
+                  })()}
+                </td>
                 <td style={{ color: row.paymentAccountColor || undefined }}>
                   <span
                     className="bank-account-dot"
@@ -1804,14 +2117,14 @@ export default function BankImportView({
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div className="bank-empty">Keine Bankbelege für diesen Filter gefunden.</div>
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div className="bank-empty">Bankbelege werden geladen …</div>
                 </td>
               </tr>
@@ -1845,8 +2158,12 @@ export default function BankImportView({
       {showImport && (
         <BankImportModal
           accounts={paymentAccounts}
+          initialFile={initialImportFile}
           notify={notify}
-          onClose={() => setShowImport(false)}
+          onClose={() => {
+            setShowImport(false)
+            setInitialImportFile(null)
+          }}
           onImported={() => {
             setPage(1)
             void load()

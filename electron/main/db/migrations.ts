@@ -759,8 +759,81 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensurePartyTables(db)
     }
+  },
+  {
+    version: 38,
+    up: (db: DB) => {
+      ensureRecurringBookingTables(db)
+    }
+  },
+  {
+    version: 39,
+    up: (db: DB) => {
+      ensureRecurringBookingTables(db)
+    }
   }
 ]
+
+export function ensureRecurringBookingTables(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS recurring_bookings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT CHECK(type IN ('IN','OUT')) NOT NULL,
+      sphere TEXT CHECK(sphere IN ('IDEELL','ZWECK','VERMOEGEN','WGB')) NOT NULL,
+      description TEXT,
+      note TEXT,
+      counterparty TEXT,
+      amount_mode TEXT CHECK(amount_mode IN ('NET','GROSS')) NOT NULL DEFAULT 'GROSS',
+      amount NUMERIC NOT NULL,
+      variable_amount INTEGER NOT NULL DEFAULT 0,
+      vat_rate NUMERIC NOT NULL DEFAULT 0,
+      payment_account_id INTEGER REFERENCES payment_accounts(id) ON DELETE SET NULL,
+      budget_id INTEGER REFERENCES budgets(id) ON DELETE SET NULL,
+      earmark_id INTEGER REFERENCES earmarks(id) ON DELETE SET NULL,
+      budget_assignments_json TEXT NOT NULL DEFAULT '[]',
+      earmark_assignments_json TEXT NOT NULL DEFAULT '[]',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      frequency TEXT CHECK(frequency IN ('WEEKLY','MONTHLY','QUARTERLY','YEARLY')) NOT NULL,
+      anchor_day INTEGER NOT NULL,
+      start_date TEXT NOT NULL,
+      next_due_date TEXT NOT NULL,
+      end_date TEXT,
+      status TEXT CHECK(status IN ('ACTIVE','PAUSED','ENDED')) NOT NULL DEFAULT 'ACTIVE',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_recurring_bookings_status_due
+      ON recurring_bookings(status, next_due_date);
+
+    CREATE TABLE IF NOT EXISTS recurring_occurrences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recurring_booking_id INTEGER NOT NULL REFERENCES recurring_bookings(id) ON DELETE CASCADE,
+      scheduled_date TEXT NOT NULL,
+      status TEXT CHECK(status IN ('DUE','BOOKED','SKIPPED')) NOT NULL DEFAULT 'DUE',
+      voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+      booked_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE(recurring_booking_id, scheduled_date)
+    );
+    CREATE INDEX IF NOT EXISTS idx_recurring_occurrences_due
+      ON recurring_occurrences(status, scheduled_date);
+    CREATE INDEX IF NOT EXISTS idx_recurring_occurrences_booking
+      ON recurring_occurrences(recurring_booking_id, status, scheduled_date);
+  `)
+  const columns = db.prepare('PRAGMA table_info(recurring_bookings)').all() as Array<{ name: string }>
+  if (!columns.some((column) => column.name === 'anchor_day')) {
+    db.exec(`ALTER TABLE recurring_bookings ADD COLUMN anchor_day INTEGER NOT NULL DEFAULT 1;`)
+    db.exec(`UPDATE recurring_bookings SET anchor_day=CAST(substr(start_date, 9, 2) AS INTEGER);`)
+  }
+  if (!columns.some((column) => column.name === 'budget_assignments_json')) {
+    db.exec(`ALTER TABLE recurring_bookings ADD COLUMN budget_assignments_json TEXT NOT NULL DEFAULT '[]';`)
+  }
+  if (!columns.some((column) => column.name === 'earmark_assignments_json')) {
+    db.exec(`ALTER TABLE recurring_bookings ADD COLUMN earmark_assignments_json TEXT NOT NULL DEFAULT '[]';`)
+  }
+}
 
 export function ensurePartyTables(db: DB) {
   db.exec(`
@@ -1546,6 +1619,7 @@ export function applyMigrations(db: DB) {
   ensureSubmissionColumns(db)
   ensureBankImportTables(db)
   ensurePartyTables(db)
+  ensureRecurringBookingTables(db)
 
   const applied = getAppliedVersions(db)
   let migrationApplied = false
@@ -1630,5 +1704,6 @@ export function applyMigrations(db: DB) {
     ensureSubmissionColumns(db)
     ensureBankImportTables(db)
     ensurePartyTables(db)
+    ensureRecurringBookingTables(db)
   }
 }

@@ -5,10 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
-## [3.0.1] - 2026-07-18
+## [3.1.0] - 2026-07-20
+
+### Hinzugefügt
+
+- Dauerbuchungen: Wiederkehrende Einnahmen und Ausgaben können mit wöchentlichem, monatlichem, quartalsweisem oder jährlichem Rhythmus verwaltet, pausiert, übersprungen und nach Bestätigung als normale Buchung erzeugt werden.
+- Navigation: Der neue Bereich „Dauerbuchungen“ verwendet ein CalendarSync-Symbol und zeigt die Anzahl fälliger Termine als Badge.
+- Testdaten: Zwei CAMT.053-Auszüge decken den Abgleich der Beispiel-Abos auf den Zahlkonten Bank und Volksbank ab.
 
 ### Geändert
 
+- Dauerbuchungen und Bankimport gleichen fällige Termine, bestehende Buchungen und Bankbelege richtungsunabhängig ab; bestätigte Treffer werden zu einer Buchung zusammengeführt statt doppelt angelegt.
+- KI-Agent: Dauerbuchungen, ihre Fälligkeiten und lokale Bankimport-Treffer stehen im Kontext und über eigene Agent-Tools für lesende Prüfungen und Zuordnungs-Reviews bereit.
 - Dashboard und Reports: Flächen-, Balken-, Linien- und Donutdiagramme verwenden nun einen konsistenten Dither-Kit-inspirierten Stil mit Gradient, Dithertextur und Aura.
 - Donutdiagramme heben beim Darüberfahren das aktive Segment hervor und vergrößern es leicht; andere Segmente treten zurück.
 

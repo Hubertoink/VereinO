@@ -52,6 +52,19 @@ import type {
     TPartyUpsertOutput,
     TPartyArchiveInput,
     TPartyArchiveOutput,
+    TRecurringBookingActionInput,
+    TRecurringBookingBookInput,
+    TRecurringBookingBookOutput,
+    TRecurringBookingLinkInput,
+    TRecurringBookingLinkOutput,
+    TRecurringBookingSkipOutput,
+    TRecurringBookingsListInput,
+    TRecurringBookingsListOutput,
+    TRecurringBookingsSummaryOutput,
+    TRecurringBookingStatusInput,
+    TRecurringBookingStatusOutput,
+    TRecurringBookingUpsertInput,
+    TRecurringBookingUpsertOutput,
     TTagDeleteInput,
     TTagDeleteOutput,
     TTagsListInput,
@@ -148,6 +161,15 @@ export interface FinanceApi {
         list: (payload?: TBudgetListInput) => Promise<TBudgetListOutput>
         delete: (payload: TBudgetDeleteInput) => Promise<TBudgetDeleteOutput>
         usage: (payload: TBudgetUsageInput) => Promise<TBudgetUsageOutput>
+    }
+    recurringBookings: {
+        list: (payload?: TRecurringBookingsListInput) => Promise<TRecurringBookingsListOutput>
+        summary: () => Promise<TRecurringBookingsSummaryOutput>
+        upsert: (payload: TRecurringBookingUpsertInput) => Promise<TRecurringBookingUpsertOutput>
+        setStatus: (payload: TRecurringBookingStatusInput) => Promise<TRecurringBookingStatusOutput>
+        skip: (payload: TRecurringBookingActionInput) => Promise<TRecurringBookingSkipOutput>
+        book: (payload: TRecurringBookingBookInput) => Promise<TRecurringBookingBookOutput>
+        link: (payload: TRecurringBookingLinkInput) => Promise<TRecurringBookingLinkOutput>
     }
     attachments: {
         list: (payload: TAttachmentsListInput) => Promise<TAttachmentsListOutput>

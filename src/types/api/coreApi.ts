@@ -24,6 +24,7 @@ export interface StartupBootstrapData {
         openBankImports: number
         dueMembershipFees: number
         openInvoices: number
+        dueRecurringBookings: number
     }
     years: number[]
     earmarks: unknown[]

@@ -11,12 +11,13 @@ interface TopNavProps {
   openBankImportsCount?: number
   openInvoicesCount?: number
   dueMembershipFeesCount?: number
+  dueRecurringBookingsCount?: number
   showBadges?: boolean
   items?: NavItem[]
   aiBusy?: boolean
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
       {items.map((item, idx) => {
@@ -31,6 +32,7 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
         if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
         if (item.key === 'Mitglieder') badgeCount = dueMembershipFeesCount
+        if (item.key === 'Dauerbuchungen') badgeCount = dueRecurringBookingsCount
         
         const showBadge = showBadges && badgeCount > 0
         const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)

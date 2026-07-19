@@ -4,6 +4,8 @@ import { getDb, withTransaction } from '../db/database'
 import { getPaymentAccountById } from './paymentAccounts'
 import { parseBankStatement, type BankCsvMapping, type ParsedBankTransaction } from '../services/bankStatementParser'
 import { writeAudit } from '../services/audit'
+import { recurringGrossAmount, scoreRecurringMatch } from '../../../shared/recurringMatching'
+import { materializeDueOccurrences } from './recurringOccurrences'
 
 type DB = InstanceType<typeof Database>
 type BankStatus = 'OPEN' | 'LINKED' | 'CHECKED'
@@ -338,7 +340,15 @@ export function listBankTransactions(input: {
     ${whereSql}
     ${orderSql}
     LIMIT ? OFFSET ?
-  `).all(...params, limit, (page - 1) * limit)
+  `).all(...params, limit, (page - 1) * limit) as any[]
+  const hasOpenRows = rows.some((row) => row.status === 'OPEN')
+  if (hasOpenRows) materializeDueOccurrences(d)
+  const rowsWithMatchScore = rows.map((row) => {
+    if (row.status !== 'OPEN') return { ...row, matchScore: null }
+    const bestScore = findBankTransactionMatches({ id: Number(row.id), recurringOccurrencesMaterialized: hasOpenRows })
+      .reduce((best, match: any) => Math.max(best, Number(match.score || 0)), 0)
+    return { ...row, matchScore: bestScore >= 15 ? bestScore : null }
+  })
   const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>
   const stats = { total: 0, open: 0, linked: 0, checked: 0 }
   for (const row of statsRows) {
@@ -347,7 +357,7 @@ export function listBankTransactions(input: {
     if (row.status === 'LINKED') stats.linked = Number(row.count)
     if (row.status === 'CHECKED') stats.checked = Number(row.count)
   }
-  return { rows, total, page, limit, stats }
+  return { rows: rowsWithMatchScore, total, page, limit, stats }
 }
 
 export function getBankImportStatus() {
@@ -360,6 +370,34 @@ export function getBankImportStatus() {
     SELECT MAX(created_at) as lastImportAt, COUNT(*) as total
     FROM bank_import_batches
   `).get() as { lastImportAt?: string | null; total?: number } | undefined
+  const recentImports = d.prepare(`
+    SELECT
+      bib.id,
+      bib.file_name as fileName,
+      bib.format,
+      bib.payment_account_id as paymentAccountId,
+      pa.name as paymentAccountName,
+      pa.color as paymentAccountColor,
+      bib.imported_count as imported,
+      bib.duplicate_count as duplicates,
+      bib.error_count as errors,
+      bib.created_at as importedAt
+    FROM bank_import_batches bib
+    LEFT JOIN payment_accounts pa ON pa.id = bib.payment_account_id
+    ORDER BY bib.created_at DESC, bib.id DESC
+    LIMIT 8
+  `).all() as Array<{
+    id: number
+    fileName: string
+    format: 'CAMT' | 'CSV'
+    paymentAccountId: number
+    paymentAccountName?: string | null
+    paymentAccountColor?: string | null
+    imported: number
+    duplicates: number
+    errors: number
+    importedAt: string
+  }>
   const accounts = d.prepare(`
     SELECT
       pa.id,
@@ -383,6 +421,7 @@ export function getBankImportStatus() {
     lastBookingDate: latest?.lastBookingDate ?? null,
     lastImportAt: latestBatch?.lastImportAt ?? null,
     total: Number(latest?.total || 0),
+    recentImports,
     accounts
   }
 }
@@ -462,7 +501,12 @@ function wordSet(value?: string | null) {
   return new Set(normalized(value).split(/[^a-z0-9äöüß]+/).filter((word) => word.length >= 3))
 }
 
-export function findBankTransactionMatches(input: { id: number; q?: string; includeAllDates?: boolean; manual?: boolean }) {
+export function findBankTransactionMatches(input: {
+  id: number
+  q?: string
+  manual?: boolean
+  recurringOccurrencesMaterialized?: boolean
+}) {
   const d = getDb()
   const transaction = getBankTransaction(input.id) as any
   const manual = Boolean(input.manual)
@@ -472,18 +516,14 @@ export function findBankTransactionMatches(input: { id: number; q?: string; incl
   ]
   const params: unknown[] = [input.id]
   if (manual) {
-    if (!input.includeAllDates) {
-      where.push(`ABS(julianday(v.date) - julianday(?)) <= 31`)
-      params.push(transaction.bookingDate)
-    }
+    where.push(`ABS(julianday(v.date) - julianday(?)) <= 31`)
+    params.push(transaction.bookingDate)
   } else {
     where.push(`v.type = ?`)
     where.push(`ROUND(v.gross_amount, 2) = ROUND(?, 2)`)
     params.push(transaction.direction, transaction.amount)
-    if (!input.includeAllDates) {
-      where.push(`ABS(julianday(v.date) - julianday(?)) <= 14`)
-      params.push(transaction.bookingDate)
-    }
+    where.push(`ABS(julianday(v.date) - julianday(?)) <= 14`)
+    params.push(transaction.bookingDate)
   }
   if (input.q?.trim()) {
     where.push(`(v.voucher_no LIKE ? OR COALESCE(v.description, '') LIKE ? OR COALESCE(v.note, '') LIKE ?)`)
@@ -493,16 +533,20 @@ export function findBankTransactionMatches(input: { id: number; q?: string; incl
   const rows = d.prepare(`
     SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.description, v.note,
       v.gross_amount as grossAmount, v.payment_account_id as paymentAccountId,
-      pa.name as paymentAccountName, pa.color as paymentAccountColor
+      pa.name as paymentAccountName, pa.color as paymentAccountColor,
+      ro.id as recurringOccurrenceId, rb.id as recurringBookingId,
+      rb.name as recurringBookingName
     FROM vouchers v
     LEFT JOIN payment_accounts pa ON pa.id = v.payment_account_id
+    LEFT JOIN recurring_occurrences ro ON ro.voucher_id = v.id AND ro.status = 'BOOKED'
+    LEFT JOIN recurring_bookings rb ON rb.id = ro.recurring_booking_id
     WHERE ${where.join(' AND ')}
     ORDER BY ABS(julianday(v.date) - julianday(?)) ASC, v.date DESC, v.id DESC
     LIMIT 100
   `).all(...params, transaction.bookingDate) as any[]
 
   const sourceWords = wordSet([transaction.counterparty, transaction.purpose].filter(Boolean).join(' '))
-  return rows.map((row) => {
+  const voucherMatches = rows.map((row) => {
     const targetWords = wordSet([row.description, row.note].filter(Boolean).join(' '))
     let sharedWords = 0
     for (const word of sourceWords) if (targetWords.has(word)) sharedWords++
@@ -522,9 +566,101 @@ export function findBankTransactionMatches(input: { id: number; q?: string; incl
       if (paymentAccountMismatch) score = Math.max(5, score)
       if (sharedWords === 0 && dateDistance > 20) score = Math.max(1, Math.min(score, 15))
     }
-    return { ...row, dateDistance, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
+    return { ...row, matchKind: 'VOUCHER', dateDistance, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
   }).sort((a, b) => {
     if (!manual && Number(a.paymentAccountMismatch) !== Number(b.paymentAccountMismatch)) return Number(a.paymentAccountMismatch) - Number(b.paymentAccountMismatch)
     return a.dateDistance - b.dateDistance || b.score - a.score
   })
+
+  if (manual) return voucherMatches
+
+  // A close existing voucher is the safest target. In particular, do not offer the next
+  // recurring period when the bank transaction most likely belongs to the one just booked.
+  const hasStrongExistingVoucher = voucherMatches.some((match: any) =>
+    !match.paymentAccountMismatch && match.dateDistance <= 3 && match.score >= 50
+  )
+  if (hasStrongExistingVoucher) return voucherMatches
+
+  if (!input.recurringOccurrencesMaterialized) materializeDueOccurrences(d)
+  const recurringCandidates = d.prepare(`
+    SELECT ro.id as occurrenceId, ro.scheduled_date as scheduledDate,
+      rb.id as recurringBookingId, rb.name as recurringBookingName, rb.type,
+      rb.description, rb.note, rb.counterparty, rb.amount_mode as amountMode,
+      rb.amount, rb.variable_amount as variableAmount, rb.vat_rate as vatRate,
+      rb.payment_account_id as paymentAccountId,
+      pa.name as paymentAccountName, pa.color as paymentAccountColor
+    FROM recurring_occurrences ro
+    JOIN recurring_bookings rb ON rb.id = ro.recurring_booking_id
+    LEFT JOIN payment_accounts pa ON pa.id = rb.payment_account_id
+    WHERE ro.status = 'DUE'
+      AND rb.type = ?
+      AND rb.payment_account_id = ?
+      AND ABS(julianday(ro.scheduled_date) - julianday(?)) <= 14
+    ORDER BY ABS(julianday(ro.scheduled_date) - julianday(?)), ro.id
+    LIMIT 50
+  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, transaction.bookingDate) as any[]
+
+  const upcomingCandidates = d.prepare(`
+    SELECT NULL as occurrenceId, rb.next_due_date as scheduledDate,
+      rb.id as recurringBookingId, rb.name as recurringBookingName, rb.type,
+      rb.description, rb.note, rb.counterparty, rb.amount_mode as amountMode,
+      rb.amount, rb.variable_amount as variableAmount, rb.vat_rate as vatRate,
+      rb.payment_account_id as paymentAccountId,
+      pa.name as paymentAccountName, pa.color as paymentAccountColor
+    FROM recurring_bookings rb
+    LEFT JOIN payment_accounts pa ON pa.id = rb.payment_account_id
+    WHERE rb.status = 'ACTIVE'
+      AND rb.type = ?
+      AND rb.payment_account_id = ?
+      AND ABS(julianday(rb.next_due_date) - julianday(?)) <= 14
+      AND NOT EXISTS (
+        SELECT 1 FROM recurring_occurrences ro
+        WHERE ro.recurring_booking_id = rb.id AND ro.scheduled_date = rb.next_due_date
+      )
+    ORDER BY ABS(julianday(rb.next_due_date) - julianday(?)), rb.id
+    LIMIT 50
+  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, transaction.bookingDate) as any[]
+
+  const recurringMatches = [...recurringCandidates, ...upcomingCandidates].flatMap((candidate) => {
+    const expectedGrossAmount = recurringGrossAmount(candidate.amountMode, candidate.amount, candidate.vatRate)
+    const match = scoreRecurringMatch({
+      scheduledDate: candidate.scheduledDate,
+      bookingDate: transaction.bookingDate,
+      recurringType: candidate.type,
+      bookingType: transaction.direction,
+      expectedGrossAmount,
+      bookingGrossAmount: Number(transaction.amount),
+      variableAmount: !!candidate.variableAmount,
+      recurringPaymentAccountId: candidate.paymentAccountId,
+      bookingPaymentAccountId: transaction.paymentAccountId,
+      recurringText: [candidate.recurringBookingName, candidate.description, candidate.counterparty].filter(Boolean).join(' '),
+      bookingText: [transaction.counterparty, transaction.purpose].filter(Boolean).join(' ')
+    })
+    if (!match) return []
+    return [{
+      id: candidate.occurrenceId == null ? -Number(candidate.recurringBookingId) : Number(candidate.occurrenceId),
+      matchKind: 'RECURRING',
+      occurrenceId: candidate.occurrenceId == null ? null : Number(candidate.occurrenceId),
+      scheduledDate: candidate.scheduledDate,
+      recurringBookingId: Number(candidate.recurringBookingId),
+      recurringBookingName: candidate.recurringBookingName,
+      voucherNo: 'Dauerbuchung',
+      date: candidate.scheduledDate,
+      type: candidate.type,
+      description: candidate.description || candidate.recurringBookingName,
+      grossAmount: Number(transaction.amount),
+      expectedGrossAmount,
+      variableAmount: !!candidate.variableAmount,
+      paymentAccountId: Number(candidate.paymentAccountId),
+      paymentAccountName: candidate.paymentAccountName,
+      paymentAccountColor: candidate.paymentAccountColor,
+      paymentAccountMismatch: false,
+      paymentAccountWarning: null,
+      ...match
+    }]
+  })
+
+  return [...recurringMatches, ...voucherMatches]
+    .sort((a: any, b: any) => b.score - a.score || a.dateDistance - b.dateDistance)
+    .slice(0, 100)
 }

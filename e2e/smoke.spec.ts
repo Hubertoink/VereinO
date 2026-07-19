@@ -389,7 +389,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
 
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
-  await expect(flyout).toContainText('Als aktiver Buchungsreiter geöffnet')
+  await expect(flyout).toContainText('Aktive Buchungen')
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Geparkter Reiter-Test')
   await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('47.50')
   await flyout.getByRole('button', { name: '+ Kommentar', exact: true }).click()

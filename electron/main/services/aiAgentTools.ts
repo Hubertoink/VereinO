@@ -13,6 +13,7 @@ import { listAiAgentAutoRules, listAiAgentMemory, upsertAiAgentAutoRule, upsertA
 import * as mp from '../repositories/members_payments'
 import { listPaymentAccounts } from '../repositories/paymentAccounts'
 import { listParties } from '../repositories/parties'
+import { listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
 import { listTags } from '../repositories/tags'
 import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVouchers, summarizeVouchers } from '../repositories/vouchers'
 import type { AiContext } from './ai'
@@ -604,7 +605,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
   return [
     {
       name: 'vereino_context_overview',
-      description: 'Liefert eine kompakte Übersicht über Verein, Stammdaten, aktuelle Kennzahlen, Konten, Tags, Budgets, Mitglieder- und Rechnungsstatus.',
+      description: 'Liefert eine kompakte Übersicht über Verein, Stammdaten, aktuelle Kennzahlen, Konten, Tags, Budgets, Mitglieder-, Rechnungs- und Dauerbuchungsstatus.',
       readOnly: true,
       parameters: toolParameters({}),
       run: () => ({
@@ -614,7 +615,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'master_data_list',
-      description: 'Listet aktive Zahlungskonten, Geschäftspartner, Tags, Budgets/Kategorien und Zweckbindungen für genaue ID-Zuordnungen.',
+      description: 'Listet aktive Zahlungskonten, Geschäftspartner, Tags, Budgets/Kategorien, Zweckbindungen und Dauerbuchungen für genaue ID-Zuordnungen.',
       readOnly: true,
       parameters: toolParameters({
         includeArchived: { type: 'boolean', description: 'Archivierte Budgets und inaktive Zweckbindungen einbeziehen.' }
@@ -628,7 +629,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             parties: listParties({ activeOnly: true, limit: 200 } as any),
             tags: listTags({ includeUsage: true } as any),
             budgets: listBudgets({ includeArchived: !!args.includeArchived } as any),
-            earmarks: listBindings({ activeOnly: !args.includeArchived } as any)
+            earmarks: listBindings({ activeOnly: !args.includeArchived } as any),
+            recurringBookings: listRecurringBookings({})
           }
         }
       }
@@ -876,6 +878,29 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             summary: mp.dueSummary(),
             rows
           }
+        }
+      }
+    },
+    {
+      name: 'recurring_bookings_list',
+      description: 'Listet Dauerbuchungen mit Status, Rhythmus, Konto, Betrag, nächster/fälliger Ausführung und erkannten bestehenden Buchungs- oder Bankbelegtreffern.',
+      readOnly: true,
+      parameters: toolParameters({
+        status: { type: ['string', 'null'], enum: ['ACTIVE', 'PAUSED', 'ENDED', null] },
+        q: nullableString
+      }),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          status: z.enum(['ACTIVE', 'PAUSED', 'ENDED']).nullable().optional(),
+          q: z.string().nullable().optional()
+        }), rawArgs)
+        const rows = listRecurringBookings({
+          status: args.status || undefined,
+          q: args.q || undefined
+        })
+        return {
+          ok: true,
+          data: { summary: recurringBookingsSummary(), count: rows.length, rows }
         }
       }
     },
@@ -1954,7 +1979,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'bank_transactions_open',
-      description: 'Liest offene Banktransaktionen samt lokalen möglichen Buchungstreffern.',
+      description: 'Liest offene Banktransaktionen samt lokalen Treffern. matchKind VOUCHER bezeichnet eine vorhandene Buchung; matchKind RECURRING eine passende fällige oder nächste Dauerbuchungs-Ausführung.',
       readOnly: true,
       parameters: toolParameters({
         limit: { type: 'number', description: 'Maximal 50.' }
@@ -1974,7 +1999,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             total: result.total,
             rows: (result.rows || []).map((transaction: any) => ({
               ...transaction,
-              matches: findBankTransactionMatches({ id: transaction.id, includeAllDates: false } as any)
+              matches: findBankTransactionMatches({ id: transaction.id } as any)
                 .filter((match: any) => Number(match.score || 0) > 0)
                 .slice(0, 5)
             }))
@@ -1984,7 +2009,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'bank_transaction_link_draft_prepare',
-      description: 'Bereitet einen Review-Entwurf vor, um offene Bankimportbelege mit bereits vorhandenen passenden Buchungen zu verknüpfen. Nutze dies bei "Bankbeleg/Bankimport mit Buchung verknüpfen/zuordnen". Das storniert nichts und legt keine Ersatzbuchung an.',
+      description: 'Bereitet einen Review-Entwurf vor, um offene Bankimportbelege mit vorhandenen Buchungen oder passenden Dauerbuchungs-Ausführungen zu verknüpfen. Für VOUCHER-Treffer voucherId übergeben; für RECURRING-Treffer recurringBookingId plus occurrenceId oder scheduledDate. Das storniert nichts und verhindert Doppelbuchungen.',
       readOnly: false,
       parameters: toolParameters({
         links: {
@@ -1994,9 +2019,12 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             additionalProperties: false,
             properties: {
               bankTransactionId: { type: 'number' },
-              voucherId: { type: 'number' }
+              voucherId: nullableNumber,
+              recurringBookingId: nullableNumber,
+              occurrenceId: nullableNumber,
+              scheduledDate: nullableString
             },
-            required: ['bankTransactionId', 'voucherId']
+            required: ['bankTransactionId']
           }
         },
         reason: nullableString
@@ -2005,17 +2033,26 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         const args = parseArgs(z.object({
           links: z.array(z.object({
             bankTransactionId: z.number().int().positive(),
-            voucherId: z.number().int().positive()
+            voucherId: z.number().int().positive().nullable().optional(),
+            recurringBookingId: z.number().int().positive().nullable().optional(),
+            occurrenceId: z.number().int().positive().nullable().optional(),
+            scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()
+          }).refine((link) => !!link.voucherId !== !!link.recurringBookingId, {
+            message: 'Genau voucherId oder recurringBookingId muss angegeben werden.'
+          }).refine((link) => !link.recurringBookingId || !!link.occurrenceId || !!link.scheduledDate, {
+            message: 'Für eine Dauerbuchung wird occurrenceId oder scheduledDate benötigt.'
           })).min(1).max(50),
           reason: z.string().nullable().optional()
         }), rawArgs)
-        const voucherIds = [...new Set(args.links.map((link) => Number(link.voucherId)))]
-        const voucherResult = listVouchersAdvancedPaged({
-          voucherIds,
-          limit: voucherIds.length,
-          sort: 'ASC',
-          sortBy: 'date'
-        } as any)
+        const voucherIds = [...new Set(args.links.map((link) => Number(link.voucherId || 0)).filter((id) => id > 0))]
+        const voucherResult = voucherIds.length
+          ? listVouchersAdvancedPaged({
+              voucherIds,
+              limit: voucherIds.length,
+              sort: 'ASC',
+              sortBy: 'date'
+            } as any)
+          : { rows: [] }
         const vouchersById = new Map((voucherResult.rows || []).map((row: any) => [Number(row.id), row]))
         const changes: any[] = []
         const warnings: string[] = []
@@ -2028,13 +2065,52 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             warnings.push(`Bankbeleg #${link.bankTransactionId}: ${error?.message || 'nicht gefunden'}.`)
             continue
           }
+          if (transaction.status !== 'OPEN') {
+            warnings.push(`Bankbeleg #${link.bankTransactionId} ist nicht offen.`)
+            continue
+          }
+
+          if (link.recurringBookingId) {
+            const recurringMatch = findBankTransactionMatches({ id: link.bankTransactionId }).find((match: any) =>
+              match.matchKind === 'RECURRING' &&
+              Number(match.recurringBookingId) === Number(link.recurringBookingId) &&
+              (link.occurrenceId
+                ? Number(match.occurrenceId) === Number(link.occurrenceId)
+                : match.scheduledDate === link.scheduledDate)
+            ) as any
+            if (!recurringMatch) {
+              warnings.push(`Bankbeleg #${link.bankTransactionId} passt nicht zur Dauerbuchung #${link.recurringBookingId}.`)
+              continue
+            }
+            changes.push({
+              id: `agent-bank-recurring-${transaction.id}-${link.recurringBookingId}-${link.occurrenceId || link.scheduledDate}`,
+              targetKind: 'RECURRING',
+              bankTransactionId: Number(transaction.id),
+              bankBookingDate: transaction.bookingDate,
+              bankDirection: transaction.direction,
+              bankAmount: roundMoney(transaction.amount),
+              bankCounterparty: transaction.counterparty ?? null,
+              bankPurpose: transaction.purpose ?? null,
+              bankReference: transaction.bankReference ?? null,
+              paymentAccountName: transaction.paymentAccountName ?? null,
+              recurringBookingId: Number(link.recurringBookingId),
+              recurringBookingName: recurringMatch.recurringBookingName,
+              occurrenceId: recurringMatch.occurrenceId ?? null,
+              scheduledDate: recurringMatch.scheduledDate || recurringMatch.date,
+              voucherId: null,
+              voucherNo: null,
+              voucherDate: recurringMatch.scheduledDate || recurringMatch.date,
+              voucherType: recurringMatch.type,
+              voucherDescription: recurringMatch.description,
+              voucherGrossAmount: roundMoney(transaction.amount),
+              selected: true
+            })
+            continue
+          }
+
           const voucher = vouchersById.get(Number(link.voucherId)) as any
           if (!voucher) {
             warnings.push(`Buchung #${link.voucherId} wurde nicht gefunden.`)
-            continue
-          }
-          if (transaction.status !== 'OPEN') {
-            warnings.push(`Bankbeleg #${link.bankTransactionId} ist nicht offen.`)
             continue
           }
           if (voucher.reversedById || voucher.originalId) {
@@ -2051,6 +2127,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           }
           changes.push({
             id: `agent-bank-link-${transaction.id}-${voucher.id}`,
+            targetKind: 'VOUCHER',
             bankTransactionId: Number(transaction.id),
             bankBookingDate: transaction.bookingDate,
             bankDirection: transaction.direction,
@@ -2079,12 +2156,12 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         return {
           ok: true,
           data: {
-            message: `${changes.length} Bankbeleg-Verknüpfung(en) als Review-Entwurf vorbereitet.`,
+            message: `${changes.length} Bankbeleg-Zuordnung(en) als Review-Entwurf vorbereitet.`,
             warnings
           },
           draft: {
             kind: 'bankLink',
-            title: args.reason || `${changes.length} Bankbeleg(e) verknüpfen`,
+            title: args.reason || `${changes.length} Bankbeleg(e) zuordnen`,
             payload: {
               changes,
               reason: args.reason || null,

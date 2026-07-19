@@ -21,6 +21,8 @@ interface SummaryData {
     inGross: number
     outGross: number
     diff: number
+    planned?: number
+    remaining?: number
     bySphere?: Array<{ key: string; gross: number }>
     byPaymentMethod?: Array<{ key: string | null; gross: number }>
     count?: number
@@ -99,7 +101,17 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                     const inflow = Math.max(0, Number(u?.inflow || 0))
                     const spent = Math.max(0, Number(u?.spent || 0))
                     const diff = Math.round((inflow - spent) * 100) / 100
-                    if (alive) setValues({ inGross: inflow, outGross: spent, diff })
+                    const planned = Math.max(0, Number(u?.planned || 0))
+                    const remaining = Math.round(Number(u?.remaining ?? planned + diff) * 100) / 100
+                    if (alive) setValues({ inGross: inflow, outGross: spent, diff, planned, remaining })
+                } else if (typeof earmarkId === 'number') {
+                    const u = await window.api?.bindings?.usage?.({ earmarkId, from, to, sphere })
+                    const inflow = Math.max(0, Number(u?.allocated || 0))
+                    const spent = Math.max(0, Number(u?.released || 0))
+                    const diff = Math.round((inflow - spent) * 100) / 100
+                    const planned = Math.max(0, Number(u?.budget || 0))
+                    const remaining = Math.round(Number(u?.remaining ?? planned + diff) * 100) / 100
+                    if (alive) setValues({ inGross: inflow, outGross: spent, diff, planned, remaining })
                 } else {
                     const basePayload = buildFilterTotalsPayload({ from, to, paymentMethod, paymentAccountId, sphere, type, earmarkId, q, tag })
                     const res = await window.api?.reports.summary?.(basePayload)
@@ -176,6 +188,11 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
     const inVal = values?.inGross ?? 0
     const outVal = values?.outGross ?? 0
     const diffVal = values?.diff ?? 0
+    const plannedVal = values?.planned ?? 0
+    const hasPlannedBudget = plannedVal > 0
+    const remainingVal = values?.remaining ?? (plannedVal + diffVal)
+    const summaryVal = hasPlannedBudget ? remainingVal : diffVal
+    const summaryLabel = hasPlannedBudget ? 'Rest' : diffVal >= 0 ? 'Überschuss' : 'Defizit'
     const total = inVal + outVal
     const inPercent = total > 0 ? (inVal / total) * 100 : 50
 
@@ -249,6 +266,22 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
             
             {/* Stats Grid */}
             <div className="filter-totals-stats">
+                {hasPlannedBudget && (
+                    <HoverTooltip
+                        className="tooltip-modal"
+                        content={<TooltipList title="Budget" rows={[{ key: 'Festgelegt', value: fmt.format(plannedVal), dotColor: 'var(--accent)' }]} />}
+                    >
+                        {({ ref, props }) => (
+                            <div ref={ref} {...props} tabIndex={0} className="filter-totals-stat filter-totals-stat--diff">
+                                <div className="filter-totals-stat__icon">€</div>
+                                <div className="filter-totals-stat__content">
+                                    <span className="filter-totals-stat__label">Budget</span>
+                                    <span className="filter-totals-stat__value">{fmt.format(plannedVal)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </HoverTooltip>
+                )}
                 {/* IN Card */}
                 <HoverTooltip
                     className="tooltip-modal"
@@ -303,13 +336,18 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                     className="tooltip-modal"
                     content={
                         (() => {
-                            const diffRows: Array<{ key: string; value: string; dotColor?: string }> = [
-                                {
+                            const diffRows: Array<{ key: string; value: string; dotColor?: string }> = hasPlannedBudget
+                                ? [
+                                    { key: 'Budget', value: fmt.format(plannedVal), dotColor: 'var(--accent)' },
+                                    { key: 'Einnahmen', value: fmt.format(inVal), dotColor: 'var(--success)' },
+                                    { key: 'Ausgaben', value: fmt.format(outVal), dotColor: 'var(--danger)' },
+                                    { key: 'Rest', value: fmt.format(remainingVal), dotColor: remainingVal >= 0 ? 'var(--success)' : 'var(--danger)' }
+                                ]
+                                : [{
                                     key: diffVal >= 0 ? 'Mehr eingenommen als ausgegeben' : 'Mehr ausgegeben als eingenommen',
                                     value: fmt.format(Math.abs(diffVal)),
                                     dotColor: diffVal >= 0 ? 'var(--success)' : 'var(--danger)'
-                                }
-                            ]
+                                }]
                             // Use cashBalance values (includes transfers) when available
                             const barVal = values?.cashBalanceBAR
                             const bankVal = values?.cashBalanceBANK
@@ -325,7 +363,7 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                             }
                             return (
                                 <TooltipList
-                                    title={diffVal >= 0 ? 'Überschuss' : 'Defizit'}
+                                    title={hasPlannedBudget ? 'Restbudget' : diffVal >= 0 ? 'Überschuss' : 'Defizit'}
                                     rows={diffRows}
                                 />
                             )
@@ -337,12 +375,12 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                             ref={ref}
                             {...props}
                             tabIndex={0}
-                            className={`filter-totals-stat filter-totals-stat--diff ${diffVal >= 0 ? 'positive' : 'negative'}`}
+                            className={`filter-totals-stat filter-totals-stat--diff ${summaryVal >= 0 ? 'positive' : 'negative'}`}
                         >
-                            <div className="filter-totals-stat__icon">{diffVal >= 0 ? '✓' : '!'}</div>
+                            <div className="filter-totals-stat__icon">{hasPlannedBudget ? '€' : diffVal >= 0 ? '✓' : '!'}</div>
                             <div className="filter-totals-stat__content">
-                                <span className="filter-totals-stat__label">{diffVal >= 0 ? 'Überschuss' : 'Defizit'}</span>
-                                <span className="filter-totals-stat__value">{fmt.format(Math.abs(diffVal))}</span>
+                                <span className="filter-totals-stat__label">{summaryLabel}</span>
+                                <span className="filter-totals-stat__value">{fmt.format(Math.abs(summaryVal))}</span>
                             </div>
                         </div>
                     )}

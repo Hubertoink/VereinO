@@ -183,6 +183,21 @@ import {
   CashChecksGetInspectorDefaultsOutput
 } from './schemas'
 import {
+  RecurringBookingActionInput,
+  RecurringBookingBookInput,
+  RecurringBookingBookOutput,
+  RecurringBookingLinkInput,
+  RecurringBookingLinkOutput,
+  RecurringBookingSkipOutput,
+  RecurringBookingsListInput,
+  RecurringBookingsListOutput,
+  RecurringBookingsSummaryOutput,
+  RecurringBookingStatusInput,
+  RecurringBookingStatusOutput,
+  RecurringBookingUpsertInput,
+  RecurringBookingUpsertOutput
+} from './schemas'
+import {
   AiActionPlanInput,
   AiActionPlanOutput,
   AiAgentAutoRuleUpsertInput,
@@ -300,6 +315,15 @@ import {
 import type { MembersExportOptions } from '../services/membersExport'
 import { listBindings, upsertBinding, deleteBinding, bindingUsage } from '../repositories/bindings'
 import { upsertBudget, listBudgets, deleteBudget, budgetUsage } from '../repositories/budgets'
+import {
+  bookRecurringOccurrence,
+  linkRecurringOccurrence,
+  listRecurringBookings,
+  recurringBookingsSummary,
+  setRecurringBookingStatus,
+  skipRecurringOccurrence,
+  upsertRecurringBooking
+} from '../repositories/recurringBookings'
 import {
   listAdvances,
   createAdvance,
@@ -713,6 +737,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const openInvoices = listInvoicesPaged({ status: 'OPEN', limit: 1 })
     const partialInvoices = listInvoicesPaged({ status: 'PARTIAL', limit: 1 })
     const membership = mp.dueSummary()
+    const recurring = recurringBookingsSummary()
     const lock = getSetting<{ closedUntil?: string | null }>('period_lock')
 
     return {
@@ -720,7 +745,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         pendingSubmissions: Number((submissions as any)?.total || 0),
         openBankImports: Number(bankImports?.stats?.open || bankImports?.total || 0),
         dueMembershipFees: Number(membership?.dueMembers || 0),
-        openInvoices: Number(openInvoices.total || 0) + Number(partialInvoices.total || 0)
+        openInvoices: Number(openInvoices.total || 0) + Number(partialInvoices.total || 0),
+        dueRecurringBookings: recurring.due
       },
       years: listVoucherYears(),
       earmarks: listBindings({ activeOnly: true }),
@@ -852,6 +878,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     return AiSettingsTestOutput.parse(await testAiConnection())
   })
   ipcMain.handle('ai.invoice.extract', async (event, payload) => {
+    const startedAt = Date.now()
     const senderFrame = event.senderFrame
     const senderUrl = senderFrame?.url || ''
     const isTrustedRenderer =
@@ -867,8 +894,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       import('../services/docling')
     ])
     let localDocumentText = ''
+    let doclingMs: number | null = null
+    let doclingStartedAt: number | null = null
     try {
       if ((await getDoclingStatus()).enabled) {
+        doclingStartedAt = Date.now()
         localDocumentText = (await extractWithDocling({
           fileName: parsed.file.fileName,
           mimeType: parsed.file.mimeType,
@@ -879,6 +909,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       // Docling is supplementary. The normal document/OCR path can still
       // analyze the invoice when a local extraction fails.
       console.warn('[Invoice] Optionale Docling-Vorverarbeitung fehlgeschlagen:', error)
+    } finally {
+      if (doclingStartedAt !== null) doclingMs = Date.now() - doclingStartedAt
     }
     const analyzed = await analyzeInvoiceDocument({
       file: {
@@ -889,7 +921,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       context: buildAiInvoiceContext(),
       localDocumentText
     })
-    return AiInvoiceExtractOutput.parse(analyzed)
+    return AiInvoiceExtractOutput.parse({
+      ...analyzed,
+      timings: {
+        ...analyzed.timings,
+        totalMs: Date.now() - startedAt,
+        doclingMs
+      }
+    })
   })
   ipcMain.handle('ai.invoice.checkDuplicate', async (event, payload) => {
     const senderFrame = event.senderFrame
@@ -965,7 +1004,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       }) as any
     ).rows as any[]
     const transactions = openRows.map((transaction) => {
-      const matches = findBankTransactionMatches({ id: transaction.id, includeAllDates: false })
+      const matches = findBankTransactionMatches({ id: transaction.id })
         .filter((match: any) => Number(match.score || 0) > 0)
         .slice(0, 5)
       return {
@@ -1017,6 +1056,35 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
           return {
             ...suggestion,
             voucherNo: suggestion.voucherNo || match.voucherNo || null,
+            transaction
+          }
+        }
+        if (suggestion.action === 'APPLY_RECURRING') {
+          const match = matches.find((item: any) =>
+            item.matchKind === 'RECURRING' &&
+            Number(item.recurringBookingId) === Number(suggestion.recurringBookingId) &&
+            (suggestion.occurrenceId
+              ? Number(item.occurrenceId) === Number(suggestion.occurrenceId)
+              : item.scheduledDate === suggestion.scheduledDate)
+          ) as any
+          if (!match) {
+            return {
+              ...suggestion,
+              action: 'NEEDS_MANUAL_REVIEW' as const,
+              recurringBookingId: null,
+              recurringBookingName: null,
+              occurrenceId: null,
+              scheduledDate: null,
+              reason: `${suggestion.reason} Dauerbuchungs-Treffer konnte nicht sicher validiert werden.`,
+              transaction
+            }
+          }
+          return {
+            ...suggestion,
+            recurringBookingId: Number(match.recurringBookingId),
+            recurringBookingName: match.recurringBookingName || null,
+            occurrenceId: match.occurrenceId == null ? null : Number(match.occurrenceId),
+            scheduledDate: match.scheduledDate || match.date,
             transaction
           }
         }
@@ -2246,6 +2314,45 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     return BudgetUsageOutput.parse(res)
   })
 
+  // Dauerbuchungen
+  ipcMain.handle('recurringBookings.list', async (_e, payload) => {
+    const parsed = RecurringBookingsListInput.parse(payload)
+    return RecurringBookingsListOutput.parse({ rows: listRecurringBookings(parsed) })
+  })
+  ipcMain.handle('recurringBookings.summary', async () => {
+    return RecurringBookingsSummaryOutput.parse(recurringBookingsSummary())
+  })
+  ipcMain.handle('recurringBookings.upsert', async (_e, payload) => {
+    const parsed = RecurringBookingUpsertInput.parse(payload)
+    const result = upsertRecurringBooking(parsed)
+    notifyDataChanged(['recurring-bookings'])
+    return RecurringBookingUpsertOutput.parse(result)
+  })
+  ipcMain.handle('recurringBookings.setStatus', async (_e, payload) => {
+    const parsed = RecurringBookingStatusInput.parse(payload)
+    const result = setRecurringBookingStatus(parsed.id, parsed.status)
+    notifyDataChanged(['recurring-bookings'])
+    return RecurringBookingStatusOutput.parse(result)
+  })
+  ipcMain.handle('recurringBookings.skip', async (_e, payload) => {
+    const parsed = RecurringBookingActionInput.parse(payload)
+    const result = skipRecurringOccurrence(parsed.recurringBookingId)
+    notifyDataChanged(['recurring-bookings'])
+    return RecurringBookingSkipOutput.parse(result)
+  })
+  ipcMain.handle('recurringBookings.book', async (_e, payload) => {
+    const parsed = RecurringBookingBookInput.parse(payload)
+    const result = bookRecurringOccurrence(parsed)
+    notifyDataChanged(['recurring-bookings', 'vouchers', 'bank-imports', 'budgets', 'earmarks', 'tags'])
+    return RecurringBookingBookOutput.parse(result)
+  })
+  ipcMain.handle('recurringBookings.link', async (_e, payload) => {
+    const parsed = RecurringBookingLinkInput.parse(payload)
+    const result = linkRecurringOccurrence(parsed)
+    notifyDataChanged(['recurring-bookings', 'vouchers', 'bank-imports'])
+    return RecurringBookingLinkOutput.parse(result)
+  })
+
   // Vorschüsse
   const advanceSchemaTables = [
     'member_advances',
@@ -2429,12 +2536,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
   ipcMain.handle('bankTransactions.link', async (_e, payload) => {
     const parsed = BankTransactionLinkInput.parse(payload)
-    return BankTransactionOutput.parse(
+    const result = BankTransactionOutput.parse(
       await withSchemaHealRetry(
         () => linkBankTransaction({ ...parsed, origin: 'EXISTING' }),
         ['bank_transactions', 'bank_import_batches']
       )
     )
+    notifyDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
+    return result
   })
   ipcMain.handle('bankTransactions.check', async (_e, payload) => {
     const parsed = BankTransactionCheckInput.parse(payload)

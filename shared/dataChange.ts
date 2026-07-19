@@ -9,6 +9,7 @@ export const DATA_CHANGE_SCOPES = [
   'tags',
   'parties',
   'organizations',
+  'recurring-bookings',
   'settings'
 ] as const
 

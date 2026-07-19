@@ -148,6 +148,7 @@ export type AiContext = {
   members?: any
   reports?: any
   invoices?: any
+  recurringBookings?: any
   generatedAt?: string
 }
 
@@ -195,6 +196,11 @@ export type AiBankReviewTransaction = {
     dateDistance?: number | null
     paymentAccountMismatch?: boolean | null
     paymentAccountWarning?: string | null
+    matchKind?: 'VOUCHER' | 'RECURRING' | null
+    recurringBookingId?: number | null
+    recurringBookingName?: string | null
+    occurrenceId?: number | null
+    scheduledDate?: string | null
   }>
 }
 
@@ -656,13 +662,14 @@ export function compactContext(context: AiContext) {
       .slice(0, 500),
     members: context.members,
     reports: context.reports,
-    invoices: context.invoices
+    invoices: context.invoices,
+    recurringBookings: context.recurringBookings
   }
 }
 
 function isVereinRelevantPrompt(prompt: string) {
   const normalized = prompt.toLowerCase()
-  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/.test(
+  return /verein|vereino|mitglied|mitglieder|vorstand|kassier|kasse|beitrag|spende|rechnung|beleg|buchung|dauerbuchung|abo|abonnement|zahlung|bank|konto|konten|budget|budgets|zweckbindung|bericht|report|einnahm|ausgab|saldo|bilanz|jahr|steuer|gemeinnuetzig|gemeinnützig|einladung|veranstaltung|sommerfest|arbeitseinsatz|protokoll|finanz|sepa|lastschrift|zuwendung|quittung|import|offen|bezahlt|tag|tags|kategorie|kategorien|stammdaten|excel|xlsx|csv|tabelle|tabellen/.test(
     normalized
   )
 }
@@ -1099,12 +1106,19 @@ export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
   context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
   localDocumentText?: string | null
-}): Promise<{ model: string; result: TAiInvoiceExtractionResult; usage: AiUsage }> {
+}): Promise<{
+  model: string
+  result: TAiInvoiceExtractionResult
+  usage: AiUsage
+  timings: { ocrMs: number | null; analysisMs: number }
+}> {
   await validateTransientInvoiceFile(input.file)
   const settings = getAiSettings()
   const model = settings.model
   let mittwaldOcrText = ''
+  let ocrMs: number | null = null
   if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
+    const ocrStartedAt = Date.now()
     const ocrResponse = await createAiResponse({
       model: 'GLM-OCR',
       input: [
@@ -1120,6 +1134,7 @@ export async function analyzeInvoiceDocument(input: {
         }
       ]
     } as any)
+    ocrMs = Date.now() - ocrStartedAt
     mittwaldOcrText = extractOutputText(ocrResponse)
     if (!mittwaldOcrText.trim()) {
       throw new Error('Mittwald GLM-OCR hat keinen auswertbaren Dokumenttext geliefert.')
@@ -1178,6 +1193,7 @@ export async function analyzeInvoiceDocument(input: {
     'Minimaler VereinO-Stammdatenkontext:',
     JSON.stringify(context)
   ].join('\n')
+  const analysisStartedAt = Date.now()
   const response = await createAiResponse({
     model,
     reasoning: { effort: settings.defaultReasoningEffort },
@@ -1201,7 +1217,8 @@ export async function analyzeInvoiceDocument(input: {
   return {
     model,
     result: parseInvoiceExtraction(response),
-    usage: normalizeUsage(response, model)
+    usage: normalizeUsage(response, model),
+    timings: { ocrMs, analysisMs: Date.now() - analysisStartedAt }
   }
 }
 
@@ -1265,6 +1282,11 @@ export async function planAiAction(input: {
     {
       entity: 'bankImport',
       operations: ['reviewBankImport', 'linkExisting']
+    },
+    {
+      entity: 'recurringBookings',
+      operations: ['read', 'linkExisting'],
+      filters: ['status', 'name', 'paymentAccountId', 'dueOnly']
     }
   ]
 
@@ -1285,7 +1307,7 @@ export async function planAiAction(input: {
               'Du bist der Aktionsplaner fuer VereinO. Analysiere, was der Nutzer will, und liefere ausschliesslich einen strukturierten Action Plan.',
               'Du fuehrst keine finalen Schreibaktionen aus. Schreibende Aktionen muessen safety REVIEW_REQUIRED haben.',
               'Wenn die Anfrage ausserhalb von VereinO/Vereinsverwaltung liegt, setze entity unknown, operation none, safety BLOCKED und erklaere kurz in answer.',
-              'Denke wie ein Kassier: Belege, Bankimporte, Buchungen und Zahlungskonten muessen nachvollziehbar zusammenpassen. Plane keine Aktion, die Duplikate erzeugt oder Bankbelege unverbunden laesst.',
+              'Denke wie ein Kassier: Belege, Bankimporte, Buchungen, Dauerbuchungen und Zahlungskonten muessen nachvollziehbar zusammenpassen. Plane keine Aktion, die Duplikate erzeugt oder Bankbelege unverbunden laesst.',
               'Wenn der Nutzer eine fachliche Aktion verlangt, die im erlaubten Toolset nicht sicher abbildbar ist, waehle keine ungefaehr passende Ersatzaktion. Setze safety BLOCKED oder REVIEW_REQUIRED mit einer klaren Rueckfrage in answer.',
               'Nutze echte Namen aus dem Kontext, z.B. vorhandene Tags, Mitglieder, Zahlungskonten, Budgets und Zweckbindungen.',
               'Bei Folgefragen nutze die Unterhaltung. Korrigiere fruehere Annahmen, wenn der Nutzer sie verbessert.',
@@ -1297,6 +1319,7 @@ export async function planAiAction(input: {
               'Fuer "erstelle eine Buchung fuer Mitgliedsbeitrag und verknuepfe sie": entity payments, operation create, filter memberName, change amount/date/paymentAccountName/tags. Das lokale Tool erstellt danach einen Review mit Buchung und Beitragsverknuepfung.',
               'Wenn vorher offene Mitgliedsbeitraege genannt wurden und der Nutzer danach "hierzu/dazu eine Buchung anlegen/verknuepfen" schreibt, ist das payments create, nicht members create.',
               'Fuer "Bankbeleg/Bankimport mit bestehender Buchung verknuepfen": entity bankImport, operation linkExisting, safety REVIEW_REQUIRED. Das ist kein Storno und keine Ersatzbuchung.',
+              'Fuer Fragen nach aktiven, faelligen oder kommenden Dauerbuchungen: entity recurringBookings, operation read, safety READ_ONLY. Fuer Bankbeleg mit Dauerbuchungs-Faelligkeit verbinden: entity recurringBookings, operation linkExisting, safety REVIEW_REQUIRED.',
               'Wenn vorher ein Report/Controllingbericht besprochen wurde und der Nutzer einen anderen Zeitraum, "letzte X Monate", "was sticht heraus" oder weitere KPIs nennt, ist das entity reports, operation export/generateText, nicht members.',
               'Fuer "Report/Bericht fuer die letzten X Monate" oder "Controlling fuer Zeitraum" ist entity reports, operation export, safety REVIEW_REQUIRED.',
               'Fuer reine Fragen: operation read, safety READ_ONLY, answer nur wenn eine direkte kurze Antwort ohne Tool reicht.',
@@ -1415,12 +1438,14 @@ export async function reviewBankImportTransactions(input: {
     'Denke wie ein Kassier: Jeder offene Bankbeleg soll entweder mit einer vorhandenen Buchung verknuepft, als neue Buchung vorbereitet, als nicht buchungsrelevant markiert oder bewusst manuell geklaert werden. Lass Bankbelege nicht unverbunden, wenn du eine Buchung daraus erzeugst.',
     'Pruefe offene Bankbelege und entscheide pro Beleg genau eine Aktion:',
     '- LINK_EXISTING: wenn eine vorhandene Buchung sehr wahrscheinlich passt.',
+    '- APPLY_RECURRING: wenn matchKind RECURRING eine passende Dauerbuchungs-Ausfuehrung bezeichnet und keine vorhandene Buchung vorrangig ist.',
     '- CREATE_BOOKING: wenn keine passende Buchung existiert und aus dem Bankbeleg eine neue Buchung vorbereitet werden soll.',
     '- MARK_CHECKED: wenn der Beleg nachweislich nicht buchungsrelevant ist.',
     '- NEEDS_MANUAL_REVIEW: wenn die Daten uneindeutig sind.',
     '',
     'Wichtige Regeln:',
     'Verknuepfe nur mit voucherId aus den mitgegebenen matches.',
+    'Fuer APPLY_RECURRING uebernimm recurringBookingId, recurringBookingName, occurrenceId und scheduledDate exakt aus einem RECURRING-Match. Erfinde keine IDs oder Termine.',
     'LINK_EXISTING nur bei passendem Typ, Betrag und hoher Plausibilitaet.',
     'Wenn ein lokaler Treffer passt, ist LINK_EXISTING vorrangig. Erstelle dann keine neue Buchung.',
     'CREATE_BOOKING erzeugt nur einen Vorschlag, keine finale Buchung.',

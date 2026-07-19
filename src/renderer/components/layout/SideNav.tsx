@@ -13,12 +13,13 @@ interface SideNavProps {
   openBankImportsCount?: number
   openInvoicesCount?: number
   dueMembershipFeesCount?: number
+  dueRecurringBookingsCount?: number
   showBadges?: boolean
   items?: NavItem[]
   aiBusy?: boolean
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, showBadges = true, items = navItems, aiBusy = false }: SideNavProps) {
+export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false }: SideNavProps) {
   return (
     <nav aria-label="Seitenleiste" className="side-nav">
       {items.map((item, idx) => {
@@ -32,6 +33,7 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
         if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
         if (item.key === 'Mitglieder') badgeCount = dueMembershipFeesCount
+        if (item.key === 'Dauerbuchungen') badgeCount = dueRecurringBookingsCount
         
         const showBadge = showBadges && badgeCount > 0
         const badgeText = badgeCount > 99 ? '99+' : String(badgeCount)

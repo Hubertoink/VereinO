@@ -1180,6 +1180,129 @@ export type TBudgetUpsertOutput = z.infer<typeof BudgetUpsertOutput>
 export type TBudgetListOutput = z.infer<typeof BudgetListOutput>
 export type TBudgetDeleteOutput = z.infer<typeof BudgetDeleteOutput>
 
+// Dauerbuchungen
+export const RecurringFrequency = z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'])
+export const RecurringBookingStatus = z.enum(['ACTIVE', 'PAUSED', 'ENDED'])
+export const RecurringBookingUpsertInput = z.object({
+  id: z.number().int().positive().optional(),
+  name: z.string().trim().min(1),
+  type: z.enum(['IN', 'OUT']),
+  sphere: Sphere,
+  description: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  counterparty: z.string().nullable().optional(),
+  amountMode: VoucherAmountMode,
+  amount: z.number().positive(),
+  variableAmount: z.boolean().optional(),
+  vatRate: z.number().min(0).max(100),
+  paymentAccountId: z.number().int().positive().nullable().optional(),
+  budgetId: z.number().int().positive().nullable().optional(),
+  earmarkId: z.number().int().positive().nullable().optional(),
+  budgets: z.array(z.object({ budgetId: z.number().int().positive(), amount: z.number().positive() })).optional(),
+  earmarks: z.array(z.object({ earmarkId: z.number().int().positive(), amount: z.number().positive() })).optional(),
+  tags: z.array(z.string()).optional(),
+  frequency: RecurringFrequency,
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  nextDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  status: RecurringBookingStatus.optional()
+})
+export const RecurringBookingUpsertOutput = z.object({ id: z.number() })
+export const RecurringBookingsListInput = z.object({
+  status: RecurringBookingStatus.optional(),
+  q: z.string().optional()
+}).optional()
+export const RecurringBookingRow = z.object({
+  id: z.number(),
+  name: z.string(),
+  type: z.enum(['IN', 'OUT']),
+  sphere: Sphere,
+  description: z.string().nullable(),
+  note: z.string().nullable(),
+  counterparty: z.string().nullable(),
+  amountMode: VoucherAmountMode,
+  amount: z.number(),
+  variableAmount: z.boolean(),
+  vatRate: z.number(),
+  paymentAccountId: z.number().nullable(),
+  paymentAccountName: z.string().nullable(),
+  paymentAccountKind: PaymentAccountKind.nullable(),
+  budgetId: z.number().nullable(),
+  budgetLabel: z.string().nullable(),
+  earmarkId: z.number().nullable(),
+  earmarkLabel: z.string().nullable(),
+  budgets: z.array(z.object({ budgetId: z.number(), amount: z.number() })),
+  earmarks: z.array(z.object({ earmarkId: z.number(), amount: z.number() })),
+  tags: z.array(z.string()),
+  frequency: RecurringFrequency,
+  startDate: z.string(),
+  nextDueDate: z.string(),
+  endDate: z.string().nullable(),
+  status: RecurringBookingStatus,
+  dueCount: z.number(),
+  earliestDueDate: z.string().nullable(),
+  lastBookedDate: z.string().nullable(),
+  suggestedVoucherId: z.number().nullable(),
+  suggestedVoucherNo: z.string().nullable(),
+  suggestedVoucherDate: z.string().nullable(),
+  suggestedVoucherDescription: z.string().nullable(),
+  suggestedBankTransactionId: z.number().nullable(),
+  suggestedMatchScore: z.number().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable()
+})
+export const RecurringBookingsListOutput = z.object({ rows: z.array(RecurringBookingRow) })
+export const RecurringBookingsSummaryOutput = z.object({
+  due: z.number(),
+  upcoming: z.number(),
+  active: z.number(),
+  paused: z.number()
+})
+export const RecurringBookingStatusInput = z.object({
+  id: z.number().int().positive(),
+  status: RecurringBookingStatus
+})
+export const RecurringBookingStatusOutput = z.object({
+  id: z.number(),
+  status: RecurringBookingStatus
+})
+export const RecurringBookingActionInput = z.object({ recurringBookingId: z.number().int().positive() })
+export const RecurringBookingSkipOutput = z.object({ id: z.number(), scheduledDate: z.string() })
+export const RecurringBookingBookInput = RecurringBookingActionInput.extend({
+  bookingDate: z.string(),
+  amount: z.number().positive().optional(),
+  occurrenceId: z.number().int().positive().optional(),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  bankTransactionId: z.number().int().positive().optional()
+})
+export const RecurringBookingBookOutput = VoucherCreateOutput.extend({
+  occurrenceId: z.number(),
+  scheduledDate: z.string()
+})
+export const RecurringBookingLinkInput = RecurringBookingActionInput.extend({
+  voucherId: z.number().int().positive()
+})
+export const RecurringBookingLinkOutput = z.object({
+  occurrenceId: z.number(),
+  scheduledDate: z.string(),
+  voucherId: z.number(),
+  voucherNo: z.string()
+})
+
+export type TRecurringBookingUpsertInput = z.infer<typeof RecurringBookingUpsertInput>
+export type TRecurringBookingUpsertOutput = z.infer<typeof RecurringBookingUpsertOutput>
+export type TRecurringBookingsListInput = z.infer<typeof RecurringBookingsListInput>
+export type TRecurringBookingsListOutput = z.infer<typeof RecurringBookingsListOutput>
+export type TRecurringBookingsSummaryOutput = z.infer<typeof RecurringBookingsSummaryOutput>
+export type TRecurringBookingStatusInput = z.infer<typeof RecurringBookingStatusInput>
+export type TRecurringBookingStatusOutput = z.infer<typeof RecurringBookingStatusOutput>
+export type TRecurringBookingActionInput = z.infer<typeof RecurringBookingActionInput>
+export type TRecurringBookingSkipOutput = z.infer<typeof RecurringBookingSkipOutput>
+export type TRecurringBookingBookInput = z.infer<typeof RecurringBookingBookInput>
+export type TRecurringBookingBookOutput = z.infer<typeof RecurringBookingBookOutput>
+export type TRecurringBookingLinkInput = z.infer<typeof RecurringBookingLinkInput>
+export type TRecurringBookingLinkOutput = z.infer<typeof RecurringBookingLinkOutput>
+
 // Vorschüsse (Mitglieder/Personen)
 const AdvanceStatus = z.enum(['OPEN', 'RESOLVED'])
 const AdvancePurchaseType = z.enum(['IN', 'OUT'])
@@ -1643,7 +1766,6 @@ export const BankTransactionCheckInput = BankTransactionIdInput.extend({
 })
 export const BankTransactionMatchesInput = BankTransactionIdInput.extend({
   q: z.string().optional(),
-  includeAllDates: z.boolean().optional(),
   manual: z.boolean().optional()
 })
 export const BankTransactionOutput = z.record(z.any())
@@ -1658,6 +1780,20 @@ export const BankImportStatusOutput = z.object({
   lastBookingDate: z.string().nullable(),
   lastImportAt: z.string().nullable().optional(),
   total: z.number(),
+  recentImports: z.array(
+    z.object({
+      id: z.number(),
+      fileName: z.string(),
+      format: z.enum(['CAMT', 'CSV']),
+      paymentAccountId: z.number(),
+      paymentAccountName: z.string().nullable().optional(),
+      paymentAccountColor: z.string().nullable().optional(),
+      imported: z.number(),
+      duplicates: z.number(),
+      errors: z.number(),
+      importedAt: z.string()
+    })
+  ),
   accounts: z.array(
     z.object({
       id: z.number(),
@@ -2128,6 +2264,7 @@ export const AiTextDraftResultStructured = z.object({
 
 export const AiBankImportAction = z.enum([
   'LINK_EXISTING',
+  'APPLY_RECURRING',
   'CREATE_BOOKING',
   'MARK_CHECKED',
   'NEEDS_MANUAL_REVIEW'
@@ -2140,6 +2277,10 @@ export const AiBankImportReviewSuggestion = z
     reason: z.string().min(1),
     voucherId: z.number().int().positive().nullable().optional(),
     voucherNo: z.string().nullable().optional(),
+    recurringBookingId: z.number().int().positive().nullable().optional(),
+    recurringBookingName: z.string().nullable().optional(),
+    occurrenceId: z.number().int().positive().nullable().optional(),
+    scheduledDate: z.string().nullable().optional(),
     bookingCandidate: AiBookingCandidate.nullable().optional(),
     warnings: z.array(z.string()).default([]),
     evidence: z.array(z.string()).default([]),
@@ -2160,6 +2301,13 @@ export const AiBankImportReviewSuggestion = z
         path: ['bookingCandidate']
       })
     }
+    if (value.action === 'APPLY_RECURRING' && (!value.recurringBookingId || (!value.occurrenceId && !value.scheduledDate))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'APPLY_RECURRING requires recurringBookingId and occurrenceId or scheduledDate',
+        path: ['recurringBookingId']
+      })
+    }
   })
 
 export const AiBankImportReviewResult = z.object({
@@ -2176,6 +2324,10 @@ export const AiBankImportReviewSuggestionStructured = z
     reason: z.string().min(1),
     voucherId: z.number().int().positive().nullable(),
     voucherNo: z.string().nullable(),
+    recurringBookingId: z.number().int().positive().nullable(),
+    recurringBookingName: z.string().nullable(),
+    occurrenceId: z.number().int().positive().nullable(),
+    scheduledDate: z.string().nullable(),
     bookingCandidate: AiBookingCandidateStructured.nullable(),
     warnings: z.array(z.string()),
     evidence: z.array(z.string())
@@ -2193,6 +2345,13 @@ export const AiBankImportReviewSuggestionStructured = z
         code: z.ZodIssueCode.custom,
         message: 'CREATE_BOOKING requires bookingCandidate',
         path: ['bookingCandidate']
+      })
+    }
+    if (value.action === 'APPLY_RECURRING' && (!value.recurringBookingId || (!value.occurrenceId && !value.scheduledDate))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'APPLY_RECURRING requires recurringBookingId and occurrenceId or scheduledDate',
+        path: ['recurringBookingId']
       })
     }
   })
@@ -2213,6 +2372,7 @@ export const AiActionEntity = z.enum([
   'earmarks',
   'reports',
   'bankImport',
+  'recurringBookings',
   'text',
   'unknown'
 ])
@@ -2223,6 +2383,7 @@ export const AiActionOperation = z.enum([
   'delete',
   'export',
   'reviewBankImport',
+  'linkExisting',
   'generateText',
   'none'
 ])
@@ -2332,7 +2493,13 @@ export const AiInvoiceExtractInput = z.object({
 export const AiInvoiceExtractOutput = z.object({
   model: z.string(),
   result: AiInvoiceExtractionResult,
-  usage: AiUsageSchema
+  usage: AiUsageSchema,
+  timings: z.object({
+    totalMs: z.number().int().nonnegative(),
+    doclingMs: z.number().int().nonnegative().nullable(),
+    ocrMs: z.number().int().nonnegative().nullable(),
+    analysisMs: z.number().int().nonnegative()
+  })
 })
 export const AiInvoiceDuplicateCheckInput = z.object({
   file: z

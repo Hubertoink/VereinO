@@ -6,6 +6,7 @@ import { listMembers } from '../repositories/members'
 import * as mp from '../repositories/members_payments'
 import { listPaymentAccounts } from '../repositories/paymentAccounts'
 import { listParties } from '../repositories/parties'
+import { listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
 import { listTags } from '../repositories/tags'
 import {
   cashBalance,
@@ -207,6 +208,29 @@ export function buildAiContext(): AiContext {
     budgetId: invoice.budgetId,
     tags: invoice.tags || []
   }))
+  const recurringRows = listRecurringBookings({}).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    sphere: row.sphere,
+    description: row.description,
+    counterparty: row.counterparty,
+    amountMode: row.amountMode,
+    amount: roundMoney(row.amount),
+    variableAmount: !!row.variableAmount,
+    vatRate: row.vatRate,
+    paymentAccountId: row.paymentAccountId,
+    paymentAccountName: row.paymentAccountName,
+    frequency: row.frequency,
+    nextDueDate: row.nextDueDate,
+    earliestDueDate: row.earliestDueDate,
+    dueCount: row.dueCount,
+    status: row.status,
+    suggestedVoucherId: row.suggestedVoucherId,
+    suggestedVoucherNo: row.suggestedVoucherNo,
+    suggestedBankTransactionId: row.suggestedBankTransactionId,
+    suggestedMatchScore: row.suggestedMatchScore
+  }))
   return {
     organization,
     generatedAt: today,
@@ -309,6 +333,10 @@ export function buildAiContext(): AiContext {
         grossOut: roundMoney(openInvoiceSummary.grossOut)
       },
       openRows: openInvoices
+    },
+    recurringBookings: {
+      summary: recurringBookingsSummary(),
+      rows: recurringRows
     }
   }
 }

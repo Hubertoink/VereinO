@@ -217,12 +217,23 @@ describe('AiBankImportReviewResult', () => {
             vatRate: 19,
             paymentMethod: 'BANK'
           }
+        },
+        {
+          transactionId: 12,
+          action: 'APPLY_RECURRING',
+          confidence: 0.94,
+          reason: 'Konto, Betrag, Datum und Abo-Text passen.',
+          recurringBookingId: 7,
+          recurringBookingName: 'Webhosting',
+          occurrenceId: 71,
+          scheduledDate: '2026-07-04'
         }
       ]
     })
 
     expect(parsed.suggestions[0].voucherId).toBe(42)
     expect(parsed.suggestions[1].bookingCandidate?.description).toBe('Webhosting Juli')
+    expect(parsed.suggestions[2].recurringBookingId).toBe(7)
   })
 
   it('rejects unsafe link suggestions without voucher id', () => {

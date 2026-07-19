@@ -42,6 +42,7 @@ import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
+const RecurringBookingsView = lazy(() => import('./views/RecurringBookings/RecurringBookingsView'))
 const ActivityReportEditorModal = lazy(() => import('./views/Reports/ActivityReportEditorModal'))
 const TagsManagerModal = lazy(() => import('./components/modals/TagsManagerModal'))
 const AutoBackupPromptModal = lazy(() => import('./components/modals/AutoBackupPromptModal'))
@@ -142,6 +143,7 @@ type PageShortcutAction = {
 const goToShortcutKeys = {
   Dashboard: 'd',
   Buchungen: 'b',
+  Dauerbuchungen: 'u',
   Bankimport: 'k',
   Verbindlichkeiten: 'v',
   Mitglieder: 'm',
@@ -1467,6 +1469,9 @@ function AppInner() {
   // Open invoices count for nav badge
   const [openInvoicesCount, setOpenInvoicesCount] = useState(0)
 
+  // Fällige Dauerbuchungen für das Navigations-Badge
+  const [dueRecurringBookingsCount, setDueRecurringBookingsCount] = useState(0)
+
   // Global data refresh key to trigger summary re-fetches across views
   const [refreshKey, setRefreshKey] = useState(0)
   const bumpDataVersion = useCallback(() => setRefreshKey((k) => k + 1), [])
@@ -1477,7 +1482,7 @@ function AppInner() {
   useEffect(() => {
     const onDataChanged = () => bumpDataVersion()
     return addDataChangedListener(
-      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations'],
+      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'recurring-bookings'],
       onDataChanged
     )
   }, [bumpDataVersion])
@@ -1548,10 +1553,16 @@ function AppInner() {
   const [visibleNavItems, setVisibleNavItemsState] = useState<NavKey[]>(() => {
     try {
       const parsed = JSON.parse(localStorage.getItem('ui.visibleNavItems') || 'null')
-      if (!Array.isArray(parsed)) return defaultVisibleNavItems
+      if (!Array.isArray(parsed)) {
+        localStorage.setItem('ui.recurringBookingsNavIntroduced', 'true')
+        return defaultVisibleNavItems
+      }
       const valid = new Set(navItems.map((item) => item.key))
+      const introduced = localStorage.getItem('ui.recurringBookingsNavIntroduced') === 'true'
+      const upgraded = introduced ? parsed : [...parsed, 'Dauerbuchungen']
+      if (!introduced) localStorage.setItem('ui.recurringBookingsNavIntroduced', 'true')
       return Array.from(
-        new Set([...parsed.filter((key) => valid.has(key)), ...requiredNavItems])
+        new Set([...upgraded.filter((key) => valid.has(key)), ...requiredNavItems])
       ) as NavKey[]
     } catch {
       return defaultVisibleNavItems
@@ -2874,6 +2885,7 @@ function AppInner() {
         setOpenBankImportsCount(data.counts.openBankImports)
         setDueMembershipFeesCount(data.counts.dueMembershipFees)
         setOpenInvoicesCount(data.counts.openInvoices)
+        setDueRecurringBookingsCount(data.counts.dueRecurringBookings)
         setYearsAvail(data.years)
         setEarmarks(data.earmarks as typeof earmarks)
         setPaymentAccounts(data.paymentAccounts as typeof paymentAccounts)
@@ -2899,7 +2911,7 @@ function AppInner() {
     const taskId = scheduleInitialLoad()
     const onChanged = () => void loadBootstrap()
     const removeDataChangedListener = addDataChangedListener(
-      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'settings'],
+      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'settings', 'recurring-bookings'],
       onChanged
     )
     return () => {
@@ -3295,6 +3307,7 @@ function AppInner() {
               openBankImportsCount={openBankImportsCount}
               openInvoicesCount={openInvoicesCount}
               dueMembershipFeesCount={dueMembershipFeesCount}
+              dueRecurringBookingsCount={dueRecurringBookingsCount}
               showBadges
               items={visibleNavigationItems}
               aiBusy={aiBusy}
@@ -3345,6 +3358,7 @@ function AppInner() {
             openBankImportsCount={openBankImportsCount}
             openInvoicesCount={openInvoicesCount}
             dueMembershipFeesCount={dueMembershipFeesCount}
+            dueRecurringBookingsCount={dueRecurringBookingsCount}
             showBadges
             items={visibleNavigationItems}
             aiBusy={aiBusy}
@@ -3488,6 +3502,9 @@ function AppInner() {
               bookingsOpenDetached={bookingsOpenDetached}
               allowVoucherDeletion={allowVoucherDeletion}
             />
+          )}
+          {activePage === 'Dauerbuchungen' && (
+            <RecurringBookingsView notify={notify} />
           )}
           {/* Old Buchungen block removed - now using JournalView component */}
 

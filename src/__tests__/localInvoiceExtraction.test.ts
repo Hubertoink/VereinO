@@ -112,4 +112,10 @@ describe('local invoice extraction', () => {
     })
     expect(normalizeInvoicePickerValue('grossAmount', '5 2 , 3 6 €')).toBe('52.36')
   })
+
+  it('accepts whole-euro amounts selected from an invoice', () => {
+    expect(normalizeInvoicePickerValue('grossAmount', '200')).toBe('200.00')
+    expect(normalizeInvoicePickerValue('netAmount', '€ 200')).toBe('200.00')
+    expect(normalizeInvoicePickerValue('taxAmount', '-15')).toBe('-15.00')
+  })
 })

@@ -27,7 +27,7 @@ Empfohlene Teststammdaten:
 Diese Punkte zuerst prüfen. Bei einem Fehler den ausführlichen Test abbrechen.
 
 - [ ] App startet ohne Fehlermeldung und zeigt die zuletzt aktive Organisation.
-- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Bankimport, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, Einreichungen, KI, Belege, Reports und Einstellungen.
+- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Dauerbuchungen, Bankimport, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, Einreichungen, KI, Belege, Reports und Einstellungen.
 - [ ] Eine Einnahme kann angelegt, gespeichert und im Journal wiedergefunden werden.
 - [ ] Eine Ausgabe kann angelegt, bearbeitet und gespeichert werden.
 - [ ] Eine Buchung mit Datei kann geöffnet werden; der Anhang bleibt nach Neustart vorhanden.
@@ -445,7 +445,23 @@ Dieser Abschnitt ist nach der IPC-Auslagerung besonders wichtig.
 - [ ] Mehrfaches Öffnen/Schließen von Modalen erzeugt keine doppelten Events oder Toasts.
 - [ ] Keine unverständlichen Electron-IPC-Präfixe in Fehlermeldungen.
 
-## 29. Abschlusskontrolle
+## 29. Dauerbuchungen
+
+- [ ] Neue Dauerbuchung mit Art, Betrag, Sphäre, Konto und Rhythmus anlegen.
+- [ ] Wöchentliche, monatliche, quartalsweise und jährliche Fälligkeiten werden korrekt fortgeschrieben.
+- [ ] Monatsende und Schaltjahr erzeugen gültige Folgetermine.
+- [ ] Fällige Termine erscheinen im Navigations-Badge und in der Zusammenfassung.
+- [ ] „Jetzt buchen“ erzeugt nach Prüfung von Datum und Betrag genau eine normale Buchung.
+- [ ] Zuerst über die Dauerbuchung buchen, danach einen passenden Bankbeleg importieren: Der Bankimport schlägt die bestehende Dauerbuchungs-Buchung vor und „Zuordnen“ erzeugt keine zweite Buchung.
+- [ ] Zuerst einen Bankbeleg importieren und daraus eine Buchung anlegen: Die fällige Dauerbuchung zeigt „Bankbeleg gefunden“ und lässt sich der bestehenden Buchung zuordnen.
+- [ ] Einen offenen Bankbeleg direkt mit einer vorgeschlagenen Dauerbuchung „Buchen & zuordnen“; danach sind Bankbeleg und Fälligkeit erledigt und verweisen auf dieselbe Buchung.
+- [ ] Die CAMT-Testdateien unter `test-data/bankimport` getrennt den Konten Bank und Volksbank zuweisen; die bereits am 19.07. gebuchten Juli-Abos werden am 20.07. als bestehende Buchungen vorgeschlagen.
+- [ ] KI-Agent nach offenen Bankbelegen mit passenden Dauerbuchungen fragen; der Agent nennt Trefferart, Dauerbuchung, Fälligkeit und bereitet bei gewünschter Zuordnung einen Review statt einer Doppelbuchung vor.
+- [ ] Budget, Zweckbindung und Tags werden in die erzeugte Buchung übernommen.
+- [ ] Überspringen, Pausieren, Aktivieren und Beenden funktionieren ohne doppelte Termine.
+- [ ] Bereits erzeugte Buchungen bleiben beim Bearbeiten oder Beenden der Vorlage unverändert.
+
+## 30. Abschlusskontrolle
 
 - [ ] Ausgangszahlen und Endzahlen sind durch die ausgeführten Testaktionen erklärbar.
 - [ ] Keine Daten der zweiten Testorganisation wurden verändert.

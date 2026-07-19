@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr>
+      <MsgId>VEREINO-TEST-VOLKSBANK-20260720</MsgId>
+      <CreDtTm>2026-07-20T18:05:00+02:00</CreDtTm>
+    </GrpHdr>
+    <Stmt>
+      <Id>VEREINO-DAUERBUCHUNGEN-VOLKSBANK</Id>
+      <CreDtTm>2026-07-20T18:05:00+02:00</CreDtTm>
+      <Acct>
+        <Id><IBAN>DE44500105175407324931</IBAN></Id>
+        <Ccy>EUR</Ccy>
+        <Ownr><Nm>JH Hochstaett Testkonto Volksbank</Nm></Ownr>
+      </Acct>
+      <Ntry>
+        <Amt Ccy="EUR">10.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-07-20</Dt></BookgDt>
+        <ValDt><Dt>2026-07-20</Dt></ValDt>
+        <NtryRef>VEREINO-TEST-PHOTOSHOP-2026-07-20</NtryRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>ADOBE-PHOTOSHOP-2026-07-20</EndToEndId></Refs>
+          <RltdPties>
+            <Cdtr><Nm>Adobe Inc.</Nm></Cdtr>
+            <CdtrAcct><Id><IBAN>DE75512108001245126199</IBAN></Id></CdtrAcct>
+          </RltdPties>
+          <RmtInf><Ustrd>Adobe Photoshop Abo Juli 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="EUR">25.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-07-20</Dt></BookgDt>
+        <ValDt><Dt>2026-07-20</Dt></ValDt>
+        <NtryRef>VEREINO-TEST-ALDI-2026-07</NtryRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>ALDI-ABO-2026-07</EndToEndId></Refs>
+          <RltdPties>
+            <Cdtr><Nm>ALDI Services GmbH</Nm></Cdtr>
+            <CdtrAcct><Id><IBAN>DE23100500001234567890</IBAN></Id></CdtrAcct>
+          </RltdPties>
+          <RmtInf><Ustrd>Aldi Abo Juli 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

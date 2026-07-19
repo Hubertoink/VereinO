@@ -152,7 +152,7 @@ export default function FilterDropdown({
     }
     // Check bottom overflow
     if (rect.bottom > window.innerHeight - 16) {
-      panel.style.maxHeight = `${Math.max(200, window.innerHeight - rect.top - 32)}px`
+      panel.style.maxHeight = `${Math.max(0, window.innerHeight - rect.top - 16)}px`
     }
   }, [open])
 

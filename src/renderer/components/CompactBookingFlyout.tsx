@@ -399,7 +399,7 @@ export default function CompactBookingFlyout({
       <header className="compact-booking-flyout__header">
         <div>
           <strong id="compact-booking-title">Buchung erfassen</strong>
-          <small>{draftTabsEnabled ? `Als aktiver Buchungsreiter geöffnet · ${draftTabs.length} offen` : 'Kompakte Erfassung'}</small>
+          <small>{draftTabsEnabled ? `Aktive Buchungen · ${draftTabs.length} offen` : 'Kompakte Erfassung'}</small>
         </div>
         {draftTabsEnabled && draftTabs.length > 0 && (
           <div className="compact-booking-flyout__tab-switcher">
