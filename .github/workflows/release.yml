@@ -27,6 +27,9 @@ jobs:
           - platform: linux
             os: ubuntu-latest
             artifact: release-linux
+          - platform: macos
+            os: macos-13
+            artifact: release-macos
 
     steps:
       - name: Checkout repository
@@ -64,6 +67,9 @@ jobs:
             release/*.exe
             release/*.exe.blockmap
             release/*.AppImage
+            release/*.dmg
+            release/*.zip
+            release/*.zip.blockmap
             !release/*-unpacked/**
           if-no-files-found: error
 

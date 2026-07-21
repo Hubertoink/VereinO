@@ -1,306 +1,124 @@
-# VereinO – Finanzmanagement für gemeinnützige Vereine
+# VereinO
 
-<p align="center">
-  <strong>Offline-first Desktop-App für die moderne Vereinsbuchhaltung</strong><br>
-  Cross-Platform • Electron + React + TypeScript • MIT License
-</p>
+Offline-first Desktop-App für moderne Vereinsbuchhaltung.
 
----
+VereinO richtet sich an gemeinnützige Vereine, die Buchungen, Belege, Mitglieder, Budgets, Zweckbindungen, Rechnungen und Berichte lokal verwalten möchten. Die Hauptbuchhaltung bleibt auf dem eigenen Gerät; für Belegeinreichungen gibt es optional ein separates Submission Portal.
 
-## 📋 Inhaltsverzeichnis
+## Download
 
-- [Über das Projekt](#-über-das-projekt)
-- [Features](#-features)
-- [Installation](#-installation)
-- [Verwendung](#-verwendung)
-- [Online-Plattform](#-online-plattform--submission-portal)r
-- [Technologie-Stack](#-technologie-stack)
-- [Lizenz](#-lizenz)
+Die einfachste Installation läuft über die GitHub-Releases:
 
----
+[VereinO Releases](https://github.com/Hubertoink/VereinO/releases)
 
-## 🎯 Über das Projekt
+Aktuelle Release-Artefakte:
 
-**VereinO** ist eine speziell für gemeinnützige Vereine entwickelte Finanzverwaltungssoftware. Die App ermöglicht eine einfache und übersichtliche Buchführung – komplett offline nutzbar, mit optionaler Cloud-Synchronisation.
+| System | Datei | Hinweis |
+| --- | --- | --- |
+| Windows | `VereinO-Setup-<version>-x64.exe` | Empfohlener Installer mit Auto-Update-Metadaten |
+| Linux | `VereinO-<version>-x86_64.AppImage` | Direkt ausführbare AppImage-Datei |
+| macOS | `VereinO-<version>-x64.dmg` / `.zip` | Wird vom GitHub-Release-Workflow gebaut; aktuell unsigniert |
 
-Die Anwendung unterstützt die besonderen Anforderungen gemeinnütziger Organisationen, einschließlich der korrekten Sphärentrennung (ideeller Bereich, Zweckbetrieb, Vermögensverwaltung, wirtschaftlicher Geschäftsbetrieb) und zweckgebundener Mittelverwendung.
+macOS-Hinweis: Ohne Apple Developer ID ist die App nicht signiert/notarisiert. Beim ersten Start kann macOS deshalb eine Gatekeeper-Warnung zeigen; in dem Fall die App per Rechtsklick -> Öffnen starten.
 
----
+## Highlights
 
-## ✨ Features
+- Lokale SQLite-Datenbank mit Backup, Restore, Speicherortwechsel und Sicherheitskopien
+- Buchungsjournal für Einnahmen, Ausgaben, Umbuchungen, Barzahlungen und Bankkonten
+- Kompakte Buchungserfassung mit Flyout, Tabs, Anhängen, Tags, Budgets und Zweckbindungen
+- Dauerbuchungen mit Wochen-, Monats-, Quartals- und Jahresrhythmus inklusive Fälligkeitsabgleich
+- Bankimport mit CAMT.053-Auswertung, Zuordnungsvorschlägen und Abgleich gegen bestehende Buchungen
+- Mitgliederverwaltung mit Beitrags- und Spendenzuordnung
+- Rechnungs- und Belegerfassung mit PDF-Anhängen, Batch-Upload, Duplikatprüfung und optionaler KI-Auslesung
+- Geschäftspartnerkartei für Lieferanten und Kunden mit Verwendung in Buchungen und Rechnungen
+- Budgets, Zweckbindungen und Auswertungen nach gemeinnützigkeitsrelevanten Sphären
+- Dashboard und Reports mit Monatsverlauf, Einnahmen/Ausgaben, Sphärenauswertung und Tätigkeitsbericht
+- Spendenbescheinigungen, Kassenprüfung, Jahresabschluss- und Exportfunktionen
+- Optionaler KI-Agent für prüfbare Vorschläge, Rechnungsanalyse und lokale Buchhaltungsunterstützung
+- Submission Portal unter [vereino.kassiero.de](https://vereino.kassiero.de) für dezentrale Belegeinreichungen
 
-### 📊 Dashboard
+## Erste Schritte
 
-- **KPI-Karten**: Kassenstand, Einnahmen/Ausgaben pro Monat, offene Zweckmittel, nicht zugeordnete Belege
-- **Charts**: Visualisierung von Einnahmen/Ausgaben nach Sphäre, Budget vs. Ist-Vergleich
-- **Aktivitätsfeed**: Übersicht der letzten Buchungen, Abschlüsse und Import/Export-Vorgänge
+1. Release-Datei für dein Betriebssystem herunterladen.
+2. App installieren oder starten.
+3. Beim ersten Start den Setup-Assistenten ausfüllen.
+4. Vereinsdaten, Konten und Geschäftsjahr prüfen.
+5. Erste Buchungen erfassen oder vorhandene Daten importieren.
 
-### 💰 Buchungsverwaltung (Journal)
+Backups und Datenumzug findest du in der App unter Einstellungen -> Daten.
 
-- Erfassung von Einnahmen, Ausgaben und Umbuchungen
-- Unterstützung für Bar- und Bankzahlungen
-- Automatische Belegnummerierung
-- Mehrstufige MwSt-Sätze
-- Kategorisierung nach Sphären (IDEELL, ZWECK, VERMÖGEN, WGB)
+## Submission Portal
 
-### 🏷️ Zweckbindungen (Earmarks)
+Das optionale Submission Portal ist für Mitglieder gedacht, die Ausgaben oder Belege einreichen möchten:
 
-- Verwaltung zweckgebundener Spenden und Fördermittel
-- Nachverfolgung der Mittelverwendung
-- Automatische Prüfung auf korrekte Verwendung
+[https://vereino.kassiero.de](https://vereino.kassiero.de)
 
-### 📈 Budgets
+Typischer Ablauf:
 
-- Jahresbudgets pro Sphäre und Kategorie
-- Echtzeit-Verfolgung von Budget vs. tatsächlichen Ausgaben
-- Zeitraumbasierte Budgetierung
+1. Kassierer exportiert Budgets, Zweckbindungen und Tags als Katalogdatei.
+2. Mitglied erfasst Ausgaben und lädt Belege hoch.
+3. Portal exportiert die Einreichung als JSON.
+4. Kassierer importiert und prüft die Einreichung in VereinO.
+5. Geprüfte Buchungen werden ins offizielle Journal übernommen.
 
-### 👥 Mitgliederverwaltung
+## Entwicklung
 
-- Vollständige Mitgliederdatenbank
-- Verknüpfung mit Buchungen (Spenden, Beiträge)
-- Such- und Filterfunktionen
+Der Entwicklerweg ist nur nötig, wenn du am Code arbeiten oder eigene Builds erzeugen möchtest.
 
-### 📎 Belegverwaltung
+Voraussetzungen:
 
-- Digitale Erfassung und Speicherung von Belegen
-- Verknüpfung mit Buchungen
-- Anhänge-Management
-
-### 📑 Reports & Export
-
-- Export-Funktionen für Berichte
-- Excel-Export (ExcelJS)
-- Individuelle Auswertungen
-
-### 🔒 Datensicherheit
-
-- **Lokale SQLite-Datenbank**: Alle Daten bleiben auf deinem Gerät
-- **Backup & Restore**: Einfacher Export/Import der Datenbank
-- **Smart Restore**: Intelligente Wiederherstellung bei Datenbankproblemen
-- **Audit-Trail**: Protokollierung aller Änderungen
-
-### ⚙️ Einstellungen
-
-- Anpassbare Geschäftsjahre
-- Perioden-Sperrung für abgeschlossene Zeiträume
-- Vereinsdaten und Freistellungsbescheid
-- Datenbank-Management (Import/Export)
-
----
-
-## 🚀 Installation
-
-### Voraussetzungen
-
-- **Node.js** 20 oder höher
-- **npm** (wird mit Node.js installiert)
-- **Git** (zum Klonen des Repositories)
-
-### Schritt 1: Repository klonen
+- Node.js 20 oder höher
+- npm
+- Git
 
 ```bash
 git clone https://github.com/Hubertoink/VereinO.git
 cd VereinO
+npm ci
+npm run dev
 ```
 
-### Schritt 2: Abhängigkeiten installieren
-
-```bash
-npm install
-```
-
-### Schritt 3: Native Module neu bauen (wichtig!)
-
-Nach der Installation oder bei Problemen mit `better-sqlite3` müssen die nativen Module für Electron neu kompiliert werden:
+Native Electron-Module lassen sich bei Bedarf neu bauen:
 
 ```bash
 npm run rebuild:native
 ```
 
-> ⚠️ Dieser Schritt ist erforderlich, wenn du Fehler wie "Module was compiled against a different Node.js version" erhältst.
-
-### Schritt 4: Entwicklung starten (optional)
-
-Um die App im Entwicklungsmodus zu starten:
+Lokale Paketierung:
 
 ```bash
-npm run dev
+npm run release:artifacts
 ```
 
-### Schritt 5: Ausführbare Datei (EXE) erstellen
+Release-Artefakte werden im Ordner `release/` abgelegt. Für offizielle Windows-, Linux- und macOS-Releases ist der GitHub-Workflow `.github/workflows/release.yml` maßgeblich, weil jedes System auf dem passenden Runner gebaut wird.
 
-Um eine installierbare Desktop-Anwendung zu erstellen:
+## Release-Prozess
+
+1. Version in `package.json` und `electron-builder.yml` aktualisieren.
+2. `CHANGELOG.md` für die neue Version pflegen.
+3. Änderungen committen.
+4. Tag erstellen und pushen:
 
 ```bash
-# Projekt bauen
-npm run build
-
-# App paketieren (erstellt EXE für Windows, DMG für macOS, AppImage für Linux)
-npm run package
+git tag vX.Y.Z
+git push origin main
+git push origin vX.Y.Z
 ```
 
-Nach dem Paketieren findest du die erstellten Dateien im `dist/` oder `out/` Ordner:
+Der GitHub-Workflow erstellt anschließend die Release-Artefakte für Windows, Linux und macOS und hängt sie an das GitHub-Release. Für ein bereits vorhandenes Release kann der Workflow manuell mit demselben Tag erneut gestartet werden.
 
-| Betriebssystem | Dateiformat        |
-| -------------- | ------------------ |
-| Windows        | `.exe` (Installer) |
-| macOS          | `.dmg`             |
-| Linux          | `.AppImage`        |
+## Tech Stack
 
-### Alternative: Direkte Release-Downloads
+- Electron, React, TypeScript und Vite
+- SQLite mit `better-sqlite3`
+- Electron Builder und Electron Updater
+- Jest, Playwright, ESLint und Prettier
+- Fastify/PostgreSQL im separaten Submission-Portal-Kontext
 
-Vorbereitete Installationsdateien können (falls verfügbar) direkt von der [Releases-Seite](https://github.com/Hubertoink/VereinO/releases) heruntergeladen werden.
+## Lizenz
 
----
+MIT License. Details stehen in [LICENSE](LICENSE), sofern die Lizenzdatei im Checkout vorhanden ist.
 
-## 📖 Verwendung
+## Support
 
-### Erste Schritte
-
-1. **App starten**: Öffne die installierte Anwendung
-2. **Setup-Wizard**: Beim ersten Start führt dich ein Assistent durch die Grundkonfiguration
-3. **Vereinsdaten eingeben**: Name, Adresse, Bankverbindung
-4. **Erste Buchung**: Nutze den Quick-Add Button (`+ Buchung`) für schnelle Erfassung
-
-### Datenbank sichern
-
-1. Gehe zu `Einstellungen → Allgemein → Datenbank`
-2. Klicke auf `Exportieren`
-3. Wähle einen Speicherort für die Backup-Datei (.sqlite)
-
-### Datenbank wiederherstellen
-
-1. Gehe zu `Einstellungen → Allgemein → Datenbank`
-2. Klicke auf `Importieren…`
-3. Wähle eine vorhandene SQLite-Datei
-
-> ⚠️ **Achtung**: Beim Import wird die aktuelle Datenbank vollständig ersetzt!
-
----
-
-## 🌐 Online-Plattform – Submission Portal
-
-Für Vereinsmitglieder, die Ausgaben einreichen möchten, steht ein **Submission Portal** zur Verfügung:
-
-### 🔗 [https://vereino.kassiero.de](https://vereino.kassiero.de)
-
-Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
-
-#### Für Mitglieder (Einreicher)
-
-- **Buchungen anlegen**: Ausgaben mit allen relevanten Daten erfassen
-- **Kategorien übernehmen**: Optional vom Kassierer exportierte Budgets, Zweckbindungen und Tags importieren
-- **Belege hochladen**: Digitale Kopien von Quittungen und Rechnungen anhängen
-- **Als JSON exportieren**: Eingereichte Buchungen als JSON-Datei herunterladen
-- **An Kassierer senden**: JSON-Export per E-Mail oder Dateifreigabe übermitteln
-
-#### Für Kassierer (in der VereinO Desktop-App)
-
-- **JSON importieren**: Eingereichte Buchungen in der App prüfen
-- **Kategorien bereitstellen**: Budgets, Zweckbindungen und Tags als Katalogdatei für das Portal exportieren
-- **Validieren**: Belege und Beträge kontrollieren
-- **Übernehmen**: Geprüfte Buchungen in die offizielle Buchhaltung aufnehmen
-
-### Workflow
-
-```
-┌─────────────────┐    JSON-Export    ┌──────────────────┐
-│  Mitglied       │ ───────────────► │  Kassierer       │
-│  (Portal)       │                   │  (Desktop-App)   │
-├─────────────────┤                   ├──────────────────┤
-│ • Buchung       │                   │ • Import prüfen  │
-│   anlegen       │                   │ • Validieren     │
-│ • Beleg         │                   │ • In Journal     │
-│   hochladen     │                   │   übernehmen     │
-│ • JSON Export   │                   │                  │
-└─────────────────┘                   └──────────────────┘
-```
-
-Diese Trennung ermöglicht:
-
-- **Dezentrale Erfassung**: Mitglieder können von überall Ausgaben einreichen
-- **Zentrale Kontrolle**: Der Kassierer behält die volle Kontrolle über die Buchhaltung
-- **Offline-Fähigkeit**: Die Hauptbuchhaltung bleibt offline und sicher
-
----
-
-## 🛠️ Technologie-Stack
-
-### Desktop-App (Frontend)
-
-- **Electron** – Cross-Platform Desktop Framework
-- **React** – UI-Bibliothek
-- **TypeScript** – Typsichere Entwicklung
-- **Vite** – Build-Tool & Dev-Server
-- **SQLite (better-sqlite3)** – Lokale Datenbank
-
-### Backend (Submission Portal)
-
-- **Fastify** – Web-Framework
-- **PostgreSQL** – Relationale Datenbank
-- **Zod** – Schema-Validierung
-- **JWT** – Token-basierte Authentifizierung
-- **Docker** – Container-Deployment
-
-### Entwicklungstools
-
-- **ESLint & Prettier** – Code-Qualität
-- **Playwright** – E2E-Tests
-- **VS Code** – IDE-Integration mit Tasks & Debugging
-
----
-
-## 📁 Projektstruktur
-
-```
-VereinO/
-├── electron/
-│   ├── main/           # Electron Main-Prozess
-│   │   ├── db/         # Datenbank-Logik
-│   │   ├── ipc/        # IPC-Handler
-│   │   ├── repositories/  # Datenzugriffsschicht
-│   │   └── services/   # Business-Logik
-│   └── preload/        # Preload/IPC-Brücke
-├── src/
-│   ├── renderer/       # React-Anwendung
-│   │   ├── components/ # UI-Komponenten
-│   │   ├── views/      # Seiten/Views
-│   │   ├── hooks/      # Custom React Hooks
-│   │   └── context/    # React Context Provider
-│   └── App.tsx         # Root-Komponente
-├── backend/            # Submission Portal API (Fastify)
-├── shared/             # Gemeinsame Typen
-└── docs/               # Dokumentation
-```
-
----
-
-## 📄 Lizenz
-
-Dieses Projekt ist unter der **MIT-Lizenz** lizenziert. Siehe [LICENSE](LICENSE) für weitere Details.
-
----
-
-## 🤝 Mitwirken
-
-Beiträge sind willkommen! So kannst du helfen:
-
-1. Fork das Repository
-2. Erstelle einen Feature-Branch (`git checkout -b feature/NeuesFeature`)
-3. Committe deine Änderungen (`git commit -m 'Add NeuesFeature'`)
-4. Push zum Branch (`git push origin feature/NeuesFeature`)
-5. Öffne einen Pull Request
-
----
-
-## 📞 Kontakt & Support
-
-- **GitHub Issues**: [https://github.com/Hubertoink/VereinO/issues](https://github.com/Hubertoink/VereinO/issues)
-- **Submission Portal**: [https://vereino.kassiero.de](https://vereino.kassiero.de)
-
----
-
-<p align="center">
-  Made with ❤️ für gemeinnützige Vereine
-</p>
+- Issues: [https://github.com/Hubertoink/VereinO/issues](https://github.com/Hubertoink/VereinO/issues)
+- Submission Portal: [https://vereino.kassiero.de](https://vereino.kassiero.de)

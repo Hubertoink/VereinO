@@ -1,7 +1,7 @@
 appId: org.verein.finanzplaner
 productName: VereinO
 buildVersion: 3.1.0
-icon: build/Icon.ico
+icon: build/icon.png
 files:
   - dist/**
   - dist-electron/**
@@ -18,6 +18,13 @@ win:
 artifactName: '${productName}-Setup-${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+  artifactName: '${productName}-${version}-${arch}.${ext}'
 linux:
   target: [AppImage]
   category: Finance
