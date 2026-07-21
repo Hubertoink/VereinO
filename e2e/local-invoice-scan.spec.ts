@@ -15,6 +15,31 @@ let electronApp: ElectronApplication
 let page: Page
 let userDataDir: string
 
+async function waitForVereinOWindow(app: ElectronApplication) {
+  const deadline = Date.now() + 20_000
+
+  while (Date.now() < deadline) {
+    for (const candidate of app.windows()) {
+      await candidate.waitForLoadState('domcontentloaded', { timeout: 1_000 }).catch(() => undefined)
+      const title = await candidate.title().catch(() => '')
+      if (/VereinO/i.test(title)) return candidate
+    }
+
+    const nextWindow = await app.waitForEvent('window', {
+      timeout: Math.min(1_000, Math.max(1, deadline - Date.now()))
+    }).catch(() => null)
+
+    if (nextWindow) {
+      await nextWindow.waitForLoadState('domcontentloaded', { timeout: 1_000 }).catch(() => undefined)
+      const title = await nextWindow.title().catch(() => '')
+      if (/VereinO/i.test(title)) return nextWindow
+    }
+  }
+
+  const titles = await Promise.all(app.windows().map(async (candidate) => `"${await candidate.title().catch(() => '')}"`))
+  throw new Error(`VereinO window did not open. Open windows: ${titles.join(', ') || 'none'}`)
+}
+
 test.beforeAll(async () => {
   userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-local-invoice-e2e-'))
   const launchEnv = { ...process.env }
@@ -28,8 +53,7 @@ test.beforeAll(async () => {
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
     }
   })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
+  page = await waitForVereinOWindow(electronApp)
 })
 
 test.afterAll(async () => {

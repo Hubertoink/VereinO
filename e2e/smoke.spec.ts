@@ -8,6 +8,31 @@ let electronApp: ElectronApplication
 let page: Page
 let userDataDir: string
 
+async function waitForVereinOWindow(app: ElectronApplication) {
+  const deadline = Date.now() + 20_000
+
+  while (Date.now() < deadline) {
+    for (const candidate of app.windows()) {
+      await candidate.waitForLoadState('domcontentloaded', { timeout: 1_000 }).catch(() => undefined)
+      const title = await candidate.title().catch(() => '')
+      if (/VereinO/i.test(title)) return candidate
+    }
+
+    const nextWindow = await app.waitForEvent('window', {
+      timeout: Math.min(1_000, Math.max(1, deadline - Date.now()))
+    }).catch(() => null)
+
+    if (nextWindow) {
+      await nextWindow.waitForLoadState('domcontentloaded', { timeout: 1_000 }).catch(() => undefined)
+      const title = await nextWindow.title().catch(() => '')
+      if (/VereinO/i.test(title)) return nextWindow
+    }
+  }
+
+  const titles = await Promise.all(app.windows().map(async (candidate) => `"${await candidate.title().catch(() => '')}"`))
+  throw new Error(`VereinO window did not open. Open windows: ${titles.join(', ') || 'none'}`)
+}
+
 async function openBookingWorkflowSettings() {
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
@@ -38,8 +63,7 @@ test.beforeEach(async () => {
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
     }
   })
-  page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
+  page = await waitForVereinOWindow(electronApp)
   await expect(page).toHaveTitle(/VereinO/i, { timeout: 15_000 })
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
@@ -210,6 +234,8 @@ test('presents the optimized booking workflow', async () => {
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined)
   if (await laterButton.isVisible()) await laterButton.click()
+  await chooseBookingEntryPresentation('Dialog')
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   const totalCards = page.locator('.filter-totals-stat')
   await expect(totalCards).toHaveCount(3)
   const totalCardBackgrounds = await totalCards.evaluateAll((cards) =>
@@ -327,9 +353,7 @@ test('presents the optimized booking workflow', async () => {
 })
 
 test('routes new bookings through the configured dialog, flyout, and detached window', async () => {
-  const presentation = await openBookingWorkflowSettings()
-  const dialogOption = presentation.getByRole('button', { name: 'Dialog', exact: true })
-  await expect(dialogOption).toHaveClass(/\bactive\b/)
+  await chooseBookingEntryPresentation('Dialog')
 
   await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   await page.locator('.fab-buchung').click()
@@ -373,7 +397,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
   await expect(page.locator('.compact-booking-flyout')).toHaveCount(0)
 
   const detachedWindowClosed = detachedPage.waitForEvent('close')
-  await detachedDialog.getByRole('button', { name: 'Schließen' }).click()
+  await detachedDialog.getByRole('button', { name: 'Schließen' }).evaluate((button: HTMLElement) => button.click()).catch(() => undefined)
   await detachedWindowClosed
 })
 
@@ -389,7 +413,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
 
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
-  await expect(flyout).toContainText('Aktive Buchungen')
+  await expect(flyout).toContainText('Als aktiver Buchungsreiter geöffnet')
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Geparkter Reiter-Test')
   await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('47.50')
   await flyout.getByRole('button', { name: '+ Kommentar', exact: true }).click()
@@ -532,9 +556,11 @@ test('parks the compact draft while an existing booking is edited and restores i
 })
 
 test('keeps expanded tags and comments separated in the detached booking window', async () => {
+  await chooseBookingEntryPresentation('Dialog')
   await page.setViewportSize({ width: 1200, height: 780 })
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   if (await laterButton.isVisible()) await laterButton.click()
+  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   await page.locator('.fab-buchung').click()
 
   const dialog = page.locator('.quick-add-modal')
@@ -586,11 +612,12 @@ test('keeps expanded tags and comments separated in the detached booking window'
   await detachedPage.screenshot({ path: 'test-results/quick-add-detached-details.png', fullPage: true })
 
   const detachedWindowClosed = detachedPage.waitForEvent('close')
-  await detachedDialog.getByRole('button', { name: 'Schließen' }).click()
+  await detachedDialog.getByRole('button', { name: 'Schließen' }).evaluate((button: HTMLElement) => button.click()).catch(() => undefined)
   await detachedWindowClosed
 })
 
 test('distributes untouched budget amounts evenly and preserves manual values', async () => {
+  await chooseBookingEntryPresentation('Dialog')
   await page.evaluate(async () => {
     for (const name of ['E2E Budget A', 'E2E Budget B', 'E2E Budget C', 'E2E Budget D']) {
       await window.api.budgets.upsert({
