@@ -18,7 +18,7 @@ win:
 artifactName: '${productName}-Setup-${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance
-  icon: build/icon.png
+  icon: build/icon-1024.png
   target:
     - target: dmg
       arch: [x64]
