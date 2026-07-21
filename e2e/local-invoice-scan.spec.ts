@@ -139,8 +139,8 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
   await expect(dialog.getByRole('button', { name: 'Mit KI auslesen' })).toBeVisible()
 
   const fieldLayout = await dialog.locator('.local-invoice-scan__fields').evaluate((container) => {
-    const supplier = container.querySelector<HTMLInputElement>('input[placeholder="Noch nicht erkannt"]')
-    const invoiceNumber = container.querySelectorAll<HTMLInputElement>('input[placeholder="Noch nicht erkannt"]')[1]
+    const supplier = container.querySelector<HTMLInputElement>('#local-invoice-party')
+    const invoiceNumber = container.querySelector<HTMLInputElement>('#local-invoice-party + * input, .local-invoice-scan__field:nth-child(2) input')
     if (!supplier || !invoiceNumber) throw new Error('Invoice fields are missing')
     const resultBody = container.closest('.local-invoice-scan__result-body')
     return {

@@ -1081,6 +1081,7 @@ export default function LocalInvoiceScanModal({
                       valueName={fields.supplier}
                       role="SUPPLIER"
                       inputId="local-invoice-party"
+                      ariaLabel="Lieferant / Rechnungsteller"
                       placeholder="Wählen, eingeben oder neu anlegen"
                       onChange={(selection) => {
                         manuallyEditedRef.current.add('supplier')
