@@ -731,7 +731,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       return { version: '0.0.0', name: 'VereinO' }
     }
   })
-  ipcMain.handle('app.bootstrap', async () => {
+  ipcMain.handle('app.bootstrap', async () => withSchemaHealRetry(() => {
     const submissions = createSubmissionsRepository(getDb()).list({ status: 'pending', limit: 1 })
     const bankImports = listBankTransactions({ status: 'OPEN', limit: 1, page: 1 }) as any
     const openInvoices = listInvoicesPaged({ status: 'OPEN', limit: 1 })
@@ -759,7 +759,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         lastAuto: Number(getSetting<number>('backup.lastAuto') || 0)
       }
     }
-  })
+  }, ['invoices', 'i.party_id']))
   ipcMain.handle('app.dashboardSnapshot', async (_event, payload: DashboardSnapshotInput) => {
     return getDashboardSnapshot(payload)
   })
