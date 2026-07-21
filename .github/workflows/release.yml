@@ -28,7 +28,7 @@ jobs:
             os: ubuntu-latest
             artifact: release-linux
           - platform: macos
-            os: macos-13
+            os: macos-15-intel
             artifact: release-macos
 
     steps:
