@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.1.1] - 2026-07-21
+
+### Geändert
+
+- Buchungsjournal: Bei geplanten Budgets zeigt der Übersichts-Balken nun den verfügbaren und verbrauchten Budgetanteil statt des Einnahmen-/Ausgabenverhältnisses.
+
+### Behoben
+
+- Electron-E2E-Tests warten auf die vollständig initialisierte App-Oberfläche, bevor sie mit Datenbank- und Buchungsabläufen beginnen.
+
 ## [3.1.0] - 2026-07-20
 
 ### Hinzugefügt

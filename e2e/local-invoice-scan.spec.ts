@@ -54,6 +54,9 @@ test.beforeAll(async () => {
     }
   })
   page = await waitForVereinOWindow(electronApp)
+  // The first window initially contains the startup screen. The invoice test
+  // needs the fully initialized renderer and its IPC-backed database.
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
 })
 
 test.afterAll(async () => {

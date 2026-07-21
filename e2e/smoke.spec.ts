@@ -65,6 +65,10 @@ test.beforeEach(async () => {
   })
   page = await waitForVereinOWindow(electronApp)
   await expect(page).toHaveTitle(/VereinO/i, { timeout: 15_000 })
+  // The native window is created with the startup screen before migrations and
+  // IPC handlers are ready. Wait for the actual renderer shell so each test
+  // starts against a fully initialized database.
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
   if (await laterButton.isVisible()) {

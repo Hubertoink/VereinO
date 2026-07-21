@@ -195,6 +195,14 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
     const summaryLabel = hasPlannedBudget ? 'Rest' : diffVal >= 0 ? 'Überschuss' : 'Defizit'
     const total = inVal + outVal
     const inPercent = total > 0 ? (inVal / total) * 100 : 50
+    // With a defined budget, the flow bar represents the budget status instead of
+    // the ratio of incoming to outgoing bookings. Clamp the visible values to the
+    // budget amount so an overdrawn budget is shown as fully consumed.
+    const availableBudgetForFlow = hasPlannedBudget ? Math.min(plannedVal, Math.max(0, remainingVal)) : 0
+    const consumedBudgetForFlow = hasPlannedBudget ? plannedVal - availableBudgetForFlow : 0
+    const greenFlowAmount = hasPlannedBudget ? availableBudgetForFlow : inVal
+    const redFlowAmount = hasPlannedBudget ? consumedBudgetForFlow : outVal
+    const greenFlowPercent = hasPlannedBudget ? (availableBudgetForFlow / plannedVal) * 100 : inPercent
 
     const sphereSource = type === 'IN' ? (values?.bySphere || []) : !type ? (values?.inBySphere || []) : (values?.bySphere || [])
     const outPaymentSource = type === 'OUT' ? (values?.byPaymentMethod || []) : !type ? (values?.outByPaymentMethod || []) : (values?.byPaymentMethod || [])
@@ -247,19 +255,19 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
             <div className="filter-totals-flow">
                 <HoverTooltip
                     className="tooltip-modal"
-                    content={<TooltipList title="Einnahmen" rows={[{ key: 'Summe', value: fmt.format(inVal), dotColor: 'var(--success)' }]} />}
+                    content={<TooltipList title={hasPlannedBudget ? 'Budgetstand' : 'Einnahmen'} rows={[{ key: hasPlannedBudget ? 'Verfügbar' : 'Summe', value: fmt.format(greenFlowAmount), dotColor: 'var(--success)' }]} />}
                 >
                     {({ ref, props }) => (
-                        <div ref={ref} {...props} className="filter-totals-flow__in" style={{ width: `${inPercent}%` }} />
+                        <div ref={ref} {...props} className="filter-totals-flow__in" style={{ width: `${greenFlowPercent}%` }} />
                     )}
                 </HoverTooltip>
 
                 <HoverTooltip
                     className="tooltip-modal"
-                    content={<TooltipList title="Ausgaben" rows={[{ key: 'Summe', value: fmt.format(outVal), dotColor: 'var(--danger)' }]} />}
+                    content={<TooltipList title={hasPlannedBudget ? 'Budgetstand' : 'Ausgaben'} rows={[{ key: hasPlannedBudget ? 'Verbraucht' : 'Summe', value: fmt.format(redFlowAmount), dotColor: 'var(--danger)' }]} />}
                 >
                     {({ ref, props }) => (
-                        <div ref={ref} {...props} className="filter-totals-flow__out" style={{ width: `${100 - inPercent}%` }} />
+                        <div ref={ref} {...props} className="filter-totals-flow__out" style={{ width: `${100 - greenFlowPercent}%` }} />
                     )}
                 </HoverTooltip>
             </div>
