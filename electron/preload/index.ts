@@ -370,6 +370,10 @@ const rendererApi = {
       invokeRaw<{ value: T }>('settings.get', payload),
     set: (payload) => invoke('settings.set', payload)
   },
+  ocr: {
+    status: () => invoke('ocr.status'),
+    extract: (payload) => cleanInvoke('ocr.extract', payload)
+  },
   docling: {
     status: (force = false) => invoke('docling.status', force),
     setEnabled: (enabled: boolean) => cleanInvoke('docling.setEnabled', enabled),

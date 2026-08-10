@@ -31,6 +31,22 @@ interface OrganizationAppearance {
 }
 
 export interface SystemApi {
+    ocr: {
+        status: () => Promise<{
+            available: boolean
+            languages: string[]
+            error: string | null
+        }>
+        extract: (payload: { images: Array<{ dataBytes?: Uint8Array; dataBase64?: string }> }) => Promise<{
+            text: string
+            pages: Array<{
+                text: string
+                confidence: number
+                words: Array<{ text: string; x: number; y: number; width: number; height: number }>
+            }>
+            confidence: number
+        }>
+    }
     docling: {
         status: (force?: boolean) => Promise<{
             installed: boolean

@@ -167,7 +167,6 @@ export default function QuickAddModal({
     onDownloadExistingFile,
     onDeleteExistingFile
 }: QuickAddModalProps) {
-    const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const amountInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
@@ -966,20 +965,7 @@ export default function QuickAddModal({
                             <div className="row booking-basis-fields">
                                 <div className={`field booking-floating-field${qa.date ? ' booking-floating-field--filled' : ''}`}>
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                    <span className="booking-date-input-wrap">
-                                        <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
-                                        <button
-                                            type="button"
-                                            className="booking-date-picker-button"
-                                            aria-label="Kalender zur Datumsauswahl öffnen"
-                                            onClick={() => dateInputRef.current?.showPicker()}
-                                        >
-                                            <svg className="booking-date-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
-                                                <rect x="3" y="5" width="18" height="16" rx="2" />
-                                                <path d="M16 3v4M8 3v4M3 10h18" />
-                                            </svg>
-                                        </button>
-                                    </span>
+                                    <input id="quick-add-date" className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
                                 </div>
                                 {qa.type !== 'TRANSFER' && (
                                     <div className="field booking-floating-field booking-floating-field--filled booking-floating-field--with-info">

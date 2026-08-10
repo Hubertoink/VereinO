@@ -29,6 +29,16 @@ const cancelledJobIds = new Set<number>()
 const savedFileHashCache = new Map<string, { size: number; mtimeMs: number; sha256: string }>()
 const DUPLICATE_ERROR_PREFIX = 'INVOICE_DUPLICATE:'
 const DUPLICATE_OVERRIDE_ERROR = 'INVOICE_DUPLICATE_OVERRIDE'
+type InvoiceBatchGuidance = {
+  instructions?: string
+  defaults?: {
+    type?: 'IN' | 'OUT'
+    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    paymentMethod?: 'BAR' | 'BANK'
+    paymentAccountId?: number | null
+  }
+}
+const importedGuidanceByPath = new Map<string, InvoiceBatchGuidance | undefined>()
 
 type InvoiceDuplicate = { voucherId: number; voucherNo?: string | null }
 
@@ -82,10 +92,27 @@ type InvoiceBatchSourceMeta = {
   path: string
   sha256?: string
   segment?: { index: number; total: number; pageNumbers: number[]; confidence: number; warnings: string[] }
+  guidance?: InvoiceBatchGuidance
 }
 
-function queuePrompt(filePath: string, sourceSha256: string, segment?: InvoiceBatchSourceMeta['segment']) {
-  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: sourceSha256, segment })}`
+function queuePrompt(filePath: string, sourceSha256: string, segment?: InvoiceBatchSourceMeta['segment'], guidance?: InvoiceBatchGuidance) {
+  return `invoice-batch:${JSON.stringify({ path: path.resolve(filePath), sha256: sourceSha256, segment, guidance })}`
+}
+
+function applyGuidanceDefaults(result: any, guidance?: InvoiceBatchGuidance) {
+  const defaults = guidance?.defaults
+  if (!defaults) return result
+  if (defaults.type) result.type = defaults.type
+  if (defaults.sphere) result.sphere = defaults.sphere
+  if (defaults.paymentMethod) result.paymentMethod = defaults.paymentMethod
+  if (defaults.paymentAccountId !== undefined) result.paymentAccountId = defaults.paymentAccountId
+  const label = [
+    defaults.type === 'OUT' ? 'Ausgabe' : defaults.type === 'IN' ? 'Einnahme' : '',
+    defaults.sphere,
+    defaults.paymentMethod === 'BANK' ? 'Bank' : defaults.paymentMethod === 'BAR' ? 'Kasse' : ''
+  ].filter(Boolean).join(' · ')
+  if (label) result.warnings = [...new Set([`Nutzer-Vorgabe übernommen: ${label}.`, ...(result.warnings || [])])]
+  return result
 }
 
 function sourceMetaFromPrompt(prompt?: string | null): InvoiceBatchSourceMeta | null {
@@ -168,7 +195,8 @@ async function runInvoiceSubmitDirectoryScan(options?: { announceDuplicates?: bo
       if (!stat.isFile()) continue
       const data = await fs.readFile(filePath)
       const dataSha256 = await sha256Buffer(data)
-      const prompt = queuePrompt(filePath, dataSha256)
+      const guidance = importedGuidanceByPath.get(path.resolve(filePath))
+      const prompt = queuePrompt(filePath, dataSha256, undefined, guidance)
       const existing = findAiJobByPrompt('BOOKING_FROM_DOCUMENTS', prompt)
       const sourceJobs = openJobsForSource(filePath)
       const duplicate = await findSavedVoucherDuplicate(data, dataSha256)
@@ -223,7 +251,8 @@ export function scanInvoiceSubmitDirectory(options?: { announceDuplicates?: bool
 }
 
 export async function importInvoiceBatchFiles(
-  files: Array<{ fileName: string; dataBytes?: Uint8Array; dataBase64?: string }>
+  files: Array<{ fileName: string; dataBytes?: Uint8Array; dataBase64?: string }>,
+  guidance?: InvoiceBatchGuidance
 ) {
   const imported: string[] = []
   const reused: string[] = []
@@ -232,6 +261,7 @@ export async function importInvoiceBatchFiles(
     if (!data.length) continue
     const destination = await uniqueDestination(file.fileName, await sha256Buffer(data))
     if (!destination.reused) await fs.writeFile(destination.path, data)
+    importedGuidanceByPath.set(path.resolve(destination.path), guidance)
     const importedName = path.basename(destination.path)
     imported.push(importedName)
     if (destination.reused) reused.push(importedName)
@@ -273,7 +303,7 @@ export async function processInvoiceBatchQueue() {
             const parsed = value.trim() ? Number(value) : Number.NaN
             return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
           }
-          saveAiJobResult(job.id, 'BOOKING_CANDIDATE', {
+          saveAiJobResult(job.id, 'BOOKING_CANDIDATE', applyGuidanceDefaults({
             supplier: fields.supplier || null,
             invoiceNumber: fields.invoiceNumber || null,
             invoiceDate: fields.invoiceDate || null,
@@ -297,7 +327,7 @@ export async function processInvoiceBatchQueue() {
               'Mehrere Rechnungen innerhalb derselben PDF können im reinen Offline-Modus nicht zuverlässig getrennt werden.'
             ],
             evidence: [`Docling ${local.version || ''}`.trim()]
-          })
+          }, source.guidance))
           setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: `docling-${local.version || 'local'}` })
           notifyQueueChanged()
           continue
@@ -325,7 +355,7 @@ export async function processInvoiceBatchQueue() {
               const child = createAiJob({
                 type: 'BOOKING_FROM_DOCUMENTS',
                 title,
-                prompt: queuePrompt(source.path, source.sha256 || await sha256Buffer(groupData), segment),
+                prompt: queuePrompt(source.path, source.sha256 || await sha256Buffer(groupData), segment, source.guidance),
                 files: [{ fileName: title.replace(/\.pdf(?= ·)/i, '') + '.pdf', mimeType: 'application/pdf', dataBase64: group.dataBase64 }]
               })
               const duplicate = await findSavedVoucherDuplicate(groupData)
@@ -365,7 +395,8 @@ export async function processInvoiceBatchQueue() {
             dataBase64: file.dataBase64
           },
           context: buildAiInvoiceContext(),
-          localDocumentText
+          localDocumentText,
+          guidance: source.guidance
         })
         // Discarding a processing item cannot necessarily abort the provider
         // request, but it must guarantee that a late response is never saved.
@@ -377,6 +408,7 @@ export async function processInvoiceBatchQueue() {
           }
           analyzed.result.warnings = [...new Set([...groupingWarnings, ...analyzed.result.warnings])]
         }
+        applyGuidanceDefaults(analyzed.result, source.guidance)
         saveAiJobResult(job.id, 'BOOKING_CANDIDATE', analyzed.result)
         setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
       } catch (error: any) {
@@ -409,6 +441,7 @@ export async function listInvoiceBatchItems() {
         isDuplicate: !!duplicate,
         duplicateVoucherId: duplicate?.voucherId ?? null,
         duplicateVoucherNo: duplicate?.voucherNo ?? null,
+        guidance: source?.guidance || null,
         packet: source?.segment ? {
           index: source.segment.index,
           total: source.segment.total,
@@ -441,6 +474,7 @@ export function getInvoiceBatchItem(id: number) {
     isDuplicate: !!duplicate,
     duplicateVoucherId: duplicate?.voucherId ?? null,
     duplicateVoucherNo: duplicate?.voucherNo ?? null,
+    guidance: source?.guidance || null,
     packet: source?.segment ? {
       index: source.segment.index,
       total: source.segment.total,

@@ -1106,6 +1106,15 @@ export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
   context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
   localDocumentText?: string | null
+  guidance?: {
+    instructions?: string
+    defaults?: {
+      type?: 'IN' | 'OUT'
+      sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+      paymentMethod?: 'BAR' | 'BANK'
+      paymentAccountId?: number | null
+    }
+  } | null
 }): Promise<{
   model: string
   result: TAiInvoiceExtractionResult
@@ -1180,11 +1189,20 @@ export async function analyzeInvoiceDocument(input: {
     'Nutze Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
     'Setze partyId nur bei einem eindeutig passenden vorhandenen Geschäftspartner (Name, rechtlicher Name, E-Mail, IBAN-Endziffern oder USt-IdNr.). Erfinde niemals einen Partner oder eine ID; bei keinem sicheren Treffer ist partyId null.',
     'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
-    input.localDocumentText?.trim()
-      ? 'Docling hat lokal bereits strukturierten Dokumenttext erkannt. Nutze ihn als zusätzliche Evidenz, prüfe Werte aber weiterhin gegen das Originaldokument.'
+    input.guidance?.instructions?.trim() || input.guidance?.defaults
+      ? 'Die folgenden Angaben stammen vom Nutzer und sind Buchungsvorgaben, nicht Dokumentevidenz. Übernimm nur ausdrücklich gesetzte Vorgabefelder; bei einem Widerspruch zum Beleg ergänze eine Warnung.'
+      : '',
+    input.guidance?.instructions?.trim()
+      ? `Hinweis des Nutzers:\n${input.guidance.instructions.trim()}`
+      : '',
+    input.guidance?.defaults
+      ? `Verbindliche Buchungsvorgaben (nur die enthaltenen Felder setzen):\n${JSON.stringify(input.guidance.defaults)}`
       : '',
     input.localDocumentText?.trim()
-      ? `Lokaler Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}`
+      ? 'Lokale OCR oder Docling hat bereits Dokumenttext erkannt. Nutze ihn als zusätzliche Evidenz, prüfe Werte aber weiterhin gegen das Originaldokument.'
+      : '',
+    input.localDocumentText?.trim()
+      ? `Lokaler OCR-/Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}`
       : '',
     mittwaldOcrText
       ? `Mittwald GLM-OCR-Text:\n${mittwaldOcrText.slice(0, 80_000)}`

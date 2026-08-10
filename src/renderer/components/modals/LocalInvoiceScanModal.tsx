@@ -14,6 +14,7 @@ import {
 } from '../../utils/localInvoiceExtraction'
 import type { TAiInvoiceExtractionResult } from '../../../../electron/main/ipc/schemas'
 import type { QA } from '../../hooks/useQuickAdd'
+import type { InvoiceAiGuidance } from '../../types/invoiceAiGuidance'
 
 type AnalysisState = 'idle' | 'analyzing' | 'text-found' | 'ocr-needed' | 'error'
 type PreviewKind = 'none' | 'pdf' | 'image'
@@ -22,6 +23,7 @@ type OptionalSection = 'budgets' | 'earmarks' | 'tags' | 'comment'
 type BudgetAssignment = NonNullable<QA['budgets']>[number]
 type EarmarkAssignment = NonNullable<QA['earmarksAssigned']>[number]
 type InvoiceDuplicate = { voucherId: number; voucherNo: string | null }
+type OcrWord = { text: string; x: number; y: number; width: number; height: number }
 
 function formatAnalysisDuration(milliseconds: number) {
   return milliseconds >= 1_000
@@ -53,6 +55,16 @@ type EarmarkOption = {
 
 type BookingMeta = Pick<QA, 'type' | 'sphere' | 'paymentMethod' | 'paymentAccountId'>
 
+function bookingMetaFromGuidance(guidance?: InvoiceAiGuidance): BookingMeta {
+  const defaults = guidance?.defaults
+  return {
+    type: defaults?.type || 'OUT',
+    sphere: defaults?.sphere || 'IDEELL',
+    paymentMethod: defaults?.paymentMethod || 'BANK',
+    paymentAccountId: defaults?.paymentAccountId ?? null
+  }
+}
+
 export type LocalInvoiceScanResult = {
   file: File
   fields: LocalInvoiceFields
@@ -78,6 +90,7 @@ export type LocalInvoiceScanDraftState = {
 const MAX_FILE_BYTES = 25 * 1024 * 1024
 const MAX_AI_FILE_BYTES = 10 * 1024 * 1024
 const MAX_TEXT_PAGES = 20
+const MAX_LOCAL_OCR_PAGES = 3
 const PICKER_FIELDS: Array<{ value: LocalInvoicePickerField; label: string }> = [
   { value: 'supplier', label: 'Lieferant' },
   { value: 'invoiceNumber', label: 'Rechnungsnummer' },
@@ -264,6 +277,7 @@ export default function LocalInvoiceScanModal({
   closeOnCreate = true,
   initialFile,
   initialState,
+  aiGuidance,
   onDraftChange,
   onFileChange
 }: {
@@ -277,6 +291,7 @@ export default function LocalInvoiceScanModal({
   closeOnCreate?: boolean
   initialFile?: File
   initialState?: LocalInvoiceScanDraftState
+  aiGuidance?: InvoiceAiGuidance
   onDraftChange?: (state: LocalInvoiceScanDraftState & { file: File }) => void
   onFileChange?: (file: File | null) => void
 }) {
@@ -285,6 +300,7 @@ export default function LocalInvoiceScanModal({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const textLayerRef = useRef<HTMLDivElement | null>(null)
+  const ocrTextLayerRef = useRef<HTMLDivElement | null>(null)
   const pdfJsRef = useRef<PdfJsModule | null>(null)
   const pdfDocumentRef = useRef<any>(null)
   const renderTaskRef = useRef<any>(null)
@@ -311,6 +327,7 @@ export default function LocalInvoiceScanModal({
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfPages, setPdfPages] = useState(0)
   const [pdfPageSize, setPdfPageSize] = useState({ width: 595, height: 842 })
+  const [ocrWordsByPage, setOcrWordsByPage] = useState<Record<number, OcrWord[]>>({})
   const [dragActive, setDragActive] = useState(false)
   const [pickerEnabled, setPickerEnabled] = useState(false)
   const [pickerText, setPickerText] = useState('')
@@ -320,15 +337,11 @@ export default function LocalInvoiceScanModal({
   const [earmarkAssignments, setEarmarkAssignments] = useState<EarmarkAssignment[]>([])
   const [tags, setTags] = useState<string[]>([])
   const [note, setNote] = useState('')
-  const [bookingMeta, setBookingMeta] = useState<BookingMeta>({
-    type: 'OUT',
-    sphere: 'IDEELL',
-    paymentMethod: 'BANK',
-    paymentAccountId: null
-  })
+  const [bookingMeta, setBookingMeta] = useState<BookingMeta>(() => bookingMetaFromGuidance(aiGuidance))
   const [aiAvailable, setAiAvailable] = useState(false)
   const [aiProvider, setAiProvider] = useState('KI')
   const [aiBusy, setAiBusy] = useState(false)
+  const [isTransferring, setIsTransferring] = useState(false)
   const [draftReady, setDraftReady] = useState(!initialFile)
 
   const grossAmount = useMemo(
@@ -343,6 +356,15 @@ export default function LocalInvoiceScanModal({
     () => earmarks.filter((earmark) => earmark.isActive !== 0),
     [earmarks]
   )
+  const aiGuidanceLabel = useMemo(() => {
+    const defaults = aiGuidance?.defaults
+    const values = [
+      defaults?.type === 'OUT' ? 'Ausgabe' : defaults?.type === 'IN' ? 'Einnahme' : '',
+      defaults?.sphere === 'IDEELL' ? 'Ideeller Bereich' : defaults?.sphere === 'ZWECK' ? 'Zweckbetrieb' : defaults?.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : defaults?.sphere === 'WGB' ? 'Wirtschaftlicher Geschäftsbetrieb' : '',
+      defaults?.paymentMethod === 'BANK' ? 'Bank' : defaults?.paymentMethod === 'BAR' ? 'Kasse' : ''
+    ].filter(Boolean)
+    return values.join(' · ') || (aiGuidance?.instructions?.trim() ? 'Hinweis für die KI' : '')
+  }, [aiGuidance])
 
   useEffect(() => {
     let cancelled = false
@@ -510,6 +532,7 @@ export default function LocalInvoiceScanModal({
     setPdfPage(1)
     setPdfPages(0)
     setPdfPageSize({ width: 595, height: 842 })
+    setOcrWordsByPage({})
     setPickerText('')
     setPickerEnabled(false)
     setVisibleSections(new Set())
@@ -517,7 +540,7 @@ export default function LocalInvoiceScanModal({
     setEarmarkAssignments([])
     setTags([])
     setNote('')
-    setBookingMeta({ type: 'OUT', sphere: 'IDEELL', paymentMethod: 'BANK', paymentAccountId: null })
+    setBookingMeta(bookingMetaFromGuidance(aiGuidance))
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -543,8 +566,10 @@ export default function LocalInvoiceScanModal({
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setPartyId(null)
+    setBookingMeta(bookingMetaFromGuidance(aiGuidance))
     setPdfPage(1)
     setPdfPages(0)
+    setOcrWordsByPage({})
     setPickerText('')
     setAnalysisState('analyzing')
     setAnalysisMessage('Dokument wird gelesen …')
@@ -576,6 +601,10 @@ export default function LocalInvoiceScanModal({
       setVisibleSections(new Set(restored.visibleSections))
     }
 
+    // Der Docling-Fallback darf die konkrete Fehlerursache der integrierten OCR nicht verdecken.
+    let localOcrFailure = ''
+    const ocrFailureHint = () => localOcrFailure ? ` Lokale OCR-Fehler: ${localOcrFailure}` : ''
+
     const applyDocling = async (fallbackText = '') => {
       try {
         if (restored) return false
@@ -598,20 +627,80 @@ export default function LocalInvoiceScanModal({
         setAnalysisMessage(
           text.length >= 20
             ? `Mit Docling ${result.version ? `v${result.version} ` : ''}lokal erkannt und vorbefüllt.`
-            : 'Docling konnte keinen ausreichend verwertbaren Text erkennen.'
+            : `Docling konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
         )
         return true
       } catch (error: any) {
         if (requestRef.current !== requestId) return true
         if (!fallbackText) {
           setAnalysisState('error')
-          setAnalysisMessage(`Docling-Analyse fehlgeschlagen: ${error?.message || String(error)}`)
+          setAnalysisMessage(`Docling-Analyse fehlgeschlagen: ${error?.message || String(error)}${ocrFailureHint()}`)
           return true
         }
         setAnalysisMessage(
           `Textschicht erkannt; Docling konnte nicht ergänzt werden: ${error?.message || String(error)}`
         )
         return false
+      }
+    }
+
+    const applyLocalOcr = async (pdfDocument?: any) => {
+      try {
+        if (restored) return null
+        setAnalysisState('analyzing')
+        setAnalysisMessage('Lokale OCR liest den Scan …')
+        const images: Array<{ dataBytes: Uint8Array }> = []
+
+        if (pdfDocument) {
+          const pagesToRead = Math.min(pdfDocument.numPages || 1, MAX_LOCAL_OCR_PAGES)
+          for (let pageNumber = 1; pageNumber <= pagesToRead; pageNumber += 1) {
+            const page = await pdfDocument.getPage(pageNumber)
+            const viewport = page.getViewport({ scale: 2.5 })
+            const canvas = document.createElement('canvas')
+            canvas.width = Math.ceil(viewport.width)
+            canvas.height = Math.ceil(viewport.height)
+            const context = canvas.getContext('2d')
+            if (!context) throw new Error('OCR-Seite konnte nicht gerendert werden.')
+            await page.render({ canvasContext: context, viewport }).promise
+            const blob = await new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob(
+                (value) => value ? resolve(value) : reject(new Error('OCR-Seite konnte nicht erzeugt werden.')),
+                'image/jpeg',
+                0.92
+              )
+            })
+            images.push({ dataBytes: new Uint8Array(await blob.arrayBuffer()) })
+          }
+        } else {
+          images.push({ dataBytes: new Uint8Array(await nextFile.arrayBuffer()) })
+        }
+
+        const result = await window.api.ocr.extract({ images })
+        if (requestRef.current !== requestId) return null
+        if (pdfDocument) {
+          setOcrWordsByPage(
+            Object.fromEntries(
+              result.pages.map((page, index) => [
+                index + 1,
+                page.words.map((word) => ({
+                  ...word,
+                  x: word.x / 2.5,
+                  y: word.y / 2.5,
+                  width: word.width / 2.5,
+                  height: word.height / 2.5
+                }))
+              ])
+            )
+          )
+        }
+        return result
+      } catch (error: any) {
+        if (requestRef.current === requestId) {
+          localOcrFailure = error?.message || String(error)
+          setAnalysisState('ocr-needed')
+          setAnalysisMessage(`Lokale OCR konnte den Scan nicht lesen: ${localOcrFailure}`)
+        }
+        return null
       }
     }
 
@@ -625,11 +714,20 @@ export default function LocalInvoiceScanModal({
       setImageUrl(url)
       setPreviewKind('image')
       if (restored) setFields(restored.fields)
+      const ocr = await applyLocalOcr()
+      if (ocr?.text.length && ocr.text.length >= 20) {
+        setRawText(ocr.text)
+        setFields(extractLocalInvoiceFields(ocr.text))
+        if (await applyDocling(ocr.text)) return
+        setAnalysisState('text-found')
+        setAnalysisMessage(`Lokal per OCR erkannt und vorbefüllt · ${ocr.confidence}% Zuversicht.`)
+        return
+      }
       const handledByDocling = await applyDocling()
       if (!handledByDocling) {
         setAnalysisState('ocr-needed')
         setAnalysisMessage(
-          'Bildvorschau bereit. Für lokale Texterkennung kann Docling aktiviert werden.'
+          `Bildvorschau bereit. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
         )
       }
       return
@@ -659,7 +757,20 @@ export default function LocalInvoiceScanModal({
       const text = pageTexts.join('\n\n').trim()
       setRawText(text)
       if (restored) setFields(restored.fields)
-      if (text.length < 20 && (await applyDocling(text))) return
+      if (text.length < 20) {
+        const ocr = await applyLocalOcr(document)
+        if (ocr?.text.length && ocr.text.length >= 20) {
+          setRawText(ocr.text)
+          setFields(extractLocalInvoiceFields(ocr.text))
+          if (await applyDocling(ocr.text)) return
+          setAnalysisState('text-found')
+          setAnalysisMessage(
+            `Lokal per OCR aus ${ocr.pages.length} ${ocr.pages.length === 1 ? 'Seite' : 'Seiten'} erkannt und vorbefüllt · ${ocr.confidence}% Zuversicht.`
+          )
+          return
+        }
+        if (await applyDocling(text)) return
+      }
       if (text.length >= 20) {
         if (!restored) setFields(extractLocalInvoiceFields(text))
         setAnalysisState('text-found')
@@ -671,7 +782,7 @@ export default function LocalInvoiceScanModal({
       } else {
         setAnalysisState('ocr-needed')
         setAnalysisMessage(
-          'Keine brauchbare Textschicht gefunden. Für diese Rechnung ist OCR nötig.'
+          `Keine brauchbare Textschicht gefunden. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
         )
       }
     } catch (error: any) {
@@ -747,11 +858,14 @@ export default function LocalInvoiceScanModal({
   }
 
   const capturePdfSelection = () => {
-    if (!pickerEnabled || !textLayerRef.current) return
+    if (!pickerEnabled || (!textLayerRef.current && !ocrTextLayerRef.current)) return
     window.setTimeout(() => {
       const selection = window.getSelection()
       const anchor = selection?.anchorNode
-      if (!selection || !anchor || !textLayerRef.current?.contains(anchor)) return
+      if (!selection || !anchor) return
+      const isDocumentText = !!textLayerRef.current?.contains(anchor)
+      const isOcrText = !!ocrTextLayerRef.current?.contains(anchor)
+      if (!isDocumentText && !isOcrText) return
       const selectedText = selection.toString().trim()
       if (selectedText) setPickerText(selectedText)
     }, 0)
@@ -785,19 +899,22 @@ export default function LocalInvoiceScanModal({
           fileName: file.name,
           mimeType,
           dataBytes: new Uint8Array(await file.arrayBuffer())
-        }
+        },
+        localDocumentText: rawText.slice(0, 250_000),
+        guidance: aiGuidance
       })
       const result = analyzed.result
       if (!manuallyEditedRef.current.has('supplier')) setPartyId(result.partyId ?? null)
       setFields((current) => mergeInvoiceFields(current, result, manuallyEditedRef.current))
       setBookingMeta({
-        type: result.type,
-        sphere: result.sphere,
-        paymentMethod:
+        type: aiGuidance?.defaults?.type || result.type,
+        sphere: aiGuidance?.defaults?.sphere || result.sphere,
+        paymentMethod: aiGuidance?.defaults?.paymentMethod || (
           result.paymentMethod === 'BAR' || result.paymentMethod === 'BANK'
             ? result.paymentMethod
-            : 'BANK',
-        paymentAccountId: result.paymentAccountId
+            : 'BANK'
+        ),
+        paymentAccountId: aiGuidance?.defaults?.paymentAccountId ?? result.paymentAccountId
       })
       if (result.budgets.length) {
         setBudgets(
@@ -842,19 +959,32 @@ export default function LocalInvoiceScanModal({
   }
 
   const createInvoice = async () => {
-    if (!file) return
-    if (duplicateCheckInProgress) return
-    const created = await onCreateInvoice({
-      file,
-      fields,
-      partyId,
-      budgets: budgets.filter((assignment) => assignment.budgetId > 0),
-      earmarksAssigned: earmarkAssignments.filter((assignment) => assignment.earmarkId > 0),
-      tags,
-      note,
-      bookingMeta
-    })
-    if (created && closeOnCreate) onClose()
+    if (!file || duplicateCheckInProgress || isTransferring) return
+    setIsTransferring(true)
+    document.documentElement.dataset.bookingHandoff = 'true'
+    try {
+      // The short outgoing motion makes the hand-off tangible before this
+      // review is replaced by the prefilled booking form.
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 180))
+      const created = await onCreateInvoice({
+        file,
+        fields,
+        partyId,
+        budgets: budgets.filter((assignment) => assignment.budgetId > 0),
+        earmarksAssigned: earmarkAssignments.filter((assignment) => assignment.earmarkId > 0),
+        tags,
+        note,
+        bookingMeta
+      })
+      if (!created) {
+        delete document.documentElement.dataset.bookingHandoff
+        return
+      }
+      window.setTimeout(() => delete document.documentElement.dataset.bookingHandoff, 900)
+      if (closeOnCreate) onClose()
+    } finally {
+      setIsTransferring(false)
+    }
   }
 
   return createPortal(
@@ -897,6 +1027,8 @@ export default function LocalInvoiceScanModal({
             </button>
           </div>
         </header>
+
+        {aiGuidanceLabel && <div className="local-invoice-scan__guidance">KI-Vorgabe: {aiGuidanceLabel}</div>}
 
         <input
           ref={fileInputRef}
@@ -985,6 +1117,21 @@ export default function LocalInvoiceScanModal({
                       className={`local-invoice-scan__text-layer${pickerEnabled ? ' is-picker-active' : ''}`}
                       onMouseUp={capturePdfSelection}
                     />
+                    <div
+                      ref={ocrTextLayerRef}
+                      className={`local-invoice-scan__ocr-text-layer${pickerEnabled && ocrWordsByPage[pdfPage]?.length ? ' is-picker-active' : ''}`}
+                      onMouseUp={capturePdfSelection}
+                    >
+                      {(ocrWordsByPage[pdfPage] || []).map((word, index) => (
+                        <span
+                          key={`${index}-${word.x}-${word.y}`}
+                          style={{ left: word.x, top: word.y, width: word.width, height: word.height, fontSize: Math.max(1, word.height) }}
+                          onClick={() => setPickerText(word.text)}
+                        >
+                          {word.text}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {previewKind === 'image' && imageUrl && <img src={imageUrl} alt="Rechnung" />}
@@ -1443,8 +1590,8 @@ export default function LocalInvoiceScanModal({
         <footer className="local-invoice-scan__footer">
           <div className="local-invoice-scan__footer-actions">
             {file && (
-              <button type="button" className="btn primary" onClick={() => void createInvoice()} disabled={duplicateCheckInProgress}>
-                {submitLabel}
+              <button type="button" className={`btn primary${isTransferring ? ' is-transferring' : ''}`} onClick={() => void createInvoice()} disabled={duplicateCheckInProgress || isTransferring}>
+                {isTransferring ? 'Daten werden übernommen …' : submitLabel}
               </button>
             )}
             <button type="button" className="btn" onClick={onClose}>

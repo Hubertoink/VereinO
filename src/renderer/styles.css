@@ -4507,17 +4507,15 @@ svg text {
 }
 
 .journal-edit-modal-overlay {
-  align-items: stretch;
-  padding: 2px 12px 4px;
+  align-items: center;
+  padding: 12px;
   overflow: hidden;
 }
 
 .journal-edit-modal {
-  max-height: calc(100vh - 6px);
-  max-height: calc(100dvh - 6px);
+  max-height: min(90vh, calc(100dvh - 24px));
   min-height: 0;
-  height: calc(100vh - 6px);
-  height: calc(100dvh - 6px);
+  height: min(90vh, calc(100dvh - 24px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -6491,6 +6489,30 @@ textarea:focus {
 .invoice-batch-flyout header > div { display: grid; gap: 3px; }
 .invoice-batch-flyout header small, .invoice-batch-item small { color: var(--text-dim); }
 .invoice-batch-flyout__notice { margin: 10px 12px 0; padding: 9px 10px; border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--border)); border-radius: 10px; color: color-mix(in oklab, var(--warning) 55%, var(--text)); font-size: 12px; }
+.invoice-ai-guidance { flex: 0 0 auto; margin: 10px 12px 0; border: 1px solid color-mix(in oklab, var(--accent) 30%, var(--border)); border-radius: 10px; background: color-mix(in oklab, var(--panel) 82%, transparent); overflow: hidden; }
+.invoice-ai-guidance summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 47px; padding: 8px 11px; cursor: pointer; color: var(--text); list-style: none; }
+.invoice-ai-guidance summary::-webkit-details-marker { display: none; }
+.invoice-ai-guidance summary::before { content: '✦'; color: var(--accent); font-size: 16px; }
+.invoice-ai-guidance summary > span { display: grid; gap: 1px; margin-right: auto; }
+.invoice-ai-guidance summary strong { font-size: 12px; letter-spacing: .01em; }
+.invoice-ai-guidance summary small { color: var(--text-dim); font-size: 10px; font-weight: 500; }
+.invoice-ai-guidance summary em { padding: 3px 7px; border-radius: 999px; background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); font-size: 10px; font-style: normal; font-weight: 700; }
+.invoice-ai-guidance[open] summary { border-bottom: 1px solid var(--border); background: color-mix(in oklab, var(--accent) 7%, transparent); }
+.invoice-ai-guidance__body { padding: 10px 11px 11px; }
+.invoice-ai-guidance[open] .invoice-ai-guidance__body { max-height: 170px; overflow-x: hidden; overflow-y: scroll; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.invoice-ai-guidance__body > p { margin: 0 0 9px; color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+.invoice-ai-guidance label { display: grid; gap: 4px; color: var(--text-dim); font-size: 10px; font-weight: 700; letter-spacing: .025em; text-transform: uppercase; }
+.invoice-ai-guidance textarea { box-sizing: border-box; min-width: 0; width: 100%; min-height: 46px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--input-bg); color: var(--text); font: inherit; resize: vertical; text-transform: none; letter-spacing: normal; }
+.invoice-ai-guidance .select-dropdown__trigger { box-sizing: border-box; width: 100%; height: 31px; min-width: 0; font-size: 12px; text-transform: none; letter-spacing: normal; }
+.invoice-ai-guidance__defaults { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+.invoice-ai-guidance__defaults > label { min-width: 0; }
+.invoice-ai-guidance__summary { display: block; margin-top: 10px; padding: 6px 8px; border-left: 2px solid var(--accent); background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--accent); font-size: 11px; }
+.invoice-batch-item__guidance { display: block; margin-top: 3px; color: var(--accent); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-invoice-scan__guidance { margin: 0 20px 10px; padding: 7px 10px; border: 1px solid color-mix(in oklab, var(--accent) 42%, var(--border)); border-radius: 8px; color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, transparent); font-size: 12px; }
+
+/* Hintergrund-Kacheln dürfen keine Hilfetexte über einer aktiven Rechnungserfassung einblenden. */
+body:has(.local-invoice-scan-overlay) .tooltip-portal.tooltip-modal,
+body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !important; }
 .invoice-batch-flyout__list { min-height: 80px; overflow: auto; padding: 8px; }
 .invoice-batch-item { display: grid; grid-template-columns: 24px minmax(0,1fr) auto auto; align-items: center; gap: 7px; min-height: 52px; padding: 6px; border-radius: 10px; }
 .invoice-batch-item:hover { background: color-mix(in oklab, var(--text) 5%, transparent); }
@@ -7532,6 +7554,33 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   opacity: 1;
   pointer-events: auto;
   user-select: text;
+}
+
+.local-invoice-scan__ocr-text-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.local-invoice-scan__ocr-text-layer.is-picker-active {
+  pointer-events: auto;
+  user-select: text;
+}
+
+.local-invoice-scan__ocr-text-layer span {
+  position: absolute;
+  display: block;
+  color: transparent;
+  line-height: 1;
+  cursor: text;
+  white-space: nowrap;
+}
+
+.local-invoice-scan__ocr-text-layer span::selection {
+  background: color-mix(in oklab, var(--accent) 58%, transparent);
 }
 
 .local-invoice-scan__text-layer :is(span, br) {
@@ -11633,6 +11682,33 @@ html[data-glass-modals='true'] .modal-content {
 
 .select-dropdown__trigger:disabled {
   cursor: not-allowed;
+}
+
+.select-dropdown__value {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-booking-handoff='true'] .quick-add-modal,
+html[data-booking-handoff='true'] .compact-booking-flyout {
+  animation: bookingDataHandoffIn 0.48s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.local-invoice-scan__footer .btn.is-transferring {
+  animation: bookingDataHandoffOut 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes bookingDataHandoffIn {
+  0% { opacity: 0; transform: translateY(12px) scale(0.985); }
+  58% { opacity: 1; transform: translateY(-2px) scale(1.006); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bookingDataHandoffOut {
+  to { transform: translateY(-1px); opacity: 0.72; }
 }
 
 .select-dropdown__placeholder {
@@ -17285,8 +17361,8 @@ button.filter-totals-stat {
 }
 
 .quick-add-modal input[type='date']::-webkit-calendar-picker-indicator {
-  display: none;
-  -webkit-appearance: none;
+  display: block;
+  -webkit-appearance: auto;
 }
 
 .booking-date-input-wrap {

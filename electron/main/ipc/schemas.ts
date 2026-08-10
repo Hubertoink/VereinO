@@ -2472,6 +2472,49 @@ export const AiUsageSchema = z.object({
 const AiInvoiceMimeType = z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
 const MAX_AI_INVOICE_BASE64_LENGTH = 4 * Math.ceil((10 * 1024 * 1024) / 3)
 const MAX_LOCAL_INVOICE_BASE64_LENGTH = 4 * Math.ceil((25 * 1024 * 1024) / 3)
+const MAX_LOCAL_OCR_BASE64_LENGTH = 4 * Math.ceil((12 * 1024 * 1024) / 3)
+export const LocalOcrExtractInput = z.object({
+  images: z.array(
+    z.object({
+      ...FileDataFields
+    })
+      .refine(hasFileData, { message: 'OCR-Bilddaten fehlen.' })
+      .refine(
+        (image) =>
+          (image.dataBytes?.byteLength ?? 0) <= 12 * 1024 * 1024 &&
+          (image.dataBase64?.length ?? 0) <= MAX_LOCAL_OCR_BASE64_LENGTH,
+        { message: 'Eine OCR-Seite ist zu groß.' }
+      )
+      .refine((image) => !image.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(image.dataBase64), {
+        message: 'Ungültige Base64-Datei'
+      })
+  ).min(1).max(3)
+})
+export const LocalOcrExtractOutput = z.object({
+  text: z.string(),
+  pages: z.array(z.object({
+    text: z.string(),
+    confidence: z.number().min(0).max(100),
+    words: z.array(z.object({
+      text: z.string().max(200),
+      x: z.number().nonnegative(),
+      y: z.number().nonnegative(),
+      width: z.number().positive(),
+      height: z.number().positive()
+    })).max(10_000)
+  })).min(1).max(3),
+  confidence: z.number().int().min(0).max(100)
+})
+export const AiInvoiceBookingDefaults = z.object({
+  type: z.enum(['IN', 'OUT']).optional(),
+  sphere: Sphere.optional(),
+  paymentMethod: PaymentMethod.optional(),
+  paymentAccountId: z.number().int().positive().nullable().optional()
+})
+export const AiInvoiceGuidance = z.object({
+  instructions: z.string().trim().max(2_000).optional(),
+  defaults: AiInvoiceBookingDefaults.optional()
+})
 export const AiInvoiceExtractInput = z.object({
   file: z
     .object({
@@ -2488,7 +2531,9 @@ export const AiInvoiceExtractInput = z.object({
     )
     .refine((file) => !file.dataBase64 || /^[A-Za-z0-9+/]+={0,2}$/.test(file.dataBase64), {
       message: 'Ungültige Base64-Datei'
-    })
+    }),
+  localDocumentText: z.string().max(250_000).optional(),
+  guidance: AiInvoiceGuidance.optional()
 })
 export const AiInvoiceExtractOutput = z.object({
   model: z.string(),
@@ -2532,7 +2577,8 @@ export const AiInvoiceBatchFileInput = z
   })
   .refine(hasFileData, { message: 'Dateidaten fehlen.' })
 export const AiInvoiceBatchImportInput = z.object({
-  files: z.array(AiInvoiceBatchFileInput).min(1).max(50)
+  files: z.array(AiInvoiceBatchFileInput).min(1).max(50),
+  guidance: AiInvoiceGuidance.optional()
 })
 export const AiInvoiceBatchItem = z.object({
   id: z.number().int().positive(),
@@ -2544,6 +2590,7 @@ export const AiInvoiceBatchItem = z.object({
   isDuplicate: z.boolean().default(false),
   duplicateVoucherId: z.number().int().positive().nullable().optional(),
   duplicateVoucherNo: z.string().nullable().optional(),
+  guidance: AiInvoiceGuidance.nullable().optional(),
   packet: z
     .object({
       index: z.number().int().positive(),
@@ -2860,6 +2907,8 @@ export type TAiJobFileInput = z.infer<typeof AiJobFileInput>
 export type TAiBookingCandidate = z.infer<typeof AiBookingCandidate>
 export type TAiBookingAnalysisResult = z.infer<typeof AiBookingAnalysisResult>
 export type TAiInvoiceExtractionResult = z.infer<typeof AiInvoiceExtractionResult>
+export type TLocalOcrExtractInput = z.infer<typeof LocalOcrExtractInput>
+export type TLocalOcrExtractOutput = z.infer<typeof LocalOcrExtractOutput>
 export type TAiTextDraftResult = z.infer<typeof AiTextDraftResult>
 export type TAiActionPlan = z.infer<typeof AiActionPlan>
 export type TAiBankImportReviewSuggestion = z.infer<typeof AiBankImportReviewSuggestion>

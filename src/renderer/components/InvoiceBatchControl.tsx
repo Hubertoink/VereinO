@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
+import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
+import { hasInvoiceAiGuidance } from '../types/invoiceAiGuidance'
+import SelectDropdown from './common/SelectDropdown'
 
 type BatchItem = TAiInvoiceBatchListOutput['rows'][number]
 
@@ -12,6 +15,12 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const MAX_SINGLE_INVOICE_BYTES = 25 * 1024 * 1024
+const SPHERE_OPTIONS = [
+  ['IDEELL', 'Ideeller Bereich'],
+  ['ZWECK', 'Zweckbetrieb'],
+  ['VERMOEGEN', 'Vermögensverwaltung'],
+  ['WGB', 'Wirtschaftlicher Geschäftsbetrieb']
+] as const
 
 function isSupportedSingleInvoice(file: File) {
   return /\.(pdf|png|jpe?g|webp)$/i.test(file.name)
@@ -21,11 +30,13 @@ function isSupportedSingleInvoice(file: File) {
 export default function InvoiceBatchControl({
   onNewInvoice,
   onReview,
-  notify
+  notify,
+  paymentAccounts
 }: {
-  onNewInvoice: (file: File) => void | Promise<void>
+  onNewInvoice: (file: File, guidance?: InvoiceAiGuidance) => void | Promise<void>
   onReview: (id: number) => void
   notify: (type: 'success' | 'error' | 'info' | 'warn', text: string) => void
+  paymentAccounts: Array<{ id: number; name: string; kind?: string | null; isActive?: number }>
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const singleInputRef = useRef<HTMLInputElement | null>(null)
@@ -37,6 +48,16 @@ export default function InvoiceBatchControl({
   const [dragging, setDragging] = useState(false)
   const [singleDragging, setSingleDragging] = useState(false)
   const [singleError, setSingleError] = useState('')
+  const [guidanceInstructions, setGuidanceInstructions] = useState('')
+  const [guidanceDefaults, setGuidanceDefaults] = useState<NonNullable<InvoiceAiGuidance['defaults']>>({})
+
+  const guidance: InvoiceAiGuidance | undefined = (() => {
+    const instructions = guidanceInstructions.trim()
+    const defaults = Object.fromEntries(
+      Object.entries(guidanceDefaults).filter(([, value]) => value !== undefined)
+    ) as NonNullable<InvoiceAiGuidance['defaults']>
+    return hasInvoiceAiGuidance({ instructions, defaults }) ? { instructions: instructions || undefined, defaults } : undefined
+  })()
 
   const reload = useCallback(async () => {
     try { setQueue(await window.api.ai.invoiceBatch.list()) } catch { /* startup/recovery */ }
@@ -88,7 +109,7 @@ export default function InvoiceBatchControl({
         fileName: file.name,
         dataBytes: new Uint8Array(await file.arrayBuffer())
       })))
-      const result = await window.api.ai.invoiceBatch.import({ files: payload })
+      const result = await window.api.ai.invoiceBatch.import({ files: payload, guidance })
       const duplicates = result.duplicates || []
       const duplicateNames = new Set(duplicates.map((item) => item.fileName))
       const reused = (result.reused || []).filter((fileName) => !duplicateNames.has(fileName))
@@ -124,6 +145,33 @@ export default function InvoiceBatchControl({
   const readyCount = rows.filter((item) => item.status === 'NEEDS_REVIEW').length
   const duplicateCount = rows.filter((item) => item.isDuplicate).length
   const busyCount = rows.filter((item) => !item.isDuplicate && ['DRAFT', 'QUEUED', 'PROCESSING'].includes(item.status)).length
+  const bankAccounts = paymentAccounts.filter((account) => account.isActive !== 0 && (!account.kind || account.kind === 'BANK'))
+  const guidanceSummary = [
+    guidanceDefaults.type === 'OUT' ? 'Ausgabe' : guidanceDefaults.type === 'IN' ? 'Einnahme' : '',
+    SPHERE_OPTIONS.find(([value]) => value === guidanceDefaults.sphere)?.[1] || '',
+    guidanceDefaults.paymentAccountId
+      ? paymentAccounts.find((account) => account.id === guidanceDefaults.paymentAccountId)?.name || 'Bankkonto'
+      : guidanceDefaults.paymentMethod === 'BANK' ? 'Bank' : guidanceDefaults.paymentMethod === 'BAR' ? 'Kasse' : ''
+  ].filter(Boolean).join(' · ')
+  const guidanceFields = (
+    <details className="invoice-ai-guidance">
+      <summary><span><strong>KI-Vorgaben</strong><small>Hinweis, Sphäre und Buchungskonto</small></span><em>Optional</em></summary>
+      <div className="invoice-ai-guidance__body">
+      <p>Die Vorgaben werden getrennt vom Belegtext an die KI übergeben und bleiben danach prüfbar.</p>
+      <label>
+        <span>Hinweis an die KI</span>
+        <textarea value={guidanceInstructions} onChange={(event) => setGuidanceInstructions(event.target.value.slice(0, 2000))} placeholder="z. B. Alle Belege gehören zum Sommerfest." rows={2} />
+      </label>
+      <div className="invoice-ai-guidance__defaults">
+        <label><span>Art</span><SelectDropdown value={guidanceDefaults.type || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, type: (value || undefined) as 'IN' | 'OUT' | undefined }))} ariaLabel="Buchungsart vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, { value: 'OUT', label: 'Ausgabe' }, { value: 'IN', label: 'Einnahme' }]} /></label>
+        <label><span>Sphäre</span><SelectDropdown value={guidanceDefaults.sphere || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, sphere: (value || undefined) as NonNullable<InvoiceAiGuidance['defaults']>['sphere'] }))} ariaLabel="Sphäre vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, ...SPHERE_OPTIONS.map(([value, label]) => ({ value, label }))]} /></label>
+        <label><span>Zahlweg</span><SelectDropdown value={guidanceDefaults.paymentMethod || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, paymentMethod: (value || undefined) as 'BAR' | 'BANK' | undefined, paymentAccountId: value === 'BANK' ? current.paymentAccountId : undefined }))} ariaLabel="Zahlweg vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, { value: 'BANK', label: 'Bank' }, { value: 'BAR', label: 'Kasse' }]} /></label>
+        {guidanceDefaults.paymentMethod === 'BANK' && bankAccounts.length > 0 && <label><span>Bankkonto</span><SelectDropdown value={String(guidanceDefaults.paymentAccountId || '')} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, paymentAccountId: value ? Number(value) : undefined }))} ariaLabel="Bankkonto vorgeben" placeholder="Beliebiges Bankkonto" options={[{ value: '', label: 'Beliebiges Bankkonto' }, ...bankAccounts.map((account) => ({ value: String(account.id), label: account.name }))]} /></label>}
+      </div>
+      {guidanceSummary && <small className="invoice-ai-guidance__summary">Vorgabe: {guidanceSummary}</small>}
+      </div>
+    </details>
+  )
 
   const openSingleInvoice = (files: File[]) => {
     const file = files[0]
@@ -139,7 +187,7 @@ export default function InvoiceBatchControl({
     setSingleError('')
     setSingleDragging(false)
     setSingleOpen(false)
-    Promise.resolve().then(() => onNewInvoice(file)).catch((error: any) => {
+    Promise.resolve().then(() => onNewInvoice(file, guidance)).catch((error: any) => {
       notify('error', error?.message || String(error))
     })
   }
@@ -239,6 +287,7 @@ export default function InvoiceBatchControl({
             </div>
             <button className="btn ghost" onClick={() => setSingleOpen(false)} aria-label="Upload-Flyout schließen">✕</button>
           </header>
+          {guidanceFields}
           <button
             type="button"
             className={`invoice-single-upload-flyout__dropzone${singleDragging ? ' is-dragging' : ''}`}
@@ -293,6 +342,7 @@ export default function InvoiceBatchControl({
           {!queue?.aiAvailable && queue?.doclingAvailable && (
             <p className="invoice-batch-flyout__notice">Lokaler Docling-Modus: Grunddaten werden offline vorbereitet; Zuordnung und Scanpaket-Grenzen bitte vollständig prüfen.</p>
           )}
+          {guidanceFields}
           <div className="invoice-batch-flyout__list">
             {rows.map((item: BatchItem) => (
               <article key={item.id} className={`invoice-batch-item invoice-batch-item--${item.status.toLowerCase()}${item.isDuplicate ? ' invoice-batch-item--duplicate' : ''}`}>
@@ -309,6 +359,15 @@ export default function InvoiceBatchControl({
                         ? `Seite ${item.packet.pageNumbers[0]}`
                         : `Seiten ${item.packet.pageNumbers[0]}–${item.packet.pageNumbers[item.packet.pageNumbers.length - 1]}`}
                       {item.packet.confidence < 0.75 ? ' · Grenze prüfen' : ''}
+                    </span>
+                  )}
+                  {item.guidance && (
+                    <span className="invoice-batch-item__guidance" title={item.guidance?.instructions || undefined}>
+                      Vorgabe: {[
+                        item.guidance?.defaults?.type === 'OUT' ? 'Ausgabe' : item.guidance?.defaults?.type === 'IN' ? 'Einnahme' : '',
+                        SPHERE_OPTIONS.find(([value]) => value === item.guidance?.defaults?.sphere)?.[1] || '',
+                        item.guidance?.defaults?.paymentMethod === 'BANK' ? 'Bank' : item.guidance?.defaults?.paymentMethod === 'BAR' ? 'Kasse' : ''
+                      ].filter(Boolean).join(' · ') || 'Hinweis für KI'}
                     </span>
                   )}
                 </button>

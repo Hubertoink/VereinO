@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getInternalAssignmentValidationState } from '../components/modals/voucherMetaValidation'
 import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoiceScanModal'
+import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
 import type { BookingEntryPresentation } from '../context/UIPreferencesContextCore'
 import { encodeFilesForUpload } from '../utils/fileEncoding'
 
@@ -41,6 +42,7 @@ type QuickAddDraft = {
     detached?: boolean
     kind?: 'booking' | 'invoice'
     invoiceState?: LocalInvoiceScanDraftState
+    invoiceGuidance?: InvoiceAiGuidance
     invoiceBatchJobId?: number
 }
 
@@ -192,8 +194,9 @@ export function useQuickAdd(
     const files = activeDraft?.files ?? []
     const activeDraftKind = activeDraft?.kind ?? 'booking'
     const activeInvoiceState = activeDraft?.invoiceState
+    const activeInvoiceGuidance = activeDraft?.invoiceGuidance
 
-    const openQuickAdd = useCallback((initial?: { qa?: QA; files?: File[]; invoiceState?: LocalInvoiceScanDraftState; invoiceBatchJobId?: number }, options?: OpenQuickAddOptions) => {
+    const openQuickAdd = useCallback((initial?: { qa?: QA; files?: File[]; invoiceState?: LocalInvoiceScanDraftState; invoiceGuidance?: InvoiceAiGuidance; invoiceBatchJobId?: number }, options?: OpenQuickAddOptions) => {
         const detached = !!options?.detached
         const showModal = options?.showModal ?? !detached
         const draft: QuickAddDraft = {
@@ -204,6 +207,7 @@ export function useQuickAdd(
             detached,
             kind: options?.kind ?? 'booking',
             invoiceState: initial?.invoiceState,
+            invoiceGuidance: initial?.invoiceGuidance,
             invoiceBatchJobId: initial?.invoiceBatchJobId
         }
         setDrafts((prev) => draftTabsEnabled ? [...prev, draft] : [draft])
@@ -260,7 +264,7 @@ export function useQuickAdd(
         setQuickAdd(true)
     }, [])
 
-    const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean; kind?: 'booking' | 'invoice'; invoiceState?: LocalInvoiceScanDraftState; invoiceBatchJobId?: number }) => {
+    const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean; kind?: 'booking' | 'invoice'; invoiceState?: LocalInvoiceScanDraftState; invoiceGuidance?: InvoiceAiGuidance; invoiceBatchJobId?: number }) => {
         setDrafts((prev) => prev.map((draft) => (
             draft.id === draftId ? { ...draft, ...patch } : draft
         )))
@@ -576,6 +580,7 @@ export function useQuickAdd(
         quickAdd,
         activeDraftKind,
         activeInvoiceState,
+        activeInvoiceGuidance,
         qa,
         setQa,
         onQuickSave,

@@ -110,7 +110,13 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
           }
         }}
       >
-        <span className={selected ? '' : 'select-dropdown__placeholder'} style={selected?.color ? { color: selected.color } : undefined}>{selected?.label || placeholder}</span>
+        <span
+          className={`select-dropdown__value${selected ? '' : ' select-dropdown__placeholder'}`}
+          style={selected?.color ? { color: selected.color } : undefined}
+          title={selected?.description || selected?.label || placeholder}
+        >
+          {selected?.label || placeholder}
+        </span>
         <span className="select-dropdown__chevron" aria-hidden="true" />
       </button>
       {open && menuPosition && createPortal(

@@ -8,6 +8,11 @@ files:
 asar: true
 asarUnpack:
   - '**/*.node'
+  - 'node_modules/tesseract.js/**'
+  - 'node_modules/tesseract.js-core/**'
+extraResources:
+  - from: assets/ocr
+    to: ocr
 directories:
   output: release
 win:

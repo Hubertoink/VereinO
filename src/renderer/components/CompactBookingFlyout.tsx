@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { QA } from '../hooks/useQuickAdd'
 import { rememberBookingAIPattern } from '../utils/bookingAiPatterns'
 import TagsEditor from './TagsEditor'
-import DatePickerButton from './common/DatePickerButton'
 import HoverTooltip from './common/HoverTooltip'
 import PartySelector from './common/PartySelector'
 import SelectDropdown, { SuggestionInput } from './common/SelectDropdown'
@@ -149,7 +148,6 @@ export default function CompactBookingFlyout({
   onSelectDraft,
   onNewDraft
 }: Props) {
-  const dateInputRef = useRef<HTMLInputElement | null>(null)
   const amountInputRef = useRef<HTMLInputElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
 
@@ -430,10 +428,7 @@ export default function CompactBookingFlyout({
           <div className="compact-booking-core-grid">
             <label className="compact-booking-field">
               <span>Datum *</span>
-              <span className="booking-date-input-wrap">
-                <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
-                <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
-              </span>
+              <input className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
             </label>
 
             {qa.type !== 'TRANSFER' && (

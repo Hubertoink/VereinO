@@ -11,6 +11,7 @@ import type {
   LocalInvoiceScanDraftState,
   LocalInvoiceScanResult
 } from './components/modals/LocalInvoiceScanModal'
+import type { InvoiceAiGuidance } from './types/invoiceAiGuidance'
 import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/useToast'
 import { UIPreferencesProvider } from './context/UIPreferences'
@@ -566,6 +567,7 @@ function DetachedQuickAddWindow() {
   const [windowModeKind, setWindowModeKind] = useState<'create' | 'invoice' | 'edit' | 'details'>('create')
   const [invoiceDraftFile, setInvoiceDraftFile] = useState<File | null>(null)
   const [invoiceDraftState, setInvoiceDraftState] = useState<LocalInvoiceScanDraftState | null>(null)
+  const [invoiceDraftGuidance, setInvoiceDraftGuidance] = useState<InvoiceAiGuidance | undefined>()
   const [editQa, setEditQa] = useState<any | null>(null)
   const [detailVoucher, setDetailVoucher] = useState<any | null>(null)
   const [detailAttachmentsVoucher, setDetailAttachmentsVoucher] = useState<null | {
@@ -723,6 +725,7 @@ function DetachedQuickAddWindow() {
         setWindowModeKind('invoice')
         setInvoiceDraftFile(initialFiles[0] || null)
         setInvoiceDraftState((initial?.invoiceState as LocalInvoiceScanDraftState) || null)
+        setInvoiceDraftGuidance((initial?.invoiceGuidance as InvoiceAiGuidance) || undefined)
       } else if (initial?.mode === 'details') {
         setWindowModeKind('details')
         const initialVoucher = initial?.voucher || initial?.qa || null
@@ -805,10 +808,11 @@ function DetachedQuickAddWindow() {
       draftId: detachedDraftIdRef.current,
       files: encodedFiles,
       invoiceState: invoiceDraftState || undefined,
+      invoiceGuidance: invoiceDraftGuidance,
       kind: 'invoice',
       detached: true
     })
-  }, [invoiceDraftFile, invoiceDraftState])
+  }, [invoiceDraftFile, invoiceDraftGuidance, invoiceDraftState])
 
   useEffect(() => {
     if (windowModeKind !== 'invoice' || !loaded || !invoiceDraftFile) return
@@ -1114,6 +1118,7 @@ function DetachedQuickAddWindow() {
         closeOnCreate={false}
         initialFile={invoiceDraftFile || undefined}
         initialState={invoiceDraftState || undefined}
+        aiGuidance={invoiceDraftGuidance}
         onDraftChange={(state) => {
           setInvoiceDraftFile(state.file)
           setInvoiceDraftState(state)
@@ -1960,6 +1965,7 @@ function AppInner() {
     quickAdd,
     activeDraftKind,
     activeInvoiceState,
+    activeInvoiceGuidance,
     qa,
     setQa,
     onQuickSave,
@@ -2215,6 +2221,7 @@ function AppInner() {
               qa: sourceDraft.qa,
               files: detachedFiles,
               invoiceState: sourceDraft.invoiceState,
+              invoiceGuidance: sourceDraft.invoiceGuidance,
               afterSaveDefault: quickAddAfterSave
             })
             if (!res?.ok) {
@@ -2320,12 +2327,12 @@ function AppInner() {
     openBookingEntry()
   }, [activeDraftKind, bookingEntryPresentation, openBookingEntry, parkQuickAdd, quickAdd, showBookingDraftTabs])
 
-  const openJournalInvoiceScan = useCallback((file: File) => {
+  const openJournalInvoiceScan = useCallback((file: File, guidance?: InvoiceAiGuidance) => {
     if (!bookingsOpenDetached) {
-      openQuickAdd({ files: [file] }, { kind: 'invoice' })
+      openQuickAdd({ files: [file], invoiceGuidance: guidance }, { kind: 'invoice' })
       return
     }
-    const draft = openQuickAdd({ files: [file] }, { detached: true, showModal: false, kind: 'invoice' })
+    const draft = openQuickAdd({ files: [file], invoiceGuidance: guidance }, { detached: true, showModal: false, kind: 'invoice' })
     void (async () => {
       try {
         const encodedFile = await encodeFileForUpload(file)
@@ -2334,6 +2341,7 @@ function AppInner() {
           mode: 'invoice',
           kind: 'invoice',
           files: [encodedFile],
+          invoiceGuidance: guidance,
           afterSaveDefault: quickAddAfterSave
         })
         if (!response?.ok) {
@@ -2362,6 +2370,7 @@ function AppInner() {
       openQuickAdd({
         files: [file],
         invoiceState: aiInvoiceResultToDraft(item.result),
+        invoiceGuidance: item.guidance || undefined,
         invoiceBatchJobId: jobId
       }, { kind: 'invoice' })
     } catch (error: any) {
@@ -3788,6 +3797,7 @@ function AppInner() {
           closeOnCreate={false}
           initialFile={files[0]}
           initialState={activeInvoiceState}
+          aiGuidance={activeInvoiceGuidance}
           onDraftChange={(state) => {
             updateDraft(activeDraftId, {
               files: [state.file],
@@ -3836,6 +3846,7 @@ function AppInner() {
             onNewInvoice={openJournalInvoiceScan}
             onReview={(id) => void reviewBatchInvoice(id)}
             notify={notify}
+            paymentAccounts={paymentAccounts}
           />
           <button
             className="fab fab-buchung"

@@ -180,7 +180,9 @@ import {
   CashChecksSetInspectorsOutput,
   CashChecksExportPdfInput,
   CashChecksExportPdfOutput,
-  CashChecksGetInspectorDefaultsOutput
+  CashChecksGetInspectorDefaultsOutput,
+  LocalOcrExtractInput,
+  LocalOcrExtractOutput
 } from './schemas'
 import {
   RecurringBookingActionInput,
@@ -893,17 +895,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       loadAiContextService(),
       import('../services/docling')
     ])
-    let localDocumentText = ''
+    let localDocumentText = parsed.localDocumentText?.trim() || ''
     let doclingMs: number | null = null
     let doclingStartedAt: number | null = null
     try {
       if ((await getDoclingStatus()).enabled) {
         doclingStartedAt = Date.now()
-        localDocumentText = (await extractWithDocling({
+        const doclingText = (await extractWithDocling({
           fileName: parsed.file.fileName,
           mimeType: parsed.file.mimeType,
           dataBase64: filePayloadToBase64(parsed.file)
-        })).text
+        })).text.trim()
+        localDocumentText = [localDocumentText, doclingText].filter(Boolean).join('\n\n')
       }
     } catch (error) {
       // Docling is supplementary. The normal document/OCR path can still
@@ -919,7 +922,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         dataBase64: filePayloadToBase64(parsed.file)
       },
       context: buildAiInvoiceContext(),
-      localDocumentText
+      localDocumentText,
+      guidance: parsed.guidance
     })
     return AiInvoiceExtractOutput.parse({
       ...analyzed,
@@ -961,7 +965,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('ai.invoiceBatch.import', async (_event, payload) => {
     const parsed = AiInvoiceBatchImportInput.parse(payload)
     const { importInvoiceBatchFiles } = await import('../services/invoiceBatchQueue')
-    return importInvoiceBatchFiles(parsed.files)
+    return importInvoiceBatchFiles(parsed.files, parsed.guidance)
   })
   ipcMain.handle('ai.invoiceBatch.retry', async (_event, payload) => {
     const parsed = AiInvoiceBatchIdInput.parse(payload)
@@ -3287,6 +3291,22 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('docling.extract', async (_e, payload) => {
     const { extractWithDocling } = await import('../services/docling')
     return extractWithDocling(payload)
+  })
+  ipcMain.handle('ocr.status', async () => {
+    const { getOcrStatus } = await import('../services/ocr')
+    return getOcrStatus()
+  })
+  ipcMain.handle('ocr.extract', async (event, payload) => {
+    const senderFrame = event.senderFrame
+    const senderUrl = senderFrame?.url || ''
+    const isTrustedRenderer =
+      senderFrame === event.sender.mainFrame &&
+      (senderUrl.startsWith('file:') ||
+        /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i.test(senderUrl))
+    if (!isTrustedRenderer) throw new Error('Nicht erlaubter OCR-Aufruf.')
+    const parsed = LocalOcrExtractInput.parse(payload)
+    const { extractWithTesseract } = await import('../services/ocr')
+    return LocalOcrExtractOutput.parse(await extractWithTesseract(parsed.images))
   })
 
   // Tax Exemption Certificate
