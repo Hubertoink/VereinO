@@ -5,6 +5,7 @@ import path from 'node:path'
 import { app } from 'electron'
 
 import { deleteOrganizationStorage } from './organizationDeletion'
+import type { OrganizationProfile } from '../../../shared/classification'
 
 const require = createRequire(import.meta.url)
 let BetterSqlite3: any
@@ -47,6 +48,7 @@ type AppConfig = {
         name: string
         dbRoot: string
         createdAt: string
+        profile?: OrganizationProfile
         colorTheme?: string
         backgroundImage?: string
         customBackgroundImage?: string
@@ -189,7 +191,7 @@ function generateOrgId(): string {
  * List all organizations from the app config.
  * If no organizations exist, returns the current DB as a "default" organization.
  */
-export function listOrganizations(): Array<{ id: string; name: string; dbRoot: string; createdAt: string; isActive: boolean }> {
+export function listOrganizations(): Array<{ id: string; name: string; dbRoot: string; createdAt: string; profile?: OrganizationProfile; isActive: boolean }> {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
@@ -212,7 +214,7 @@ export function listOrganizations(): Array<{ id: string; name: string; dbRoot: s
 /**
  * Get the currently active organization
  */
-export function getActiveOrganization(): { id: string; name: string; dbRoot: string; createdAt: string } | null {
+export function getActiveOrganization(): { id: string; name: string; dbRoot: string; createdAt: string; profile?: OrganizationProfile } | null {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId || 'default'
@@ -225,11 +227,24 @@ export function getActiveOrganization(): { id: string; name: string; dbRoot: str
     return orgs.find(o => o.id === activeId) || orgs[0] || null
 }
 
+/** Persist the selected profile alongside the organization directory metadata. */
+export function setOrganizationConfigProfile(orgId: string, profile: OrganizationProfile): void {
+    const cfg = readAppConfig()
+    const orgs = cfg.organizations || []
+    const index = orgs.findIndex((org) => org.id === orgId)
+    if (index === -1) throw new Error('Organisation nicht gefunden')
+    orgs[index] = { ...orgs[index], profile }
+    writeAppConfig({ ...cfg, organizations: orgs })
+}
+
 /**
  * Create a new organization with its own database folder.
  * The folder is created under userData/organizations/<id>/
  */
-export function createOrganization(name: string): { id: string; name: string; dbRoot: string; createdAt: string } {
+export function createOrganization(
+    name: string,
+    profile: OrganizationProfile = 'NONPROFIT'
+): { id: string; name: string; dbRoot: string; createdAt: string; profile: OrganizationProfile } {
     if (!name || typeof name !== 'string' || !name.trim()) {
         throw new Error('Organisationsname ist erforderlich')
     }
@@ -275,7 +290,8 @@ export function createOrganization(name: string): { id: string; name: string; db
         id,
         name: name.trim(),
         dbRoot: orgRoot,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        profile
     }
 
     orgs.push(newOrg)
@@ -288,7 +304,7 @@ export function createOrganization(name: string): { id: string; name: string; db
  * Switch to a different organization.
  * Closes current DB and updates config. Caller should reload the app/window.
  */
-export function switchOrganization(orgId: string): { success: boolean; org: { id: string; name: string; dbRoot: string } } {
+export function switchOrganization(orgId: string): { success: boolean; org: { id: string; name: string; dbRoot: string; profile?: OrganizationProfile } } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
 

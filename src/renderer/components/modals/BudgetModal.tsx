@@ -21,6 +21,7 @@ export type BudgetModalValue = {
   id?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   amountPlanned: number
   name?: string | null
   categoryName?: string | null
@@ -46,18 +47,31 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; icon?: string | null }>>([])
   useEffect(() => { 
     setV(value); setNameError(''); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) 
   }, [value])
+  useEffect(() => {
+    let active = true
+    void window.api.classifications.primary.list().then((result) => {
+      if (!active) return
+      setIsGeneralProfile(result.profile === 'GENERAL')
+      setCategories(result.values.filter((category) => category.isActive !== false))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
 
   async function save() {
     setRequiredTouched(true)
     const name = (v.name || '').trim()
     if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
+    if (isGeneralProfile && !v.primaryClassificationValueId) { setNameError('Bitte Kategorie wählen'); return }
     await (window as any).api?.budgets.upsert?.({
       id: v.id as any,
       year: v.year,
       sphere: v.sphere,
+      primaryClassificationValueId: v.primaryClassificationValueId ?? null,
       amountPlanned: v.amountPlanned,
       name: name || null,
       categoryName: (v.categoryName || '').trim() || null,
@@ -119,6 +133,13 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
             <label htmlFor="budget-category">Kategorie</label>
             <input id="budget-category" className="input" value={v.categoryName ?? ''} onChange={(e) => setV({ ...v, categoryName: e.target.value || null })} placeholder="z. B. Material" />
           </div>
+          {isGeneralProfile && <div className="field standard-floating-field standard-floating-field--filled">
+            <label htmlFor="budget-primary-category">Kategorie <span className="req-asterisk" aria-hidden="true">*</span></label>
+            <select id="budget-primary-category" className="input" value={String(v.primaryClassificationValueId || '')} onChange={(e) => setV({ ...v, primaryClassificationValueId: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">Kategorie wählen</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+            </select>
+          </div>}
           <div className={`field standard-floating-field${(v.projectName || '').trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="budget-project">Projekt</label>
             <input id="budget-project" className="input" value={v.projectName ?? ''} onChange={(e) => setV({ ...v, projectName: e.target.value || null })} placeholder="z. B. Projekt X" />

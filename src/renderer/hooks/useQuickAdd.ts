@@ -9,6 +9,7 @@ type QA = {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     grossAmount?: number
     netAmount?: number
     vatRate: number
@@ -362,6 +363,9 @@ export function useQuickAdd(
             counterparty: activeDraft.qa.counterparty?.trim() || null,
             partyId: activeDraft.qa.partyId ?? null,
             vatRate: activeDraft.qa.vatRate
+        }
+        if (typeof activeDraft.qa.primaryClassificationValueId === 'number') {
+            payload.primaryClassificationValueId = activeDraft.qa.primaryClassificationValueId
         }
         if (typeof (activeDraft.qa as any).agentDraftId === 'string') {
             payload.agentDraftId = (activeDraft.qa as any).agentDraftId

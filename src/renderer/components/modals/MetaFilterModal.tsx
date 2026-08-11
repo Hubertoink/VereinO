@@ -2,20 +2,28 @@ import React, { useEffect, useState } from 'react'
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 
-export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, earmarkId, budgetId, onApply }: {
+export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphere, primaryClassificationValueId, earmarkId, budgetId, onApply }: {
   open: boolean
   onClose: () => void
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
   earmarks: Array<{ id: number; code: string; name?: string | null }>
   sphere: Sphere
+  primaryClassificationValueId: number | null
   earmarkId: number | null
   budgetId: number | null
-  onApply: (v: { sphere: Sphere; earmarkId: number | null; budgetId: number | null }) => void
+  onApply: (v: { sphere: Sphere; primaryClassificationValueId: number | null; earmarkId: number | null; budgetId: number | null }) => void
 }) {
   const [s, setS] = useState<Sphere>(sphere)
   const [e, setE] = useState<number | null>(earmarkId)
   const [b, setB] = useState<number | null>(budgetId)
-  useEffect(() => { setS(sphere); setE(earmarkId); setB(budgetId) }, [sphere, earmarkId, budgetId, open])
+  const [isGeneral, setIsGeneral] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; icon?: string | null }>>([])
+  const [primary, setPrimary] = useState<number | null>(primaryClassificationValueId)
+  useEffect(() => { setS(sphere); setPrimary(primaryClassificationValueId); setE(earmarkId); setB(budgetId) }, [sphere, primaryClassificationValueId, earmarkId, budgetId, open])
+  useEffect(() => {
+    if (!open) return
+    void window.api.classifications.primary.list().then((result) => { setIsGeneral(result.profile === 'GENERAL'); setCategories(result.values.filter((item) => item.isActive !== false)) }).catch(() => undefined)
+  }, [open])
   const labelForBudget = (bud: { id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }) =>
     (bud.name && bud.name.trim()) || bud.categoryName || bud.projectName || String(bud.year)
   if (!open) return null
@@ -27,7 +35,13 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
           <button className="btn danger" onClick={onClose}>Schließen</button>
         </header>
         <div className="row">
-          <div className="field">
+          {isGeneral ? <div className="field">
+            <label>Kategorie</label>
+            <select className="input" value={primary ?? ''} onChange={(ev) => setPrimary(ev.target.value ? Number(ev.target.value) : null)}>
+              <option value="">Alle</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+            </select>
+          </div> : <div className="field">
             <label>Sphäre</label>
             <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
               <option value="">Alle</option>
@@ -36,7 +50,7 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
               <option value="VERMOEGEN">VERMOEGEN</option>
               <option value="WGB">WGB</option>
             </select>
-          </div>
+          </div>}
           <div className="field">
             <label>Zweckbindung</label>
             <select className="input" value={e ?? ''} onChange={(ev) => setE(ev.target.value ? Number(ev.target.value) : null)}>
@@ -57,10 +71,10 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-          <button className="btn" onClick={() => { setS(null); setE(null); setB(null) }}>Zurücksetzen</button>
+          <button className="btn" onClick={() => { setS(null); setPrimary(null); setE(null); setB(null) }}>Zurücksetzen</button>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={onClose}>Abbrechen</button>
-            <button className="btn primary" onClick={() => { onApply({ sphere: s, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
+            <button className="btn primary" onClick={() => { onApply({ sphere: s, primaryClassificationValueId: primary, earmarkId: e, budgetId: b }); onClose() }}>Übernehmen</button>
           </div>
         </div>
       </div>

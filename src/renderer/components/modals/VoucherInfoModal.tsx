@@ -15,6 +15,10 @@ type VoucherInfo = {
   date: string
   type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
+  primaryClassificationName?: string | null
+  primaryClassificationColor?: string | null
+  primaryClassificationIcon?: string | null
   description?: string | null
   note?: string | null
   counterparty?: string | null
@@ -81,8 +85,21 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
 )
 
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false }: VoucherInfoModalProps) {
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : voucher.type === 'INTERNAL' ? 'Interne Umbuchung' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
+  const classificationLabel = isGeneralProfile ? 'Kategorie' : 'Sphäre'
+  const classificationValue = isGeneralProfile
+    ? `${voucher.primaryClassificationIcon ? `${voucher.primaryClassificationIcon} ` : ''}${voucher.primaryClassificationName || '—'}`
+    : sphereLabel
+
+  useEffect(() => {
+    let active = true
+    window.api?.classifications?.primary.list()
+      .then((result) => { if (active) setIsGeneralProfile(result.profile === 'GENERAL') })
+      .catch(() => { if (active) setIsGeneralProfile(false) })
+    return () => { active = false }
+  }, [])
   const isReversalVoucher = !!voucher.originalId
   const isReversedOriginal = !!voucher.reversedById
   const originalRef = voucher.originalVoucherNo ? `#${voucher.originalVoucherNo}` : voucher.originalId ? `#${voucher.originalId}` : ''
@@ -266,7 +283,7 @@ Geschäftspartner: ${voucher.counterparty || '-'}
 Kommentar: ${voucher.note || '-'}
 Brutto: ${eurFmt.format(voucher.grossAmount)}
 Art: ${typeLabel}
-Sphäre: ${sphereLabel}
+${classificationLabel}: ${classificationValue}
 Budget: ${budgetDisplay}
 Zweckbindung: ${earmarkDisplay}
 Zahlweg: ${paymentLabel}
@@ -283,8 +300,8 @@ Status: ${statusLabel}`
 
   const copyForExcel = () => {
     // Tab-separated format (headers + data)
-    const headers = 'Datum\tBelegnummer\tBeschreibung\tKommentar\tBrutto\tArt\tSphäre\tBudget\tZweckbindung\tZahlweg\tTags\tStatus'
-    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${voucher.note || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${sphereLabel}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}\t${statusLabel}`
+    const headers = `Datum\tBelegnummer\tBeschreibung\tKommentar\tBrutto\tArt\t${classificationLabel}\tBudget\tZweckbindung\tZahlweg\tTags\tStatus`
+    const data = `${fmtDate(voucher.date)}\t${voucher.voucherNo}\t${voucher.description || '-'}\t${voucher.note || '-'}\t${eurFmt.format(voucher.grossAmount)}\t${typeLabel}\t${classificationValue}\t${budgetDisplay}\t${earmarkDisplay}\t${paymentLabel}\t${tagsDisplay}\t${statusLabel}`
     const combined = `${headers}\n${data}`
     
     navigator.clipboard.writeText(combined).then(() => {
@@ -476,8 +493,8 @@ Status: ${statusLabel}`
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Sphäre:</span>
-              <span>{sphereLabel}</span>
+              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{classificationLabel}:</span>
+              <span>{classificationValue}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zahlweg:</span>

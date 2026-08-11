@@ -434,6 +434,14 @@ export default function JournalTable({
     onRowDoubleClick
 }: JournalTableProps) {
     const dragIdx = useRef<number | null>(null)
+    const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+    useEffect(() => {
+        let alive = true
+        void window.api?.classifications?.primary?.list?.()
+            .then((result) => { if (alive) setIsGeneralProfile(result?.profile === 'GENERAL') })
+            .catch(() => { if (alive) setIsGeneralProfile(false) })
+        return () => { alive = false }
+    }, [])
     const visibleOrder = order.filter(k => cols[k])
     const [headerMenu, setHeaderMenu] = useState<{ columnKey: string; x: number; y: number } | null>(null)
 
@@ -678,7 +686,7 @@ export default function JournalTable({
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
                     : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
-                        : k === 'sphere' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('sphere')}>Sphäre {renderSortIcon('sphere')}</th>
+                        : k === 'sphere' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('sphere')}>{isGeneralProfile ? 'Kategorie' : 'Sphäre'} {renderSortIcon('sphere')}</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'note' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Kommentar</th>
                                     : k === 'earmark' ? <th key={k} className="sortable" align="center" title="Zweckbindung" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('earmark')}>Zweck {renderSortIcon('earmark')}</th>
@@ -766,7 +774,7 @@ export default function JournalTable({
         ) : k === 'type' ? (
             <td key={k}><span className={`badge voucher-type-badge voucher-type-badge--${r.type.toLowerCase()} ${r.type.toLowerCase()}`}>{r.type}</span></td>
         ) : k === 'sphere' ? (
-            <td key={k}>{r.type === 'TRANSFER' ? '' : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
+            <td key={k}>{r.type === 'TRANSFER' ? '' : isGeneralProfile ? <span className="badge" style={{ background: r.primaryClassificationColor || 'var(--muted)', color: '#fff' }}>{r.primaryClassificationIcon ? `${r.primaryClassificationIcon} ` : ''}{r.primaryClassificationName || '—'}</span> : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (
             <td key={k}>
                 <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>

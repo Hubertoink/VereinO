@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../context/useToast'
-import QuickAddModal from '../../components/modals/QuickAddModal'
+import CompactBookingFlyout from '../../components/CompactBookingFlyout'
 import DatePickerButton from '../../components/common/DatePickerButton'
 import type { QA } from '../../hooks/useQuickAdd'
 import { dispatchDataChanged } from '../../utils/refresh'
@@ -48,6 +48,7 @@ type AdvanceDetail = AdvanceRow & {
     date: string
     type: 'IN' | 'OUT'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     description?: string | null
     netAmount: number
     grossAmount: number
@@ -162,6 +163,8 @@ export default function AdvancesView() {
 
   const [tagDefs, setTagDefs] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
   const [descSuggest, setDescSuggest] = useState<string[]>([])
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; icon?: string | null; color?: string | null }>>([])
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createBusy, setCreateBusy] = useState(false)
@@ -172,7 +175,8 @@ export default function AdvancesView() {
     amount: '',
     notes: '',
     budgetId: '',
-    earmarkId: ''
+    earmarkId: '',
+    primaryClassificationValueId: ''
   })
 
   const [settleOpen, setSettleOpen] = useState(false)
@@ -208,6 +212,7 @@ export default function AdvancesView() {
       date: p.date,
       type: p.type,
       sphere: p.sphere,
+      primaryClassificationValueId: p.primaryClassificationValueId ?? null,
       mode,
       grossAmount: p.grossAmount ?? 0,
       netAmount: p.netAmount ?? 0,
@@ -271,13 +276,14 @@ export default function AdvancesView() {
   }
 
   async function loadMeta() {
-    const [budgetState, earmarkState, openInvState, partialInvState, tagsState, paymentAccountsState] = await Promise.allSettled([
+    const [budgetState, earmarkState, openInvState, partialInvState, tagsState, paymentAccountsState, classificationsState] = await Promise.allSettled([
       (window as any).api?.budgets?.list?.({ includeArchived: false }),
       (window as any).api?.bindings?.list?.({ activeOnly: true }),
       (window as any).api?.invoices?.list?.({ limit: 80, offset: 0, status: 'OPEN', sort: 'ASC', sortBy: 'due' }),
       (window as any).api?.invoices?.list?.({ limit: 80, offset: 0, status: 'PARTIAL', sort: 'ASC', sortBy: 'due' }),
       (window as any).api?.tags?.list?.({ includeUsage: true }),
-      (window as any).api?.paymentAccounts?.list?.()
+      (window as any).api?.paymentAccounts?.list?.(),
+      (window as any).api?.classifications?.primary?.list?.()
     ])
 
     const budgetRes = budgetState.status === 'fulfilled' ? budgetState.value : null
@@ -286,6 +292,7 @@ export default function AdvancesView() {
     const partialInvRes = partialInvState.status === 'fulfilled' ? partialInvState.value : null
     const tagsRes = tagsState.status === 'fulfilled' ? tagsState.value : null
     const paymentAccountsRes = paymentAccountsState.status === 'fulfilled' ? paymentAccountsState.value : null
+    const classificationsRes = classificationsState.status === 'fulfilled' ? classificationsState.value : null
 
     setBudgets((budgetRes?.rows || []).map((budget: any) => ({
       id: budget.id,
@@ -308,6 +315,8 @@ export default function AdvancesView() {
       isActive: earmark.isActive ?? 1
     })))
     setTagDefs((tagsRes?.rows || []).map((t: any) => ({ id: t.id, name: t.name, color: t.color ?? null })))
+    setIsGeneralProfile(classificationsRes?.profile === 'GENERAL')
+    setCategories((classificationsRes?.values || []).filter((category: any) => category.isActive !== false))
     setPaymentAccounts((paymentAccountsRes?.rows || []).map((account: any) => ({
       id: account.id,
       name: account.name,
@@ -368,6 +377,7 @@ export default function AdvancesView() {
     if (!createDraft.recipientName.trim()) return notify('error', 'Empfänger ist erforderlich')
     if (!createDraft.issuedAt) return notify('error', 'Ausgabedatum ist erforderlich')
     if (!isFinite(amount) || amount <= 0) return notify('error', 'Betrag muss positiv sein')
+    if (isGeneralProfile && !createDraft.primaryClassificationValueId) return notify('error', 'Kategorie ist erforderlich')
 
     setCreateBusy(true)
     try {
@@ -377,7 +387,8 @@ export default function AdvancesView() {
         amount,
         notes: createDraft.notes.trim() || null,
         budgetId: createDraft.budgetId ? Number(createDraft.budgetId) : null,
-        earmarkId: createDraft.earmarkId ? Number(createDraft.earmarkId) : null
+        earmarkId: createDraft.earmarkId ? Number(createDraft.earmarkId) : null,
+        primaryClassificationValueId: createDraft.primaryClassificationValueId ? Number(createDraft.primaryClassificationValueId) : null
       })
       setCreateOpen(false)
       setCreateDraft({
@@ -386,7 +397,8 @@ export default function AdvancesView() {
         amount: '',
         notes: '',
         budgetId: '',
-        earmarkId: ''
+        earmarkId: '',
+        primaryClassificationValueId: ''
       })
       await loadList()
       notify('success', 'Vorschuss erfasst')
@@ -491,6 +503,7 @@ export default function AdvancesView() {
       date: qa.date,
       type: qa.type,
       sphere: qa.sphere,
+      primaryClassificationValueId: qa.primaryClassificationValueId ?? null,
       description: qa.description || undefined,
       vatRate: qa.vatRate
     }
@@ -800,6 +813,15 @@ export default function AdvancesView() {
               </div>
             </div>
             <div className="row">
+              {isGeneralProfile && <div className="field standard-floating-field standard-floating-field--filled">
+                <label htmlFor="advance-primary-category">Kategorie *</label>
+                <select id="advance-primary-category" className="input" value={createDraft.primaryClassificationValueId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, primaryClassificationValueId: e.target.value }))}>
+                  <option value="">Kategorie wählen</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>
+                  ))}
+                </select>
+              </div>}
               <div className="field standard-floating-field standard-floating-field--filled">
                 <label htmlFor="advance-budget">Budget (optional)</label>
                 <select id="advance-budget" className="input" value={createDraft.budgetId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, budgetId: e.target.value }))}>
@@ -971,26 +993,43 @@ export default function AdvancesView() {
 
       {purchaseModalOpen && detail && (
         <>
-          <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={(e) => onDropFiles(e.target.files)} />
-          <QuickAddModal
-            qa={purchaseQa}
-            setQa={setPurchaseQa}
-            onSave={submitPurchase}
-            onClose={() => { setPurchaseModalOpen(false); setPurchaseFiles([]); setEditPurchaseId(null) }}
-            files={purchaseFiles}
-            setFiles={setPurchaseFiles}
-            openFilePicker={openFilePicker}
-            onDropFiles={onDropFiles}
-            fileInputRef={fileInputRef}
-            fmtDate={fmtDate}
-            eurFmt={eurFmt}
-            budgetsForEdit={budgets}
-            earmarks={earmarks as any}
-            paymentAccounts={paymentAccounts}
-            tagDefs={tagDefs as any}
-            descSuggest={descSuggest}
-            title={editPurchaseId ? 'Buchung bearbeiten' : '+ Buchung'}
+          <div
+            className="compact-booking-flyout-dismiss"
+            role="presentation"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              setPurchaseModalOpen(false)
+              setPurchaseFiles([])
+              setEditPurchaseId(null)
+            }}
           />
+          <div className="compact-booking-flyout-anchor advances-purchase-flyout-anchor">
+            <CompactBookingFlyout
+              qa={purchaseQa}
+              setQa={setPurchaseQa}
+              kindOptions={[{ value: 'IN', label: 'Einnahme' }, { value: 'OUT', label: 'Ausgabe' }]}
+              onSave={submitPurchase}
+              onClose={() => { setPurchaseModalOpen(false); setPurchaseFiles([]); setEditPurchaseId(null) }}
+              onExpand={() => undefined}
+              showExpand={false}
+              files={purchaseFiles}
+              setFiles={setPurchaseFiles}
+              openFilePicker={openFilePicker}
+              onDropFiles={onDropFiles}
+              fileInputRef={fileInputRef}
+              budgetsForEdit={budgets}
+              earmarks={earmarks as any}
+              paymentAccounts={paymentAccounts}
+              tagDefs={tagDefs as any}
+              descSuggest={descSuggest}
+              afterSaveDefault="close"
+              draftTabsEnabled={false}
+              draftTabs={[]}
+              activeDraftId={null}
+              onSelectDraft={() => undefined}
+              onNewDraft={() => undefined}
+            />
+          </div>
         </>
       )}
     </div>

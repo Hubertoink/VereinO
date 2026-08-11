@@ -28,6 +28,8 @@ export interface BudgetTileBudget {
   id: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
+  primaryClassificationName?: string | null
   amountPlanned: number
   name?: string | null
   categoryName?: string | null

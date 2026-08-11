@@ -15,6 +15,7 @@ import type {
   QuickAddAfterSave
 } from '../../context/UIPreferencesContextCore'
 import type { ColorTheme } from '../../context/uiTheme'
+import type { OrganizationProfile } from '../../../../shared/classification'
 
 // ============================================================================
 // Navigation & Layout Types
@@ -27,6 +28,7 @@ export type TileKey =
   | 'docling'
   | 'import'
   | 'org'
+  | 'categories'
   | 'donations'
   | 'paymentAccounts'
   | 'parties'
@@ -111,6 +113,7 @@ export interface PaymentAccount {
 // ============================================================================
 
 export interface SettingsProps {
+  organizationProfile: OrganizationProfile
   // Table Configuration
   defaultCols: Record<ColKey, boolean>
   defaultOrder: ColKey[]

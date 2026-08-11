@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './AIView.css'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
+import { AiRulesCatalog } from './AiRulesCatalog'
 import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
 import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
 import {
@@ -2372,6 +2373,14 @@ function CandidateEditor({
   paymentAccounts: PaymentAccountOption[]
   busy: boolean
 }) {
+  const [classificationState, setClassificationState] = useState<{ profile: 'NONPROFIT' | 'GENERAL'; values: Array<{ id: number; name: string; color: string | null; icon: string | null }> } | null>(null)
+  useEffect(() => {
+    let active = true
+    window.api.classifications.primary.list().then((result) => {
+      if (active) setClassificationState({ profile: result.profile, values: result.values })
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
   const sourceFile = candidate.source?.fileName
     ? job.files.find((file) => file.fileName === candidate.source?.fileName) || job.files?.[0]
     : job.files?.[0]
@@ -2465,8 +2474,16 @@ function CandidateEditor({
             </select>
           </label>
           <label className="field">
-            <span>Sphäre</span>
-            <select
+            <span>{classificationState?.profile === 'GENERAL' ? 'Kategorie' : 'Sphäre'}</span>
+            {classificationState?.profile === 'GENERAL' ? <select
+              className="input"
+              disabled={isApproved}
+              value={String(candidate.primaryClassificationValueId ?? '')}
+              onChange={(event) => update('primaryClassificationValueId', (event.target.value ? Number(event.target.value) : null) as TAiBookingCandidate['primaryClassificationValueId'])}
+            >
+              <option value="">Kategorie wählen</option>
+              {classificationState.values.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+            </select> : <select
               className="input"
               disabled={isApproved}
               value={candidate.sphere}
@@ -2478,7 +2495,7 @@ function CandidateEditor({
               <option value="ZWECK">ZWECK</option>
               <option value="VERMOEGEN">VERMÖGEN</option>
               <option value="WGB">WGB</option>
-            </select>
+            </select>}
           </label>
           <label className="field">
             <span>Betrag</span>
@@ -2591,9 +2608,11 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const historyButtonRef = useRef<HTMLButtonElement | null>(null)
   const agentContextButtonRef = useRef<HTMLButtonElement | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
+  const rulesButtonRef = useRef<HTMLButtonElement | null>(null)
   const historyDrawerRef = useRef<HTMLElement | null>(null)
   const agentContextDrawerRef = useRef<HTMLElement | null>(null)
   const settingsDrawerRef = useRef<HTMLElement | null>(null)
+  const rulesDrawerRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
   const [initialChat] = useState(readAiChatSnapshot)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
@@ -2665,6 +2684,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const [showHistory, setShowHistory] = useState(false)
   const [showAgentContext, setShowAgentContext] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   const [busy, setBusy] = useState(false)
   const [avatarFrame, setAvatarFrame] = useState<AiAvatarFrame>('default')
   const [assistantReactionUntil, setAssistantReactionUntil] = useState(0)
@@ -3413,7 +3433,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }, [notify, selectedJob?.id, selectedJobId])
 
   useEffect(() => {
-    if (!showHistory && !showAgentContext && !showSettings) return
+    if (!showHistory && !showAgentContext && !showSettings && !showRules) return
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null
       if (!target) return
@@ -3425,15 +3445,19 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       const inSettings =
         !!settingsDrawerRef.current?.contains(target) ||
         !!settingsButtonRef.current?.contains(target)
+      const inRules =
+        !!rulesDrawerRef.current?.contains(target) || !!rulesButtonRef.current?.contains(target)
       if (showHistory && !inHistory) setShowHistory(false)
       if (showAgentContext && !inAgentContext) setShowAgentContext(false)
       if (showSettings && !inSettings) setShowSettings(false)
+      if (showRules && !inRules) setShowRules(false)
     }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowHistory(false)
         setShowAgentContext(false)
         setShowSettings(false)
+        setShowRules(false)
       }
     }
     document.addEventListener('pointerdown', handlePointerDown, true)
@@ -3442,7 +3466,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       document.removeEventListener('pointerdown', handlePointerDown, true)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showAgentContext, showHistory, showSettings])
+  }, [showAgentContext, showHistory, showRules, showSettings])
 
   useEffect(() => {
     if (messages.some((message) => message.isStreaming)) return
@@ -6047,6 +6071,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               }
             : {}),
           ...(change.newTags ? { tags: change.newTags } : {})
+          ,...(change.newPrimaryClassificationValueId !== undefined
+            ? { primaryClassificationValueId: change.newPrimaryClassificationValueId ?? undefined }
+            : {})
         }
         await window.api.vouchers.updateMeta(payload)
       }
@@ -6171,6 +6198,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         date: replacement.date,
         type: replacement.type,
         sphere: replacement.sphere,
+        primaryClassificationValueId: replacement.primaryClassificationValueId ?? undefined,
         description: replacement.description,
         note: replacement.note || `Ersatzbuchung nach Storno ${reversal.voucherNo}.`,
         grossAmount: Number(replacement.grossAmount || 0),
@@ -6370,6 +6398,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         date: candidate.date,
         type: candidate.type,
         sphere: candidate.sphere,
+        primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
         description: candidate.description,
         note: ['Aus KI-Bankimport-Vorschlag erstellt.', suggestion.reason]
           .filter(Boolean)
@@ -8348,7 +8377,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         <div className="ai-header-brand">
           {renderAvatar()}
           <div className="ai-header-title">
-            <h1>KI</h1>
+            <div className="ai-header-title-line">
+              <h1>KI</h1>
+              <span className={`ai-key-state ${settings.hasApiKey ? 'is-ready' : 'is-missing'}`}>
+                {settings.hasApiKey ? 'API-Key aktiv' : 'API-Key fehlt'}
+              </span>
+            </div>
           </div>
         </div>
         <div className="ai-header-actions">
@@ -8357,9 +8391,21 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               + Neuer Chat
             </button>
           )}
-          <span className={`ai-key-state ${settings.hasApiKey ? 'is-ready' : 'is-missing'}`}>
-            {settings.hasApiKey ? 'API-Key aktiv' : 'API-Key fehlt'}
-          </span>
+          <button
+            ref={rulesButtonRef}
+            className="btn ai-header-rules"
+            type="button"
+            onClick={() => {
+              setShowRules((open) => !open)
+              setShowHistory(false)
+              setShowAgentContext(false)
+              setShowSettings(false)
+            }}
+            aria-label="KI-Regelkatalog"
+            title="KI-Regelkatalog"
+          >
+            ✦ Regeln
+          </button>
           <button
             ref={historyButtonRef}
             className="btn ai-icon-btn"
@@ -8368,6 +8414,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               setShowHistory((open) => !open)
               setShowAgentContext(false)
               setShowSettings(false)
+              setShowRules(false)
             }}
             aria-label="KI-Verlauf"
           >
@@ -8381,6 +8428,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               setShowAgentContext((open) => !open)
               setShowHistory(false)
               setShowSettings(false)
+              setShowRules(false)
             }}
             aria-label="Agent-Kontext"
             title="Agent-Kontext"
@@ -8395,6 +8443,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
               setShowSettings((open) => !open)
               setShowHistory(false)
               setShowAgentContext(false)
+              setShowRules(false)
             }}
             aria-label="KI-Einstellungen"
           >
@@ -9299,6 +9348,12 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
         >
           <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules} />
         </section>
+      )}
+
+      {showRules && (
+        <div ref={rulesDrawerRef}>
+          <AiRulesCatalog notify={notify} onClose={() => setShowRules(false)} />
+        </div>
       )}
 
       {showSettings && (

@@ -9,6 +9,7 @@ export interface BatchAssignDropdownProps {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     from?: string
     to?: string
@@ -94,6 +95,7 @@ export default function BatchAssignDropdown({ earmarks, tagDefs, budgets, curren
     paymentMethod: currentFilters.paymentMethod,
     paymentAccountId: currentFilters.paymentAccountId ?? undefined,
     sphere: currentFilters.sphere,
+    primaryClassificationValueId: currentFilters.primaryClassificationValueId ?? undefined,
     type: currentFilters.type,
     from: currentFilters.from,
     to: currentFilters.to,

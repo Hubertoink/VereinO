@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { QuickAddPayload, RendererApi, UpdateState } from '../../src/types/api'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../shared/dataChange'
+import type { OrganizationProfile } from '../../shared/classification'
 
 type AsyncApiMethod = (...args: never[]) => Promise<unknown>
 
@@ -137,6 +138,11 @@ const rendererApi = {
     invoice: {
       extract: (payload) => cleanInvoke('ai.invoice.extract', payload),
       checkDuplicate: (payload) => cleanInvoke('ai.invoice.checkDuplicate', payload)
+    },
+    rules: {
+      list: (payload) => invoke('ai.rules.list', payload),
+      upsert: (payload) => cleanInvoke('ai.rules.upsert', payload),
+      delete: (payload) => cleanInvoke('ai.rules.delete', payload)
     },
     invoiceBatch: {
       list: () => invoke('ai.invoiceBatch.list'),
@@ -471,7 +477,7 @@ const rendererApi = {
   organizations: {
     list: () => invoke('organizations.list'),
     active: () => invoke('organizations.active'),
-    create: (payload: { name: string }) => invoke('organizations.create', payload),
+    create: (payload: { name: string; profile?: OrganizationProfile }) => invoke('organizations.create', payload),
     switch: (payload: { orgId: string }) => invoke('organizations.switch', payload),
     rename: (payload: { orgId: string; name: string }) => invoke('organizations.rename', payload),
     delete: (payload: { orgId: string; deleteData?: boolean }) =>
@@ -492,6 +498,24 @@ const rendererApi = {
       ) => cb(org)
       ipcRenderer.on('organizations:switched', handler)
       return () => ipcRenderer.removeListener('organizations:switched', handler)
+    }
+  },
+  classifications: {
+    profile: {
+      update: (payload: { profile: OrganizationProfile }) => invoke('classifications.profile.update', payload)
+    },
+    primary: {
+      list: () => invoke('classifications.primary.list'),
+      create: (payload: { name: string; color?: string | null; icon?: string | null; description?: string | null }) =>
+        invoke('classifications.primary.create', payload),
+      update: (payload: {
+        id: number
+        name?: string
+        color?: string | null
+        icon?: string | null
+        description?: string | null
+        isActive?: boolean
+      }) => invoke('classifications.primary.update', payload)
     }
   }
 } satisfies RendererApi

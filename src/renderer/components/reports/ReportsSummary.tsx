@@ -6,6 +6,9 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   const [data, setData] = useState<null | {
     totals: { net: number; vat: number; gross: number }
     bySphere: Array<{ key: Sphere; net: number; vat: number; gross: number }>
+    byPrimaryClassification: Array<{ key: string; color: string | null; net: number; vat: number; gross: number }>
+    classificationProfile: 'NONPROFIT' | 'GENERAL'
+    primaryClassificationLabel: string
     byPaymentMethod: Array<{ key: PaymentMethod | null; net: number; vat: number; gross: number }>
     byPaymentAccount?: Array<{ accountId: number | null; key: string; kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null; color?: string | null; net: number; vat: number; gross: number }>
     byType: Array<{ key: VoucherType; net: number; vat: number; gross: number }>
@@ -75,14 +78,14 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
           })()}
           {/* Netto/MwSt/Brutto totals row intentionally removed per UI simplification */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-            {/* Nach Sphäre */}
+            {/* Tax spheres for non-profits, user-defined categories otherwise */}
             <div className="card" style={{ padding: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 16 }}>📊</span>
-                <strong>Nach Sphäre</strong>
+                <strong>Nach {data.classificationProfile === 'GENERAL' ? data.primaryClassificationLabel : 'Sphäre'}</strong>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {data.bySphere.map((r) => {
+                {(data.classificationProfile === 'GENERAL' ? data.byPrimaryClassification : data.bySphere).map((r: any) => {
                   // Use rgba with low opacity for theme compatibility (works in light and dark)
                   const colors: Record<string, { bg: string; text: string }> = {
                     IDEELL: { bg: 'rgba(21, 101, 192, 0.15)', text: '#42a5f5' },
@@ -90,7 +93,9 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                     VERMOEGEN: { bg: 'rgba(239, 108, 0, 0.15)', text: '#ffa726' },
                     WGB: { bg: 'rgba(123, 31, 162, 0.15)', text: '#ab47bc' }
                   }
-                  const c = colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
+                  const c = r.color
+                    ? { bg: `${r.color}26`, text: r.color }
+                    : colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
                   return (
                     <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: c.bg }}>
                       <span style={{ fontWeight: 500, color: c.text, fontSize: 13 }}>{r.key}</span>

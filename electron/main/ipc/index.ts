@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataChange'
 import type { DashboardSnapshotInput } from '../../../shared/dashboard'
+import { ORGANIZATION_PROFILES, type OrganizationProfile } from '../../../shared/classification'
 import { filePayloadToBase64, filePayloadToBuffer } from '../services/filePayload'
 import {
   clearDashboardSnapshotCache,
@@ -210,6 +211,11 @@ import {
   AiAgentMemoryUpsertInput,
   AiAgentRunInput,
   AiAgentRunOutput,
+  AiKnowledgeRuleDeleteInput,
+  AiKnowledgeRuleDeleteOutput,
+  AiKnowledgeRulesListInput,
+  AiKnowledgeRulesListOutput,
+  AiKnowledgeRuleUpsertInput,
   AiBankImportReviewInput,
   AiBankImportReviewOutput,
   AiBookingAnalysisResult,
@@ -256,6 +262,7 @@ import {
   listOrganizations,
   getActiveOrganization,
   createOrganization,
+  setOrganizationConfigProfile,
   switchOrganization,
   renameOrganization,
   deleteOrganization,
@@ -392,6 +399,15 @@ import {
 } from '../db/migrations'
 import { listRecentAudit } from '../repositories/audit'
 import {
+  createGeneralClassificationValue,
+  getOrganizationProfile,
+  getOrganizationProfileDefinition,
+  getPrimaryClassificationScheme,
+  listPrimaryClassificationValues,
+  setOrganizationProfile,
+  updateGeneralClassificationValue
+} from '../repositories/classifications'
+import {
   AuditRecentInput,
   AuditRecentOutput,
   DbSmartRestorePreviewOutput,
@@ -489,10 +505,13 @@ import {
   updateAiJobCandidate
 } from '../repositories/aiJobs'
 import {
+  deleteAiKnowledgeRule,
   listAiAgentAutoRules,
   listAiAgentMemory,
+  listAiKnowledgeRules,
   upsertAiAgentAutoRule,
-  upsertAiAgentMemory
+  upsertAiAgentMemory,
+  upsertAiKnowledgeRule
 } from '../repositories/aiAgentKnowledge'
 
 const loadAiService = () => import('../services/ai')
@@ -1206,6 +1225,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       date: candidate.date,
       type: candidate.type,
       sphere: candidate.sphere,
+      primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
       description: candidate.description,
       grossAmount: candidate.grossAmount,
       vatRate: candidate.vatRate ?? 0,
@@ -1307,6 +1327,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('ai.agent.autoRules.upsert', async (_e, payload) => {
     const parsed = AiAgentAutoRuleUpsertInput.parse(payload)
     return upsertAiAgentAutoRule(parsed)
+  })
+  ipcMain.handle('ai.rules.list', async (_e, payload) => {
+    const parsed = AiKnowledgeRulesListInput.parse(payload)
+    return AiKnowledgeRulesListOutput.parse({ rows: listAiKnowledgeRules(parsed || {}) })
+  })
+  ipcMain.handle('ai.rules.upsert', async (_e, payload) => {
+    const parsed = AiKnowledgeRuleUpsertInput.parse(payload)
+    return upsertAiKnowledgeRule(parsed)
+  })
+  ipcMain.handle('ai.rules.delete', async (_e, payload) => {
+    const parsed = AiKnowledgeRuleDeleteInput.parse(payload)
+    return AiKnowledgeRuleDeleteOutput.parse(deleteAiKnowledgeRule(parsed.id))
   })
   ipcMain.handle('vouchers.create', async (_e, payload) => {
     const parsed = VoucherCreateInput.parse(payload)
@@ -3791,6 +3823,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       date: submission.date,
       type: submission.type as 'IN' | 'OUT',
       sphere: parsed.sphere,
+      primaryClassificationValueId: parsed.primaryClassificationValueId,
       description: submission.description || undefined,
       grossAmount: submission.grossAmount,
       vatRate: 0,
@@ -3849,6 +3882,69 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Primary classification (tax spheres or freely maintained categories)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('classifications.primary.list', async () => {
+    return {
+      profile: getOrganizationProfile(),
+      definition: getOrganizationProfileDefinition(),
+      scheme: getPrimaryClassificationScheme(),
+      values: listPrimaryClassificationValues({ includeInactive: true })
+    }
+  })
+
+  ipcMain.handle(
+    'classifications.primary.create',
+    async (_e, payload: { name?: string; color?: string | null; icon?: string | null; description?: string | null }) => {
+      if (!payload?.name) throw new Error('Kategoriename ist erforderlich')
+      return createGeneralClassificationValue({
+        name: payload.name,
+        color: payload.color,
+        icon: payload.icon,
+        description: payload.description
+      })
+    }
+  )
+
+  ipcMain.handle(
+    'classifications.primary.update',
+    async (_e, payload: {
+      id?: number
+      name?: string
+      color?: string | null
+      icon?: string | null
+      description?: string | null
+      isActive?: boolean
+    }) => {
+      if (!Number.isInteger(payload?.id) || Number(payload.id) <= 0) {
+        throw new Error('Ungültige Kategorie')
+      }
+      return updateGeneralClassificationValue({
+        id: Number(payload.id),
+        name: payload.name,
+        color: payload.color,
+        icon: payload.icon,
+        description: payload.description,
+        isActive: payload.isActive
+      })
+    }
+  )
+
+  ipcMain.handle('classifications.profile.update', async (_e, payload: { profile?: OrganizationProfile }) => {
+    const profile = payload?.profile
+    if (!profile || !ORGANIZATION_PROFILES.includes(profile)) {
+      throw new Error('Ungültiges Organisationsprofil')
+    }
+    const result = setOrganizationProfile(profile)
+    const organization = getActiveOrganization()
+    if (organization && organization.id !== 'default') {
+      setOrganizationConfigProfile(organization.id, profile)
+    }
+    return result
+  })
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Organization Management
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -3860,9 +3956,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     return { organization: getActiveOrganization() }
   })
 
-  ipcMain.handle('organizations.create', async (_e, payload: { name: string }) => {
+  ipcMain.handle('organizations.create', async (_e, payload: { name: string; profile?: OrganizationProfile }) => {
     if (!payload?.name) throw new Error('Name ist erforderlich')
-    const org = createOrganization(payload.name)
+    const profile = payload.profile ?? 'NONPROFIT'
+    if (!ORGANIZATION_PROFILES.includes(profile)) throw new Error('Ungültiges Organisationsprofil')
+    const org = createOrganization(payload.name, profile)
     return { organization: org }
   })
 
@@ -3877,6 +3975,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     try {
       const db = getDb()
       applyMigrations(db)
+      // The profile is written with the organization configuration before its
+      // database exists. Apply it only after the fresh database schema is ready.
+      // Existing organizations without a stored profile keep the non-profit
+      // default created by the migration.
+      if (result.org.profile) setOrganizationProfile(result.org.profile)
     } catch (err) {
       // Roll back config to the previous org to avoid leaving the app in a broken state.
       try {

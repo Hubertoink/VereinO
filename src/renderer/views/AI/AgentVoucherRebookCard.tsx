@@ -9,6 +9,8 @@ export type AiVoucherRebookState = {
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
+    primaryClassificationName?: string | null
     description?: string | null
     grossAmount: number
     vatRate?: number | null
@@ -19,6 +21,7 @@ export type AiVoucherRebookState = {
   }
   replacement: TVoucherCreateInput & {
     paymentAccountName?: string | null
+    primaryClassificationName?: string | null
     budgets?: Array<{ budgetId: number; amount: number }>
     earmarks?: Array<{ earmarkId: number; amount: number }>
   }
@@ -78,7 +81,7 @@ export function AgentVoucherRebookCard({
           <strong>{typeLabel(state.replacement.type)} · {euro.format(Number(state.replacement.grossAmount || 0))}</strong>
           <dl>
             <div><dt>Datum</dt><dd>{formatDate(state.replacement.date)}</dd></div>
-            <div><dt>Sphäre</dt><dd>{state.replacement.sphere}</dd></div>
+            <div><dt>{state.replacement.primaryClassificationName ? 'Kategorie' : 'Sphäre'}</dt><dd>{state.replacement.primaryClassificationName || state.replacement.sphere}</dd></div>
             <div><dt>Konto</dt><dd>{state.replacement.paymentAccountName || state.replacement.paymentMethod || '-'}</dd></div>
             <div><dt>Text</dt><dd>{state.replacement.description || '-'}</dd></div>
           </dl>

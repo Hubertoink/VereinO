@@ -40,7 +40,7 @@ function metaItems(invoice: TInvoiceCreateInput) {
   return [
     { label: 'Datum', value: invoice.date },
     { label: 'Fällig', value: invoice.dueDate || 'offen' },
-    { label: 'Sphäre', value: invoice.sphere },
+    { label: invoice.primaryClassificationValueId != null ? 'Kategorie' : 'Sphäre', value: invoice.primaryClassificationValueId != null ? `#${invoice.primaryClassificationValueId}` : invoice.sphere },
     invoice.invoiceNo ? { label: 'Nr.', value: invoice.invoiceNo } : null,
     invoice.budgetId != null ? { label: 'Budget', value: `#${invoice.budgetId}` } : null,
     invoice.earmarkId != null ? { label: 'Zweck', value: `#${invoice.earmarkId}` } : null

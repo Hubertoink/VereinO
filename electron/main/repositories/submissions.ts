@@ -7,6 +7,7 @@ export interface Submission {
   date: string
   type: 'IN' | 'OUT'
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+  primaryClassificationValueId?: number | null
   paymentMethod?: 'BAR' | 'BANK' | null
   description?: string | null
   grossAmount: number
@@ -43,6 +44,7 @@ export interface CreateSubmissionPayload {
   date: string
   type: 'IN' | 'OUT'
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   paymentMethod?: 'BAR' | 'BANK'
   description?: string
   grossAmount: number
@@ -63,6 +65,7 @@ export interface ImportSubmissionPayload {
     date: string
     type?: 'IN' | 'OUT'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     paymentMethod?: 'BAR' | 'BANK'
     description?: string
     grossAmount: number
@@ -116,7 +119,7 @@ export function createSubmissionsRepository(db: DB) {
       let sql = `
         SELECT 
           s.id, s.external_id as externalId, s.date, s.type, 
-          s.sphere, s.payment_method as paymentMethod,
+          s.sphere, s.primary_classification_value_id as primaryClassificationValueId, s.payment_method as paymentMethod,
           s.description,
           s.gross_amount as grossAmount, s.category_hint as categoryHint,
           s.counterparty,
@@ -171,7 +174,7 @@ export function createSubmissionsRepository(db: DB) {
         SELECT 
           id, external_id as externalId, date, type, description,
           gross_amount as grossAmount, category_hint as categoryHint,
-          sphere, payment_method as paymentMethod,
+          sphere, primary_classification_value_id as primaryClassificationValueId, payment_method as paymentMethod,
           counterparty,
           budget_id as budgetId, budget_label as budgetLabel,
           earmark_id as earmarkId, earmark_label as earmarkLabel,
@@ -198,11 +201,11 @@ export function createSubmissionsRepository(db: DB) {
     create(payload: CreateSubmissionPayload): { id: number } {
       const insertSubmission = db.prepare(`
         INSERT INTO submissions (
-          external_id, date, type, sphere, payment_method, description, gross_amount,
+          external_id, date, type, sphere, primary_classification_value_id, payment_method, description, gross_amount,
           category_hint, counterparty, budget_id, budget_label, earmark_id, earmark_label,
           tags_json, submitted_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -216,6 +219,7 @@ export function createSubmissionsRepository(db: DB) {
           payload.date,
           payload.type,
           payload.sphere || null,
+          payload.primaryClassificationValueId ?? null,
           payload.paymentMethod || null,
           payload.description || null,
           payload.grossAmount,
@@ -245,11 +249,11 @@ export function createSubmissionsRepository(db: DB) {
     import(payload: ImportSubmissionPayload): { imported: number; ids: number[] } {
       const insertSubmission = db.prepare(`
         INSERT INTO submissions (
-          external_id, date, type, sphere, payment_method, description, gross_amount,
+          external_id, date, type, sphere, primary_classification_value_id, payment_method, description, gross_amount,
           category_hint, counterparty, budget_id, budget_label, earmark_id, earmark_label,
           tags_json, submitted_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const insertAttachment = db.prepare(`
@@ -266,6 +270,7 @@ export function createSubmissionsRepository(db: DB) {
             sub.date,
             sub.type || 'OUT',
             sub.sphere || null,
+            sub.primaryClassificationValueId ?? null,
             sub.paymentMethod || null,
             sub.description || null,
             sub.grossAmount,

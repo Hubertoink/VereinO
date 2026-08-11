@@ -48,6 +48,7 @@ export const VoucherCreateInput = z
     date: z.string(),
     type: VoucherType,
     sphere: Sphere,
+    primaryClassificationValueId: z.number().int().positive().optional(),
     description: z.string().optional(),
     note: z.string().nullable().optional(),
     counterparty: z.string().nullable().optional(),
@@ -372,6 +373,7 @@ export const ReportsSummaryInput = z.object({
   paymentMethod: PaymentMethod.optional(),
   paymentAccountId: z.number().nullable().optional(),
   sphere: Sphere.optional(),
+  primaryClassificationValueId: z.number().int().positive().optional(),
   type: VoucherType.optional(),
   earmarkId: z.number().optional(),
   budgetId: z.number().optional(),
@@ -386,6 +388,15 @@ export const ReportsSummaryOutput = z.object({
     gross: z.number()
   }),
   bySphere: z.array(z.object({ key: Sphere, net: z.number(), vat: z.number(), gross: z.number() })),
+  byPrimaryClassification: z.array(z.object({
+    key: z.string(),
+    color: z.string().nullable(),
+    net: z.number(),
+    vat: z.number(),
+    gross: z.number()
+  })),
+  classificationProfile: z.enum(['NONPROFIT', 'GENERAL']),
+  primaryClassificationLabel: z.string(),
   byPaymentMethod: z.array(
     z.object({ key: PaymentMethod.nullable(), net: z.number(), vat: z.number(), gross: z.number() })
   ),
@@ -476,6 +487,7 @@ export const VouchersListInput = z
     paymentMethod: PaymentMethod.optional(),
     paymentAccountId: z.number().nullable().optional(),
     sphere: Sphere.optional(),
+    primaryClassificationValueId: z.number().int().positive().optional(),
     type: VoucherType.optional(),
     from: z.string().optional(),
     to: z.string().optional(),
@@ -494,6 +506,10 @@ export const VouchersListOutput = z.object({
       date: z.string(),
       type: VoucherType,
       sphere: Sphere,
+      primaryClassificationValueId: z.number().nullable().optional(),
+      primaryClassificationName: z.string().nullable().optional(),
+      primaryClassificationColor: z.string().nullable().optional(),
+      primaryClassificationIcon: z.string().nullable().optional(),
       isCashCheck: z.boolean().optional(),
       isAdvancePlaceholder: z.boolean().optional(),
       paymentMethod: PaymentMethod.nullable().optional(),
@@ -577,6 +593,7 @@ export const InvoiceCreateInput = z.object({
   paymentMethod: z.string().nullable().optional(),
   paymentAccountId: z.number().nullable().optional(),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   earmarkId: z.number().nullable().optional(),
   budgetId: z.number().nullable().optional(),
   autoPost: z.boolean().optional(),
@@ -601,6 +618,7 @@ export const InvoiceUpdateInput = z.object({
   paymentMethod: z.string().nullable().optional(),
   paymentAccountId: z.number().nullable().optional(),
   sphere: Sphere.optional(),
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   earmarkId: z.number().nullable().optional(),
   budgetId: z.number().nullable().optional(),
   autoPost: z.boolean().optional(),
@@ -644,6 +662,10 @@ export const InvoicesListOutput = z.object({
       paymentMethod: z.string().nullable().optional(),
       paymentAccountId: z.number().nullable().optional(),
       sphere: Sphere,
+      primaryClassificationValueId: z.number().nullable(),
+      primaryClassificationName: z.string().nullable(),
+      primaryClassificationColor: z.string().nullable(),
+      primaryClassificationIcon: z.string().nullable(),
       earmarkId: z.number().nullable().optional(),
       budgetId: z.number().nullable().optional(),
       autoPost: z.number().optional(),
@@ -698,6 +720,10 @@ export const InvoiceByIdOutput = z.object({
   paymentAccountName: z.string().nullable().optional(),
   paymentAccountKind: z.string().nullable().optional(),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().nullable(),
+  primaryClassificationName: z.string().nullable(),
+  primaryClassificationColor: z.string().nullable(),
+  primaryClassificationIcon: z.string().nullable(),
   earmarkId: z.number().nullable().optional(),
   budgetId: z.number().nullable().optional(),
   autoPost: z.number().optional(),
@@ -828,6 +854,7 @@ export const VoucherUpdateInput = z.object({
   date: z.string().optional(),
   type: VoucherType.optional(),
   sphere: Sphere.optional(),
+  primaryClassificationValueId: z.number().int().positive().optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   counterparty: z.string().nullable().optional(),
@@ -988,6 +1015,7 @@ export const VouchersBatchAssignEarmarkInput = z.object({
   paymentMethod: PaymentMethod.optional(),
   paymentAccountId: z.number().nullable().optional(),
   sphere: Sphere.optional(),
+  primaryClassificationValueId: z.number().int().positive().optional(),
   type: VoucherType.optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -1007,6 +1035,7 @@ export const VouchersBatchAssignBudgetInput = z.object({
   paymentMethod: PaymentMethod.optional(),
   paymentAccountId: z.number().nullable().optional(),
   sphere: Sphere.optional(),
+  primaryClassificationValueId: z.number().int().positive().optional(),
   type: VoucherType.optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -1105,6 +1134,7 @@ export const BudgetUpsertInput = z.object({
   id: z.number().optional(),
   year: z.number(),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   categoryId: z.number().nullable().optional(),
   projectId: z.number().nullable().optional(),
   earmarkId: z.number().nullable().optional(),
@@ -1123,6 +1153,7 @@ export const BudgetListInput = z
   .object({
     year: z.number().optional(),
     sphere: Sphere.optional(),
+    primaryClassificationValueId: z.number().int().positive().nullable().optional(),
     earmarkId: z.number().nullable().optional(),
     includeArchived: z.boolean().optional(),
     archivedOnly: z.boolean().optional()
@@ -1134,6 +1165,10 @@ export const BudgetListOutput = z.object({
       id: z.number(),
       year: z.number(),
       sphere: Sphere,
+      primaryClassificationValueId: z.number().nullable(),
+      primaryClassificationName: z.string().nullable(),
+      primaryClassificationColor: z.string().nullable(),
+      primaryClassificationIcon: z.string().nullable(),
       categoryId: z.number().nullable(),
       projectId: z.number().nullable(),
       earmarkId: z.number().nullable(),
@@ -1188,6 +1223,7 @@ export const RecurringBookingUpsertInput = z.object({
   name: z.string().trim().min(1),
   type: z.enum(['IN', 'OUT']),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   description: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   counterparty: z.string().nullable().optional(),
@@ -1217,6 +1253,10 @@ export const RecurringBookingRow = z.object({
   name: z.string(),
   type: z.enum(['IN', 'OUT']),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().nullable(),
+  primaryClassificationName: z.string().nullable(),
+  primaryClassificationColor: z.string().nullable(),
+  primaryClassificationIcon: z.string().nullable(),
   description: z.string().nullable(),
   note: z.string().nullable(),
   counterparty: z.string().nullable(),
@@ -1349,7 +1389,8 @@ export const AdvanceCreateInput = z.object({
   amount: z.number(),
   notes: z.string().nullable().optional(),
   budgetId: z.number().nullable().optional(),
-  earmarkId: z.number().nullable().optional()
+  earmarkId: z.number().nullable().optional(),
+  primaryClassificationValueId: z.number().int().positive().nullable().optional()
 })
 export const AdvanceCreateOutput = z.object({ id: z.number() })
 
@@ -1394,6 +1435,7 @@ export const AdvanceGetOutput = z
         date: z.string(),
         type: AdvancePurchaseType,
         sphere: Sphere,
+        primaryClassificationValueId: z.number().nullable().optional(),
         description: z.string().nullable().optional(),
         netAmount: z.number(),
         grossAmount: z.number(),
@@ -1427,6 +1469,7 @@ export const AdvancePurchaseCreateInput = z
     date: z.string(),
     type: AdvancePurchaseType,
     sphere: Sphere,
+    primaryClassificationValueId: z.number().int().positive().nullable().optional(),
     description: z.string().optional(),
     netAmount: z.number().optional(),
     grossAmount: z.number().optional(),
@@ -1454,6 +1497,7 @@ export const AdvancePurchaseUpdateInput = z
     date: z.string(),
     type: AdvancePurchaseType,
     sphere: Sphere,
+    primaryClassificationValueId: z.number().int().positive().nullable().optional(),
     description: z.string().optional(),
     netAmount: z.number().optional(),
     grossAmount: z.number().optional(),
@@ -2176,6 +2220,7 @@ export const AiBookingCandidate = z.object({
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   description: z.string().min(1),
   grossAmount: z.number().positive(),
   vatRate: z.number().min(0).max(100).default(0),
@@ -2208,6 +2253,7 @@ export const AiBookingCandidateStructured = z.object({
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   description: z.string().min(1),
   grossAmount: z.number().positive(),
   vatRate: z.number().min(0).max(100),
@@ -2244,6 +2290,7 @@ export const AiInvoiceExtractionResult = z.object({
   description: z.string().nullable(),
   type: z.enum(['IN', 'OUT']),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   paymentMethod: PaymentMethod.nullable(),
   paymentAccountId: z.number().int().positive().nullable(),
   budgets: z.array(AiBookingAssignment),
@@ -2738,6 +2785,34 @@ export const AiAgentAutoRuleUpsertInput = z.object({
   enabled: z.boolean().optional()
 })
 
+export const AiKnowledgeRuleScope = z.enum(['ALL', 'BOOKINGS', 'INVOICES'])
+export const AiKnowledgeRuleSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  scope: AiKnowledgeRuleScope,
+  instruction: z.string(),
+  enabled: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+})
+export const AiKnowledgeRulesListInput = z
+  .object({
+    enabledOnly: z.boolean().optional(),
+    scope: AiKnowledgeRuleScope.optional(),
+    limit: z.number().int().positive().max(200).optional()
+  })
+  .optional()
+export const AiKnowledgeRulesListOutput = z.object({ rows: z.array(AiKnowledgeRuleSchema) })
+export const AiKnowledgeRuleUpsertInput = z.object({
+  id: z.number().int().positive().optional(),
+  name: z.string().trim().min(1).max(120),
+  scope: AiKnowledgeRuleScope.optional(),
+  instruction: z.string().trim().min(1).max(4000),
+  enabled: z.boolean().optional()
+})
+export const AiKnowledgeRuleDeleteInput = z.object({ id: z.number().int().positive() })
+export const AiKnowledgeRuleDeleteOutput = z.object({ ok: z.boolean() })
+
 export const AiJobSchema = z.object({
   id: z.number(),
   type: AiJobType,
@@ -2923,6 +2998,11 @@ export type TAiAgentMemoryUpsertInput = z.infer<typeof AiAgentMemoryUpsertInput>
 export type TAiAgentAutoRulesListInput = z.infer<typeof AiAgentAutoRulesListInput>
 export type TAiAgentAutoRulesListOutput = z.infer<typeof AiAgentAutoRulesListOutput>
 export type TAiAgentAutoRuleUpsertInput = z.infer<typeof AiAgentAutoRuleUpsertInput>
+export type TAiKnowledgeRulesListInput = z.infer<typeof AiKnowledgeRulesListInput>
+export type TAiKnowledgeRulesListOutput = z.infer<typeof AiKnowledgeRulesListOutput>
+export type TAiKnowledgeRuleUpsertInput = z.infer<typeof AiKnowledgeRuleUpsertInput>
+export type TAiKnowledgeRuleDeleteInput = z.infer<typeof AiKnowledgeRuleDeleteInput>
+export type TAiKnowledgeRuleDeleteOutput = z.infer<typeof AiKnowledgeRuleDeleteOutput>
 export type TAiUsage = z.infer<typeof AiUsageSchema>
 export type TAiInvoiceExtractInput = z.infer<typeof AiInvoiceExtractInput>
 export type TAiInvoiceExtractOutput = z.infer<typeof AiInvoiceExtractOutput>
@@ -3129,6 +3209,7 @@ const SubmissionSchema = z.object({
   date: z.string(),
   type: z.enum(['IN', 'OUT']),
   sphere: Sphere.nullable().optional(),
+  primaryClassificationValueId: z.number().nullable().optional(),
   paymentMethod: PaymentMethod.nullable().optional(),
   description: z.string().nullable().optional(),
   grossAmount: z.number(),
@@ -3169,6 +3250,7 @@ export const SubmissionsImportInput = z.object({
       date: z.string(),
       type: z.enum(['IN', 'OUT']).optional(),
       sphere: Sphere.optional(),
+      primaryClassificationValueId: z.number().int().positive().nullable().optional(),
       paymentMethod: PaymentMethod.optional(),
       description: z.string().optional(),
       grossAmount: z.number(),
@@ -3216,6 +3298,7 @@ export const SubmissionDeleteOutput = z.object({ ok: z.boolean() })
 export const SubmissionConvertInput = z.object({
   id: z.number(),
   sphere: Sphere,
+  primaryClassificationValueId: z.number().int().positive().optional(),
   paymentMethod: PaymentMethod.optional(),
   categoryId: z.number().optional(),
   earmarkId: z.number().optional(),

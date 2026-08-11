@@ -27,6 +27,10 @@ export type AiVoucherUpdateChange = {
   newEarmarkAmount?: number | null
   oldTags?: string[]
   newTags?: string[]
+  oldPrimaryClassificationValueId?: number | null
+  oldPrimaryClassificationName?: string | null
+  newPrimaryClassificationValueId?: number | null
+  newPrimaryClassificationName?: string | null
   noteAppend?: string | null
   selected: boolean
   applied?: boolean
@@ -67,6 +71,7 @@ function targetSummary(change: AiVoucherUpdateChange) {
   return [
     budgetSummary,
     change.newEarmarkLabel ? `Zweck: ${change.newEarmarkLabel}${amountSuffix(change.newEarmarkAmount)}` : null,
+    change.newPrimaryClassificationName ? `Kategorie: ${change.newPrimaryClassificationName}` : null,
     change.newTags?.length ? `Tags: ${change.newTags.join(', ')}` : null
   ].filter(Boolean).join(' · ') || 'Metadaten aktualisieren'
 }

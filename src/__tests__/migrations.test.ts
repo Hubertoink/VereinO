@@ -2,6 +2,7 @@ import {
   ensureAdvanceTables,
   ensureAiTables,
   ensureBankImportTables,
+  ensureOrganizationClassificationTables,
   ensureJournalPerformanceIndexes,
   ensurePartyTables,
   expandVoucherTypeConstraint
@@ -96,5 +97,35 @@ describe('ensurePartyTables', () => {
     expect(sql).toContain('ALTER TABLE vouchers ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
     expect(sql).toContain('ALTER TABLE invoices ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
     expect(sql).toContain('ALTER TABLE submissions ADD COLUMN party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL')
+  })
+})
+
+describe('ensureOrganizationClassificationTables', () => {
+  it('creates profiles and maps legacy spheres without altering the legacy column', () => {
+    const exec = jest.fn()
+    const run = jest.fn()
+    const prepare = jest.fn((sql: string) => ({
+      run,
+      all: () => [],
+      get: () => {
+        if (sql.includes('FROM sqlite_master')) return { existsFlag: 1 }
+        if (sql.includes('SELECT id FROM classification_schemes')) return { id: 1 }
+        return undefined
+      }
+    }))
+
+    ensureOrganizationClassificationTables({ exec, prepare } as any)
+
+    const sql = exec.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS organization_profile')
+    expect(sql).toContain("CHECK(profile IN ('NONPROFIT', 'GENERAL'))")
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS classification_schemes')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS classification_values')
+    expect(sql).toContain('ALTER TABLE vouchers ADD COLUMN primary_classification_value_id INTEGER')
+    expect(sql).toContain('UPDATE vouchers')
+    expect(sql).toContain('cv.stable_key = vouchers.sphere')
+    expect(sql).not.toContain('ALTER TABLE vouchers DROP COLUMN sphere')
+    expect(sql).not.toContain('UPDATE vouchers SET sphere')
+    expect(run).toHaveBeenCalledWith('nonprofit-spheres')
   })
 })

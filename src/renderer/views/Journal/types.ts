@@ -27,6 +27,10 @@ export type VoucherRow = {
     date: string
     type: VoucherType
     sphere: VoucherSphere
+    primaryClassificationValueId?: number | null
+    primaryClassificationName?: string | null
+    primaryClassificationColor?: string | null
+    primaryClassificationIcon?: string | null
     description?: string | null
     note?: string | null
     counterparty?: string | null

@@ -8,6 +8,7 @@ import WindowControls from '../layout/WindowControls'
 import { getInternalAssignmentValidationState } from './voucherMetaValidation'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { distributeAmountEvenly, isAmountEvenlyDistributed } from '../../utils/budgetDistribution'
+import type { ClassificationValue, OrganizationProfile } from '../../../../shared/classification'
 import {
     AI_PATTERNS_CHANGED_EVENT,
     buildAISuggestions,
@@ -20,6 +21,11 @@ type BudgetAssignment = { budgetId: number; amount: number }
 type EarmarkAssignment = { earmarkId: number; amount: number }
 type ExistingAttachment = { id: number; fileName: string }
 type PaymentAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }
+type PrimaryClassificationState = {
+    profile: OrganizationProfile
+    label: string
+    values: ClassificationValue[]
+}
 type AISuggestionPartKey =
     | 'type'
     | 'sphere'
@@ -177,6 +183,25 @@ export default function QuickAddModal({
     const [aiMenuOpen, setAiMenuOpen] = React.useState(false)
     const [aiLearningVersion, setAiLearningVersion] = React.useState(0)
     const [aiDisabledParts, setAiDisabledParts] = React.useState<Record<string, AISuggestionPartKey[]>>({})
+    const [primaryClassification, setPrimaryClassification] = React.useState<PrimaryClassificationState | null>(null)
+
+    React.useEffect(() => {
+        let alive = true
+        void (async () => {
+            try {
+                const result = await window.api?.classifications?.primary?.list?.()
+                if (!alive || !result) return
+                setPrimaryClassification({
+                    profile: result.profile,
+                    label: result.definition.primaryLabel,
+                    values: result.values || []
+                })
+            } catch {
+                if (alive) setPrimaryClassification(null)
+            }
+        })()
+        return () => { alive = false }
+    }, [])
 
     const grossAmt = (() => {
         if (qa.type === 'TRANSFER' || qa.type === 'INTERNAL') return Number((qa as any).grossAmount || 0)
@@ -654,7 +679,14 @@ export default function QuickAddModal({
     }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
     return (
-        <div className={`modal-overlay quick-add-modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`} role="dialog" aria-modal="true">
+        <div
+            className={`modal-overlay quick-add-modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(event) => {
+                if (!windowMode && event.target === event.currentTarget) closeModal()
+            }}
+        >
             <div
                 ref={modalRef}
                 className={`modal booking-modal quick-add-modal booking-modal--type-${qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}`}
@@ -967,7 +999,22 @@ export default function QuickAddModal({
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <input id="quick-add-date" className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
                                 </div>
-                                {qa.type !== 'TRANSFER' && (
+                                {primaryClassification?.profile === 'GENERAL' ? (
+                                    <div className="field booking-floating-field booking-floating-field--filled">
+                                        <label htmlFor="quick-add-primary-category">Kategorie <span className="req-asterisk" aria-hidden="true">*</span></label>
+                                        <SelectDropdown
+                                            id="quick-add-primary-category"
+                                            value={String(qa.primaryClassificationValueId ?? '')}
+                                            onChange={(value) => setQa({ ...qa, primaryClassificationValueId: value ? Number(value) : null })}
+                                            ariaLabel="Kategorie der Buchung"
+                                            placeholder="Kategorie wählen"
+                                            options={primaryClassification.values.map((category) => ({
+                                                value: String(category.id),
+                                                label: category.isActive ? category.name : `${category.name} (archiviert)`
+                                            }))}
+                                        />
+                                    </div>
+                                ) : qa.type !== 'TRANSFER' && (
                                     <div className="field booking-floating-field booking-floating-field--filled booking-floating-field--with-info">
                                         <label htmlFor="quick-add-sphere">Bereich</label>
                                         <HoverTooltip<HTMLButtonElement>

@@ -9,6 +9,11 @@ import type {
   TAiAgentMemoryUpsertInput,
   TAiAgentRunInput,
   TAiAgentRunOutput,
+  TAiKnowledgeRuleDeleteInput,
+  TAiKnowledgeRuleDeleteOutput,
+  TAiKnowledgeRulesListInput,
+  TAiKnowledgeRulesListOutput,
+  TAiKnowledgeRuleUpsertInput,
   TAiJobIdInput,
   TAiJobsApproveCandidateInput,
   TAiJobsApproveCandidateOutput,
@@ -52,6 +57,13 @@ export interface AiApi {
     invoice: {
       extract: (payload: TAiInvoiceExtractInput) => Promise<TAiInvoiceExtractOutput>
       checkDuplicate: (payload: TAiInvoiceDuplicateCheckInput) => Promise<TAiInvoiceDuplicateCheckOutput>
+    }
+    rules: {
+      list: (payload?: TAiKnowledgeRulesListInput) => Promise<TAiKnowledgeRulesListOutput>
+      upsert: (
+        payload: TAiKnowledgeRuleUpsertInput
+      ) => Promise<TAiKnowledgeRulesListOutput['rows'][number]>
+      delete: (payload: TAiKnowledgeRuleDeleteInput) => Promise<TAiKnowledgeRuleDeleteOutput>
     }
     invoiceBatch: {
       list: () => Promise<TAiInvoiceBatchListOutput>

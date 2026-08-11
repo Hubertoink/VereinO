@@ -3,6 +3,7 @@ import path from 'node:path'
 import Database from 'better-sqlite3'
 import { getAppDataDir, getDb, withTransaction } from '../db/database'
 import { createVoucher } from './vouchers'
+import { resolvePrimaryClassificationValueId } from './classifications'
 import { setVoucherTags } from './tags'
 import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 import { filePayloadToBuffer } from '../services/filePayload'
@@ -128,6 +129,7 @@ export function buildInvoiceVoucherCreationInput(input: {
     date: input.date,
     type: invoice.voucher_type ?? 'OUT',
     sphere: invoice.sphere,
+    primaryClassificationValueId: invoice.primary_classification_value_id ?? invoice.primaryClassificationValueId ?? null,
     description: invoice.description && String(invoice.description).trim() ? String(invoice.description).trim() : `Zahlung zu Rechnung ${invoice.invoice_no ?? '#' + input.invoiceId}`,
     note: buildInvoiceVoucherNote(invoice),
     grossAmount,
@@ -154,6 +156,7 @@ export function createInvoice(input: {
   paymentMethod?: string | null
   paymentAccountId?: number | null
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   earmarkId?: number | null
   earmarkAmount?: number | null
   budgetId?: number | null
@@ -170,8 +173,9 @@ export function createInvoice(input: {
     const normalizedEarmarks = normalizeInvoiceEarmarkAssignments(input, clamp2(input.grossAmount))
     const normalizedBudgetId = normalizedBudgets[0]?.budgetId ?? input.budgetId ?? null
     const normalizedEarmarkId = normalizedEarmarks[0]?.earmarkId ?? input.earmarkId ?? null
-    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, party_id, description, note, gross_amount, payment_method, sphere, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    const primaryClassificationValueId = resolvePrimaryClassificationValueId(d, { legacySphere: input.sphere, primaryClassificationValueId: input.primaryClassificationValueId })
+    const info = d.prepare(`INSERT INTO invoices(date, due_date, invoice_no, party, party_id, description, note, gross_amount, payment_method, sphere, primary_classification_value_id, earmark_id, budget_id, payment_account_id, auto_post, voucher_type)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         input.date,
         input.dueDate ?? null,
         input.invoiceNo ?? null,
@@ -182,6 +186,7 @@ export function createInvoice(input: {
         clamp2(input.grossAmount),
         input.paymentMethod ?? null,
         input.sphere,
+        primaryClassificationValueId,
         normalizedEarmarkId,
         normalizedBudgetId,
         input.paymentAccountId ?? null,
@@ -220,6 +225,7 @@ export function updateInvoice(input: {
   paymentMethod?: string | null
   paymentAccountId?: number | null
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   earmarkId?: number | null
   earmarkAmount?: number | null
   budgetId?: number | null
@@ -245,6 +251,9 @@ export function updateInvoice(input: {
       : (input.earmarkId != null || input.earmarkAmount != null ? normalizeInvoiceEarmarkAssignments({ earmarkId: input.earmarkId, earmarkAmount: input.earmarkAmount }, Number(cur.gross_amount || 0)) : undefined)
     const nextBudgetId = input.budgetId !== undefined ? input.budgetId : (input.budgets !== undefined && normalizedBudgets?.length ? normalizedBudgets[0].budgetId : undefined)
     const nextEarmarkId = input.earmarkId !== undefined ? input.earmarkId : (input.earmarks !== undefined && normalizedEarmarks?.length ? normalizedEarmarks[0].earmarkId : undefined)
+    const primaryClassificationValueId = input.primaryClassificationValueId !== undefined || input.sphere !== undefined
+      ? resolvePrimaryClassificationValueId(d, { legacySphere: input.sphere ?? cur.sphere, primaryClassificationValueId: input.primaryClassificationValueId ?? cur.primary_classification_value_id ?? null })
+      : null
     d.prepare(`UPDATE invoices SET
       date=COALESCE(?, date),
       due_date=COALESCE(?, due_date),
@@ -256,6 +265,7 @@ export function updateInvoice(input: {
       gross_amount=COALESCE(?, gross_amount),
       payment_method=COALESCE(?, payment_method),
       sphere=COALESCE(?, sphere),
+      primary_classification_value_id=COALESCE(?, primary_classification_value_id),
       earmark_id=COALESCE(?, earmark_id),
       budget_id=COALESCE(?, budget_id),
       payment_account_id=COALESCE(?, payment_account_id),
@@ -274,6 +284,7 @@ export function updateInvoice(input: {
       input.grossAmount != null ? clamp2(input.grossAmount) : null,
       input.paymentMethod ?? null,
       input.sphere ?? null,
+      primaryClassificationValueId,
       nextEarmarkId ?? null,
       nextBudgetId ?? null,
       input.paymentAccountId ?? null,
@@ -346,6 +357,7 @@ export function listInvoicesPaged(filters: {
   const rows = d.prepare(`
     SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.party_id as partyId, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.sphere,
+           i.primary_classification_value_id as primaryClassificationValueId, cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
            (SELECT v.voucher_no FROM vouchers v WHERE v.id = i.posted_voucher_id) as postedVoucherNo,
@@ -356,7 +368,7 @@ export function listInvoicesPaged(filters: {
              FROM invoice_tags it2 JOIN tags t2 ON t2.id = it2.tag_id
              WHERE it2.invoice_id = i.id
            ) as tagsConcat
-    ${base}
+    ${base.replace('FROM invoices i', 'FROM invoices i LEFT JOIN classification_values cv ON cv.id=i.primary_classification_value_id')}
     GROUP BY i.id
     ORDER BY ${orderExpr} ${orderDir}, i.id ASC
     LIMIT ? OFFSET ?
@@ -452,11 +464,11 @@ export function getInvoiceById(id: number) {
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.payment_account_id as paymentAccountId,
            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountName,
            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = i.payment_account_id) as paymentAccountKind,
-           i.sphere,
+           i.sphere, i.primary_classification_value_id as primaryClassificationValueId, cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
            i.earmark_id as earmarkId, i.budget_id as budgetId, i.auto_post as autoPost,
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
            (SELECT v.voucher_no FROM vouchers v WHERE v.id = i.posted_voucher_id) as postedVoucherNo
-         FROM invoices i WHERE i.id=?`).get(id) as any
+         FROM invoices i LEFT JOIN classification_values cv ON cv.id=i.primary_classification_value_id WHERE i.id=?`).get(id) as any
   if (!r) throw new Error('Rechnung nicht gefunden')
   const payments = d.prepare('SELECT id, date, amount FROM invoice_payments WHERE invoice_id = ? ORDER BY date ASC, id ASC').all(id) as any[]
   const files = d.prepare('SELECT id, file_name as fileName, mime_type as mimeType, size, created_at as createdAt FROM invoice_files WHERE invoice_id = ? ORDER BY created_at DESC').all(id) as any[]

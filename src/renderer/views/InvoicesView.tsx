@@ -92,6 +92,10 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
     paymentMethod: row?.paymentMethod === 'BAR' || row?.paymentMethod === 'BANK' ? row.paymentMethod : '',
     paymentAccountId: typeof row?.paymentAccountId === 'number' ? row.paymentAccountId : '',
     sphere: row?.sphere ?? 'IDEELL',
+    primaryClassificationValueId: typeof row?.primaryClassificationValueId === 'number' ? row.primaryClassificationValueId : '',
+    primaryClassificationName: row?.primaryClassificationName ?? null,
+    primaryClassificationColor: row?.primaryClassificationColor ?? null,
+    primaryClassificationIcon: row?.primaryClassificationIcon ?? null,
     earmarkId: firstEarmarkId(earmarks),
     budgetId: firstBudgetId(budgets),
     budgets,
@@ -471,6 +475,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [formError, setFormError] = useState('')
   const [requiredTouched, setRequiredTouched] = useState(false)
   const [showInvoiceScan, setShowInvoiceScan] = useState(false)
+  const [invoiceScanAnchor, setInvoiceScanAnchor] = useState<Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null>(null)
 
   const openCreate = useCallback(() => {
     setForm({
@@ -517,6 +522,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         paymentMethod: result.bookingMeta.paymentMethod || null,
         paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
         sphere: result.bookingMeta.sphere || 'IDEELL',
+        primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? null,
         budgetId: result.budgets[0]?.budgetId || null,
         earmarkId: result.earmarksAssigned[0]?.earmarkId || null,
         budgets: result.budgets.map((item) => ({ budgetId: item.budgetId, amount: item.amount })),
@@ -600,6 +606,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           paymentMethod: draft.paymentMethod || null,
           paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
           sphere: draft.sphere,
+          primaryClassificationValueId: typeof draft.primaryClassificationValueId === 'number' ? draft.primaryClassificationValueId : null,
           earmarkId: typeof cleanEarmarks[0]?.earmarkId === 'number' ? cleanEarmarks[0].earmarkId : null,
           budgetId: typeof cleanBudgets[0]?.budgetId === 'number' ? cleanBudgets[0].budgetId : null,
           budgets: cleanBudgets,
@@ -632,6 +639,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           paymentMethod: draft.paymentMethod || null,
           paymentAccountId: typeof draft.paymentAccountId === 'number' ? draft.paymentAccountId : null,
           sphere: draft.sphere,
+          primaryClassificationValueId: typeof draft.primaryClassificationValueId === 'number' ? draft.primaryClassificationValueId : null,
           earmarkId: typeof cleanEarmarks[0]?.earmarkId === 'number' ? cleanEarmarks[0].earmarkId : null,
           budgetId: typeof cleanBudgets[0]?.budgetId === 'number' ? cleanBudgets[0].budgetId : null,
           budgets: cleanBudgets,
@@ -746,8 +754,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           />
           {!!(q.trim() || status !== 'ALL' || sphere || budgetId || tag || dueFrom || dueTo) && <button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">×</button>}
           <div className="filter-divider" />
-          <button className="btn invoices-scan-button" onClick={() => setShowInvoiceScan(true)}>Rechnung erfassen</button>
-          <button className="btn primary" onClick={openCreate}>+ Neu</button>
+          <button className="btn primary invoices-toolbar-action" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}>Rechnung erfassen</button>
+          <button className="btn primary invoices-toolbar-action" onClick={openCreate}>+ Neu</button>
         </div>
       </div>
 
@@ -981,10 +989,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       )}
       {showInvoiceScan && (
         <LocalInvoiceScanModal
-          onClose={() => setShowInvoiceScan(false)}
+          onClose={() => { setShowInvoiceScan(false); setInvoiceScanAnchor(null) }}
           onCreateInvoice={async (result) => {
             const created = await createInvoiceFromScan(result)
-            if (created) setShowInvoiceScan(false)
+            if (created) { setShowInvoiceScan(false); setInvoiceScanAnchor(null) }
             return created
           }}
           budgetsForEdit={budgets.map((budget) => ({
@@ -994,6 +1002,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           }))}
           earmarks={earmarks}
           tagDefs={tags}
+          anchorRect={invoiceScanAnchor}
         />
       )}
 

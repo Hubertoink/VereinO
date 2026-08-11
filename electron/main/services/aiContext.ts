@@ -8,6 +8,8 @@ import { listPaymentAccounts } from '../repositories/paymentAccounts'
 import { listParties } from '../repositories/parties'
 import { listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
 import { listTags } from '../repositories/tags'
+import { listAiKnowledgeRules } from '../repositories/aiAgentKnowledge'
+import { getOrganizationProfile, getOrganizationProfileDefinition, listPrimaryClassificationValues } from '../repositories/classifications'
 import {
   cashBalance,
   listVoucherYears,
@@ -38,6 +40,7 @@ function dateRangeForYear(year: number, today: string) {
 
 function compactReportSummary(filters: any = {}) {
   const summary = summarizeVouchers(filters)
+  const primaryClassificationLabel = summary.primaryClassificationLabel || 'Sphäre'
   return {
     totals: {
       net: roundMoney(summary.totals?.net),
@@ -50,8 +53,10 @@ function compactReportSummary(filters: any = {}) {
       vat: roundMoney(row.vat),
       gross: roundMoney(row.gross)
     })),
-    bySphere: (summary.bySphere || []).map((row: any) => ({
-      sphere: row.key,
+    primaryClassificationLabel,
+    byPrimaryClassification: (summary.classificationProfile === 'GENERAL' ? summary.byPrimaryClassification : summary.bySphere || []).map((row: any) => ({
+      name: row.key,
+      color: row.color ?? null,
       gross: roundMoney(row.gross)
     })),
     byPaymentAccount: (summary.byPaymentAccount || []).map((row: any) => ({
@@ -70,6 +75,8 @@ function compactVoucherForAi(row: any) {
     date: row.date,
     type: row.type,
     sphere: row.sphere,
+    primaryClassificationValueId: row.primaryClassificationValueId ?? null,
+    primaryClassificationName: row.primaryClassificationName ?? null,
     description: row.description,
     counterparty: row.counterparty,
     grossAmount: roundMoney(row.grossAmount),
@@ -99,13 +106,20 @@ function compactPartyForAi(party: any) {
 }
 
 export function buildAiInvoiceContext(): AiContext {
+  const profile = getOrganizationProfile()
+  const definition = getOrganizationProfileDefinition()
+  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, color: value.color, icon: value.icon, isActive: value.isActive }))
   const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
   const budgets = listBudgets({ includeArchived: true } as any) || []
   const earmarks = listBindings({ activeOnly: true } as any) || []
   const tags = listTags({ includeUsage: true } as any) || []
   const parties = listParties({ activeOnly: true, limit: 500 }) || []
+  const aiRules = listAiKnowledgeRules({ enabledOnly: true, scope: 'INVOICES' })
 
   return {
+    organization: { profile, primaryClassificationLabel: definition.primaryLabel },
+    aiRules,
+    primaryClassifications,
     generatedAt: new Date().toISOString().slice(0, 10),
     paymentAccounts: paymentAccounts.map((account: any) => ({
       id: account.id,
@@ -149,12 +163,17 @@ export function buildAiInvoiceContext(): AiContext {
 export function buildAiContext(): AiContext {
   const today = new Date().toISOString().slice(0, 10)
   const currentYear = Number(today.slice(0, 4))
+  const profile = getOrganizationProfile()
+  const definition = getOrganizationProfileDefinition()
+  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, color: value.color, icon: value.icon, isActive: value.isActive }))
   const organization = (() => {
     try {
       const active = getActiveOrganization() as any
       return {
         name: active?.name ?? active?.displayName ?? null,
-        activeName: active?.name ?? active?.displayName ?? null
+        activeName: active?.name ?? active?.displayName ?? null,
+        profile,
+        primaryClassificationLabel: definition.primaryLabel
       }
     } catch {
       return undefined
@@ -165,6 +184,7 @@ export function buildAiContext(): AiContext {
   const earmarks = listBindings({} as any) || []
   const tags = listTags({ includeUsage: true } as any) || []
   const parties = listParties({ activeOnly: true, limit: 500 }) || []
+  const aiRules = listAiKnowledgeRules({ enabledOnly: true })
   const members = listMembers({ status: 'ALL', limit: 2000, sortBy: 'name', sort: 'ASC' } as any)
   const memberStatusCounts = members.rows.reduce<Record<string, number>>((acc, member: any) => {
     acc[member.status] = (acc[member.status] || 0) + 1
@@ -205,6 +225,8 @@ export function buildAiContext(): AiContext {
     status: invoice.status,
     voucherType: invoice.voucherType,
     sphere: invoice.sphere,
+    primaryClassificationValueId: invoice.primaryClassificationValueId ?? null,
+    primaryClassificationName: invoice.primaryClassificationName ?? null,
     budgetId: invoice.budgetId,
     tags: invoice.tags || []
   }))
@@ -233,6 +255,8 @@ export function buildAiContext(): AiContext {
   }))
   return {
     organization,
+    aiRules,
+    primaryClassifications,
     generatedAt: today,
     paymentAccounts: paymentAccounts.map((account: any) => ({
       id: account.id,

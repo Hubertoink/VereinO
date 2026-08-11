@@ -112,7 +112,15 @@ export type AiUsage = {
 }
 
 export type AiContext = {
-  organization?: { name?: string | null; activeName?: string | null }
+  organization?: { name?: string | null; activeName?: string | null; profile?: 'NONPROFIT' | 'GENERAL'; primaryClassificationLabel?: string | null }
+  aiRules?: Array<{
+    id: number
+    name: string
+    scope: 'ALL' | 'BOOKINGS' | 'INVOICES'
+    instruction: string
+    enabled?: number | boolean
+  }>
+  primaryClassifications?: Array<{ id: number; name: string; color?: string | null; icon?: string | null; isActive?: number | boolean }>
   paymentAccounts?: Array<{
     id: number
     name: string
@@ -546,6 +554,7 @@ function normalizeInvoiceExtraction(value: unknown) {
     warnings.unshift('Einordnung für Einnahme/Ausgabe oder Sphäre war unvollständig und wurde konservativ vorbelegt. Bitte prüfen.')
   }
   const paymentAccountId = nullableNumber(raw.paymentAccountId)
+  const primaryClassificationValueId = nullableNumber(raw.primaryClassificationValueId)
   const partyId = nullableNumber(raw.partyId)
   const vatRate = nullableNumber(raw.vatRate)
   return {
@@ -562,6 +571,9 @@ function normalizeInvoiceExtraction(value: unknown) {
     description: textOrNull(raw.description),
     type,
     sphere,
+    primaryClassificationValueId: primaryClassificationValueId != null && Number.isInteger(primaryClassificationValueId) && primaryClassificationValueId > 0
+      ? primaryClassificationValueId
+      : null,
     paymentMethod,
     paymentAccountId:
       paymentAccountId != null && Number.isInteger(paymentAccountId) && paymentAccountId > 0
@@ -619,6 +631,12 @@ export function normalizeUsage(response: any, model: string): AiUsage {
 export function compactContext(context: AiContext) {
   return {
     organization: context.organization,
+    aiRules: (context.aiRules || [])
+      .filter((rule) => rule.enabled !== 0 && rule.enabled !== false)
+      .map((rule) => ({ id: rule.id, name: rule.name, scope: rule.scope, instruction: rule.instruction })),
+    primaryClassifications: (context.primaryClassifications || [])
+      .filter((classification) => classification.isActive !== 0 && classification.isActive !== false)
+      .map((classification) => ({ id: classification.id, name: classification.name, color: classification.color, icon: classification.icon })),
     generatedAt: context.generatedAt,
     paymentAccounts: (context.paymentAccounts || [])
       .filter((account) => account.isActive !== 0)
@@ -913,8 +931,10 @@ export async function analyzeBookingDocuments(input: {
     'Wenn eine Quelle genau einen einzelnen Beleg oder Kassenbon enthaelt, erzeuge dafuer genau einen Kandidaten.',
     'Wenn eine Excel-/CSV-/Tabellendatei mehrere Buchungszeilen enthaelt, erstelle pro erkannter Buchungszeile einen eigenen Kandidaten.',
     'Erzeuge keine finale Buchung. Liefere nur Kandidaten, Warnungen und Evidenz.',
-    'Nutze Budget-, Zweckbindungs- und Konto-IDs nur aus dem bereitgestellten Kontext.',
+    'Nutze Kategorie-, Budget-, Zweckbindungs- und Konto-IDs nur aus dem bereitgestellten Kontext.',
+    'Bei Organisationen mit profile GENERAL ist primaryClassificationValueId verpflichtend: wähle ausschließlich eine passende Kategorie aus primaryClassifications. sphere bleibt aus technischen Gründen IDEELL.',
     'Bei Tags: Nutze vorhandene VereinO-Tags, wenn sie passen. Wenn eine Datei eine Tag-/Kategorie-Spalte mit einem noch nicht vorhandenen Tag enthaelt, uebernimm den Tag-Namen trotzdem als vorgeschlagenen Tag und ergaenze eine Warnung, dass der Tag vor dem Buchen angelegt werden muss.',
+    'Wende aktive aiRules mit Geltungsbereich ALL oder BOOKINGS verbindlich an, sobald ihre beschriebene Bedingung erfüllt ist. Nutze dabei nur vorhandene Stammdaten-IDs.',
     'Wenn ein Feld unsicher ist, waehle den plausibelsten Wert und ergaenze eine Warnung.',
     'Betrage werden in Euro als positive Zahlen geliefert. Ausgabe/Einnahme steckt in type.',
     '',
@@ -1104,7 +1124,7 @@ async function validateTransientInvoiceFile(file: AiInputFile) {
 
 export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
-  context: Pick<AiContext, 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
+  context: Pick<AiContext, 'organization' | 'aiRules' | 'primaryClassifications' | 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
   localDocumentText?: string | null
   guidance?: {
     instructions?: string
@@ -1150,6 +1170,11 @@ export async function analyzeInvoiceDocument(input: {
     }
   }
   const context = {
+    organization: input.context.organization,
+    aiRules: (input.context.aiRules || [])
+      .filter((rule) => rule.enabled !== 0 && rule.enabled !== false)
+      .map((rule) => ({ id: rule.id, name: rule.name, instruction: rule.instruction })),
+    primaryClassifications: (input.context.primaryClassifications || []).filter((classification) => classification.isActive !== 0 && classification.isActive !== false).map((classification) => ({ id: classification.id, name: classification.name, color: classification.color, icon: classification.icon })),
     generatedAt: input.context.generatedAt,
     paymentAccounts: (input.context.paymentAccounts || [])
       .filter((account) => account.isActive !== 0)
@@ -1186,9 +1211,13 @@ export async function analyzeInvoiceDocument(input: {
     'Erfinde keine Werte: Nutze null, leere Arrays und Warnungen, wenn etwas nicht sicher erkennbar ist.',
     'Bewahre Rechnungsnummer und IBAN exakt; Datumswerte muessen YYYY-MM-DD sein.',
     'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt Einnahme oder Ausgabe.',
-    'Nutze Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
+    'Nutze Kategorie-, Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
+    'Wenn organization.profile GENERAL ist, setze primaryClassificationValueId zwingend auf eine passende Kategorie aus primaryClassifications. sphere bleibt dann technisch IDEELL.',
     'Setze partyId nur bei einem eindeutig passenden vorhandenen Geschäftspartner (Name, rechtlicher Name, E-Mail, IBAN-Endziffern oder USt-IdNr.). Erfinde niemals einen Partner oder eine ID; bei keinem sicheren Treffer ist partyId null.',
     'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
+    context.aiRules.length
+      ? 'Wende die folgenden organisationsweiten KI-Regeln verbindlich an. Nutze für Tags, Budgets und andere Zuordnungen ausschließlich IDs aus dem Stammdatenkontext; bei nicht erfüllter Bedingung greift die Regel nicht.'
+      : '',
     input.guidance?.instructions?.trim() || input.guidance?.defaults
       ? 'Die folgenden Angaben stammen vom Nutzer und sind Buchungsvorgaben, nicht Dokumentevidenz. Übernimm nur ausdrücklich gesetzte Vorgabefelder; bei einem Widerspruch zum Beleg ergänze eine Warnung.'
       : '',

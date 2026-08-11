@@ -12,6 +12,7 @@ import type {
   LocalInvoiceScanResult
 } from './components/modals/LocalInvoiceScanModal'
 import type { InvoiceAiGuidance } from './types/invoiceAiGuidance'
+import type { OrganizationProfile } from '../../shared/classification'
 import { ToastProvider } from './context/ToastContext'
 import { useToast } from './context/useToast'
 import { UIPreferencesProvider } from './context/UIPreferences'
@@ -183,6 +184,7 @@ function resetVoucherFilters(options: {
   setFilterPM: ClearOptionalText
   setFilterPaymentAccountId: SetOptionalNumber
   setFilterSphere: ClearOptionalText
+  setFilterPrimaryClassification?: SetOptionalNumber
   setQ: (value: string) => void
   setFrom?: (value: string) => void
   setTo?: (value: string) => void
@@ -195,6 +197,7 @@ function resetVoucherFilters(options: {
   options.setFilterPM(null)
   options.setFilterPaymentAccountId(null)
   options.setFilterSphere(null)
+  options.setFilterPrimaryClassification?.(null)
   options.setQ('')
   if (!options.keepDateRange) {
     options.setFrom?.('')
@@ -385,6 +388,9 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
     earmarks,
     tags: Array.isArray(row.tags) ? row.tags : []
   }
+  if (typeof row.primaryClassificationValueId === 'number') {
+    payload.primaryClassificationValueId = row.primaryClassificationValueId
+  }
 
   if (row.type === 'TRANSFER') {
     payload.paymentMethod = null
@@ -448,6 +454,7 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
         date: result.fields.invoiceDate,
         type: result.bookingMeta.type === 'IN' ? 'IN' : 'OUT',
         sphere: result.bookingMeta.sphere || 'IDEELL',
+        primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? undefined,
         mode: 'GROSS',
         grossAmount,
         vatRate: 0,
@@ -497,6 +504,7 @@ function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
     bookingMeta: {
       type: result?.type === 'IN' ? 'IN' : 'OUT',
       sphere: result?.sphere || 'IDEELL',
+      primaryClassificationValueId: result?.primaryClassificationValueId ?? null,
       paymentMethod: result?.paymentMethod === 'BAR' ? 'BAR' : 'BANK',
       paymentAccountId: result?.paymentAccountId ?? null
     },
@@ -1464,6 +1472,20 @@ function AppInner() {
 
   // Pending submissions count for nav badge
   const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
+  const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>('NONPROFIT')
+
+  useEffect(() => {
+    let alive = true
+    void window.api?.classifications?.primary?.list?.()
+      .then((result) => {
+        if (alive && result?.profile) setOrganizationProfile(result.profile)
+      })
+      .catch(() => {
+        // Existing installations remain in the established non-profit mode if
+        // the profile table cannot be read during startup recovery.
+      })
+    return () => { alive = false }
+  }, [])
 
   // Open bank transactions count for nav badge
   const [openBankImportsCount, setOpenBankImportsCount] = useState(0)
@@ -1587,14 +1609,21 @@ function AppInner() {
     [requiredNavItems]
   )
   const visibleNavSet = useMemo(() => new Set(visibleNavItems), [visibleNavItems])
+  const profileAllowedNavSet = useMemo(() => {
+    if (organizationProfile !== 'GENERAL') return new Set(navItems.map((item) => item.key))
+    return new Set<NavKey>([
+      'Dashboard', 'Buchungen', 'Dauerbuchungen', 'Bankimport', 'Verbindlichkeiten',
+      'Vorschuesse', 'Budgets', 'KI', 'Belege', 'Reports', 'Einstellungen'
+    ])
+  }, [organizationProfile])
   const visibleNavigationItems = useMemo(
-    () => navItems.filter((item) => visibleNavSet.has(item.key)),
-    [visibleNavSet]
+    () => navItems.filter((item) => visibleNavSet.has(item.key) && profileAllowedNavSet.has(item.key)),
+    [profileAllowedNavSet, visibleNavSet]
   )
   useEffect(() => {
-    if (visibleNavSet.has(activePage)) return
+    if (visibleNavSet.has(activePage) && profileAllowedNavSet.has(activePage)) return
     setActivePage(visibleNavSet.has('Dashboard') ? 'Dashboard' : 'Buchungen')
-  }, [activePage, visibleNavSet])
+  }, [activePage, profileAllowedNavSet, visibleNavSet])
   useEffect(() => {
     if (activePage === 'KI') setAiViewMounted(true)
   }, [activePage])
@@ -2759,6 +2788,7 @@ function AppInner() {
   const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(
     null
   )
+  const [filterPrimaryClassificationValueId, setFilterPrimaryClassificationValueId] = useState<number | null>(null)
   const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null>(null)
   const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
   const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
@@ -2829,6 +2859,8 @@ function AppInner() {
         label: `Sphäre: ${filterSphere}`,
         clear: () => setFilterSphere(null)
       })
+    if (filterPrimaryClassificationValueId != null)
+      list.push({ key: 'primary-classification', label: `Kategorie: #${filterPrimaryClassificationValueId}`, clear: () => setFilterPrimaryClassificationValueId(null) })
     if (filterType)
       list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
     if (filterPaymentAccountId != null) {
@@ -2865,6 +2897,7 @@ function AppInner() {
     from,
     to,
     filterSphere,
+    filterPrimaryClassificationValueId,
     filterType,
     filterPM,
     filterPaymentAccountId,
@@ -3058,6 +3091,7 @@ function AppInner() {
         paymentMethod: filterPM || undefined,
         paymentAccountId: filterPaymentAccountId || undefined,
         sphere: filterSphere || undefined,
+        primaryClassificationValueId: filterPrimaryClassificationValueId || undefined,
         type: filterType || undefined,
         from: from || undefined,
         to: to || undefined,
@@ -3081,6 +3115,7 @@ function AppInner() {
     filterPM,
     filterPaymentAccountId,
     filterSphere,
+    filterPrimaryClassificationValueId,
     filterType,
     from,
     to,
@@ -3519,6 +3554,7 @@ function AppInner() {
 
           {activePage === 'Einstellungen' && (
             <SettingsView
+              organizationProfile={organizationProfile}
               defaultCols={defaultCols}
               defaultOrder={defaultOrder}
               cols={cols}
@@ -3717,6 +3753,15 @@ function AppInner() {
 
       {/* Quick-Add: full dialog or optional compact flyout */}
       {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
+        <>
+        <div
+          className="compact-booking-flyout-dismiss"
+          role="presentation"
+          onMouseDown={(event) => {
+            event.preventDefault()
+            parkQuickAdd()
+          }}
+        />
         <div className={`compact-booking-flyout-anchor${activePage === 'Buchungen' ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
           <CompactBookingFlyout
             key={activeDraftId ?? 'compact-quick-add'}
@@ -3746,6 +3791,7 @@ function AppInner() {
             onNewDraft={triggerBookingEntry}
           />
         </div>
+        </>
       )}
       {quickAdd && activeDraftKind === 'booking' && (bookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
         <QuickAddModal
@@ -3955,10 +4001,12 @@ function AppInner() {
         earmarks={earmarks}
         budgets={budgets}
         sphere={filterSphere}
+        primaryClassificationValueId={filterPrimaryClassificationValueId}
         earmarkId={filterEarmark}
         budgetId={filterBudgetId}
-        onApply={({ sphere, earmarkId, budgetId }) => {
+        onApply={({ sphere, primaryClassificationValueId, earmarkId, budgetId }) => {
           setFilterSphere(sphere)
+          setFilterPrimaryClassificationValueId(primaryClassificationValueId)
           setFilterEarmark(earmarkId)
           setFilterBudgetId(budgetId)
         }}

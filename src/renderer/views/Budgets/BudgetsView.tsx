@@ -7,6 +7,8 @@ type Budget = {
   id: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
+  primaryClassificationName?: string | null
   categoryId: number | null
   projectId: number | null
   earmarkId: number | null
@@ -25,6 +27,7 @@ type BudgetEdit = {
   id?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   categoryId?: number | null
   projectId?: number | null
   earmarkId?: number | null
@@ -134,6 +137,7 @@ export default function BudgetsView({
       id: b.id,
       year: b.year,
       sphere: b.sphere,
+      primaryClassificationValueId: b.primaryClassificationValueId ?? null,
       amountPlanned: b.amountPlanned,
       name: b.name ?? null,
       categoryName: b.categoryName ?? null,
@@ -162,7 +166,8 @@ export default function BudgetsView({
             onClick={() =>
               setEditBudget({
                 year: new Date().getFullYear(),
-                sphere: 'IDEELL',
+      sphere: 'IDEELL',
+      primaryClassificationValueId: null,
                 amountPlanned: 0,
                 categoryId: null,
                 projectId: null,
@@ -264,6 +269,7 @@ export default function BudgetsView({
                         id: b.id,
                         year: b.year,
                         sphere: b.sphere,
+                        primaryClassificationValueId: b.primaryClassificationValueId ?? null,
                         categoryId: b.categoryId ?? null,
                         projectId: b.projectId ?? null,
                         earmarkId: b.earmarkId ?? null,
@@ -350,6 +356,7 @@ export default function BudgetsView({
             id: b.id,
             year: b.year,
             sphere: b.sphere,
+            primaryClassificationValueId: b.primaryClassificationValueId ?? null,
             categoryId: b.categoryId ?? null,
             projectId: b.projectId ?? null,
             earmarkId: b.earmarkId ?? null,

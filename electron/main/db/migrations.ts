@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { CLASSIFICATION_SCHEME_KEYS, NONPROFIT_SPHERE_KEYS } from '../../../shared/classification'
 type DB = InstanceType<typeof Database>
 
 type Mig = { version: number; up: string | ((db: DB) => void) }
@@ -771,8 +772,150 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensureRecurringBookingTables(db)
     }
+  },
+  {
+    version: 40,
+    up: (db: DB) => {
+      ensureOrganizationClassificationTables(db)
+    }
+  },
+  {
+    version: 41,
+    up: (db: DB) => {
+      ensureOrganizationClassificationTables(db)
+    }
   }
 ]
+
+function tableExists(db: DB, table: string) {
+  const row = db
+    .prepare("SELECT 1 as existsFlag FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(table) as { existsFlag?: number } | undefined
+  return Number(row?.existsFlag || 0) === 1
+}
+
+function ensureNullableIntegerColumn(db: DB, table: string, column: string) {
+  if (!tableExists(db, table)) return false
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (columns.some((entry) => entry.name === column)) return false
+  // SQLite cannot add a foreign-key constraint to an existing table safely.
+  // Values are therefore validated by the repository and never hard-deleted.
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER`)
+  return true
+}
+
+/**
+ * Adds the neutral primary-classification model without changing legacy sphere
+ * columns. Existing organisations are explicitly kept in the NONPROFIT profile
+ * and every legacy sphere is mapped to its immutable system value.
+ */
+export function ensureOrganizationClassificationTables(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS organization_profile (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      profile TEXT NOT NULL CHECK(profile IN ('NONPROFIT', 'GENERAL')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS classification_schemes (
+      id INTEGER PRIMARY KEY,
+      key TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      label_plural TEXT NOT NULL,
+      description TEXT,
+      required INTEGER NOT NULL DEFAULT 1 CHECK(required IN (0, 1)),
+      is_system INTEGER NOT NULL DEFAULT 0 CHECK(is_system IN (0, 1)),
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS classification_values (
+      id INTEGER PRIMARY KEY,
+      scheme_id INTEGER NOT NULL REFERENCES classification_schemes(id) ON DELETE RESTRICT,
+      stable_key TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT,
+      icon TEXT,
+      description TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_system INTEGER NOT NULL DEFAULT 0 CHECK(is_system IN (0, 1)),
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE(scheme_id, stable_key),
+      UNIQUE(scheme_id, name COLLATE NOCASE)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_classification_values_scheme_active
+      ON classification_values(scheme_id, is_active, sort_order);
+  `)
+
+  const valueColumns = db.prepare('PRAGMA table_info(classification_values)').all() as Array<{ name: string }>
+  if (!valueColumns.some((column) => column.name === 'icon')) {
+    db.exec('ALTER TABLE classification_values ADD COLUMN icon TEXT;')
+  }
+
+  db.prepare("INSERT OR IGNORE INTO organization_profile(id, profile) VALUES (1, 'NONPROFIT')").run()
+  db.prepare(`
+    INSERT OR IGNORE INTO classification_schemes(key, label, label_plural, description, required, is_system, is_active)
+    VALUES (?, 'Sphäre', 'Sphären', 'Gemeinnützigkeitsrelevante Tätigkeitsbereiche.', 1, 1, 1)
+  `).run(CLASSIFICATION_SCHEME_KEYS.nonprofit)
+  db.prepare(`
+    INSERT OR IGNORE INTO classification_schemes(key, label, label_plural, description, required, is_system, is_active)
+    VALUES (?, 'Kategorie', 'Kategorien', 'Frei definierbare primäre Budgetkategorien.', 1, 1, 1)
+  `).run(CLASSIFICATION_SCHEME_KEYS.general)
+
+  const nonprofitScheme = db
+    .prepare('SELECT id FROM classification_schemes WHERE key = ?')
+    .get(CLASSIFICATION_SCHEME_KEYS.nonprofit) as { id: number }
+  const nonprofitValues: Array<{ key: (typeof NONPROFIT_SPHERE_KEYS)[number]; name: string; color: string }> = [
+    { key: 'IDEELL', name: 'Ideeller Bereich', color: '#6aa6ff' },
+    { key: 'ZWECK', name: 'Zweckbetrieb', color: '#f5c451' },
+    { key: 'VERMOEGEN', name: 'Vermögensverwaltung', color: '#aab3c2' },
+    { key: 'WGB', name: 'Wirtschaftlicher Geschäftsbetrieb', color: '#8bb9ff' }
+  ]
+  const insertValue = db.prepare(`
+    INSERT OR IGNORE INTO classification_values(scheme_id, stable_key, name, color, sort_order, is_system, is_active)
+    VALUES (?, ?, ?, ?, ?, 1, 1)
+  `)
+  nonprofitValues.forEach((value, index) => {
+    insertValue.run(nonprofitScheme.id, value.key, value.name, value.color, index + 1)
+  })
+
+  const classifiedTables = [
+    'accounts',
+    'categories',
+    'vouchers',
+    'budgets',
+    'invoices',
+    'submissions',
+    'recurring_bookings',
+    'member_advance_purchases'
+  ]
+  for (const table of classifiedTables) {
+    ensureNullableIntegerColumn(db, table, 'primary_classification_value_id')
+    if (tableExists(db, table)) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_${table}_primary_classification
+        ON ${table}(primary_classification_value_id);
+      `)
+      db.exec(`
+        UPDATE ${table}
+        SET primary_classification_value_id = (
+          SELECT cv.id
+          FROM classification_values cv
+          JOIN classification_schemes cs ON cs.id = cv.scheme_id
+          WHERE cs.key = '${CLASSIFICATION_SCHEME_KEYS.nonprofit}'
+            AND cv.stable_key = ${table}.sphere
+        )
+        WHERE primary_classification_value_id IS NULL
+          AND sphere IN ('IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB');
+      `)
+    }
+  }
+}
 
 export function ensureRecurringBookingTables(db: DB) {
   db.exec(`
@@ -880,6 +1023,9 @@ export function ensurePartyTables(db: DB) {
 }
 
 export function ensureJournalPerformanceIndexes(db: DB) {
+  // New organization databases can reach migration 36 before the older
+  // payment-account migration has run. Ensure the indexed columns exist first.
+  ensureVoucherColumns(db)
   db.exec(`
     -- Journal pagination and its most common filters/sorts.
     CREATE INDEX IF NOT EXISTS idx_vouchers_date_id

@@ -5,7 +5,11 @@ import TagsEditor from './TagsEditor'
 import HoverTooltip from './common/HoverTooltip'
 import PartySelector from './common/PartySelector'
 import SelectDropdown, { SuggestionInput } from './common/SelectDropdown'
+import DatePickerButton from './common/DatePickerButton'
 import { getInternalAssignmentValidationState } from './modals/voucherMetaValidation'
+import BookingOptionalArea from './booking/BookingOptionalArea'
+import { type BookingOptionalAction } from './booking/BookingOptionalActionBar'
+import BookingKindSwitch from './booking/BookingKindSwitch'
 
 type OptionalSection = 'budget' | 'earmark' | 'party' | 'tags' | 'comment' | 'attachments'
 type BudgetAssignment = { budgetId: number; amount: number }
@@ -42,9 +46,11 @@ type PaymentAccount = {
 type Props = {
   qa: QA
   setQa: (qa: QA) => void
+  kindOptions?: Array<{ value: QA['type']; label: string }>
   onSave: () => void | Promise<void>
   onClose: () => void
   onExpand: () => void
+  showExpand?: boolean
   files: File[]
   setFiles: (files: File[]) => void
   onDropFiles: (files: FileList | null) => void
@@ -118,19 +124,22 @@ function initialSections(qa: QA, files: File[]) {
   if (qa.tags?.length) sections.add('tags')
   if (qa.note?.trim()) sections.add('comment')
   if (files.length) sections.add('attachments')
-  if (qa.type === 'INTERNAL') {
-    sections.add('budget')
-    sections.add('earmark')
-  }
   return sections
 }
 
 export default function CompactBookingFlyout({
   qa,
   setQa,
+  kindOptions = [
+    { value: 'IN', label: 'Einnahme' },
+    { value: 'OUT', label: 'Ausgabe' },
+    { value: 'TRANSFER', label: 'Umbuchung' },
+    { value: 'INTERNAL', label: 'Intern' }
+  ],
   onSave,
   onClose,
   onExpand,
+  showExpand = true,
   files,
   setFiles,
   onDropFiles,
@@ -149,7 +158,20 @@ export default function CompactBookingFlyout({
   onNewDraft
 }: Props) {
   const amountInputRef = useRef<HTMLInputElement | null>(null)
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
+  const [classification, setClassification] = useState<null | { profile: string; label: string; values: Array<any> }>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.api?.classifications?.primary?.list?.()
+      .then((result) => {
+        if (!alive || !result) return
+        setClassification({ profile: result.profile, label: result.definition.primaryLabel, values: result.values || [] })
+      })
+      .catch(() => { if (alive) setClassification(null) })
+    return () => { alive = false }
+  }, [])
 
   const gross = grossAmount(qa)
   const budgets = (qa.budgets || []) as BudgetAssignment[]
@@ -259,11 +281,6 @@ export default function CompactBookingFlyout({
     window.setTimeout(() => amountInputRef.current?.focus(), 0)
   }, [])
 
-  useEffect(() => {
-    if (qa.type !== 'INTERNAL') return
-    setVisibleSections((current) => new Set([...current, 'budget', 'earmark']))
-  }, [qa.type])
-
   const patchQa = (patch: Partial<QA>) => setQa({ ...qa, ...patch } as QA)
 
   const selectType = (type: QA['type']) => {
@@ -301,14 +318,13 @@ export default function CompactBookingFlyout({
   }
 
   const setSectionVisible = (section: OptionalSection) => {
-    if (!visibleSections.has(section) && section === 'budget' && budgets.length === 0 && qa.type !== 'INTERNAL') {
+    if (!visibleSections.has(section) && section === 'budget' && budgets.length === 0) {
       patchQa({ budgets: [{ budgetId: 0, amount: gross }] })
     }
-    if (!visibleSections.has(section) && section === 'earmark' && assignedEarmarks.length === 0 && qa.type !== 'INTERNAL') {
+    if (!visibleSections.has(section) && section === 'earmark' && assignedEarmarks.length === 0) {
       patchQa({ earmarksAssigned: [{ earmarkId: 0, amount: gross }] })
     }
     setVisibleSections((current) => {
-      if (qa.type === 'INTERNAL' && (section === 'budget' || section === 'earmark')) return current
       const next = new Set(current)
       if (next.has(section)) next.delete(section)
       else next.add(section)
@@ -323,13 +339,11 @@ export default function CompactBookingFlyout({
     if (section === 'party') patchQa({ partyId: null, counterparty: '' })
     if (section === 'comment') patchQa({ note: '' })
     if (section === 'attachments') setFiles([])
-    if (qa.type !== 'INTERNAL' || (section !== 'budget' && section !== 'earmark')) {
-      setVisibleSections((current) => {
-        const next = new Set(current)
-        next.delete(section)
-        return next
-      })
-    }
+    setVisibleSections((current) => {
+      const next = new Set(current)
+      next.delete(section)
+      return next
+    })
   }
 
   const nextInternalAssignmentAmount = () => {
@@ -383,7 +397,7 @@ export default function CompactBookingFlyout({
     void onSave()
   }
 
-  const optionalButtons: Array<{ key: OptionalSection; label: string; count?: number; disabled?: boolean }> = [
+  const optionalButtons: Array<BookingOptionalAction & { key: OptionalSection }> = [
     { key: 'budget', label: 'Budget', count: budgets.length, disabled: !activeBudgets.length },
     { key: 'earmark', label: 'Zweckbindung', count: assignedEarmarks.length, disabled: !activeEarmarks.length },
     ...(qa.type === 'IN' || qa.type === 'OUT' ? [{ key: 'party' as const, label: qa.type === 'OUT' ? 'Lieferant' : 'Kunde', count: qa.counterparty?.trim() ? 1 : 0 }] : []),
@@ -411,7 +425,7 @@ export default function CompactBookingFlyout({
           </div>
         )}
         <div className="compact-booking-flyout__header-actions">
-          <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--expand" onClick={onExpand} title="Vollständigen Dialog öffnen" aria-label="Vollständigen Buchungsdialog öffnen">↗</button>
+          {showExpand && <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--expand" onClick={onExpand} title="Vollständigen Dialog öffnen" aria-label="Vollständigen Buchungsdialog öffnen">↗</button>}
           <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--close" onClick={onClose} aria-label={draftTabsEnabled ? 'Buchungsflyout parken' : 'Buchungsflyout schließen'}>✕</button>
         </div>
       </header>
@@ -419,19 +433,38 @@ export default function CompactBookingFlyout({
       <form className="compact-booking-flyout__form" onSubmit={(event) => { event.preventDefault(); save() }}>
         <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
-          <div className="compact-booking-kind" role="group" aria-label="Buchungsart wählen">
-            {([['IN', 'Einnahme'], ['OUT', 'Ausgabe'], ['TRANSFER', 'Umbuchung'], ['INTERNAL', 'Intern']] as const).map(([type, label]) => (
-              <button key={type} type="button" className={qa.type === type ? 'is-active' : ''} aria-pressed={qa.type === type} onClick={() => selectType(type)}>{label}</button>
-            ))}
-          </div>
+          <BookingKindSwitch
+            value={qa.type}
+            ariaLabel="Buchungsart wählen"
+            options={kindOptions}
+            onChange={(value) => selectType(value as QA['type'])}
+          />
 
           <div className="compact-booking-core-grid">
             <label className="compact-booking-field">
               <span>Datum *</span>
-              <input className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
+              <span className="booking-date-input-wrap">
+                <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
+                <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
+              </span>
             </label>
 
-            {qa.type !== 'TRANSFER' && (
+            {classification?.profile === 'GENERAL' ? (
+              <label className="compact-booking-field">
+                <span>Kategorie *</span>
+                <SelectDropdown
+                  value={String(qa.primaryClassificationValueId ?? '')}
+                  onChange={(value) => patchQa({ primaryClassificationValueId: value ? Number(value) : null })}
+                  ariaLabel="Kategorie der Buchung"
+                  placeholder="Kategorie wählen"
+                  options={classification.values.map((category) => ({
+                    value: String(category.id),
+                    label: category.isActive ? `${category.icon || ''} ${category.name}`.trim() : `${category.icon || ''} ${category.name} (archiviert)`.trim(),
+                    color: category.color || undefined
+                  }))}
+                />
+              </label>
+            ) : qa.type !== 'TRANSFER' && (
               <label className="compact-booking-field">
                 <span className="booking-field-label-row">
                   <span>Bereich</span>
@@ -545,16 +578,10 @@ export default function CompactBookingFlyout({
             <SuggestionInput value={qa.description} suggestions={descSuggest} onChange={(value) => patchQa({ description: value })} placeholder="Was wurde gebucht?" />
           </label>
 
-          <div className="compact-booking-optional-bar" aria-label="Weitere Buchungsfelder">
-            <span>Weitere Angaben</span>
-            <div>
-              {optionalButtons.map((item) => (
-                <button key={item.key} type="button" className={visibleSections.has(item.key) ? 'is-active' : ''} aria-pressed={visibleSections.has(item.key)} disabled={item.disabled} onClick={() => setSectionVisible(item.key)}>
-                  {visibleSections.has(item.key) ? '−' : '+'} {item.label}{item.count ? ` · ${item.count}` : ''}
-                </button>
-              ))}
-            </div>
-          </div>
+          <BookingOptionalArea
+            actions={optionalButtons.map((item) => ({ ...item, active: visibleSections.has(item.key) }))}
+            onToggle={(key) => setSectionVisible(key as OptionalSection)}
+          >
 
           {qa.type === 'INTERNAL' && (
             <div className="compact-booking-required-note">Interne Buchungen benötigen ausgeglichene Zuordnungen: Quelle negativ, Ziel positiv.</div>
@@ -580,7 +607,7 @@ export default function CompactBookingFlyout({
 
           {visibleSections.has('budget') && (
             <div className="compact-booking-optional-section" aria-label="Budget-Zuordnungen">
-              <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Budget (erforderlich, alternativ Zweckbindung)' : 'Budget'}</strong>{qa.type !== 'INTERNAL' && <button type="button" onClick={() => removeSection('budget')} aria-label="Budget-Feld entfernen">×</button>}</div>
+              <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Budget (erforderlich, alternativ Zweckbindung)' : 'Budget'}</strong><button type="button" onClick={() => removeSection('budget')} aria-label="Budget-Feld entfernen">×</button></div>
               {budgets.map((assignment, index) => (
                 <div className="compact-booking-assignment-row" key={`budget-${index}`}>
                   <SelectDropdown invalid={!assignment.budgetId || chosenBudgetIds.filter((id) => id === assignment.budgetId).length > 1 || invalidBudgetIds.has(assignment.budgetId)} value={assignment.budgetId ? String(assignment.budgetId) : ''} placeholder="Budget wählen" onChange={(value) => {
@@ -619,7 +646,7 @@ export default function CompactBookingFlyout({
 
           {visibleSections.has('earmark') && (
             <div className="compact-booking-optional-section" aria-label="Zweckbindungs-Zuordnungen">
-              <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Zweckbindung (erforderlich, alternativ Budget)' : 'Zweckbindung'}</strong>{qa.type !== 'INTERNAL' && <button type="button" onClick={() => removeSection('earmark')} aria-label="Zweckbindungs-Feld entfernen">×</button>}</div>
+              <div className="compact-booking-section-title"><strong>{qa.type === 'INTERNAL' ? 'Zweckbindung (erforderlich, alternativ Budget)' : 'Zweckbindung'}</strong><button type="button" onClick={() => removeSection('earmark')} aria-label="Zweckbindungs-Feld entfernen">×</button></div>
               {assignedEarmarks.map((assignment, index) => (
                 <div className="compact-booking-assignment-row" key={`earmark-${index}`}>
                   <SelectDropdown invalid={!assignment.earmarkId || chosenEarmarkIds.filter((id) => id === assignment.earmarkId).length > 1 || invalidEarmarkIds.has(assignment.earmarkId)} value={assignment.earmarkId ? String(assignment.earmarkId) : ''} placeholder="Zweckbindung wählen" onChange={(value) => {
@@ -676,6 +703,7 @@ export default function CompactBookingFlyout({
               {!!files.length && <div className="compact-booking-files">{files.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${file.name} entfernen`}>×</button></span>)}</div>}
             </div>
           )}
+          </BookingOptionalArea>
         </div>
 
         <footer className="compact-booking-flyout__footer">

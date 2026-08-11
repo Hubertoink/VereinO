@@ -107,6 +107,8 @@ function Donut({ data, colors, title }: { data: Array<{ key: string; value: numb
 
 export default function SphereShareCard({ from, to }: CommonFilters) {
   const [bySphere, setBySphere] = useState<Array<{ key: string; gross: number }>>([])
+  const [classificationLabel, setClassificationLabel] = useState('Sphären')
+  const [classificationColors, setClassificationColors] = useState<Record<string, string>>({})
   const [byAccount, setByAccount] = useState<Array<{ key: string; gross: number; color?: string | null }>>([])
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
@@ -116,12 +118,17 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
       try {
         const s = await (window as any).api?.reports?.summary?.({ from, to })
         if (!alive || !s) return
-        setBySphere((s.bySphere || []).map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
+        const rows = s.classificationProfile === 'GENERAL'
+          ? (s.byPrimaryClassification || [])
+          : (s.bySphere || [])
+        setBySphere(rows.map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0) })))
+        setClassificationLabel(s.primaryClassificationLabel ? `${s.primaryClassificationLabel}n` : 'Sphären')
+        setClassificationColors(Object.fromEntries(rows.map((x: any) => [String(x.key), x.color || ''])))
         const accountRows = Array.isArray(s.byPaymentAccount) && s.byPaymentAccount.length
           ? s.byPaymentAccount
           : (s.byPaymentMethod || []).filter((x: any) => x.key === 'BAR' || x.key === 'BANK')
         setByAccount(accountRows.map((x: any) => ({ key: String(x.key), gross: Number(x.gross || 0), color: x.color || null })))
-      } catch { if (alive) { setBySphere([]); setByAccount([]) } }
+      } catch { if (alive) { setBySphere([]); setByAccount([]); setClassificationColors({}) } }
     }
     load()
     const onChanged = () => load()
@@ -135,6 +142,10 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
     VERMOEGEN: '#9575cd',
     WGB: '#ffb74d',
   }
+  const primaryColors = Object.fromEntries(bySphere.map((row, index) => [
+    row.key,
+    classificationColors[row.key] || sphereColors[row.key] || ['#64b5f6', '#4db6ac', '#9575cd', '#ffb74d', '#66bb6a'][index % 5]
+  ]))
   const accountColors: Record<string, string> = Object.fromEntries(byAccount.map((account, index) => [account.key, account.color || ['#42a5f5', '#26a69a', '#ab47bc', '#ffb74d', '#66bb6a'][index % 5]]))
 
   const sphereData = bySphere.filter(x => (x.gross || 0) !== 0)
@@ -143,11 +154,11 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
   return (
     <section className="card dither-chart-card" style={{ padding: 12 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <strong>Sphären-Anteile</strong>
+        <strong>{classificationLabel}-Anteile</strong>
         <span className="helper">{from} → {to}</span>
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'center' }}>
-        <Donut title="Sphären" data={sphereData.map(s => ({ key: s.key, value: Math.abs(s.gross) }))} colors={sphereColors} />
+        <Donut title={classificationLabel} data={sphereData.map(s => ({ key: s.key, value: Math.abs(s.gross) }))} colors={primaryColors} />
         <Donut title="Zahlungskonten" data={accountData.map(p => ({ key: String(p.key), value: Math.abs(p.gross) }))} colors={accountColors} />
         <div>
           <div className="helper">Legende</div>
@@ -155,7 +166,7 @@ export default function SphereShareCard({ from, to }: CommonFilters) {
             {sphereData.map(s => (
               <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: sphereColors[s.key] || 'var(--accent)' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: primaryColors[s.key] || 'var(--accent)' }} />
                   {s.key}
                 </span>
                 <span>{eur.format(Math.abs(s.gross))}</span>

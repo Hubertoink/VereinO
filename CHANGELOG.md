@@ -5,6 +5,30 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.3.0] - 2026-08-11
+
+### Hinzugefügt
+
+- Organisationsprofile: Eine Organisation kann als Verein/gemeinnützig oder als allgemeine Budgetverwaltung geführt werden.
+- Allgemeine Budgetverwaltung: Frei angelegte Kategorien mit Farben und Zeichen ersetzen in diesem Profil die festen gemeinnützigen Sphären.
+- Kategorieverwaltung: Kategorien können angelegt, bearbeitet, eingefärbt und archiviert werden; Buchungen, Journale, Rechnungen, Budgets und Vorschüsse verwenden die profildynamische Hauptklassifikation.
+- KI-Regelkatalog: Organisationsweite Regeln für Händler, Beträge, Tags, Budgets und Kategorien können aktiviert, bearbeitet und gelöscht werden.
+- Tesseract OCR: Lokale OCR-Unterstützung für Beleg- und Rechnungserkennung mit deutscher und englischer Sprachunterstützung.
+- Gemeinsame Buchungsdialoge: Buchungen, Dauerbuchungen, Verbindlichkeiten, Vorschussbuchungen und Rechnungserfassung teilen sich ein einheitliches Flyout-/Modal-Design.
+
+### Geändert
+
+- KI-Kontext, Vorschläge, Belegscan, Agent-Aktionen, Importe und Exporte berücksichtigen Organisationsprofil und verfügbare Kategorien.
+- Journal, Buchungsdetails, Auswertungen und Exporte zeigen bei allgemeiner Budgetverwaltung „Kategorie“ statt „Sphäre“.
+- Vorschüsse, Budgets, Bankimport, Einreichungen und Rechnungsaktionen speichern Klassifikationen über stabile Kategorie-IDs.
+- Migrationen aktualisieren bestehende Datenbanken sicher auf die profildynamische Klassifikationsstruktur.
+
+### Behoben
+
+- Kategorien werden im Vereinsprofil nicht mehr als eigener Einstellungsbereich angeboten; dort bleiben die festen Sphären maßgeblich.
+- Buchungsarten, Farbzustände, Datumsfelder und optionale Angaben sind in den verwandten Buchungsformularen visuell konsistent.
+- KI-Regeln und Flyouts behandeln fehlende oder veraltete API-Funktionen kontrolliert und ohne Folgefehler.
+
 ## [3.1.1] - 2026-07-21
 
 ### Geändert

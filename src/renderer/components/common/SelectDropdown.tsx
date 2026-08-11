@@ -38,14 +38,17 @@ function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement |
     const anchor = anchorRef.current
     if (!anchor) return
     const rect = anchor.getBoundingClientRect()
-    const gap = 10
+    // The menu deliberately touches its trigger.  Besides looking like one
+    // control, this also avoids a pointer-sized gap that could close portal
+    // menus while moving from the field to an option.
+    const gap = 0
     const below = window.innerHeight - rect.bottom
     const above = rect.top
     const placeAbove = menuPlacement === 'top' || (menuPlacement !== 'bottom' && below < 230 && above > below)
     setPosition({
       left: rect.left,
       width: rect.width,
-      ...(placeAbove ? { bottom: window.innerHeight - rect.top + gap } : { top: rect.bottom + gap }),
+      ...(placeAbove ? { bottom: window.innerHeight - rect.top - 1 } : { top: rect.bottom - 1 }),
       maxHeight: Math.min(280, Math.max(120, (placeAbove ? above : below) - gap))
     })
   }, [anchorRef, menuPlacement])
@@ -178,18 +181,18 @@ export function SuggestionInput({ value, suggestions, onChange, id, ariaLabel, p
         placeholder={placeholder}
         aria-label={ariaLabel}
         autoComplete="off"
-        onFocus={() => setOpen(true)}
-        onChange={(event) => { onChange(event.target.value); setOpen(true) }}
+        onFocus={() => setOpen(suggestions.length > 0)}
+        onChange={(event) => { onChange(event.target.value); setOpen(suggestions.length > 0) }}
         onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}
       />
-      <button type="button" className="suggestion-input__toggle" aria-label="Beschreibungsvorschläge anzeigen" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpen((current) => !current)}>
+      {suggestions.length > 0 && <button type="button" className="suggestion-input__toggle" aria-label="Beschreibungsvorschläge anzeigen" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpen((current) => !current)}>
         <span className="select-dropdown__chevron" aria-hidden="true" />
-      </button>
-      {open && menuPosition && createPortal(
+      </button>}
+      {open && matches.length > 0 && menuPosition && createPortal(
         <div ref={menuRef} className="select-dropdown__menu select-dropdown__menu--portal" style={menuPosition} role="listbox">
-          {matches.length ? matches.map((suggestion) => (
+          {matches.map((suggestion) => (
             <button key={suggestion} type="button" role="option" onClick={() => { onChange(suggestion); setOpen(false); inputRef.current?.focus() }}><span><strong>{suggestion}</strong></span></button>
-          )) : <div className="select-dropdown__empty">Keine passende Beschreibung gefunden.</div>}
+          ))}
         </div>,
         document.body
       )}

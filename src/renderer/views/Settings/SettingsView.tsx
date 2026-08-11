@@ -6,6 +6,7 @@ import { TablePane } from './panes/TablePane'
 import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
 import { OrgPane } from './panes/OrgPane'
+import { CategoriesPane } from './panes/CategoriesPane'
 import { DonationsPane } from './panes/DonationsPane'
 import { PaymentAccountsPane } from './panes/PaymentAccountsPane'
 import { PartiesPane } from './panes/PartiesPane'
@@ -24,6 +25,7 @@ const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'docling',
   'import',
   'org',
+  'categories',
   'donations',
   'paymentAccounts',
   'parties',
@@ -62,6 +64,12 @@ export function SettingsView(props: SettingsProps) {
   const [orgLogo, setOrgLogo] = useState<string>('')
 
   useEffect(() => {
+    if (props.organizationProfile === 'NONPROFIT' && activeTile === 'categories') {
+      setActiveTile('org')
+    }
+  }, [activeTile, props.organizationProfile])
+
+  useEffect(() => {
     try {
       sessionStorage.setItem('settingsActiveTile', activeTile)
     } catch {
@@ -98,7 +106,7 @@ export function SettingsView(props: SettingsProps) {
         {orgLogo && <img src={orgLogo} alt="Vereinslogo" className="settings-heading-logo" />}
       </div>
       
-      <SettingsNav active={activeTile} onSelect={setActiveTile} />
+      <SettingsNav active={activeTile} onSelect={setActiveTile} organizationProfile={props.organizationProfile} />
       
       <div className="settings-content">
         {activeTile === 'general' && (
@@ -168,6 +176,8 @@ export function SettingsView(props: SettingsProps) {
   {activeTile === 'import' && <ImportPane notify={props.notify} />}
 
   {activeTile === 'org' && <OrgPane notify={props.notify} />}
+
+      {activeTile === 'categories' && <CategoriesPane notify={props.notify} />}
 
       {activeTile === 'donations' && <DonationsPane notify={props.notify} />}
 

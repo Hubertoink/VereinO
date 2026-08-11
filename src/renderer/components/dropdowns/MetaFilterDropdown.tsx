@@ -13,6 +13,7 @@ export interface MetaFilterDropdownProps {
   paymentAccountId?: number | null
   filterTag: string | null
   sphere: Sphere
+  primaryClassificationValueId?: number | null
   earmarkId: number | null
   budgetId: number | null
   tooltip?: string
@@ -22,6 +23,7 @@ export interface MetaFilterDropdownProps {
     paymentAccountId?: number | null
     filterTag: string | null
     sphere: Sphere
+    primaryClassificationValueId?: number | null
     earmarkId: number | null
     budgetId: number | null
   }) => void
@@ -37,6 +39,7 @@ export default function MetaFilterDropdown({
   paymentAccountId = null,
   filterTag,
   sphere,
+  primaryClassificationValueId = null,
   earmarkId,
   budgetId,
   onApply,
@@ -48,8 +51,11 @@ export default function MetaFilterDropdown({
   const [accountId, setAccountId] = useState<number | null>(paymentAccountId)
   const [tag, setTag] = useState<string | null>(filterTag)
   const [s, setS] = useState<Sphere>(sphere)
+  const [primary, setPrimary] = useState<number | null>(primaryClassificationValueId)
   const [e, setE] = useState<number | null>(earmarkId)
   const [b, setB] = useState<number | null>(budgetId)
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; icon?: string | null }>>([])
 
   useEffect(() => {
     setType(filterType)
@@ -57,11 +63,21 @@ export default function MetaFilterDropdown({
     setAccountId(paymentAccountId)
     setTag(filterTag)
     setS(sphere)
+    setPrimary(primaryClassificationValueId)
     setE(earmarkId)
     setB(budgetId)
-  }, [filterType, filterPM, paymentAccountId, filterTag, sphere, earmarkId, budgetId])
+  }, [filterType, filterPM, paymentAccountId, filterTag, sphere, primaryClassificationValueId, earmarkId, budgetId])
+  useEffect(() => {
+    let active = true
+    void window.api.classifications.primary.list().then((result) => {
+      if (!active) return
+      setIsGeneralProfile(result.profile === 'GENERAL')
+      setCategories(result.values.filter((category) => category.isActive !== false))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
 
-  const hasFilters = type != null || pm != null || accountId != null || tag != null || s != null || e != null || b != null
+  const hasFilters = type != null || pm != null || accountId != null || tag != null || s != null || primary != null || e != null || b != null
 
   const showTags = tagDefs.length > 0
   const showEarmarks = earmarks.length > 0
@@ -85,13 +101,14 @@ export default function MetaFilterDropdown({
     setAccountId(null)
     setTag(null)
     setS(null)
+    setPrimary(null)
     setE(null)
     setB(null)
-    onApply({ filterType: null, filterPM: null, paymentAccountId: null, filterTag: null, sphere: null, earmarkId: null, budgetId: null })
+    onApply({ filterType: null, filterPM: null, paymentAccountId: null, filterTag: null, sphere: null, primaryClassificationValueId: null, earmarkId: null, budgetId: null })
   }
 
   const handleApply = () => {
-    onApply({ filterType: type, filterPM: accountId == null ? pm : null, paymentAccountId: accountId, filterTag: tag, sphere: s, earmarkId: e, budgetId: b })
+    onApply({ filterType: type, filterPM: accountId == null ? pm : null, paymentAccountId: accountId, filterTag: tag, sphere: s, primaryClassificationValueId: primary, earmarkId: e, budgetId: b })
     closeRef.current?.()
   }
 
@@ -160,14 +177,17 @@ export default function MetaFilterDropdown({
         )}
 
         <div className="filter-dropdown__field">
-          <label className="filter-dropdown__label">Sphäre</label>
-          <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
+          <label className="filter-dropdown__label">{isGeneralProfile ? 'Kategorie' : 'Sphäre'}</label>
+          {isGeneralProfile ? <select className="input" value={primary ?? ''} onChange={(ev) => setPrimary(ev.target.value ? Number(ev.target.value) : null)}>
+            <option value="">Alle</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+          </select> : <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
             <option value="">Alle</option>
             <option value="IDEELL">IDEELL</option>
             <option value="ZWECK">ZWECK</option>
             <option value="VERMOEGEN">VERMOEGEN</option>
             <option value="WGB">WGB</option>
-          </select>
+          </select>}
         </div>
 
         {showEarmarks && (

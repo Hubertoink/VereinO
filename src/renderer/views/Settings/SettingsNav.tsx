@@ -1,9 +1,11 @@
 import React from 'react'
 import { TileKey } from './types'
+import type { OrganizationProfile } from '../../../../shared/classification'
 
 interface SettingsNavProps {
   active: TileKey
   onSelect: (key: TileKey) => void
+  organizationProfile: OrganizationProfile
 }
 
 const iconProps = {
@@ -25,6 +27,7 @@ const settingsIconColors: Record<TileKey, string> = {
   docling: '#8B5CF6',
   import: '#F50057',
   org: '#26A69A',
+  categories: '#F59E0B',
   donations: '#FF7043',
   paymentAccounts: '#1976D2',
   parties: '#26A69A',
@@ -114,6 +117,8 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
           <path d="M2 12l10 5 10-5" />
         </svg>
       )
+    case 'categories':
+      return <svg {...iconProps}><path d="M3 7h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" /><path d="M8 14h8" /></svg>
     case 'parties':
       return (
         <svg {...iconProps}>
@@ -220,6 +225,7 @@ const GROUPS: SettingsGroup[] = [
     label: 'Verein',
     items: [
       { key: 'org', label: 'Organisation', shortLabel: 'Orga' },
+      { key: 'categories', label: 'Kategorien', shortLabel: 'Kategorien' },
       { key: 'paymentAccounts', label: 'Konten', shortLabel: 'Konten' },
       { key: 'parties', label: 'Geschäftspartner', shortLabel: 'Partner' },
       { key: 'tags', label: 'Tags', shortLabel: 'Tags' },
@@ -237,9 +243,12 @@ const GROUPS: SettingsGroup[] = [
   },
 ]
 
-export function SettingsNav({ active, onSelect }: SettingsNavProps) {
+export function SettingsNav({ active, onSelect, organizationProfile }: SettingsNavProps) {
+  const groups = React.useMemo(() => organizationProfile === 'NONPROFIT'
+    ? GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => item.key !== 'categories') }))
+    : GROUPS, [organizationProfile])
   const activeGroupKey =
-    GROUPS.find((group) => group.items.some((item) => item.key === active))?.key ?? GROUPS[0].key
+    groups.find((group) => group.items.some((item) => item.key === active))?.key ?? groups[0].key
 
   const [openGroupKey, setOpenGroupKey] = React.useState<SettingsGroup['key'] | null>(null)
 
@@ -248,7 +257,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
   }, [active])
 
   const visibleGroupKey = openGroupKey ?? activeGroupKey
-  const visibleGroup = GROUPS.find((group) => group.key === visibleGroupKey) ?? GROUPS[0]
+  const visibleGroup = groups.find((group) => group.key === visibleGroupKey) ?? groups[0]
 
   return (
     <div
@@ -260,7 +269,7 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
       </div>
 
       <div className="settings-clusters" role="tablist" aria-label="Einstellungsbereiche">
-        {GROUPS.map((group) => {
+        {groups.map((group) => {
           const groupIsActive = group.key === activeGroupKey
           const groupIsOpen = group.key === visibleGroupKey
 

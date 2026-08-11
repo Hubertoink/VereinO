@@ -1,9 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagsEditor from '../../components/TagsEditor'
 import PartySelector from '../../components/common/PartySelector'
 import SelectDropdown from '../../components/common/SelectDropdown'
+import DatePickerButton from '../../components/common/DatePickerButton'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
+import BookingPopupFrame from '../../components/modals/BookingPopupFrame'
+import BookingOptionalArea from '../../components/booking/BookingOptionalArea'
+import BookingKindSwitch from '../../components/booking/BookingKindSwitch'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 import { localIsoDate, type RecurringFrequency } from '../../../../shared/recurrence'
 
@@ -18,6 +22,10 @@ type RecurringBooking = {
   name: string
   type: 'IN' | 'OUT'
   sphere: Sphere
+  primaryClassificationValueId: number | null
+  primaryClassificationName: string | null
+  primaryClassificationColor: string | null
+  primaryClassificationIcon: string | null
   description: string | null
   note: string | null
   counterparty: string | null
@@ -54,6 +62,7 @@ type Draft = Omit<RecurringBooking, 'id' | 'paymentAccountName' | 'budgetLabel' 
 
 type Lookup = { id: number; label: string; isArchived?: boolean; isActive?: boolean }
 type PaymentAccount = { id: number; name: string; kind: string; isActive?: boolean }
+type PrimaryClassification = { id: number; name: string; color: string | null; icon: string | null; isActive: boolean }
 
 const FREQUENCY_LABELS: Record<RecurringFrequency, string> = {
   WEEKLY: 'Wöchentlich',
@@ -102,6 +111,10 @@ function initialDraft(): Draft {
     name: '',
     type: 'OUT',
     sphere: 'IDEELL',
+    primaryClassificationValueId: null,
+    primaryClassificationName: null,
+    primaryClassificationColor: null,
+    primaryClassificationIcon: null,
     description: '',
     note: '',
     counterparty: '',
@@ -134,6 +147,10 @@ function draftFromRow(row: RecurringBooking): Draft {
     name: row.name,
     type: row.type,
     sphere: row.sphere,
+    primaryClassificationValueId: row.primaryClassificationValueId,
+    primaryClassificationName: row.primaryClassificationName,
+    primaryClassificationColor: row.primaryClassificationColor,
+    primaryClassificationIcon: row.primaryClassificationIcon,
     description: row.description,
     note: row.note,
     counterparty: row.counterparty,
@@ -161,6 +178,7 @@ function RecurringBookingModal({
   budgets,
   earmarks,
   tagNames,
+  anchorRect,
   onClose,
   onSaved,
   notify
@@ -170,12 +188,33 @@ function RecurringBookingModal({
   budgets: Lookup[]
   earmarks: Lookup[]
   tagNames: string[]
+  anchorRect?: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null
   onClose: () => void
   onSaved: () => void
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
   const [draft, setDraft] = useState(value)
+  const startDateInputRef = useRef<HTMLInputElement | null>(null)
+  const nextDueDateInputRef = useRef<HTMLInputElement | null>(null)
+  const endDateInputRef = useRef<HTMLInputElement | null>(null)
   const [saving, setSaving] = useState(false)
+  const [visibleExtras, setVisibleExtras] = useState<Set<'budget' | 'earmark' | 'tags' | 'comment'>>(() => new Set([
+    ...(value.budgets.length ? ['budget' as const] : []),
+    ...(value.earmarks.length ? ['earmark' as const] : []),
+    ...(value.tags.length ? ['tags' as const] : []),
+    ...(value.note ? ['comment' as const] : [])
+  ]))
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [categories, setCategories] = useState<PrimaryClassification[]>([])
+  useEffect(() => {
+    let active = true
+    window.api.classifications.primary.list().then((result) => {
+      if (!active) return
+      setIsGeneralProfile(result.profile === 'GENERAL')
+      setCategories(result.values)
+    }).catch(() => { if (active) setIsGeneralProfile(false) })
+    return () => { active = false }
+  }, [])
   const tagDefs = useMemo(() => tagNames.map((name, index) => ({ id: index + 1, name })), [tagNames])
   const grossAmount = draft.amountMode === 'NET'
     ? Math.round(draft.amount * (1 + draft.vatRate / 100) * 100) / 100
@@ -188,6 +227,21 @@ function RecurringBookingModal({
   const earmarkTotal = draft.earmarks.reduce((total, assignment) => total + Number(assignment.amount || 0), 0)
   const addBudget = () => setDraft((current) => ({ ...current, budgets: [...current.budgets, { budgetId: 0, amount: Math.max(0, Math.round((grossAmount - budgetTotal) * 100) / 100) }] }))
   const addEarmark = () => setDraft((current) => ({ ...current, earmarks: [...current.earmarks, { earmarkId: 0, amount: Math.max(0, Math.round((grossAmount - earmarkTotal) * 100) / 100) }] }))
+  const toggleExtra = (key: 'budget' | 'earmark' | 'tags' | 'comment') => {
+    const opening = !visibleExtras.has(key)
+    if (opening && key === 'budget' && draft.budgets.length === 0) addBudget()
+    if (opening && key === 'earmark' && draft.earmarks.length === 0) addEarmark()
+    if (!opening && key === 'budget') setDraft((current) => ({ ...current, budgets: [] }))
+    if (!opening && key === 'earmark') setDraft((current) => ({ ...current, earmarks: [] }))
+    if (!opening && key === 'tags') setDraft((current) => ({ ...current, tags: [] }))
+    if (!opening && key === 'comment') setDraft((current) => ({ ...current, note: null }))
+    setVisibleExtras((current) => {
+      const next = new Set(current)
+      if (opening) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
 
   const save = async () => {
     if (!draft.name.trim()) {
@@ -196,6 +250,10 @@ function RecurringBookingModal({
     }
     if (!(draft.amount > 0)) {
       notify('error', 'Bitte einen Betrag größer als 0 € angeben.')
+      return
+    }
+    if (isGeneralProfile && !draft.primaryClassificationValueId) {
+      notify('error', 'Bitte eine Kategorie auswählen.')
       return
     }
     if (draft.budgets.some((assignment) => !assignment.budgetId || !(assignment.amount > 0)) || draft.earmarks.some((assignment) => !assignment.earmarkId || !(assignment.amount > 0))) {
@@ -245,40 +303,34 @@ function RecurringBookingModal({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-booking-modal-title">
-      <div className={`modal booking-modal quick-add-modal recurring-booking-modal booking-modal--type-${draft.type.toLowerCase()}`} onClick={(event) => event.stopPropagation()}>
-        <header className="modal-header-flex">
-          <h2 id="recurring-booking-modal-title">{draft.id ? 'Dauerbuchung bearbeiten' : '+ Dauerbuchung'}</h2>
-          <div className="booking-kind-switch recurring-booking-kind-switch" role="group" aria-label="Art der Dauerbuchung">
-            {([['IN', 'Einnahme'], ['OUT', 'Ausgabe']] as const).map(([type, label]) => (
-              <button key={type} type="button" className={`btn booking-kind-switch__button ${draft.type === type ? 'btn-toggle-active' : ''} ${type === 'IN' ? 'btn-type-in' : 'btn-type-out'}`} onClick={() => setDraft({ ...draft, type })} aria-pressed={draft.type === type}>{label}</button>
-            ))}
-          </div>
-          <div className="booking-modal-header-actions">
-            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" onClick={onClose} title="Schließen (Esc)" aria-label="Schließen">✕</button>
-          </div>
-        </header>
+  return <BookingPopupFrame
+    title={draft.id ? 'Dauerbuchung bearbeiten' : '+ Dauerbuchung'}
+    titleId="recurring-booking-modal-title"
+    subtitle="Vorlage für regelmäßig fällige Buchungen"
+    onClose={onClose}
+    className={`recurring-booking-modal booking-modal--type-${draft.type.toLowerCase()}`}
+    variant="compact"
+    anchorRect={anchorRect}
+    anchorAlign="end"
+    kindSwitch={<BookingKindSwitch value={draft.type} ariaLabel="Art der Dauerbuchung" options={[{ value: 'IN', label: 'Einnahme' }, { value: 'OUT', label: 'Ausgabe' }]} onChange={(value) => setDraft({ ...draft, type: value as Draft['type'] })} />}
+  >
 
         <form className="quick-add-form recurring-booking-form" onSubmit={(event) => { event.preventDefault(); void save() }}>
-          <div className="card summary-card booking-ai-summary recurring-booking-summary">
-            <div className="summary-text-bold">
-              {draft.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · <span className={draft.type === 'IN' ? 'text-success' : 'text-danger'}>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(draft.amount || 0)}</span> · {paymentAccounts.find((account) => account.id === draft.paymentAccountId)?.name || 'Konto fehlt'} · {SPHERE_LABELS[draft.sphere]}
-            </div>
-            <span className="helper">Vorlage für regelmäßig fällige Buchungen</span>
-          </div>
-
+          <div className="recurring-booking-form__scroll">
           <div className="block-grid block-grid-mb booking-primary-grid">
             <section className="card form-card booking-section booking-section--basis">
               <div className="booking-section-heading"><strong>Basis</strong></div>
               <div className="row booking-basis-fields">
                 <div className="field booking-floating-field booking-floating-field--filled">
                   <label htmlFor="recurring-start-date">Beginn *</label>
-                  <input id="recurring-start-date" className="input" type="date" value={draft.startDate} onChange={(event) => setDraft({ ...draft, startDate: event.target.value, nextDueDate: draft.id ? draft.nextDueDate : event.target.value })} />
+                  <span className="booking-date-input-wrap"><input ref={startDateInputRef} id="recurring-start-date" className="input" type="date" value={draft.startDate} onChange={(event) => setDraft({ ...draft, startDate: event.target.value, nextDueDate: draft.id ? draft.nextDueDate : event.target.value })} /><DatePickerButton inputRef={startDateInputRef} ariaLabel="Kalender für Beginn öffnen" /></span>
                 </div>
                 <div className="field booking-floating-field booking-floating-field--filled">
-                  <label htmlFor="recurring-sphere">Bereich *</label>
-                  <SelectDropdown id="recurring-sphere" value={draft.sphere} onChange={(value) => setDraft({ ...draft, sphere: value as Sphere })} ariaLabel="Bereich der Dauerbuchung" options={Object.entries(SPHERE_LABELS).map(([value, label]) => ({ value, label }))} />
+                  <label htmlFor="recurring-sphere">{isGeneralProfile ? 'Kategorie' : 'Bereich'} *</label>
+                  {isGeneralProfile ? <SelectDropdown id="recurring-sphere" value={String(draft.primaryClassificationValueId ?? '')} placeholder="Kategorie wählen" onChange={(value) => {
+                    const category = categories.find((entry) => entry.id === Number(value))
+                    setDraft({ ...draft, primaryClassificationValueId: value ? Number(value) : null, primaryClassificationName: category?.name || null, primaryClassificationColor: category?.color || null, primaryClassificationIcon: category?.icon || null })
+                  }} ariaLabel="Kategorie der Dauerbuchung" options={categories.map((category) => ({ value: String(category.id), label: `${category.icon ? `${category.icon} ` : ''}${category.name}`, color: category.color || undefined }))} /> : <SelectDropdown id="recurring-sphere" value={draft.sphere} onChange={(value) => setDraft({ ...draft, sphere: value as Sphere })} ariaLabel="Bereich der Dauerbuchung" options={Object.entries(SPHERE_LABELS).map(([value, label]) => ({ value, label }))} />}
                 </div>
                 <div className="field booking-floating-field booking-floating-field--filled">
                   <label htmlFor="recurring-account">Konto</label>
@@ -312,55 +364,61 @@ function RecurringBookingModal({
             </div>
           </section>
 
-          <section className="card form-card booking-assignments-card">
-            <div className="booking-section-heading"><div><strong>Zuordnungen</strong><span className="helper">Optional für Einnahmen und Ausgaben.</span></div></div>
-            <div className="recurring-assignment-group">
-              <div className="quick-add-assignment-title">Budget <button type="button" className="btn ghost" onClick={addBudget} title="Weiteres Budget hinzufügen">+</button>{draft.budgets.length === 0 && <span className="helper booking-assignment-empty-hint">Kein Budget zugeordnet.</span>}</div>
-              {draft.budgets.map((assignment, index) => (
-                <div className="recurring-assignment-row" key={`budget-${index}`}>
-                  <SelectDropdown value={assignment.budgetId ? String(assignment.budgetId) : ''} invalid={!!assignment.budgetId && budgetIds.filter((id) => id === assignment.budgetId).length > 1} placeholder="— Budget wählen —" onChange={(value) => setDraft((current) => ({ ...current, budgets: current.budgets.map((item, itemIndex) => itemIndex === index ? { ...item, budgetId: value ? Number(value) : 0 } : item) }))} ariaLabel={`Budget ${index + 1}`} options={budgets.filter((budget) => !budget.isArchived || budget.id === assignment.budgetId).map((budget) => ({ value: String(budget.id), label: budget.label }))} />
-                  <span className="adorn-wrap"><input className="input" type="number" min="0.01" step="0.01" value={assignment.amount || ''} onChange={(event) => setDraft((current) => ({ ...current, budgets: current.budgets.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value || 0) } : item) }))} aria-label={`Betrag für Budget ${index + 1}`} /><span className="adorn-suffix">€</span></span>
-                  <button type="button" className="btn ghost recurring-assignment-remove" onClick={() => setDraft((current) => ({ ...current, budgets: current.budgets.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={`Budget ${index + 1} entfernen`}>×</button>
-                </div>
-              ))}
-              {hasDuplicateBudgets && <span className="recurring-assignment-error">Ein Budget kann nur einmal zugeordnet werden.</span>}
-              {budgetTotal > grossAmount + 0.001 && <span className="recurring-assignment-error">Budgetsumme übersteigt den Bruttobetrag.</span>}
-            </div>
-            <div className="recurring-assignment-group">
-              <div className="quick-add-assignment-title">Zweckbindung <button type="button" className="btn ghost" onClick={addEarmark} title="Weitere Zweckbindung hinzufügen">+</button>{draft.earmarks.length === 0 && <span className="helper booking-assignment-empty-hint">Keine Zweckbindung zugeordnet.</span>}</div>
-              {draft.earmarks.map((assignment, index) => (
-                <div className="recurring-assignment-row" key={`earmark-${index}`}>
-                  <SelectDropdown value={assignment.earmarkId ? String(assignment.earmarkId) : ''} invalid={!!assignment.earmarkId && earmarkIds.filter((id) => id === assignment.earmarkId).length > 1} placeholder="— Zweckbindung wählen —" onChange={(value) => setDraft((current) => ({ ...current, earmarks: current.earmarks.map((item, itemIndex) => itemIndex === index ? { ...item, earmarkId: value ? Number(value) : 0 } : item) }))} ariaLabel={`Zweckbindung ${index + 1}`} options={earmarks.filter((earmark) => earmark.isActive !== false || earmark.id === assignment.earmarkId).map((earmark) => ({ value: String(earmark.id), label: earmark.label }))} />
-                  <span className="adorn-wrap"><input className="input" type="number" min="0.01" step="0.01" value={assignment.amount || ''} onChange={(event) => setDraft((current) => ({ ...current, earmarks: current.earmarks.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value || 0) } : item) }))} aria-label={`Betrag für Zweckbindung ${index + 1}`} /><span className="adorn-suffix">€</span></span>
-                  <button type="button" className="btn ghost recurring-assignment-remove" onClick={() => setDraft((current) => ({ ...current, earmarks: current.earmarks.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={`Zweckbindung ${index + 1} entfernen`}>×</button>
-                </div>
-              ))}
-              {hasDuplicateEarmarks && <span className="recurring-assignment-error">Eine Zweckbindung kann nur einmal zugeordnet werden.</span>}
-              {earmarkTotal > grossAmount + 0.001 && <span className="recurring-assignment-error">Zweckbindungssumme übersteigt den Bruttobetrag.</span>}
-            </div>
-          </section>
-
           <div className="block-grid block-grid-mb booking-secondary-grid">
             <section className="card form-card recurring-schedule-card">
               <div className="booking-section-heading"><div><strong>Wiederholung</strong><span className="helper">Fälligkeiten werden zur Bestätigung bereitgestellt.</span></div></div>
               <div className="recurring-schedule-grid">
                 <div className="field booking-floating-field booking-floating-field--filled"><label htmlFor="recurring-frequency">Rhythmus *</label><SelectDropdown id="recurring-frequency" value={draft.frequency} onChange={(value) => setDraft({ ...draft, frequency: value as RecurringFrequency })} ariaLabel="Rhythmus der Dauerbuchung" options={Object.entries(FREQUENCY_LABELS).map(([value, label]) => ({ value, label }))} /></div>
-                <div className="field booking-floating-field booking-floating-field--filled"><label htmlFor="recurring-next-due">Nächste Fälligkeit *</label><input id="recurring-next-due" className="input" type="date" value={draft.nextDueDate} onChange={(event) => setDraft({ ...draft, nextDueDate: event.target.value })} /></div>
-                <div className="field booking-floating-field booking-floating-field--filled recurring-end-date-field"><label htmlFor="recurring-end-date">Ende</label><input id="recurring-end-date" className="input" type="date" value={draft.endDate || ''} onChange={(event) => setDraft({ ...draft, endDate: event.target.value || null })} /></div>
+                <div className="field booking-floating-field booking-floating-field--filled"><label htmlFor="recurring-next-due">Nächste Fälligkeit *</label><span className="booking-date-input-wrap"><input ref={nextDueDateInputRef} id="recurring-next-due" className="input" type="date" value={draft.nextDueDate} onChange={(event) => setDraft({ ...draft, nextDueDate: event.target.value })} /><DatePickerButton inputRef={nextDueDateInputRef} ariaLabel="Kalender für nächste Fälligkeit öffnen" /></span></div>
+                <div className="field booking-floating-field booking-floating-field--filled recurring-end-date-field"><label htmlFor="recurring-end-date">Ende</label><span className="booking-date-input-wrap"><input ref={endDateInputRef} id="recurring-end-date" className="input" type="date" value={draft.endDate || ''} onChange={(event) => setDraft({ ...draft, endDate: event.target.value || null })} /><DatePickerButton inputRef={endDateInputRef} ariaLabel="Kalender für Ende öffnen" /></span></div>
                 <button type="button" className={`recurring-variable-amount${draft.variableAmount ? ' is-active' : ''}`} onClick={() => setDraft({ ...draft, variableAmount: !draft.variableAmount })} aria-pressed={draft.variableAmount}><span aria-hidden="true">{draft.variableAmount ? '✓' : '+'}</span>Betrag bei Fälligkeit prüfen</button>
               </div>
             </section>
+          </div>
 
-            <section className="card form-card booking-optional-card">
-              <details className="booking-details">
-                <summary><span className="booking-details__heading"><span>Tags</span>{draft.tags.length > 0 && <span className="badge booking-tag-count">{draft.tags.length}</span>}</span></summary>
-                <TagsEditor label="Tags" className="booking-tags-editor" value={draft.tags} onChange={(tags) => setDraft({ ...draft, tags })} tagDefs={tagDefs} />
-              </details>
-              <details className="booking-details">
-                <summary><span>Kommentar</span>{draft.note && <span className="booking-comment-preview" title={draft.note}>{draft.note}</span>}</summary>
-                <div className="field field-full-width booking-note-field"><textarea className="input booking-note-textarea" rows={3} value={draft.note || ''} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Interne Notiz oder Ablagehinweis …" /></div>
-              </details>
-            </section>
+          <BookingOptionalArea
+            actions={[
+              { key: 'budget', label: 'Budget', active: visibleExtras.has('budget'), count: draft.budgets.length },
+              { key: 'earmark', label: 'Zweckbindung', active: visibleExtras.has('earmark'), count: draft.earmarks.length },
+              { key: 'tags', label: 'Tag', active: visibleExtras.has('tags'), count: draft.tags.length },
+              { key: 'comment', label: 'Kommentar', active: visibleExtras.has('comment') }
+            ]}
+            onToggle={(key) => toggleExtra(key as 'budget' | 'earmark' | 'tags' | 'comment')}
+          >
+            {visibleExtras.has('budget') && <div className="compact-booking-optional-section" aria-label="Budget-Zuordnungen">
+              <div className="compact-booking-section-title"><strong>Budget</strong><button type="button" onClick={() => toggleExtra('budget')} aria-label="Budget entfernen">×</button></div>
+              {draft.budgets.map((assignment, index) => <div className="compact-booking-assignment-row" key={`budget-${index}`}>
+                <SelectDropdown value={assignment.budgetId ? String(assignment.budgetId) : ''} invalid={!!assignment.budgetId && budgetIds.filter((id) => id === assignment.budgetId).length > 1} placeholder="Budget wählen" onChange={(value) => setDraft((current) => ({ ...current, budgets: current.budgets.map((item, itemIndex) => itemIndex === index ? { ...item, budgetId: value ? Number(value) : 0 } : item) }))} ariaLabel={`Budget ${index + 1}`} options={budgets.filter((budget) => !budget.isArchived || budget.id === assignment.budgetId).map((budget) => ({ value: String(budget.id), label: budget.label }))} />
+                <span className="adorn-wrap"><input className="input" type="number" min="0.01" step="0.01" value={assignment.amount || ''} onChange={(event) => setDraft((current) => ({ ...current, budgets: current.budgets.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value || 0) } : item) }))} aria-label={`Betrag für Budget ${index + 1}`} /><span className="adorn-suffix">€</span></span>
+                <button type="button" className="compact-booking-remove-row" onClick={() => setDraft((current) => ({ ...current, budgets: current.budgets.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={`Budget ${index + 1} entfernen`}>×</button>
+              </div>)}
+              <button type="button" className="compact-booking-add-row" onClick={addBudget}>+ Budgetzeile</button>
+              {hasDuplicateBudgets && <small className="compact-booking-error">Ein Budget kann nur einmal zugeordnet werden.</small>}
+              {budgetTotal > grossAmount + 0.001 && <small className="compact-booking-error">Budgetsumme übersteigt den Bruttobetrag.</small>}
+            </div>}
+
+            {visibleExtras.has('earmark') && <div className="compact-booking-optional-section" aria-label="Zweckbindungs-Zuordnungen">
+              <div className="compact-booking-section-title"><strong>Zweckbindung</strong><button type="button" onClick={() => toggleExtra('earmark')} aria-label="Zweckbindung entfernen">×</button></div>
+              {draft.earmarks.map((assignment, index) => <div className="compact-booking-assignment-row" key={`earmark-${index}`}>
+                <SelectDropdown value={assignment.earmarkId ? String(assignment.earmarkId) : ''} invalid={!!assignment.earmarkId && earmarkIds.filter((id) => id === assignment.earmarkId).length > 1} placeholder="Zweckbindung wählen" onChange={(value) => setDraft((current) => ({ ...current, earmarks: current.earmarks.map((item, itemIndex) => itemIndex === index ? { ...item, earmarkId: value ? Number(value) : 0 } : item) }))} ariaLabel={`Zweckbindung ${index + 1}`} options={earmarks.filter((earmark) => earmark.isActive !== false || earmark.id === assignment.earmarkId).map((earmark) => ({ value: String(earmark.id), label: earmark.label }))} />
+                <span className="adorn-wrap"><input className="input" type="number" min="0.01" step="0.01" value={assignment.amount || ''} onChange={(event) => setDraft((current) => ({ ...current, earmarks: current.earmarks.map((item, itemIndex) => itemIndex === index ? { ...item, amount: Number(event.target.value || 0) } : item) }))} aria-label={`Betrag für Zweckbindung ${index + 1}`} /><span className="adorn-suffix">€</span></span>
+                <button type="button" className="compact-booking-remove-row" onClick={() => setDraft((current) => ({ ...current, earmarks: current.earmarks.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={`Zweckbindung ${index + 1} entfernen`}>×</button>
+              </div>)}
+              <button type="button" className="compact-booking-add-row" onClick={addEarmark}>+ Zweckbindungszeile</button>
+              {hasDuplicateEarmarks && <small className="compact-booking-error">Eine Zweckbindung kann nur einmal zugeordnet werden.</small>}
+              {earmarkTotal > grossAmount + 0.001 && <small className="compact-booking-error">Zweckbindungssumme übersteigt den Bruttobetrag.</small>}
+            </div>}
+
+            {visibleExtras.has('tags') && <div className="compact-booking-optional-section">
+              <div className="compact-booking-section-title"><strong>Tags</strong><button type="button" onClick={() => toggleExtra('tags')} aria-label="Tags entfernen">×</button></div>
+              <TagsEditor value={draft.tags} onChange={(tags) => setDraft({ ...draft, tags })} tagDefs={tagDefs} />
+            </div>}
+
+            {visibleExtras.has('comment') && <div className="compact-booking-optional-section">
+              <div className="compact-booking-section-title"><strong>Kommentar</strong><button type="button" onClick={() => toggleExtra('comment')} aria-label="Kommentar entfernen">×</button></div>
+              <textarea className="input" rows={3} value={draft.note || ''} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Interne Notiz oder Ablagehinweis …" />
+            </div>}
+          </BookingOptionalArea>
           </div>
 
           <footer className="modal-footer-actions">
@@ -368,10 +426,7 @@ function RecurringBookingModal({
             <div className="booking-modal-save-actions"><button type="button" className="btn" onClick={onClose}>Abbrechen</button><button type="submit" className="btn primary" disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button></div>
           </footer>
         </form>
-      </div>
-    </div>,
-    document.body
-  )
+  </BookingPopupFrame>
 }
 
 export default function RecurringBookingsView({ notify }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
@@ -381,6 +436,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<'ALL' | Status>('ALL')
   const [editing, setEditing] = useState<Draft | null>(null)
+  const [editingAnchor, setEditingAnchor] = useState<Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null>(null)
   const [booking, setBooking] = useState<RecurringBooking | null>(null)
   const [bookingDate, setBookingDate] = useState(localIsoDate())
   const [bookingAmount, setBookingAmount] = useState(0)
@@ -516,7 +572,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
           </div>
           <RecurringStatusFilterDropdown value={status} onChange={setStatus} />
           <div className="filter-divider" />
-          <button className="btn primary" onClick={() => setEditing(initialDraft())}>+ Dauerbuchung</button>
+          <button className="btn primary" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}>+ Dauerbuchung</button>
         </div>
       </div>
 
@@ -539,7 +595,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                 <tr key={row.id} className={row.dueCount > 0 ? 'recurring-row-due' : undefined}>
                   <td>
                     <strong>{row.name}</strong>
-                    <small>{[row.counterparty, row.budgetLabel, row.earmarkLabel].filter(Boolean).join(' · ') || row.description || '—'}</small>
+                    <small>{[row.counterparty, row.primaryClassificationName ? `${row.primaryClassificationIcon ? `${row.primaryClassificationIcon} ` : ''}${row.primaryClassificationName}` : SPHERE_LABELS[row.sphere], row.budgetLabel, row.earmarkLabel].filter(Boolean).join(' · ') || row.description || '—'}</small>
                   </td>
                   <td>{FREQUENCY_LABELS[row.frequency]}</td>
                   <td>
@@ -575,7 +631,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                           {row.suggestedVoucherId ? 'Trotzdem neu' : 'Jetzt buchen'}
                         </button>
                       )}
-                      <button className="btn ghost recurring-action-icon" onClick={() => setEditing(draftFromRow(row))} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></button>
+                      <button className="btn ghost recurring-action-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(draftFromRow(row)) }} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1-1-4Z" /></svg></button>
                       {row.dueCount > 0 && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'skip' })} title="Fälligkeit überspringen" aria-label={`Fälligkeit von ${row.name} überspringen`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M9 15l6 0M12 12l3 3-3 3" /></svg></button>}
                       {row.status === 'ACTIVE' && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'pause' })} title="Dauerbuchung pausieren" aria-label={`${row.name} pausieren`}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>}
                       {row.status === 'PAUSED' && <button className="btn" onClick={() => void setRowStatus(row, 'ACTIVE')}>Aktivieren</button>}
@@ -591,7 +647,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
         </div>
       </div>
 
-      {editing && <RecurringBookingModal value={editing} paymentAccounts={paymentAccounts} budgets={budgets} earmarks={earmarks} tagNames={tagNames} notify={notify} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); void load() }} />}
+      {editing && <RecurringBookingModal value={editing} paymentAccounts={paymentAccounts} budgets={budgets} earmarks={earmarks} tagNames={tagNames} anchorRect={editingAnchor} notify={notify} onClose={() => { setEditing(null); setEditingAnchor(null) }} onSaved={() => { setEditing(null); setEditingAnchor(null); void load() }} />}
 
       {pendingAction && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">
@@ -616,7 +672,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
             <div className="recurring-book-summary">
               <label className="field"><span>Buchungsdatum</span><input className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /></label>
               <label className="field"><span>{booking.amountMode === 'NET' ? 'Nettobetrag' : 'Bruttobetrag'} (€)</span><input className="input" type="number" min="0.01" step="0.01" value={bookingAmount} onChange={(event) => setBookingAmount(Number(event.target.value || 0))} /></label>
-              <div className="card recurring-book-preview"><span>{booking.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {SPHERE_LABELS[booking.sphere]}</span><strong>{eurFmt.format(bookingAmount || 0)}</strong></div>
+              <div className="card recurring-book-preview"><span>{booking.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {booking.primaryClassificationName ? `${booking.primaryClassificationIcon ? `${booking.primaryClassificationIcon} ` : ''}${booking.primaryClassificationName}` : SPHERE_LABELS[booking.sphere]}</span><strong>{eurFmt.format(bookingAmount || 0)}</strong></div>
             </div>
             <div className="modal-footer"><div className="helper">{booking.suggestedVoucherId ? `Hinweis: ${booking.suggestedVoucherNo || 'Eine bestehende Buchung'} wurde als möglicher Treffer erkannt. Eine neue Buchung kann eine Doppelung erzeugen.` : 'Es entsteht eine normale, nachvollziehbare Buchung.'}</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setBooking(null)}>Abbrechen</button><button className="btn primary" onClick={() => void confirmBooking()} disabled={actionBusy || !bookingDate || !(bookingAmount > 0)}>{actionBusy ? 'Bucht…' : booking.suggestedVoucherId ? 'Trotzdem erstellen' : 'Buchung erstellen'}</button></div></div>
           </div>

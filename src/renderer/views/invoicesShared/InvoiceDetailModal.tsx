@@ -140,7 +140,7 @@ export default function InvoiceDetailModal({
               <div className="invoices-detail-info-grid">
                 <div><div className="helper">Datum</div><div>{fmtDateLocal(detail.date)}</div></div>
                 <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '')}</div></div>
-                <div><div className="helper">Sphäre</div><div>{detail.sphere}</div></div>
+                <div><div className="helper">{detail.primaryClassificationName ? 'Kategorie' : 'Sphäre'}</div><div>{detail.primaryClassificationName || detail.sphere}</div></div>
                 <div><div className="helper">Zahlweg</div><div>{paymentRouteLabel}</div></div>
                 <div><div className="helper">Zahlkonto</div><div>{paymentAccountName || (detail.paymentAccountId ? `#${detail.paymentAccountId}` : '-')}</div></div>
                 <div><div className="helper">Betrag</div><div>{eurFmt.format(detail.grossAmount)}</div></div>

@@ -18,6 +18,7 @@ interface Submission {
     date: string
     type: 'IN' | 'OUT'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null
+    primaryClassificationValueId?: number | null
     paymentMethod?: 'BAR' | 'BANK' | null
     paymentAccountId?: number | null
     paymentAccountName?: string | null
@@ -48,6 +49,7 @@ interface VoucherDraft {
     date: string
     type: 'IN' | 'OUT'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId: number | null
     description: string
     grossAmount: number
     vatRate: number
@@ -99,6 +101,8 @@ function ReviewModal({
     const [editMode, setEditMode] = useState(false)
     const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; mimeType?: string | null; dataBase64?: string } | null>(null)
     const [loadingPreview, setLoadingPreview] = useState(false)
+    const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+    const [categories, setCategories] = useState<Array<{ id: number; name: string; icon?: string | null }>>([])
     const paymentAccountsById = useMemo(() => new Map((paymentAccounts || []).map((account) => [account.id, account])), [paymentAccounts])
     const activePaymentAccounts = useMemo(() => (paymentAccounts || []).filter((account) => account.isActive !== 0), [paymentAccounts])
     
@@ -117,6 +121,7 @@ function ReviewModal({
             date: submission.date,
             type: submission.type,
             sphere: submission.sphere || 'IDEELL',
+            primaryClassificationValueId: submission.primaryClassificationValueId ?? null,
             description: submission.description || '',
             grossAmount: submission.grossAmount, // stored in cents
             vatRate: 0,
@@ -134,6 +139,16 @@ function ReviewModal({
     const [grossAmountEuro, setGrossAmountEuro] = useState(() => 
         (submission.grossAmount / 100).toFixed(2).replace('.', ',')
     )
+
+    useEffect(() => {
+        let active = true
+        void window.api.classifications.primary.list().then((result) => {
+            if (!active) return
+            setIsGeneralProfile(result.profile === 'GENERAL')
+            setCategories(result.values.filter((category) => category.isActive !== false))
+        }).catch(() => undefined)
+        return () => { active = false }
+    }, [])
 
     // ESC key handler
     useEffect(() => {
@@ -279,8 +294,15 @@ function ReviewModal({
                                         </div>
                                         <div className="grid gap-12" style={{ gridTemplateColumns: '1fr 1fr' }}>
                                             <div className="field">
-                                                <label>Sphäre</label>
-                                                <select
+                                                <label>{isGeneralProfile ? 'Kategorie' : 'Sphäre'}</label>
+                                                {isGeneralProfile ? <select
+                                                    className="input"
+                                                    value={draft.primaryClassificationValueId ?? ''}
+                                                    onChange={(e) => setDraft({ ...draft, primaryClassificationValueId: e.target.value ? Number(e.target.value) : null })}
+                                                >
+                                                    <option value="">Kategorie wählen</option>
+                                                    {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+                                                </select> : <select
                                                     className="input"
                                                     value={draft.sphere}
                                                     onChange={(e) => setDraft({ ...draft, sphere: e.target.value as any })}
@@ -289,7 +311,7 @@ function ReviewModal({
                                                     <option value="ZWECK">ZWECK</option>
                                                     <option value="VERMOEGEN">VERMÖGEN</option>
                                                     <option value="WGB">WGB</option>
-                                                </select>
+                                                </select>}
                                             </div>
                                             <div className="field">
                                                 <label>Konto</label>
@@ -751,6 +773,7 @@ export default function SubmissionsView({ notify, eurFmt, fmtDate, earmarks, bud
                 date: draft.date,
                 type: draft.type,
                 sphere: draft.sphere,
+                primaryClassificationValueId: draft.primaryClassificationValueId ?? undefined,
                 description: finalDescription || undefined,
                 grossAmount: draft.grossAmount / 100, // Convert from cents to euros
                 vatRate: draft.vatRate,

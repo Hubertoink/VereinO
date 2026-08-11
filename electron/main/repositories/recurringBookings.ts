@@ -3,6 +3,7 @@ import { localIsoDate, recurringPeriodDescription, type RecurringFrequency } fro
 import { recurringGrossAmount, scoreRecurringMatch } from '../../../shared/recurringMatching'
 import { getDb, withTransaction } from '../db/database'
 import { createVoucher } from './vouchers'
+import { resolvePrimaryClassificationValueId } from './classifications'
 import { writeAudit } from '../services/audit'
 import { materializeDueOccurrences, materializeRecurringBookingThrough } from './recurringOccurrences'
 
@@ -13,6 +14,7 @@ export type RecurringBookingInput = {
   name: string
   type: 'IN' | 'OUT'
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   description?: string | null
   note?: string | null
   counterparty?: string | null
@@ -60,6 +62,10 @@ function mapRow(row: any) {
     name: String(row.name),
     type: row.type,
     sphere: row.sphere,
+    primaryClassificationValueId: row.primaryClassificationValueId == null ? null : Number(row.primaryClassificationValueId),
+    primaryClassificationName: row.primaryClassificationName ?? null,
+    primaryClassificationColor: row.primaryClassificationColor ?? null,
+    primaryClassificationIcon: row.primaryClassificationIcon ?? null,
     description: row.description ?? null,
     note: row.note ?? null,
     counterparty: row.counterparty ?? null,
@@ -140,7 +146,10 @@ function bestVoucherSuggestion(d: DB, recurring: any) {
 }
 
 const baseSelect = `
-  SELECT rb.id, rb.name, rb.type, rb.sphere, rb.description, rb.note, rb.counterparty,
+  SELECT rb.id, rb.name, rb.type, rb.sphere,
+         rb.primary_classification_value_id as primaryClassificationValueId,
+         cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
+         rb.description, rb.note, rb.counterparty,
          rb.amount_mode as amountMode, rb.amount, rb.variable_amount as variableAmount,
          rb.vat_rate as vatRate, rb.payment_account_id as paymentAccountId,
          pa.name as paymentAccountName, pa.kind as paymentAccountKind,
@@ -159,6 +168,7 @@ const baseSelect = `
   LEFT JOIN payment_accounts pa ON pa.id=rb.payment_account_id
   LEFT JOIN budgets b ON b.id=rb.budget_id
   LEFT JOIN earmarks e ON e.id=rb.earmark_id
+  LEFT JOIN classification_values cv ON cv.id=rb.primary_classification_value_id
 `
 
 export function listRecurringBookings(input?: { status?: 'ACTIVE' | 'PAUSED' | 'ENDED'; q?: string }) {
@@ -220,6 +230,10 @@ export function upsertRecurringBooking(input: RecurringBookingInput) {
   if (!(input.amount > 0)) throw new Error('Bitte einen Betrag größer als 0 € angeben.')
   if (input.endDate && input.endDate < input.startDate) throw new Error('Das Enddatum darf nicht vor dem Beginn liegen.')
   if (input.nextDueDate < input.startDate) throw new Error('Die nächste Fälligkeit darf nicht vor dem Beginn liegen.')
+  const primaryClassificationValueId = resolvePrimaryClassificationValueId(d, {
+    legacySphere: input.sphere,
+    primaryClassificationValueId: input.primaryClassificationValueId
+  })
 
   const budgets = (input.budgets || []).filter((assignment) => assignment.budgetId && assignment.amount > 0).map((assignment) => ({ budgetId: Number(assignment.budgetId), amount: Number(assignment.amount) }))
   const earmarks = (input.earmarks || []).filter((assignment) => assignment.earmarkId && assignment.amount > 0).map((assignment) => ({ earmarkId: Number(assignment.earmarkId), amount: Number(assignment.amount) }))
@@ -229,6 +243,7 @@ export function upsertRecurringBooking(input: RecurringBookingInput) {
     name,
     input.type,
     input.sphere,
+    primaryClassificationValueId,
     input.description?.trim() || null,
     input.note?.trim() || null,
     input.counterparty?.trim() || null,
@@ -255,7 +270,7 @@ export function upsertRecurringBooking(input: RecurringBookingInput) {
     if (!before) throw new Error('Dauerbuchung nicht gefunden.')
     d.prepare(`
       UPDATE recurring_bookings SET
-        name=?, type=?, sphere=?, description=?, note=?, counterparty=?, amount_mode=?, amount=?, variable_amount=?, vat_rate=?,
+        name=?, type=?, sphere=?, primary_classification_value_id=?, description=?, note=?, counterparty=?, amount_mode=?, amount=?, variable_amount=?, vat_rate=?,
         payment_account_id=?, budget_id=?, earmark_id=?, budget_assignments_json=?, earmark_assignments_json=?, tags_json=?, frequency=?, anchor_day=?, start_date=?, next_due_date=?, end_date=?, status=?, updated_at=datetime('now')
       WHERE id=?
     `).run(...data, input.id)
@@ -265,9 +280,9 @@ export function upsertRecurringBooking(input: RecurringBookingInput) {
 
   const result = d.prepare(`
     INSERT INTO recurring_bookings(
-      name, type, sphere, description, note, counterparty, amount_mode, amount, variable_amount, vat_rate,
+      name, type, sphere, primary_classification_value_id, description, note, counterparty, amount_mode, amount, variable_amount, vat_rate,
       payment_account_id, budget_id, earmark_id, budget_assignments_json, earmark_assignments_json, tags_json, frequency, anchor_day, start_date, next_due_date, end_date, status
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(...data)
   const id = Number(result.lastInsertRowid)
   writeAudit(d, null, 'recurring_bookings', id, 'CREATE', { input })
@@ -425,6 +440,7 @@ export function bookRecurringOccurrence(input: { recurringBookingId: number; occ
       date: input.bookingDate,
       type: recurring.type,
       sphere: recurring.sphere,
+      primaryClassificationValueId: recurring.primaryClassificationValueId,
       description: recurringPeriodDescription(recurring.description || recurring.name, recurring.frequency, occurrence.scheduledDate),
       note: recurring.note || null,
       counterparty: recurring.counterparty || null,

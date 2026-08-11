@@ -226,6 +226,7 @@ export default function JournalView({
     const [from, setFrom] = useState<string>('')
     const [to, setTo] = useState<string>('')
     const [filterSphere, setFilterSphere] = useState<'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB' | null>(null)
+    const [filterPrimaryClassificationValueId, setFilterPrimaryClassificationValueId] = useState<number | null>(null)
     const [filterType, setFilterType] = useState<'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL' | null>(null)
     const [filterPM, setFilterPM] = useState<'BAR' | 'BANK' | null>(null)
     const [filterPaymentAccountId, setFilterPaymentAccountId] = useState<number | null>(null)
@@ -238,6 +239,7 @@ export default function JournalView({
     const activeFrom = fromProp !== undefined ? fromProp : from
     const activeTo = toProp !== undefined ? toProp : to
     const activeFilterSphere = filterSphereProp !== undefined ? filterSphereProp : filterSphere
+    const activeFilterPrimaryClassificationValueId = filterPrimaryClassificationValueId
     const activeFilterType = filterTypeProp !== undefined ? filterTypeProp : filterType
     const activeFilterPM = filterPMProp !== undefined ? filterPMProp : filterPM
     const activeFilterPaymentAccountId = filterPaymentAccountIdProp !== undefined ? filterPaymentAccountIdProp : filterPaymentAccountId
@@ -695,6 +697,7 @@ export default function JournalView({
         const list: Array<{ key: string; label: string; clear: () => void; color?: string | null }> = []
         if (activeFrom || activeTo) list.push({ key: 'range', label: `${activeFrom || '…'} – ${activeTo || '…'}`, clear: () => { activeSetFrom(''); activeSetTo('') } })
         if (activeFilterSphere) list.push({ key: 'sphere', label: `Sphäre: ${activeFilterSphere}`, clear: () => activeSetFilterSphere(null) })
+        if (activeFilterPrimaryClassificationValueId != null) list.push({ key: 'primary-classification', label: `Kategorie: #${activeFilterPrimaryClassificationValueId}`, clear: () => setFilterPrimaryClassificationValueId(null) })
         if (activeFilterType) list.push({ key: 'type', label: `Art: ${activeFilterType}`, clear: () => activeSetFilterType(null) })
         if (activeFilterPaymentAccountId != null) {
             const account = paymentAccountsById.get(Number(activeFilterPaymentAccountId))
@@ -720,7 +723,7 @@ export default function JournalView({
         if (activeQ) list.push({ key: 'q', label: `Suche: ${activeQ}`.slice(0, 40) + (activeQ.length > 40 ? '…' : ''), clear: () => activeSetQ('') })
         if (stornoPairIds) list.push({ key: 'storno-pair', label: 'Original + Storno', clear: () => setStornoPairIds(null) })
         return list
-    }, [activeFrom, activeTo, activeFilterSphere, activeFilterType, activeFilterPM, activeFilterPaymentAccountId, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ, stornoPairIds, paymentAccountsById, activeSetFilterPaymentAccountId])
+    }, [activeFrom, activeTo, activeFilterSphere, activeFilterPrimaryClassificationValueId, activeFilterType, activeFilterPM, activeFilterPaymentAccountId, activeFilterEarmark, activeFilterBudgetId, activeFilterTag, earmarks, budgetNames, budgets, tagDefs, activeQ, stornoPairIds, paymentAccountsById, activeSetFilterPaymentAccountId])
 
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
@@ -735,6 +738,7 @@ export default function JournalView({
                 paymentMethod: activeFilterPM || undefined,
                 paymentAccountId: activeFilterPaymentAccountId || undefined,
                 sphere: activeFilterSphere || undefined,
+                primaryClassificationValueId: activeFilterPrimaryClassificationValueId || undefined,
                 type: activeFilterType || undefined,
                 from: activeFrom || undefined,
                 to: activeTo || undefined,
@@ -900,15 +904,17 @@ export default function JournalView({
                         paymentAccountId={activeFilterPaymentAccountId}
                         filterTag={activeFilterTag}
                         sphere={activeFilterSphere}
+                        primaryClassificationValueId={activeFilterPrimaryClassificationValueId}
                         earmarkId={activeFilterEarmark}
                         budgetId={activeFilterBudgetId}
                         tooltip="Filter nach Art, Sphäre, Tags …"
-                        onApply={({ filterType, filterPM, paymentAccountId, filterTag, sphere, earmarkId, budgetId }) => {
+                        onApply={({ filterType, filterPM, paymentAccountId, filterTag, sphere, primaryClassificationValueId, earmarkId, budgetId }) => {
                             activeSetFilterType(filterType)
                             activeSetFilterPM(filterPM)
                             activeSetFilterPaymentAccountId(paymentAccountId ?? null)
                             activeSetFilterTag(filterTag)
                             activeSetFilterSphere(sphere)
+                            setFilterPrimaryClassificationValueId(primaryClassificationValueId ?? null)
                             activeSetFilterEarmark(earmarkId)
                             activeSetFilterBudgetId(budgetId)
                             activeSetPage(1)
@@ -1072,6 +1078,7 @@ export default function JournalView({
                         paymentMethod: activeFilterPM || undefined,
                         paymentAccountId: activeFilterPaymentAccountId ?? undefined,
                         sphere: activeFilterSphere || undefined,
+                        primaryClassificationValueId: activeFilterPrimaryClassificationValueId || undefined,
                         type: activeFilterType || undefined,
                         from: activeFrom || undefined,
                         to: activeTo || undefined,

@@ -250,6 +250,9 @@ export async function runAiAgent(input: {
           .slice(0, 80)
       ),
       '',
+      'Organisationweite KI-Regeln (verbindlich anwenden, sofern Bedingung und Geltungsbereich passen):',
+      JSON.stringify(input.context.aiRules || []),
+      '',
       'Aktive Auto-Approve-Regeln:',
       JSON.stringify(
         autoRules

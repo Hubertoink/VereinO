@@ -90,13 +90,14 @@ export function getNavIcon(key: NavKey): React.ReactNode {
         </svg>
       )
     case 'Vorschuesse':
-      // Hand coin icon
+      // Hand giving / advance icon: open hand with a coin above it
       return (
         <svg {...iconProps}>
-          <circle cx="16" cy="8" r="3" />
-          <path d="M3 17h7a3 3 0 0 0 3-3v0a2 2 0 0 0-2-2H6" />
-          <path d="M3 13h3.5a2 2 0 0 1 0 4H5" />
-          <path d="M3 17v2a2 2 0 0 0 2 2h6.5a5 5 0 0 0 3.5-1.4L21 14" />
+          <path d="M3 13.5h4.2l2-2a2.7 2.7 0 0 1 3.8 0l1.8 1.8h3a2.6 2.6 0 0 1 0 5.2H9.5" />
+          <path d="M3 13.5v3.2a3.3 3.3 0 0 0 3.3 3.3h8.1a6.1 6.1 0 0 0 5.8-4.2" />
+          <path d="M7.2 13.5H3" />
+          <circle cx="17.5" cy="6.5" r="3.2" />
+          <path d="M17.5 4.9v3.2M15.9 6.5h3.2" />
         </svg>
       )
     case 'Budgets':

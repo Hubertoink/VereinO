@@ -53,6 +53,10 @@ export type InvoiceListRow = {
   paymentMethod?: string | null
   paymentAccountId?: number | null
   sphere: InvoiceSphere
+  primaryClassificationValueId?: number | null
+  primaryClassificationName?: string | null
+  primaryClassificationColor?: string | null
+  primaryClassificationIcon?: string | null
   earmarkId?: number | null
   budgetId?: number | null
   autoPost?: number | boolean
@@ -80,6 +84,10 @@ export type InvoiceDraft = {
   paymentMethod?: InvoicePaymentMethod
   paymentAccountId?: number | ''
   sphere: InvoiceSphere
+  primaryClassificationValueId?: number | ''
+  primaryClassificationName?: string | null
+  primaryClassificationColor?: string | null
+  primaryClassificationIcon?: string | null
   earmarkId?: number | ''
   budgetId?: number | ''
   budgets: InvoiceBudgetAssignment[]
@@ -117,6 +125,10 @@ export type InvoiceDetail = {
   paymentAccountName?: string | null
   paymentAccountKind?: string | null
   sphere: InvoiceSphere
+  primaryClassificationValueId?: number | null
+  primaryClassificationName?: string | null
+  primaryClassificationColor?: string | null
+  primaryClassificationIcon?: string | null
   earmarkId?: number | null
   budgetId?: number | null
   autoPost?: number

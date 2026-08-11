@@ -3,6 +3,7 @@ import { getDb, withTransaction } from '../db/database'
 import { createVoucher, deleteVoucher } from './vouchers'
 import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 import { normalizeUploadFilesForJson } from '../services/filePayload'
+import { resolvePrimaryClassificationValueId } from './classifications'
 import type { UploadFilePayload } from '../../../shared/filePayload'
 
 type DB = InstanceType<typeof Database>
@@ -25,6 +26,17 @@ function ensureAdvancePurchasePaymentAccountColumn(d: DB) {
     // Ignore if another startup path has already healed the schema.
   }
   return hasAdvancePurchasePaymentAccountColumn(d)
+}
+
+function hasAdvancePurchasePrimaryClassificationColumn(d: DB) {
+  return (d.prepare('PRAGMA table_info(member_advance_purchases)').all() as Array<{ name: string }>)
+    .some((col) => col.name === 'primary_classification_value_id')
+}
+
+function ensureAdvancePurchasePrimaryClassificationColumn(d: DB) {
+  if (hasAdvancePurchasePrimaryClassificationColumn(d)) return true
+  try { d.exec('ALTER TABLE member_advance_purchases ADD COLUMN primary_classification_value_id INTEGER REFERENCES classification_values(id);') } catch {}
+  return hasAdvancePurchasePrimaryClassificationColumn(d)
 }
 
 function safeJsonParse<T>(raw: unknown, fallback: T): T {
@@ -250,6 +262,7 @@ export function createAdvance(input: {
   notes?: string | null
   budgetId?: number | null
   earmarkId?: number | null
+  primaryClassificationValueId?: number | null
 }) {
   if (!input.recipientName?.trim()) throw new Error('Empfänger ist erforderlich')
   if (!input.issuedAt) throw new Error('Ausgabedatum ist erforderlich')
@@ -263,7 +276,8 @@ export function createAdvance(input: {
       description: `Vorschuss: ${input.recipientName.trim()}`,
       grossAmount: toMoney(input.amount),
       vatRate: 0,
-      paymentMethod: 'BAR'
+      paymentMethod: 'BAR',
+      primaryClassificationValueId: input.primaryClassificationValueId ?? undefined
     })
 
     const info = d.prepare(`
@@ -289,6 +303,7 @@ export function addAdvancePurchase(input: {
   date: string
   type: AdvancePurchaseType
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   description?: string | null
   netAmount?: number
   grossAmount?: number
@@ -307,6 +322,8 @@ export function addAdvancePurchase(input: {
 
   const d = getDb()
   const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
+  const hasPrimaryClassificationColumn = ensureAdvancePurchasePrimaryClassificationColumn(d)
+  const primaryClassificationValueId = resolvePrimaryClassificationValueId(d, { legacySphere: input.sphere, primaryClassificationValueId: input.primaryClassificationValueId })
   const advance = d.prepare('SELECT id, resolved_at as resolvedAt FROM member_advances WHERE id = ?').get(input.advanceId) as any
   if (!advance) throw new Error('Vorschuss nicht gefunden')
   if (advance?.resolvedAt) throw new Error('Vorschuss ist bereits aufgelöst')
@@ -326,16 +343,17 @@ export function addAdvancePurchase(input: {
   return withTransaction((tx: DB) => {
     const info = tx.prepare(`
       INSERT INTO member_advance_purchases(
-        advance_id, date, type, sphere, description,
+        advance_id, date, type, sphere${hasPrimaryClassificationColumn ? ', primary_classification_value_id' : ''}, description,
         net_amount, gross_amount, vat_rate, payment_method${hasPaymentAccountColumn ? ', payment_account_id' : ''},
         category_id, project_id,
         budgets_json, earmarks_json, tags_json, files_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentAccountColumn ? ', ?' : ''}, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?${hasPrimaryClassificationColumn ? ', ?' : ''}, ?, ?, ?, ?, ?${hasPaymentAccountColumn ? ', ?' : ''}, ?, ?, ?, ?, ?, ?)
     `).run(
       input.advanceId,
       input.date,
       input.type,
       input.sphere,
+      ...(hasPrimaryClassificationColumn ? [primaryClassificationValueId] : []),
       (input.description ?? null),
       computedNet,
       computedGross,
@@ -358,6 +376,7 @@ export function updateAdvancePurchase(input: {
   date: string
   type: AdvancePurchaseType
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+  primaryClassificationValueId?: number | null
   description?: string | null
   netAmount?: number
   grossAmount?: number
@@ -376,6 +395,8 @@ export function updateAdvancePurchase(input: {
 
   const d = getDb()
   const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
+  const hasPrimaryClassificationColumn = ensureAdvancePurchasePrimaryClassificationColumn(d)
+  const primaryClassificationValueId = resolvePrimaryClassificationValueId(d, { legacySphere: input.sphere, primaryClassificationValueId: input.primaryClassificationValueId })
   const row = d.prepare(`
     SELECT p.id, p.voucher_id as voucherId, a.resolved_at as resolvedAt
     FROM member_advance_purchases p
@@ -401,7 +422,7 @@ export function updateAdvancePurchase(input: {
   return withTransaction((tx: DB) => {
     tx.prepare(`
       UPDATE member_advance_purchases SET
-        date = ?, type = ?, sphere = ?, description = ?,
+        date = ?, type = ?, sphere = ?${hasPrimaryClassificationColumn ? ', primary_classification_value_id = ?' : ''}, description = ?,
         net_amount = ?, gross_amount = ?, vat_rate = ?, payment_method = ?${hasPaymentAccountColumn ? ', payment_account_id = ?' : ''},
         category_id = ?, project_id = ?,
         budgets_json = ?, earmarks_json = ?, tags_json = ?, files_json = ?
@@ -410,6 +431,7 @@ export function updateAdvancePurchase(input: {
       input.date,
       input.type,
       input.sphere,
+      ...(hasPrimaryClassificationColumn ? [primaryClassificationValueId] : []),
       (input.description ?? null),
       computedNet,
       computedGross,
@@ -457,7 +479,7 @@ export function resolveAdvance(input: { id: number }) {
     if (advance.resolvedAt) throw new Error('Vorschuss ist bereits aufgelöst')
 
     const purchases = d.prepare(`
-      SELECT id, date, type, sphere, description, net_amount as netAmount, gross_amount as grossAmount, vat_rate as vatRate,
+      SELECT id, date, type, sphere, ${hasAdvancePurchasePrimaryClassificationColumn(d) ? 'primary_classification_value_id' : 'NULL'} as primaryClassificationValueId, description, net_amount as netAmount, gross_amount as grossAmount, vat_rate as vatRate,
              payment_method as paymentMethod, ${hasPaymentAccountColumn ? 'payment_account_id' : 'NULL'} as paymentAccountId, category_id as categoryId, project_id as projectId,
              budgets_json as budgetsJson, earmarks_json as earmarksJson, tags_json as tagsJson, files_json as filesJson
       FROM member_advance_purchases
@@ -475,6 +497,7 @@ export function resolveAdvance(input: { id: number }) {
         date: p.date,
         type: p.type,
         sphere: p.sphere,
+        primaryClassificationValueId: p.primaryClassificationValueId ?? null,
         description: (p.description ?? '').trim() || `Vorschuss: ${advance.recipientName}`,
         // Preserve entry mode: if net is present/non-zero, prefer net; otherwise gross
         netAmount: typeof p.netAmount === 'number' && Number(p.netAmount) > 0 ? Number(p.netAmount) : undefined,

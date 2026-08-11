@@ -431,6 +431,7 @@ function reportRows(args: AgentReportExportInput) {
     paymentMethod: args.filters?.paymentMethod || undefined,
     paymentAccountId: args.filters?.paymentAccountId ?? undefined,
     sphere: args.filters?.sphere || undefined,
+    primaryClassificationValueId: args.filters?.primaryClassificationValueId ?? undefined,
     type: args.filters?.type || undefined,
     from: args.from,
     to: args.to,
@@ -444,6 +445,7 @@ function reportRows(args: AgentReportExportInput) {
 }
 
 function reportCell(row: any, field: string, outNegative: boolean) {
+  if (field === 'sphere') return row.primaryClassificationName || row.sphere || ''
   if (field === 'paymentMethod') return row.paymentAccountName || row.paymentMethod || ''
   if (field === 'tags') return (row.tags || []).join(', ')
   if (field === 'grossAmount' || field === 'netAmount' || field === 'vatAmount') {
@@ -465,6 +467,7 @@ function reportSummaryData(args: AgentReportExportInput) {
     paymentMethod: args.filters?.paymentMethod || undefined,
     paymentAccountId: args.filters?.paymentAccountId ?? undefined,
     sphere: args.filters?.sphere || undefined,
+    primaryClassificationValueId: args.filters?.primaryClassificationValueId ?? undefined,
     type: args.filters?.type || undefined,
     earmarkId: args.filters?.earmarkId,
     budgetId: args.filters?.budgetId
@@ -492,13 +495,16 @@ async function exportAgentReportPdf(args: AgentReportExportInput, rows: any[], f
   const includeKpis = args.includeKpis !== false
   const includeCharts = args.includeCharts !== false
   const includeVoucherList = args.includeVoucherList !== false
+  const classificationLabel = data.summary.primaryClassificationLabel || 'Sphäre'
   const chartColors: Record<string, string> = { IDEELL: '#6aa6ff', ZWECK: '#00c853', VERMOEGEN: '#ffc107', WGB: '#9c27b0' }
-  const sphereRows = data.summary.bySphere || []
-  const sphereTotal = Math.max(0.0001, sphereRows.reduce((sum: number, row: any) => sum + Math.abs(Number(row.gross || 0)), 0))
+  const classificationRows = data.summary.classificationProfile === 'GENERAL'
+    ? (data.summary.byPrimaryClassification || [])
+    : (data.summary.bySphere || [])
+  const classificationTotal = Math.max(0.0001, classificationRows.reduce((sum: number, row: any) => sum + Math.abs(Number(row.gross || 0)), 0))
   const sphereDonutSvg = () => {
     let cursor = -Math.PI / 2
-    const segments = sphereRows.map((row: any) => {
-      const frac = Math.abs(Number(row.gross || 0)) / sphereTotal
+    const segments = classificationRows.map((row: any) => {
+      const frac = Math.abs(Number(row.gross || 0)) / classificationTotal
       const next = cursor + frac * Math.PI * 2
       const large = next - cursor > Math.PI ? 1 : 0
       const xy = (angle: number, radius: number) => [80 + radius * Math.cos(angle), 80 + radius * Math.sin(angle)]
@@ -507,7 +513,7 @@ async function exportAgentReportPdf(args: AgentReportExportInput, rows: any[], f
       const [x3, y3] = xy(next, 42)
       const [x4, y4] = xy(cursor, 42)
       cursor = next
-      return `<path d="M ${x1} ${y1} A 72 72 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A 42 42 0 ${large} 0 ${x4} ${y4} Z" fill="${chartColors[row.key] || '#88918a'}"/>`
+      return `<path d="M ${x1} ${y1} A 72 72 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A 42 42 0 ${large} 0 ${x4} ${y4} Z" fill="${row.color || chartColors[row.key] || '#88918a'}"/>`
     }).join('')
     return `<svg width="160" height="160" viewBox="0 0 160 160">${segments}<circle cx="80" cy="80" r="36" fill="#fff"/></svg>`
   }
@@ -547,9 +553,9 @@ ${includeKpis ? `<div class="kpis">
 <div class="kpi"><span>Ausgaben</span><strong>${euro(data.expenses)}</strong></div>
 <div class="kpi"><span>Saldo</span><strong>${euro(data.saldo)}</strong></div>
 </div>` : ''}
-${includeCharts ? `<section class="card"><h2>Diagramme</h2><div class="chart-row"><div>${sphereDonutSvg()}</div><div class="legend">${sphereRows.map((row: any) => `<span><i class="sw" style="background:${chartColors[row.key] || '#88918a'}"></i>${esc(row.key)} · ${euro(row.gross)}</span>`).join('')}</div></div><h2 style="margin-top:14px">Monatsverlauf</h2>${monthlyChartSvg()}</section>` : ''}
+${includeCharts ? `<section class="card"><h2>Diagramme</h2><div class="chart-row"><div>${sphereDonutSvg()}</div><div class="legend">${classificationRows.map((row: any) => `<span><i class="sw" style="background:${row.color || chartColors[row.key] || '#88918a'}"></i>${esc(row.key)} · ${euro(row.gross)}</span>`).join('')}</div></div><h2 style="margin-top:14px">Monatsverlauf</h2>${monthlyChartSvg()}</section>` : ''}
 <div class="grid">
-<section class="card"><h2>Nach Sphäre</h2><table><tbody>${(data.summary.bySphere || []).map((row: any) => `<tr><td>${esc(row.key)}</td><td class="right">${euro(row.gross)}</td></tr>`).join('')}</tbody></table></section>
+<section class="card"><h2>Nach ${esc(classificationLabel)}</h2><table><tbody>${classificationRows.map((row: any) => `<tr><td>${esc(row.key)}</td><td class="right">${euro(row.gross)}</td></tr>`).join('')}</tbody></table></section>
 <section class="card"><h2>Nach Zahlungskonto</h2><table><tbody>${((data.summary as any).byPaymentAccount || data.summary.byPaymentMethod || []).map((row: any) => `<tr><td>${esc(row.key || row.name || 'Ohne Konto')}</td><td class="right">${euro(row.gross)}</td></tr>`).join('')}</tbody></table></section>
 </div>
 <section class="card"><h2>Monatswerte</h2><table><thead><tr><th>Monat</th><th class="right">Brutto</th><th class="right">Anzahl</th></tr></thead><tbody>${(data.monthly || []).map((row: any) => `<tr><td>${esc(row.month)}</td><td class="right">${euro(row.gross)}</td><td class="right">${esc(row.count || '')}</td></tr>`).join('')}</tbody></table></section>
@@ -576,13 +582,15 @@ async function exportAgentReport(args: AgentReportExportInput) {
   const outNegative = args.amountMode === 'OUT_NEGATIVE'
 
   if (args.format === 'CSV') {
-    const header = fields.map((field) => csvValue(reportFieldLabels[field] || field)).join(';')
+    const classificationLabel = (summarizeVouchers({}).primaryClassificationLabel || 'Sphäre')
+    const header = fields.map((field) => csvValue(field === 'sphere' ? classificationLabel : (reportFieldLabels[field] || field))).join(';')
     const body = rows.map((row: any) => fields.map((field) => csvValue(reportCell(row, field, outNegative))).join(';')).join('\n')
     await fs.writeFile(filePath, `${header}\n${body}`, 'utf8')
   } else if (args.format === 'XLSX') {
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet(args.title || 'VereinO Export')
-    sheet.columns = fields.map((field) => ({ header: reportFieldLabels[field] || field, key: field, width: field === 'description' ? 42 : 16 }))
+    const classificationLabel = (summarizeVouchers({}).primaryClassificationLabel || 'Sphäre')
+    sheet.columns = fields.map((field) => ({ header: field === 'sphere' ? classificationLabel : (reportFieldLabels[field] || field), key: field, width: field === 'description' ? 42 : 16 }))
     rows.forEach((row: any) => {
       const record: Record<string, unknown> = {}
       fields.forEach((field) => { record[field] = reportCell(row, field, outNegative) })
@@ -602,6 +610,19 @@ async function exportAgentReport(args: AgentReportExportInput) {
 }
 
 export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[] {
+  const isGeneralOrganization = input.context.organization?.profile === 'GENERAL'
+  const activeCategoryIds = new Set(
+    (input.context.primaryClassifications || [])
+      .filter((value) => value.isActive !== false && value.isActive !== 0)
+      .map((value) => Number(value.id))
+  )
+  const categoryName = (id?: number | null) =>
+    input.context.primaryClassifications?.find((value) => Number(value.id) === Number(id))?.name || null
+  const requireValidCategory = (id?: number | null) => {
+    if (!isGeneralOrganization) return null
+    if (id != null && activeCategoryIds.has(Number(id))) return null
+    return 'Für diese allgemeine Organisation muss eine aktive Kategorie über primaryClassificationValueId gewählt werden.'
+  }
   return [
     {
       name: 'vereino_context_overview',
@@ -734,6 +755,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         q: nullableString,
         type: { type: ['string', 'null'], enum: ['IN', 'OUT', 'TRANSFER', 'INTERNAL', null] },
         sphere: { type: ['string', 'null'], enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB', null] },
+        primaryClassificationValueId: nullableNumber,
         paymentAccountId: nullableNumber,
         budgetId: nullableNumber,
         withoutBudget: { type: 'boolean', description: 'Nur Buchungen ohne Budget-Zuordnung zurückgeben.' },
@@ -747,6 +769,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           q: z.string().nullable().optional(),
           type: z.enum(['IN', 'OUT', 'TRANSFER', 'INTERNAL']).nullable().optional(),
           sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']).nullable().optional(),
+          primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           paymentAccountId: z.number().nullable().optional(),
           budgetId: z.number().nullable().optional(),
           withoutBudget: z.boolean().optional(),
@@ -759,6 +782,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           q: args.q || undefined,
           type: args.type || undefined,
           sphere: args.sphere || undefined,
+          primaryClassificationValueId: args.primaryClassificationValueId ?? undefined,
           paymentAccountId: args.paymentAccountId || undefined,
           budgetId: args.budgetId || undefined,
           tag: args.tag || undefined,
@@ -1651,6 +1675,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             paymentMethod: { type: ['string', 'null'], enum: ['BAR', 'BANK', null] },
             paymentAccountId: nullableNumber,
             sphere: { type: ['string', 'null'], enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB', null] },
+            primaryClassificationValueId: nullableNumber,
             type: { type: ['string', 'null'], enum: ['IN', 'OUT', 'TRANSFER', 'INTERNAL', null] },
             earmarkId: nullableNumber,
             budgetId: nullableNumber,
@@ -1917,14 +1942,15 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         party: { type: 'string', description: 'Debitor/Kreditor bzw. Gegenpartei.' },
         description: nullableString,
         grossAmount: { type: 'number', description: 'Bruttobetrag positiv in EUR.' },
-        sphere: { type: 'string', enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] },
+        sphere: { type: ['string', 'null'], enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB', null] },
+        primaryClassificationValueId: nullableNumber,
         paymentMethod: nullableString,
         paymentAccountId: nullableNumber,
         budgetId: nullableNumber,
         earmarkId: nullableNumber,
         tags: { type: 'array', items: { type: 'string' } },
         reason: nullableString
-      }, ['voucherType', 'date', 'party', 'grossAmount', 'sphere']),
+      }, ['voucherType', 'date', 'party', 'grossAmount']),
       run: (rawArgs) => {
         const args = parseArgs(z.object({
           voucherType: z.enum(['IN', 'OUT']),
@@ -1934,7 +1960,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           party: z.string().min(1),
           description: z.string().nullable().optional(),
           grossAmount: z.number().positive(),
-          sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']),
+          sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']).nullable().optional(),
+          primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           paymentMethod: z.string().nullable().optional(),
           paymentAccountId: z.number().nullable().optional(),
           budgetId: z.number().nullable().optional(),
@@ -1942,6 +1969,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           tags: z.array(z.string()).optional(),
           reason: z.string().nullable().optional()
         }), rawArgs)
+        const categoryWarning = requireValidCategory(args.primaryClassificationValueId)
+        if (categoryWarning) return { ok: false, warning: categoryWarning }
         const payload = {
           action: 'CREATE',
           invoice: {
@@ -1953,7 +1982,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             grossAmount: roundMoney(args.grossAmount),
             paymentMethod: args.paymentMethod || null,
             paymentAccountId: args.paymentAccountId ?? null,
-            sphere: args.sphere,
+            sphere: args.sphere || 'IDEELL',
+            primaryClassificationValueId: args.primaryClassificationValueId ?? null,
             earmarkId: args.earmarkId ?? null,
             budgetId: args.budgetId ?? null,
             autoPost: true,
@@ -2194,6 +2224,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         },
         earmarkId: nullableNumber,
         earmarkName: nullableString,
+        primaryClassificationValueId: nullableNumber,
         addTags: { type: 'array', items: { type: 'string' } },
         noteAppend: nullableString,
         reason: nullableString
@@ -2210,6 +2241,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           })).optional(),
           earmarkId: z.number().nullable().optional(),
           earmarkName: z.string().nullable().optional(),
+          primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           addTags: z.array(z.string()).optional(),
           noteAppend: z.string().nullable().optional(),
           reason: z.string().nullable().optional()
@@ -2217,7 +2249,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         const requestedBudgetAssignments = (args.budgetAssignments || []).filter((item) => item.budgetId != null || !!item.budgetName)
         const hasBudgetChange = Object.prototype.hasOwnProperty.call(args, 'budgetId') || !!args.budgetName || requestedBudgetAssignments.length > 0
         const hasEarmarkChange = Object.prototype.hasOwnProperty.call(args, 'earmarkId') || !!args.earmarkName
-        if (!hasBudgetChange && !hasEarmarkChange && !(args.addTags || []).length && !args.noteAppend) {
+        const hasClassificationChange = Object.prototype.hasOwnProperty.call(args, 'primaryClassificationValueId')
+        if (!hasBudgetChange && !hasEarmarkChange && !hasClassificationChange && !(args.addTags || []).length && !args.noteAppend) {
           return { ok: false, warning: 'Es wurde keine konkrete Änderung für den Buchungsentwurf angegeben.' }
         }
         const intentText = normalizeLookup([args.reason, args.noteAppend, ...(args.addTags || [])].filter(Boolean).join(' '))
@@ -2233,6 +2266,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           sort: 'ASC',
           sortBy: 'date'
         } as any)
+        const categoryWarning = hasClassificationChange ? requireValidCategory(args.primaryClassificationValueId) : null
+        if (categoryWarning) return { ok: false, warning: categoryWarning }
         const budgets = listBudgets({ includeArchived: true } as any) || []
         const budget = args.budgetId != null
           ? budgets.find((item: any) => Number(item.id) === Number(args.budgetId))
@@ -2297,6 +2332,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             voucherNo: row.voucherNo,
             date: row.date,
             type: row.type,
+            oldPrimaryClassificationValueId: row.primaryClassificationValueId ?? null,
+            oldPrimaryClassificationName: row.primaryClassificationName ?? null,
             description: row.description,
             grossAmount,
             oldBudgetId: row.budgetId ?? null,
@@ -2315,6 +2352,10 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
               newEarmarkId: earmark?.id ?? args.earmarkId ?? null,
               newEarmarkLabel: earmark?.code || earmark?.name || args.earmarkName || (args.earmarkId ? `Zweckbindung #${args.earmarkId}` : null),
               newEarmarkAmount: fullGrossAmount
+            } : {}),
+            ...(hasClassificationChange ? {
+              newPrimaryClassificationValueId: args.primaryClassificationValueId ?? null,
+              newPrimaryClassificationName: categoryName(args.primaryClassificationValueId) || null
             } : {}),
             oldTags: row.tags || [],
             newTags: [...(row.tags || []), ...addTags],
@@ -2413,6 +2454,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         vatRate: nullableNumber,
         paymentMethod: { type: ['string', 'null'], enum: ['BAR', 'BANK', null] },
         paymentAccountId: nullableNumber,
+        primaryClassificationValueId: nullableNumber,
         tags: { type: 'array', items: { type: 'string' } },
         bankTransactionId: nullableNumber,
         reason: nullableString
@@ -2428,6 +2470,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           vatRate: z.number().min(0).max(100).nullable().optional(),
           paymentMethod: z.enum(['BAR', 'BANK']).nullable().optional(),
           paymentAccountId: z.number().nullable().optional(),
+          primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           tags: z.array(z.string()).optional(),
           bankTransactionId: z.number().nullable().optional(),
           reason: z.string().nullable().optional()
@@ -2453,6 +2496,9 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         if (!original) return { ok: false, warning: `Beleg #${args.originalVoucherId} wurde nicht gefunden.` }
         if (original.reversedById) return { ok: false, warning: `Beleg ${original.voucherNo || args.originalVoucherId} wurde bereits storniert.` }
         if (original.originalId) return { ok: false, warning: `Beleg ${original.voucherNo || args.originalVoucherId} ist selbst eine Stornobuchung.` }
+        const primaryClassificationValueId = args.primaryClassificationValueId ?? original.primaryClassificationValueId ?? null
+        const categoryWarning = requireValidCategory(primaryClassificationValueId)
+        if (categoryWarning) return { ok: false, warning: categoryWarning }
 
         const paymentAccountId = Object.prototype.hasOwnProperty.call(args, 'paymentAccountId')
           ? args.paymentAccountId ?? null
@@ -2465,6 +2511,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           date: args.date || original.date,
           type: args.newType,
           sphere: args.sphere || original.sphere,
+          primaryClassificationValueId,
+          primaryClassificationName: categoryName(primaryClassificationValueId) || original.primaryClassificationName || null,
           description: args.description || original.description || `Korrektur zu ${original.voucherNo}`,
           grossAmount: roundMoney(args.grossAmount ?? original.grossAmount),
           vatRate: args.vatRate ?? original.vatRate ?? 0,
@@ -2498,6 +2546,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
                 date: original.date,
                 type: original.type,
                 sphere: original.sphere,
+                primaryClassificationValueId: original.primaryClassificationValueId ?? null,
+                primaryClassificationName: original.primaryClassificationName ?? null,
                 description: original.description,
                 grossAmount: roundMoney(original.grossAmount),
                 vatRate: original.vatRate ?? 0,
@@ -2527,12 +2577,13 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         paymentAccountId: nullableNumber,
         tags: { type: 'array', items: { type: 'string' } },
         note: nullableString
-      }, ['date', 'type', 'sphere', 'description', 'grossAmount']),
+      }, ['date', 'type', 'description', 'grossAmount']),
       run: (rawArgs) => {
         const args = parseArgs(z.object({
           date: z.string(),
           type: z.enum(['IN', 'OUT']),
-          sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']),
+          sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']).nullable().optional(),
+          primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           description: z.string(),
           grossAmount: z.number().positive(),
           vatRate: z.number().min(0).max(100).optional(),
@@ -2541,13 +2592,16 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           tags: z.array(z.string()).optional(),
           note: z.string().nullable().optional()
         }), rawArgs)
+        const categoryWarning = requireValidCategory(args.primaryClassificationValueId)
+        if (categoryWarning) return { ok: false, warning: categoryWarning }
         const account = args.paymentAccountId
           ? listPaymentAccounts({ activeOnly: true } as any).find((item: any) => Number(item.id) === Number(args.paymentAccountId))
           : null
         const draft = {
           date: args.date,
           type: args.type,
-          sphere: args.sphere,
+          sphere: args.sphere || 'IDEELL',
+          primaryClassificationValueId: args.primaryClassificationValueId ?? null,
           mode: 'GROSS',
           grossAmount: args.grossAmount,
           vatRate: args.vatRate ?? 0,

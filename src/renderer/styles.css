@@ -6599,8 +6599,19 @@ body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !i
   pointer-events: none;
   transition: right .3s cubic-bezier(.4, 0, .2, 1);
 }
+.compact-booking-flyout-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
 .compact-booking-flyout-anchor--journal { bottom: 140px; }
 .compact-booking-flyout-anchor--journal-end { right: 128px; }
+.advances-purchase-flyout-anchor {
+  right: 32px;
+  bottom: 32px;
+}
 .compact-booking-flyout {
   --compact-booking-tone: var(--accent);
   max-height: min(690px, calc(100vh - 160px));
@@ -7856,6 +7867,107 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   background: var(--accent);
   color: #24171b;
   box-shadow: 0 7px 20px color-mix(in oklab, var(--accent) 42%, transparent);
+}
+
+.invoices-toolbar-action {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+/* The invoice capture starts beside its toolbar button. Once a file has been
+   selected it intentionally expands into the larger review workspace. */
+.local-invoice-scan--flyout {
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 32px));
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__header {
+  padding: 12px 14px 10px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__title-row {
+  gap: 8px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__title-row h2 {
+  font-size: 15px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__title-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-radius: 9px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__title-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__dropzone {
+  min-height: 230px;
+  margin: 12px 14px 14px;
+  border-radius: 12px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__drop-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+}
+
+.local-invoice-scan--flyout .local-invoice-scan__drop-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.local-invoice-scan__ai-guidance {
+  margin: 10px 14px 0;
+  border: 1px solid color-mix(in oklab, var(--accent) 36%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+
+.local-invoice-scan__ai-guidance summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 10px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.local-invoice-scan__ai-guidance summary::-webkit-details-marker { display: none; }
+.local-invoice-scan__ai-guidance summary > span { display: inline-flex; align-items: center; gap: 7px; }
+.local-invoice-scan__ai-guidance summary svg { color: var(--accent); }
+.local-invoice-scan__ai-guidance summary small { padding: 2px 7px; border-radius: 999px; color: var(--text-dim); background: color-mix(in oklab, var(--muted) 76%, transparent); font-size: 10px; font-weight: 700; }
+
+.local-invoice-scan__ai-guidance > div {
+  display: grid;
+  gap: 6px;
+  padding: 0 10px 10px;
+  border-top: 1px solid color-mix(in oklab, var(--accent) 20%, var(--border));
+}
+
+.local-invoice-scan__ai-guidance label,
+.local-invoice-scan__ai-guidance > div > small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.local-invoice-scan__ai-guidance textarea {
+  min-height: 66px;
+  resize: vertical;
 }
 
 /* The scanner is a true modal: background page scrolling must stay disabled. */
@@ -11595,6 +11707,7 @@ html[data-glass-modals='true'] .modal-content {
 
 .party-selector__menu,
 .select-dropdown__menu {
+  box-sizing: border-box;
   position: absolute;
   z-index: 250;
   top: calc(100% + 5px);
@@ -11617,6 +11730,8 @@ html[data-glass-modals='true'] .modal-content {
   right: auto;
   bottom: auto;
   left: auto;
+  /* The position is calculated from the trigger's border box. */
+  right: auto;
 }
 
 .party-selector__menu > button,
@@ -11659,8 +11774,11 @@ html[data-glass-modals='true'] .modal-content {
 
 .party-selector__empty {
   padding: 9px;
-  color: var(--muted);
+  color: var(--text-dim);
+  background: color-mix(in oklab, var(--surface-alt) 84%, var(--surface));
+  border-radius: 6px;
   font-size: 11px;
+  line-height: 1.4;
 }
 
 .select-dropdown__empty {
@@ -11762,6 +11880,247 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
   border-top: 1px solid var(--border);
   border-radius: 0 0 6px 6px;
   color: var(--accent);
+  font-weight: 650;
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+}
+
+/* Invoice forms use the same booking popup shell. Their specialised content
+   still needs the more compact two-column dimensions. */
+.invoices-modal-redesign.booking-modal.quick-add-modal {
+  width: min(1000px, 96vw);
+  max-height: min(600px, 88vh);
+  padding: 0;
+}
+
+.invoices-modal-redesign .modal-header-flex {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.invoices-modal-redesign .modal-header-flex h2 {
+  font-size: 1.1rem;
+}
+
+/* Compact booking flyout for related financial forms.  The specialised fields
+   remain available, but invoices and recurring templates now open in the same
+   narrow, vertical popup as a normal booking. */
+.modal.compact-booking-popup {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(690px, calc(100vh - 72px));
+  margin: auto;
+  padding: 0;
+}
+
+.compact-booking-popup__content {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.compact-booking-popup__kind {
+  flex: 0 0 auto;
+  padding: 11px 14px 0;
+}
+
+.compact-booking-popup__kind > .compact-booking-kind {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compact-booking-popup .invoices-modal-body {
+  min-height: 0;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.compact-booking-popup .invoices-modal-left,
+.compact-booking-popup .invoices-modal-right {
+  gap: 8px;
+}
+
+.compact-booking-popup .invoice-form-card,
+.compact-booking-popup .invoices-modal-right > .card {
+  border-radius: 11px;
+}
+
+.compact-booking-popup .invoices-modal-footer {
+  gap: 8px;
+  padding: 9px 14px;
+}
+
+.compact-booking-popup .invoices-modal-footer > .helper {
+  font-size: 10px;
+}
+
+.compact-booking-popup .recurring-booking-form {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.compact-booking-popup .recurring-booking-summary {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+
+.compact-booking-popup .booking-primary-grid,
+.compact-booking-popup .booking-secondary-grid {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.compact-booking-popup .booking-basis-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.compact-booking-popup .booking-basis-fields > :last-child {
+  grid-column: 1 / -1;
+}
+
+.compact-booking-popup .booking-section,
+.compact-booking-popup .booking-description-card,
+.compact-booking-popup .booking-assignments-card,
+.compact-booking-popup .recurring-schedule-card,
+.compact-booking-popup .booking-optional-card {
+  padding: 8px;
+  border-radius: 11px;
+}
+
+.compact-booking-popup .recurring-schedule-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.compact-booking-popup .recurring-end-date-field,
+.compact-booking-popup .recurring-variable-amount {
+  grid-column: 1 / -1;
+}
+
+/* Internal bookings have no payment account selector. Keep the readonly
+   marker and the amount on one compact row instead of creating a tall card. */
+.compact-booking-flyout--internal .compact-booking-core-grid .compact-booking-field--readonly {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.compact-booking-flyout--internal .compact-booking-field--readonly > span:first-child {
+  font-size: 10px;
+}
+
+.compact-booking-flyout--internal .compact-booking-field--readonly strong {
+  font-size: 12px;
+}
+
+.compact-booking-flyout--internal .compact-booking-core-grid .compact-booking-field--amount {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.compact-booking-flyout--internal .compact-booking-amount-control {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compact-booking-popup .modal-footer-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 0;
+  padding-top: 8px;
+  background: color-mix(in oklab, var(--surface) 96%, transparent);
+}
+
+/* Related forms keep their own scroll area between the fixed header and
+   footer. This prevents the keyboard hint/save row from drifting through the
+   content when a long recurring template is scrolled. */
+.compact-booking-popup .recurring-booking-form {
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.compact-booking-popup .recurring-booking-form__scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.compact-booking-popup .recurring-booking-form > .modal-footer-actions {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 97%, transparent);
+}
+
+/* The description and title fields are single-line controls. Keep them at
+   the same compact height as the rest of the flyout fields. */
+.compact-booking-popup .booking-description-card .input {
+  height: 38px;
+  min-height: 38px;
+  padding-top: 11px;
+  padding-bottom: 3px;
+  font-size: 12px;
+}
+
+.compact-booking-popup .booking-description-card .booking-floating-field > label {
+  font-size: 11px;
+}
+
+.compact-booking-popup #invoice-description {
+  height: 38px;
+  min-height: 38px;
+  padding-top: 11px;
+  padding-bottom: 3px;
+}
+
+.compact-booking-popup .compact-booking-optional-bar {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 8px;
+}
+
+.compact-booking-popup .invoices-modal-body + .compact-booking-optional-bar {
+  margin: 0 14px;
+  padding-bottom: 2px;
+}
+
+@media (max-width: 620px) {
+  .modal.compact-booking-popup {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 32px);
+  }
+
+  .compact-booking-popup .invoices-modal-footer {
+    flex-wrap: wrap;
+  }
 }
 
 /* Party controls sit inside floating booking fields. Their nested input needs
@@ -18036,4 +18395,169 @@ button.filter-totals-stat {
   .member-finance-grid > [style*='grid-column'] {
     grid-column: auto !important;
   }
+}
+
+/* Shared optional booking area: every expanded panel follows the action row
+   directly, regardless of whether it belongs to a booking, invoice or
+   recurring template. Kept last to deliberately override legacy form rules. */
+.compact-booking-optional-area {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compact-booking-optional-panels {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compact-booking-optional-area .compact-booking-optional-bar {
+  margin: 0;
+  padding-top: 9px;
+}
+
+.compact-booking-popup .booking-description-card .input,
+.compact-booking-popup #invoice-description {
+  height: 36px;
+  min-height: 36px;
+  padding-top: 10px;
+  padding-bottom: 2px;
+  font-size: 12px;
+}
+
+.compact-booking-popup .booking-description-card .booking-floating-field > label {
+  font-size: 10px;
+}
+
+.compact-booking-popup .invoices-modal-body > .compact-booking-optional-area {
+  margin-top: 2px;
+}
+
+.recurring-summary-grid {
+  gap: 8px;
+}
+
+.recurring-summary-card {
+  min-height: 48px;
+  padding: 8px 11px;
+}
+
+.recurring-summary-card span {
+  font-size: 11px;
+}
+
+.recurring-summary-card strong {
+  font-size: 19px;
+}
+
+/* One control contract for the compact booking family. Invoices retain their
+   floating labels, but use the exact same height, typography and padding as
+   the normal booking flyout. */
+.compact-booking-flyout,
+.compact-booking-popup {
+  --booking-compact-control-height: 36px;
+  --booking-compact-control-font-size: 12px;
+}
+
+.compact-booking-field .input,
+.compact-booking-field select {
+  height: var(--booking-compact-control-height);
+  min-height: var(--booking-compact-control-height);
+  font-size: var(--booking-compact-control-font-size);
+}
+
+.invoices-modal-redesign .booking-compact-control > :is(.input, select),
+.invoices-modal-redesign .booking-compact-control > .booking-date-input-wrap > .input,
+.invoices-modal-redesign .booking-compact-control > .party-selector .party-selector__control > .input {
+  height: var(--booking-compact-control-height);
+  min-height: var(--booking-compact-control-height);
+  box-sizing: border-box;
+  padding-top: 10px;
+  padding-bottom: 2px;
+  font-size: var(--booking-compact-control-font-size);
+}
+
+.invoices-modal-redesign .booking-compact-control > label {
+  font-size: 12px;
+}
+
+:root[data-theme='dark'] .invoices-modal-redesign {
+  --invoice-field-bg: color-mix(in oklab, var(--surface) 82%, var(--muted) 18%);
+  --invoice-field-border: color-mix(in oklab, var(--border) 82%, var(--text-dim) 18%);
+  --invoice-field-focus-bg: color-mix(in oklab, var(--surface) 78%, var(--accent) 22%);
+}
+
+:root[data-theme='dark'] .compact-booking-popup .card,
+:root[data-theme='dark'] .compact-booking-popup .compact-booking-optional-section {
+  border-color: color-mix(in oklab, var(--border) 82%, var(--text-dim) 18%);
+  background: color-mix(in oklab, var(--surface) 86%, var(--muted) 14%);
+}
+
+/* Compact booking dialogs use the theme-aware button exclusively. Chromium's
+   native indicator stays hidden here so a date field never shows two icons. */
+.compact-booking-flyout input[type='date']::-webkit-calendar-picker-indicator,
+.compact-booking-popup input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.compact-booking-flyout .booking-date-input-wrap,
+.compact-booking-popup .booking-date-input-wrap {
+  display: block;
+}
+
+.compact-booking-flyout .booking-date-input-wrap .input,
+.compact-booking-popup .booking-date-input-wrap .input {
+  height: var(--booking-compact-control-height, 36px);
+  min-height: var(--booking-compact-control-height, 36px);
+}
+
+.compact-booking-flyout .booking-date-picker-button,
+.compact-booking-popup .booking-date-picker-button {
+  color: var(--text);
+}
+
+/* Shared semantic colour treatment for the compact booking family. This keeps
+   recurring bookings and invoices visually consistent with the normal booking
+   flyout, including a clear coloured outline on the selected direction. */
+.compact-booking-popup.booking-modal--type-in,
+.compact-booking-popup.invoices-modal--type-in {
+  --compact-booking-tone: var(--success);
+}
+
+.compact-booking-popup.booking-modal--type-out,
+.compact-booking-popup.invoices-modal--type-out {
+  --compact-booking-tone: var(--danger);
+}
+
+.compact-booking-kind button.compact-booking-kind__button {
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.compact-booking-kind button.compact-booking-kind__button--in.is-active {
+  color: var(--success);
+  border-color: color-mix(in oklab, var(--success) 72%, var(--border));
+  background: color-mix(in oklab, var(--success) 15%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--success) 42%, transparent) inset;
+}
+
+.compact-booking-kind button.compact-booking-kind__button--out.is-active {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 72%, var(--border));
+  background: color-mix(in oklab, var(--danger) 15%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--danger) 42%, transparent) inset;
+}
+
+/* Section titles in recurring/invoice forms use the same compact scale as
+   the rest of the shared booking controls. */
+.compact-booking-popup .booking-section-heading strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.compact-booking-popup .booking-section-heading .helper {
+  font-size: 10px;
+  line-height: 1.3;
 }

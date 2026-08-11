@@ -1,3 +1,10 @@
+import type {
+    ClassificationScheme,
+    ClassificationValue,
+    OrganizationProfile,
+    OrganizationProfileDefinition
+} from '../../../shared/classification'
+
 export type UpdateStatus =
     | 'idle'
     | 'checking'
@@ -158,6 +165,7 @@ export interface SystemApi {
                 name: string
                 dbRoot: string
                 createdAt: string
+                profile?: OrganizationProfile
                 isActive: boolean
             }>
         }>
@@ -167,14 +175,15 @@ export interface SystemApi {
                 name: string
                 dbRoot: string
                 createdAt: string
+                profile?: OrganizationProfile
             } | null
         }>
-        create: (payload: { name: string }) => Promise<{
-            organization: { id: string; name: string; dbRoot: string; createdAt: string }
+        create: (payload: { name: string; profile?: OrganizationProfile }) => Promise<{
+            organization: { id: string; name: string; dbRoot: string; createdAt: string; profile: OrganizationProfile }
         }>
         switch: (payload: { orgId: string }) => Promise<{
             success: boolean
-            org: { id: string; name: string; dbRoot: string }
+            org: { id: string; name: string; dbRoot: string; profile?: OrganizationProfile }
         }>
         rename: (payload: { orgId: string; name: string }) => Promise<{ success: boolean }>
         delete: (payload: { orgId: string; deleteData?: boolean }) => Promise<{ success: boolean }>
@@ -187,7 +196,29 @@ export interface SystemApi {
             glassModals?: boolean
         }) => Promise<{ success: boolean }>
         activeAppearance: () => Promise<OrganizationAppearance>
-        onSwitched: (callback: (organization: { id: string; name: string; dbRoot: string }) => void) => () => void
+        onSwitched: (callback: (organization: { id: string; name: string; dbRoot: string; profile?: OrganizationProfile }) => void) => () => void
+    }
+    classifications: {
+        profile: {
+            update: (payload: { profile: OrganizationProfile }) => Promise<{ profile: OrganizationProfile; changed: boolean }>
+        }
+        primary: {
+            list: () => Promise<{
+                profile: OrganizationProfile
+                definition: OrganizationProfileDefinition
+                scheme: ClassificationScheme
+                values: ClassificationValue[]
+            }>
+            create: (payload: { name: string; color?: string | null; icon?: string | null; description?: string | null }) => Promise<{ id: number }>
+            update: (payload: {
+                id: number
+                name?: string
+                color?: string | null
+                icon?: string | null
+                description?: string | null
+                isActive?: boolean
+            }) => Promise<{ id: number }>
+        }
     }
     shell: {
         showItemInFolder: (fullPath: string) => Promise<{ ok: boolean; error?: string | null }>

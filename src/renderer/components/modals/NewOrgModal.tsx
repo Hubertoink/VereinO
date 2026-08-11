@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
+import type { OrganizationProfile } from '../../../../shared/classification'
 
 interface NewOrgModalProps {
   onClose: () => void
@@ -12,6 +13,7 @@ interface NewOrgModalProps {
  */
 export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalProps) {
   const [name, setName] = useState('')
+  const [profile, setProfile] = useState<OrganizationProfile>('NONPROFIT')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -22,7 +24,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
     setBusy(true)
     setError('')
     try {
-      const result = await (window as any).api?.organizations?.create?.({ name: name.trim() })
+      const result = await (window as any).api?.organizations?.create?.({ name: name.trim(), profile })
       if (result?.organization) {
         notify?.('success', `Organisation "${result.organization.name}" erstellt`)
         onCreated(result.organization)
@@ -83,6 +85,61 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
             disabled={busy}
           />
         </div>
+
+        <fieldset className="field" style={{ border: 0, padding: 0, margin: '16px 0 0' }}>
+          <legend>Verwendungsprofil</legend>
+          <div className="helper" style={{ marginBottom: 8 }}>
+            Das Profil legt fest, ob Buchungen nach gemeinnützigen Sphären oder frei angelegten Kategorien gegliedert werden.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <label
+              style={{
+                display: 'block',
+                cursor: busy ? 'default' : 'pointer',
+                border: `1px solid ${profile === 'NONPROFIT' ? '#4f8cff' : 'var(--border, #3a4356)'}`,
+                borderRadius: 8,
+                padding: '14px 12px',
+                background: profile === 'NONPROFIT' ? 'color-mix(in oklab, #4f8cff 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
+              }}
+            >
+              <input
+                type="radio"
+                name="organization-profile"
+                value="NONPROFIT"
+                checked={profile === 'NONPROFIT'}
+                onChange={() => setProfile('NONPROFIT')}
+                disabled={busy}
+              />{' '}
+              <strong>Verein / gemeinnützig</strong>
+              <span className="helper" style={{ display: 'block', marginLeft: 22, marginTop: 3 }}>
+                Nutzt die vier steuerlichen Sphären und die Vereinsfunktionen.
+              </span>
+            </label>
+            <label
+              style={{
+                display: 'block',
+                cursor: busy ? 'default' : 'pointer',
+                border: `1px solid ${profile === 'GENERAL' ? '#22c55e' : 'var(--border, #3a4356)'}`,
+                borderRadius: 8,
+                padding: '14px 12px',
+                background: profile === 'GENERAL' ? 'color-mix(in oklab, #22c55e 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
+              }}
+            >
+              <input
+                type="radio"
+                name="organization-profile"
+                value="GENERAL"
+                checked={profile === 'GENERAL'}
+                onChange={() => setProfile('GENERAL')}
+                disabled={busy}
+              />{' '}
+              <strong>Allgemeine Budgetverwaltung</strong>
+              <span className="helper" style={{ display: 'block', marginLeft: 22, marginTop: 3 }}>
+                Für Kleingewerbe, Projekte und Teams mit frei angelegten Kategorien.
+              </span>
+            </label>
+          </div>
+        </fieldset>
 
         <div className="flex justify-end gap-8" style={{ marginTop: 16 }}>
           <button className="btn" onClick={onClose} disabled={busy}>

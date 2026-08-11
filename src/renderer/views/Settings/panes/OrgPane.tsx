@@ -4,6 +4,7 @@ import ConfirmSwitchOrgModal from '../../../components/modals/ConfirmSwitchOrgMo
 import NewOrgModal from '../../../components/modals/NewOrgModal'
 import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
+import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
 import { dispatchDataChanged } from '../../../utils/refresh'
 
 interface ActiveOrg {
@@ -40,6 +41,13 @@ export function OrgPane({ notify }: OrgPaneProps) {
   const [error, setError] = React.useState<string>('')
   const [showTaxExemptionModal, setShowTaxExemptionModal] = React.useState(false)
   const [taxCertificate, setTaxCertificate] = React.useState<TaxExemptionCertificate | null>(null)
+  const [profile, setProfile] = React.useState<OrganizationProfile | null>(null)
+  const [categories, setCategories] = React.useState<ClassificationValue[]>([])
+  const [newCategoryName, setNewCategoryName] = React.useState('')
+  const [categoryBusy, setCategoryBusy] = React.useState(false)
+  const [editingCategoryId, setEditingCategoryId] = React.useState<number | null>(null)
+  const [editingCategoryName, setEditingCategoryName] = React.useState('')
+  const [profileChangeBusy, setProfileChangeBusy] = React.useState(false)
 
   async function loadTaxCertificate() {
     try {
@@ -59,6 +67,17 @@ export function OrgPane({ notify }: OrgPaneProps) {
       }
     } catch (e: any) {
       console.error('Error loading active organization:', e)
+    }
+  }
+
+  async function loadPrimaryClassifications() {
+    try {
+      const res = await (window as any).api?.classifications?.primary?.list?.()
+      if (!res) return
+      setProfile(res.profile || null)
+      setCategories(res.values || [])
+    } catch (e: any) {
+      console.error('Error loading classifications:', e)
     }
   }
 
@@ -83,6 +102,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
     load()
     loadTaxCertificate()
     loadActiveOrg()
+    loadPrimaryClassifications()
     return () => { cancelled = true }
   }, [])
 
@@ -163,6 +183,53 @@ export function OrgPane({ notify }: OrgPaneProps) {
     }
   }
 
+  async function createCategory() {
+    const name = newCategoryName.trim()
+    if (!name || categoryBusy) return
+    setCategoryBusy(true)
+    try {
+      await (window as any).api?.classifications?.primary?.create?.({ name })
+      setNewCategoryName('')
+      await loadPrimaryClassifications()
+      notify('success', `Kategorie „${name}“ angelegt`)
+      dispatchDataChanged(['settings'])
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    } finally {
+      setCategoryBusy(false)
+    }
+  }
+
+  async function updateCategory(id: number, patch: { name?: string; isActive?: boolean }) {
+    if (categoryBusy) return
+    setCategoryBusy(true)
+    try {
+      await (window as any).api?.classifications?.primary?.update?.({ id, ...patch })
+      setEditingCategoryId(null)
+      setEditingCategoryName('')
+      await loadPrimaryClassifications()
+      notify('success', patch.isActive === false ? 'Kategorie archiviert' : patch.isActive === true ? 'Kategorie reaktiviert' : 'Kategorie umbenannt')
+      dispatchDataChanged(['settings'])
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+    } finally {
+      setCategoryBusy(false)
+    }
+  }
+
+  async function changeOrganizationProfile(nextProfile: OrganizationProfile) {
+    if (profileChangeBusy || nextProfile === profile) return
+    setProfileChangeBusy(true)
+    try {
+      await (window as any).api?.classifications?.profile?.update?.({ profile: nextProfile })
+      notify('success', 'Organisationsprofil geändert. Die Ansicht wird neu geladen.')
+      window.setTimeout(() => window.location.reload(), 400)
+    } catch (e: any) {
+      notify('error', e?.message || String(e))
+      setProfileChangeBusy(false)
+    }
+  }
+
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {/* Active Organization Name (for switcher) */}
@@ -198,6 +265,111 @@ export function OrgPane({ notify }: OrgPaneProps) {
         </div>
       )}
 
+      <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <strong>{profile === 'GENERAL' ? '🏷️ Allgemeine Budgetverwaltung' : '🏛️ Gemeinnützige Organisation'}</strong>
+          <div className="helper" style={{ marginTop: 4 }}>
+            {profile === 'GENERAL'
+              ? 'Buchungen werden mit frei angelegten Kategorien gegliedert.'
+              : 'Buchungen werden mit den vier steuerlichen Sphären gegliedert.'}
+          </div>
+          <div className="helper" style={{ marginTop: 4 }}>Das Profil kann nur geändert werden, solange keine Finanzdaten vorhanden sind.</div>
+        </div>
+        <button
+          className="btn"
+          type="button"
+          disabled={profileChangeBusy || !profile}
+          onClick={() => changeOrganizationProfile(profile === 'GENERAL' ? 'NONPROFIT' : 'GENERAL')}
+        >
+          {profileChangeBusy ? 'Ändere…' : profile === 'GENERAL' ? 'Zu Verein wechseln' : 'Zu Budgetverwaltung wechseln'}
+        </button>
+      </div>
+
+      {profile === 'GENERAL' && (
+        <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div><strong>🏷️ Kategorien</strong><div className="helper">Kategorien, Farben und Zeichen werden in einem eigenen Bereich verwaltet.</div></div>
+          <button className="btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'categories' } }))}>Kategorien verwalten</button>
+        </div>
+      )}
+
+      {false && profile === 'GENERAL' && (
+        <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ marginBottom: 10 }}>
+            <strong>🏷️ Kategorien</strong>
+            <div className="helper">Kategorien sind die verpflichtende Hauptgliederung deiner Buchungen.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'end', maxWidth: 520 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label htmlFor="new-primary-category">Neue Kategorie</label>
+              <input
+                id="new-primary-category"
+                className="input"
+                value={newCategoryName}
+                disabled={categoryBusy}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    createCategory()
+                  }
+                }}
+                placeholder="z. B. Material, Vertrieb oder Projekt A"
+              />
+            </div>
+            <button className="btn primary" type="button" disabled={!newCategoryName.trim() || categoryBusy} onClick={createCategory}>
+              Hinzufügen
+            </button>
+          </div>
+          <div style={{ display: 'grid', gap: 6, marginTop: 12, maxWidth: 640 }}>
+            {categories.length === 0 ? (
+              <div className="helper">Noch keine Kategorien angelegt.</div>
+            ) : categories.map((category) => (
+              <div
+                key={category.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  border: '1px solid var(--border)', borderRadius: 7,
+                  opacity: category.isActive ? 1 : 0.6
+                }}
+              >
+                {editingCategoryId === category.id ? (
+                  <input
+                    className="input"
+                    value={editingCategoryName}
+                    disabled={categoryBusy}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') updateCategory(category.id, { name: editingCategoryName })
+                      if (event.key === 'Escape') setEditingCategoryId(null)
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <span style={{ flex: 1 }}>{category.name}</span>
+                )}
+                <span className="helper">{category.isActive ? 'Aktiv' : 'Archiviert'}</span>
+                {editingCategoryId === category.id ? (
+                  <>
+                    <button className="btn" type="button" disabled={!editingCategoryName.trim() || categoryBusy} onClick={() => updateCategory(category.id, { name: editingCategoryName })}>Speichern</button>
+                    <button className="btn" type="button" disabled={categoryBusy} onClick={() => setEditingCategoryId(null)}>Abbrechen</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn" type="button" disabled={categoryBusy} onClick={() => {
+                      setEditingCategoryId(category.id)
+                      setEditingCategoryName(category.name)
+                    }}>Umbenennen</button>
+                    <button className="btn" type="button" disabled={categoryBusy} onClick={() => updateCategory(category.id, { isActive: !category.isActive })}>
+                      {category.isActive ? 'Archivieren' : 'Reaktivieren'}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Organization Display Settings */}
       <div>
         <strong>📋 Anzeige-Einstellungen</strong>
@@ -206,8 +378,8 @@ export function OrgPane({ notify }: OrgPaneProps) {
       {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
       <div className="row">
         <div className="field">
-          <label>Vollständiger Vereinsname</label>
-          <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
+          <label>{profile === 'GENERAL' ? 'Vollständiger Organisationsname' : 'Vollständiger Vereinsname'}</label>
+          <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder={profile === 'GENERAL' ? 'z. B. Musterbetrieb GmbH' : 'z. B. Förderverein Muster e.V.'} />
         </div>
         <div className="field">
           <label>Name (Kassier)</label>
@@ -216,7 +388,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
       </div>
       <div className="row">
         <div className="field">
-          <label>Anschrift Verein</label>
+          <label>{profile === 'GENERAL' ? 'Anschrift Organisation' : 'Anschrift Verein'}</label>
           <textarea
             className="input"
             value={orgAddress}
@@ -282,7 +454,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
       </div>
 
       {/* Tax Exemption Certificate Section */}
-      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+      {profile !== 'GENERAL' && <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
         <div style={{ marginBottom: 12 }}>
           <strong>📄 Steuerbefreiungsbescheid</strong>
           <div className="helper">Gemeinnützigkeitsbescheid für Spendenbescheinigungen hinterlegen</div>
@@ -341,7 +513,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Modal */}
       {showTaxExemptionModal && (

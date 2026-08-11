@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import TagsEditor from '../TagsEditor'
@@ -53,7 +53,8 @@ type EarmarkOption = {
   isActive?: number
 }
 
-type BookingMeta = Pick<QA, 'type' | 'sphere' | 'paymentMethod' | 'paymentAccountId'>
+type BookingMeta = Pick<QA, 'type' | 'sphere' | 'primaryClassificationValueId' | 'paymentMethod' | 'paymentAccountId'>
+type PrimaryClassification = { id: number; name: string; color?: string | null; icon?: string | null }
 
 function bookingMetaFromGuidance(guidance?: InvoiceAiGuidance): BookingMeta {
   const defaults = guidance?.defaults
@@ -279,7 +280,8 @@ export default function LocalInvoiceScanModal({
   initialState,
   aiGuidance,
   onDraftChange,
-  onFileChange
+  onFileChange,
+  anchorRect
 }: {
   onClose: () => void
   onCreateInvoice: (result: LocalInvoiceScanResult) => Promise<boolean> | boolean
@@ -294,6 +296,7 @@ export default function LocalInvoiceScanModal({
   aiGuidance?: InvoiceAiGuidance
   onDraftChange?: (state: LocalInvoiceScanDraftState & { file: File }) => void
   onFileChange?: (file: File | null) => void
+  anchorRect?: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null
 }) {
   const { notify } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -338,11 +341,42 @@ export default function LocalInvoiceScanModal({
   const [tags, setTags] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [bookingMeta, setBookingMeta] = useState<BookingMeta>(() => bookingMetaFromGuidance(aiGuidance))
+  const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [categories, setCategories] = useState<PrimaryClassification[]>([])
   const [aiAvailable, setAiAvailable] = useState(false)
   const [aiProvider, setAiProvider] = useState('KI')
+  const [aiInstructions, setAiInstructions] = useState(aiGuidance?.instructions || '')
   const [aiBusy, setAiBusy] = useState(false)
   const [isTransferring, setIsTransferring] = useState(false)
   const [draftReady, setDraftReady] = useState(!initialFile)
+  const [flyoutStyle, setFlyoutStyle] = useState<CSSProperties | undefined>()
+
+  useLayoutEffect(() => {
+    if (!anchorRect || file) {
+      setFlyoutStyle(undefined)
+      return
+    }
+    const gap = 8
+    const width = Math.min(460, window.innerWidth - 32)
+    const left = Math.max(12, Math.min(anchorRect.right - width, window.innerWidth - width - 12))
+    const spaceBelow = window.innerHeight - anchorRect.bottom - gap - 12
+    const spaceAbove = anchorRect.top - gap - 12
+    const opensDown = spaceBelow >= spaceAbove
+    const maxHeight = Math.max(240, Math.min(520, opensDown ? spaceBelow : spaceAbove))
+    setFlyoutStyle(opensDown
+      ? { position: 'fixed', left, top: Math.max(12, anchorRect.bottom + gap), maxHeight, margin: 0 }
+      : { position: 'fixed', left, bottom: Math.max(12, window.innerHeight - anchorRect.top + gap), maxHeight, margin: 0 })
+  }, [anchorRect, file])
+
+  useEffect(() => {
+    let active = true
+    void window.api.classifications.primary.list().then((result) => {
+      if (!active) return
+      setIsGeneralProfile(result.profile === 'GENERAL')
+      setCategories(result.values.filter((value) => value.isActive !== false))
+    }).catch(() => { if (active) setIsGeneralProfile(false) })
+    return () => { active = false }
+  }, [])
 
   const grossAmount = useMemo(
     () => Number(fields.grossAmount.replace(',', '.')) || 0,
@@ -365,6 +399,12 @@ export default function LocalInvoiceScanModal({
     ].filter(Boolean)
     return values.join(' · ') || (aiGuidance?.instructions?.trim() ? 'Hinweis für die KI' : '')
   }, [aiGuidance])
+  const activeAiGuidance = useMemo<InvoiceAiGuidance | undefined>(() => {
+    if (!aiAvailable) return undefined
+    const instructions = aiInstructions.trim()
+    const defaults = aiGuidance?.defaults
+    return instructions || defaults ? { instructions: instructions || undefined, defaults } : undefined
+  }, [aiAvailable, aiGuidance?.defaults, aiInstructions])
 
   useEffect(() => {
     let cancelled = false
@@ -901,20 +941,20 @@ export default function LocalInvoiceScanModal({
           dataBytes: new Uint8Array(await file.arrayBuffer())
         },
         localDocumentText: rawText.slice(0, 250_000),
-        guidance: aiGuidance
+        guidance: activeAiGuidance
       })
       const result = analyzed.result
       if (!manuallyEditedRef.current.has('supplier')) setPartyId(result.partyId ?? null)
       setFields((current) => mergeInvoiceFields(current, result, manuallyEditedRef.current))
       setBookingMeta({
-        type: aiGuidance?.defaults?.type || result.type,
-        sphere: aiGuidance?.defaults?.sphere || result.sphere,
-        paymentMethod: aiGuidance?.defaults?.paymentMethod || (
+        type: activeAiGuidance?.defaults?.type || result.type,
+        sphere: activeAiGuidance?.defaults?.sphere || result.sphere,
+        paymentMethod: activeAiGuidance?.defaults?.paymentMethod || (
           result.paymentMethod === 'BAR' || result.paymentMethod === 'BANK'
             ? result.paymentMethod
             : 'BANK'
         ),
-        paymentAccountId: aiGuidance?.defaults?.paymentAccountId ?? result.paymentAccountId
+        paymentAccountId: activeAiGuidance?.defaults?.paymentAccountId ?? result.paymentAccountId
       })
       if (result.budgets.length) {
         setBudgets(
@@ -990,11 +1030,12 @@ export default function LocalInvoiceScanModal({
   return createPortal(
     <div className="modal-overlay local-invoice-scan-overlay" role="presentation" onClick={onClose}>
       <section
-        className="modal local-invoice-scan"
+        className={`modal local-invoice-scan${!file && anchorRect ? ' local-invoice-scan--flyout' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="local-invoice-scan-title"
         onClick={(event) => event.stopPropagation()}
+        style={flyoutStyle}
       >
         <header className="local-invoice-scan__header">
           <div className="local-invoice-scan__title-row">
@@ -1028,7 +1069,17 @@ export default function LocalInvoiceScanModal({
           </div>
         </header>
 
-        {aiGuidanceLabel && <div className="local-invoice-scan__guidance">KI-Vorgabe: {aiGuidanceLabel}</div>}
+        {aiAvailable && <details className="local-invoice-scan__ai-guidance">
+          <summary>
+            <span><SparkleIcon /> KI-Vorgaben</span>
+            <small>Optional</small>
+          </summary>
+          <div>
+            <label htmlFor="local-invoice-ai-instructions">Instruktionen für {aiProvider}</label>
+            <textarea id="local-invoice-ai-instructions" className="input" rows={3} value={aiInstructions} onChange={(event) => setAiInstructions(event.target.value)} placeholder="z. B. als Projektkosten einordnen und den Lieferanten besonders prüfen" />
+            <small>{aiGuidanceLabel ? `Voreinstellung: ${aiGuidanceLabel}` : 'Die Vorgabe wird nur bei der KI-Auswertung dieser Rechnung verwendet.'}</small>
+          </div>
+        </details>}
 
         <input
           ref={fileInputRef}
@@ -1279,14 +1330,17 @@ export default function LocalInvoiceScanModal({
                     onChange={(value) => updateField('iban', value)}
                     placeholder="Noch nicht erkannt"
                   />
-                  <SelectField
+                  {isGeneralProfile ? <SelectField
+                    label="Kategorie"
+                    value={String(bookingMeta.primaryClassificationValueId || '')}
+                    options={categories.map((category) => ({ value: String(category.id), label: `${category.icon ? `${category.icon} ` : ''}${category.name}` }))}
+                    onChange={(value) => setBookingMeta((current) => ({ ...current, primaryClassificationValueId: value ? Number(value) : null }))}
+                  /> : <SelectField
                     label="Sphäre"
                     value={bookingMeta.sphere}
                     options={SPHERE_OPTIONS}
-                    onChange={(value) =>
-                      setBookingMeta((current) => ({ ...current, sphere: value }))
-                    }
-                  />
+                    onChange={(value) => setBookingMeta((current) => ({ ...current, sphere: value }))}
+                  />}
                   <div className="local-invoice-scan__field-span">
                     <Field
                       label="Beschreibung"
@@ -1587,18 +1641,13 @@ export default function LocalInvoiceScanModal({
           </div>
         )}
 
-        <footer className="local-invoice-scan__footer">
+        {file && <footer className="local-invoice-scan__footer">
           <div className="local-invoice-scan__footer-actions">
-            {file && (
-              <button type="button" className={`btn primary${isTransferring ? ' is-transferring' : ''}`} onClick={() => void createInvoice()} disabled={duplicateCheckInProgress || isTransferring}>
-                {isTransferring ? 'Daten werden übernommen …' : submitLabel}
-              </button>
-            )}
-            <button type="button" className="btn" onClick={onClose}>
-              Schließen
+            <button type="button" className={`btn primary${isTransferring ? ' is-transferring' : ''}`} onClick={() => void createInvoice()} disabled={duplicateCheckInProgress || isTransferring}>
+              {isTransferring ? 'Daten werden übernommen …' : submitLabel}
             </button>
           </div>
-        </footer>
+        </footer>}
       </section>
     </div>,
     document.body

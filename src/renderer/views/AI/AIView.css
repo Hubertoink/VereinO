@@ -3022,8 +3022,315 @@ html[data-glass-modals="true"] .ai-page .card {
     grid-template-rows: none;
   }
 
-  .ai-history-group--all {
+.ai-history-group--all {
     height: auto;
     max-height: 360px;
+  }
+}
+
+.ai-header-rules {
+  min-height: 38px;
+  padding: 0 13px;
+  border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  color: var(--text);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ai-header-rules:hover,
+.ai-header-rules:focus-visible {
+  border-color: color-mix(in oklab, var(--accent) 68%, var(--border));
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+}
+
+.ai-rules-drawer {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 2450;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(700px, calc(100vw - 48px));
+  max-height: calc(100vh - 104px);
+  padding: 16px;
+  overflow: hidden;
+  border-color: color-mix(in oklab, var(--accent) 34%, var(--border));
+  background: color-mix(in oklab, var(--surface) 97%, var(--bg) 3%);
+  box-shadow: 0 22px 64px rgb(0 0 0 / 34%);
+}
+
+.ai-rules-head,
+.ai-rules-toolbar,
+.ai-rule-editor-footer,
+.ai-rule-row,
+.ai-rule-row-title,
+.ai-rule-row-actions {
+  display: flex;
+  align-items: center;
+}
+
+.ai-rules-head {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ai-rules-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.ai-rules-head strong {
+  font-size: 18px;
+}
+
+.ai-rules-head span,
+.ai-rules-toolbar > span {
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ai-rules-close {
+  flex: 0 0 auto;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 22px;
+}
+
+.ai-rules-toolbar,
+.ai-rule-editor-footer {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-rule-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--accent) 42%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+}
+
+.ai-rule-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(180px, 0.65fr);
+  gap: 10px;
+}
+
+.ai-rule-instruction textarea {
+  min-height: 92px;
+  max-height: 180px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.ai-rule-editor-footer > div {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-rule-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: color-mix(in oklab, var(--text) 82%, var(--bg) 18%);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ai-rule-enabled input {
+  accent-color: var(--accent);
+}
+
+.ai-rule-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.ai-rule-row {
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 88%, var(--text) 12%);
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--surface-alt) 62%, var(--surface));
+}
+
+.ai-rule-row.is-disabled {
+  opacity: 0.62;
+}
+
+.ai-rule-row-main {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-rule-row-title {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-rule-row-title em {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 13%, var(--surface));
+  color: color-mix(in oklab, var(--accent) 72%, var(--text) 28%);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.ai-rule-row-main p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: color-mix(in oklab, var(--text) 76%, var(--bg) 24%);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ai-rule-row-actions {
+  align-self: center;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.ai-rule-row-actions .btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.ai-rule-row-actions .danger {
+  color: color-mix(in oklab, var(--danger) 76%, var(--text) 24%);
+}
+
+.ai-rule-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--text) 12%, var(--surface));
+  cursor: pointer;
+}
+
+.ai-rule-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--text) 72%, var(--surface));
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.ai-rule-switch.is-active {
+  border-color: color-mix(in oklab, var(--success) 58%, var(--border));
+  background: color-mix(in oklab, var(--success) 32%, var(--surface));
+}
+
+.ai-rule-switch.is-active span {
+  transform: translateX(16px);
+  background: color-mix(in oklab, var(--success) 78%, white 22%);
+}
+
+.ai-rules-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 18px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: color-mix(in oklab, var(--text) 70%, var(--bg) 30%);
+  text-align: center;
+}
+
+.ai-rules-empty strong {
+  color: var(--text);
+}
+
+.ai-rules-empty--error {
+  border-color: color-mix(in oklab, var(--warning) 48%, var(--border));
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface));
+}
+
+@media (max-width: 760px) {
+  .ai-rules-drawer {
+    left: 16px;
+    right: 16px;
+    top: 72px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+  }
+
+  .ai-rule-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-rule-row {
+    flex-direction: column;
+  }
+
+  .ai-rule-row-actions {
+    align-self: flex-end;
+  }
+}
+
+/* Header flyouts dock below the action row instead of covering it. */
+.ai-assistant-sidebar,
+.ai-agent-context-drawer,
+.ai-settings-drawer,
+.ai-rules-drawer {
+  top: 124px;
+  max-height: calc(100vh - 148px);
+}
+
+.ai-assistant-sidebar {
+  overflow: hidden;
+}
+
+.ai-history-drawer {
+  max-height: calc(100vh - 148px);
+  overflow: hidden;
+}
+
+.ai-header-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .ai-assistant-sidebar,
+  .ai-agent-context-drawer,
+  .ai-settings-drawer,
+  .ai-rules-drawer {
+    top: 104px;
+    max-height: calc(100vh - 128px);
   }
 }

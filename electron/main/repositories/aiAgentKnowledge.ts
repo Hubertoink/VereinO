@@ -24,6 +24,20 @@ export type AiAgentAutoRuleRow = {
   updatedAt: string
 }
 
+export type AiRuleScope = 'ALL' | 'BOOKINGS' | 'INVOICES'
+
+export type AiKnowledgeRuleRow = {
+  id: number
+  name: string
+  scope: AiRuleScope
+  instruction: string
+  enabled: number
+  createdAt: string
+  updatedAt: string
+}
+
+const AI_RULE_DRAFT_KIND_PREFIX = 'CATALOG:'
+
 function db() {
   const d = getDb()
   ensureAiTables(d as any)
@@ -118,6 +132,7 @@ export function listAiAgentAutoRules(input: { enabledOnly?: boolean; draftKind?:
   const params: any[] = []
   if (input.enabledOnly !== false) wh.push('enabled = 1')
   if (input.draftKind) { wh.push('draft_kind = ?'); params.push(input.draftKind) }
+  else wh.push("draft_kind NOT LIKE 'CATALOG:%'")
   const limit = Math.max(1, Math.min(200, Number(input.limit || 80)))
   params.push(limit)
   const rows = d.prepare(`
@@ -128,6 +143,87 @@ export function listAiAgentAutoRules(input: { enabledOnly?: boolean; draftKind?:
     LIMIT ?
   `).all(...params) as any[]
   return rows.map(mapRule)
+}
+
+function normalizeRuleScope(value: unknown): AiRuleScope {
+  if (value === 'BOOKINGS' || value === 'INVOICES') return value
+  return 'ALL'
+}
+
+function mapKnowledgeRule(row: any): AiKnowledgeRuleRow {
+  const conditions = parseJsonObject(row.conditionsJson)
+  return {
+    id: Number(row.id),
+    name: String(row.name || ''),
+    scope: normalizeRuleScope(String(row.draftKind || '').slice(AI_RULE_DRAFT_KIND_PREFIX.length)),
+    instruction: String(conditions.instruction || ''),
+    enabled: Number(row.enabled ?? 1),
+    createdAt: String(row.createdAt || ''),
+    updatedAt: String(row.updatedAt || '')
+  }
+}
+
+export function listAiKnowledgeRules(input: {
+  enabledOnly?: boolean
+  scope?: AiRuleScope
+  limit?: number
+} = {}) {
+  const d = db()
+  const wh = ["draft_kind LIKE 'CATALOG:%'"]
+  const params: any[] = []
+  if (input.enabledOnly !== false) wh.push('enabled = 1')
+  if (input.scope) {
+    wh.push("draft_kind IN (?, ?)")
+    params.push(`${AI_RULE_DRAFT_KIND_PREFIX}ALL`, `${AI_RULE_DRAFT_KIND_PREFIX}${input.scope}`)
+  }
+  const limit = Math.max(1, Math.min(200, Number(input.limit || 100)))
+  params.push(limit)
+  const rows = d.prepare(`
+    SELECT id, name, draft_kind as draftKind, conditions_json as conditionsJson,
+      enabled, created_at as createdAt, updated_at as updatedAt
+    FROM ai_agent_auto_rules
+    WHERE ${wh.join(' AND ')}
+    ORDER BY enabled DESC, updated_at DESC, id DESC
+    LIMIT ?
+  `).all(...params) as any[]
+  return rows.map(mapKnowledgeRule)
+}
+
+export function upsertAiKnowledgeRule(input: {
+  id?: number
+  name: string
+  scope?: AiRuleScope
+  instruction: string
+  enabled?: boolean
+}) {
+  const d = db()
+  const name = String(input.name || '').trim()
+  const instruction = String(input.instruction || '').trim()
+  const scope = normalizeRuleScope(input.scope)
+  if (!name || !instruction) throw new Error('Eine KI-Regel braucht einen Namen und einen Regeltext.')
+  const draftKind = `${AI_RULE_DRAFT_KIND_PREFIX}${scope}`
+  const conditionsJson = JSON.stringify({ catalogRule: true, instruction })
+  if (input.id) {
+    const existing = d.prepare("SELECT id FROM ai_agent_auto_rules WHERE id = ? AND draft_kind LIKE 'CATALOG:%'").get(input.id) as any
+    if (!existing) throw new Error('KI-Regel nicht gefunden.')
+    d.prepare(`
+      UPDATE ai_agent_auto_rules
+      SET name = ?, draft_kind = ?, conditions_json = ?, enabled = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(name, draftKind, conditionsJson, input.enabled === false ? 0 : 1, input.id)
+    return listAiKnowledgeRules({ enabledOnly: false }).find((row) => row.id === input.id)!
+  }
+  const info = d.prepare(`
+    INSERT INTO ai_agent_auto_rules(name, draft_kind, conditions_json, action, enabled)
+    VALUES (?, ?, ?, 'AUTO_PRESELECT', ?)
+  `).run(name, draftKind, conditionsJson, input.enabled === false ? 0 : 1)
+  return listAiKnowledgeRules({ enabledOnly: false }).find((row) => row.id === Number(info.lastInsertRowid))!
+}
+
+export function deleteAiKnowledgeRule(id: number) {
+  const d = db()
+  const info = d.prepare("DELETE FROM ai_agent_auto_rules WHERE id = ? AND draft_kind LIKE 'CATALOG:%'").run(id)
+  return { ok: info.changes > 0 }
 }
 
 export function upsertAiAgentAutoRule(input: {
