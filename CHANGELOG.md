@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.3.1] - 2026-08-12
+
+### Geändert
+
+- KI-Belegprüfung: PDF-Belege werden direkt im Review angezeigt und lassen sich per Steuerelementen sowie Strg + Mausrad zoomen.
+- KI-Buchungsentwürfe folgen in Formular, Tags, Kalender und Angaben der vertrauten Buchungserfassung.
+
+### Behoben
+
+- Mittwald-Qwen verarbeitet PDFs über GLM-OCR und erhält den extrahierten Text für strukturierte Buchungsvorschläge.
+- Direkt aus der KI geöffnete Buchungsentwürfe laden Budgets, Zweckbindungen und Konten zuverlässig – auch ohne vorherigen Besuch im Journal.
+
 ## [3.3.0] - 2026-08-11
 
 ### Hinzugefügt

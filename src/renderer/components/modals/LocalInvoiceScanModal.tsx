@@ -92,6 +92,9 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024
 const MAX_AI_FILE_BYTES = 10 * 1024 * 1024
 const MAX_TEXT_PAGES = 20
 const MAX_LOCAL_OCR_PAGES = 3
+const MIN_PDF_ZOOM = 0.6
+const MAX_PDF_ZOOM = 2.6
+const PDF_ZOOM_STEP = 0.15
 const PICKER_FIELDS: Array<{ value: LocalInvoicePickerField; label: string }> = [
   { value: 'supplier', label: 'Lieferant' },
   { value: 'invoiceNumber', label: 'Rechnungsnummer' },
@@ -329,6 +332,7 @@ export default function LocalInvoiceScanModal({
   const [partyId, setPartyId] = useState<number | null>(initialState?.partyId ?? null)
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfPages, setPdfPages] = useState(0)
+  const [pdfZoom, setPdfZoom] = useState(1)
   const [pdfPageSize, setPdfPageSize] = useState({ width: 595, height: 842 })
   const [ocrWordsByPage, setOcrWordsByPage] = useState<Record<number, OcrWord[]>>({})
   const [dragActive, setDragActive] = useState(false)
@@ -377,6 +381,8 @@ export default function LocalInvoiceScanModal({
     }).catch(() => { if (active) setIsGeneralProfile(false) })
     return () => { active = false }
   }, [])
+
+  const clampPdfZoom = (value: number) => Math.min(MAX_PDF_ZOOM, Math.max(MIN_PDF_ZOOM, value))
 
   const grossAmount = useMemo(
     () => Number(fields.grossAmount.replace(',', '.')) || 0,
@@ -481,7 +487,7 @@ export default function LocalInvoiceScanModal({
         const canvas = canvasRef.current
         const textLayer = textLayerRef.current
         if (!canvas || !textLayer) return
-        const viewport = page.getViewport({ scale: 1 })
+        const viewport = page.getViewport({ scale: pdfZoom })
         const outputScale = Math.min(window.devicePixelRatio || 1, 2)
         const context = canvas.getContext('2d')
         if (!context) return
@@ -523,7 +529,7 @@ export default function LocalInvoiceScanModal({
         textLayerTaskRef.current?.cancel?.()
       } catch {}
     }
-  }, [pdfPage, pdfPages, previewKind])
+  }, [pdfPage, pdfPages, pdfZoom, previewKind])
 
   const updateField = (key: keyof LocalInvoiceFields, value: string) => {
     manuallyEditedRef.current.add(key)
@@ -584,6 +590,14 @@ export default function LocalInvoiceScanModal({
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const handlePdfWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (previewKind !== 'pdf' || (!event.ctrlKey && !event.metaKey)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const delta = -Math.sign(event.deltaY || event.deltaX || 1) * PDF_ZOOM_STEP
+    setPdfZoom((current) => clampPdfZoom(current + delta))
+  }
+
   const analyzeFile = async (nextFile: File, restored?: LocalInvoiceScanDraftState) => {
     const mimeType = inferMimeType(nextFile)
     if (!isSupportedFile(nextFile) || !mimeType) {
@@ -607,6 +621,7 @@ export default function LocalInvoiceScanModal({
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setPartyId(null)
     setBookingMeta(bookingMetaFromGuidance(aiGuidance))
+    setPdfZoom(1)
     setPdfPage(1)
     setPdfPages(0)
     setOcrWordsByPage({})
@@ -1130,6 +1145,31 @@ export default function LocalInvoiceScanModal({
                   <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <div className="local-invoice-scan__preview-actions">
+                  {previewKind === 'pdf' && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn small"
+                        aria-label="PDF verkleinern"
+                        title="PDF verkleinern"
+                        disabled={pdfZoom <= MIN_PDF_ZOOM}
+                        onClick={() => setPdfZoom((current) => clampPdfZoom(current - PDF_ZOOM_STEP))}
+                      >
+                        −
+                      </button>
+                      <span className="local-invoice-scan__zoom-label">{Math.round(pdfZoom * 100)}%</span>
+                      <button
+                        type="button"
+                        className="btn small"
+                        aria-label="PDF vergrößern"
+                        title="PDF vergrößern"
+                        disabled={pdfZoom >= MAX_PDF_ZOOM}
+                        onClick={() => setPdfZoom((current) => clampPdfZoom(current + PDF_ZOOM_STEP))}
+                      >
+                        +
+                      </button>
+                    </>
+                  )}
                   {previewKind === 'pdf' && rawText && (
                     <button
                       type="button"
@@ -1151,7 +1191,7 @@ export default function LocalInvoiceScanModal({
                 </div>
               </div>
 
-              <div className="local-invoice-scan__preview">
+              <div className="local-invoice-scan__preview" onWheel={handlePdfWheel}>
                 {previewKind === 'pdf' && (
                   <div
                     className="local-invoice-scan__pdf-page"

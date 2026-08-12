@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { getContrastTextColor, resolveTagDisplayColor } from '../utils/tagColors'
 
-export default function TagsEditor({ label, labelAccessory, value, onChange, tagDefs, className, inputRef }: { label?: string; labelAccessory?: React.ReactNode; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string; inputRef?: React.Ref<HTMLInputElement> }) {
+export default function TagsEditor({ label, labelAccessory, value, onChange, tagDefs, className, inputRef, disabled = false }: { label?: string; labelAccessory?: React.ReactNode; value: string[]; onChange: (v: string[]) => void; tagDefs: Array<{ id: number; name: string; color?: string | null }>; className?: string; inputRef?: React.Ref<HTMLInputElement>; disabled?: boolean }) {
   const [input, setInput] = useState('')
   const floatingEditorClass = className?.includes('booking-tags-editor')
     ? 'booking-tags-editor__control booking-floating-field'
@@ -31,12 +31,13 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
           return (
             <span key={t} className="chip" style={{ background: bg, color: bg ? fg : undefined }}>
               {t}
-              <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button">×</button>
+              <button className="chip-x" onClick={() => removeTag(t)} aria-label={`Tag ${t} entfernen`} type="button" disabled={disabled}>×</button>
             </span>
           )
         })}
         <input
           ref={inputRef}
+          disabled={disabled}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -75,6 +76,7 @@ export default function TagsEditor({ label, labelAccessory, value, onChange, tag
                 className={`btn tag-suggestion-btn${bg ? ' tag-has-color' : ''}${selected ? ' tag-suggestion-btn--selected' : ''}`}
                 style={bg ? ({ '--tag-bg': bg, '--tag-fg': fg } as React.CSSProperties) : undefined}
                 onClick={() => selected ? removeTag(s.name) : addTag(s.name)}
+                disabled={disabled}
                 aria-pressed={selected}
                 aria-label={selected ? `Tag ${s.name} entfernen` : `Tag ${s.name} hinzufügen`}
               >{selected ? '✓ ' : ''}{s.name}</button>

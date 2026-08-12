@@ -2087,7 +2087,13 @@ function AppInner() {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ qa?: any; files?: File[] }>).detail || {}
       if (!detail.qa) return
-      openQuickAdd({ qa: detail.qa, files: detail.files || [] })
+
+      // KI-Entwürfe können geöffnet werden, ohne dass die Person zuvor das
+      // Journal besucht hat. Die Auswahlfelder brauchen dann die Stammdaten
+      // bereits vor dem ersten Rendern des Buchungsdialogs.
+      void Promise.allSettled([loadBindings(), loadBudgets(), loadEarmarks()]).then(() => {
+        openQuickAdd({ qa: detail.qa, files: detail.files || [] })
+      })
     }
     window.addEventListener('ai:open-booking-draft', handler)
     return () => window.removeEventListener('ai:open-booking-draft', handler)
@@ -3294,15 +3300,17 @@ function AppInner() {
   }
 
   useEffect(() => {
-    // Load bindings/budgets for Buchungen page (dropdown/filter needs labels)
-    if (activePage === 'Buchungen') {
+    // Ein Buchungsentwurf kann direkt aus der KI geöffnet werden. Dann sind
+    // dieselben Stammdaten wie im Journal erforderlich, auch ohne Seitenwechsel.
+    if (activePage === 'Buchungen' || quickAdd) {
       loadBindings()
       loadBudgets()
+      loadEarmarks()
     }
     if (activePage === 'Reports') {
       loadBudgets()
     }
-  }, [activePage])
+  }, [activePage, quickAdd])
 
   // (earmarks loaded above)
 

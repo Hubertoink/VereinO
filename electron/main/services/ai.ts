@@ -22,6 +22,7 @@ import {
 } from '../ipc/schemas'
 import { getSetting, setSetting } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
+import { isPdfInputFile } from './aiDocumentRouting'
 
 const API_KEY_SETTING = 'ai.openai.apiKey'
 const MODEL_SETTING = 'ai.openai.model'
@@ -498,6 +499,29 @@ export function extractOutputText(response: any) {
   return parts.join('\n').trim()
 }
 
+async function extractMittwaldDocumentText(file: AiInputFile) {
+  const response = await createAiResponse({
+    model: 'GLM-OCR',
+    input: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: 'Extrahiere den vollständigen, quellengetreuen Text aus diesem Dokument. Bewahre Zahlen, Daten, Rechnungsnummern und IBAN exakt.'
+          },
+          toResponseFileContent(file)
+        ]
+      }
+    ]
+  } as any)
+  const text = extractOutputText(response)
+  if (!text.trim()) {
+    throw new Error('Mittwald GLM-OCR hat keinen auswertbaren Dokumenttext geliefert.')
+  }
+  return text
+}
+
 function parseStructured<T>(response: any, schema: { parse: (value: unknown) => T }): T {
   const parsed = response?.output_parsed
   if (parsed) return schema.parse(parsed)
@@ -918,7 +942,17 @@ export async function analyzeBookingDocuments(input: {
   const settings = getAiSettings()
   const model = input.model || settings.model
   const expandedFiles = await expandInputFilesForAnalysis(input.files)
-  const sourceManifest = expandedFiles
+  const filesForAnalysis: Array<ExpandedAiInputFile & { mittwaldOcrText?: string }> = []
+  for (const item of expandedFiles) {
+    // Mittwald accepts PDF documents only through GLM-OCR. Qwen gets the OCR
+    // text afterwards, so it can still produce the requested structured result.
+    const mittwaldOcrText =
+      settings.provider === 'mittwald' && model !== 'GLM-OCR' && isPdfInputFile(item.file)
+        ? await extractMittwaldDocumentText(item.file)
+        : undefined
+    filesForAnalysis.push({ ...item, mittwaldOcrText })
+  }
+  const sourceManifest = filesForAnalysis
     .map((item, idx) => `${idx + 1}. ${item.source.label}`)
     .join('\n')
   const prompt = [
@@ -953,9 +987,11 @@ export async function analyzeBookingDocuments(input: {
         role: 'user',
         content: [
           { type: 'input_text', text: prompt },
-          ...expandedFiles.flatMap((item, idx) => [
+          ...filesForAnalysis.flatMap((item, idx) => [
             { type: 'input_text', text: `Quelle ${idx + 1}: ${item.source.label}` },
-            toResponseFileContent(item.file)
+            ...(item.mittwaldOcrText
+              ? [{ type: 'input_text', text: `Mittwald GLM-OCR-Text:\n${item.mittwaldOcrText.slice(0, 80_000)}` }]
+              : [toResponseFileContent(item.file)])
           ])
         ]
       }
@@ -1148,26 +1184,8 @@ export async function analyzeInvoiceDocument(input: {
   let ocrMs: number | null = null
   if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
     const ocrStartedAt = Date.now()
-    const ocrResponse = await createAiResponse({
-      model: 'GLM-OCR',
-      input: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: 'Extrahiere den vollständigen, quellengetreuen Text aus diesem Dokument. Bewahre Zahlen, Daten, Rechnungsnummern und IBAN exakt.'
-            },
-            toResponseFileContent(input.file)
-          ]
-        }
-      ]
-    } as any)
+    mittwaldOcrText = await extractMittwaldDocumentText(input.file)
     ocrMs = Date.now() - ocrStartedAt
-    mittwaldOcrText = extractOutputText(ocrResponse)
-    if (!mittwaldOcrText.trim()) {
-      throw new Error('Mittwald GLM-OCR hat keinen auswertbaren Dokumenttext geliefert.')
-    }
   }
   const context = {
     organization: input.context.organization,

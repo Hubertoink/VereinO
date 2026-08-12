@@ -7,6 +7,7 @@ import {
   AiSettingsGetOutput,
   AiSettingsSetInput
 } from '../../electron/main/ipc/schemas'
+import { isPdfInputFile } from '../../electron/main/services/aiDocumentRouting'
 
 describe('AiBookingAnalysisResult', () => {
   it('accepts a reviewable booking candidate with evidence and assignments', () => {
@@ -188,6 +189,13 @@ describe('AiInvoiceExtractionResult', () => {
         file: { fileName: 'rechnung.svg', mimeType: 'image/svg+xml', dataBase64: 'PHN2Zz4=' }
       })
     ).toThrow()
+  })
+})
+
+describe('Mittwald PDF handling', () => {
+  it('identifies PDFs for GLM-OCR preprocessing while leaving the analysis model unchanged', () => {
+    expect(isPdfInputFile({ fileName: 'rechnung.pdf', dataBase64: 'JVBERi0=' })).toBe(true)
+    expect(isPdfInputFile({ fileName: 'rechnung.PNG', dataBase64: 'iVBORw0KGgo=' })).toBe(false)
   })
 })
 
