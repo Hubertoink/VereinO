@@ -223,6 +223,8 @@ async function loadRenderer(win: BrowserWindow) {
     } else {
         await win.loadFile(path.join(__dirname, '../../dist/index.html'))
     }
+    // The temporary startup document must never become a browser-back target.
+    win.webContents.navigationHistory.clear()
 }
 
 async function createWindow(showStartup = false): Promise<BrowserWindow> {
@@ -252,6 +254,15 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
     win.on('ready-to-show', () => win.show())
     win.on('maximize', () => win.webContents.send('window:maximized', true))
     win.on('unmaximize', () => win.webContents.send('window:unmaximized', false))
+    win.on('app-command', (event, command) => {
+        if (command !== 'browser-backward' && command !== 'browser-forward') return
+        event.preventDefault()
+        try {
+            win.webContents.send(command === 'browser-backward' ? 'window:navigation-back' : 'window:navigation-forward')
+        } catch {
+            // Ignore commands received while the renderer is being replaced.
+        }
+    })
     win.on('close', (event) => {
         if (allowClose || win.webContents.isDestroyed()) return
         event.preventDefault()

@@ -28,6 +28,8 @@ describe('ensureBankImportTables', () => {
     const sql = String(exec.mock.calls[0][0])
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS bank_import_batches')
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS bank_transactions')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS bank_transaction_ai_suggestions')
+    expect(sql).toContain("CHECK(action IN ('LINK_EXISTING', 'APPLY_RECURRING', 'CREATE_BOOKING', 'MARK_CHECKED', 'NEEDS_MANUAL_REVIEW'))")
     expect(sql).toContain('voucher_id INTEGER UNIQUE REFERENCES vouchers(id) ON DELETE SET NULL')
     expect(sql).toContain('trg_bank_transactions_voucher_deleted')
     expect(sql).toContain('BEFORE DELETE ON vouchers')

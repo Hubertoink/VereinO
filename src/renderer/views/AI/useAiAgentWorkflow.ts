@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { TAiAgentRunOutput } from '../../../../electron/main/ipc/schemas'
 
 type AgentMessage = {
@@ -104,7 +104,8 @@ function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
 export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(input.initialSessionId || null)
 
-  const resetAgentSession = () => setAgentSessionId(null)
+  const resetAgentSession = useCallback(() => setAgentSessionId(null), [])
+  const restoreAgentSession = useCallback((sessionId?: string | null) => setAgentSessionId(sessionId || null), [])
 
   const shouldUseAgentRuntime = (userPrompt: string) => {
     if (input.filesLength) return false
@@ -181,6 +182,7 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
   return {
     agentSessionId,
     resetAgentSession,
+    restoreAgentSession,
     shouldUseAgentRuntime,
     runAgentRuntime
   }

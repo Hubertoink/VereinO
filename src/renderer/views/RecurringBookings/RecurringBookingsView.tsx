@@ -576,8 +576,6 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
         </div>
       </div>
 
-      <div className="helper recurring-page-summary">Fällige Dauerbuchungen: <strong>{summary.due}</strong><span className="summary-remaining">({summary.active} aktiv, {summary.paused} pausiert)</span></div>
-
       <div className="recurring-summary-grid">
         <div className={`card recurring-summary-card ${summary.due > 0 ? 'is-due' : ''}`}><span>Fällig</span><strong>{summary.due}</strong></div>
         <div className="card recurring-summary-card"><span>Demnächst (30 Tage)</span><strong>{summary.upcoming}</strong></div>

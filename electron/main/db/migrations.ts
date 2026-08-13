@@ -784,6 +784,12 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensureOrganizationClassificationTables(db)
     }
+  },
+  {
+    version: 42,
+    up: (db: DB) => {
+      ensureBankImportTables(db)
+    }
   }
 ]
 
@@ -1401,6 +1407,23 @@ export function ensureBankImportTables(db: DB) {
         ON bank_transactions(payment_account_id, booking_date DESC);
       CREATE INDEX IF NOT EXISTS idx_bank_transactions_batch
         ON bank_transactions(batch_id);
+
+      CREATE TABLE IF NOT EXISTS bank_transaction_ai_suggestions (
+        transaction_id INTEGER PRIMARY KEY REFERENCES bank_transactions(id) ON DELETE CASCADE,
+        action TEXT NOT NULL CHECK(action IN ('LINK_EXISTING', 'APPLY_RECURRING', 'CREATE_BOOKING', 'MARK_CHECKED', 'NEEDS_MANUAL_REVIEW')),
+        confidence REAL NOT NULL DEFAULT 0.5,
+        reason TEXT NOT NULL,
+        voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+        voucher_no TEXT,
+        recurring_booking_id INTEGER,
+        recurring_booking_name TEXT,
+        occurrence_id INTEGER,
+        scheduled_date TEXT,
+        booking_candidate_json TEXT,
+        warnings_json TEXT NOT NULL DEFAULT '[]',
+        evidence_json TEXT NOT NULL DEFAULT '[]',
+        reviewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
 
       DROP TRIGGER IF EXISTS trg_bank_transactions_voucher_deleted;
       CREATE TRIGGER trg_bank_transactions_voucher_deleted

@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.3.2] - 2026-08-13
+
+### Hinzugefügt
+
+- KI-Prüfung für neue Bankimporte mit gespeicherten Vorschlägen zum Verknüpfen, Zuordnen, Erstellen oder manuellen Prüfen.
+- Browserähnliche Vor-/Zurücknavigation zwischen den VereinsO-Bereichen über die Maustasten.
+
+### Geändert
+
+- Bankimport-Historie, Duplikatauswahl sowie Budget- und Zweckbindungskarten wurden kompakter und übersichtlicher gestaltet.
+- KI-Unterhaltungen werden je Organisation getrennt gespeichert; Farbcodes in KI-Antworten werden visuell markiert.
+- Der Abgleich von Dauerbuchungen berücksichtigt zusätzliche Banktextdaten und vermeidet schwache Vorschläge bei variablen Beträgen.
+
+### Behoben
+
+- KI-Vorschläge werden nach dem Bearbeiten, Verknüpfen, Prüfen oder Wiedereröffnen eines Bankbelegs zuverlässig entfernt.
+- Neue Bankimport-Vorschläge und Buchungszeiträume werden über die IPC-Schnittstelle vollständig an die Oberfläche weitergegeben.
+
 ## [3.3.1] - 2026-08-12
 
 ### Geändert

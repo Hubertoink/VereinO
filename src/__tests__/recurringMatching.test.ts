@@ -38,4 +38,23 @@ describe('scoreRecurringMatch', () => {
     expect(scoreRecurringMatch({ ...base, bookingGrossAmount: 15, variableAmount: true }))
       .toEqual(expect.objectContaining({ amountMatches: false }))
   })
+
+  it('rejects variable recurring bookings without a textual connection', () => {
+    expect(scoreRecurringMatch({
+      ...base,
+      bookingGrossAmount: 118.75,
+      variableAmount: true,
+      recurringText: 'Adobe Photoshop Abo',
+      bookingText: 'OBI Farbe und Werkzeug Renovierung Gruppenraum'
+    })).toBeNull()
+  })
+
+  it('rejects a distant fixed recurring booking without a textual connection', () => {
+    expect(scoreRecurringMatch({
+      ...base,
+      bookingDate: '2026-08-30',
+      recurringText: 'Adobe Photoshop Abo',
+      bookingText: 'OBI Farbe und Werkzeug Renovierung Gruppenraum'
+    })).toBeNull()
+  })
 })

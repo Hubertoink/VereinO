@@ -1784,6 +1784,7 @@ const BankImportDuplicateRow = z.object({
 export const BankImportCommitOutput = z.object({
   batchId: z.number(),
   imported: z.number(),
+  importedTransactionIds: z.array(z.number().int().positive()),
   duplicates: z.number(),
   duplicateRows: z.array(BankImportDuplicateRow),
   errors: z.array(z.object({ row: z.number(), message: z.string() }))
@@ -1835,7 +1836,9 @@ export const BankImportStatusOutput = z.object({
       imported: z.number(),
       duplicates: z.number(),
       errors: z.number(),
-      importedAt: z.string()
+      importedAt: z.string(),
+      periodFrom: z.string().nullable().optional(),
+      periodTo: z.string().nullable().optional()
     })
   ),
   accounts: z.array(
@@ -2905,7 +2908,8 @@ export const AiMcpConfigureInput = z.object({
 export const AiMcpConfigureOutput = AiMcpStatusOutput
 export const AiBankImportReviewInput = z
   .object({
-    limit: z.number().int().min(1).max(50).default(20).optional()
+    limit: z.number().int().min(1).max(50).default(20).optional(),
+    transactionIds: z.array(z.number().int().positive()).min(1).max(50).optional()
   })
   .optional()
 export const AiBankImportReviewOutput = AiBankImportReviewResult

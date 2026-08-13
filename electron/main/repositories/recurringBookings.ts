@@ -398,7 +398,7 @@ export function bookRecurringOccurrence(input: { recurringBookingId: number; occ
     const bankTransaction = input.bankTransactionId
       ? d.prepare(`
           SELECT id, status, booking_date as bookingDate, direction, amount,
-            payment_account_id as paymentAccountId
+            payment_account_id as paymentAccountId, counterparty, purpose
           FROM bank_transactions WHERE id=?
         `).get(input.bankTransactionId) as any
       : null
@@ -420,7 +420,7 @@ export function bookRecurringOccurrence(input: { recurringBookingId: number; occ
         recurringPaymentAccountId: recurring.paymentAccountId,
         bookingPaymentAccountId: bankTransaction.paymentAccountId,
         recurringText: [recurring.name, recurring.description, recurring.counterparty].filter(Boolean).join(' '),
-        bookingText: ''
+        bookingText: [bankTransaction.counterparty, bankTransaction.purpose].filter(Boolean).join(' ')
       })
       if (!match) throw new Error('Bankbeleg und Dauerbuchung passen bei Konto, Art, Betrag oder Zeitraum nicht zusammen.')
     }

@@ -100,6 +100,16 @@ const rendererApi = {
       const handler = () => cb()
       ipcRenderer.on('window:close-requested', handler)
       return () => ipcRenderer.removeListener('window:close-requested', handler)
+    },
+    onNavigationBackRequested: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('window:navigation-back', handler)
+      return () => ipcRenderer.removeListener('window:navigation-back', handler)
+    },
+    onNavigationForwardRequested: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('window:navigation-forward', handler)
+      return () => ipcRenderer.removeListener('window:navigation-forward', handler)
     }
   },
   workQueue: {

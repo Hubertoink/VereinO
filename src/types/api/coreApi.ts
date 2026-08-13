@@ -60,6 +60,8 @@ export interface CoreApi {
         setInvoiceScanExpanded: (expanded: boolean) => Promise<{ ok: boolean }>
         onMaximizeChanged: (callback: (isMaximized: boolean) => void) => () => void
         onCloseRequested: (callback: () => void) => () => void
+        onNavigationBackRequested: (callback: () => void) => () => void
+        onNavigationForwardRequested: (callback: () => void) => () => void
     }
     quickAdd: {
         openDetached: (payload?: QuickAddPayload) => Promise<{ ok: boolean; token?: string; error?: string }>

@@ -666,12 +666,27 @@
   z-index: 4;
   margin-top: 2px;
   border-radius: 14px;
+  background: color-mix(in oklab, var(--surface) 18%, transparent);
+  border-color: color-mix(in oklab, var(--border) 34%, transparent);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 10%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, backdrop-filter 160ms ease;
+}
+
+.ai-composer-card--followup:focus-within,
+.ai-composer-card--followup:has(.ai-prompt-box.is-busy),
+.ai-composer-card--followup:has(.ai-prompt-box.is-dragover) {
   background:
     linear-gradient(
       135deg,
       color-mix(in oklab, var(--surface) 94%, var(--accent) 6%) 0%,
       color-mix(in oklab, var(--surface) 96%, #00b8d4 4%) 100%
     );
+  border-color: color-mix(in oklab, var(--border) 86%, var(--accent) 14%);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 22%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .ai-composer-card--followup .ai-prompt-input {
@@ -992,6 +1007,10 @@
 
 .ai-conversation-card {
   min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .ai-conversation-toolbar {
@@ -1028,6 +1047,20 @@
 .ai-message--user {
   justify-self: end;
   background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+}
+
+html[data-glass-modals='true'] .ai-message,
+html[data-glass-modals='true'] .ai-agent-review-card,
+html[data-glass-modals='true'] .ai-tag-action-card,
+html[data-glass-modals='true'] .ai-voucher-action-card,
+html[data-glass-modals='true'] .ai-contribution-payment-card {
+  background: color-mix(in oklab, var(--surface) 72%, transparent);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+
+html[data-glass-modals='true'] .ai-message--user {
+  background: color-mix(in oklab, var(--accent) 14%, color-mix(in oklab, var(--surface) 65%, transparent));
 }
 
 .ai-message-head {
@@ -1105,6 +1138,22 @@
 
 .ai-markdown strong {
   color: var(--text);
+}
+
+.ai-inline-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.ai-inline-color i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid color-mix(in oklab, var(--text) 45%, transparent);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
 }
 
 .ai-markdown-table-wrap {
@@ -2598,7 +2647,7 @@
   box-shadow: 0 16px 40px rgb(0 0 0 / 20%);
 }
 
-html[data-glass-modals="true"] .ai-page .card {
+html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
   background: color-mix(in oklab, var(--surface) 97%, var(--bg) 3%) !important;
   border-color: color-mix(in oklab, var(--border) 86%, var(--text) 14%);
 }
@@ -3265,6 +3314,49 @@ html[data-glass-modals="true"] .ai-page .card {
     height: auto;
     max-height: 360px;
   }
+}
+
+/* The follow-up composer sits over the latest answer. Keep it visually quiet
+   until the user interacts with it, then restore a solid editing surface. */
+.ai-page .ai-composer-card--followup:not(:focus-within) {
+  background: color-mix(in oklab, var(--surface) 38%, transparent) !important;
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--border) 58%) !important;
+  outline: 1px solid color-mix(in oklab, var(--accent) 22%, transparent);
+  outline-offset: -1px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.ai-page .ai-composer-card--followup:not(:focus-within):hover {
+  background: color-mix(in oklab, var(--surface) 58%, transparent) !important;
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--border) 42%) !important;
+  outline-color: color-mix(in oklab, var(--accent) 34%, transparent);
+  box-shadow: 0 16px 36px rgb(0 0 0 / 18%);
+}
+
+.ai-page .ai-composer-card--followup:not(:focus-within) .ai-icon-btn,
+.ai-page .ai-composer-card--followup:not(:focus-within) .ai-send-btn {
+  border-color: color-mix(in oklab, var(--border) 64%, transparent) !important;
+  box-shadow: none;
+}
+
+.ai-page .ai-composer-card--followup:not(:focus-within) .ai-icon-btn {
+  background: color-mix(in oklab, var(--surface) 54%, transparent) !important;
+}
+
+.ai-page .ai-composer-card--followup:not(:focus-within) .ai-send-btn {
+  background: color-mix(in oklab, var(--accent) 72%, transparent) !important;
+}
+
+.ai-page .ai-composer-card--followup:focus-within,
+.ai-page .ai-composer-card--followup:has(.ai-prompt-box.is-busy),
+.ai-page .ai-composer-card--followup:has(.ai-prompt-box.is-dragover) {
+  background: color-mix(in oklab, var(--surface) 94%, var(--accent) 6%) !important;
+  border-color: color-mix(in oklab, var(--border) 86%, var(--accent) 14%) !important;
+  box-shadow: 0 18px 42px rgb(0 0 0 / 22%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .ai-header-rules {

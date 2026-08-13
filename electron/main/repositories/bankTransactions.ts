@@ -23,6 +23,14 @@ function hash(value: string) {
   return createHash('sha256').update(value).digest('hex')
 }
 
+function jsonValue<T>(value: string | null | undefined, fallback: T): T {
+  try {
+    return value ? JSON.parse(value) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
 function meaningfulReference(row: ParsedBankTransaction) {
   const candidates = [row.bankReference, row.endToEndId]
   return candidates.find((value) => {
@@ -193,6 +201,7 @@ export function commitBankImport(input: {
     `)
 
     let imported = 0
+    const importedTransactionIds: number[] = []
     let duplicates = 0
     const errors: Array<{ row: number; message: string }> = []
     const duplicateRows: Array<Record<string, any>> = []
@@ -209,7 +218,7 @@ export function commitBankImport(input: {
         if (duplicate) duplicateRows.push(duplicate)
         continue
       }
-      insert.run(
+      const inserted = insert.run(
         batchId,
         paymentAccountId,
         row.bookingDate,
@@ -226,6 +235,7 @@ export function commitBankImport(input: {
         fingerprint
       )
       imported++
+      importedTransactionIds.push(Number(inserted.lastInsertRowid))
     }
 
     d.prepare(`
@@ -241,7 +251,7 @@ export function commitBankImport(input: {
       errorCount: errors.length,
       forcedImportSourceRows: Array.from(forcedRows)
     })
-    return { batchId, imported, duplicates, duplicateRows, errors }
+    return { batchId, imported, importedTransactionIds, duplicates, duplicateRows, errors }
   })
 }
 
@@ -271,12 +281,64 @@ const BANK_TRANSACTION_SELECT = `
     bib.file_name as sourceFileName,
     v.voucher_no as voucherNo,
     v.description as voucherDescription,
-    v.reversed_by_id as voucherReversedById
+    v.reversed_by_id as voucherReversedById,
+    btai.action as aiSuggestionAction,
+    btai.confidence as aiSuggestionConfidence,
+    btai.reason as aiSuggestionReason,
+    btai.voucher_id as aiSuggestionVoucherId,
+    btai.voucher_no as aiSuggestionVoucherNo,
+    btai.recurring_booking_id as aiSuggestionRecurringBookingId,
+    btai.recurring_booking_name as aiSuggestionRecurringBookingName,
+    btai.occurrence_id as aiSuggestionOccurrenceId,
+    btai.scheduled_date as aiSuggestionScheduledDate,
+    btai.booking_candidate_json as aiSuggestionBookingCandidateJson,
+    btai.warnings_json as aiSuggestionWarningsJson,
+    btai.evidence_json as aiSuggestionEvidenceJson,
+    btai.reviewed_at as aiSuggestionReviewedAt
   FROM bank_transactions bt
   JOIN payment_accounts pa ON pa.id = bt.payment_account_id
   JOIN bank_import_batches bib ON bib.id = bt.batch_id
   LEFT JOIN vouchers v ON v.id = bt.voucher_id
+  LEFT JOIN bank_transaction_ai_suggestions btai ON btai.transaction_id = bt.id
 `
+
+function withAiSuggestion(row: Record<string, any>) {
+  if (!row.aiSuggestionAction) return row
+  const {
+    aiSuggestionAction,
+    aiSuggestionConfidence,
+    aiSuggestionReason,
+    aiSuggestionVoucherId,
+    aiSuggestionVoucherNo,
+    aiSuggestionRecurringBookingId,
+    aiSuggestionRecurringBookingName,
+    aiSuggestionOccurrenceId,
+    aiSuggestionScheduledDate,
+    aiSuggestionBookingCandidateJson,
+    aiSuggestionWarningsJson,
+    aiSuggestionEvidenceJson,
+    aiSuggestionReviewedAt,
+    ...transaction
+  } = row
+  return {
+    ...transaction,
+    aiSuggestion: {
+      action: aiSuggestionAction,
+      confidence: Number(aiSuggestionConfidence || 0),
+      reason: aiSuggestionReason,
+      voucherId: aiSuggestionVoucherId == null ? null : Number(aiSuggestionVoucherId),
+      voucherNo: aiSuggestionVoucherNo ?? null,
+      recurringBookingId: aiSuggestionRecurringBookingId == null ? null : Number(aiSuggestionRecurringBookingId),
+      recurringBookingName: aiSuggestionRecurringBookingName ?? null,
+      occurrenceId: aiSuggestionOccurrenceId == null ? null : Number(aiSuggestionOccurrenceId),
+      scheduledDate: aiSuggestionScheduledDate ?? null,
+      bookingCandidate: jsonValue(aiSuggestionBookingCandidateJson, null),
+      warnings: jsonValue<string[]>(aiSuggestionWarningsJson, []),
+      evidence: jsonValue<string[]>(aiSuggestionEvidenceJson, []),
+      reviewedAt: aiSuggestionReviewedAt ?? null
+    }
+  }
+}
 
 export function listBankTransactions(input: {
   status?: BankStatus | 'ALL'
@@ -288,6 +350,7 @@ export function listBankTransactions(input: {
   sortDir?: 'ASC' | 'DESC'
   page?: number
   limit?: number
+  ids?: number[]
 }) {
   const d = getDb()
   const where: string[] = []
@@ -307,6 +370,11 @@ export function listBankTransactions(input: {
   if (input.to) {
     where.push('bt.booking_date <= ?')
     params.push(input.to)
+  }
+  const ids = [...new Set((input.ids || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+  if (ids.length) {
+    where.push(`bt.id IN (${ids.map(() => '?').join(', ')})`)
+    params.push(...ids)
   }
   if (input.q?.trim()) {
     const like = `%${input.q.trim()}%`
@@ -344,10 +412,11 @@ export function listBankTransactions(input: {
   const hasOpenRows = rows.some((row) => row.status === 'OPEN')
   if (hasOpenRows) materializeDueOccurrences(d)
   const rowsWithMatchScore = rows.map((row) => {
-    if (row.status !== 'OPEN') return { ...row, matchScore: null }
+    const transaction = withAiSuggestion(row)
+    if (transaction.status !== 'OPEN') return { ...transaction, matchScore: null }
     const bestScore = findBankTransactionMatches({ id: Number(row.id), recurringOccurrencesMaterialized: hasOpenRows })
       .reduce((best, match: any) => Math.max(best, Number(match.score || 0)), 0)
-    return { ...row, matchScore: bestScore >= 15 ? bestScore : null }
+    return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null }
   })
   const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>
   const stats = { total: 0, open: 0, linked: 0, checked: 0 }
@@ -381,9 +450,14 @@ export function getBankImportStatus() {
       bib.imported_count as imported,
       bib.duplicate_count as duplicates,
       bib.error_count as errors,
-      bib.created_at as importedAt
+      bib.created_at as importedAt,
+      MIN(bt.booking_date) as periodFrom,
+      MAX(bt.booking_date) as periodTo
     FROM bank_import_batches bib
     LEFT JOIN payment_accounts pa ON pa.id = bib.payment_account_id
+    LEFT JOIN bank_transactions bt ON bt.batch_id = bib.id
+    GROUP BY bib.id, bib.file_name, bib.format, bib.payment_account_id, pa.name, pa.color,
+      bib.imported_count, bib.duplicate_count, bib.error_count, bib.created_at
     ORDER BY bib.created_at DESC, bib.id DESC
     LIMIT 8
   `).all() as Array<{
@@ -397,6 +471,8 @@ export function getBankImportStatus() {
     duplicates: number
     errors: number
     importedAt: string
+    periodFrom?: string | null
+    periodTo?: string | null
   }>
   const accounts = d.prepare(`
     SELECT
@@ -429,7 +505,51 @@ export function getBankImportStatus() {
 export function getBankTransaction(id: number) {
   const row = getDb().prepare(`${BANK_TRANSACTION_SELECT} WHERE bt.id = ?`).get(id)
   if (!row) throw new Error('Bankbeleg nicht gefunden.')
-  return row
+  return withAiSuggestion(row as Record<string, any>)
+}
+
+export function saveBankTransactionAiSuggestions(suggestions: Array<Record<string, any>>) {
+  return withTransaction((d: DB) => {
+    const insert = d.prepare(`
+      INSERT INTO bank_transaction_ai_suggestions (
+        transaction_id, action, confidence, reason, voucher_id, voucher_no,
+        recurring_booking_id, recurring_booking_name, occurrence_id, scheduled_date,
+        booking_candidate_json, warnings_json, evidence_json, reviewed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(transaction_id) DO UPDATE SET
+        action = excluded.action,
+        confidence = excluded.confidence,
+        reason = excluded.reason,
+        voucher_id = excluded.voucher_id,
+        voucher_no = excluded.voucher_no,
+        recurring_booking_id = excluded.recurring_booking_id,
+        recurring_booking_name = excluded.recurring_booking_name,
+        occurrence_id = excluded.occurrence_id,
+        scheduled_date = excluded.scheduled_date,
+        booking_candidate_json = excluded.booking_candidate_json,
+        warnings_json = excluded.warnings_json,
+        evidence_json = excluded.evidence_json,
+        reviewed_at = datetime('now')
+    `)
+    for (const suggestion of suggestions) {
+      insert.run(
+        Number(suggestion.transactionId),
+        suggestion.action,
+        Number(suggestion.confidence || 0),
+        String(suggestion.reason || 'KI-Vorschlag'),
+        suggestion.voucherId ?? null,
+        suggestion.voucherNo ?? null,
+        suggestion.recurringBookingId ?? null,
+        suggestion.recurringBookingName ?? null,
+        suggestion.occurrenceId ?? null,
+        suggestion.scheduledDate ?? null,
+        suggestion.bookingCandidate ? JSON.stringify(suggestion.bookingCandidate) : null,
+        JSON.stringify(suggestion.warnings || []),
+        JSON.stringify(suggestion.evidence || [])
+      )
+    }
+    return suggestions.length
+  })
 }
 
 function compatibleVoucher(d: DB, transaction: any, voucherId: number) {
@@ -462,6 +582,7 @@ export function linkBankTransaction(input: { id: number; voucherId: number; orig
       resolved_at = datetime('now'), updated_at = datetime('now')
     WHERE id = ?
   `).run(input.voucherId, input.origin ?? 'EXISTING', input.id)
+  d.prepare('DELETE FROM bank_transaction_ai_suggestions WHERE transaction_id = ?').run(input.id)
   writeAudit(d, null, 'bank_transactions', input.id, 'LINK', { voucherId: input.voucherId, origin: input.origin ?? 'EXISTING' })
   return getBankTransaction(input.id)
 }
@@ -477,6 +598,7 @@ export function markBankTransactionChecked(input: { id: number; note?: string | 
         resolved_at = datetime('now'), updated_at = datetime('now')
       WHERE id = ?
     `).run(input.note?.trim() || null, input.id)
+    d.prepare('DELETE FROM bank_transaction_ai_suggestions WHERE transaction_id = ?').run(input.id)
     writeAudit(d, null, 'bank_transactions', input.id, 'CHECK', { note: input.note?.trim() || null })
     return getBankTransaction(input.id)
   })
@@ -492,6 +614,7 @@ export function reopenBankTransaction(id: number) {
         resolved_at = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(id)
+    d.prepare('DELETE FROM bank_transaction_ai_suggestions WHERE transaction_id = ?').run(id)
     writeAudit(d, null, 'bank_transactions', id, 'REOPEN', {})
     return getBankTransaction(id)
   })

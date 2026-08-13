@@ -492,7 +492,8 @@ import {
   listBankTransactions,
   markBankTransactionChecked,
   previewBankImport,
-  reopenBankTransaction
+  reopenBankTransaction,
+  saveBankTransactionAiSuggestions
 } from '../repositories/bankTransactions'
 import {
   createAiJob,
@@ -1016,16 +1017,25 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
   ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
     const parsed = AiBankImportReviewInput.parse(payload)
-    const limit = Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
+    const transactionIds = parsed?.transactionIds
+    const limit = transactionIds?.length || Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
     const openRows = (
       listBankTransactions({
         status: 'OPEN',
+        ids: transactionIds,
         sortBy: 'date',
         sortDir: 'DESC',
         page: 1,
         limit
       }) as any
     ).rows as any[]
+    if (!openRows.length) {
+      return AiBankImportReviewOutput.parse({
+        suggestions: [],
+        summary: 'Keine offenen Bankbelege für die KI-Prüfung gefunden.',
+        warnings: []
+      })
+    }
     const transactions = openRows.map((transaction) => {
       const matches = findBankTransactionMatches({ id: transaction.id })
         .filter((match: any) => Number(match.score || 0) > 0)
@@ -1127,6 +1137,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         })
       }
     }
+    saveBankTransactionAiSuggestions(suggestions)
     return AiBankImportReviewOutput.parse({
       ...reviewed.result,
       suggestions

@@ -65,6 +65,16 @@ export function scoreRecurringMatch(input: RecurringMatchInput) {
   const containsText = normalizedRecurring.length >= 4 && normalizedBooking.length >= 4 &&
     (normalizedRecurring.includes(normalizedBooking) || normalizedBooking.includes(normalizedRecurring))
 
+  // A variable amount deliberately removes the strongest matching signal. Do not
+  // compensate that by merely sharing account, direction and a nearby due date:
+  // otherwise every variable recurring booking becomes a candidate for unrelated
+  // expenses in the same two-week window.
+  const hasTextEvidence = sharedWords > 0 || containsText
+  if (input.variableAmount && !hasTextEvidence) return null
+  // Fixed amounts can be useful evidence on their own, but a distant booking with
+  // no textual relationship is still too weak to suggest to the user.
+  if (!input.variableAmount && !hasTextEvidence && dateDistance > 2) return null
+
   const dateScore = Math.max(0, 30 - dateDistance * 2)
   const amountScore = amountMatches ? 30 : 10
   const textScore = Math.min(20, sharedWords * 10) + (containsText ? 10 : 0)

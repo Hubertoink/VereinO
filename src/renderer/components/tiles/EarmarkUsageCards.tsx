@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { getNavIcon } from '../../utils/navIcons'
 
 function contrastText(bg?: string | null) {
   if (!bg) return 'var(--text)'
@@ -120,38 +121,47 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
             >
               <div className="budget-compact-card__head">
                 <span className="budget-compact-card__code">{b.code}</span>
+                <strong className="budget-compact-card__title" title={b.name}>{b.name}</strong>
                 {!!b.enforceTimeRange && <span title="Strikter Zeitraum aktiv">{renderLockIcon('currentColor')}</span>}
               </div>
-              <strong className="budget-compact-card__title" title={b.name}>{b.name}</strong>
               <div
-                className="budget-compact-card__amounts"
+                className="budget-compact-card__stats"
                 style={{ gridTemplateColumns: hasBudget ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}
               >
                 {hasBudget ? (
                   <>
-                    <div><span>Budget</span><strong>{fmt.format(budget)}</strong></div>
-                    <div><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{fmt.format(remaining)}</strong></div>
-                    <div><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                    <div className="budget-compact-card__stat"><span>Budget</span><strong>{fmt.format(budget)}</strong></div>
+                    <div className="budget-compact-card__stat"><span>Verfügbar</span><strong className={remaining >= 0 ? 'text-success' : 'text-danger'}>{fmt.format(remaining)}</strong></div>
+                    <div className="budget-compact-card__stat"><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
                   </>
                 ) : (
                   <>
-                    <div><span>Zugewiesen</span><strong className="text-success">{fmt.format(allocated)}</strong></div>
-                    <div><span>Verbraucht</span><strong className="text-danger">{fmt.format(released)}</strong></div>
+                    <div className="budget-compact-card__stat"><span>Zugewiesen</span><strong className="text-success">{fmt.format(allocated)}</strong></div>
+                    <div className="budget-compact-card__stat"><span>Verbraucht</span><strong className="text-danger">{fmt.format(released)}</strong></div>
                   </>
                 )}
               </div>
               {hasBudget && (
-                <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
-                  <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+                <div className="budget-compact-card__detail-panel">
+                  <div className="budget-compact-card__detail-label"><span>Verbrauch</span><strong style={{ color: status.text }}>{pct}%</strong></div>
+                  <div className="budget-compact-card__progress" aria-label={`Verbrauch ${pct} Prozent`}>
+                    <span style={{ width: `${Math.min(100, pct)}%`, background: pct >= 100 ? '#ef5350' : pct >= 80 ? '#ffa726' : bg }} />
+                  </div>
                 </div>
               )}
-              <div className="budget-compact-card__meta">
-                {dateRange && <span>{dateRange}</span>}
-                {totalCount != null && totalCount > 0 && <span>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>}
-              </div>
-              <div className="budget-compact-card__actions">
-                <button className="btn ghost" onClick={() => onGoToBookings?.(b.id)}>Buchungen</button>
-                {onEdit && <button className="btn btn-edit" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
+              {!hasBudget && dateRange && (
+                <div className="budget-compact-card__detail-panel budget-compact-card__period">
+                  <span className="budget-compact-card__detail-label">Zeitraum</span>
+                  <strong>{dateRange}</strong>
+                </div>
+              )}
+              {hasBudget && dateRange && <span className="budget-compact-card__period-hint">{dateRange}</span>}
+              <div className="budget-compact-card__footer">
+                <button className="budget-compact-card__bookings" onClick={() => onGoToBookings?.(b.id)}>
+                  <span className="budget-compact-card__bookings-icon" aria-hidden="true">{getNavIcon('Buchungen')}</span>
+                  <span><strong>Buchungen</strong><small>{totalCount ?? 0} Buchung{totalCount !== 1 ? 'en' : ''}</small></span>
+                </button>
+                {onEdit && <button className="btn btn-edit budget-compact-card__edit" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
               </div>
             </div>
           )

@@ -407,7 +407,7 @@ type BookingJobLike = {
   result?: unknown
 }
 
-const AI_CHAT_STORAGE_KEY = 'vereino.ai.chat.v1'
+const AI_CHAT_STORAGE_KEY = 'vereino.ai.chat.v2'
 const AI_MESSAGE_STREAM_TICK_MS = 18
 const AI_MESSAGE_STREAM_TARGET_TICKS = 180
 
@@ -742,24 +742,28 @@ function warningClassName(warning: string) {
   return duplicate ? 'ai-warning ai-warning--duplicate' : 'ai-warning'
 }
 
-function readAiChatSnapshot(): AiChatSnapshot {
-  if (typeof window === 'undefined') return {}
+function aiChatStorageKey(organizationId: string) {
+  return `${AI_CHAT_STORAGE_KEY}.${encodeURIComponent(organizationId)}`
+}
+
+function readAiChatSnapshot(organizationId?: string | null): AiChatSnapshot {
+  if (typeof window === 'undefined' || !organizationId) return {}
   try {
-    const raw = window.localStorage.getItem(AI_CHAT_STORAGE_KEY)
+    const raw = window.localStorage.getItem(aiChatStorageKey(organizationId))
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
   }
 }
 
-function writeAiChatSnapshot(snapshot: AiChatSnapshot) {
-  if (typeof window === 'undefined') return
+function writeAiChatSnapshot(snapshot: AiChatSnapshot, organizationId?: string | null) {
+  if (typeof window === 'undefined' || !organizationId) return
   try {
     const persistedMessages = (snapshot.messages || []).map(
       ({ displayBody, isStreaming, ...message }) => message
     )
     window.localStorage.setItem(
-      AI_CHAT_STORAGE_KEY,
+      aiChatStorageKey(organizationId),
       JSON.stringify({ ...snapshot, messages: persistedMessages })
     )
   } catch {
@@ -767,10 +771,10 @@ function writeAiChatSnapshot(snapshot: AiChatSnapshot) {
   }
 }
 
-function clearAiChatSnapshot() {
-  if (typeof window === 'undefined') return
+function clearAiChatSnapshot(organizationId?: string | null) {
+  if (typeof window === 'undefined' || !organizationId) return
   try {
-    window.localStorage.removeItem(AI_CHAT_STORAGE_KEY)
+    window.localStorage.removeItem(aiChatStorageKey(organizationId))
   } catch {
     // Ignore storage errors; clearing is a convenience, not critical state.
   }
@@ -932,13 +936,34 @@ function renderInlineMarkdown(text: string, onOpenVoucher?: (mention: AiVoucherM
   return parts.map((part, idx) => {
     const strong = part.match(/^\*\*([^*]+)\*\*$/)
     return strong ? (
-      <strong key={idx}>{renderInlineVoucherReferences(strong[1], onOpenVoucher)}</strong>
+      <strong key={idx}>{renderInlineColorValues(strong[1], onOpenVoucher)}</strong>
     ) : (
       <React.Fragment key={idx}>
-        {renderInlineVoucherReferences(part, onOpenVoucher)}
+        {renderInlineColorValues(part, onOpenVoucher)}
       </React.Fragment>
     )
   })
+}
+
+const HEX_COLOR_PATTERN = /#[0-9a-fA-F]{3,8}\b/g
+
+function renderInlineColorValues(text: string, onOpenVoucher?: (mention: AiVoucherMention) => void) {
+  const parts = String(text || '').split(HEX_COLOR_PATTERN)
+  const matches = String(text || '').match(HEX_COLOR_PATTERN) || []
+  const nodes: React.ReactNode[] = []
+  parts.forEach((part, idx) => {
+    if (part) nodes.push(renderInlineVoucherReferences(part, onOpenVoucher))
+    const color = matches[idx]
+    if (color) {
+      nodes.push(
+        <span className="ai-inline-color" key={`color-${idx}`} title={`Farbe ${color}`}>
+          <i aria-hidden="true" style={{ backgroundColor: color }} />
+          {color}
+        </span>
+      )
+    }
+  })
+  return nodes.length ? nodes : [text]
 }
 
 function splitMarkdownTableRow(line: string) {
@@ -2830,7 +2855,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   const settingsDrawerRef = useRef<HTMLElement | null>(null)
   const rulesDrawerRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
-  const [initialChat] = useState(readAiChatSnapshot)
+  const [initialChat] = useState<AiChatSnapshot>({})
+  const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null)
+  const [chatSnapshotReady, setChatSnapshotReady] = useState(false)
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
   const [apiKey, setApiKey] = useState('')
   const [connectionTest, setConnectionTest] = useState<Awaited<
@@ -3469,7 +3496,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     selectedJobId
   ])
 
-  const { agentSessionId, resetAgentSession, shouldUseAgentRuntime, runAgentRuntime } =
+  const { agentSessionId, resetAgentSession, restoreAgentSession, shouldUseAgentRuntime, runAgentRuntime } =
     useAiAgentWorkflow({
       initialSessionId: initialChat.agentSessionId || null,
       filesLength: files.length,
@@ -3625,12 +3652,69 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   )
 
   useEffect(() => {
-    void loadSettings()
-    void loadJobs()
-    void loadPaymentAccounts()
-    void loadMentionOptions()
-    void loadAgentKnowledge()
-  }, [loadAgentKnowledge, loadJobs, loadMentionOptions, loadPaymentAccounts, loadSettings])
+    let cancelled = false
+
+    const restoreOrganizationChat = async (organizationId?: string | null) => {
+      let resolvedOrganizationId = organizationId || null
+      if (!resolvedOrganizationId) {
+        try {
+          const result = await window.api.organizations.active()
+          resolvedOrganizationId = result.organization?.id || null
+        } catch {
+          resolvedOrganizationId = null
+        }
+      }
+      if (cancelled || !resolvedOrganizationId) return
+
+      const snapshot = readAiChatSnapshot(resolvedOrganizationId)
+      setChatSnapshotReady(false)
+      setActiveOrganizationId(resolvedOrganizationId)
+      setMessages(snapshot.messages || [])
+      restoreAgentSession(snapshot.agentSessionId)
+      setSelectedJob(null)
+      setSelectedJobId(snapshot.selectedJobId || null)
+      setSelectedCandidate(snapshot.selectedCandidate || 0)
+      setBankReview(snapshot.bankReview || null)
+      setPendingMembers(sanitizeMemberState(snapshot.pendingMembers))
+      setPendingMemberUpdates(snapshot.pendingMemberUpdates || null)
+      setPendingContributionPayment(snapshot.pendingContributionPayment || null)
+      setPendingContributionLinks(snapshot.pendingContributionLinks || null)
+      setPendingTagActions(snapshot.pendingTagActions || null)
+      setPendingPartyActions(snapshot.pendingPartyActions || null)
+      setPendingVoucherTagActions(snapshot.pendingVoucherTagActions || null)
+      setPendingVoucherUpdates(snapshot.pendingVoucherUpdates || null)
+      setPendingVoucherReverse(snapshot.pendingVoucherReverse || null)
+      setPendingVoucherRebook(snapshot.pendingVoucherRebook || null)
+      setPendingBankLinks(snapshot.pendingBankLinks || null)
+      setPendingInvoiceActions(snapshot.pendingInvoiceActions || null)
+      setPendingBudgetActions(snapshot.pendingBudgetActions || null)
+      setPendingEarmarkActions(snapshot.pendingEarmarkActions || null)
+      setPendingPlannerQuestion(snapshot.pendingPlannerQuestion || null)
+      setAgentTrace(snapshot.agentTrace || [])
+      setFiles([])
+      setPrompt('')
+      setShowHistory(false)
+      setShowAgentContext(false)
+      setShowSettings(false)
+      setShowRules(false)
+      setChatSnapshotReady(true)
+
+      void loadSettings()
+      void loadJobs()
+      void loadPaymentAccounts()
+      void loadMentionOptions()
+      void loadAgentKnowledge()
+    }
+
+    void restoreOrganizationChat()
+    const off = window.api.organizations.onSwitched((organization) => {
+      void restoreOrganizationChat(organization.id)
+    })
+    return () => {
+      cancelled = true
+      off?.()
+    }
+  }, [loadAgentKnowledge, loadJobs, loadMentionOptions, loadPaymentAccounts, loadSettings, restoreAgentSession])
 
   useEffect(() => {
     if (!selectedJobId || selectedJob?.id === selectedJobId) return
@@ -3685,7 +3769,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
   }, [showAgentContext, showHistory, showRules, showSettings])
 
   useEffect(() => {
-    if (messages.some((message) => message.isStreaming)) return
+    if (!chatSnapshotReady || !activeOrganizationId || messages.some((message) => message.isStreaming)) return
     writeAiChatSnapshot({
       messages,
       agentSessionId,
@@ -3708,8 +3792,9 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
       pendingEarmarkActions,
       pendingPlannerQuestion,
       agentTrace
-    })
+    }, activeOrganizationId)
   }, [
+    activeOrganizationId,
     agentSessionId,
     agentTrace,
     bankReview,
@@ -3730,7 +3815,8 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     pendingVoucherTagActions,
     pendingVoucherUpdates,
     selectedCandidate,
-    selectedJobId
+    selectedJobId,
+    chatSnapshotReady
   ])
 
   useEffect(() => {
@@ -4276,7 +4362,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
     setShowHistory(false)
     setShowAgentContext(false)
     setShowSettings(false)
-    clearAiChatSnapshot()
+    clearAiChatSnapshot(activeOrganizationId)
   }
 
   const updateBankSuggestion = (transactionId: number, patch: Partial<AiBankReviewSuggestion>) => {
@@ -8689,10 +8775,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
           )}
 
           {messages.length > 0 && (
-            <section className="card ai-conversation-card">
-              <div className="ai-conversation-toolbar">
-                <span>Unterhaltung</span>
-              </div>
+            <section className="ai-conversation-card">
               <div className="ai-message-list">
                 {messages.map((message) => {
                   const messageBody = message.displayBody ?? message.body

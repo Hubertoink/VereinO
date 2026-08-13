@@ -37,6 +37,36 @@ type BankTransaction = {
   resolvedAt?: string | null
   sourceFileName: string
   matchScore?: number | null
+  aiSuggestion?: BankAiSuggestion | null
+}
+
+type BankAiSuggestion = {
+  action: 'LINK_EXISTING' | 'APPLY_RECURRING' | 'CREATE_BOOKING' | 'MARK_CHECKED' | 'NEEDS_MANUAL_REVIEW'
+  confidence: number
+  reason: string
+  voucherId?: number | null
+  voucherNo?: string | null
+  recurringBookingId?: number | null
+  recurringBookingName?: string | null
+  occurrenceId?: number | null
+  scheduledDate?: string | null
+  bookingCandidate?: {
+    date: string
+    type: 'IN' | 'OUT'
+    sphere: string
+    primaryClassificationValueId?: number | null
+    description: string
+    grossAmount: number
+    vatRate?: number | null
+    paymentMethod?: string | null
+    paymentAccountId?: number | null
+    budgets?: Array<{ id: number; amount: number }>
+    earmarks?: Array<{ id: number; amount: number }>
+    tags?: string[]
+  } | null
+  warnings: string[]
+  evidence: string[]
+  reviewedAt?: string | null
 }
 
 type BankImportStatus = {
@@ -54,6 +84,8 @@ type BankImportStatus = {
     duplicates: number
     errors: number
     importedAt: string
+    periodFrom?: string | null
+    periodTo?: string | null
   }>
   accounts: Array<{
     id: number
@@ -102,6 +134,7 @@ type ImportPreview = {
 type ImportCommitResult = {
   batchId: number
   imported: number
+  importedTransactionIds: number[]
   duplicates: number
   duplicateRows: Array<{
     sourceRow: number
@@ -339,8 +372,12 @@ function BankAccountFilterDropdown({
 
 function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null }) {
   const recentImports = status?.recentImports || []
-  const latestImport = recentImports.at(0)
-  const previousImports = recentImports.slice(1)
+  const periodLabel = (entry: NonNullable<BankImportStatus['recentImports']>[number]) => {
+    if (!entry.periodFrom) return 'Kein neuer Buchungstag'
+    const from = formatDate(entry.periodFrom)
+    const to = formatDate(entry.periodTo || entry.periodFrom)
+    return from === to ? from : `${from} – ${to}`
+  }
 
   return (
     <FilterDropdown
@@ -358,40 +395,18 @@ function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null
       buttonTitle="Importhistorie"
       colorVariant="time"
     >
-      <div className="bank-history-summary">
-        <span>Letzter Import</span>
-        {latestImport ? (
-          <>
-            <strong>{latestImport.fileName}</strong>
-            <span>{latestImport.format} importiert am {formatDateTime(latestImport.importedAt)}</span>
-            <div className="bank-history-summary__footer">
-              <span style={{ color: latestImport.paymentAccountColor || undefined }}>
-                {latestImport.paymentAccountName || 'Zahlkonto'}
-              </span>
-              <div className="bank-history-item__stats">
-                <span>{latestImport.imported} neu</span>
-                {latestImport.duplicates > 0 && <span>{latestImport.duplicates} Duplikat(e)</span>}
-                {latestImport.errors > 0 && <span>{latestImport.errors} Fehler</span>}
-              </div>
-            </div>
-          </>
-        ) : (
-          <strong>{formatDateTime(status?.lastImportAt)}</strong>
-        )}
-      </div>
-
       <div className="bank-history-list">
-        {previousImports.map((entry) => (
+        {recentImports.map((entry) => (
           <div className="bank-history-item" key={entry.id}>
             <div className="bank-history-item__main">
-              <strong>{entry.fileName}</strong>
+              <strong title={entry.fileName}>{entry.fileName}</strong>
               <span>
-                {entry.format} importiert am {formatDateTime(entry.importedAt)}
-              </span>
-              <span style={{ color: entry.paymentAccountColor || undefined }}>
-                {entry.paymentAccountName || 'Zahlkonto'}
+                {formatDateTime(entry.importedAt)} · {periodLabel(entry)}
               </span>
             </div>
+            <span className="bank-history-item__account" style={{ color: entry.paymentAccountColor || undefined }}>
+              {entry.paymentAccountName || 'Zahlkonto'}
+            </span>
             <div className="bank-history-item__stats">
               <span>{entry.imported} neu</span>
               {entry.duplicates > 0 && <span>{entry.duplicates} Duplikat(e)</span>}
@@ -525,73 +540,6 @@ function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
   return reason === 'REFERENCE'
     ? 'Bankreferenz / End-to-End-ID'
     : 'Fingerprint aus Konto, Datum, Betrag und Text'
-}
-
-function DuplicateRecordCard({
-  title,
-  row
-}: {
-  title: string
-  row: {
-    bookingDate: string
-    direction: 'IN' | 'OUT'
-    amount: number
-    counterparty?: string | null
-    purpose?: string | null
-    bankReference?: string | null
-    endToEndId?: string | null
-    paymentAccountName?: string | null
-    sourceFileName?: string | null
-    idLabel?: string | null
-  }
-}) {
-  return (
-    <div className="bank-duplicate-record">
-      <div className="bank-duplicate-record__title">{title}</div>
-      <div className="bank-duplicate-record__grid">
-        <div>
-          <span>Datum</span>
-          <strong>{formatDate(row.bookingDate)}</strong>
-        </div>
-        <div>
-          <span>Typ</span>
-          <strong>{row.direction}</strong>
-        </div>
-        <div>
-          <span>Summe</span>
-          <strong>{euro.format(row.amount)}</strong>
-        </div>
-        <div>
-          <span>Beleg</span>
-          <strong>{row.idLabel || '–'}</strong>
-        </div>
-        <div>
-          <span>Partei</span>
-          <strong>{row.counterparty || '–'}</strong>
-        </div>
-        <div>
-          <span>Zweck</span>
-          <strong>{row.purpose || '–'}</strong>
-        </div>
-        <div>
-          <span>Bankreferenz</span>
-          <strong>{row.bankReference || '–'}</strong>
-        </div>
-        <div>
-          <span>End-to-End-ID</span>
-          <strong>{row.endToEndId || '–'}</strong>
-        </div>
-        <div>
-          <span>Zahlkonto</span>
-          <strong>{row.paymentAccountName || '–'}</strong>
-        </div>
-        <div>
-          <span>Quelldatei</span>
-          <strong>{row.sourceFileName || '–'}</strong>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function BankMatchRow({
@@ -881,25 +829,27 @@ function BankImportResultModal({
             <div className="bank-section-title">
               <div>
                 <strong>Erkannte Duplikate</strong>
-                <span className="helper">
-                  Hier siehst du, warum eine Zeile übersprungen wurde und auf welchen bestehenden
-                  Bankbeleg sie gematcht hat.
-                </span>
+                <span className="helper">Zum bewussten Importieren die jeweilige Zeile auswählen.</span>
               </div>
             </div>
             <div className="bank-duplicate-list">
               {result.duplicateRows.map((row) => {
                 const selected = selectedRows.includes(row.sourceRow)
                 return (
-                  <label
+                  <div
                     key={row.sourceRow}
                     className={`bank-duplicate-row ${selected ? 'active' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selected}
+                    onClick={() => onToggleRow(row.sourceRow)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onToggleRow(row.sourceRow)
+                      }
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => onToggleRow(row.sourceRow)}
-                    />
                     <div className="bank-duplicate-row__content">
                       <div className="bank-duplicate-row__head">
                         <strong>
@@ -911,7 +861,7 @@ function BankImportResultModal({
                         </span>
                       </div>
                       <div className="bank-duplicate-compact">
-                        <div className="bank-duplicate-compact__card">
+                        <div>
                           <span>Importzeile</span>
                           <strong>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</strong>
                           <small>
@@ -919,8 +869,8 @@ function BankImportResultModal({
                             {euro.format(row.amount)}
                           </small>
                         </div>
-                        <div className="bank-duplicate-compact__equals">=</div>
-                        <div className="bank-duplicate-compact__card">
+                        <div className="bank-duplicate-compact__equals" aria-hidden="true">→</div>
+                        <div>
                           <span>Bestehender Bankbeleg</span>
                           <strong>
                             {row.existing.counterparty ||
@@ -933,49 +883,8 @@ function BankImportResultModal({
                           </small>
                         </div>
                       </div>
-                      <details className="bank-duplicate-details">
-                        <summary className="bank-duplicate-details__summary">
-                          Mehr Vergleich anzeigen
-                        </summary>
-                        <div className="bank-duplicate-grid">
-                          <DuplicateRecordCard
-                            title="Importzeile"
-                            row={{
-                              bookingDate: row.bookingDate,
-                              direction: row.direction,
-                              amount: row.amount,
-                              counterparty: row.counterparty,
-                              purpose: row.purpose,
-                              bankReference: row.bankReference,
-                              endToEndId: row.endToEndId,
-                              paymentAccountName: null,
-                              sourceFileName: null,
-                              idLabel: `Zeile ${row.sourceRow}`
-                            }}
-                          />
-                          <DuplicateRecordCard
-                            title="Bestehender Bankbeleg"
-                            row={{
-                              bookingDate: row.existing.bookingDate,
-                              direction: row.existing.direction,
-                              amount: row.existing.amount,
-                              counterparty: row.existing.counterparty,
-                              purpose: row.existing.purpose,
-                              bankReference: row.existing.bankReference,
-                              endToEndId: row.existing.endToEndId,
-                              paymentAccountName: row.existing.paymentAccountName,
-                              sourceFileName: row.existing.sourceFileName,
-                              idLabel: `#${row.existing.id}`
-                            }}
-                          />
-                          <div className="bank-duplicate-grid__wide">
-                            <span>Abgleich über</span>
-                            <strong className="word-break-all">{row.duplicateValue}</strong>
-                          </div>
-                        </div>
-                      </details>
                     </div>
-                  </label>
+                  </div>
                 )
               })}
             </div>
@@ -1041,6 +950,23 @@ function BankImportModal({
   const [paymentAccountError, setPaymentAccountError] = useState(false)
   const [commitResult, setCommitResult] = useState<ImportCommitResult | null>(null)
   const [selectedDuplicateRows, setSelectedDuplicateRows] = useState<number[]>([])
+  const [aiAvailable, setAiAvailable] = useState(false)
+  const [reviewWithAi, setReviewWithAi] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void window.api.ai.settings.get()
+      .then((settings) => {
+        if (!active) return
+        setAiAvailable(settings.hasApiKey)
+      })
+      .catch(() => {
+        if (active) setAiAvailable(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const loadPreview = async (nextFile: File, nextBytes: Uint8Array, nextMapping?: CsvMapping) => {
     setBusy(true)
@@ -1100,13 +1026,27 @@ function BankImportModal({
       })) as ImportCommitResult
       notify(
         'success',
-        `${result.imported} Bankbeleg(e) importiert${result.duplicates ? `, ${result.duplicates} Duplikat(e) übersprungen` : ''}.`
+        `${result.imported} ${result.imported === 1 ? 'Bankbeleg' : 'Bankbelege'} importiert.`
       )
       if (result.errors.length)
         notify('info', `${result.errors.length} fehlerhafte Zeile(n) wurden nicht übernommen.`)
-      setCommitResult(result)
-      setSelectedDuplicateRows([])
+      if (reviewWithAi && result.importedTransactionIds.length) {
+        try {
+          const review = await window.api.ai.bankImports.reviewOpen({
+            transactionIds: result.importedTransactionIds
+          })
+          notify('success', `${review.suggestions.length} KI-Vorschlag/-Vorschläge vorbereitet.`)
+        } catch (aiReason: any) {
+          notify('info', `Import abgeschlossen, KI-Prüfung nicht verfügbar: ${aiReason?.message || String(aiReason)}`)
+        }
+      }
       onImported()
+      if (result.duplicateRows.length || result.errors.length) {
+        setCommitResult(result)
+        setSelectedDuplicateRows([])
+      } else {
+        onClose()
+      }
     } catch (reason: any) {
       setError(reason?.message || String(reason))
     } finally {
@@ -1254,6 +1194,20 @@ function BankImportModal({
                 <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>
               )}
             </label>
+
+            {aiAvailable && (
+              <label className="bank-import-ai-option">
+                <input
+                  type="checkbox"
+                  checked={reviewWithAi}
+                  onChange={(event) => setReviewWithAi(event.target.checked)}
+                />
+                <span>
+                  <strong>KI-Vorschläge nach dem Import erstellen</strong>
+                  <small>Nur neue, nicht doppelte Bankbelege werden geprüft.</small>
+                </span>
+              </label>
+            )}
 
             {preview.format === 'CSV' && (
               <section className="bank-mapping-card">
@@ -1833,6 +1787,183 @@ function BankReviewModal({
   )
 }
 
+function BankAiSuggestionModal({
+  transaction,
+  suggestion: initialSuggestion,
+  onClose,
+  onChanged,
+  onOpenReview,
+  notify
+}: {
+  transaction: BankTransaction
+  suggestion: BankAiSuggestion
+  onClose: () => void
+  onChanged: () => void
+  onOpenReview: (transaction: BankTransaction) => void
+  notify: Props['notify']
+}) {
+  const [busy, setBusy] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [suggestion, setSuggestion] = useState<BankAiSuggestion>(initialSuggestion)
+  const actionLabel = {
+    LINK_EXISTING: 'Bestehende Buchung zuordnen',
+    APPLY_RECURRING: 'Dauerbuchung anwenden',
+    CREATE_BOOKING: 'Neue Buchung vorbereiten',
+    MARK_CHECKED: 'Ohne Buchung prüfen',
+    NEEDS_MANUAL_REVIEW: 'Manuelle Prüfung'
+  }[suggestion.action]
+
+  const complete = async (run: () => Promise<unknown>, success: string) => {
+    setBusy(true)
+    try {
+      await run()
+      notify('success', success)
+      onChanged()
+      onClose()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const refreshSuggestion = async () => {
+    setBusy(true)
+    setRefreshing(true)
+    try {
+      const review = await window.api.ai.bankImports.reviewOpen({ transactionIds: [transaction.id] })
+      const nextSuggestion = review.suggestions.find(
+        (candidate) => Number(candidate.transactionId) === transaction.id
+      )
+      if (!nextSuggestion) throw new Error('Die KI hat keinen aktualisierten Vorschlag zurückgegeben.')
+      setSuggestion(nextSuggestion as BankAiSuggestion)
+      notify('success', 'KI-Vorschlag wurde mit den aktuellen Treffern neu erstellt.')
+      onChanged()
+    } catch (reason: any) {
+      notify('error', reason?.message || String(reason))
+    } finally {
+      setRefreshing(false)
+      setBusy(false)
+    }
+  }
+
+  const openBookingDraft = () => {
+    const candidate = suggestion.bookingCandidate
+    if (!candidate) return
+    window.dispatchEvent(
+      new CustomEvent('ai:open-booking-draft', {
+        detail: {
+          qa: {
+            date: candidate.date,
+            type: candidate.type,
+            sphere: candidate.sphere,
+            primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
+            mode: 'GROSS',
+            grossAmount: candidate.grossAmount,
+            vatRate: candidate.vatRate ?? 0,
+            description: candidate.description,
+            note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason].filter(Boolean).join('\n'),
+            paymentMethod: candidate.paymentMethod || 'BANK',
+            paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId,
+            paymentAccountName: transaction.paymentAccountName,
+            budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
+            earmarksAssigned: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
+            tags: candidate.tags || [],
+            bankTransactionId: transaction.id
+          }
+        }
+      })
+    )
+    onClose()
+  }
+
+  return createPortal(
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal bank-ai-suggestion-modal">
+        <header className="bank-modal-header">
+          <div>
+            <h2>KI-Vorschlag für Bankbeleg #{transaction.id}</h2>
+            <p>{transaction.counterparty || transaction.purpose || 'Ohne Beschreibung'}</p>
+          </div>
+          <button className="btn ghost" type="button" onClick={onClose} aria-label="Schließen">×</button>
+        </header>
+
+        <section className="bank-ai-suggestion-card">
+          {refreshing && (
+            <div className="bank-ai-refresh-state" role="status">
+              <span aria-hidden="true" />
+              KI prüft den Bankbeleg mit den aktuellen Treffern …
+            </div>
+          )}
+          <span className="bank-ai-suggestion-action">{actionLabel}</span>
+          <strong>{suggestion.reason}</strong>
+          <span className="helper">Sicherheit: {Math.round(suggestion.confidence * 100)} %</span>
+          {suggestion.action === 'LINK_EXISTING' && (
+            <span className="helper">Vorgeschlagene Buchung: {suggestion.voucherNo || `#${suggestion.voucherId}`}</span>
+          )}
+          {suggestion.action === 'APPLY_RECURRING' && (
+            <span className="helper">Dauerbuchung: {suggestion.recurringBookingName || `#${suggestion.recurringBookingId}`}</span>
+          )}
+          {suggestion.bookingCandidate && (
+            <div className="bank-ai-booking-preview">
+              <span>{formatDate(suggestion.bookingCandidate.date)} · {suggestion.bookingCandidate.type === 'IN' ? 'Einnahme' : 'Ausgabe'}</span>
+              <strong>{suggestion.bookingCandidate.description}</strong>
+              <span>{euro.format(suggestion.bookingCandidate.grossAmount)}</span>
+            </div>
+          )}
+          {suggestion.warnings.length > 0 && (
+            <ul className="bank-ai-suggestion-warnings">
+              {suggestion.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+            </ul>
+          )}
+        </section>
+
+        <footer className="bank-modal-footer">
+          <button className="btn" type="button" disabled={busy} onClick={onClose}>Schließen</button>
+          <button className="btn" type="button" disabled={busy} onClick={() => void refreshSuggestion()}>
+            {refreshing ? 'KI prüft …' : 'KI erneut prüfen'}
+          </button>
+          {suggestion.action === 'CREATE_BOOKING' && suggestion.bookingCandidate && (
+            <button className="btn primary" type="button" disabled={busy} onClick={openBookingDraft}>Buchungsvorschlag öffnen</button>
+          )}
+          {suggestion.action === 'LINK_EXISTING' && suggestion.voucherId && (
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void complete(
+              () => window.api.bankTransactions.link({ id: transaction.id, voucherId: suggestion.voucherId! }),
+              'Bankbeleg wurde der vorgeschlagenen Buchung zugeordnet.'
+            )}>Zuordnung übernehmen</button>
+          )}
+          {suggestion.action === 'APPLY_RECURRING' && suggestion.recurringBookingId && (suggestion.occurrenceId || suggestion.scheduledDate) && (
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void complete(
+              () => window.api.recurringBookings.book({
+                recurringBookingId: suggestion.recurringBookingId!,
+                occurrenceId: suggestion.occurrenceId ?? undefined,
+                scheduledDate: suggestion.scheduledDate ?? undefined,
+                bookingDate: transaction.bookingDate,
+                amount: transaction.amount,
+                bankTransactionId: transaction.id
+              }),
+              'Dauerbuchung und Bankbeleg wurden zusammengeführt.'
+            )}>Dauerbuchung übernehmen</button>
+          )}
+          {suggestion.action === 'MARK_CHECKED' && (
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void complete(
+              () => window.api.bankTransactions.check({ id: transaction.id, note: suggestion.reason }),
+              'Bankbeleg wurde als geprüft markiert.'
+            )}>Als geprüft markieren</button>
+          )}
+          {suggestion.action === 'NEEDS_MANUAL_REVIEW' && (
+            <button className="btn primary" type="button" disabled={busy} onClick={() => {
+              onClose()
+              onOpenReview(transaction)
+            }}>Bankbeleg manuell prüfen</button>
+          )}
+        </footer>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 export default function BankImportView({
   paymentAccounts,
   notify,
@@ -1854,6 +1985,7 @@ export default function BankImportView({
   const [showImport, setShowImport] = useState(false)
   const [initialImportFile, setInitialImportFile] = useState<File | null>(null)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
+  const [aiSuggestionTransaction, setAiSuggestionTransaction] = useState<BankTransaction | null>(null)
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const limit = 50
@@ -1986,12 +2118,8 @@ export default function BankImportView({
         </div>
       </div>
 
-      <div className="helper bank-page-summary">
-        Offene Bankbelege: <strong>{stats.open}</strong>
-        <span className="summary-remaining">
-          ({stats.total} gesamt; Zugeordnet: {stats.linked}, Geprüft: {stats.checked})
-        </span>
-        {importReminder && (
+      {importReminder && (
+        <div className="helper bank-page-summary">
           <span
             className="bank-import-reminder"
             tabIndex={0}
@@ -2006,8 +2134,8 @@ export default function BankImportView({
               <span>{importReminder.detail}</span>
             </span>
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
         {(
@@ -2087,13 +2215,29 @@ export default function BankImportView({
                   {(() => {
                     const match = matchScorePresentation(row.matchScore)
                     return (
-                      <span
-                        className={`bank-match-indicator bank-match-indicator--${match.level}`}
-                        title={match.level === 'none' ? match.label : `${match.label}: ${Math.round(Number(row.matchScore))} %`}
-                        aria-label={match.label}
-                      >
-                        {match.stars}
-                      </span>
+                      <div className="bank-assignment-cell">
+                        {row.aiSuggestion && (
+                          <button
+                            className="bank-ai-suggestion-trigger"
+                            type="button"
+                            title="KI-Vorschlag öffnen"
+                            aria-label="KI-Vorschlag öffnen"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setAiSuggestionTransaction(row)
+                            }}
+                          >
+                            <span aria-hidden="true">✦</span>
+                          </button>
+                        )}
+                        <span
+                          className={`bank-match-indicator bank-match-indicator--${match.level}`}
+                          title={match.level === 'none' ? match.label : `${match.label}: ${Math.round(Number(row.matchScore))} %`}
+                          aria-label={match.label}
+                        >
+                          {match.stars}
+                        </span>
+                      </div>
                     )
                   })()}
                 </td>
@@ -2183,6 +2327,19 @@ export default function BankImportView({
           onCreateBooking={onCreateBooking}
           onCheckWithoutBooking={setCheckTransaction}
           onOpenVoucher={onOpenVoucher}
+        />
+      )}
+      {aiSuggestionTransaction?.aiSuggestion && (
+        <BankAiSuggestionModal
+          transaction={aiSuggestionTransaction}
+          suggestion={aiSuggestionTransaction.aiSuggestion}
+          notify={notify}
+          onClose={() => setAiSuggestionTransaction(null)}
+          onChanged={() => {
+            dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
+            void load()
+          }}
+          onOpenReview={(transaction) => setSelected(transaction)}
         />
       )}
       {checkTransaction && (

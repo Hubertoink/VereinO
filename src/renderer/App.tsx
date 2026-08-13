@@ -1540,6 +1540,39 @@ function AppInner() {
       return 'Buchungen'
     }
   })
+  const pageHistoryRef = useRef<NavKey[]>([])
+  const pageHistoryIndexRef = useRef(-1)
+  const pageHistoryTargetRef = useRef<NavKey | null>(null)
+
+  useEffect(() => {
+    if (pageHistoryTargetRef.current === activePage) {
+      pageHistoryTargetRef.current = null
+      return
+    }
+    const pages = pageHistoryRef.current
+    const currentIndex = pageHistoryIndexRef.current
+    if (pages[currentIndex] === activePage) return
+    pages.splice(currentIndex + 1)
+    pages.push(activePage)
+    pageHistoryIndexRef.current = pages.length - 1
+  }, [activePage])
+
+  useEffect(() => {
+    const navigateHistory = (direction: -1 | 1) => {
+      const nextIndex = pageHistoryIndexRef.current + direction
+      const nextPage = pageHistoryRef.current[nextIndex]
+      if (!nextPage) return
+      pageHistoryIndexRef.current = nextIndex
+      pageHistoryTargetRef.current = nextPage
+      setActivePage(nextPage)
+    }
+    const offBack = window.api?.window?.onNavigationBackRequested?.(() => navigateHistory(-1))
+    const offForward = window.api?.window?.onNavigationForwardRequested?.(() => navigateHistory(1))
+    return () => {
+      offBack?.()
+      offForward?.()
+    }
+  }, [])
   useEffect(() => {
     if (activePage !== 'Buchungen') {
       setFabNearJournalEnd(false)
