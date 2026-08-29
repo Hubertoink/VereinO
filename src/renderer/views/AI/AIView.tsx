@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { IconDiamond, IconMenu2, IconSettings } from '@tabler/icons-react'
 import './AIView.css'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { dispatchDataChanged } from '../../utils/refresh'
 import TagsEditor from '../../components/TagsEditor'
 import DatePickerButton from '../../components/common/DatePickerButton'
+import AppIcon from '../../components/common/AppIcon'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AiRulesCatalog } from './AiRulesCatalog'
 import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
@@ -8720,7 +8722,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             }}
             aria-label="KI-Verlauf"
           >
-            ☰
+            <AppIcon icon={IconMenu2} size="action" />
           </button>
           <button
             ref={agentContextButtonRef}
@@ -8735,7 +8737,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             aria-label="Agent-Kontext"
             title="Agent-Kontext"
           >
-            ◈
+            <AppIcon icon={IconDiamond} size="action" />
           </button>
           <button
             ref={settingsButtonRef}
@@ -8749,7 +8751,7 @@ export default function AIView({ notify, onBooked, onBusyChange }: Props) {
             }}
             aria-label="KI-Einstellungen"
           >
-            ⚙
+            <AppIcon icon={IconSettings} size="action" />
           </button>
         </div>
       </header>

@@ -45,13 +45,11 @@ import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
 const RecurringBookingsView = lazy(() => import('./views/RecurringBookings/RecurringBookingsView'))
-const ActivityReportEditorModal = lazy(() => import('./views/Reports/ActivityReportEditorModal'))
 const TagsManagerModal = lazy(() => import('./components/modals/TagsManagerModal'))
 const AutoBackupPromptModal = lazy(() => import('./components/modals/AutoBackupPromptModal'))
 const UpdateAvailableModal = lazy(() => import('./components/modals/UpdateAvailableModal'))
 const MetaFilterModal = lazy(() => import('./components/modals/MetaFilterModal'))
 const TimeFilterModal = lazy(() => import('./components/modals/TimeFilterModal'))
-const ExportOptionsModal = lazy(() => import('./components/modals/ExportOptionsModal'))
 const AttachmentsModal = lazy(() => import('./components/modals/AttachmentsModal'))
 const LocalInvoiceScanModal = lazy(() => import('./components/modals/LocalInvoiceScanModal'))
 const VoucherInfoModal = lazy(() => import('./components/modals/VoucherInfoModal'))
@@ -71,6 +69,12 @@ const BankImportView = lazy(() => import('./views/BankImport/BankImportView'))
 const AIView = lazy(() => import('./views/AI/AIView'))
 // Resolve app icon for titlebar (works with Vite bundling)
 const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
+
+// The active organization has its own database.  Keeping the visible modules
+// there prevents a change to the top navigation of one organization from
+// changing every other organization as well.
+const VISIBLE_NAV_ITEMS_SETTING_KEY = 'ui.visibleNavItems'
+const LEGACY_VISIBLE_NAV_ITEMS_MIGRATION_KEY = 'ui.visibleNavItems.migratedToOrganizationSettings'
 
 function friendlyVoucherError(e: any) {
   const msg = String(e?.message || e || '')
@@ -1610,36 +1614,83 @@ function AppInner() {
     () => navItems.filter((item) => item.key !== 'KI').map((item) => item.key),
     []
   )
-  const [visibleNavItems, setVisibleNavItemsState] = useState<NavKey[]>(() => {
-    try {
-      const parsed = JSON.parse(localStorage.getItem('ui.visibleNavItems') || 'null')
-      if (!Array.isArray(parsed)) {
-        localStorage.setItem('ui.recurringBookingsNavIntroduced', 'true')
-        return defaultVisibleNavItems
-      }
+  const normalizeVisibleNavItems = useCallback(
+    (items: unknown, includeRecurringBookings = false): NavKey[] => {
+      const source = Array.isArray(items) ? items : []
       const valid = new Set(navItems.map((item) => item.key))
-      const introduced = localStorage.getItem('ui.recurringBookingsNavIntroduced') === 'true'
-      const upgraded = introduced ? parsed : [...parsed, 'Dauerbuchungen']
-      if (!introduced) localStorage.setItem('ui.recurringBookingsNavIntroduced', 'true')
+      const upgraded = includeRecurringBookings ? [...source, 'Dauerbuchungen'] : source
       return Array.from(
-        new Set([...upgraded.filter((key) => valid.has(key)), ...requiredNavItems])
+        new Set([...upgraded.filter((key): key is NavKey => typeof key === 'string' && valid.has(key as NavKey)), ...requiredNavItems])
       ) as NavKey[]
-    } catch {
-      return defaultVisibleNavItems
-    }
-  })
-  const setVisibleNavItems = useCallback(
-    (items: NavKey[]) => {
-      const valid = new Set(navItems.map((item) => item.key))
-      const next = Array.from(
-        new Set([...items.filter((key) => valid.has(key)), ...requiredNavItems])
-      ) as NavKey[]
-      setVisibleNavItemsState(next)
-      try {
-        localStorage.setItem('ui.visibleNavItems', JSON.stringify(next))
-      } catch {}
     },
     [requiredNavItems]
+  )
+  const [visibleNavItems, setVisibleNavItemsState] = useState<NavKey[]>(defaultVisibleNavItems)
+
+  useEffect(() => {
+    let alive = true
+
+    const loadVisibleNavItems = async () => {
+      try {
+        const saved = await window.api?.settings?.get?.<unknown>({ key: VISIBLE_NAV_ITEMS_SETTING_KEY })
+        if (!alive) return
+
+        if (Array.isArray(saved?.value)) {
+          setVisibleNavItemsState(normalizeVisibleNavItems(saved.value))
+          return
+        }
+
+        // Preserve existing installations once. New organizations deliberately
+        // start with the default modules instead of inheriting another org's UI.
+        const hasMigratedLegacySetting = localStorage.getItem(LEGACY_VISIBLE_NAV_ITEMS_MIGRATION_KEY) === 'true'
+        let legacyItems: unknown = null
+        if (!hasMigratedLegacySetting) {
+          try {
+            legacyItems = JSON.parse(localStorage.getItem(VISIBLE_NAV_ITEMS_SETTING_KEY) || 'null')
+          } catch {
+            legacyItems = null
+          }
+        }
+
+        const usesLegacyItems = Array.isArray(legacyItems)
+        const needsRecurringBookingsUpgrade = localStorage.getItem('ui.recurringBookingsNavIntroduced') !== 'true'
+        const next = usesLegacyItems
+          ? normalizeVisibleNavItems(legacyItems, needsRecurringBookingsUpgrade)
+          : defaultVisibleNavItems
+
+        setVisibleNavItemsState(next)
+        await window.api?.settings?.set?.({ key: VISIBLE_NAV_ITEMS_SETTING_KEY, value: next })
+        if (usesLegacyItems && needsRecurringBookingsUpgrade) {
+          localStorage.setItem('ui.recurringBookingsNavIntroduced', 'true')
+        }
+        localStorage.setItem(LEGACY_VISIBLE_NAV_ITEMS_MIGRATION_KEY, 'true')
+      } catch (error) {
+        // The UI remains usable with the safe default if persistence is not
+        // available (for example during a recovery startup).
+        console.warn('Sichtbare Navigationsmodule konnten nicht geladen werden:', error)
+        if (alive) setVisibleNavItemsState(defaultVisibleNavItems)
+      }
+    }
+
+    void loadVisibleNavItems()
+    const off = window.api?.organizations?.onSwitched?.(() => {
+      void loadVisibleNavItems()
+    })
+
+    return () => {
+      alive = false
+      off?.()
+    }
+  }, [defaultVisibleNavItems, normalizeVisibleNavItems])
+
+  const setVisibleNavItems = useCallback(
+    (items: NavKey[]) => {
+      const next = normalizeVisibleNavItems(items)
+      setVisibleNavItemsState(next)
+      void window.api?.settings?.set?.({ key: VISIBLE_NAV_ITEMS_SETTING_KEY, value: next })
+        .catch((error: unknown) => console.warn('Sichtbare Navigationsmodule konnten nicht gespeichert werden:', error))
+    },
+    [normalizeVisibleNavItems]
   )
   const visibleNavSet = useMemo(() => new Set(visibleNavItems), [visibleNavItems])
   const profileAllowedNavSet = useMemo(() => {
@@ -3473,8 +3524,121 @@ function AppInner() {
               setFilterBudgetId={setReportsFilterBudgetId}
               budgets={budgets}
               earmarks={earmarks}
-              onOpenExport={() => setShowExportOptions(true)}
-              onOpenActivityReport={() => setShowActivityReportEditor(true)}
+              showExportOptions={showExportOptions}
+              setShowExportOptions={setShowExportOptions}
+              exportOptions={{
+                fields: exportFields,
+                setFields: setExportFields,
+                orgName: exportOrgName,
+                setOrgName: setExportOrgName,
+                amountMode: exportAmountMode,
+                setAmountMode: setExportAmountMode,
+                sortDir: exportSortDir,
+                setSortDir: setExportSortDir,
+                dateFrom: reportsFrom,
+                dateTo: reportsTo,
+                exportType,
+                setExportType,
+                fiscalYear,
+                setFiscalYear,
+                includeBindings,
+                setIncludeBindings,
+                includeVoucherList,
+                setIncludeVoucherList,
+                includeBudgets,
+                setIncludeBudgets,
+                includeActivityReport,
+                setIncludeActivityReport,
+                includeInternalVouchers,
+                setIncludeInternalVouchers,
+                onExport: async (fmt, reportOpts) => {
+                  try {
+                    if (fmt === 'PDF_FISCAL') {
+                      const fiscalOpts = (reportOpts || {}) as FiscalExportOptions
+                      const res = await (window as any).api?.reports?.exportFiscal?.({
+                        fiscalYear,
+                        includeBindings: fiscalOpts.includeBindings ?? includeBindings,
+                        includeVoucherList: fiscalOpts.includeVoucherList ?? includeVoucherList,
+                        includeBudgets: fiscalOpts.includeBudgets ?? includeBudgets,
+                        includeActivityReport: fiscalOpts.includeActivityReport ?? includeActivityReport,
+                        includeInactiveBindings: fiscalOpts.includeInactiveBindings ?? false,
+                        includeArchivedBudgets: fiscalOpts.includeArchivedBudgets ?? false,
+                        includeInternalVouchers: fiscalOpts.includeInternalVouchers ?? includeInternalVouchers,
+                        bindingIds: fiscalOpts.selectedBindingIds,
+                        budgetIds: fiscalOpts.selectedBudgetIds,
+                        orgName: exportOrgName || undefined
+                      })
+                      if (res) {
+                        notify('success', `Finanzamt-Report exportiert: ${res.filePath}`, 6000, {
+                          label: 'Ordner öffnen',
+                          onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                        })
+                      }
+                    } else if (fmt === 'PDF_TREASURER') {
+                      const treasurerOpts = (reportOpts || {}) as TreasurerExportOptions
+                      const res = await (window as any).api?.reports?.exportTreasurer?.({
+                        fiscalYear,
+                        orgName: exportOrgName || undefined,
+                        cashBalanceDate: treasurerOpts?.cashBalanceDate,
+                        includeMembers: treasurerOpts?.includeMembers,
+                        includeInvoices: treasurerOpts?.includeInvoices,
+                        includeBindings: treasurerOpts?.includeBindings,
+                        includeBudgets: treasurerOpts?.includeBudgets,
+                        includeTagSummary: treasurerOpts?.includeTagSummary,
+                        includeVoucherList: treasurerOpts?.includeVoucherList,
+                        includeTags: treasurerOpts?.includeTags,
+                        includeInternalVouchers: treasurerOpts?.includeInternalVouchers ?? includeInternalVouchers,
+                        voucherListFrom: treasurerOpts?.voucherListFrom,
+                        voucherListTo: treasurerOpts?.voucherListTo,
+                        voucherListSort: treasurerOpts?.voucherListSort
+                      })
+                      if (res) {
+                        notify('success', `Kassierbericht exportiert: ${res.filePath}`, 6000, {
+                          label: 'Ordner öffnen',
+                          onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                        })
+                      }
+                    } else {
+                      const res = await window.api?.reports.export?.({
+                        type: 'JOURNAL',
+                        format: fmt,
+                        from: reportsFrom || '',
+                        to: reportsTo || '',
+                        filters: {
+                          paymentMethod: reportsFilterPM || undefined,
+                          sphere: reportsFilterSphere || undefined,
+                          type: reportsFilterType || undefined,
+                          earmarkId: reportsFilterEarmark || undefined,
+                          budgetId: reportsFilterBudgetId || undefined
+                        },
+                        fields: exportFields,
+                        orgName: exportOrgName || undefined,
+                        amountMode: exportAmountMode,
+                        sort: exportSortDir,
+                        sortBy: 'date'
+                      } as any)
+                      if (res) {
+                        notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
+                          label: 'Ordner öffnen',
+                          onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
+                        })
+                      }
+                    }
+                    setShowExportOptions(false)
+                  } catch (e: any) {
+                    notify('error', e?.message || String(e))
+                  }
+                }
+              }}
+              showActivityReportEditor={showActivityReportEditor}
+              setShowActivityReportEditor={setShowActivityReportEditor}
+              activityReportOptions={{
+                fiscalYear,
+                setFiscalYear,
+                yearsAvail,
+                budgets,
+                notify
+              }}
               refreshKey={refreshKey}
               activateKey={reportsActivateKey}
             />
@@ -4183,135 +4347,6 @@ function AppInner() {
         />
       )}
 
-      {/* Reports: Export Options Modal */}
-      {activePage === 'Reports' && showExportOptions && (
-        <Suspense fallback={null}>
-          <ExportOptionsModal
-          open={showExportOptions}
-          onClose={() => setShowExportOptions(false)}
-          fields={exportFields}
-          setFields={setExportFields}
-          orgName={exportOrgName}
-          setOrgName={setExportOrgName}
-          amountMode={exportAmountMode}
-          setAmountMode={setExportAmountMode}
-          sortDir={exportSortDir}
-          setSortDir={setExportSortDir}
-          dateFrom={reportsFrom}
-          dateTo={reportsTo}
-          exportType={exportType}
-          setExportType={setExportType}
-          fiscalYear={fiscalYear}
-          setFiscalYear={setFiscalYear}
-          includeBindings={includeBindings}
-          setIncludeBindings={setIncludeBindings}
-          includeVoucherList={includeVoucherList}
-          setIncludeVoucherList={setIncludeVoucherList}
-          includeBudgets={includeBudgets}
-          setIncludeBudgets={setIncludeBudgets}
-          includeActivityReport={includeActivityReport}
-          setIncludeActivityReport={setIncludeActivityReport}
-          includeInternalVouchers={includeInternalVouchers}
-          setIncludeInternalVouchers={setIncludeInternalVouchers}
-          onExport={async (fmt, reportOpts) => {
-            try {
-              if (fmt === 'PDF_FISCAL') {
-                const fiscalOpts = (reportOpts || {}) as FiscalExportOptions
-                // Fiscal year report for tax office
-                const res = await (window as any).api?.reports?.exportFiscal?.({
-                  fiscalYear,
-                  includeBindings: fiscalOpts.includeBindings ?? includeBindings,
-                  includeVoucherList: fiscalOpts.includeVoucherList ?? includeVoucherList,
-                  includeBudgets: fiscalOpts.includeBudgets ?? includeBudgets,
-                  includeActivityReport: fiscalOpts.includeActivityReport ?? includeActivityReport,
-                  includeInactiveBindings: fiscalOpts.includeInactiveBindings ?? false,
-                  includeArchivedBudgets: fiscalOpts.includeArchivedBudgets ?? false,
-                  includeInternalVouchers:
-                    fiscalOpts.includeInternalVouchers ?? includeInternalVouchers,
-                  bindingIds: fiscalOpts.selectedBindingIds,
-                  budgetIds: fiscalOpts.selectedBudgetIds,
-                  orgName: exportOrgName || undefined
-                })
-                if (res) {
-                  notify('success', `Finanzamt-Report exportiert: ${res.filePath}`, 6000, {
-                    label: 'Ordner öffnen',
-                    onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
-                  })
-                }
-              } else if (fmt === 'PDF_TREASURER') {
-                const treasurerOpts = (reportOpts || {}) as TreasurerExportOptions
-                const res = await (window as any).api?.reports?.exportTreasurer?.({
-                  fiscalYear,
-                  orgName: exportOrgName || undefined,
-                  cashBalanceDate: treasurerOpts?.cashBalanceDate,
-                  includeMembers: treasurerOpts?.includeMembers,
-                  includeInvoices: treasurerOpts?.includeInvoices,
-                  includeBindings: treasurerOpts?.includeBindings,
-                  includeBudgets: treasurerOpts?.includeBudgets,
-                  includeTagSummary: treasurerOpts?.includeTagSummary,
-                  includeVoucherList: treasurerOpts?.includeVoucherList,
-                  includeTags: treasurerOpts?.includeTags,
-                  includeInternalVouchers:
-                    treasurerOpts?.includeInternalVouchers ?? includeInternalVouchers,
-                  voucherListFrom: treasurerOpts?.voucherListFrom,
-                  voucherListTo: treasurerOpts?.voucherListTo,
-                  voucherListSort: treasurerOpts?.voucherListSort
-                })
-                if (res) {
-                  notify('success', `Kassierbericht exportiert: ${res.filePath}`, 6000, {
-                    label: 'Ordner öffnen',
-                    onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
-                  })
-                }
-              } else {
-                // Standard export
-                const res = await window.api?.reports.export?.({
-                  type: 'JOURNAL',
-                  format: fmt,
-                  from: reportsFrom || '',
-                  to: reportsTo || '',
-                  filters: {
-                    paymentMethod: reportsFilterPM || undefined,
-                    sphere: reportsFilterSphere || undefined,
-                    type: reportsFilterType || undefined,
-                    earmarkId: reportsFilterEarmark || undefined,
-                    budgetId: reportsFilterBudgetId || undefined
-                  },
-                  fields: exportFields,
-                  orgName: exportOrgName || undefined,
-                  amountMode: exportAmountMode,
-                  sort: exportSortDir,
-                  sortBy: 'date'
-                } as any)
-                if (res) {
-                  notify('success', `${fmt} exportiert: ${res.filePath}`, 6000, {
-                    label: 'Ordner öffnen',
-                    onClick: () => window.api?.shell?.showItemInFolder?.(res.filePath)
-                  })
-                }
-              }
-              setShowExportOptions(false)
-            } catch (e: any) {
-              notify('error', e?.message || String(e))
-            }
-          }}
-          />
-        </Suspense>
-      )}
-
-      {activePage === 'Reports' && showActivityReportEditor && (
-        <Suspense fallback={null}>
-          <ActivityReportEditorModal
-            open={showActivityReportEditor}
-            onClose={() => setShowActivityReportEditor(false)}
-            fiscalYear={fiscalYear}
-            setFiscalYear={setFiscalYear}
-            yearsAvail={yearsAvail}
-            budgets={budgets}
-            notify={notify}
-          />
-        </Suspense>
-      )}
     </div>
   )
 }

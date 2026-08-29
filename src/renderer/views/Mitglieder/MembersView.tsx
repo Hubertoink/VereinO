@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
 import DatePickerButton from '../../components/common/DatePickerButton'
+import AppIcon from '../../components/common/AppIcon'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
@@ -500,14 +502,14 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         ]}
                     />
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'); return hasFilters ? (
-                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setContributionFilter('ALL'); setIntervalFilter('ALL'); setBoardFilter('ALL'); setOffset(0) }} title="Filter zurücksetzen">✕</button>
+                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setContributionFilter('ALL'); setIntervalFilter('ALL'); setBoardFilter('ALL'); setOffset(0) }} title="Filter zurücksetzen"><AppIcon icon={IconX} size="action" /></button>
                     ) : null })()}
                 </div>
                 <div className="members-header-right">
-                    <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}>📄</button>
-                    <button className="btn" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}>✉ Einladen (E-Mail)</button>
-                    <button className="btn btn-accent" onClick={openCreateMember}>
-                        + Neu
+                    <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}><AppIcon icon={IconFileExport} size="action" /></button>
+                    <button className="btn btn-with-icon" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}><AppIcon icon={IconMail} size="control" />Einladen (E-Mail)</button>
+                    <button className="btn btn-accent btn-with-icon" onClick={openCreateMember}>
+                        <AppIcon icon={IconPlus} size="control" />Neu
                     </button>
                 </div>
             </div>
@@ -616,7 +618,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     leave_date: (r as any).leave_date ?? null,
                                     notes: (r as any).notes ?? null,
                                     next_due_date: (r as any).next_due_date ?? null
-                                } })}>✎</button>
+                                } })}><AppIcon icon={IconPencil} size="control" /></button>
                             </td>
                         </tr>
                     ))}
@@ -639,10 +641,10 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     </div>
                 </div>
                 <div className="pagination-bar__controls">
-                    <button className="btn pagination-bar__btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste">«</button>
-                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück">‹</button>
-                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter">›</button>
-                    <button className="btn pagination-bar__btn" onClick={() => setOffset((pages - 1) * limit)} disabled={offset + limit >= total} title="Letzte">»</button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(0)} disabled={offset <= 0} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => Math.max(0, v - limit))} disabled={offset <= 0} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset(v => (v + limit < total ? v + limit : v))} disabled={offset + limit >= total} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
+                    <button className="btn pagination-bar__btn" onClick={() => setOffset((pages - 1) * limit)} disabled={offset + limit >= total} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
                 </div>
             </div>
 
@@ -654,9 +656,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                 <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
                                 <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                    </svg>
+                                    <AppIcon icon={IconX} size="action" />
                                 </button>
                             </div>
                         </header>
@@ -803,11 +803,11 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 {form.mode === 'edit' && (
-                                    <button className="btn danger modal-delete-btn" onClick={() => {
+                                    <button className="btn danger modal-delete-btn btn-with-icon" onClick={() => {
                                         if (!form?.draft?.id) return
                                         const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
                                         setDeleteConfirm({ id: form.draft.id, label })
-                                    }}>🗑 Löschen</button>
+                                    }}><AppIcon icon={IconTrash} size="control" />Löschen</button>
                                 )}
                                 <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
                                 <button className="btn primary" onClick={() => { void saveMemberForm() }}>Speichern</button>
@@ -822,7 +822,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         <header className="invite-modal-header">
                             <h3 id="invite-modal-title">Einladung per E-Mail</h3>
                             <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={()=>setShowInvite(false)} aria-label="Schließen" title="Schließen (ESC)">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                                <AppIcon icon={IconX} size="action" />
                             </button>
                         </header>
                         <div className="card invite-modal-content">
@@ -917,7 +917,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <div className="helper">{inviteCurrentBatch.length} E-Mail-Adresse{inviteCurrentBatch.length === 1 ? '' : 'n'}</div>
                             </div>
                             <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setShowInviteRecipients(false)} aria-label="Schließen">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                                <AppIcon icon={IconX} size="action" />
                             </button>
                         </header>
                         <div className="invite-recipient-modal__content">
@@ -965,7 +965,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
-                                <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen">×</button>
+                                <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
                             </header>
                             <div className="card" style={{ padding: 10 }}>
                                 <div>Bitte ergänze die folgenden Felder:</div>
@@ -986,7 +986,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Mitglied löschen</h3>
-                            <button className="btn" onClick={() => setDeleteConfirm(null)}>×</button>
+                            <button className="btn" onClick={() => setDeleteConfirm(null)}><AppIcon icon={IconX} size="control" /></button>
                         </header>
                         <div className="card" style={{ padding: 10 }}>
                             <div style={{ marginBottom: 6 }}>Soll das folgende Mitglied wirklich gelöscht werden?</div>
@@ -1088,11 +1088,7 @@ function MemberFilterDropdown({
 
     return (
         <FilterDropdown
-            trigger={
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
-                </svg>
-            }
+            trigger={<AppIcon icon={IconFilter} size="action" />}
             title="Filter"
             hasActiveFilters={hasFilters}
             alignRight
@@ -1326,12 +1322,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
     return (
         <>
             <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <rect x="2" y="6" width="20" height="12" rx="2" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="3.2" fill="#fff"/>
-                    <rect x="4" y="8" width="2" height="2" rx="1" fill="#fff"/>
-                    <rect x="18" y="8" width="2" height="2" rx="1" fill="#fff"/>
-                </svg>
+                <AppIcon icon={IconCalendarDue} size="control" />
             </button>
             {open && createPortal(
                 <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', overflow: 'auto' }} onClick={() => setOpen(false)}>
@@ -1361,11 +1352,12 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                             Ausgetreten
                                         </span>
                                     )}
-                                    <span className={`fee-modal__status-badge ${status?.state === 'OVERDUE' ? 'fee-modal__status-badge--overdue' : 'fee-modal__status-badge--ok'}`}>
-                                        {status?.state === 'OVERDUE' ? `⚠ ${status?.overdue || 0} überfällig` : '✓ OK'}
+                                    <span className={`fee-modal__status-badge ${status?.state === 'OVERDUE' ? 'fee-modal__status-badge--overdue' : 'fee-modal__status-badge--ok'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                        <AppIcon icon={status?.state === 'OVERDUE' ? IconCalendarDue : IconCalendarCheck} size="inline" />
+                                        {status?.state === 'OVERDUE' ? `${status?.overdue || 0} überfällig` : 'OK'}
                                     </span>
                                     <button className="btn ghost" onClick={()=>setOpen(false)} aria-label="Schließen">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                                        <AppIcon icon={IconX} size="action" />
                                     </button>
                                 </div>
                             </div>
@@ -1415,10 +1407,11 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                         {selectedPeriod && selectedPeriodInfo && (
                             <div className="fee-quick-action">
                                 <div className="fee-quick-action__header">
-                                    <span className="fee-quick-action__title">
-                                        {selectedPeriodInfo.isPaid ? '✓ Bezahlte Periode' : '⚠ Fällige Periode'}: {selectedPeriod}
+                                    <span className="fee-quick-action__title" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                        <AppIcon icon={selectedPeriodInfo.isPaid ? IconCalendarCheck : IconCalendarDue} size="inline" />
+                                        {selectedPeriodInfo.isPaid ? 'Bezahlte Periode' : 'Fällige Periode'}: {selectedPeriod}
                                     </span>
-                                    <button className="btn ghost" onClick={() => { setSelectedPeriod(null); setSelectedPeriodInfo(null) }} aria-label="Schließen">×</button>
+                                    <button className="btn ghost" onClick={() => { setSelectedPeriod(null); setSelectedPeriodInfo(null) }} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
                                 </div>
                                 {selectedPeriodInfo.isPaid && selectedPeriodInfo.paymentInfo ? (
                                     <div className="fee-quick-action__info">
@@ -1481,7 +1474,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                                                         </span>
                                                                     )}
                                                                     <div className="fee-suggestion__check">
-                                                                        {isSelected && <span>✓</span>}
+                                                                        {isSelected && <AppIcon icon={IconCheck} size="inline" />}
                                                                     </div>
                                                                 </div>
                                                             )
@@ -1511,7 +1504,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                                                             setShowManualSearch(prev => ({ ...prev, [selectedPeriod]: false }))
                                                             setManualListByPeriod(prev => ({ ...prev, [selectedPeriod]: [] }))
                                                             setSearchByPeriod(prev => ({ ...prev, [selectedPeriod]: '' }))
-                                                        }}>×</button>
+                                                        }}><AppIcon icon={IconX} size="control" /></button>
                                                     </div>
                                                 )}
 
@@ -1542,13 +1535,13 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
 
                         {/* Action buttons */}
                         <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn" onClick={async ()=>{
+                            <button className="btn btn-with-icon" onClick={async ()=>{
                                 try {
                                     const addr = memberData?.address || null
                                     const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
                                     if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
                                 } catch (e: any) { alert(e?.message || String(e)) }
-                            }}>✉ Mitglied anschreiben</button>
+                            }}><AppIcon icon={IconMail} size="control" />Mitglied anschreiben</button>
                         </div>
 
                         {/* History */}
@@ -1921,14 +1914,14 @@ function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string
                     onClick={() => setShowStatus(true)}
                     style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)') }}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm1 5h-2v6h6v-2h-4V8z"/></svg>
+                    <AppIcon icon={IconCalendarDue} size="inline" />
                 </button>
                 {showStatus && (
                     <div className="modal-overlay" onClick={() => setShowStatus(false)}>
                         <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', maxWidth: 1100, display: 'grid', gap: 10 }}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
-                                <button className="btn" onClick={()=>setShowStatus(false)}>×</button>
+                                <button className="btn" onClick={()=>setShowStatus(false)}><AppIcon icon={IconX} size="control" /></button>
                             </header>
                             <div className="helper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                 <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>

@@ -1,5 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { IconDotsVertical } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 
 type InvoiceActionMenuProps = {
   actions: Array<{ label: string; tone?: 'danger' | 'primary'; onClick: () => void }>
@@ -85,7 +87,7 @@ export default function InvoiceActionMenu({
           onClick={() => setOpen((current) => !current)}
           style={{ minWidth: 40, textAlign: 'center' }}
         >
-          ...
+          <AppIcon icon={IconDotsVertical} size="action" />
         </button>
       </div>
       {open && createPortal(

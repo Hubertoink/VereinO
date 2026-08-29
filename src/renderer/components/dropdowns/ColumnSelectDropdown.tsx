@@ -1,4 +1,6 @@
 import React from 'react'
+import { IconLayoutGrid } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'
 
 type ColumnKey = string
@@ -19,11 +21,7 @@ export interface ColumnSelectDropdownProps {
 export default function ColumnSelectDropdown({ columns, title = 'Spalten', tip, alignRight = true }: ColumnSelectDropdownProps) {
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconLayoutGrid} size="action" />}
       title={title}
       hasActiveFilters={false}
       alignRight={alignRight}

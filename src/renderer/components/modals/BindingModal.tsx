@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconTrash, IconX } from '@tabler/icons-react'
 import ModalHeader from '../ModalHeader'
+import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'
 
 // Local contrast helper (kept self-contained)
@@ -175,7 +177,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           <div className="helper m-0">Ctrl+S = Speichern · Esc = Abbrechen</div>
           <div className="modal-actions">
             {!!v.id && (
-              <button className="btn danger modal-delete-btn" onClick={() => setAskDelete(true)}>🗑 Löschen</button>
+              <button className="btn danger modal-delete-btn btn-with-icon" onClick={() => setAskDelete(true)}><AppIcon icon={IconTrash} size="control" />Löschen</button>
             )}
             <button className="btn" onClick={onClose}>Abbrechen</button>
             <button className="btn primary" onClick={() => save()}>Speichern</button>
@@ -187,7 +189,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
             <div className="delete-modal-header">
               <h3 className="m-0">Zweckbindung löschen</h3>
-              <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <div>Möchtest du die Zweckbindung <strong>{v.code}</strong> – {v.name} wirklich löschen?</div>
             <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt erhalten; es wird nur die Zweckbindung entfernt.</div>
@@ -203,7 +205,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="color-picker-header">
               <h3 className="m-0">Eigene Farbe wählen</h3>
-              <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <div className="row">
               <div className="field">

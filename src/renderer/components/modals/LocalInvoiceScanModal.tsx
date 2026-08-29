@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { IconChevronLeft, IconChevronRight, IconFilePlus, IconPlus, IconSparkles, IconTargetArrow, IconX } from '@tabler/icons-react'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import TagsEditor from '../TagsEditor'
 import PartySelector from '../common/PartySelector'
+import AppIcon from '../common/AppIcon'
 import { useToast } from '../../context/useToast'
 import {
   EMPTY_LOCAL_INVOICE_FIELDS,
@@ -113,63 +115,16 @@ const SPHERE_OPTIONS: Array<{ value: BookingMeta['sphere']; label: string }> = [
   { value: 'WGB', label: 'Wirtschaftlicher Geschäftsbetrieb' }
 ]
 
-function FileTextPlusIcon({ size = 24 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h7" />
-      <path d="M14 2v6h6M8 13h4M8 17h3" />
-      <circle cx="18" cy="18" r="4" />
-      <path d="M18 16v4M16 18h4" />
-    </svg>
-  )
+function FileTextPlusIcon({ size = 18 }: { size?: number }) {
+  return <IconFilePlus aria-hidden="true" size={size} stroke={1.8} />
 }
 
 function SparkleIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m12 3-1.2 5.8L5 10l5.8 1.2L12 17l1.2-5.8L19 10l-5.8-1.2L12 3Z" />
-      <path d="m19 16-.5 2.5L16 19l2.5.5L19 22l.5-2.5L22 19l-2.5-.5L19 16Z" />
-    </svg>
-  )
+  return <AppIcon icon={IconSparkles} size="control" />
 }
 
 function FieldPickerIcon() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m4 3 15.5 8.2-7.1 2.2-2.2 7.1L4 3Z" />
-      <path d="m13 13 5 5" />
-    </svg>
-  )
+  return <AppIcon icon={IconTargetArrow} size="control" />
 }
 
 function Field({
@@ -1055,7 +1010,7 @@ export default function LocalInvoiceScanModal({
         <header className="local-invoice-scan__header">
           <div className="local-invoice-scan__title-row">
             <span className="local-invoice-scan__title-icon">
-              <FileTextPlusIcon size={22} />
+              <FileTextPlusIcon />
             </span>
             <h2 id="local-invoice-scan-title">Rechnung erfassen</h2>
           </div>
@@ -1079,7 +1034,7 @@ export default function LocalInvoiceScanModal({
               onClick={onClose}
               aria-label="Rechnungserfassung schließen"
             >
-              ✕
+              <AppIcon icon={IconX} size="action" />
             </button>
           </div>
         </header>
@@ -1269,7 +1224,7 @@ export default function LocalInvoiceScanModal({
                     disabled={pdfPage <= 1}
                     onClick={() => setPdfPage((current) => Math.max(1, current - 1))}
                   >
-                    ‹
+                    <AppIcon icon={IconChevronLeft} size="control" />
                   </button>
                   <span>
                     Seite {pdfPage} von {pdfPages}
@@ -1280,7 +1235,7 @@ export default function LocalInvoiceScanModal({
                     disabled={pdfPage >= pdfPages}
                     onClick={() => setPdfPage((current) => Math.min(pdfPages, current + 1))}
                   >
-                    ›
+                    <AppIcon icon={IconChevronRight} size="control" />
                   </button>
                 </div>
               )}
@@ -1451,7 +1406,7 @@ export default function LocalInvoiceScanModal({
                             }
                             aria-label="Weiteres Budget hinzufügen"
                           >
-                            +
+                            <AppIcon icon={IconPlus} size="control" />
                           </button>
                           <button
                             type="button"
@@ -1459,7 +1414,7 @@ export default function LocalInvoiceScanModal({
                             onClick={() => removeOptionalSection('budgets')}
                             aria-label="Budget entfernen"
                           >
-                            ×
+                            <AppIcon icon={IconX} size="control" />
                           </button>
                         </div>
                       </div>
@@ -1521,7 +1476,7 @@ export default function LocalInvoiceScanModal({
                               }
                               aria-label="Budgetzeile entfernen"
                             >
-                              ×
+                              <AppIcon icon={IconX} size="control" />
                             </button>
                           </div>
                         ))
@@ -1545,7 +1500,7 @@ export default function LocalInvoiceScanModal({
                             }
                             aria-label="Weitere Zweckbindung hinzufügen"
                           >
-                            +
+                            <AppIcon icon={IconPlus} size="control" />
                           </button>
                           <button
                             type="button"
@@ -1553,7 +1508,7 @@ export default function LocalInvoiceScanModal({
                             onClick={() => removeOptionalSection('earmarks')}
                             aria-label="Zweckbindung entfernen"
                           >
-                            ×
+                            <AppIcon icon={IconX} size="control" />
                           </button>
                         </div>
                       </div>
@@ -1615,7 +1570,7 @@ export default function LocalInvoiceScanModal({
                               }
                               aria-label="Zweckbindungszeile entfernen"
                             >
-                              ×
+                              <AppIcon icon={IconX} size="control" />
                             </button>
                           </div>
                         ))
@@ -1633,7 +1588,7 @@ export default function LocalInvoiceScanModal({
                           onClick={() => removeOptionalSection('tags')}
                           aria-label="Tags entfernen"
                         >
-                          ×
+                          <AppIcon icon={IconX} size="control" />
                         </button>
                       </div>
                       <TagsEditor
@@ -1655,7 +1610,7 @@ export default function LocalInvoiceScanModal({
                           onClick={() => removeOptionalSection('comment')}
                           aria-label="Kommentar entfernen"
                         >
-                          ×
+                          <AppIcon icon={IconX} size="control" />
                         </button>
                       </div>
                       <textarea

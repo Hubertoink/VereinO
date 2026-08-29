@@ -1,5 +1,7 @@
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
+import AppIcon from '../../../components/common/AppIcon'
 import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconAttachment } from '../../../utils/icons'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
@@ -754,17 +756,17 @@ export default function JournalTable({
         k === 'actions' ? (
             <td key={k} align="center" style={{ whiteSpace: 'nowrap' }}>
                 {isLocked(r.date) ? (
-                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt">🔒</span>
+                    <span className="badge" title={`Bis ${lockedUntil} abgeschlossen (Jahresabschluss)`} aria-label="Gesperrt"><AppIcon icon={IconLock} size="inline" /></span>
                 ) : r.isCashCheck ? (
-                    <span className="badge" title="Kassenprüfung-Buchung (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
+                    <span className="badge" title="Kassenprüfung-Buchung (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt"><AppIcon icon={IconLock} size="inline" /></span>
                 ) : r.isAdvancePlaceholder ? (
-                    <span className="badge badge-advance-placeholder-lock" title="Vorschuss-Platzhalter (systemgeneriert) – nicht bearbeitbar" aria-label="Gesperrt">🔒</span>
+                    <span className="badge badge-advance-placeholder-lock" title="Vorschuss-Platzhalter (systemgeneriert) – nicht bearbeitbar"><AppIcon icon={IconLock} size="inline" /></span>
                 ) : isReversalVoucher(r) ? (
-                    <button className="btn btn-edit" title="Stornieren" onClick={() => onDelete?.({ id: r.id, voucherNo: r.voucherNo, description: r.description ?? null })}>↺</button>
+                    <button className="btn btn-edit" title="Stornieren" onClick={() => onDelete?.({ id: r.id, voucherNo: r.voucherNo, description: r.description ?? null })}><AppIcon icon={IconRotateClockwise} size="control" /></button>
                 ) : isReversedOriginal(r) ? (
-                    <button className="btn btn-edit" title="Stornieren" onClick={() => onDelete?.({ id: r.id, voucherNo: r.voucherNo, description: r.description ?? null })}>↺</button>
+                    <button className="btn btn-edit" title="Stornieren" onClick={() => onDelete?.({ id: r.id, voucherNo: r.voucherNo, description: r.description ?? null })}><AppIcon icon={IconRotateClockwise} size="control" /></button>
                 ) : (
-                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', counterparty: r.counterparty ?? null, partyId: r.partyId ?? null, paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, paymentAccountName: r.paymentAccountName ?? null, paymentAccountKind: r.paymentAccountKind ?? null, paymentAccountColor: r.paymentAccountColor ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferFromAccountName: r.transferFromAccountName ?? null, transferFromAccountKind: r.transferFromAccountKind ?? null, transferFromAccountColor: r.transferFromAccountColor ?? null, transferToAccountId: r.transferToAccountId ?? null, transferToAccountName: r.transferToAccountName ?? null, transferToAccountKind: r.transferToAccountKind ?? null, transferToAccountColor: r.transferToAccountColor ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}>✎</button>
+                    <button className="btn btn-edit" title="Bearbeiten" onClick={() => onEdit({ id: r.id, date: r.date, description: r.description ?? '', counterparty: r.counterparty ?? null, partyId: r.partyId ?? null, paymentMethod: r.paymentMethod ?? null, paymentAccountId: r.paymentAccountId ?? null, paymentAccountName: r.paymentAccountName ?? null, paymentAccountKind: r.paymentAccountKind ?? null, paymentAccountColor: r.paymentAccountColor ?? null, transferFrom: r.transferFrom ?? null, transferTo: r.transferTo ?? null, transferFromAccountId: r.transferFromAccountId ?? null, transferFromAccountName: r.transferFromAccountName ?? null, transferFromAccountKind: r.transferFromAccountKind ?? null, transferFromAccountColor: r.transferFromAccountColor ?? null, transferToAccountId: r.transferToAccountId ?? null, transferToAccountName: r.transferToAccountName ?? null, transferToAccountKind: r.transferToAccountKind ?? null, transferToAccountColor: r.transferToAccountColor ?? null, type: r.type, sphere: r.sphere, earmarkId: r.earmarkId ?? null, earmarkAmount: r.earmarkAmount ?? null, budgetId: r.budgetId ?? null, budgetAmount: r.budgetAmount ?? null, originalId: r.originalId ?? null, originalVoucherNo: r.originalVoucherNo ?? null, reversedById: r.reversedById ?? null, reversedByVoucherNo: r.reversedByVoucherNo ?? null, tags: r.tags || [], netAmount: r.netAmount, grossAmount: r.grossAmount, vatRate: r.vatRate, amountMode: r.amountMode, budgets: r.budgets || [], earmarksAssigned: r.earmarksAssigned || [] })}><AppIcon icon={IconPencil} size="control" /></button>
                 )}
             </td>
         ) : k === 'date' ? (

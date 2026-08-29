@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconExternalLink, IconGripVertical, IconLayoutGrid, IconPaperclip, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
 import FilterTotals from './components/FilterTotals'
 import JournalTable from './components/JournalTable'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
@@ -32,6 +33,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { encodeFileForUpload } from '../../utils/fileEncoding'
 import PartySelector from '../../components/common/PartySelector'
+import AppIcon from '../../components/common/AppIcon'
 
 type EditVoucherRow = SharedEditVoucherRow
 
@@ -927,11 +929,7 @@ export default function JournalView({
                 {/* Anzeige-Cluster: Spaltenauswahl */}
                 <div ref={columnsFilterRef} className="toolbar-icon">
                     <FilterDropdown
-                        trigger={
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
-                            </svg>
-                        }
+                        trigger={<AppIcon icon={IconLayoutGrid} size="action" />}
                         title="Spalten"
                         hasActiveFilters={false}
                         alignRight
@@ -1035,16 +1033,7 @@ export default function JournalView({
                                                 setDropTarget(null)
                                             }}
                                         >
-                                            <div className="filter-dropdown__col-drag-handle" aria-hidden="true" title="Ziehen zum Sortieren">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                                    <circle cx="9" cy="5" r="2" />
-                                                    <circle cx="15" cy="5" r="2" />
-                                                    <circle cx="9" cy="12" r="2" />
-                                                    <circle cx="15" cy="12" r="2" />
-                                                    <circle cx="9" cy="19" r="2" />
-                                                    <circle cx="15" cy="19" r="2" />
-                                                </svg>
-                                            </div>
+                                            <div className="filter-dropdown__col-drag-handle" aria-hidden="true" title="Ziehen zum Sortieren"><AppIcon icon={IconGripVertical} size="inline" /></div>
                                             <label className="filter-dropdown__col-label">
                                                 <input
                                                     type="checkbox"
@@ -1107,7 +1096,7 @@ export default function JournalView({
                         return (
                             <span key={c.key} className="chip" style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>
                                 {c.label}
-                                <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={bg ? { color: fg } : undefined}>×</button>
+                                <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={bg ? { color: fg } : undefined}><AppIcon icon={IconX} size="inline" /></button>
                             </span>
                         )
                     })}
@@ -1118,10 +1107,7 @@ export default function JournalView({
                             onClick={resetAllFilters}
                             style={{ padding: '4px 8px', color: 'var(--accent)' }}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
+                            <AppIcon icon={IconX} size="control" />
                         </button>
                     )}
                 </div>
@@ -1179,16 +1165,16 @@ export default function JournalView({
                                         <button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => {
                                             if (draft.kind === 'edit') closeBookingEditTab(draft.id)
                                             else onCloseBookingDraft?.(draft.id)
-                                        }}>×</button>
+                                        }}><AppIcon icon={IconX} size="inline" /></button>
                                     </div>
                                 ))}
                             </div>
                         )}
                         <div className="pagination-bar__controls">
-                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste">«</button>
-                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(Math.max(1, activePage - 1)) }} disabled={activePage <= 1} title="Zurück">‹</button>
-                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(Math.min(maxP, activePage + 1)) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter">›</button>
-                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(maxP) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte">»</button>
+                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(1) }} disabled={activePage <= 1} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
+                            <button className="btn pagination-bar__btn" onClick={() => { activeSetPage(Math.max(1, activePage - 1)) }} disabled={activePage <= 1} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
+                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(Math.min(maxP, activePage + 1)) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
+                            <button className="btn pagination-bar__btn" onClick={() => { const maxP = Math.max(1, Math.ceil((totalRows || 0) / journalLimit)); activeSetPage(maxP) }} disabled={activePage >= Math.max(1, Math.ceil((totalRows || 0) / journalLimit))} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
                         </div>
                     </div>
 
@@ -1295,25 +1281,15 @@ export default function JournalView({
                                     })()}
                                 </h2>
                                 <div className="booking-modal-header-actions">
-                                    <button className="btn ghost" type="button" onClick={() => { void openDetachedEdit(editRow, true) }} title="In eigenes Fenster abdocken">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                            <path d="M15 3h6v6" />
-                                            <path d="M10 14 21 3" />
-                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                        </svg>
-                                    </button>
-                                    <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                        </svg>
-                                    </button>
+                                    <button className="btn ghost" type="button" onClick={() => { void openDetachedEdit(editRow, true) }} title="In eigenes Fenster abdocken"><AppIcon icon={IconExternalLink} size="action" /></button>
+                                    <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)"><AppIcon icon={IconX} size="action" /></button>
                                 </div>
                             </header>
 
                             {confirmDiscardEdit && (
                                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
                                     <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, width: '90vw', padding: '22px 24px', borderRadius: 14, border: '2px solid var(--accent)' }}>
-                                        <div style={{ fontSize: 28, marginBottom: 6, textAlign: 'center' }}>⚠️</div>
+                                        <div style={{ marginBottom: 6, display: 'grid', placeItems: 'center', color: 'var(--warning)' }}><AppIcon icon={IconAlertTriangle} size="action" /></div>
                                         <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>Ungespeicherte Änderungen</h3>
                                         <p style={{ margin: '0 0 16px', fontSize: 13, opacity: 0.85, lineHeight: 1.45, textAlign: 'center' }}>
                                             Diese Buchung wurde verändert. Möchtest du die Änderungen wirklich verwerfen?
@@ -1626,7 +1602,7 @@ export default function JournalView({
                                                             setEditRow({ ...editRow, budgets: [...currentBudgets, { budgetId: 0, amount }] } as any)
                                                         }}
                                                         title="Weiteres Budget hinzufügen"
-                                                    >+</button>
+                                                    ><AppIcon icon={IconPlus} size="inline" /></button>
                                                 </label>
                                                 {(() => {
                                                     const budgetsList = (editRow as any).budgets || []
@@ -1707,16 +1683,16 @@ export default function JournalView({
                                                                                 setEditRow({ ...editRow, budgets: newBudgets } as any)
                                                                             }}
                                                                             title="Entfernen"
-                                                                        >✕</button>
+                                                                        ><AppIcon icon={IconX} size="inline" /></button>
                                                                     </div>
                                                                     )
                                                                 })
                                                             ) : null}
                                                             {hasDuplicateBudgets && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Ein Budget kann nur einmal zugeordnet werden</div>
+                                                                <div className="helper" style={{ color: 'var(--danger)', display: 'inline-flex', gap: 5, alignItems: 'center' }}><AppIcon icon={IconAlertTriangle} size="inline" />Ein Budget kann nur einmal zugeordnet werden</div>
                                                             )}
                                                             {exceedsTotal && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                                <div className="helper" style={{ color: 'var(--danger)', display: 'inline-flex', gap: 5, alignItems: 'center' }}><AppIcon icon={IconAlertTriangle} size="inline" />Summe ({totalBudgetAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                             )}
                                                             {editRow.type === 'INTERNAL' && internalBudgetValidation.budgetHint ? (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>{internalBudgetValidation.budgetHint}</div>
@@ -1744,7 +1720,7 @@ export default function JournalView({
                                                             setEditRow({ ...editRow, earmarksAssigned: [...currentEarmarks, { earmarkId: 0, amount }] } as any)
                                                         }}
                                                         title="Weitere Zweckbindung hinzufügen"
-                                                    >+</button>
+                                                    ><AppIcon icon={IconPlus} size="inline" /></button>
                                                 </label>
                                                 {(() => {
                                                     const earmarksList = (editRow as any).earmarksAssigned || []
@@ -1814,16 +1790,16 @@ export default function JournalView({
                                                                                 setEditRow({ ...editRow, earmarksAssigned: newEarmarks } as any)
                                                                             }}
                                                                             title="Entfernen"
-                                                                        >✕</button>
+                                                                        ><AppIcon icon={IconX} size="inline" /></button>
                                                                     </div>
                                                                     )
                                                                 })
                                                             ) : null}
                                                             {hasDuplicateEarmarks && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Eine Zweckbindung kann nur einmal zugeordnet werden</div>
+                                                                <div className="helper" style={{ color: 'var(--danger)', display: 'inline-flex', gap: 5, alignItems: 'center' }}><AppIcon icon={IconAlertTriangle} size="inline" />Eine Zweckbindung kann nur einmal zugeordnet werden</div>
                                                             )}
                                                             {exceedsTotal && (
-                                                                <div className="helper" style={{ color: 'var(--danger)' }}>⚠ Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
+                                                                <div className="helper" style={{ color: 'var(--danger)', display: 'inline-flex', gap: 5, alignItems: 'center' }}><AppIcon icon={IconAlertTriangle} size="inline" />Summe ({totalEarmarkAmount.toFixed(2)} €) übersteigt Buchungsbetrag ({grossAmt.toFixed(2)} €)</div>
                                                             )}
                                                             {editRow.type === 'INTERNAL' && internalEarmarkValidation.earmarkHint ? (
                                                                 <div className="helper" style={{ color: 'var(--danger)' }}>{internalEarmarkValidation.earmarkHint}</div>
@@ -1951,7 +1927,7 @@ export default function JournalView({
                                                                         setConfirmDeleteAttachment({ id: f.id, fileName: f.fileName, voucherId: editRow.id })
                                                                     }
                                                                 }}
-                                                            >🗑</button>
+                                                            ><AppIcon icon={IconTrash} size="control" /></button>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -1968,7 +1944,7 @@ export default function JournalView({
                                                     }}
                                                     onClick={() => editFileInputRef.current?.click?.()}
                                                 >
-                                                    <div style={{ fontSize: 24, marginBottom: 4 }}>📎</div>
+                                                    <div style={{ marginBottom: 4, display: 'inline-flex' }}><AppIcon icon={IconPaperclip} size="action" /></div>
                                                     <div className="helper">Dateien hierher ziehen oder klicken</div>
                                                 </div>
                                             )
@@ -1989,7 +1965,7 @@ export default function JournalView({
                                                     aria-label="Schließen"
                                                     style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}
                                                 >
-                                                    ✕
+                                                    <AppIcon icon={IconX} size="control" />
                                                 </button>
                                             </div>
                                             <div>
@@ -2027,11 +2003,11 @@ export default function JournalView({
                                         ) : (
                                             <button
                                                 type="button"
-                                                className="btn danger"
+                                                className={`btn danger${allowVoucherDeletion ? ' btn-with-icon' : ''}`}
                                                 title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}
                                                 onClick={() => { setDeleteRow({ id: editRow.id, voucherNo: (editRow as any)?.voucherNo as any, description: editRow.description ?? null, fromEdit: true }); }}
                                             >
-                                                {allowVoucherDeletion ? '🗑 Löschen' : 'Stornieren'}
+                                                {allowVoucherDeletion ? <><AppIcon icon={IconTrash} size="control" />Löschen</> : 'Stornieren'}
                                             </button>
                                         )}
                                     </div>

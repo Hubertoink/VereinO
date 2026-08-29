@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import TagsEditor from '../../components/TagsEditor'
 import DatePickerButton from '../../components/common/DatePickerButton'
 import PartySelector from '../../components/common/PartySelector'
@@ -378,28 +380,28 @@ export default function InvoiceFormModal({
               onToggle={(key) => toggleExtra(key as 'budget' | 'earmark' | 'tags' | 'comment' | 'attachments')}
             >
               {visibleExtras.has('budget') && <div className="compact-booking-optional-section" aria-label="Budget-Zuordnungen">
-                <div className="compact-booking-section-title"><strong>Budget</strong><button type="button" onClick={() => toggleExtra('budget')} aria-label="Budget-Feld entfernen">×</button></div>
+                <div className="compact-booking-section-title"><strong>Budget</strong><button type="button" onClick={() => toggleExtra('budget')} aria-label="Budget-Feld entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 {(form.draft.budgets || []).map((assignment, index) => <div key={`budget-${index}`} className="compact-booking-assignment-row">
                   <select className="input" value={assignment.budgetId || ''} onChange={(event) => updateBudgetAssignment(index, { budgetId: event.target.value ? Number(event.target.value) : 0 })}>
                     <option value="">Budget wählen</option>
                     {budgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.year}{budget.name ? ` – ${budget.name}` : ''}</option>)}
                   </select>
                   <span className="adorn-wrap"><input className="input" type="number" step="0.01" min="0" value={assignment.amount ?? ''} onChange={(event) => updateBudgetAssignment(index, { amount: event.target.value ? Number(event.target.value) : 0 })} aria-label={`Betrag für Budget ${index + 1}`} /><span className="adorn-suffix">€</span></span>
-                  <button type="button" className="compact-booking-remove-row" onClick={() => removeBudgetAssignment(index)} aria-label={`Budget ${index + 1} entfernen`}>×</button>
+                  <button type="button" className="compact-booking-remove-row" onClick={() => removeBudgetAssignment(index)} aria-label={`Budget ${index + 1} entfernen`}><AppIcon icon={IconX} size="inline" /></button>
                 </div>)}
                 <button type="button" className="compact-booking-add-row" onClick={addBudgetAssignment}>+ Budgetzeile</button>
                 <small className="helper">{(form.draft.budgets || []).length ? `Summe: ${totalBudgetAmount.toFixed(2)} €` : 'Kein Budget zugeordnet.'}</small>
               </div>}
 
               {visibleExtras.has('earmark') && <div className="compact-booking-optional-section" aria-label="Zweckbindungs-Zuordnungen">
-                <div className="compact-booking-section-title"><strong>Zweckbindung</strong><button type="button" onClick={() => toggleExtra('earmark')} aria-label="Zweckbindungs-Feld entfernen">×</button></div>
+                <div className="compact-booking-section-title"><strong>Zweckbindung</strong><button type="button" onClick={() => toggleExtra('earmark')} aria-label="Zweckbindungs-Feld entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 {(form.draft.earmarks || []).map((assignment, index) => <div key={`earmark-${index}`} className="compact-booking-assignment-row">
                   <select className="input" value={assignment.earmarkId || ''} onChange={(event) => updateEarmarkAssignment(index, { earmarkId: event.target.value ? Number(event.target.value) : 0 })}>
                     <option value="">Zweckbindung wählen</option>
                     {earmarks.map((earmark) => <option key={earmark.id} value={earmark.id}>{earmark.code} – {earmark.name}</option>)}
                   </select>
                   <span className="adorn-wrap"><input className="input" type="number" step="0.01" min="0" value={assignment.amount ?? ''} onChange={(event) => updateEarmarkAssignment(index, { amount: event.target.value ? Number(event.target.value) : 0 })} aria-label={`Betrag für Zweckbindung ${index + 1}`} /><span className="adorn-suffix">€</span></span>
-                  <button type="button" className="compact-booking-remove-row" onClick={() => removeEarmarkAssignment(index)} aria-label={`Zweckbindung ${index + 1} entfernen`}>×</button>
+                  <button type="button" className="compact-booking-remove-row" onClick={() => removeEarmarkAssignment(index)} aria-label={`Zweckbindung ${index + 1} entfernen`}><AppIcon icon={IconX} size="inline" /></button>
                 </div>)}
                 <button type="button" className="compact-booking-add-row" onClick={addEarmarkAssignment}>+ Zweckbindungszeile</button>
                 <small className="helper">{(form.draft.earmarks || []).length ? `Summe: ${totalEarmarkAmount.toFixed(2)} €` : 'Keine Zweckbindung zugeordnet.'}</small>
@@ -408,22 +410,22 @@ export default function InvoiceFormModal({
               {(visibleExtras.has('budget') || visibleExtras.has('earmark')) && grossAmountValue > 0 && <small className="helper">Betrag: {grossAmountValue.toFixed(2)} € · Budgets: {totalBudgetAmount.toFixed(2)} € · Zweckbindungen: {totalEarmarkAmount.toFixed(2)} €</small>}
 
               {visibleExtras.has('tags') && <div className="compact-booking-optional-section">
-                <div className="compact-booking-section-title"><strong>Tags</strong><button type="button" onClick={() => toggleExtra('tags')} aria-label="Tags entfernen">×</button></div>
+                <div className="compact-booking-section-title"><strong>Tags</strong><button type="button" onClick={() => toggleExtra('tags')} aria-label="Tags entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 <TagsEditor value={form.draft.tags} onChange={(nextTags) => setDraft({ tags: nextTags })} tagDefs={tags} inputRef={invoiceTagsInputRef} />
               </div>}
 
               {visibleExtras.has('comment') && <div className="compact-booking-optional-section">
-                <div className="compact-booking-section-title"><strong>Kommentar</strong><button type="button" onClick={() => toggleExtra('comment')} aria-label="Kommentar entfernen">×</button></div>
+                <div className="compact-booking-section-title"><strong>Kommentar</strong><button type="button" onClick={() => toggleExtra('comment')} aria-label="Kommentar entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 <textarea id="invoice-note" className="input" value={form.draft.note || ''} onChange={(event) => setDraft({ note: event.target.value })} placeholder="Interne Notiz zur Verbindlichkeit" rows={3} />
               </div>}
 
               {visibleExtras.has('attachments') && <div className="compact-booking-optional-section" onDragOver={(event) => { event.preventDefault(); event.stopPropagation() }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void handleDrop(event.dataTransfer?.files || null) }}>
-                <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => toggleExtra('attachments')} aria-label="Anhänge entfernen">×</button></div>
+                <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => toggleExtra('attachments')} aria-label="Anhänge entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 <input ref={form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => { void (form.mode === 'create' ? handleCreateFiles(event.target.files) : handleEditFiles(event.target.files)) }} />
                 <button type="button" className="compact-booking-add-row" onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}>+ Datei auswählen</button>
                 {(form.mode === 'create' ? formFiles : editInvoiceFiles).length > 0 && <div className="compact-booking-files">{form.mode === 'create'
-                  ? formFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => onRemovePendingFile(index)} aria-label={`${file.name} entfernen`}>×</button></span>)
-                  : editInvoiceFiles.map((file) => <span key={file.id}>{file.fileName}<button type="button" onClick={() => void onDeleteEditFile(file.id)} aria-label={`${file.fileName} entfernen`}>×</button></span>)}</div>}
+                  ? formFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => onRemovePendingFile(index)} aria-label={`${file.name} entfernen`}><AppIcon icon={IconX} size="inline" /></button></span>)
+                  : editInvoiceFiles.map((file) => <span key={file.id}>{file.fileName}<button type="button" onClick={() => void onDeleteEditFile(file.id)} aria-label={`${file.fileName} entfernen`}><AppIcon icon={IconX} size="inline" /></button></span>)}</div>}
               </div>}
             </BookingOptionalArea>
             </div>

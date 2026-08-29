@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconX } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 
 export interface FilterDropdownProps {
   trigger: React.ReactNode
@@ -14,6 +16,10 @@ export interface FilterDropdownProps {
   tooltip?: string
   /** Mutable ref that receives the close function once mounted */
   closeRef?: React.MutableRefObject<(() => void) | null>
+  /** Controls the open state when provided. */
+  open?: boolean
+  /** Called whenever the dropdown requests a state change. */
+  onOpenChange?: (open: boolean) => void
 }
 
 type TooltipPlacement = 'bottom' | 'top'
@@ -29,9 +35,17 @@ export default function FilterDropdown({
   buttonTitle,
   colorVariant = 'default',
   tooltip,
-  closeRef
+  closeRef,
+  open: controlledOpen,
+  onOpenChange
 }: FilterDropdownProps) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = (next: boolean | ((current: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next
+    if (controlledOpen === undefined) setUncontrolledOpen(value)
+    onOpenChange?.(value)
+  }
   const panelRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
@@ -228,10 +242,7 @@ export default function FilterDropdown({
                 buttonRef.current?.focus()
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <AppIcon icon={IconX} size="control" />
             </button>
           </header>
 

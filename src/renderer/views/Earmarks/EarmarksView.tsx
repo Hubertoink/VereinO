@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { IconArchive, IconChevronLeft, IconChevronRight, IconChevronsDown, IconChevronsLeft, IconChevronsRight, IconChevronsUp, IconPencil, IconPlus, IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
@@ -152,7 +154,7 @@ export default function EarmarksView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="helper">Zweckbindungen verwalten</div>
           <button
-            className="btn primary"
+            className="btn primary btn-with-icon"
             onClick={() =>
               setEditBinding({
                 code: '',
@@ -166,7 +168,7 @@ export default function EarmarksView({
               })
             }
           >
-            + Neu
+            <AppIcon icon={IconPlus} size="control" />Neu
           </button>
         </div>
 
@@ -242,13 +244,7 @@ export default function EarmarksView({
                     onClick={() => setArchiveConfirm(b)}
                     title={b.isActive ? 'Archivieren' : 'Wiederherstellen'}
                     style={{ marginRight: 6 }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {b.isActive
-                        ? <><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></>
-                        : <><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></>}
-                    </svg>
-                  </button>
+                  ><AppIcon icon={b.isActive ? IconChevronsDown : IconChevronsUp} size="inline" /></button>
                   <button
                     className="btn btn-edit"
                     onClick={() =>
@@ -265,9 +261,7 @@ export default function EarmarksView({
                         enforceTimeRange: b.enforceTimeRange ?? 0
                       })
                     }
-                  >
-                    ✎
-                  </button>
+                  ><AppIcon icon={IconPencil} size="control" /></button>
                 </td>
               </tr>
             ))}
@@ -305,10 +299,10 @@ export default function EarmarksView({
             <div className="pagination-bar__controls">
               {tableExpanded && (
                 <>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste">«</button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück">‹</button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter">›</button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte">»</button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
+                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
                 </>
               )}
               <button
@@ -361,7 +355,7 @@ export default function EarmarksView({
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ margin: 0 }}>{archiveConfirm.isActive ? 'Zweckbindung archivieren?' : 'Zweckbindung wiederherstellen?'}</h3>
-              <button className="btn ghost" onClick={() => setArchiveConfirm(null)}>✕</button>
+              <button className="btn ghost" onClick={() => setArchiveConfirm(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <p style={{ margin: '0 0 16px' }}>
               {archiveConfirm.isActive
@@ -370,12 +364,8 @@ export default function EarmarksView({
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setArchiveConfirm(null)}>Abbrechen</button>
-              <button className="btn primary" onClick={() => doArchive(archiveConfirm)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {archiveConfirm.isActive
-                    ? <><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></>
-                    : <><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></>}
-                </svg>
+              <button className="btn primary btn-with-icon" onClick={() => doArchive(archiveConfirm)}>
+                <AppIcon icon={archiveConfirm.isActive ? IconChevronsDown : IconChevronsUp} size="inline" />
                 {archiveConfirm.isActive ? 'Archivieren' : 'Wiederherstellen'}
               </button>
             </div>
@@ -401,11 +391,7 @@ export default function EarmarksView({
           }}
           title={showArchived ? 'Archivierte ausblenden' : 'Archivierte anzeigen'}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="21 8 21 21 3 21 3 8"/>
-            <rect x="1" y="3" width="22" height="5"/>
-            <line x1="10" y1="12" x2="14" y2="12"/>
-          </svg>
+          <span style={{ color: 'var(--text-dim)' }}><AppIcon icon={IconArchive} size="action" /></span>
           <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{archivedCount} archiviert</span>
           <label className="label-row" style={{ cursor: 'pointer' }}>
             <input type="checkbox" className="toggle" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />

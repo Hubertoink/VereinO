@@ -5,8 +5,9 @@ import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsSphereDonut from '../../components/reports/ReportsSphereDonut'
 import ReportsPaymentMethodBars from '../../components/reports/ReportsPaymentMethodBars'
 import ReportsInOutLines from '../../components/reports/ReportsInOutLines'
-import { MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
-import HoverTooltip from '../../components/common/HoverTooltip'
+import { FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
+import ExportOptionsModal from '../../components/modals/ExportOptionsModal'
+import ActivityReportEditorModal from './ActivityReportEditorModal'
 
 export default function ReportsView(props: {
   from: string
@@ -26,8 +27,12 @@ export default function ReportsView(props: {
   setFilterBudgetId: (v: number | null) => void
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
   earmarks: Array<{ id: number; code: string; name?: string | null }>
-  onOpenExport: () => void
-  onOpenActivityReport: () => void
+  showExportOptions: boolean
+  setShowExportOptions: (open: boolean) => void
+  exportOptions: Omit<React.ComponentProps<typeof ExportOptionsModal>, 'open' | 'onClose' | 'flyout'>
+  showActivityReportEditor: boolean
+  setShowActivityReportEditor: (open: boolean) => void
+  activityReportOptions: Omit<React.ComponentProps<typeof ActivityReportEditorModal>, 'open' | 'onClose' | 'flyout'>
   refreshKey: number
   activateKey: number
 }) {
@@ -49,8 +54,12 @@ export default function ReportsView(props: {
     setFilterBudgetId,
     budgets,
     earmarks,
-    onOpenExport,
-    onOpenActivityReport,
+    showExportOptions,
+    setShowExportOptions,
+    exportOptions,
+    showActivityReportEditor,
+    setShowActivityReportEditor,
+    activityReportOptions,
     refreshKey,
     activateKey
   } = props
@@ -193,43 +202,57 @@ export default function ReportsView(props: {
             />
           </div>
 
-          <HoverTooltip<HTMLButtonElement> content="Tätigkeitsbericht bearbeiten">
-            {({ ref, props }) => (
-              <button
-                ref={ref}
-                {...props}
-                className="report-toolbar-icon-btn report-toolbar-icon-btn--note"
-                onClick={() => onOpenActivityReport()}
-                aria-label="Tätigkeitsbericht bearbeiten"
-                type="button"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
-                </svg>
-              </button>
-            )}
-          </HoverTooltip>
+          <FilterDropdown
+            trigger={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+              </svg>
+            }
+            title="Tätigkeitsbericht"
+            alignRight
+            width="min(980px, calc(100vw - 28px))"
+            ariaLabel="Tätigkeitsbericht bearbeiten"
+            buttonTitle="Tätigkeitsbericht bearbeiten"
+            colorVariant="time"
+            tooltip="Tätigkeitsbericht bearbeiten"
+            open={showActivityReportEditor}
+            onOpenChange={setShowActivityReportEditor}
+          >
+            <ActivityReportEditorModal
+              {...activityReportOptions}
+              open={showActivityReportEditor}
+              onClose={() => setShowActivityReportEditor(false)}
+              flyout
+            />
+          </FilterDropdown>
 
-          <HoverTooltip<HTMLButtonElement> content="Exportieren">
-            {({ ref, props }) => (
-              <button
-                ref={ref}
-                {...props}
-                className="report-toolbar-icon-btn report-toolbar-icon-btn--export"
-                onClick={() => onOpenExport()}
-                aria-label="Exportieren"
-                type="button"
-              >
+          <FilterDropdown
+            trigger={
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <path d="M14 2v6h6" />
                   <path d="M12 18v-6" />
                   <path d="m9 15 3 3 3-3" />
                 </svg>
-              </button>
-            )}
-          </HoverTooltip>
+            }
+            title="Exportoptionen"
+            alignRight
+            width="min(920px, calc(100vw - 28px))"
+            ariaLabel="Exportieren"
+            buttonTitle="Exportieren"
+            colorVariant="action"
+            tooltip="Exportieren"
+            open={showExportOptions}
+            onOpenChange={setShowExportOptions}
+          >
+            <ExportOptionsModal
+              {...exportOptions}
+              open={showExportOptions}
+              onClose={() => setShowExportOptions(false)}
+              flyout
+            />
+          </FilterDropdown>
         </div>
       </header>
 

@@ -1,5 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  IconCalendarCheck,
+  IconCalendarPlus,
+  IconCalendarX,
+  IconCircleX,
+  IconFilter,
+  IconLink,
+  IconPencil,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconReceipt2,
+  IconX
+} from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import TagsEditor from '../../components/TagsEditor'
 import PartySelector from '../../components/common/PartySelector'
 import SelectDropdown from '../../components/common/SelectDropdown'
@@ -88,7 +102,7 @@ function RecurringStatusFilterDropdown({ value, onChange }: { value: 'ALL' | Sta
   ]
   return (
     <FilterDropdown
-      trigger={<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" /></svg>}
+      trigger={<AppIcon icon={IconFilter} size="control" />}
       title="Status filtern"
       hasActiveFilters={value !== 'ALL'}
       alignRight
@@ -565,22 +579,23 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
     <div className="card recurring-bookings-view">
       <div className="recurring-page-header">
         <h1>Dauerbuchungen</h1>
+      </div>
+      <div className="recurring-overview-row">
+        <div className="recurring-summary-grid">
+          <div className={`card recurring-summary-card recurring-summary-card--due ${summary.due > 0 ? 'is-due' : ''}`}><span>Fällig</span><strong>{summary.due}</strong></div>
+          <div className="card recurring-summary-card recurring-summary-card--upcoming"><span>Demnächst</span><small>30 Tage</small><strong>{summary.upcoming}</strong></div>
+          <div className="card recurring-summary-card recurring-summary-card--active"><span>Aktiv</span><strong>{summary.active}</strong></div>
+          <div className="card recurring-summary-card recurring-summary-card--paused"><span>Pausiert</span><strong>{summary.paused}</strong></div>
+        </div>
         <div className="recurring-page-tools">
           <div className="recurring-search-wrap">
             <input className="input" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Dauerbuchungen durchsuchen…" aria-label="Dauerbuchungen durchsuchen" />
-            {q && <button className="btn ghost recurring-search-clear" type="button" onClick={() => setQ('')} aria-label="Suche leeren">×</button>}
+            {q && <button className="btn ghost recurring-search-clear" type="button" onClick={() => setQ('')} aria-label="Suche leeren"><AppIcon icon={IconX} size="control" /></button>}
           </div>
           <RecurringStatusFilterDropdown value={status} onChange={setStatus} />
           <div className="filter-divider" />
-          <button className="btn primary" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}>+ Dauerbuchung</button>
+          <button className="btn primary btn-with-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}><AppIcon icon={IconCalendarPlus} size="control" />Dauerbuchung</button>
         </div>
-      </div>
-
-      <div className="recurring-summary-grid">
-        <div className={`card recurring-summary-card ${summary.due > 0 ? 'is-due' : ''}`}><span>Fällig</span><strong>{summary.due}</strong></div>
-        <div className="card recurring-summary-card"><span>Demnächst (30 Tage)</span><strong>{summary.upcoming}</strong></div>
-        <div className="card recurring-summary-card"><span>Aktiv</span><strong>{summary.active}</strong></div>
-        <div className="card recurring-summary-card"><span>Pausiert</span><strong>{summary.paused}</strong></div>
       </div>
 
       <div className="recurring-table-card">
@@ -612,28 +627,28 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                     <div className="recurring-actions">
                       {row.dueCount > 0 && row.suggestedVoucherId && (
                         <button
-                          className="btn primary"
+                          className="btn primary btn-with-icon"
                           disabled={linkingRecurringId === row.id}
                           onClick={() => void linkSuggestion(row)}
                           title={`${row.suggestedVoucherNo || 'Buchung'} vom ${fmtDate(row.suggestedVoucherDate)} zuordnen`}
                         >
-                          {linkingRecurringId === row.id ? 'Ordnet zu…' : 'Zuordnen'}
+                          {linkingRecurringId === row.id ? 'Ordnet zu…' : <><AppIcon icon={IconLink} size="inline" />Zuordnen</>}
                         </button>
                       )}
                       {row.dueCount > 0 && (
                         <button
-                          className={row.suggestedVoucherId ? 'btn' : 'btn primary'}
+                          className={row.suggestedVoucherId ? 'btn btn-with-icon' : 'btn primary btn-with-icon'}
                           onClick={() => openBooking(row)}
                           title={row.suggestedVoucherId ? 'Den gefundenen Treffer ignorieren und eine neue Buchung erstellen' : undefined}
                         >
-                          {row.suggestedVoucherId ? 'Trotzdem neu' : 'Jetzt buchen'}
+                          {row.suggestedVoucherId ? <><AppIcon icon={IconReceipt2} size="inline" />Trotzdem neu</> : <><AppIcon icon={IconCalendarCheck} size="inline" />Jetzt buchen</>}
                         </button>
                       )}
-                      <button className="btn ghost recurring-action-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(draftFromRow(row)) }} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1-1-4Z" /></svg></button>
-                      {row.dueCount > 0 && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'skip' })} title="Fälligkeit überspringen" aria-label={`Fälligkeit von ${row.name} überspringen`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M9 15l6 0M12 12l3 3-3 3" /></svg></button>}
-                      {row.status === 'ACTIVE' && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'pause' })} title="Dauerbuchung pausieren" aria-label={`${row.name} pausieren`}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg></button>}
-                      {row.status === 'PAUSED' && <button className="btn" onClick={() => void setRowStatus(row, 'ACTIVE')}>Aktivieren</button>}
-                      {row.status !== 'ENDED' && <button className="btn danger" onClick={() => setPendingAction({ row, kind: 'end' })}>Beenden</button>}
+                      <button className="btn ghost recurring-action-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(draftFromRow(row)) }} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><AppIcon icon={IconPencil} size="control" /></button>
+                      {row.dueCount > 0 && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'skip' })} title="Fälligkeit überspringen" aria-label={`Fälligkeit von ${row.name} überspringen`}><AppIcon icon={IconCalendarX} size="control" /></button>}
+                      {row.status === 'ACTIVE' && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'pause' })} title="Dauerbuchung pausieren" aria-label={`${row.name} pausieren`}><AppIcon icon={IconPlayerPause} size="control" /></button>}
+                      {row.status === 'PAUSED' && <button className="btn btn-with-icon" onClick={() => void setRowStatus(row, 'ACTIVE')}><AppIcon icon={IconPlayerPlay} size="inline" />Aktivieren</button>}
+                      {row.status !== 'ENDED' && <button className="btn danger btn-with-icon" onClick={() => setPendingAction({ row, kind: 'end' })}><AppIcon icon={IconCircleX} size="inline" />Beenden</button>}
                     </div>
                   </td>
                 </tr>

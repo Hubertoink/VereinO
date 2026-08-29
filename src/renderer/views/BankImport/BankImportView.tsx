@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
@@ -309,11 +311,7 @@ function BankAccountFilterDropdown({
 
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconFilter} size="action" />}
       title="Zahlkonto filtern"
       hasActiveFilters={value != null}
       alignRight
@@ -381,13 +379,7 @@ function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null
 
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M3 12a9 9 0 1 0 3-6.7" />
-          <path d="M3 3v6h6" />
-          <path d="M12 7v5l3 2" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconHistory} size="action" />}
       title="Importhistorie"
       alignRight
       width={390}
@@ -447,12 +439,7 @@ function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File
 
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconPlus} size="action" />}
       title="Import"
       alignRight
       width={320}
@@ -488,14 +475,7 @@ function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File
             selectFile(event.dataTransfer.files)
           }}
         >
-          <span className="bank-import-action-dropzone__icon" aria-hidden="true">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M12 18v-6" />
-              <path d="M9 15l3-3 3 3" />
-            </svg>
-          </span>
+          <span className="bank-import-action-dropzone__icon" aria-hidden="true"><AppIcon icon={IconFileUpload} size="action" /></span>
           <strong>Bankdatei hier ablegen</strong>
           <span>oder Datei auswählen</span>
           <small>CAMT-XML oder CSV</small>
@@ -674,9 +654,7 @@ function ManualAssignmentModal({
               {transaction.direction}
             </p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
-            ×
-          </button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <section className="bank-review-section">
@@ -819,9 +797,7 @@ function BankImportResultModal({
               {result.errors.length} fehlerhaft.
             </p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
-            ×
-          </button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         {result.duplicateRows.length > 0 && (
@@ -1110,9 +1086,7 @@ function BankImportModal({
             <h2>Bankdaten importieren</h2>
             <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
-            ×
-          </button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <div className="bank-import-drop">
@@ -1254,7 +1228,7 @@ function BankImportModal({
                   />
                 </div>
                 <details className="bank-more-options">
-                  <summary className="btn">... Weitere Spalten</summary>
+                  <summary className="btn btn-with-icon"><AppIcon icon={IconLayoutGrid} size="control" />Weitere Spalten</summary>
                   <div className="bank-mapping-grid">
                     <MappingSelect
                       label="Wertstellung"
@@ -1403,9 +1377,7 @@ function BankCheckModal({
             <h2 id="bank-check-modal-title">Ohne Buchung erledigen</h2>
             <p>Bankbeleg #{transaction.id}</p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">
-            ×
-          </button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <section className="bank-check-modal__content">
@@ -1583,7 +1555,7 @@ function BankReviewModal({
                 aria-label="Aktionen"
                 aria-expanded={actionMenuOpen}
               >
-                ...
+                <AppIcon icon={IconDotsVertical} size="action" />
               </button>
               {actionMenuOpen && (
                 <div className="bank-action-menu__popover">
@@ -1644,9 +1616,7 @@ function BankReviewModal({
               title="Schließen (ESC)"
               aria-label="Schließen"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
+              <AppIcon icon={IconX} size="action" />
             </button>
           </div>
         </header>
@@ -1885,7 +1855,7 @@ function BankAiSuggestionModal({
             <h2>KI-Vorschlag für Bankbeleg #{transaction.id}</h2>
             <p>{transaction.counterparty || transaction.purpose || 'Ohne Beschreibung'}</p>
           </div>
-          <button className="btn ghost" type="button" onClick={onClose} aria-label="Schließen">×</button>
+          <button className="btn ghost" type="button" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <section className="bank-ai-suggestion-card">
@@ -2095,7 +2065,7 @@ export default function BankImportView({
                   setPage(1)
                 }}
               >
-                ×
+                <AppIcon icon={IconX} size="control" />
               </button>
             )}
           </div>
@@ -2287,14 +2257,14 @@ export default function BankImportView({
             disabled={page <= 1}
             onClick={() => setPage((value) => value - 1)}
           >
-            ‹
+            <AppIcon icon={IconChevronLeft} size="control" />
           </button>
           <button
             className="btn"
             disabled={page >= pageCount}
             onClick={() => setPage((value) => value + 1)}
           >
-            ›
+            <AppIcon icon={IconChevronRight} size="control" />
           </button>
         </div>
       </footer>

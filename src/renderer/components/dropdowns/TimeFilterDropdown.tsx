@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { IconCalendar } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'
 
 export interface TimeFilterDropdownProps {
@@ -50,11 +52,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
 
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm-1 6v12h12V8H6zm2 2h3v3H8v-3z" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconCalendar} size="action" />}
       title="Zeitraum"
       hasActiveFilters={hasFilters}
       alignRight

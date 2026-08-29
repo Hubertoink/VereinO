@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconBuildingBank, IconCash, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileImport, IconPaperclip, IconPlus, IconX } from '@tabler/icons-react'
 import { useToast } from '../context/useToast'
 import ModalHeader from '../components/ModalHeader'
+import AppIcon from '../components/common/AppIcon'
 import LoadingState from '../components/LoadingState'
 import ColumnSelectDropdown from '../components/dropdowns/ColumnSelectDropdown'
 import InvoiceFilterDropdown from '../components/dropdowns/InvoiceFilterDropdown'
@@ -749,13 +751,13 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
               { key: 'showTags', label: 'Tags anzeigen', checked: colPrefs.showTags, onChange: (checked) => setColPrefs((prev) => ({ ...prev, showTags: checked })) },
               { key: 'showBezahlt', label: 'Bezahlt anzeigen', checked: colPrefs.showBezahlt, onChange: (checked) => setColPrefs((prev) => ({ ...prev, showBezahlt: checked })) },
               { key: 'showRest', label: 'Rest anzeigen', checked: colPrefs.showRest, onChange: (checked) => setColPrefs((prev) => ({ ...prev, showRest: checked })) },
-              { key: 'showAttachments', label: 'Anhänge (📎) anzeigen', checked: colPrefs.showAttachments, onChange: (checked) => setColPrefs((prev) => ({ ...prev, showAttachments: checked })) }
+              { key: 'showAttachments', label: 'Anhänge anzeigen', checked: colPrefs.showAttachments, onChange: (checked) => setColPrefs((prev) => ({ ...prev, showAttachments: checked })) }
             ]}
           />
-          {!!(q.trim() || status !== 'ALL' || sphere || budgetId || tag || dueFrom || dueTo) && <button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen">×</button>}
+          {!!(q.trim() || status !== 'ALL' || sphere || budgetId || tag || dueFrom || dueTo) && <button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen"><AppIcon icon={IconX} size="action" /></button>}
           <div className="filter-divider" />
-          <button className="btn primary invoices-toolbar-action" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}>Rechnung erfassen</button>
-          <button className="btn primary invoices-toolbar-action" onClick={openCreate}>+ Neu</button>
+          <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}><AppIcon icon={IconFileImport} size="control" />Rechnung erfassen</button>
+          <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={openCreate}><AppIcon icon={IconPlus} size="control" />Neu</button>
         </div>
       </div>
 
@@ -808,7 +810,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                     <span aria-hidden="true" className={sortBy === 'status' ? 'invoices-sort-icon-active' : 'invoices-sort-icon'}>{sortBy === 'status' ? (sortDir === 'DESC' ? '↓' : '↑') : '↕'}</span>
                   </button>
                 </th>
-                {colPrefs.showAttachments && <th align="center" title="Anhänge">📎</th>}
+                {colPrefs.showAttachments && <th align="center" title="Anhänge"><AppIcon icon={IconPaperclip} size="control" /></th>}
                 <th align="center">Aktionen</th>
               </tr>
             </thead>
@@ -829,7 +831,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                     <td>{fmtDateLocal(row.dueDate || '')}</td>
                     <td>
                       {row.invoiceNo || '-'}
-                      {fileCount > 0 && <span className="invoices-attachment-icon" title={`${fileCount} Anhang${fileCount > 1 ? 'e' : ''}`}>📎</span>}
+                      {fileCount > 0 && <span className="invoices-attachment-icon" title={`${fileCount} Anhang${fileCount > 1 ? 'e' : ''}`}><AppIcon icon={IconPaperclip} size="inline" /></span>}
                     </td>
                     <td>{row.party}</td>
                     {colPrefs.showTags && (
@@ -848,7 +850,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                     {colPrefs.showBezahlt && <td align="right">{eurFmt.format(row.paidSum || 0)}</td>}
                     {colPrefs.showRest && <td align="right" className={remaining > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(remaining)}</td>}
                     <td>{statusBadge(row.status)}</td>
-                    {colPrefs.showAttachments && <td align="center">{fileCount > 0 ? <span className="badge">📎 {fileCount}</span> : ''}</td>}
+                    {colPrefs.showAttachments && <td align="center">{fileCount > 0 ? <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={IconPaperclip} size="inline" />{fileCount}</span> : ''}</td>}
                     <td align="center" className="invoices-actions-nowrap">
                       {(() => {
                         const actions = [
@@ -904,10 +906,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                 <option value={20}>20</option>
                 <option value={50}>50</option>
               </select>
-              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste">«</button>
-              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück">‹</button>
-              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter">›</button>
-              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(Math.min((pages - 1) * limit, offset + limit))} title="Letzte">»</button>
+              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(0)} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
+              <button className="btn pagination-bar__btn" disabled={!canPrev} onClick={() => setOffset(Math.max(0, offset - limit))} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
+              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(offset + limit)} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
+              <button className="btn pagination-bar__btn" disabled={!canNext} onClick={() => setOffset(Math.min((pages - 1) * limit, offset + limit))} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
             </div>
           </div>
         </>
@@ -955,8 +957,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
             <ModalHeader title="Zahlweg festlegen" subtitle={`Verbindlichkeit #${showPaymentMethodModal.invoiceId}`} onClose={() => setShowPaymentMethodModal(null)} />
             <div className="helper" style={{ marginBottom: 24 }}>Die Verbindlichkeit wird automatisch verbucht. Bitte wählen Sie den Zahlweg:</div>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
-              <button className="btn primary" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BAR')} disabled={busyAction}>💵 Bar</button>
-              <button className="btn primary" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BANK')} disabled={busyAction}>🏦 Bank</button>
+              <button className="btn primary btn-with-icon" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BAR')} disabled={busyAction}><AppIcon icon={IconCash} size="action" />Bar</button>
+              <button className="btn primary btn-with-icon" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BANK')} disabled={busyAction}><AppIcon icon={IconBuildingBank} size="action" />Bank</button>
             </div>
             <button className="btn" onClick={() => setShowPaymentMethodModal(null)} style={{ marginTop: 8 }}>Abbrechen</button>
           </div>

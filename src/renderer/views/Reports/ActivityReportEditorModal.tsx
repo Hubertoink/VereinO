@@ -119,7 +119,7 @@ function ReferenceTooltip({ usage, fallbackPlanned }: { usage?: ReferenceUsage; 
   )
 }
 
-export default function ActivityReportEditorModal({ open, onClose, fiscalYear, setFiscalYear, yearsAvail, budgets, notify }: {
+export default function ActivityReportEditorModal({ open, onClose, fiscalYear, setFiscalYear, yearsAvail, budgets, notify, flyout = false }: {
   open: boolean
   onClose: () => void
   fiscalYear: number
@@ -127,6 +127,8 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   yearsAvail: number[]
   budgets: BudgetInfo[]
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
+  /** Renders the editor in the report-toolbar flyout instead of a modal. */
+  flyout?: boolean
 }) {
   const [mode, setMode] = useState<'list' | 'edit'>('list')
   const [reportList, setReportList] = useState<ActivityReportListItem[]>([])
@@ -318,11 +320,11 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   if (!open) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal activity-report-modal" onClick={(event) => event.stopPropagation()}>
+    <div className={flyout ? undefined : 'modal-overlay'} onClick={flyout ? undefined : onClose} role={flyout ? undefined : 'dialog'} aria-modal={flyout ? undefined : true}>
+      <div className={flyout ? 'activity-report-flyout' : 'modal activity-report-modal'} onClick={(event) => event.stopPropagation()}>
         <header className="activity-report-modal__header">
           <div>
-            <h2 style={{ margin: 0 }}>Tätigkeitsbericht</h2>
+            {!flyout && <h2 style={{ margin: 0 }}>Tätigkeitsbericht</h2>}
             <p className="helper" style={{ marginTop: 4 }}>
               {mode === 'list'
                 ? 'Vorhandene Berichte verwalten oder einen neuen Bericht für ein Geschäftsjahr anlegen.'
@@ -335,7 +337,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                 Zur Übersicht
               </button>
             )}
-            <button className="btn ghost" onClick={onClose} aria-label="Schließen" type="button">×</button>
+            {!flyout && <button className="btn ghost" onClick={onClose} aria-label="Schließen" type="button">×</button>}
           </div>
         </header>
 

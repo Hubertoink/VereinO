@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.5.0] - 2026-08-29
+
+### Geändert
+
+- Die Oberfläche verwendet eine einheitliche Icon-Bibliothek und überarbeitete, kompaktere Bedienelemente.
+- Navigation, Filter, Modalfenster und Tabellen wurden visuell und ergonomisch vereinheitlicht.
+
 ## [3.3.2] - 2026-08-13
 
 ### Hinzugefügt

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { IconAlertTriangle, IconArrowDown, IconArrowUp, IconCheck, IconFileSpreadsheet, IconFileTypePdf, IconFolderOpen, IconX } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 
 type MemberExportField = 
   | 'memberNo' 
@@ -211,11 +213,7 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
       <div className="modal members-export-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <header className="members-export-header">
           <h2>Mitglieder exportieren</h2>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen" title="Schließen">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-            </svg>
-          </button>
+          <button className="btn ghost" onClick={onClose} aria-label="Schließen" title="Schließen"><AppIcon icon={IconX} size="action" /></button>
         </header>
 
         <div className="members-export-content">
@@ -262,14 +260,14 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
                   onClick={() => setSortDir('ASC')}
                   title="Aufsteigend"
                 >
-                  ↑
+                  <AppIcon icon={IconArrowUp} size="control" />
                 </button>
                 <button 
                   className={`btn members-export-sort-btn ${sortDir === 'DESC' ? 'active' : ''}`}
                   onClick={() => setSortDir('DESC')}
                   title="Absteigend"
                 >
-                  ↓
+                  <AppIcon icon={IconArrowDown} size="control" />
                 </button>
               </div>
             </div>
@@ -346,19 +344,19 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
           {/* Error/Success Messages */}
           {error && (
             <div className="members-export-message members-export-error">
-              ⚠️ {error}
+              <AppIcon icon={IconAlertTriangle} size="inline" /> {error}
             </div>
           )}
           {success && (
             <div className="members-export-message members-export-success">
-              <span>✓ {success}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={IconCheck} size="inline" />{success}</span>
               {exportedPath && (
                 <button 
-                  className="btn btn-small members-export-open-folder"
+                  className="btn btn-small btn-with-icon members-export-open-folder"
                   onClick={() => (window as any).api?.shell?.showItemInFolder?.(exportedPath)}
                   title="Ordner öffnen"
                 >
-                  📂 Öffnen
+                  <AppIcon icon={IconFolderOpen} size="control" />Öffnen
                 </button>
               )}
             </div>
@@ -368,18 +366,18 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
         <footer className="members-export-footer">
           <div className="members-export-actions">
             <button 
-              className="btn members-export-btn-excel" 
+              className="btn btn-with-icon members-export-btn-excel"
               onClick={() => handleExport('XLSX')} 
               disabled={exporting || selectedFields.size === 0}
             >
-              {exporting ? '...' : 'Excel (.xlsx)'}
+              {exporting ? '...' : <><AppIcon icon={IconFileSpreadsheet} size="control" />Excel (.xlsx)</>}
             </button>
             <button 
-              className="btn members-export-btn-pdf" 
+              className="btn btn-with-icon members-export-btn-pdf"
               onClick={() => handleExport('PDF')} 
               disabled={exporting || selectedFields.size === 0}
             >
-              {exporting ? '...' : 'PDF'}
+              {exporting ? '...' : <><AppIcon icon={IconFileTypePdf} size="control" />PDF</>}
             </button>
           </div>
         </footer>

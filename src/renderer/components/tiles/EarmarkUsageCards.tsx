@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { getNavIcon } from '../../utils/navIcons'
+import { IconAlertTriangle, IconBolt, IconCalendar, IconChartBar, IconCheck, IconListDetails, IconLock, IconPencil } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 
 function contrastText(bg?: string | null) {
   if (!bg) return 'var(--text)'
@@ -18,19 +19,16 @@ function contrastText(bg?: string | null) {
 }
 
 // Status colors based on usage percentage
-function getStatusColor(pct: number): { bg: string; text: string; label: string; icon: string } {
-  if (pct >= 100) return { bg: 'rgba(198, 40, 40, 0.15)', text: '#ef5350', label: 'Überschritten', icon: '⚠️' }
-  if (pct >= 80) return { bg: 'rgba(255, 152, 0, 0.15)', text: '#ffa726', label: 'Fast aufgebraucht', icon: '⚡' }
-  if (pct >= 50) return { bg: 'rgba(255, 235, 59, 0.15)', text: '#ffee58', label: 'Zur Hälfte', icon: '📊' }
-  return { bg: 'rgba(76, 175, 80, 0.15)', text: '#66bb6a', label: 'Im Plan', icon: '✓' }
+function getStatusColor(pct: number): { bg: string; text: string; label: string; icon: React.ElementType } {
+  if (pct >= 100) return { bg: 'rgba(198, 40, 40, 0.15)', text: '#ef5350', label: 'Überschritten', icon: IconAlertTriangle }
+  if (pct >= 80) return { bg: 'rgba(255, 152, 0, 0.15)', text: '#ffa726', label: 'Fast aufgebraucht', icon: IconBolt }
+  if (pct >= 50) return { bg: 'rgba(255, 235, 59, 0.15)', text: '#ffee58', label: 'Zur Hälfte', icon: IconChartBar }
+  return { bg: 'rgba(76, 175, 80, 0.15)', text: '#66bb6a', label: 'Im Plan', icon: IconCheck }
 }
 
 function renderLockIcon(color: string) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
+    <span style={{ color, opacity: 0.85 }}><AppIcon icon={IconLock} size="inline" /></span>
   )
 }
 
@@ -158,10 +156,10 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
               {hasBudget && dateRange && <span className="budget-compact-card__period-hint">{dateRange}</span>}
               <div className="budget-compact-card__footer">
                 <button className="budget-compact-card__bookings" onClick={() => onGoToBookings?.(b.id)}>
-                  <span className="budget-compact-card__bookings-icon" aria-hidden="true">{getNavIcon('Buchungen')}</span>
+                  <span className="budget-compact-card__bookings-icon" aria-hidden="true"><AppIcon icon={IconListDetails} size="inline" /></span>
                   <span><strong>Buchungen</strong><small>{totalCount ?? 0} Buchung{totalCount !== 1 ? 'en' : ''}</small></span>
                 </button>
-                {onEdit && <button className="btn btn-edit budget-compact-card__edit" onClick={() => onEdit(b)} title="Bearbeiten">✎</button>}
+                {onEdit && <button className="btn btn-edit budget-compact-card__edit" onClick={() => onEdit(b)} title="Bearbeiten"><AppIcon icon={IconPencil} size="control" /></button>}
               </div>
             </div>
           )
@@ -250,7 +248,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Verbrauch</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: status.text }}>{status.icon} {pct}%</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: status.text, display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={status.icon} size="inline" />{pct}%</span>
                   </div>
                   <div style={{ height: 8, background: 'var(--muted)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ 
@@ -269,30 +267,28 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
               {/* Meta Info */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
                 {dateRange && (
-                  <span>🗓️ {dateRange}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={IconCalendar} size="inline" />{dateRange}</span>
                 )}
                 {totalCount != null && totalCount > 0 && (
-                  <span>📄 {totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={IconListDetails} size="inline" />{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</span>
                 )}
               </div>
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button 
-                  className="btn ghost" 
+                  className="btn ghost btn-with-icon"
                   onClick={() => onGoToBookings?.(b.id)} 
                   style={{ flex: 1, fontSize: 12 }}
                 >
-                  📄 Buchungen
+                  <AppIcon icon={IconListDetails} size="control" />Buchungen
                 </button>
                 {onEdit && (
                   <button 
                     className="btn btn-edit" 
                     onClick={() => onEdit(b)} 
                     title="Bearbeiten"
-                  >
-                    ✎
-                  </button>
+                  ><AppIcon icon={IconPencil} size="control" /></button>
                 )}
               </div>
             </div>

@@ -337,7 +337,7 @@ export function GeneralPane({
             <div className="settings-layout-control settings-nav-visibility-control">
               <div className="settings-layout-label-row">
                 <label>Reiterleiste</label>
-                <span>Bestimme, welche Hauptbereiche in der Navigation sichtbar sind.</span>
+                <span>Bestimme, welche Hauptbereiche in der Navigation dieser Organisation sichtbar sind.</span>
               </div>
               <div className="settings-nav-visibility-grid">
                 {navItems.map((item) => {

@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { IconFilter } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -114,11 +116,7 @@ export default function MetaFilterDropdown({
 
   return (
     <FilterDropdown
-      trigger={
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 4h18v2L14 13v6l-4 2v-8L3 6V4z" />
-        </svg>
-      }
+      trigger={<AppIcon icon={IconFilter} size="action" />}
       title="Filter"
       hasActiveFilters={hasFilters}
       alignRight

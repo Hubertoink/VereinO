@@ -64,7 +64,7 @@ type FiscalBudgetOption = {
   isArchived?: number | null
 }
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport, includeInternalVouchers, setIncludeInternalVouchers }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport, includeInternalVouchers, setIncludeInternalVouchers, flyout = false }: {
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -92,6 +92,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   setIncludeActivityReport?: (v: boolean) => void
   includeInternalVouchers?: boolean
   setIncludeInternalVouchers?: (v: boolean) => void
+  /** Renders the options inside an anchored report-toolbar flyout. */
+  flyout?: boolean
 }) {
   const all: Array<{ key: any; label: string }> = [
     { key: 'date', label: 'Datum' },
@@ -332,13 +334,12 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   const currentYear = new Date().getFullYear()
   const years = availableYears.length > 0 ? availableYears : [currentYear]
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, width: '95vw' }}>
+  const content = (
+      <div className={flyout ? 'export-options-flyout' : 'modal'} onClick={(e) => e.stopPropagation()} style={flyout ? undefined : { maxWidth: 900, width: '95vw' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0 }}>Export Optionen</h2>
+              {!flyout && <h2 style={{ margin: 0 }}>Export Optionen</h2>}
               {(dateFrom || dateTo) && (
                 <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                   <span>📅</span>
@@ -388,14 +389,14 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             )}
           </div>
-          <button
+          {!flyout && <button
             className="btn ghost"
             onClick={onClose}
             aria-label="Schließen"
             style={{ width: 32, height: 32, padding: 0, display: 'grid', placeItems: 'center', fontSize: 18 }}
           >
             ×
-          </button>
+          </button>}
         </header>
 
         {/* Fiscal Year Selection (only for fiscal export) */}
@@ -676,7 +677,6 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </label>
                 ))}
               </div>
-              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Hinweis: Die Auswahl „Tags" gilt nur für CSV/XLSX, nicht für den PDF-Report.</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
               <div className="field" style={{ marginBottom: 0 }}>
@@ -697,7 +697,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           </>
         )}
 
-        <div className="row">
+        <div className={`row${flyout ? ' export-options-flyout__organization' : ''}`}>
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Organisationsname (optional)</label>
             <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
@@ -706,7 +706,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
         {/* Preview Section */}
         {exportType === 'standard' && fields.length > 0 && (
-          <div className="field" style={{ marginTop: 16 }}>
+          <div className="field">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 Vorschau
@@ -823,7 +823,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        <div className={flyout ? 'export-options-flyout__actions' : undefined} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           {exportType === 'fiscal' ? (
             <button
               className="btn"
@@ -890,6 +890,9 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
           )}
         </div>
       </div>
-    </div>
   )
+
+  if (flyout) return content
+
+  return <div className="modal-overlay" onClick={onClose}>{content}</div>
 }

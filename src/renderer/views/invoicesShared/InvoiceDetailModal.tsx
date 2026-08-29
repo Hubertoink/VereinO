@@ -1,6 +1,8 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { IconLock, IconX } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
+import AppIcon from '../../components/common/AppIcon'
 import InvoiceActionMenu from './InvoiceActionMenu'
 import type { InvoiceDetail, InvoiceStatus, InvoiceTagDef } from './types'
 
@@ -33,10 +35,7 @@ function contrastText(bg?: string | null) {
 
 function renderLockIcon(color: string) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
+    <span style={{ color, opacity: 0.85 }}><AppIcon icon={IconLock} size="inline" /></span>
   )
 }
 
@@ -122,7 +121,7 @@ export default function InvoiceDetailModal({
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
             {detail && canEdit && <InvoiceActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
-            <button className="btn ghost" onClick={onClose}>×</button>
+            <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
           </div>
         </div>
         {loading && <div className="helper">Lade Details...</div>}
