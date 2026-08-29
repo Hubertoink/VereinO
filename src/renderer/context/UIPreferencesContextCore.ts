@@ -37,6 +37,8 @@ interface UIPreferencesContextValue {
   setQuickAddAfterSave: (val: QuickAddAfterSave) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (val: BackgroundImage) => void
+  backgroundImageVisibility: number
+  setBackgroundImageVisibility: (val: number) => void
   customBackgroundImage: string | null
   setCustomBackgroundImage: (val: string | null) => void
   glassModals: boolean

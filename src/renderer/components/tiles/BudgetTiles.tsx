@@ -166,7 +166,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
           return (
             <div 
               key={b.id} 
-              className="card" 
+              className="card budget-overview-card"
               style={{ 
                 padding: 0, 
                 overflow: 'hidden',
@@ -197,11 +197,11 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
               <div style={{ padding: '14px 16px' }}>
                 {/* Amount Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                  <div style={{ padding: '8px 10px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #66bb6a' }}>
+                  <div className="budget-overview-metric" style={{ padding: '8px 10px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #66bb6a' }}>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Einnahmen</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: '#66bb6a' }}>{eurFmt.format(inflow)}</div>
                   </div>
-                  <div style={{ padding: '8px 10px', background: 'rgba(239, 83, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef5350' }}>
+                  <div className="budget-overview-metric" style={{ padding: '8px 10px', background: 'rgba(239, 83, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef5350' }}>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Ausgaben</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: '#ef5350' }}>{eurFmt.format(spent)}</div>
                   </div>

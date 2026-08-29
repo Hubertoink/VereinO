@@ -1,6 +1,8 @@
 import React from 'react'
+import { IconPencil, IconTag, IconX } from '@tabler/icons-react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
+import AppIcon from '../../../components/common/AppIcon'
 import { IconTrash } from '../../../utils/icons'
 
 /**
@@ -60,7 +62,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 20 }}>🏷️</span>
+            <AppIcon icon={IconTag} size="control" />
             <strong style={{ fontSize: 16 }}>Tags</strong>
             <span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{tagDefs.length}</span>
           </div>
@@ -73,8 +75,8 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
 
       {/* Tags Grid */}
       {tagDefs.length === 0 ? (
-        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🏷️</div>
+        <div className="tags-empty" style={{ padding: 32, textAlign: 'center' }}>
+          <div className="tags-empty__icon"><AppIcon icon={IconTag} size="hero" /></div>
           <div className="helper">Noch keine Tags vorhanden.</div>
           <div className="helper" style={{ marginTop: 4 }}>Erstelle deinen ersten Tag mit dem Button oben.</div>
         </div>
@@ -86,7 +88,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
             return (
               <div 
                 key={t.id} 
-                className="card"
+                className="tag-management-item"
                 style={{ 
                   padding: '12px 14px', 
                   display: 'flex', 
@@ -132,8 +134,9 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                     className="btn btn-edit" 
                     onClick={() => setEditTag({ id: t.id, name: t.name, color: t.color ?? null })} 
                     title="Bearbeiten"
+                    aria-label={`${t.name} bearbeiten`}
                   >
-                    ✎
+                    <AppIcon icon={IconPencil} size="control" />
                   </button>
                   <button 
                     className="btn ghost btn-trash" 
@@ -164,7 +167,9 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0 }}>Tag löschen</h2>
-              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen">
+                <AppIcon icon={IconX} size="control" />
+              </button>
             </header>
             <div className="helper">
               Möchtest du den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?

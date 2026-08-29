@@ -4063,6 +4063,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         orgId: string
         colorTheme?: string
         backgroundImage?: string
+        backgroundImageVisibility?: number
         customBackgroundImage?: string | null
         glassModals?: boolean
       }
@@ -4071,6 +4072,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       return setOrganizationAppearance(payload.orgId, {
         colorTheme: payload.colorTheme,
         backgroundImage: payload.backgroundImage,
+        backgroundImageVisibility: payload.backgroundImageVisibility,
         customBackgroundImage: payload.customBackgroundImage,
         glassModals: payload.glassModals
       })

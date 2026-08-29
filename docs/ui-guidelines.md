@@ -1,6 +1,6 @@
-# UI mockup für die Vereins-Finanzplaner-App im Zen-Browser-Stil
+# UI-Richtlinie für VereinO
 
-Ein ruhiges, minimalistisches Interface mit klaren Hierarchien, viel Weiß-/Negativraum, sanften Akzenten und dezenten Unschärfen. Fokus: schnelle Erfassung, Übersichtliche Reports, „Calm tech“ statt Reizüberflutung.
+Ein ruhiges, professionelles Interface mit klaren Hierarchien, verlässlicher Lesbarkeit und pragmatischer Dichte. Fokus: schnelle Erfassung und übersichtliche Reports ohne dekorative Verschachtelung.
 
 ## Designleitlinien
 
@@ -10,7 +10,7 @@ Ein ruhiges, minimalistisches Interface mit klaren Hierarchien, viel Weiß-/Nega
 
 - Farbe: Neutrale Flächen mit zartem Akzent; bevorzugt Dark Mode, Light Mode optional.
 
-- Flächen & Tiefe: Subtiles „glassmorphism light“ für Overlays/Panels (leichte Transparenz, Blur 8–12px).
+- Flächen & Tiefe: Normale Inhaltsflächen verwenden Hintergrund und Border ohne Schatten. Schatten und Blur sind auf Modals, Popovers und schwebende Menüs beschränkt.
 
 - Motion: Kurze Ease-Out 150–200 ms, Mikro-Interaktionen; keine Dauer-Animationen.
 
@@ -120,7 +120,7 @@ Ein ruhiges, minimalistisches Interface mit klaren Hierarchien, viel Weiß-/Nega
 
 - Navigation: Sidebar mit kompakten Icons + Labels, aktiv deutlich.
 
-- Karten: Glass-Panel, 12–16px Radius, zarter Border.
+- Karten: 6px Radius, zarter Border, kein Schatten. Karten sind eigenständigen wiederholbaren Objekten vorbehalten.
 
 - Button-Stufen: Primary (accent), Secondary (muted surface), Tertiary (ghost), Destructive.
 
@@ -161,8 +161,10 @@ Quick-Add: Zweispaltig bei Desktop, mobil einspaltig; Primäraktion stets sichtb
   --success: #4cc38a;
   --warning: #f5c451;
   --danger: #f06a6a;
-  --radius: 12px;
-  --shadow-1: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --radius: 6px;
+  --radius-control: 4px;
+  --radius-modal: 8px;
+  --shadow-1: none;
   --blur: saturate(180%) blur(10px);
 }
 ```

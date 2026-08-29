@@ -3,6 +3,8 @@ import TagsEditor from '../TagsEditor'
 import HoverTooltip from '../common/HoverTooltip'
 import PartySelector from '../common/PartySelector'
 import SelectDropdown, { SuggestionInput } from '../common/SelectDropdown'
+import DatePickerButton from '../common/DatePickerButton'
+import BookingKindSwitch from '../booking/BookingKindSwitch'
 import type { QA } from '../../hooks/useQuickAdd'
 import WindowControls from '../layout/WindowControls'
 import { getInternalAssignmentValidationState } from './voucherMetaValidation'
@@ -174,6 +176,7 @@ export default function QuickAddModal({
     onDeleteExistingFile
 }: QuickAddModalProps) {
     const amountInputRef = React.useRef<HTMLInputElement | null>(null)
+    const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
     const aiAssistRef = React.useRef<HTMLDivElement | null>(null)
@@ -289,6 +292,9 @@ export default function QuickAddModal({
         : qa.type === 'INTERNAL'
             ? false
             : !(qa as any).paymentAccountId
+    const hasSameTransferAccount = qa.type === 'TRANSFER'
+        && !!(qa as any).transferFromAccountId
+        && (qa as any).transferFromAccountId === (qa as any).transferToAccountId
     const internalAssignmentValidation = getInternalAssignmentValidationState({
         budgets: budgetsList,
         earmarks: earmarksList,
@@ -296,13 +302,15 @@ export default function QuickAddModal({
         grossAmount: grossAmt,
     })
     const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
-    const saveBlocked = hasOutOfRange || hasInvalidAmount || hasMissingAccount || internalAssignmentBlocked
+    const saveBlocked = hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
     const bookingValidationMessage = footerLeft
         ? null
         : hasInvalidAmount
             ? 'Bitte einen Betrag größer als 0 € eingeben.'
             : hasMissingAccount
                 ? 'Bitte ein Buchungskonto auswählen.'
+                : hasSameTransferAccount
+                    ? 'Quell- und Zielkonto müssen verschieden sein.'
                 : hasOutOfRange
                     ? 'Eine Zuordnung ist für das Buchungsdatum nicht gültig.'
                     : internalAssignmentBlocked
@@ -702,24 +710,18 @@ export default function QuickAddModal({
                     onPointerCancel={endDrag}
                 >
                     <h2>{title || '+ Buchung'}</h2>
-                    <div className="booking-kind-switch" role="group" aria-label="Buchungsart wählen">
-                        {([
-                            ['IN', 'Einnahme'],
-                            ['OUT', 'Ausgabe'],
-                            ['TRANSFER', 'Umbuchung'],
-                            ['INTERNAL', 'Intern']
-                        ] as const).map(([type, label]) => (
-                            <button
-                                key={type}
-                                type="button"
-                                className={`btn booking-kind-switch__button ${qa.type === type ? 'btn-toggle-active' : ''} ${type === 'IN' ? 'btn-type-in' : type === 'OUT' ? 'btn-type-out' : ''}`}
-                                onClick={() => selectBookingType(type)}
-                                aria-pressed={qa.type === type}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
+                    <BookingKindSwitch
+                        className="booking-kind-switch"
+                        value={qa.type}
+                        ariaLabel="Buchungsart wählen"
+                        options={[
+                            { value: 'IN', label: 'Einnahme' },
+                            { value: 'OUT', label: 'Ausgabe' },
+                            { value: 'TRANSFER', label: 'Umbuchung' },
+                            { value: 'INTERNAL', label: 'Intern' }
+                        ]}
+                        onChange={(value) => selectBookingType(value as QA['type'])}
+                    />
                     <div className="booking-modal-header-actions">
                         {onDetach && (
                             <button className="btn ghost booking-modal-icon-btn" type="button" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
@@ -770,7 +772,7 @@ export default function QuickAddModal({
                     onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) handleSave(); }}
                 >
                     {/* Live Summary */}
-                    <div className={`card summary-card booking-ai-summary ${aiSuggestions.length ? 'booking-ai-summary--active' : ''}`}>
+                    <div className={`summary-card booking-ai-summary ${aiSuggestions.length ? 'booking-ai-summary--active' : ''}`}>
                         <div className="booking-ai-summary__main">
                             <div className="summary-text-bold">
                                 {(() => {
@@ -992,12 +994,15 @@ export default function QuickAddModal({
                     {/* Blocks A+B in a side-by-side grid on wide screens */}
                     <div className="block-grid block-grid-mb booking-primary-grid">
                         {/* Block A – Basisinfos */}
-                        <div className="card form-card">
+                        <div className="form-card">
                             <div className="helper helper-mb">Basis</div>
                             <div className="row booking-basis-fields">
                                 <div className={`field booking-floating-field${qa.date ? ' booking-floating-field--filled' : ''}`}>
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                    <input id="quick-add-date" className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
+                                    <span className="booking-date-input-wrap">
+                                        <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
+                                        <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
+                                    </span>
                                 </div>
                                 {primaryClassification?.profile === 'GENERAL' ? (
                                     <div className="field booking-floating-field booking-floating-field--filled">
@@ -1057,10 +1062,13 @@ export default function QuickAddModal({
                                     </div>
                                 )}
                                 {qa.type === 'TRANSFER' ? (
-                                    <div className="field field-full-width">
-                                        <label>Kontotransfer <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                        <div className="flex gap-8">
+                                    <div className="field field-full-width booking-transfer-field">
+                                        <div className="booking-transfer-row">
+                                            <div className="field booking-floating-field booking-floating-field--filled">
+                                                <label htmlFor="quick-add-transfer-from">Von Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <SelectDropdown
+                                                id="quick-add-transfer-from"
+                                                invalid={hasSameTransferAccount}
                                                 value={String((qa as any).transferFromAccountId ?? '')}
                                                 placeholder="Von Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color || undefined }}
@@ -1076,9 +1084,20 @@ export default function QuickAddModal({
                                                     } as any)
                                                 }}
                                                 ariaLabel="Transfer von Konto"
-                                                options={activePaymentAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))}
+                                                options={activePaymentAccounts.map((account) => ({
+                                                    value: String(account.id),
+                                                    label: account.name,
+                                                    color: account.color || undefined,
+                                                    disabled: account.id === (qa as any).transferToAccountId
+                                                }))}
                                             />
+                                            </div>
+                                            <span className="booking-transfer-arrow" aria-hidden="true">→</span>
+                                            <div className="field booking-floating-field booking-floating-field--filled">
+                                                <label htmlFor="quick-add-transfer-to">Nach Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <SelectDropdown
+                                                id="quick-add-transfer-to"
+                                                invalid={hasSameTransferAccount}
                                                 value={String((qa as any).transferToAccountId ?? '')}
                                                 placeholder="Nach Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.color || undefined }}
@@ -1094,8 +1113,14 @@ export default function QuickAddModal({
                                                     } as any)
                                                 }}
                                                 ariaLabel="Transfer nach Konto"
-                                                options={activePaymentAccounts.map((account) => ({ value: String(account.id), label: account.name, color: account.color || undefined }))}
+                                                options={activePaymentAccounts.map((account) => ({
+                                                    value: String(account.id),
+                                                    label: account.name,
+                                                    color: account.color || undefined,
+                                                    disabled: account.id === (qa as any).transferFromAccountId
+                                                }))}
                                             />
+                                            </div>
                                         </div>
                                     </div>
                                 ) : qa.type === 'INTERNAL' ? (
@@ -1130,7 +1155,7 @@ export default function QuickAddModal({
                         </div>
 
                         {/* Block B – Finanzdetails */}
-                        <div className="card form-card card-finance" style={{ '--booking-account-color': financeAccountColor || 'var(--accent)' } as React.CSSProperties}>
+                        <div className="form-card card-finance" style={{ '--booking-account-color': financeAccountColor || 'var(--accent)' } as React.CSSProperties}>
                             <div className="helper helper-mb">Finanzen</div>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
@@ -1241,7 +1266,7 @@ export default function QuickAddModal({
                         </div>
                     </div>
 
-                    <div className="card form-card booking-description-card">
+                    <div className="form-card booking-description-card">
                         <div className="field field-full-width booking-floating-field booking-floating-field--filled">
                             <label htmlFor="quick-add-description">Beschreibung</label>
                             <SuggestionInput
@@ -1254,7 +1279,7 @@ export default function QuickAddModal({
                         </div>
                     </div>
 
-                    <div className={`card form-card booking-assignments-card${qa.type === 'INTERNAL' ? ' booking-assignments-card--required' : ''}`}>
+                    <div className={`form-card booking-assignments-card${qa.type === 'INTERNAL' ? ' booking-assignments-card--required' : ''}`}>
                         <div className="booking-section-heading">
                             <div>
                                 <strong>Zuordnungen</strong>
@@ -1487,7 +1512,7 @@ export default function QuickAddModal({
                         </div>
 
                     <div className="block-grid block-grid-mb booking-secondary-grid">
-                        <div className="card form-card booking-optional-card">
+                        <div className="form-card booking-optional-card">
                             <details className="booking-details">
                                 <summary>
                                     <span className="booking-details__heading">
@@ -1550,7 +1575,7 @@ export default function QuickAddModal({
                         </div>
 
                         <div
-                            className="card attachment-card"
+                            className="attachment-card"
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropFiles(e.dataTransfer?.files) }}
                         >

@@ -3298,7 +3298,7 @@ table {
 .journal-table .btn-edit:focus-visible {
   background: color-mix(in oklab, var(--accent) 24%, var(--surface));
   color: var(--accent);
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--accent) 24%, transparent);
+  box-shadow: none;
   outline: 1px solid color-mix(in oklab, var(--accent) 60%, transparent);
 }
 
@@ -3809,6 +3809,21 @@ svg text {
   overflow: auto;
   -webkit-app-region: no-drag;
   animation: modalSlideUp 0.25s ease-out;
+}
+
+.modal :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea, .input) {
+  background: var(--field-surface);
+  border-color: var(--field-border);
+}
+
+.modal :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea, .input):hover {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--border));
+}
+
+.modal :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea, .input):focus {
+  background: color-mix(in oklab, var(--surface) 70%, var(--accent) 30%);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
 }
 
 .activity-report-modal {
@@ -5951,7 +5966,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
   min-width: 220px;
   max-width: 320px;
   padding: 10px 10px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-modal);
   border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
   background: color-mix(in oklab, var(--surface) 92%, #000 0%);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
@@ -7801,8 +7816,8 @@ body.detached-quick-add-body .local-invoice-scan__header select {
 
 /* Match the slightly raised, more legible fields of the booking form. */
 .local-invoice-scan {
-  --booking-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
-  --booking-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+  --booking-field-bg: var(--field-surface);
+  --booking-field-border: var(--field-border);
 }
 
 .local-invoice-scan :is(.input, select, textarea) {
@@ -8879,7 +8894,7 @@ body:has(.local-invoice-scan) .app-main {
 /* Rich tooltip modal (used for FilterTotals hover cards, etc.) */
 .tooltip-modal {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-modal);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -9321,6 +9336,51 @@ label .req-asterisk {
 .submissions-table-card {
   min-width: 0;
   overflow: hidden;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  box-shadow: none;
+}
+
+.submissions-summary-card {
+  border-radius: 0;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.submissions-summary-card:hover {
+  transform: none;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.receipts-container {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.receipts-container > :first-child {
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--border);
+}
+
+.receipts-container table {
+  border-collapse: collapse;
+}
+
+.receipts-container th,
+.receipts-container td {
+  border-bottom: 1px solid var(--table-row-sep, var(--border));
+  padding: 8px 10px;
+}
+
+.receipts-container tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.receipts-empty {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .submissions-table-scroll {
@@ -10537,6 +10597,7 @@ button.dashboard-task-strip__item:hover {
 }
 
 .booking-kind-switch {
+  --compact-booking-tone: var(--booking-header-tone, var(--accent));
   display: grid;
   grid-template-columns: repeat(4, minmax(88px, 1fr));
   gap: 4px;
@@ -10545,7 +10606,7 @@ button.dashboard-task-strip__item:hover {
   -webkit-app-region: no-drag;
 }
 
-.booking-kind-switch__button {
+.booking-kind-switch .compact-booking-kind__button {
   min-width: 0;
   min-height: 32px;
   padding: 5px 10px;
@@ -10866,6 +10927,15 @@ button.dashboard-task-strip__item:hover {
   gap: 10px;
   padding: 12px 14px;
   border-left: 4px solid var(--account-color);
+  border-radius: 0;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.payment-account-card:hover {
+  transform: none;
+  box-shadow: none;
+  background: color-mix(in oklab, var(--account-color) 8%, var(--surface));
 }
 
 .payment-account-card__main {
@@ -11204,6 +11274,7 @@ button.dashboard-task-strip__item:hover {
 /* ========== Members View ========== */
 .members-header {
   padding: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .members-header-top {
@@ -11251,6 +11322,8 @@ button.dashboard-task-strip__item:hover {
 
 .members-board-card {
   margin-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .members-board-header {
@@ -11309,6 +11382,11 @@ button.dashboard-task-strip__item:hover {
 .members-table {
   margin-top: 8px;
   width: 100%;
+}
+
+.members-board-table tbody tr:hover,
+.members-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
 }
 
 .members-sort-header {
@@ -11532,7 +11610,7 @@ html[data-background-image]:not([data-background-image='none'])::before {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0.25;
+  opacity: var(--background-image-opacity, 0.25);
   pointer-events: none;
 }
 
@@ -11556,7 +11634,6 @@ html[data-background-image='mountain-snow']::before {
 
 html[data-background-image='niko-bg']::before {
   background-image: var(--niko-background-image);
-  opacity: 0.3;
 }
 
 html[data-background-image='custom']::before {
@@ -11586,6 +11663,7 @@ html[data-glass-modals='true'] .modal-content {
   gap: 10px;
   align-items: center;
   padding: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .parties-toolbar__check {
@@ -11598,6 +11676,7 @@ html[data-glass-modals='true'] .modal-content {
 .parties-table-wrap {
   overflow-x: auto;
   padding: 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .parties-table {
@@ -11617,6 +11696,10 @@ html[data-glass-modals='true'] .modal-content {
 
 .parties-table td > .chip + .chip {
   margin-left: 6px;
+}
+
+.parties-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
 }
 
 .parties-table tbody tr.is-archived {
@@ -11642,6 +11725,8 @@ html[data-glass-modals='true'] .modal-content {
   padding: 24px;
   text-align: center;
   color: var(--muted);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .party-editor-overlay {
@@ -11649,7 +11734,7 @@ html[data-glass-modals='true'] .modal-content {
 }
 
 .party-editor-modal {
-  width: min(820px, calc(100vw - 28px));
+  width: min(900px, calc(100vw - 28px));
   max-height: min(820px, calc(100vh - 40px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -11676,7 +11761,8 @@ html[data-glass-modals='true'] .modal-content {
 
 .party-editor-modal__body {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
   padding: 16px 18px;
   overflow-y: auto;
 }
@@ -11686,10 +11772,39 @@ html[data-glass-modals='true'] .modal-content {
   border-top: 1px solid var(--border);
 }
 
+.party-editor-modal__close {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+.party-editor-section {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.party-editor-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.party-editor-section:nth-of-type(3) {
+  grid-column: 1 / -1;
+}
+
 .party-editor-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .party-editor-grid__wide {
@@ -11700,8 +11815,18 @@ html[data-glass-modals='true'] .modal-content {
   grid-column: 1 / -1;
 }
 
+.party-editor-section:nth-of-type(3) .party-editor-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.party-editor-modal__body > .party-floating-field,
+.party-editor-modal__body > .error-text {
+  grid-column: 1 / -1;
+}
+
 .party-editor-modal {
-  --party-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
+  --party-field-bg: var(--field-surface);
+  --party-field-border: var(--field-border);
   --party-field-focus-bg: color-mix(in oklab, var(--party-field-bg) 92%, var(--accent) 8%);
 }
 
@@ -11751,6 +11876,7 @@ html[data-glass-modals='true'] .modal-content {
   padding-top: 16px;
   padding-bottom: 4px;
   background: var(--party-field-bg);
+  border-color: var(--party-field-border);
 }
 
 .party-floating-field--textarea > .input {
@@ -12335,13 +12461,19 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
 
 @media (max-width: 760px) {
   .parties-toolbar,
+  .party-editor-modal__body,
   .party-editor-grid {
     grid-template-columns: 1fr;
   }
 
+  .party-editor-section:nth-of-type(3),
   .party-editor-grid__wide,
   .party-editor-grid__full {
     grid-column: auto;
+  }
+
+  .party-editor-section:nth-of-type(3) .party-editor-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -12857,6 +12989,50 @@ html[data-glass-modals='true'] .flyout-arrow {
   font-weight: 500;
   color: var(--text);
   text-align: center;
+}
+
+.background-visibility-field {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: color-mix(in oklab, var(--surface-alt) 50%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.background-visibility-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.background-visibility-heading label {
+  margin: 0;
+  font-weight: 500;
+}
+
+.background-visibility-heading output {
+  min-width: 48px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+
+.background-visibility-slider {
+  width: 100%;
+  margin: 10px 0 6px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.background-visibility-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.background-visibility-field .helper {
+  margin: 0;
 }
 
 /* Overlay icons on custom background card */
@@ -13640,8 +13816,8 @@ html[data-glass-modals='true'] .flyout-arrow {
   align-items: center;
   gap: 9px;
   padding: 7px 12px;
-  border-radius: 8px;
-  background: var(--surface-alt);
+  border-radius: 0;
+  background: var(--surface-alt, var(--surface));
   border: 1px solid var(--border);
   min-width: 140px;
   flex: 1;
@@ -13691,7 +13867,7 @@ button.filter-totals-stat {
   max-height: min(420px, 58vh);
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-modal);
   background: var(--surface);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
 }
@@ -13702,7 +13878,11 @@ button.filter-totals-stat {
 .filter-totals-recent-popover__header span { color: var(--text-dim); font-size: 11px; }
 .filter-totals-recent-popover__list { max-height: min(360px, 50vh); overflow: auto; }
 .filter-totals-recent-row { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; align-items: center; gap: 9px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid color-mix(in oklab, var(--border) 72%, transparent); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.filter-totals-recent-row:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.filter-totals-recent-row:hover,
+.filter-totals-recent-row:focus-visible {
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  outline: none;
+}
 .filter-totals-recent-row__date { color: var(--text-dim); font-size: 11px; }
 .filter-totals-recent-row__description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .filter-totals-recent-row strong { font-size: 12px; }
@@ -15261,7 +15441,14 @@ button.filter-totals-stat {
 /* Vorschüsse (MVP) */
 .advances-page {
   display: grid;
+  align-content: start;
   gap: 12px;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
 }
 
 .advances-header {
@@ -15274,11 +15461,19 @@ button.filter-totals-stat {
 .advances-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .advances-summary-card {
-  padding: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--muted) 6%);
+}
+
+.advances-summary-card + .advances-summary-card {
+  border-left: 1px solid var(--border);
 }
 
 .advances-summary-value {
@@ -15286,11 +15481,41 @@ button.filter-totals-stat {
   font-size: 20px;
 }
 
+.advances-overview,
+.advances-workspace {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.advances-section-header {
+  min-height: 36px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.advances-section-header h2,
+.advances-section-header p {
+  margin: 0;
+}
+
+.advances-section-header h2 {
+  font-size: 15px;
+}
+
+.advances-section-header--list {
+  padding-top: 4px;
+}
+
 .advances-layout {
   display: grid;
   grid-template-columns: minmax(360px, 420px) 1fr;
   gap: 12px;
   align-items: start;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .advances-list-card,
@@ -15298,6 +15523,11 @@ button.filter-totals-stat {
   padding: 12px;
   display: grid;
   gap: 10px;
+  background: color-mix(in oklab, var(--surface) 94%, var(--muted) 6%);
+}
+
+.advances-detail-card {
+  border-left: 1px solid var(--border);
 }
 
 .advances-toolbar {
@@ -15308,8 +15538,8 @@ button.filter-totals-stat {
 
 .advances-list-table-wrap {
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .advances-list-table {
@@ -15322,6 +15552,10 @@ button.filter-totals-stat {
 
 .advances-row-active {
   background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.advances-list-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
 }
 
 .advances-status {
@@ -15365,9 +15599,9 @@ button.filter-totals-stat {
 }
 
 .advances-detail-kpis > div {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
   padding: 10px;
   transition:
     border-color 0.2s,
@@ -15409,11 +15643,21 @@ button.filter-totals-stat {
   .advances-layout {
     grid-template-columns: 1fr;
   }
+
+  .advances-detail-card {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 720px) {
   .advances-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .advances-summary-card + .advances-summary-card {
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -16035,6 +16279,11 @@ button.filter-totals-stat {
   color: var(--text);
 }
 
+.bank-import-container > .bank-page-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
 .bank-import-page {
   display: grid;
   gap: 14px;
@@ -16220,7 +16469,7 @@ button.filter-totals-stat {
   min-height: 26px;
   padding: 4px 9px 4px 6px;
   border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border));
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--warning) 10%, transparent);
   color: var(--text);
   cursor: help;
@@ -16254,7 +16503,7 @@ button.filter-totals-stat {
   gap: 4px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-modal);
   background: var(--surface);
   box-shadow: var(--shadow);
   color: var(--text);
@@ -16313,7 +16562,7 @@ button.filter-totals-stat {
   width: 28px;
   height: 28px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   color: var(--text-dim);
 }
 
@@ -16421,7 +16670,7 @@ button.filter-totals-stat {
   gap: 6px;
   padding: 18px 14px;
   border: 1.5px dashed color-mix(in oklab, var(--accent) 48%, var(--border));
-  border-radius: 14px;
+  border-radius: var(--radius-surface);
   background: color-mix(in oklab, var(--accent) 5%, transparent);
   color: var(--text);
   font: inherit;
@@ -16437,7 +16686,7 @@ button.filter-totals-stat {
 .bank-import-action-dropzone.is-dragging {
   border-color: var(--accent);
   background: color-mix(in oklab, var(--accent) 11%, transparent);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .bank-import-action-dropzone > span:not(.bank-import-action-dropzone__icon) {
@@ -16472,17 +16721,20 @@ button.filter-totals-stat {
 .bank-status-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: 8px;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .bank-status-tabs button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
   padding: 11px 14px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  background: var(--surface-alt, var(--surface));
   color: var(--text);
   font: inherit;
   cursor: pointer;
@@ -16491,6 +16743,12 @@ button.filter-totals-stat {
 .bank-status-tabs button.active {
   border-color: var(--accent);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.bank-status-tabs button:hover,
+.bank-status-tabs button:focus-visible {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  outline: none;
 }
 
 .bank-status-tabs button strong {
@@ -16505,7 +16763,7 @@ button.filter-totals-stat {
 .bank-action-card,
 .bank-resolution-card {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-surface);
   background: color-mix(in srgb, var(--surface) 98%, transparent);
   color: var(--text);
 }
@@ -16566,7 +16824,7 @@ button.filter-totals-stat {
 
 .bank-table tbody tr[tabindex]:hover,
 .bank-table tbody tr[tabindex]:focus {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
   outline: none;
 }
 
@@ -17016,6 +17274,66 @@ button.filter-totals-stat {
 
 .bank-resolution-card small {
   color: var(--text-dim);
+}
+
+/* Bank import dialogs use the modal as their only outer surface. */
+.bank-import-modal .bank-import-drop {
+  border-radius: var(--radius-surface);
+}
+
+.bank-import-modal .bank-import-summary,
+.bank-import-modal .bank-mapping-card,
+.bank-review-modal .bank-detail-card,
+.bank-review-modal .bank-review-section,
+.bank-review-modal .bank-resolution-card,
+.bank-ai-suggestion-modal .bank-ai-suggestion-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bank-import-modal .bank-import-summary,
+.bank-import-modal .bank-mapping-card,
+.bank-review-modal .bank-detail-card,
+.bank-review-modal .bank-review-section,
+.bank-review-modal .bank-resolution-card {
+  padding-left: 0;
+  padding-right: 0;
+  border-top: 1px solid var(--border);
+}
+
+.bank-import-modal .bank-import-summary {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.bank-import-modal .bank-mapping-card,
+.bank-review-modal .bank-detail-card,
+.bank-review-modal .bank-review-section,
+.bank-review-modal .bank-resolution-card {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.bank-import-modal .bank-preview-table-wrap {
+  border-radius: var(--radius-control);
+}
+
+.bank-review-modal .bank-review-layout {
+  gap: 0;
+}
+
+.bank-review-modal .bank-detail-card {
+  border-bottom: 1px solid var(--border);
+}
+
+.bank-review-modal .bank-resolution-card {
+  border-bottom: 1px solid var(--border);
+}
+
+.bank-import-modal .bank-import-ai-option {
+  border-radius: var(--radius-surface);
 }
 
 .bank-voucher-link {
@@ -17496,8 +17814,11 @@ button.filter-totals-stat {
   min-height: 58px;
   padding: 8px 10px 7px 13px;
   overflow: hidden;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--surface) 96%, var(--text) 4%), var(--surface));
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--text) 6%, transparent);
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-alt, var(--surface));
+  box-shadow: none;
+  transition: background 140ms ease;
 }
 
 .recurring-summary-card::before {
@@ -17534,7 +17855,12 @@ button.filter-totals-stat {
 
 .recurring-summary-card.is-due {
   border-color: color-mix(in oklab, var(--warning) 58%, var(--border));
-  background: linear-gradient(135deg, color-mix(in oklab, var(--surface) 84%, var(--warning) 16%), var(--surface));
+  background: color-mix(in oklab, var(--warning) 10%, var(--surface));
+}
+
+.recurring-summary-card:hover,
+.recurring-summary-card:focus-within {
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
 }
 
 .recurring-summary-card.is-due strong {
@@ -17551,7 +17877,7 @@ button.filter-totals-stat {
 .recurring-table-card {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-surface);
   background: color-mix(in oklab, var(--surface) 90%, transparent);
 }
 
@@ -17603,7 +17929,7 @@ button.filter-totals-stat {
   display: inline-flex;
   margin-left: 7px;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   color: var(--warning);
   background: color-mix(in oklab, var(--warning) 16%, transparent);
   font-size: 10px;
@@ -17616,7 +17942,7 @@ button.filter-totals-stat {
   margin-top: 5px;
   padding: 2px 7px;
   border: 1px solid color-mix(in oklab, var(--success) 42%, var(--border));
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   color: var(--success);
   font-size: 11px;
   font-weight: 700;
@@ -17627,7 +17953,7 @@ button.filter-totals-stat {
   display: inline-flex;
   padding: 3px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   font-size: 11px;
 }
 
@@ -17662,6 +17988,14 @@ button.filter-totals-stat {
   color: var(--accent);
   border-color: color-mix(in oklab, var(--accent) 48%, var(--border));
   background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+}
+
+.recurring-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.recurring-table tbody tr.recurring-row-due:hover {
+  background: color-mix(in oklab, var(--warning) 14%, var(--surface));
 }
 
 .recurring-confirm-modal {
@@ -17872,8 +18206,8 @@ button.filter-totals-stat {
 
 /* Booking fields need a distinct visual layer above their surrounding cards. */
 .quick-add-modal {
-  --booking-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
-  --booking-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+  --booking-field-bg: var(--field-surface);
+  --booking-field-border: var(--field-border);
 }
 
 .quick-add-modal :is(.input, select, textarea) {
@@ -17895,7 +18229,9 @@ button.filter-totals-stat {
   outline: none;
   border-color: var(--accent);
   background: var(--booking-field-bg);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent),
+    0 0 0 2px color-mix(in oklab, var(--accent) 24%, transparent);
 }
 
 .quick-add-modal :is(.input, select, textarea).input-error {
@@ -18117,6 +18453,11 @@ button.filter-totals-stat {
   --booking-floating-label-notch: 62px;
 }
 
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-transfer-from']),
+.quick-add-modal .booking-floating-field:has(> label[for='quick-add-transfer-to']) {
+  --booking-floating-label-notch: 88px;
+}
+
 .quick-add-modal .booking-floating-field:has(> label[for='quick-add-vat-rate']) {
   --booking-floating-label-notch: 48px;
 }
@@ -18220,6 +18561,21 @@ button.filter-totals-stat {
 
 .quick-add-modal .finance-amount-highlight .flex-gap-8 {
   align-items: center;
+}
+
+.booking-transfer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.booking-transfer-arrow {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
 }
 
 .quick-add-modal .finance-amount-highlight .flex-gap-8 > select,
@@ -18334,10 +18690,394 @@ button.filter-totals-stat {
   opacity: 0.72;
 }
 
+:root {
+  --radius: 6px;
+  --radius-control: 4px;
+  --radius-surface: 6px;
+  --radius-modal: 8px;
+  --radius-full: 999px;
+  --shadow-surface: none;
+  --shadow-overlay: 0 16px 40px rgba(0, 0, 0, 0.32);
+  --field-surface: color-mix(in oklab, var(--surface) 40%, var(--muted) 60%);
+  --field-border: color-mix(in oklab, var(--border) 55%, var(--text-dim) 45%);
+}
+
+html[data-background-image]:not([data-background-image='none']) .app-main {
+  background: color-mix(in oklab, var(--bg) var(--background-surface-opacity, 92%), transparent);
+}
+
+.card {
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-surface);
+}
+
+.btn,
+.input,
+select,
+textarea {
+  border-radius: var(--radius-control);
+}
+
+.badge {
+  border-radius: var(--radius-control);
+}
+
+.modal {
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-overlay);
+}
+
+.party-selector__menu,
+.select-dropdown__menu,
+.filter-dropdown__panel,
+.flyout-popover,
+.bank-action-menu__popover,
+.invoice-action-menu {
+  border-radius: var(--radius-modal);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+}
+
+.settings-content,
+.settings-nav-shell {
+  border-radius: var(--radius-surface);
+  box-shadow: none;
+}
+
+.settings-pane-card {
+  box-shadow: none;
+}
+
+.journal-view .journal-filter-toolbar {
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.journal-view .filter-totals-stats {
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-inline-start: 1px solid var(--border);
+  border-inline-end: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.journal-view .filter-totals-stat {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface-alt, var(--surface));
+  box-shadow: none;
+}
+
+.journal-view .filter-totals-stat--in {
+  border-inline-start: 3px solid var(--success);
+}
+
+.journal-view .filter-totals-stat--diff {
+  border-inline-end: 3px solid var(--success);
+}
+
+.journal-view .filter-totals-stat--diff.negative {
+  border-inline-end-color: var(--danger);
+}
+
+.journal-view .filter-totals-divider {
+  flex: 0 0 34px;
+  min-height: 44px;
+  padding: 0;
+  border-inline: 1px solid var(--border);
+  background: var(--surface-alt, var(--surface));
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.journal-view .filter-totals-divider span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.journal-view .filter-totals-stat + .filter-totals-stat {
+  border-left: 1px solid var(--border);
+}
+
+.journal-view .filter-totals-stat:hover {
+  transform: none;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  box-shadow: none;
+}
+
+.journal-view .filter-totals-stat:focus-visible {
+  outline: 1px solid color-mix(in oklab, var(--accent) 68%, var(--border));
+  outline-offset: -1px;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.journal-view .filter-totals-sphere-badge:hover,
+.journal-view .filter-totals-sphere-badge:focus-visible {
+  transform: none;
+  box-shadow: none;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.journal-view .filter-totals-stat__icon {
+  border-radius: var(--radius-control);
+}
+
+.journal-view .journal-table-card {
+  border-radius: var(--radius-surface);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.quick-add-modal .summary-card.booking-ai-summary,
+.quick-add-modal .form-card,
+.quick-add-modal .attachment-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.quick-add-modal .summary-card.booking-ai-summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.quick-add-modal .booking-primary-grid,
+.quick-add-modal .booking-secondary-grid {
+  gap: 0;
+}
+
+.quick-add-modal .booking-primary-grid > .form-card,
+.quick-add-modal .booking-secondary-grid > * {
+  padding: 12px 0;
+}
+
+.quick-add-modal .booking-primary-grid > .form-card + .form-card,
+.quick-add-modal .booking-secondary-grid > * + * {
+  border-left: 1px solid var(--border);
+  padding-left: 14px;
+}
+
+.dashboard-card {
+  padding: 14px 16px;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.dashboard-card .dashboard-header {
+  padding-bottom: 14px;
+}
+
+.dashboard-card .dashboard-task-strip {
+  margin-bottom: 14px;
+  border-radius: var(--radius-surface);
+  box-shadow: none;
+}
+
+.dashboard-card .dashboard-task-strip__item {
+  border-radius: var(--radius-control);
+}
+
+.dashboard-card .dashboard-grid-auto {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-card .dashboard-period-row {
+  grid-column: 1 / -1;
+  min-height: 42px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.dashboard-card .dashboard-metric-strip,
+.dashboard-card .dashboard-grid-wide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-card .dashboard-metric {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: var(--surface-alt, var(--surface));
+}
+
+.dashboard-card .dashboard-metric + .dashboard-metric {
+  border-left-color: var(--border);
+}
+
+.dashboard-card .dashboard-metric--success {
+  border-left-color: var(--success);
+}
+
+.dashboard-card .dashboard-metric--danger {
+  border-left-color: var(--danger);
+}
+
+.dashboard-card .dashboard-metric--warning {
+  border-left-color: var(--warning);
+}
+
+.dashboard-card .dashboard-metric--accent {
+  border-left-color: var(--accent);
+}
+
+.dashboard-card .dashboard-section {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.dashboard-card .dashboard-section > .chart-header-baseline {
+  margin-bottom: 8px;
+}
+
+.dashboard-card .chart-card-overflow,
+.dashboard-card .dashboard-dither-chart,
+.dashboard-card .dither-chart-card {
+  padding: 14px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-card .dashboard-chart-stack {
+  gap: 0;
+}
+
+@media (max-width: 740px) {
+  .dashboard-card {
+    padding: 12px;
+  }
+
+  .dashboard-card .dashboard-grid-auto {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-card .dashboard-period-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+.settings-content {
+  border-radius: var(--radius-surface);
+  box-shadow: none;
+}
+
+.settings-nav-shell {
+  padding: 8px 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-content .settings-pane {
+  gap: 0;
+}
+
+.settings-content .settings-pane-card {
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-content .settings-pane-card + .settings-pane-card {
+  padding-top: 16px;
+}
+
+.settings-content .settings-layout-panel,
+.settings-content .settings-layout-control,
+.settings-content .settings-toggle-card {
+  border-radius: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-content .settings-layout-panel {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-content .settings-layout-control,
+.settings-content .settings-toggle-card {
+  min-height: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-content .settings-layout-grid {
+  gap: 0 16px;
+}
+
+.quick-add-modal .booking-description-card,
+.quick-add-modal .booking-assignments-card,
+.quick-add-modal .booking-secondary-grid {
+  border-top: 1px solid var(--border);
+}
+
+.quick-add-modal .attachment-card {
+  padding-right: 0;
+}
+
+.quick-add-modal .quick-add-dropzone {
+  border-radius: var(--radius-control);
+}
+
+@media (max-width: 700px) {
+  .journal-view .filter-totals-stat {
+    flex-basis: 100%;
+  }
+
+  .journal-view .filter-totals-stat + .filter-totals-stat {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .quick-add-modal .booking-primary-grid > .form-card + .form-card,
+  .quick-add-modal .booking-secondary-grid > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+  }
+}
+
 /* Shared floating-label treatment for advances, budgets and earmarks. */
 .standard-floating-modal {
-  --standard-field-bg: color-mix(in oklab, var(--surface) 93%, var(--text) 7%);
-  --standard-field-border: color-mix(in oklab, var(--border) 66%, var(--text-dim) 34%);
+  --standard-field-bg: var(--field-surface);
+  --standard-field-border: var(--field-border);
   --standard-field-focus-bg: color-mix(in oklab, var(--standard-field-bg) 92%, var(--accent) 8%);
 }
 
@@ -18796,4 +19536,192 @@ button.filter-totals-stat {
 .compact-booking-popup .booking-section-heading .helper {
   font-size: 10px;
   line-height: 1.3;
+}
+
+.budget-management-surface,
+.earmark-management-surface {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-management-surface > table,
+.earmark-management-surface > table {
+  border-collapse: collapse;
+}
+
+.budget-management-surface > table th,
+.budget-management-surface > table td,
+.earmark-management-surface > table th,
+.earmark-management-surface > table td {
+  border-bottom: 1px solid var(--table-row-sep, var(--border));
+  padding: 8px 10px;
+}
+
+.budget-management-surface > table tbody tr:hover,
+.earmark-management-surface > table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+.budget-compact-card,
+.budget-overview-card {
+  border-radius: 0;
+  box-shadow: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.budget-compact-card:hover,
+.budget-overview-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.budget-compact-card__stats,
+.budget-compact-card__detail-panel {
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.budget-compact-card__stats {
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-compact-card__edit {
+  border-radius: var(--radius-control);
+}
+
+.budget-overview-card > div:not(:first-child) {
+  background: transparent !important;
+}
+
+.budget-overview-metric {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.invoices-container > .invoices-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoices-table tbody tr:hover,
+.invoices-table tbody tr:focus-within {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+}
+
+/* Phase 4: data-heavy pages need an opaque reading layer even when the
+   optional application background image is enabled. */
+.app-main table {
+  --page-table-body: color-mix(in oklab, var(--surface) 96%, var(--bg));
+  --page-table-alt: color-mix(in oklab, var(--surface) 90%, var(--bg));
+  --page-table-head: color-mix(in oklab, var(--surface) 84%, var(--text) 16%);
+  --page-table-hover: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  background: var(--page-table-body);
+}
+
+.app-main table thead,
+.app-main table thead tr,
+.app-main table thead th {
+  background: var(--page-table-head);
+}
+
+.app-main table tbody tr {
+  background-color: var(--page-table-body);
+}
+
+.app-main table tbody tr:nth-child(even) {
+  background-color: var(--page-table-alt);
+}
+
+.app-main table tbody tr:hover,
+.app-main table tbody tr:focus-within,
+.app-main table tbody tr:nth-child(even):hover,
+.app-main table tbody tr:nth-child(even):focus-within {
+  background-color: var(--page-table-hover) !important;
+}
+
+.app-main table.advances-list-table tbody tr.advances-row-active,
+.app-main table.advances-list-table tbody tr.advances-row-active:nth-child(even) {
+  background-color: color-mix(in oklab, var(--accent) 18%, var(--surface)) !important;
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.app-main table.advances-list-table tbody tr.advances-row-active:hover,
+.app-main table.advances-list-table tbody tr.advances-row-active:focus-within {
+  background-color: color-mix(in oklab, var(--accent) 23%, var(--surface)) !important;
+}
+
+.app-main :is(
+  .journal-table-scroll-wrapper,
+  .invoices-table-scroll-wrapper,
+  .bank-table-card,
+  .recurring-table-scroll,
+  .members-table-scroll-wrapper,
+  .members-board-table-scroll-wrapper,
+  .submissions-table-scroll,
+  .parties-table-wrap,
+  .ai-pattern-table-wrap
+) {
+  background: var(--surface);
+}
+
+/* Modal and popover radius contract: outer floating surfaces use 8 px,
+   nested content surfaces 6 px, and controls 4 px. */
+:is(
+  .modal,
+  .standard-floating-modal,
+  .compact-booking-flyout,
+  .compact-booking-popup,
+  .invoice-batch-flyout,
+  .invoice-single-upload-flyout,
+  .local-invoice-scan--flyout,
+  .filter-dropdown__panel,
+  .party-selector__menu,
+  .select-dropdown__menu,
+  .flyout-popover,
+  .bank-action-menu__popover,
+  .invoice-action-menu,
+  .filter-totals-recent-popover,
+  .bank-import-reminder__popover,
+  .suggestions-palette,
+  .leader-shortcut-layer
+) {
+  border-radius: var(--radius-modal);
+}
+
+:is(.modal, .compact-booking-flyout, .invoice-batch-flyout, .flyout-popover, .filter-dropdown__panel)
+  :is(.card, .form-card, .summary-card, .attachment-card, [class*='-card']) {
+  border-radius: var(--radius-surface);
+}
+
+:is(.modal, .compact-booking-flyout, .invoice-batch-flyout, .flyout-popover, .filter-dropdown__panel)
+  :is(.btn, .input, select, textarea, [role='button']):not(.toggle):not(.switch):not([class*='avatar']) {
+  border-radius: var(--radius-control);
+}
+
+.modal :where(div, section, aside, header, footer, form, label, details, summary):not([class*='avatar']):not([class*='badge']):not([class*='chip']):not([class*='dot']):not([class*='toggle']):not([class*='switch']):not([class*='progress']):not([class*='color']):not([class*='spinner']) {
+  border-radius: var(--radius-surface) !important;
+}
+
+.modal :where(button, input:not([type='checkbox']):not([type='radio']), select, textarea):not([class*='badge']):not([class*='toggle']):not([class*='switch']) {
+  border-radius: var(--radius-control) !important;
+}
+
+:is(.compact-booking-flyout, .invoice-batch-flyout, .invoice-single-upload-flyout, .local-invoice-scan--flyout, .flyout-popover, .filter-dropdown__panel) :where(div, section, aside, header, footer, form, label, details, summary, p, em):not([class*='avatar']):not([class*='badge']):not([class*='chip']):not([class*='dot']):not([class*='toggle']):not([class*='switch']):not([class*='progress']):not([class*='color']):not([class*='spinner']) {
+  border-radius: var(--radius-surface) !important;
+}
+
+:is(.compact-booking-flyout, .invoice-batch-flyout, .invoice-single-upload-flyout, .local-invoice-scan--flyout, .flyout-popover, .filter-dropdown__panel) :where(button, input:not([type='checkbox']):not([type='radio']), select, textarea):not([class*='badge']):not([class*='toggle']):not([class*='switch']) {
+  border-radius: var(--radius-control) !important;
+}
+
+.leader-shortcut-panel {
+  border-radius: var(--radius-modal);
+}
+
+.leader-shortcut-command {
+  border-radius: var(--radius-surface);
 }

@@ -57,7 +57,7 @@ export function PartiesPane({ notify }: Props) {
         <button type="button" className="btn primary" onClick={() => setDraft({ role: 'BOTH', isActive: 1 })}>+ Neuer Geschäftspartner</button>
       </div>
 
-      <div className="card parties-toolbar">
+      <div className="parties-toolbar">
         <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, Ort, E-Mail oder IBAN suchen …" />
         <select className="input" value={role} onChange={(e) => setRole(e.target.value as TPartyRole | '')}>
           <option value="">Alle Rollen</option>
@@ -67,7 +67,7 @@ export function PartiesPane({ notify }: Props) {
       </div>
 
       {!!parties.length && (
-        <div className="card parties-table-wrap">
+        <div className="parties-table-wrap">
           <table className="table parties-table">
             <thead>
               <tr>
@@ -123,7 +123,7 @@ export function PartiesPane({ notify }: Props) {
         </div>
       )}
 
-      {!busy && !parties.length && <div className="card parties-empty">Noch keine passenden Geschäftspartner vorhanden.</div>}
+      {!busy && !parties.length && <div className="parties-empty">Noch keine passenden Geschäftspartner vorhanden.</div>}
       {busy && <div className="helper">Lade Geschäftspartner…</div>}
 
       {draft && <PartyEditorModal initial={draft} onClose={() => setDraft(null)} onSaved={async () => { const wasEditing = Boolean(draft.id); setDraft(null); notify('success', wasEditing ? 'Geschäftspartner aktualisiert' : 'Geschäftspartner angelegt'); await load() }} />}

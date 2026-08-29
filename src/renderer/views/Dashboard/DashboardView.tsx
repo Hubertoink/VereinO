@@ -265,7 +265,7 @@ export default function DashboardView({
   }, [includePrevSaldo, period, today, yearSel, yearsAvail])
 
   return (
-    <div className="card dashboard-card">
+    <div className="dashboard-card">
       <div className="dashboard-header">
         <div className="dashboard-header-left">
           {orgLogo && <img src={orgLogo} alt="Vereinslogo" className="dashboard-header-logo" />}
@@ -282,7 +282,7 @@ export default function DashboardView({
       </div>
       <DashboardTaskStrip items={taskItems} />
         <div className="dashboard-grid-auto">
-          <div className="dashboard-period-row card" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', gap: 10 }}>
+          <div className="dashboard-period-row">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
           <div className="btn-group" role="group" aria-label="Zeitraum">
               <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
@@ -312,15 +312,15 @@ export default function DashboardView({
             </div>
           )}
         </div>
-          <div className="card card--success summary-card">
+          <div className="dashboard-metric dashboard-metric--success">
           <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
         </div>
-          <div className="card card--danger summary-card">
+          <div className="dashboard-metric dashboard-metric--danger">
           <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
             <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
         </div>
-          <div className="card card--accent summary-card">
+          <div className="dashboard-metric dashboard-metric--accent">
           <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'}{(includePrevSaldo && period !== 'GESAMT') ? ' inkl. Anfangsbestand' : ''})</div>
             {(() => {
               const base = (includePrevSaldo && period !== 'GESAMT') ? (openingSaldo || 0) : 0
@@ -329,22 +329,22 @@ export default function DashboardView({
             })()}
         </div>
       </div>
-        <div className="card card--accent chart-card-overflow">
+        <section className="dashboard-section dashboard-section--invoices">
           <div className="chart-header-baseline">
             <div className="legend-container">
             <strong>Offene Verbindlichkeiten</strong>
           </div>
         </div>
-          <div className="dashboard-grid-wide">
-            <div className="card invoice-card-warning">
+          <div className="dashboard-metric-strip">
+            <div className="dashboard-metric dashboard-metric--warning">
             <div className="helper">Offen gesamt</div>
               <div className="summary-value-overflow">{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
           </div>
-            <div className="card invoice-card-warning">
+            <div className="dashboard-metric dashboard-metric--warning">
             <div className="helper">Fällig in ≤ 5 Tagen</div>
               <div className="summary-value-overflow" style={{ color: '#f9a825' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
           </div>
-            <div className="card invoice-card-danger">
+            <div className="dashboard-metric dashboard-metric--danger">
             <div className="helper">Überfällig</div>
               <div className="summary-value-overflow" style={{ color: 'var(--danger)' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
           </div>
@@ -371,38 +371,38 @@ export default function DashboardView({
             <div className="helper" style={{ marginTop: 6 }}>—</div>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Mitgliederübersicht */}
-      <div className="card card--accent chart-card-overflow">
+      <section className="dashboard-section dashboard-section--members">
         <div className="chart-header-baseline">
           <div className="legend-container">
             <strong>Mitglieder</strong>
           </div>
         </div>
-        <div className="dashboard-grid-wide">
-          <div className="card summary-card">
+        <div className="dashboard-metric-strip dashboard-metric-strip--members">
+          <div className="dashboard-metric">
             <div className="helper">Gesamt</div>
             <div className="summary-value-overflow">{memberStats.total}</div>
           </div>
-          <div className="card summary-card card--success">
+          <div className="dashboard-metric dashboard-metric--success">
             <div className="helper">Aktiv</div>
             <div className="summary-value-overflow">{memberStats.active}</div>
           </div>
-          <div className="card summary-card">
+          <div className="dashboard-metric">
             <div className="helper">Neu</div>
             <div className="summary-value-overflow">{memberStats.new}</div>
           </div>
-          <div className="card summary-card">
+          <div className="dashboard-metric">
             <div className="helper">Pause</div>
             <div className="summary-value-overflow">{memberStats.paused}</div>
           </div>
-          <div className="card summary-card">
+          <div className="dashboard-metric">
             <div className="helper">Ausgetreten</div>
             <div className="summary-value-overflow">{memberStats.left}</div>
           </div>
         </div>
-      </div>
+      </section>
 
       {(() => {
         const now = new Date()

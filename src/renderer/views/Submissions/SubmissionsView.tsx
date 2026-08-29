@@ -983,19 +983,19 @@ export default function SubmissionsView({ notify, eurFmt, fmtDate, earmarks, bud
 
             {/* Stats */}
             <div className="grid gap-16 mb-16" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'ALL')} onClick={() => setFilterStatus('ALL')}>
+                <button className="card submissions-summary-card" type="button" style={summaryCardStyle(filterStatus === 'ALL')} onClick={() => setFilterStatus('ALL')}>
                     <div className="helper">Gesamt</div>
                     <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
                 </button>
-                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'pending', 'var(--warning)')} onClick={() => setFilterStatus('pending')}>
+                <button className="card submissions-summary-card" type="button" style={summaryCardStyle(filterStatus === 'pending', 'var(--warning)')} onClick={() => setFilterStatus('pending')}>
                     <div className="helper">Ausstehend</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--warning)' }}>{stats.pending}</div>
                 </button>
-                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'approved', 'var(--success)')} onClick={() => setFilterStatus('approved')}>
+                <button className="card submissions-summary-card" type="button" style={summaryCardStyle(filterStatus === 'approved', 'var(--success)')} onClick={() => setFilterStatus('approved')}>
                     <div className="helper">Genehmigt</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>{stats.approved}</div>
                 </button>
-                <button className="card" type="button" style={summaryCardStyle(filterStatus === 'rejected', 'var(--danger)')} onClick={() => setFilterStatus('rejected')}>
+                <button className="card submissions-summary-card" type="button" style={summaryCardStyle(filterStatus === 'rejected', 'var(--danger)')} onClick={() => setFilterStatus('rejected')}>
                     <div className="helper">Abgelehnt</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>{stats.rejected}</div>
                 </button>

@@ -6,15 +6,17 @@ export default function BookingKindSwitch({
   value,
   options,
   onChange,
-  ariaLabel
+  ariaLabel,
+  className = ''
 }: {
   value: string
   options: BookingKindOption[]
   onChange: (value: string) => void
   ariaLabel: string
+  className?: string
 }) {
   return (
-    <div className="compact-booking-kind" role="group" aria-label={ariaLabel}>
+    <div className={`compact-booking-kind${className ? ` ${className}` : ''}`} role="group" aria-label={ariaLabel}>
       {options.map((option) => (
         <button
           key={option.value}

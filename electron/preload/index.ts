@@ -497,6 +497,7 @@ const rendererApi = {
       orgId: string
       colorTheme?: string
       backgroundImage?: string
+      backgroundImageVisibility?: number
       customBackgroundImage?: string | null
       glassModals?: boolean
     }) => invoke('organizations.setAppearance', payload),

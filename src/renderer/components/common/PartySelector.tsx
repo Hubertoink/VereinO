@@ -1,7 +1,9 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { IconX } from '@tabler/icons-react'
 import type { TParty, TPartyRole, TPartyUpsertInput } from '../../../../electron/main/ipc/schemas'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
+import AppIcon from './AppIcon'
 import { PARTY_ROLE_LABELS } from './partyLabels'
 
 export type PartySelection = { partyId: number | null; name: string }
@@ -88,28 +90,46 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
             <h2>{initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'}</h2>
             <div className="helper">Die Angaben stehen danach in Buchungen und Rechnungen zur Auswahl.</div>
           </div>
-          <button type="button" className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
+          <button type="button" className="btn ghost party-editor-modal__close" onClick={onClose} aria-label="Schließen">
+            <AppIcon icon={IconX} size="control" />
+          </button>
         </header>
         <div className="party-editor-modal__body">
-          <div className="party-editor-grid">
-            <label className={floatingClass(draft.name)}><span>Name *</span><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus /></label>
-            <label className={floatingClass(draft.role, true)}><span>Rolle</span><select className="input" value={draft.role} onChange={(e) => set('role', e.target.value as TPartyRole)}>{Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className={floatingClass(draft.legalName)}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
-            <label className={floatingClass(draft.contactName)}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
-            <label className={floatingClass(draft.email)}><span>E-Mail</span><input className="input" type="email" value={draft.email || ''} onChange={(e) => set('email', e.target.value)} /></label>
-            <label className={floatingClass(draft.phone)}><span>Telefon</span><input className="input" value={draft.phone || ''} onChange={(e) => set('phone', e.target.value)} /></label>
-            <label className={`${floatingClass(draft.street)} party-editor-grid__wide`}><span>Straße</span><input className="input" value={draft.street || ''} onChange={(e) => set('street', e.target.value)} /></label>
-            <label className={floatingClass(draft.postalCode)}><span>PLZ</span><input className="input" value={draft.postalCode || ''} onChange={(e) => set('postalCode', e.target.value)} /></label>
-            <label className={floatingClass(draft.city)}><span>Ort</span><input className="input" value={draft.city || ''} onChange={(e) => set('city', e.target.value)} /></label>
-            <label className={floatingClass(draft.country, true)}><span>Land</span><input className="input" value={draft.country || ''} onChange={(e) => set('country', e.target.value)} /></label>
-            <label className={floatingClass(draft.paymentTermDays)}><span>Zahlungsziel (Tage)</span><input className="input" type="number" min="0" value={draft.paymentTermDays ?? ''} onChange={(e) => set('paymentTermDays', e.target.value === '' ? null : Number(e.target.value))} /></label>
-            <label className={`${floatingClass(draft.iban)} party-editor-grid__wide`}><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
-            <label className={floatingClass(draft.bic)}><span>BIC</span><input className="input" value={draft.bic || ''} onChange={(e) => set('bic', e.target.value)} /></label>
-            <label className={floatingClass(draft.taxNumber)}><span>Steuernummer</span><input className="input" value={draft.taxNumber || ''} onChange={(e) => set('taxNumber', e.target.value)} /></label>
-            <label className={floatingClass(draft.vatId)}><span>USt-IdNr.</span><input className="input" value={draft.vatId || ''} onChange={(e) => set('vatId', e.target.value)} /></label>
-            <label className={floatingClass(draft.isActive, true)}><span>Status</span><select className="input" value={draft.isActive === false ? '0' : '1'} onChange={(e) => set('isActive', e.target.value === '1')}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></label>
-            <label className={`${floatingClass(draft.note)} party-editor-grid__full party-floating-field--textarea`}><span>Notiz</span><textarea className="input" rows={3} value={draft.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
-          </div>
+          <section className="party-editor-section" aria-labelledby="party-editor-master-data">
+            <h3 id="party-editor-master-data">Stammdaten</h3>
+            <div className="party-editor-grid">
+              <label className={floatingClass(draft.name)}><span>Name *</span><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus /></label>
+              <label className={floatingClass(draft.role, true)}><span>Rolle</span><select className="input" value={draft.role} onChange={(e) => set('role', e.target.value as TPartyRole)}>{Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className={`${floatingClass(draft.legalName)} party-editor-grid__full`}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
+              <label className={`${floatingClass(draft.contactName)} party-editor-grid__full`}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className="party-editor-section" aria-labelledby="party-editor-contact-data">
+            <h3 id="party-editor-contact-data">Kontakt & Anschrift</h3>
+            <div className="party-editor-grid">
+              <label className={floatingClass(draft.email)}><span>E-Mail</span><input className="input" type="email" value={draft.email || ''} onChange={(e) => set('email', e.target.value)} /></label>
+              <label className={floatingClass(draft.phone)}><span>Telefon</span><input className="input" value={draft.phone || ''} onChange={(e) => set('phone', e.target.value)} /></label>
+              <label className={`${floatingClass(draft.street)} party-editor-grid__full`}><span>Straße</span><input className="input" value={draft.street || ''} onChange={(e) => set('street', e.target.value)} /></label>
+              <label className={floatingClass(draft.postalCode)}><span>PLZ</span><input className="input" value={draft.postalCode || ''} onChange={(e) => set('postalCode', e.target.value)} /></label>
+              <label className={floatingClass(draft.city)}><span>Ort</span><input className="input" value={draft.city || ''} onChange={(e) => set('city', e.target.value)} /></label>
+              <label className={floatingClass(draft.country, true)}><span>Land</span><input className="input" value={draft.country || ''} onChange={(e) => set('country', e.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className="party-editor-section" aria-labelledby="party-editor-finance-data">
+            <h3 id="party-editor-finance-data">Zahlung & Steuer</h3>
+            <div className="party-editor-grid">
+              <label className={floatingClass(draft.iban)}><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
+              <label className={floatingClass(draft.bic)}><span>BIC</span><input className="input" value={draft.bic || ''} onChange={(e) => set('bic', e.target.value)} /></label>
+              <label className={floatingClass(draft.taxNumber)}><span>Steuernummer</span><input className="input" value={draft.taxNumber || ''} onChange={(e) => set('taxNumber', e.target.value)} /></label>
+              <label className={floatingClass(draft.vatId)}><span>USt-IdNr.</span><input className="input" value={draft.vatId || ''} onChange={(e) => set('vatId', e.target.value)} /></label>
+              <label className={floatingClass(draft.paymentTermDays)}><span>Zahlungsziel (Tage)</span><input className="input" type="number" min="0" value={draft.paymentTermDays ?? ''} onChange={(e) => set('paymentTermDays', e.target.value === '' ? null : Number(e.target.value))} /></label>
+              <label className={floatingClass(draft.isActive, true)}><span>Status</span><select className="input" value={draft.isActive === false ? '0' : '1'} onChange={(e) => set('isActive', e.target.value === '1')}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></label>
+            </div>
+          </section>
+
+          <label className={`${floatingClass(draft.note)} party-editor-grid__full party-floating-field--textarea`}><span>Notiz</span><textarea className="input" rows={3} value={draft.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
           {error && <div className="helper error-text">{error}</div>}
         </div>
         <footer className="party-editor-modal__footer">

@@ -168,7 +168,7 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
         return (
           <div
             key={b.id}
-            className="card"
+            className="card budget-overview-card"
             style={{ 
               padding: 0, 
               overflow: 'hidden',
@@ -209,11 +209,11 @@ export default function EarmarkUsageCards({ bindings, from, to, sphere, onEdit, 
             <div style={{ padding: '14px 16px' }}>
               {/* Amount Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div style={{ padding: '8px 10px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #66bb6a' }}>
+                <div className="budget-overview-metric" style={{ padding: '8px 10px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #66bb6a' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Zugewiesen</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#66bb6a' }}>{fmt.format(allocated)}</div>
                 </div>
-                <div style={{ padding: '8px 10px', background: 'rgba(239, 83, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef5350' }}>
+                <div className="budget-overview-metric" style={{ padding: '8px 10px', background: 'rgba(239, 83, 80, 0.1)', borderRadius: 8, borderLeft: '3px solid #ef5350' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>Verbraucht</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#ef5350' }}>{fmt.format(released)}</div>
                 </div>

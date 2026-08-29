@@ -49,6 +49,8 @@ export function GeneralPane({
   setVisibleNavItems,
   backgroundImage,
   setBackgroundImage,
+  backgroundImageVisibility,
+  setBackgroundImageVisibility,
   customBackgroundImage,
   setCustomBackgroundImage,
   glassModals,
@@ -253,6 +255,28 @@ export function GeneralPane({
               <span className="bg-card__name">Eigenes</span>
             </div>
           </div>
+        </div>
+
+        <div className="field background-visibility-field">
+          <div className="background-visibility-heading">
+            <label htmlFor="background-image-visibility">Bildsichtbarkeit</label>
+            <output htmlFor="background-image-visibility">{backgroundImageVisibility} %</output>
+          </div>
+          <input
+            id="background-image-visibility"
+            className="background-visibility-slider"
+            type="range"
+            min="10"
+            max="100"
+            step="5"
+            value={backgroundImageVisibility}
+            disabled={backgroundImage === 'none'}
+            aria-describedby="background-image-visibility-hint"
+            onChange={(event) => setBackgroundImageVisibility(Number(event.target.value))}
+          />
+          <span id="background-image-visibility-hint" className="helper">
+            Regelt, wie deutlich das Bild hinter den Arbeitsflächen erscheint.
+          </span>
         </div>
 
         {/* Glass effect toggle - inline with preview */}

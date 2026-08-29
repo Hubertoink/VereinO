@@ -447,7 +447,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     const page = Math.floor(offset / Math.max(1, limit)) + 1
 
     return (
-        <div className="card members-header">
+        <div className="members-header">
             <div className="members-header-top">
                 <div className="members-header-left">
                     <h1 className="members-title">Mitglieder</h1>
@@ -513,7 +513,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     </button>
                 </div>
             </div>
-            <div className="card members-board-card">
+            <div className="members-board-card">
                 <div className="members-board-header">
                     <h2 className="members-board-title">Vorstand</h2>
                     {boardRows.length > 0 && <div className="helper">{boardRows.length} Personen</div>}

@@ -160,7 +160,7 @@ export default function BudgetsView({
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div className="card" style={{ padding: 12 }}>
+      <div className="budget-management-surface" style={{ padding: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
           <button

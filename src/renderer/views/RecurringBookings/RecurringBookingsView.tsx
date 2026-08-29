@@ -576,16 +576,16 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
   }
 
   return (
-    <div className="card recurring-bookings-view">
+    <div className="recurring-bookings-view">
       <div className="recurring-page-header">
         <h1>Dauerbuchungen</h1>
       </div>
       <div className="recurring-overview-row">
         <div className="recurring-summary-grid">
-          <div className={`card recurring-summary-card recurring-summary-card--due ${summary.due > 0 ? 'is-due' : ''}`}><span>Fällig</span><strong>{summary.due}</strong></div>
-          <div className="card recurring-summary-card recurring-summary-card--upcoming"><span>Demnächst</span><small>30 Tage</small><strong>{summary.upcoming}</strong></div>
-          <div className="card recurring-summary-card recurring-summary-card--active"><span>Aktiv</span><strong>{summary.active}</strong></div>
-          <div className="card recurring-summary-card recurring-summary-card--paused"><span>Pausiert</span><strong>{summary.paused}</strong></div>
+          <div className={`recurring-summary-card recurring-summary-card--due ${summary.due > 0 ? 'is-due' : ''}`}><span>Fällig</span><strong>{summary.due}</strong></div>
+          <div className="recurring-summary-card recurring-summary-card--upcoming"><span>Demnächst</span><small>30 Tage</small><strong>{summary.upcoming}</strong></div>
+          <div className="recurring-summary-card recurring-summary-card--active"><span>Aktiv</span><strong>{summary.active}</strong></div>
+          <div className="recurring-summary-card recurring-summary-card--paused"><span>Pausiert</span><strong>{summary.paused}</strong></div>
         </div>
         <div className="recurring-page-tools">
           <div className="recurring-search-wrap">
@@ -667,7 +667,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
           <div className="modal recurring-confirm-modal">
             <div className="recurring-modal-header">
               <div><h2 id="recurring-confirm-title">{pendingAction.kind === 'skip' ? 'Fälligkeit überspringen?' : pendingAction.kind === 'pause' ? 'Dauerbuchung pausieren?' : 'Dauerbuchung beenden?'}</h2><div className="helper">{pendingAction.row.name}</div></div>
-              <button className="btn ghost" onClick={() => setPendingAction(null)} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={() => setPendingAction(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <p className="recurring-confirm-message">{pendingAction.kind === 'skip' ? 'Die nächste fällige Buchung wird übersprungen. Die Dauerbuchung bleibt danach aktiv.' : pendingAction.kind === 'pause' ? 'Es werden keine weiteren Fälligkeiten erzeugt, bis du die Dauerbuchung wieder aktivierst.' : 'Offene Fälligkeiten werden verworfen. Die Dauerbuchung kann anschließend nicht mehr fortgesetzt werden.'}</p>
             <div className="modal-footer"><div className="helper">Diese Aktion kann später nicht automatisch rückgängig gemacht werden.</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setPendingAction(null)} disabled={confirmBusy}>Abbrechen</button><button className={pendingAction.kind === 'end' ? 'btn danger' : 'btn primary'} onClick={() => void confirmPendingAction()} disabled={confirmBusy}>{confirmBusy ? 'Wird ausgeführt…' : pendingAction.kind === 'skip' ? 'Überspringen' : pendingAction.kind === 'pause' ? 'Pausieren' : 'Beenden'}</button></div></div>
@@ -680,7 +680,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
           <div className="modal recurring-book-modal">
             <div className="recurring-modal-header">
               <div><h2 id="recurring-book-title">Dauerbuchung buchen</h2><div className="helper">{booking.name} · fällig am {fmtDate(booking.earliestDueDate)}</div></div>
-              <button className="btn ghost" onClick={() => setBooking(null)} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={() => setBooking(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <div className="recurring-book-summary">
               <label className="field"><span>Buchungsdatum</span><input className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /></label>

@@ -1443,6 +1443,8 @@ function AppInner() {
     setJournalRowDensity,
     backgroundImage,
     setBackgroundImage,
+    backgroundImageVisibility,
+    setBackgroundImageVisibility,
     customBackgroundImage,
     setCustomBackgroundImage,
     glassModals,
@@ -2147,6 +2149,31 @@ function AppInner() {
       window.dispatchEvent(new Event('compact-booking-flyout-opened'))
     }
   }, [activeDraftKind, bookingEntryPresentation, quickAdd])
+
+  useEffect(() => {
+    if (
+      bookingEntryPresentation !== 'flyout'
+      || !quickAdd
+      || activeDraftKind !== 'booking'
+      || forceFullBookingDialog
+    ) return
+
+    const parkOnOutsideMouseDown = (event: MouseEvent) => {
+      if (!event.isTrusted) return
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (target.closest([
+        '.compact-booking-flyout-anchor',
+        '.fab-buchung',
+        '.select-dropdown__menu--portal',
+        '.party-selector__menu--portal'
+      ].join(', '))) return
+      parkQuickAdd()
+    }
+
+    document.addEventListener('mousedown', parkOnOutsideMouseDown, true)
+    return () => document.removeEventListener('mousedown', parkOnOutsideMouseDown, true)
+  }, [activeDraftKind, bookingEntryPresentation, forceFullBookingDialog, parkQuickAdd, quickAdd])
 
   useEffect(() => {
     const parkForInvoiceFlyout = () => {
@@ -3787,6 +3814,8 @@ function AppInner() {
               setJournalRowDensity={setJournalRowDensity}
               backgroundImage={backgroundImage}
               setBackgroundImage={setBackgroundImage}
+              backgroundImageVisibility={backgroundImageVisibility}
+              setBackgroundImageVisibility={setBackgroundImageVisibility}
               customBackgroundImage={customBackgroundImage}
               setCustomBackgroundImage={setCustomBackgroundImage}
               glassModals={glassModals}
@@ -3958,15 +3987,6 @@ function AppInner() {
 
       {/* Quick-Add: full dialog or optional compact flyout */}
       {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
-        <>
-        <div
-          className="compact-booking-flyout-dismiss"
-          role="presentation"
-          onMouseDown={(event) => {
-            event.preventDefault()
-            parkQuickAdd()
-          }}
-        />
         <div className={`compact-booking-flyout-anchor${activePage === 'Buchungen' ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
           <CompactBookingFlyout
             key={activeDraftId ?? 'compact-quick-add'}
@@ -3996,7 +4016,6 @@ function AppInner() {
             onNewDraft={triggerBookingEntry}
           />
         </div>
-        </>
       )}
       {quickAdd && activeDraftKind === 'booking' && (bookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
         <QuickAddModal

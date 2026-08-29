@@ -142,6 +142,8 @@ export interface SettingsProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  backgroundImageVisibility: number
+  setBackgroundImageVisibility: (v: number) => void
   customBackgroundImage: string | null
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
@@ -191,6 +193,8 @@ export interface GeneralPaneProps {
   setJournalRowDensity: (v: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
+  backgroundImageVisibility: number
+  setBackgroundImageVisibility: (v: number) => void
   customBackgroundImage: string | null
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean

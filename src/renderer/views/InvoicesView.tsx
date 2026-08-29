@@ -719,7 +719,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   }
 
   return (
-    <div className="card invoices-container">
+    <div className="invoices-container">
       <div className="invoices-header">
         <h1>Verbindlichkeiten</h1>
         <div className="invoices-filters">
@@ -756,7 +756,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           />
           {!!(q.trim() || status !== 'ALL' || sphere || budgetId || tag || dueFrom || dueTo) && <button className="btn btn-clear-filters" onClick={clearFilters} title="Alle Filter löschen"><AppIcon icon={IconX} size="action" /></button>}
           <div className="filter-divider" />
-          <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}><AppIcon icon={IconFileImport} size="control" />Rechnung erfassen</button>
+          <button className="btn primary invoices-toolbar-action invoices-scan-button btn-with-icon" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}><AppIcon icon={IconFileImport} size="control" />Rechnung erfassen</button>
           <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={openCreate}><AppIcon icon={IconPlus} size="control" />Neu</button>
         </div>
       </div>

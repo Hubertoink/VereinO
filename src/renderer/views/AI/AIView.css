@@ -3649,6 +3649,46 @@ html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
   overflow: hidden;
 }
 
+/* Keep the AI workspace on the same data-surface and radius hierarchy as the
+   rest of the application. This file is lazy-loaded after the global CSS. */
+.ai-markdown-table {
+  background: color-mix(in oklab, var(--surface) 96%, var(--bg));
+}
+
+.ai-markdown-table thead,
+.ai-markdown-table thead tr,
+.ai-markdown-table thead th {
+  background: color-mix(in oklab, var(--surface) 84%, var(--text) 16%);
+}
+
+.ai-markdown-table tbody tr {
+  background: color-mix(in oklab, var(--surface) 96%, var(--bg));
+}
+
+.ai-markdown-table tbody tr:nth-child(even) {
+  background: color-mix(in oklab, var(--surface) 90%, var(--bg));
+}
+
+.ai-page :is(
+  .ai-assistant-sidebar,
+  .ai-agent-context-drawer,
+  .ai-settings-drawer,
+  .ai-rules-drawer
+) {
+  border-radius: var(--radius-modal);
+}
+
+.ai-page :is([class*='card'], [class*='panel'], [class*='editor'], [class*='preview'], [class*='row'], .ai-markdown-table-wrap) {
+  border-radius: var(--radius-surface);
+}
+
+.ai-page
+  :is(button, input:not([type='checkbox']):not([type='radio']), select, textarea)
+  :not([class*='badge'])
+  :not([class*='switch']) {
+  border-radius: var(--radius-control);
+}
+
 .ai-header-title-line {
   display: flex;
   align-items: center;

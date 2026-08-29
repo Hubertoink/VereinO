@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
+import { IconPaperclip } from '@tabler/icons-react'
 import { addDataChangedListener } from '../utils/refresh'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
+import AppIcon from '../components/common/AppIcon'
 
 type ReceiptTarget = { voucherId: number; voucherNo: string; date: string; description: string }
 
@@ -53,7 +55,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
     }
 
     return (
-        <div className="card" style={{ padding: 12 }}>
+        <div className="receipts-container" style={{ padding: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <strong>Belege</strong>
                 <div className="helper">Buchungen mit angehängten Dateien</div>
@@ -87,10 +89,10 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                                 <td>{r.description}</td>
                                 <td align="center">
                                     <button
-                                        className="btn"
+                                        className="btn btn-with-icon"
                                         onClick={() => setAttachmentsModal({ voucherId: r.id, voucherNo: r.voucherNo, date: r.date, description: r.description || '' })}
                                         title="Belege anzeigen"
-                                    >🔎 {r.fileCount}</button>
+                                    ><AppIcon icon={IconPaperclip} size="inline" />{r.fileCount}</button>
                                 </td>
                             </tr>
                         ))}
@@ -98,7 +100,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                 </table>
             )}
             {!loading && rows.length === 0 && (
-                <div className="card" style={{ padding: 16, marginTop: 12 }}>
+                <div className="receipts-empty" style={{ padding: 16, marginTop: 12 }}>
                     <div style={{ display: 'grid', gap: 6 }}>
                         <div><strong>Keine Belege gefunden</strong></div>
                         <div className="helper">Es wurden noch keine Dateien an Buchungen angehängt. Du kannst in „Buchungen" Belege hinzufügen oder neue Buchungen anlegen.</div>

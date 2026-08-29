@@ -150,7 +150,7 @@ export default function EarmarksView({
 
   return (
     <>
-      <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+      <div className="earmark-management-surface" style={{ padding: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="helper">Zweckbindungen verwalten</div>
           <button

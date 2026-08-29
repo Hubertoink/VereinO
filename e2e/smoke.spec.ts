@@ -46,6 +46,63 @@ async function chooseBookingEntryPresentation(name: 'Dialog' | 'Kompakt-Flyout' 
   await expect(option).toHaveClass(/\bactive\b/)
 }
 
+async function expectReadablePageCanvas() {
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-theme', 'light')
+    document.documentElement.setAttribute('data-color-theme', 'soft-blush')
+    document.documentElement.setAttribute('data-background-image', 'mountain-snow')
+  })
+  const backgroundColor = await page.locator('.app-main').evaluate((main) => getComputedStyle(main).backgroundColor)
+  expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(backgroundColor).not.toBe('transparent')
+
+  const tableSurfaces = await page.locator('.app-main table:visible').evaluateAll((tables) =>
+    tables.map((table) => {
+      const header = table.querySelector('thead th')
+      const row = table.querySelector('tbody tr')
+      return {
+        table: getComputedStyle(table).backgroundColor,
+        header: header ? getComputedStyle(header).backgroundColor : null,
+        row: row ? getComputedStyle(row).backgroundColor : null
+      }
+    })
+  )
+  for (const surface of tableSurfaces) {
+    expect(surface.table).not.toBe('rgba(0, 0, 0, 0)')
+    expect(surface.header).not.toBe('rgba(0, 0, 0, 0)')
+    expect(surface.table).not.toBe(backgroundColor)
+    expect(surface.header).not.toBe(surface.table)
+    if (surface.row) expect(surface.row).not.toBe('rgba(0, 0, 0, 0)')
+  }
+}
+
+async function expectReducedFloatingRadii(surface: ReturnType<Page['locator']>) {
+  const radii = await surface.evaluate((element) => {
+    const ignoredShapes = '[class*="avatar"], [class*="badge"], [class*="chip"], [class*="dot"], [class*="toggle"], [class*="switch"], [class*="progress"], [class*="color"], [class*="spinner"], [class*="icon"], [role="switch"], input[type="checkbox"], input[type="radio"]'
+    const nested = Array.from(element.querySelectorAll('*'))
+      .filter((candidate): candidate is HTMLElement => candidate instanceof HTMLElement && candidate.offsetParent !== null)
+      .filter((candidate) => !candidate.closest(ignoredShapes))
+      .map((candidate) => {
+        const styles = getComputedStyle(candidate)
+        const hasVisibleSurface = styles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+          || styles.backgroundImage !== 'none'
+          || Number.parseFloat(styles.borderTopWidth) > 0
+        return {
+          element: `${candidate.tagName.toLowerCase()}.${String(candidate.className).trim().replace(/\s+/g, '.')}`,
+          radius: Number.parseFloat(styles.borderRadius),
+          hasVisibleSurface
+        }
+      })
+      .filter((candidate) => candidate.hasVisibleSurface && candidate.radius > 6)
+    return {
+      outer: Number.parseFloat(getComputedStyle(element).borderRadius),
+      nested
+    }
+  })
+  expect(radii.outer).toBeLessThanOrEqual(8)
+  expect(radii.nested, 'Visible nested surfaces above 6px').toEqual([])
+}
+
 test.beforeEach(async () => {
   userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-e2e-'))
   const mainEntry = path.resolve('dist-electron/main/index.cjs')
@@ -90,6 +147,12 @@ test('starts the real Electron app with its preload bridge', async () => {
   await expect(page).toHaveTitle(/VereinO/i)
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible()
 
+  await page.getByRole('button', { name: 'Tastaturbefehle öffnen' }).click()
+  const shortcutPanel = page.locator('.leader-shortcut-panel')
+  await expect(shortcutPanel).toBeVisible()
+  await expectReducedFloatingRadii(shortcutPanel)
+  await page.getByRole('button', { name: 'Tastaturbefehle schließen' }).click({ position: { x: 2, y: 2 } })
+
   const bridgeResult = await page.evaluate(async () => ({
     ping: window.api.ping(),
     appInfo: await window.api.app.version(),
@@ -101,6 +164,38 @@ test('starts the real Electron app with its preload bridge', async () => {
   expect(bridgeResult.appInfo.version).toMatch(/^\d+\.\d+\.\d+/)
   expect(bridgeResult.bootstrap.counts.pendingSubmissions).toBeGreaterThanOrEqual(0)
   expect(Array.isArray(bridgeResult.bootstrap.paymentAccounts)).toBe(true)
+})
+
+test('adjusts and persists background image visibility', async () => {
+  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Schneeberge', exact: true }).click()
+  const visibilitySlider = page.getByRole('slider', { name: 'Bildsichtbarkeit' })
+  await expect(visibilitySlider).toBeEnabled()
+  await expect(visibilitySlider).toHaveValue('25')
+  await visibilitySlider.fill('80')
+  await expect(visibilitySlider).toHaveValue('80')
+  await expect(page.locator('output[for="background-image-visibility"]')).toHaveText('80 %')
+
+  const visibilityStyles = await page.evaluate(() => ({
+    imageOpacity: document.documentElement.style.getPropertyValue('--background-image-opacity'),
+    surfaceOpacity: document.documentElement.style.getPropertyValue('--background-surface-opacity')
+  }))
+  expect(visibilityStyles.imageOpacity).toBe('0.8')
+  expect(visibilityStyles.surfaceOpacity).toBe('74.40%')
+  await expect.poll(async () => (await page.evaluate(() => window.api.organizations.activeAppearance())).backgroundImageVisibility).toBe(80)
+  await page.screenshot({ path: 'test-results/background-visibility-80.png', fullPage: true })
+
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
+  const laterAfterReload = page.getByRole('button', { name: 'Später', exact: true })
+  await laterAfterReload.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
+  if (await laterAfterReload.isVisible()) await laterAfterReload.click()
+  const closeAfterReload = page.locator('.modal-overlay:visible button[aria-label="Schließen"]').first()
+  if (await closeAfterReload.isVisible()) await closeAfterReload.click()
+  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+  await expect(page.getByRole('slider', { name: 'Bildsichtbarkeit' })).toHaveValue('80')
 })
 
 test('creates and lists a backup through the real IPC bridge', async () => {
@@ -122,14 +217,138 @@ test('loads split application pages on demand', async () => {
 
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   await expect(page.locator('.dashboard-card').first()).toBeVisible()
+  await expectReadablePageCanvas()
 
   const laterAfterDashboard = page.getByRole('button', { name: 'Später', exact: true })
   if (await laterAfterDashboard.isVisible()) await laterAfterDashboard.click()
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
 
   await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Suche', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await page.getByRole('button', { name: 'Dauerbuchungen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Dauerbuchungen', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await page.locator('.filter-dropdown__trigger').first().click()
+  const filterPanel = page.locator('.filter-dropdown__panel')
+  await expect(filterPanel).toBeVisible()
+  const filterPanelSurface = await filterPanel.evaluate((panel) => {
+    const styles = getComputedStyle(panel)
+    return {
+      backgroundColor: styles.backgroundColor,
+      borderRadius: styles.borderRadius,
+      boxShadow: styles.boxShadow
+    }
+  })
+  expect(filterPanelSurface.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(filterPanelSurface.borderRadius).toBe('8px')
+  expect(filterPanelSurface.boxShadow).not.toBe('none')
+  await filterPanel.getByRole('button', { name: 'Schließen' }).click()
+  const recurringSummary = page.locator('.recurring-summary-card').first()
+  await expect(recurringSummary).toBeVisible()
+  await recurringSummary.hover()
+  const recurringHoverSurface = await recurringSummary.evaluate((card) => {
+    const styles = getComputedStyle(card)
+    return {
+      backgroundColor: styles.backgroundColor,
+      boxShadow: styles.boxShadow,
+      transform: styles.transform
+    }
+  })
+  expect(recurringHoverSurface.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(recurringHoverSurface.boxShadow).toBe('none')
+  expect(recurringHoverSurface.transform).toBe('none')
+
+  await page.getByRole('button', { name: 'Bankimport', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Bankimport', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  const bankStatusTabs = page.locator('.bank-status-tabs button')
+  await expect(bankStatusTabs).toHaveCount(4)
+  const bankStatusTab = bankStatusTabs.first()
+  await bankStatusTab.hover()
+  const bankTabHoverSurface = await bankStatusTab.evaluate((tab) => {
+    const styles = getComputedStyle(tab)
+    return {
+      backgroundColor: styles.backgroundColor,
+      borderRadius: styles.borderRadius,
+      transform: styles.transform
+    }
+  })
+  expect(bankTabHoverSurface.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(bankTabHoverSurface.borderRadius).toBe('0px')
+  expect(bankTabHoverSurface.transform).toBe('none')
+
+  await page.getByRole('button', { name: 'Verbindlichkeiten', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Verbindlichkeiten', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await expect(page.locator('.invoices-container')).toBeVisible()
+  await expect(page.locator('.invoices-container > .card')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/phase4-invoices-light.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Budgets', exact: true }).click()
+  await expect(page.getByText('Budgets verwalten und Fortschritt verfolgen', { exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await expect(page.locator('.budget-management-surface')).toBeVisible()
+  await expect(page.locator('.budget-management-surface > .card')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/phase4-budgets-light.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Zweckbindungen', exact: true }).click()
+  await expect(page.getByText('Zweckbindungen verwalten', { exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await expect(page.locator('.earmark-management-surface')).toBeVisible()
+  await expect(page.locator('.earmark-management-surface > .card')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/phase4-earmarks-light.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Mitglieder', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Mitglieder', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await expect(page.locator('.members-header > .card')).toHaveCount(0)
+  await expect(page.locator('.members-header .members-board-card > .card')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/phase4-members-light.png', fullPage: true })
+
+  await page.evaluate(async () => {
+    await window.api.advances.create({ recipientName: 'E2E Vorschuss A', issuedAt: '2026-08-29', amount: 125 })
+    await window.api.advances.create({ recipientName: 'E2E Vorschuss B', issuedAt: '2026-08-29', amount: 250 })
+  })
+  await page.getByRole('button', { name: 'Vorschüsse', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Vorschüsse', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await expect(page.locator('.advances-summary-card')).toHaveCount(3)
+  await expect(page.locator('.advances-summary-card.card, .advances-list-card.card, .advances-detail-card.card')).toHaveCount(0)
+  const advancesSurfaces = await page.locator('.advances-page, .advances-list-card, .advances-detail-card').evaluateAll((surfaces) =>
+    surfaces.map((surface) => getComputedStyle(surface).backgroundColor)
+  )
+  expect(advancesSurfaces).toHaveLength(3)
+  expect(advancesSurfaces).not.toContain('rgba(0, 0, 0, 0)')
+  const advanceRows = page.locator('.advances-list-card .advances-list-table tbody tr')
+  await expect(advanceRows).toHaveCount(2)
+  await expect(advanceRows.first()).toHaveAttribute('aria-selected', 'true')
+  const selectedAdvanceStyle = await advanceRows.first().evaluate((row) => ({
+    background: getComputedStyle(row).backgroundColor,
+    boxShadow: getComputedStyle(row).boxShadow
+  }))
+  const unselectedAdvanceBackground = await advanceRows.last().evaluate((row) => getComputedStyle(row).backgroundColor)
+  expect(selectedAdvanceStyle.background).not.toBe(unselectedAdvanceBackground)
+  expect(selectedAdvanceStyle.boxShadow).not.toBe('none')
+  await advanceRows.last().click()
+  await expect(advanceRows.last()).toHaveAttribute('aria-selected', 'true')
+  await expect(advanceRows.first()).toHaveAttribute('aria-selected', 'false')
+  await page.screenshot({ path: 'test-results/phase4-advances-light.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Einreichungen', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Einreichungen', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+
+  await page.getByRole('button', { name: 'Belege', exact: true }).click()
+  await expect(page.getByText('Buchungen mit angehängten Dateien', { exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+
+  await page.getByRole('button', { name: 'Reports', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Report', exact: true })).toBeVisible()
+  await expectReadablePageCanvas()
+  await page.screenshot({ path: 'test-results/phase4-reports-light.png', fullPage: true })
 })
 
 test('selects a single invoice in a compact flyout before opening recognition', async () => {
@@ -138,6 +357,7 @@ test('selects a single invoice in a compact flyout before opening recognition', 
   await page.locator('.invoice-split-fab__new').click()
   const uploadFlyout = page.locator('.invoice-single-upload-flyout')
   await expect(uploadFlyout).toBeVisible()
+  await expectReducedFloatingRadii(uploadFlyout)
   await expect(uploadFlyout).toContainText('Rechnung hier ablegen')
   await expect(page.locator('.local-invoice-scan')).toHaveCount(0)
 
@@ -153,6 +373,7 @@ test('selects a single invoice in a compact flyout before opening recognition', 
   await expect(uploadFlyout).toHaveCount(0)
   const recognitionDialog = page.locator('.local-invoice-scan')
   await expect(recognitionDialog).toBeVisible()
+  await expectReducedFloatingRadii(recognitionDialog)
   await expect(recognitionDialog.getByText('einzelrechnung.png', { exact: true })).toBeVisible()
 })
 
@@ -168,6 +389,7 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
   await splitControl.locator('.invoice-split-fab__batch').click()
   const flyout = page.locator('.invoice-batch-flyout')
   await expect(flyout).toBeVisible()
+  await expectReducedFloatingRadii(flyout)
   await expect(flyout).toContainText('KI-Rechnungsentwürfe')
   await expect(flyout).toContainText('KI-API-Key')
 
@@ -247,15 +469,75 @@ test('presents the optimized booking workflow', async () => {
   )
   expect(totalCardBackgrounds).toHaveLength(3)
   expect(totalCardBackgrounds).not.toContain('rgba(0, 0, 0, 0)')
+  const totalsStrip = page.locator('.journal-view .filter-totals-stats')
+  const totalsStripStyle = await totalsStrip.evaluate((strip) => {
+    const income = strip.querySelector('.filter-totals-stat--in')
+    const divider = strip.querySelector('.filter-totals-divider')
+    const dividerMark = divider?.querySelector('span')
+    const diff = strip.querySelector('.filter-totals-stat--diff')
+    return {
+      stripLeftBorder: getComputedStyle(strip).borderInlineStartWidth,
+      stripRightBorder: getComputedStyle(strip).borderInlineEndWidth,
+      incomeLeftBorder: income ? getComputedStyle(income).borderInlineStartWidth : '0px',
+      diffRightBorder: diff ? getComputedStyle(diff).borderInlineEndWidth : '0px',
+      dividerWidth: divider ? getComputedStyle(divider).flexBasis : '0px',
+      dividerMarkRadius: dividerMark ? getComputedStyle(dividerMark).borderRadius : '0px'
+    }
+  })
+  expect(totalsStripStyle.stripLeftBorder).toBe('1px')
+  expect(totalsStripStyle.stripRightBorder).toBe('1px')
+  expect(totalsStripStyle.incomeLeftBorder).toBe('3px')
+  expect(totalsStripStyle.diffRightBorder).toBe('3px')
+  expect(totalsStripStyle.dividerWidth).toBe('34px')
+  expect(totalsStripStyle.dividerMarkRadius).toBe('4px')
+  const incomeCard = page.locator('.filter-totals-stat--in').first()
+  await incomeCard.hover()
+  const incomeHoverSurface = await incomeCard.evaluate((card) => {
+    const styles = getComputedStyle(card)
+    return {
+      backgroundColor: styles.backgroundColor,
+      boxShadow: styles.boxShadow,
+      transform: styles.transform
+    }
+  })
+  expect(incomeHoverSurface.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(incomeHoverSurface.boxShadow).toBe('none')
+  expect(incomeHoverSurface.transform).toBe('none')
   await page.screenshot({ path: 'test-results/journal-surface-hierarchy.png', fullPage: true })
   await page.locator('.fab-buchung').click()
 
   const dialog = page.locator('.quick-add-modal')
   await expect(dialog).toBeVisible()
+  await expectReducedFloatingRadii(dialog)
+  const bookingFieldContrast = await dialog.locator('#quick-add-date').evaluate((field) => ({
+    field: getComputedStyle(field).backgroundColor,
+    modal: getComputedStyle(field.closest('.modal') as HTMLElement).backgroundColor,
+    border: getComputedStyle(field).borderColor
+  }))
+  expect(bookingFieldContrast.field).not.toBe(bookingFieldContrast.modal)
+  expect(bookingFieldContrast.border).not.toBe('rgba(0, 0, 0, 0)')
   await expect(dialog.getByRole('button', { name: 'Einnahme', exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Ausgabe', exact: true })).toBeVisible()
   await expect(dialog.getByPlaceholder(/Was wurde gebucht/i)).toBeVisible()
   await expect(dialog.getByText('Zuordnungen', { exact: true })).toBeVisible()
+  await dialog.getByTitle('Geschäftspartner anlegen').click()
+  const partyEditor = page.locator('.party-editor-modal')
+  await expect(partyEditor).toBeVisible()
+  await expect(partyEditor.locator('.party-editor-section')).toHaveCount(3)
+  await expect(partyEditor.getByRole('heading', { name: 'Stammdaten', exact: true })).toBeVisible()
+  await expect(partyEditor.getByRole('heading', { name: 'Kontakt & Anschrift', exact: true })).toBeVisible()
+  await expect(partyEditor.getByRole('heading', { name: 'Zahlung & Steuer', exact: true })).toBeVisible()
+  const partyFieldContrast = await partyEditor.locator('input').first().evaluate((field) => ({
+    field: getComputedStyle(field).backgroundColor,
+    modal: getComputedStyle(field.closest('.modal') as HTMLElement).backgroundColor
+  }))
+  expect(partyFieldContrast.field).not.toBe(partyFieldContrast.modal)
+  await partyEditor.evaluate(async (modal) => {
+    await Promise.all(modal.getAnimations({ subtree: true }).map((animation) => animation.finished))
+  })
+  await page.screenshot({ path: 'test-results/party-editor-structured.png', fullPage: true })
+  await partyEditor.getByRole('button', { name: 'Schließen' }).click()
+  await expect(partyEditor).toHaveCount(0)
   const attachmentCard = dialog.locator('.attachment-card')
   const attachmentActions = attachmentCard.locator('.attachment-actions--header')
   await expect.poll(() => attachmentActions.evaluate((element) => getComputedStyle(element).opacity)).toBe('0')
@@ -351,7 +633,29 @@ test('presents the optimized booking workflow', async () => {
   const transferButton = dialog.getByRole('button', { name: 'Umbuchung', exact: true })
   await transferButton.click()
   await expect(transferButton).toHaveAttribute('aria-pressed', 'true')
-  await expect(dialog.getByRole('button', { name: 'Transfer von Konto' })).toBeVisible()
+  const transferFrom = dialog.getByRole('button', { name: 'Transfer von Konto' })
+  const transferTo = dialog.getByRole('button', { name: 'Transfer nach Konto' })
+  await expect(transferFrom).toBeVisible()
+  await expect(transferTo).toBeVisible()
+  const transferLayout = await dialog.locator('.booking-transfer-row').evaluate((row) => {
+    const from = row.querySelector('#quick-add-transfer-from')?.getBoundingClientRect()
+    const arrow = row.querySelector('.booking-transfer-arrow')?.getBoundingClientRect()
+    const to = row.querySelector('#quick-add-transfer-to')?.getBoundingClientRect()
+    if (!from || !arrow || !to) throw new Error('Transfer row is incomplete')
+    return { from, arrow, to }
+  })
+  expect(Math.abs(transferLayout.from.top - transferLayout.to.top)).toBeLessThanOrEqual(1)
+  expect(transferLayout.from.right).toBeLessThanOrEqual(transferLayout.arrow.left + 1)
+  expect(transferLayout.arrow.right).toBeLessThanOrEqual(transferLayout.to.left + 1)
+  const transferToLabel = (await transferTo.locator('.select-dropdown__value').innerText()).trim()
+  await transferFrom.click()
+  await expect(page.getByRole('option', { name: transferToLabel, exact: true })).toBeDisabled()
+  await transferFrom.click()
+  const transferFromLabel = (await transferFrom.locator('.select-dropdown__value').innerText()).trim()
+  await transferTo.click()
+  await expect(page.getByRole('option', { name: transferFromLabel, exact: true })).toBeDisabled()
+  await transferTo.click()
+  await page.screenshot({ path: 'test-results/quick-add-transfer.png', fullPage: true })
   await expect(dialog.getByRole('button', { name: 'Sphäre der Buchung' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
 })
@@ -372,6 +676,14 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
   await page.locator('.fab-buchung').click()
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
+  await expectReducedFloatingRadii(flyout)
+  const flyoutFieldContrast = await flyout.getByPlaceholder('Was wurde gebucht?').evaluate((field) => ({
+    field: getComputedStyle(field).backgroundColor,
+    flyout: getComputedStyle(field.closest('.compact-booking-flyout') as HTMLElement).backgroundColor,
+    border: getComputedStyle(field).borderColor
+  }))
+  expect(flyoutFieldContrast.field).not.toBe(flyoutFieldContrast.flyout)
+  expect(flyoutFieldContrast.border).not.toBe('rgba(0, 0, 0, 0)')
   await expect(page.locator('.quick-add-modal')).toHaveCount(0)
   const expandButton = flyout.getByRole('button', { name: 'Vollständigen Buchungsdialog öffnen' })
   const expandBounds = await expandButton.boundingBox()

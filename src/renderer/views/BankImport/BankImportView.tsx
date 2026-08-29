@@ -2040,7 +2040,7 @@ export default function BankImportView({
   const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
 
   return (
-    <div className="card bank-import-container">
+    <div className="bank-import-container">
       <div className="bank-page-header">
         <h1>Bankimport</h1>
         <div className="bank-page-tools">

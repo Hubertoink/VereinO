@@ -16,6 +16,19 @@ import {
 const NIKO_BACKGROUND_ID: BackgroundImage = 'niko-bg'
 const NIKO_BACKGROUND_SRC = new URL('../../../assets/Niko_BG.jpg', import.meta.url).href
 const VALID_BACKGROUNDS: BackgroundImage[] = ['none', 'cherry-blossom', 'foggy-forest', 'mountain-snow', 'custom', NIKO_BACKGROUND_ID]
+const DEFAULT_BACKGROUND_VISIBILITY = 25
+
+function normalizeBackgroundVisibility(value: unknown) {
+  if (value === null || value === undefined || value === '') return DEFAULT_BACKGROUND_VISIBILITY
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? Math.min(100, Math.max(10, Math.round(numericValue))) : DEFAULT_BACKGROUND_VISIBILITY
+}
+
+function applyBackgroundVisibilityToDocument(value: unknown) {
+  const visibility = normalizeBackgroundVisibility(value)
+  document.documentElement.style.setProperty('--background-image-opacity', String(visibility / 100))
+  document.documentElement.style.setProperty('--background-surface-opacity', `${(100 - visibility * 0.32).toFixed(2)}%`)
+}
 
 // Glassmorphism: transparent modals with blur
 
@@ -92,6 +105,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return isValidTheme(stored) ? stored : 'default'
   })
   const [backgroundImage, setBackgroundImageState] = useState<BackgroundImage>('none')
+  const [backgroundImageVisibility, setBackgroundImageVisibilityState] = useState(() =>
+    normalizeBackgroundVisibility(localStorage.getItem('ui.backgroundImageVisibility'))
+  )
   const [customBackgroundImage, setCustomBackgroundImageState] = useState<string | null>(null)
   const [glassModals, setGlassModalsState] = useState<boolean>(false)
 
@@ -102,8 +118,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   useLayoutEffect(() => {
     const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('ui.colorTheme') : null
     applyColorThemeToDocument(storedTheme)
+    applyBackgroundVisibilityToDocument(backgroundImageVisibility)
     document.documentElement.style.setProperty('--niko-background-image', `url("${NIKO_BACKGROUND_SRC}")`)
-  }, [])
+  }, [backgroundImageVisibility])
 
   // Load appearance settings from organization on mount
   useEffect(() => {
@@ -126,6 +143,10 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         safeLocalStorageSet('ui.backgroundImage', appearance.backgroundImage)
         document.documentElement.setAttribute('data-background-image', appearance.backgroundImage)
       }
+      const visibility = normalizeBackgroundVisibility(appearance?.backgroundImageVisibility)
+      setBackgroundImageVisibilityState(visibility)
+      safeLocalStorageSet('ui.backgroundImageVisibility', String(visibility))
+      applyBackgroundVisibilityToDocument(visibility)
       // Apply glass modals
       if (typeof appearance?.glassModals === 'boolean') {
         setGlassModalsState(appearance.glassModals)
@@ -161,6 +182,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
           setBackgroundImageState(storedBg as BackgroundImage)
           document.documentElement.setAttribute('data-background-image', storedBg)
         }
+        const storedVisibility = normalizeBackgroundVisibility(localStorage.getItem('ui.backgroundImageVisibility'))
+        setBackgroundImageVisibilityState(storedVisibility)
+        applyBackgroundVisibilityToDocument(storedVisibility)
         const storedCustomBg = localStorage.getItem('ui.customBackgroundImage')
         if (storedCustomBg) {
           setCustomBackgroundImageState(storedCustomBg)
@@ -201,7 +225,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
 
   // Helper to save appearance to organization
-  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; customBackgroundImage?: string | null; glassModals?: boolean }) => {
+  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; backgroundImageVisibility?: number; customBackgroundImage?: string | null; glassModals?: boolean }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
@@ -260,6 +284,12 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const setBackgroundImage = (val: BackgroundImage) => {
     setBackgroundImageState(val)
     saveAppearanceToOrg({ backgroundImage: val })
+  }
+
+  const setBackgroundImageVisibility = (val: number) => {
+    const visibility = normalizeBackgroundVisibility(val)
+    setBackgroundImageVisibilityState(visibility)
+    saveAppearanceToOrg({ backgroundImageVisibility: visibility })
   }
 
   const setCustomBackgroundImage = (val: string | null) => {
@@ -412,6 +442,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [backgroundImage])
 
   useEffect(() => {
+    safeLocalStorageSet('ui.backgroundImageVisibility', String(backgroundImageVisibility))
+    applyBackgroundVisibilityToDocument(backgroundImageVisibility)
+  }, [backgroundImageVisibility])
+
+  useEffect(() => {
     if (customBackgroundImage) {
       document.documentElement.style.setProperty('--custom-background-image', `url("${customBackgroundImage}")`)
       safeLocalStorageSet('ui.customBackgroundImage', customBackgroundImage)
@@ -455,6 +490,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setQuickAddAfterSave,
         backgroundImage,
         setBackgroundImage,
+        backgroundImageVisibility,
+        setBackgroundImageVisibility,
         customBackgroundImage,
         setCustomBackgroundImage,
         glassModals,

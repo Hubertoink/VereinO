@@ -628,23 +628,40 @@ export default function AdvancesView() {
         <button className="btn primary" type="button" onClick={() => setCreateOpen(true)}>+ Vorschuss</button>
       </header>
 
-      <div className="advances-summary-grid">
-        <div className="card advances-summary-card">
-          <div className="helper">Offener Betrag</div>
-          <div className="advances-summary-value">{eurFmt.format(totals.openSum)}</div>
+      <section className="advances-overview" aria-labelledby="advances-overview-title">
+        <div className="advances-section-header">
+          <div>
+            <h2 id="advances-overview-title">Vorschussübersicht</h2>
+            <p className="helper">Aktueller Stand aller angezeigten Vorschüsse.</p>
+          </div>
         </div>
-        <div className="card advances-summary-card">
-          <div className="helper">Bereits verbucht</div>
-          <div className="advances-summary-value">{eurFmt.format(totals.paidSum)}</div>
+        <div className="advances-summary-grid">
+          <div className="advances-summary-card">
+            <div className="helper">Offener Betrag</div>
+            <div className="advances-summary-value">{eurFmt.format(totals.openSum)}</div>
+          </div>
+          <div className="advances-summary-card">
+            <div className="helper">Bereits verbucht</div>
+            <div className="advances-summary-value">{eurFmt.format(totals.paidSum)}</div>
+          </div>
+          <div className="advances-summary-card">
+            <div className="helper">Offene Vorschüsse</div>
+            <div className="advances-summary-value">{totals.openCount}</div>
+          </div>
         </div>
-        <div className="card advances-summary-card">
-          <div className="helper">Offene Vorschüsse</div>
-          <div className="advances-summary-value">{totals.openCount}</div>
-        </div>
-      </div>
+      </section>
 
-      <div className="advances-layout">
-        <section className="card advances-list-card">
+      <section className="advances-workspace" aria-labelledby="advances-list-title">
+        <div className="advances-section-header advances-section-header--list">
+          <div>
+            <h2 id="advances-list-title">Vorschussliste</h2>
+            <p className="helper">Vorschuss auswählen und Buchungen oder Auflösung bearbeiten.</p>
+          </div>
+          <span className="helper">{total} Eintrag{total === 1 ? '' : 'e'}</span>
+        </div>
+
+        <div className="advances-layout">
+        <section className="advances-list-card">
           <div className="advances-toolbar">
             <input
               className="input"
@@ -677,7 +694,7 @@ export default function AdvancesView() {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className={row.id === selectedId ? 'advances-row-active' : ''} onClick={() => setSelectedId(row.id)}>
+                    <tr key={row.id} className={row.id === selectedId ? 'advances-row-active' : ''} aria-selected={row.id === selectedId} onClick={() => setSelectedId(row.id)}>
                       <td>
                         <div>{row.memberName || row.recipientName}</div>
                         <div className="helper">{fmtDate(row.issuedAt)}</div>
@@ -695,10 +712,9 @@ export default function AdvancesView() {
               </table>
             </div>
           )}
-          <div className="helper">{total} Eintrag{total === 1 ? '' : 'e'}</div>
         </section>
 
-        <section className="card advances-detail-card">
+        <section className="advances-detail-card">
           {!detail ? (
             <div className="helper">Wähle links einen Vorschuss aus.</div>
           ) : (
@@ -783,8 +799,9 @@ export default function AdvancesView() {
               )}
             </>
           )}
-        </section>
-      </div>
+          </section>
+        </div>
+      </section>
 
       {createOpen && (
         <div className="modal-overlay" onClick={() => setCreateOpen(false)} role="dialog" aria-modal="true">

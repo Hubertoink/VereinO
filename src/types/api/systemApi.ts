@@ -33,6 +33,7 @@ interface StorageLocation {
 interface OrganizationAppearance {
     colorTheme: string | null
     backgroundImage: string | null
+    backgroundImageVisibility: number | null
     customBackgroundImage: string | null
     glassModals: boolean
 }
@@ -192,6 +193,7 @@ export interface SystemApi {
             orgId: string
             colorTheme?: string
             backgroundImage?: string
+            backgroundImageVisibility?: number
             customBackgroundImage?: string | null
             glassModals?: boolean
         }) => Promise<{ success: boolean }>

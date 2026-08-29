@@ -125,6 +125,8 @@ export function SettingsView(props: SettingsProps) {
             setJournalRowDensity={props.setJournalRowDensity}
             backgroundImage={props.backgroundImage}
             setBackgroundImage={props.setBackgroundImage}
+            backgroundImageVisibility={props.backgroundImageVisibility}
+            setBackgroundImageVisibility={props.setBackgroundImageVisibility}
             customBackgroundImage={props.customBackgroundImage}
             setCustomBackgroundImage={props.setCustomBackgroundImage}
             glassModals={props.glassModals}
