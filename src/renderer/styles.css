@@ -18767,7 +18767,7 @@ textarea {
   min-width: 0;
   border: 0;
   border-radius: 0;
-  background: var(--surface-alt, var(--surface));
+  background: var(--surface);
   box-shadow: none;
 }
 
@@ -18788,7 +18788,7 @@ textarea {
   min-height: 44px;
   padding: 0;
   border-inline: 1px solid var(--border);
-  background: var(--surface-alt, var(--surface));
+  background: var(--surface);
   color: var(--text-dim);
   font-size: 14px;
 }

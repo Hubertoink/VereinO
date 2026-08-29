@@ -1,11 +1,12 @@
 import React from 'react'
 
-export type AppIconSize = 'inline' | 'control' | 'action'
+export type AppIconSize = 'inline' | 'control' | 'action' | 'hero'
 
 const SIZE_BY_VARIANT: Record<AppIconSize, number> = {
   inline: 14,
   control: 16,
-  action: 18
+  action: 18,
+  hero: 32
 }
 
 export default function AppIcon({
