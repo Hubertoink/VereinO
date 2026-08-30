@@ -1,4 +1,5 @@
 import React from 'react'
+import { IconDownload } from '@tabler/icons-react'
 
 type UpdateState = {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
@@ -68,7 +69,7 @@ export function UpdatesPane({ notify }: Props) {
   return (
     <div className="settings-pane">
       <div className="card settings-pane-card">
-        <div className="settings-title"><span aria-hidden="true">⬇️</span> <strong>Updates</strong></div>
+        <div className="settings-title"><IconDownload size={18} aria-hidden="true" /> <strong>Updates</strong></div>
         <div className="settings-sub">Installierte Version: {appVersion || updateState.currentVersion || 'unbekannt'}</div>
         <div className="settings-inline-toggle" style={{ marginTop: 10 }}>
           <label htmlFor="toggle-auto-update-check">Bei jedem Start nach Updates suchen</label>

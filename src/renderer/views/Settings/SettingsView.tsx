@@ -17,6 +17,7 @@ import { YearEndPane } from './panes/YearEndPane'
 import { UpdatesPane } from './panes/UpdatesPane'
 import { DoclingPane } from './panes/DoclingPane'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
+import { IconListDetails } from '@tabler/icons-react'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'general',
@@ -294,7 +295,7 @@ function DevBadge({ appVersion }: { appVersion: string }) {
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowChangelog(true) }}
         >
-          VereinO {appVersion && `(v${appVersion})`} <span style={{ fontSize: 10, opacity: 0.6 }}>📋</span>
+          VereinO {appVersion && `(v${appVersion})`} <IconListDetails size={13} aria-hidden="true" />
         </div>
         <div style={{ opacity: 0.85 }}>
           erstellt von{' '}

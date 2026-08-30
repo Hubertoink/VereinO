@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.6.2] - 2026-08-30
+
+### Geändert
+
+- Einstellungsnavigation und Importansicht vereinheitlicht und kompakter gestaltet.
+- Feste Emoji-Symbole in den Einstellungen durch konsistente Icons ersetzt.
+- Import-Reiter und Datei-Zuordnung mit klarer aktiver Markierung und responsiver Button-Anordnung überarbeitet.
+
 ## [3.5.0] - 2026-08-29
 
 ### Geändert

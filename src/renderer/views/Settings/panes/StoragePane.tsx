@@ -2,6 +2,7 @@ import React from 'react'
 import { StoragePaneProps } from '../types'
 import DbMigrateModal from '../../../DbMigrateModal'
 import { dispatchDataChanged } from '../../../utils/refresh'
+import { IconClock, IconDatabase, IconDeviceFloppy, IconFolder, IconRefresh, IconShieldCheck } from '@tabler/icons-react'
 
 import { useStorageLocation, useBackupSettings } from '../hooks'
 import { LocationInfoDisplay, BackupList } from '../components'
@@ -219,8 +220,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
         <div className="helper">Aktueller Speicherort</div>
         <LocationInfoDisplay info={info} />
         <div className="storage-actions">
-          <button className="btn" disabled={busy || locBusy} onClick={handlePickFolder}>📁 Ordner wählen…</button>
-          <button className="btn" disabled={busy || locBusy} onClick={handleResetToDefault}>↩️ Standard vergleichen…</button>
+          <button className="btn" disabled={busy || locBusy} onClick={handlePickFolder}><IconFolder size={16} aria-hidden="true" /> Ordner wählen…</button>
+          <button className="btn" disabled={busy || locBusy} onClick={handleResetToDefault}><IconRefresh size={16} aria-hidden="true" /> Standard vergleichen…</button>
         </div>
         {locError && <div className="error-text">{locError}</div>}
       </section>
@@ -228,18 +229,14 @@ export function StoragePane({ notify }: StoragePaneProps) {
       <section className="card storage-section">
         <div className="backup-section-header">
           <div className="backup-section-title">
-            <span aria-hidden="true">🛡️</span>
+            <IconShieldCheck size={22} aria-hidden="true" />
             <div>
               <strong>Datensicherung</strong>
               <div className="helper">Schütze deine Daten mit automatischen und manuellen Sicherungen.</div>
             </div>
           </div>
           <button className="btn primary" disabled={busy} onClick={doMakeBackup}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17 21 17 13 7 13 7 21"/>
-              <polyline points="7 3 7 8 15 8"/>
-            </svg>
+            <IconDeviceFloppy size={16} aria-hidden="true" />
             Jetzt sichern
           </button>
         </div>
@@ -248,7 +245,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
           {/* Auto-backup config */}
           <div className="backup-auto-card">
             <div className="backup-auto-header">
-              <span className="backup-auto-icon" aria-hidden="true">⏱️</span>
+              <IconClock className="backup-auto-icon" size={18} aria-hidden="true" />
               <span className="backup-auto-label">Automatische Sicherung</span>
               <select 
                 id="auto-backup-mode" 
@@ -285,7 +282,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
           {/* Backup directory config */}
           <div className="backup-dir-card">
             <div className="backup-dir-header">
-              <span className="backup-dir-icon" aria-hidden="true">📁</span>
+              <IconFolder className="backup-dir-icon" size={18} aria-hidden="true" />
               <span className="backup-dir-label">Speicherort</span>
             </div>
             <div className="backup-dir-path">
@@ -315,7 +312,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Datenverwaltung & Sicherheit */}
       <section className="card storage-section">
         <div className="settings-title">
-          <span aria-hidden="true">🗄️</span> <strong>Datenverwaltung & Sicherheit</strong>
+          <IconDatabase size={18} aria-hidden="true" /> <strong>Datenverwaltung & Sicherheit</strong>
         </div>
         <div className="settings-sub">Exportiere eine Sicherung oder importiere eine bestehende SQLite-Datei.</div>
         <div className="storage-actions">

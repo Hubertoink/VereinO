@@ -6,6 +6,7 @@ import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
 import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
 import { dispatchDataChanged } from '../../../utils/refresh'
+import { IconBuilding, IconLayoutList, IconTags } from '@tabler/icons-react'
 
 interface ActiveOrg {
   id: string
@@ -237,7 +238,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
         <div style={{ marginBottom: 12, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
             <div>
-              <strong>🏢 Aktive Organisation</strong>
+              <strong><IconBuilding size={16} aria-hidden="true" /> Aktive Organisation</strong>
               <div className="helper">Name der Organisation im Organisations-Wechsler</div>
             </div>
             <button className="btn" type="button" onClick={() => setShowNewOrgModal(true)}>
@@ -267,7 +268,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
 
       <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <strong>{profile === 'GENERAL' ? '🏷️ Allgemeine Budgetverwaltung' : '🏛️ Gemeinnützige Organisation'}</strong>
+          <strong>{profile === 'GENERAL' ? <><IconTags size={16} aria-hidden="true" /> Allgemeine Budgetverwaltung</> : <><IconBuilding size={16} aria-hidden="true" /> Gemeinnützige Organisation</>}</strong>
           <div className="helper" style={{ marginTop: 4 }}>
             {profile === 'GENERAL'
               ? 'Buchungen werden mit frei angelegten Kategorien gegliedert.'
@@ -287,7 +288,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
 
       {profile === 'GENERAL' && (
         <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <div><strong>🏷️ Kategorien</strong><div className="helper">Kategorien, Farben und Zeichen werden in einem eigenen Bereich verwaltet.</div></div>
+          <div><strong><IconTags size={16} aria-hidden="true" /> Kategorien</strong><div className="helper">Kategorien, Farben und Zeichen werden in einem eigenen Bereich verwaltet.</div></div>
           <button className="btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('settings:selectTile', { detail: { tile: 'categories' } }))}>Kategorien verwalten</button>
         </div>
       )}
@@ -295,7 +296,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
       {false && profile === 'GENERAL' && (
         <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ marginBottom: 10 }}>
-            <strong>🏷️ Kategorien</strong>
+            <strong><IconTags size={16} aria-hidden="true" /> Kategorien</strong>
             <div className="helper">Kategorien sind die verpflichtende Hauptgliederung deiner Buchungen.</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'end', maxWidth: 520 }}>
@@ -372,7 +373,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
 
       {/* Organization Display Settings */}
       <div>
-        <strong>📋 Anzeige-Einstellungen</strong>
+        <strong><IconLayoutList size={16} aria-hidden="true" /> Anzeige-Einstellungen</strong>
         <div className="helper">Diese Angaben erscheinen in der Titelleiste und in Exporten.</div>
       </div>
       {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}

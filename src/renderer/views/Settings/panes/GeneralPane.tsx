@@ -5,6 +5,7 @@ import HoverTooltip from '../../../components/common/HoverTooltip'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
 import { navItems, type NavKey } from '../../../utils/navItems'
 import { getNavIcon } from '../../../utils/navIcons'
+import { IconPalette, IconSparkles } from '@tabler/icons-react'
 
 /**
  * GeneralPane - Darstellung & Layout Settings
@@ -132,7 +133,7 @@ export function GeneralPane({
       {/* Setup (Erststart) – Reopen wizard */}
       <div className="card settings-pane-card">
         <div className="settings-title">
-          <span aria-hidden="true">✨</span> <strong>Setup (Erststart)</strong>
+          <IconSparkles size={18} aria-hidden="true" /> <strong>Setup (Erststart)</strong>
         </div>
         <div className="settings-sub">
           Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.
@@ -147,7 +148,7 @@ export function GeneralPane({
       {/* Cluster: Farbschema & Design - organization-specific */}
       <div className="card settings-card settings-pane-card">
         <div className="settings-title">
-          <span aria-hidden="true">🎨</span> <strong>Farbschema & Design</strong>
+          <IconPalette size={18} aria-hidden="true" /> <strong>Farbschema & Design</strong>
         </div>
         <div className="settings-sub">
           Diese Einstellungen werden pro Organisation gespeichert.

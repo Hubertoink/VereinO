@@ -2,6 +2,7 @@ import React from 'react'
 import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
 import CategoryModal, { type CategoryValue } from '../../../components/modals/CategoryModal'
 import { IconTrash, ICONS } from '../../../utils/icons'
+import { IconTag } from '@tabler/icons-react'
 import type { OrgPaneProps } from '../types'
 import { dispatchDataChanged } from '../../../utils/refresh'
 
@@ -47,13 +48,13 @@ export function CategoriesPane({ notify }: OrgPaneProps) {
   return <div style={{ display: 'grid', gap: 16 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}><span style={{ fontSize: 20 }}>🏷️</span><strong style={{ fontSize: 16 }}>Kategorien</strong><span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{values.length}</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}><IconTag size={20} aria-hidden="true" /><strong style={{ fontSize: 16 }}>Kategorien</strong><span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{values.length}</span></div>
         <div className="helper">Verwalte Namen, Farben und Zeichen. Kategorien gliedern Buchungen und Auswertungen.</div>
       </div>
       <button className="btn primary" onClick={() => setEditCategory({ name: '', color: '#00C853', icon: null })} style={{ whiteSpace: 'nowrap' }}>+ Neue Kategorie</button>
     </div>
 
-    {values.length === 0 ? <div className="card" style={{ padding: 32, textAlign: 'center' }}><div style={{ fontSize: 32, marginBottom: 8 }}>🏷️</div><div className="helper">Noch keine Kategorien vorhanden.</div><div className="helper" style={{ marginTop: 4 }}>Erstelle deine erste Kategorie mit dem Button oben.</div></div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+    {values.length === 0 ? <div className="card" style={{ padding: 32, textAlign: 'center' }}><IconTag size={32} aria-hidden="true" style={{ marginBottom: 8 }} /><div className="helper">Noch keine Kategorien vorhanden.</div><div className="helper" style={{ marginTop: 4 }}>Erstelle deine erste Kategorie mit dem Button oben.</div></div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
       {values.map((category) => {
         const color = category.color || 'var(--muted)'
         return <div key={category.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, opacity: category.isActive ? 1 : .58, background: category.color ? `${category.color}20` : 'var(--muted)', borderLeft: `4px solid ${color}` }}>

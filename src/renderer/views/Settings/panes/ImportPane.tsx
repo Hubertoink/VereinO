@@ -1,6 +1,7 @@
 import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
+import { IconListDetails } from '@tabler/icons-react'
 import { ImportXlsxCard } from '../components/ImportXlsxCard'
 import { MembersImportCard } from '../components/MembersImportCard'
 
@@ -69,35 +70,25 @@ export function ImportPane({ notify }: ImportPaneProps) {
           <div className="helper">Importiere Buchungen oder Mitglieder aus Excel-Dateien.</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}>📝 Log</button>
+          <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}><IconListDetails size={16} aria-hidden="true" /> Log</button>
         </div>
       </div>
 
       {/* Tab Buttons */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+      <div className="import-pane-tabs" role="tablist" aria-label="Importtyp">
         <button
-          className={`btn ${activeTab === 'vouchers' ? 'primary' : ''}`}
+          className={`import-pane-tab ${activeTab === 'vouchers' ? 'active' : ''}`}
           onClick={() => setActiveTab('vouchers')}
-          style={{ 
-            borderRadius: '8px 8px 0 0',
-            borderBottom: activeTab === 'vouchers' ? '2px solid var(--accent)' : '2px solid transparent',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
+          role="tab"
+          aria-selected={activeTab === 'vouchers'}
         >
           <VouchersIcon /> Buchungen
         </button>
         <button
-          className={`btn ${activeTab === 'members' ? 'primary' : ''}`}
+          className={`import-pane-tab ${activeTab === 'members' ? 'active' : ''}`}
           onClick={() => setActiveTab('members')}
-          style={{ 
-            borderRadius: '8px 8px 0 0',
-            borderBottom: activeTab === 'members' ? '2px solid var(--accent)' : '2px solid transparent',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
+          role="tab"
+          aria-selected={activeTab === 'members'}
         >
           <MembersIcon /> Mitglieder
         </button>

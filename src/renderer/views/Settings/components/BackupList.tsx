@@ -1,4 +1,5 @@
 import React from 'react'
+import { IconClock, IconDeviceFloppy, IconFolderOpen } from '@tabler/icons-react'
 import { BackupInfo } from '../types'
 
 interface BackupListProps {
@@ -15,7 +16,7 @@ export function BackupList({ backups, onRestore }: BackupListProps) {
   if (backups.length === 0) {
     return (
       <div className="backup-empty-state">
-        <span className="backup-empty-icon" aria-hidden="true">📂</span>
+        <IconFolderOpen className="backup-empty-icon" size={32} aria-hidden="true" />
         <span className="backup-empty-text">Noch keine Sicherungen vorhanden</span>
       </div>
     )
@@ -52,7 +53,7 @@ export function BackupList({ backups, onRestore }: BackupListProps) {
         return (
           <div key={i} className="backup-item">
             <div className="backup-item__icon" aria-hidden="true">
-              {type === 'manual' ? '💾' : '⏰'}
+              {type === 'manual' ? <IconDeviceFloppy size={20} /> : <IconClock size={20} />}
             </div>
             <div className="backup-item__info">
               <div className="backup-item__meta">

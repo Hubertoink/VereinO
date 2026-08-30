@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { dispatchDataChanged } from '../../../utils/refresh'
+import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconCreditCard, IconDeviceMobile, IconHome, IconNotes, IconPencil, IconPlayerSkipForward, IconUser } from '@tabler/icons-react'
 
 interface MembersImportCardProps {
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
@@ -160,15 +161,11 @@ const PreviewTable = memo(function PreviewTable({
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     {isHint ? (
-                      <span style={{ fontSize: 9, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                        ⏭️
-                      </span>
+                      <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}><IconPlayerSkipForward size={12} aria-label="Hinweis-Zeile wird übersprungen" /></span>
                     ) : hasErrors ? (
-                      <span style={{ fontSize: 9, color: 'var(--warning)', whiteSpace: 'nowrap' }} title={missingFields.join(', ')}>
-                        ⚠️
-                      </span>
+                      <span style={{ color: 'var(--warning)', whiteSpace: 'nowrap' }} title={missingFields.join(', ')}><IconAlertTriangle size={12} aria-label="Fehlende Pflichtfelder" /></span>
                     ) : (
-                      <span style={{ fontSize: 9, color: 'var(--success)' }}>✓</span>
+                      <span style={{ color: 'var(--success)' }}><IconCircleCheck size={12} aria-label="Zeile gültig" /></span>
                     )}
                   </td>
                   {headers.map((h) => {
@@ -217,9 +214,7 @@ const PreviewTable = memo(function PreviewTable({
       </div>
       {Object.keys(editedRows).length > 0 && (
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--primary)' }}>
-            ✏️ {Object.keys(editedRows).length} Zeile(n) bearbeitet
-          </span>
+          <span style={{ fontSize: 11, color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPencil size={13} aria-hidden="true" /> {Object.keys(editedRows).length} Zeile(n) bearbeitet</span>
           <button 
             className="btn secondary" 
             style={{ fontSize: 10, padding: '2px 6px' }}
@@ -587,7 +582,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
           {/* Compact mapping grid */}
           <div className="members-mapping-grid">
             <div className="mapping-section">
-              <div className="section-title">👤 Basisdaten</div>
+              <div className="section-title"><IconUser size={15} aria-hidden="true" /> Basisdaten</div>
               <Field keyName="memberNo" />
               <Field keyName="name" />
               <Field keyName="firstName" />
@@ -595,24 +590,24 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
               <Field keyName="status" />
             </div>
             <div className="mapping-section">
-              <div className="section-title">📱 Kontakt</div>
+              <div className="section-title"><IconDeviceMobile size={15} aria-hidden="true" /> Kontakt</div>
               <Field keyName="email" />
               <Field keyName="phone" />
             </div>
             <div className="mapping-section">
-              <div className="section-title">🏠 Adresse</div>
+              <div className="section-title"><IconHome size={15} aria-hidden="true" /> Adresse</div>
               <Field keyName="address" />
               <Field keyName="street" />
               <Field keyName="zip" />
               <Field keyName="city" />
             </div>
             <div className="mapping-section">
-              <div className="section-title">📅 Mitgliedschaft</div>
+              <div className="section-title"><IconCalendar size={15} aria-hidden="true" /> Mitgliedschaft</div>
               <Field keyName="join_date" />
               <Field keyName="leave_date" />
             </div>
             <div className="mapping-section">
-              <div className="section-title">💳 Beitrag & SEPA</div>
+              <div className="section-title"><IconCreditCard size={15} aria-hidden="true" /> Beitrag & SEPA</div>
               <Field keyName="contribution_amount" />
               <Field keyName="contribution_interval" />
               <Field keyName="iban" />
@@ -621,7 +616,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
               <Field keyName="mandate_date" />
             </div>
             <div className="mapping-section">
-              <div className="section-title">📝 Sonstiges</div>
+              <div className="section-title"><IconNotes size={15} aria-hidden="true" /> Sonstiges</div>
               <Field keyName="notes" />
             </div>
           </div>

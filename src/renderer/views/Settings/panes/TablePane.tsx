@@ -1,6 +1,7 @@
 import React from 'react'
 import { TablePaneProps, ColKey } from '../types'
 import { DnDOrder } from '../components'
+import { IconPaperclip, IconSettings } from '@tabler/icons-react'
 
 /**
  * TablePane - Table Column Configuration
@@ -189,7 +190,7 @@ export function TablePane({
               <tr>
                 {effectiveOrder.filter(k => cols[k]).map(k => (
                   <td key={k} style={{ paddingTop: 6, color: 'var(--text-dim)' }}>
-                    {k === 'actions' ? '⚙️' : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'note' ? 'Kommentar' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? '📎' : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
+                    {k === 'actions' ? <IconSettings size={16} aria-label="Aktionen" /> : k === 'date' ? '2025-01-15' : k === 'voucherNo' ? 'B-001' : k === 'type' ? 'IN' : k === 'sphere' ? 'IDEELL' : k === 'description' ? 'Beispiel' : k === 'note' ? 'Kommentar' : k === 'earmark' ? '—' : k === 'budget' ? '—' : k === 'paymentMethod' ? 'BANK' : k === 'attachments' ? <IconPaperclip size={16} aria-label="Anhang" /> : k === 'net' ? '42,02' : k === 'vat' ? '7,98' : k === 'gross' ? '50,00' : '—'}
                   </td>
                 ))}
               </tr>

@@ -264,10 +264,6 @@ export function SettingsNav({ active, onSelect, organizationProfile }: SettingsN
       className="settings-nav-shell"
       onMouseLeave={() => setOpenGroupKey(null)}
     >
-      <div className="settings-nav-meta">
-        <span className="settings-nav-eyebrow">Bereiche</span>
-      </div>
-
       <div className="settings-clusters" role="tablist" aria-label="Einstellungsbereiche">
         {groups.map((group) => {
           const groupIsActive = group.key === activeGroupKey

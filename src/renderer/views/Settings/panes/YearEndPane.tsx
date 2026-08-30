@@ -1,6 +1,7 @@
 import React from 'react'
 import { YearEndPaneProps } from '../types'
 import { dispatchDataChanged } from '../../../utils/refresh'
+import { IconCash, IconCircleCheck, IconDownload, IconLock, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
 
 /**
  * YearEndPane - Year-End Closing: Preview, Export, Close/Reopen
@@ -75,7 +76,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
       <section className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, background: isLocked ? 'color-mix(in oklab, var(--danger) 12%, transparent)' : 'color-mix(in oklab, var(--accent) 12%, transparent)' }}>
-            <span aria-hidden>🛡️</span>
+            <IconLock size={20} aria-hidden="true" />
             <div>
               <div className="helper">Sperrstatus</div>
               <div>
@@ -97,9 +98,9 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
       <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
         <div className="helper">Interaktive Schritte</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" disabled={busy} onClick={doExport}>📤 Export-Paket</button>
+          <button className="btn" disabled={busy} onClick={doExport}><IconDownload size={16} aria-hidden="true" /> Export-Paket</button>
           {!closeDisabled && (
-            <button className="btn danger" disabled={busy} onClick={() => setConfirmAction({ type: 'close' })}>✅ Jahr abschließen…</button>
+            <button className="btn danger" disabled={busy} onClick={() => setConfirmAction({ type: 'close' })}><IconCircleCheck size={16} aria-hidden="true" /> Jahr abschließen…</button>
           )}
           {closeDisabled && (
             <button className="btn" disabled={busy} onClick={() => setConfirmAction({ type: 'reopen' })}>Wieder öffnen…</button>
@@ -114,7 +115,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Einnahmen</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>📈</span>
+                <IconTrendingUp size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: 'var(--success)' }}>
                   {eur.format(preview.totals.inGross || 0)}
                 </div>
@@ -123,7 +124,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Ausgaben</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>📉</span>
+                <IconTrendingDown size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
                   {eur.format(Math.abs(preview.totals.outGross || 0))}
                 </div>
@@ -132,7 +133,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Saldo</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>💰</span>
+                <IconCash size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: (preview.totals.inGross - Math.abs(preview.totals.outGross)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                   {eur.format(preview.totals.inGross - Math.abs(preview.totals.outGross))}
                 </div>
@@ -149,7 +150,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Einnahmen</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>📈</span>
+                <IconTrendingUp size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: 'var(--success)' }}>
                   {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0))}
                 </div>
@@ -158,7 +159,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Ausgaben</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>📉</span>
+                <IconTrendingDown size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
                   {eur.format(Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
                 </div>
@@ -167,7 +168,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
             <div className="card" style={{ padding: 12 }}>
               <div className="helper">Saldo</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span aria-hidden style={{ fontSize: 20 }}>💰</span>
+                <IconCash size={20} aria-hidden="true" />
                 <div style={{ fontWeight: 600, color: ((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                   {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
                 </div>

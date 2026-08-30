@@ -275,7 +275,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   return (
-    <div className="card import-assistant" style={{ padding: 12 }}>
+    <div className="card import-assistant">
       <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
       <div className="import-steps">
         {['Datei', 'Zuordnung', 'Validierung & Entwurf'].map((label, index) => (
@@ -284,16 +284,15 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       </div>
 
       <div
-        className="input"
+        className="import-file-zone input"
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer?.files?.[0]; if (f) processFile(f) }}
-        style={{ marginTop: 10, padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderRadius: 12, border: '1px dashed var(--border)' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="import-file-choice">
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>Datei auswählen</button>
-          <span className="helper">{fileName || 'Keine ausgewählt'}</span>
+          <span className="helper import-file-name">{fileName || 'Keine ausgewählt'}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="import-file-actions">
           <button className="btn" onClick={async () => {
             try {
               const res = await window.api?.imports.template?.()
