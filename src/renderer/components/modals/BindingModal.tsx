@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { IconTrash, IconX } from '@tabler/icons-react'
-import ModalHeader from '../ModalHeader'
 import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'
+import BookingPopupFrame from './BookingPopupFrame'
 
 // Local contrast helper (kept self-contained)
 function contrastText(bg?: string | null) {
@@ -73,14 +72,15 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
     return () => window.removeEventListener('keydown', onKey)
   }, [v])
 
-  return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal standard-floating-modal binding-floating-modal" onClick={(e) => e.stopPropagation()}>
-        <ModalHeader
-          title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
-          onClose={onClose}
-          closeButtonClassName="booking-modal-icon-btn booking-modal-close-btn"
-        />
+  return (
+    <BookingPopupFrame
+      title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
+      onClose={onClose}
+      variant="compact"
+      anchorAlign="end"
+      className="standard-floating-modal binding-floating-modal"
+    >
+      <div className="binding-modal-content">
         <div className="row">
           <div className={`field standard-floating-field${v.code.trim() ? ' standard-floating-field--filled' : ''}`}>
             <label htmlFor="binding-code">Code <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -183,7 +183,6 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <button className="btn primary" onClick={() => save()}>Speichern</button>
           </div>
         </div>
-      </div>
       {askDelete && v.id && (
         <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
           <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
@@ -235,7 +234,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
           </div>
         </div>
       )}
-    </div>,
-    document.body
+      </div>
+    </BookingPopupFrame>
   )
 }

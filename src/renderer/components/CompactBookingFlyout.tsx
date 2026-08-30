@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { QA } from '../hooks/useQuickAdd'
-import { rememberBookingAIPattern } from '../utils/bookingAiPatterns'
+import {
+  AI_PATTERNS_CHANGED_EVENT,
+  buildAISuggestions,
+  readAISuggestionLearning,
+  rememberBookingAIPattern,
+  type BookingAISuggestion
+} from '../utils/bookingAiPatterns'
 import TagsEditor from './TagsEditor'
 import HoverTooltip from './common/HoverTooltip'
 import PartySelector from './common/PartySelector'
@@ -159,8 +165,11 @@ export default function CompactBookingFlyout({
 }: Props) {
   const amountInputRef = useRef<HTMLInputElement | null>(null)
   const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const aiAssistRef = useRef<HTMLDivElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
   const [classification, setClassification] = useState<null | { profile: string; label: string; values: Array<any> }>(null)
+  const [aiMenuOpen, setAiMenuOpen] = useState(false)
+  const [aiLearningVersion, setAiLearningVersion] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -196,6 +205,51 @@ export default function CompactBookingFlyout({
   const defaultBank = activeAccounts.find((account) => account.kind === 'BANK')
     ?? activeAccounts.find((account) => account.id !== defaultCash?.id)
     ?? activeAccounts[0]
+
+  const aiLearning = useMemo(() => readAISuggestionLearning(), [aiLearningVersion])
+  const aiSuggestions = useMemo(
+    () => buildAISuggestions({
+      description: qa.description || '',
+      grossAmount: gross,
+      currentTags: qa.tags || [],
+      currentType: qa.type,
+      currentSphere: qa.sphere,
+      currentBudgets: budgets.map((item) => ({ id: item.budgetId, amount: item.amount })),
+      currentEarmarks: assignedEarmarks.map((item) => ({ id: item.earmarkId, amount: item.amount })),
+      currentPaymentAccountId: qa.paymentAccountId || null,
+      currentTransferFromAccountId: qa.transferFromAccountId || null,
+      currentTransferToAccountId: qa.transferToAccountId || null,
+      tagDefs,
+      paymentAccounts: activeAccounts,
+      learning: aiLearning
+    }),
+    [activeAccounts, aiLearning, assignedEarmarks, budgets, gross, qa.description, qa.paymentAccountId, qa.sphere, qa.tags, qa.transferFromAccountId, qa.transferToAccountId, qa.type, tagDefs]
+  )
+
+  useEffect(() => {
+    const refreshLearning = () => setAiLearningVersion((value) => value + 1)
+    window.addEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
+    window.addEventListener('storage', refreshLearning)
+    return () => {
+      window.removeEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
+      window.removeEventListener('storage', refreshLearning)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!aiSuggestions.length) setAiMenuOpen(false)
+  }, [aiSuggestions.length])
+
+  useEffect(() => {
+    if (!aiMenuOpen) return
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && aiAssistRef.current?.contains(target)) return
+      setAiMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutside)
+    return () => document.removeEventListener('pointerdown', closeOnOutside)
+  }, [aiMenuOpen])
 
   const invalidBudgetIds = new Set(
     budgets
@@ -315,6 +369,80 @@ export default function CompactBookingFlyout({
       }
     }
     setQa(next)
+  }
+
+  const applyAISuggestion = (suggestion: BookingAISuggestion) => {
+    const next = { ...qa } as QA
+    if (suggestion.type && suggestion.type !== next.type) {
+      next.type = suggestion.type
+      if (suggestion.type === 'TRANSFER') {
+        next.mode = 'GROSS'
+        next.vatRate = 0
+        next.transferFromAccountId = next.transferFromAccountId ?? defaultCash?.id ?? null
+        next.transferFromAccountName = accountsById.get(Number(next.transferFromAccountId || 0))?.name ?? defaultCash?.name ?? null
+        next.transferFrom = accountMethod(accountsById.get(Number(next.transferFromAccountId || 0))?.kind ?? defaultCash?.kind)
+        next.transferToAccountId = next.transferToAccountId ?? defaultBank?.id ?? null
+        next.transferToAccountName = accountsById.get(Number(next.transferToAccountId || 0))?.name ?? defaultBank?.name ?? null
+        next.transferTo = accountMethod(accountsById.get(Number(next.transferToAccountId || 0))?.kind ?? defaultBank?.kind)
+        next.paymentAccountId = null
+        next.paymentAccountName = null
+      } else if (suggestion.type === 'INTERNAL') {
+        next.mode = 'GROSS'
+        next.vatRate = 0
+        next.paymentAccountId = null
+        next.paymentAccountName = null
+        next.paymentMethod = undefined
+        next.transferFromAccountId = null
+        next.transferToAccountId = null
+      } else {
+        next.transferFromAccountId = null
+        next.transferToAccountId = null
+        if (!next.paymentAccountId) {
+          const fallback = suggestion.type === 'IN' ? defaultBank : (defaultCash || defaultBank)
+          next.paymentAccountId = fallback?.id ?? null
+          next.paymentAccountName = fallback?.name ?? null
+          next.paymentMethod = accountMethod(fallback?.kind)
+        }
+      }
+    }
+    if (suggestion.sphere) next.sphere = suggestion.sphere
+    if (suggestion.paymentAccountId && next.type !== 'TRANSFER' && next.type !== 'INTERNAL') {
+      const account = accountsById.get(Number(suggestion.paymentAccountId))
+      next.paymentAccountId = account?.id ?? suggestion.paymentAccountId
+      next.paymentAccountName = account?.name ?? next.paymentAccountName
+      next.paymentMethod = accountMethod(account?.kind) || next.paymentMethod
+    }
+    if (suggestion.transferFromAccountId && next.type === 'TRANSFER') {
+      const account = accountsById.get(Number(suggestion.transferFromAccountId))
+      next.transferFromAccountId = account?.id ?? suggestion.transferFromAccountId
+      next.transferFromAccountName = account?.name ?? next.transferFromAccountName
+      next.transferFrom = accountMethod(account?.kind) || next.transferFrom
+    }
+    if (suggestion.transferToAccountId && next.type === 'TRANSFER') {
+      const account = accountsById.get(Number(suggestion.transferToAccountId))
+      next.transferToAccountId = account?.id ?? suggestion.transferToAccountId
+      next.transferToAccountName = account?.name ?? next.transferToAccountName
+      next.transferTo = accountMethod(account?.kind) || next.transferTo
+    }
+    const currentTags = next.tags || []
+    const tagNames = new Set(currentTags.map((tag) => tag.toLowerCase()))
+    next.tags = [...currentTags, ...(suggestion.tags || []).filter((tag) => !tagNames.has(tag.toLowerCase()))]
+    const currentBudgetIds = new Set(budgets.map((item) => item.budgetId))
+    const currentEarmarkIds = new Set(assignedEarmarks.map((item) => item.earmarkId))
+    next.budgets = [
+      ...budgets,
+      ...(suggestion.budgets || [])
+        .filter((item) => item.id && !currentBudgetIds.has(item.id))
+        .map((item) => ({ budgetId: item.id, amount: item.amountMode === 'FULL' ? gross : Number(item.amount || gross || 0) }))
+    ]
+    next.earmarksAssigned = [
+      ...assignedEarmarks,
+      ...(suggestion.earmarks || [])
+        .filter((item) => item.id && !currentEarmarkIds.has(item.id))
+        .map((item) => ({ earmarkId: item.id, amount: item.amountMode === 'FULL' ? gross : Number(item.amount || gross || 0) }))
+    ]
+    setQa(next)
+    setAiMenuOpen(false)
   }
 
   const setSectionVisible = (section: OptionalSection) => {
@@ -707,8 +835,63 @@ export default function CompactBookingFlyout({
         </div>
 
         <footer className="compact-booking-flyout__footer">
-          <div className={validationMessage ? 'compact-booking-error' : 'compact-booking-footer-hint'} role={validationMessage ? 'alert' : undefined}>
-            {validationMessage || (afterSaveDefault === 'new' ? 'Speichert und öffnet eine neue Buchung.' : 'Strg+S zum Speichern')}
+          <div className="compact-booking-flyout__footer-main">
+            {aiSuggestions.length > 0 && (
+              <div className="booking-ai-assist compact-booking-ai-assist" ref={aiAssistRef}>
+                <button
+                  type="button"
+                  className="btn ghost booking-ai-assist__trigger"
+                  onClick={() => setAiMenuOpen((open) => !open)}
+                  aria-label="Intelligente Buchungsvorschläge"
+                  aria-expanded={aiMenuOpen}
+                  title="Intelligente Vorschläge"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2l1.7 5.1L19 9l-5.3 1.9L12 16l-1.7-5.1L5 9l5.3-1.9L12 2z" />
+                    <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" />
+                    <path d="M5 15l.7 1.8L7.5 17.5l-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z" />
+                  </svg>
+                  <span>{aiSuggestions.length}</span>
+                </button>
+                {aiMenuOpen && (
+                  <div className="booking-ai-assist__panel" role="dialog" aria-label="Intelligente Buchungsvorschläge">
+                    <div className="booking-ai-assist__panel-head">
+                      <strong>Vorschläge erkannt</strong>
+                      <span>Lokal gelerntes Muster</span>
+                    </div>
+                    <div className="booking-ai-assist__list">
+                      {aiSuggestions.map((suggestion) => (
+                        <div key={suggestion.key} className="booking-ai-suggestion">
+                          <div className="booking-ai-suggestion__copy">
+                            <strong>{suggestion.title}</strong>
+                            <span>{suggestion.reason}{suggestion.learned ? ' · gelernt' : ''}</span>
+                          </div>
+                          <div className="booking-ai-suggestion__chips">
+                            {suggestion.type && <span className="booking-ai-chip booking-ai-chip--neutral">{suggestion.type}</span>}
+                            {suggestion.sphere && <span className="booking-ai-chip booking-ai-chip--sphere">{suggestion.sphere}</span>}
+                            {(suggestion.tags || []).map((tag) => <span className="booking-ai-chip booking-ai-chip--tag" key={`${suggestion.key}-${tag}`}>{tag}</span>)}
+                            {(suggestion.budgets || []).map((budget) => {
+                              const info = activeBudgets.find((item) => item.id === budget.id)
+                              return <span className="booking-ai-chip booking-ai-chip--budget" key={`${suggestion.key}-budget-${budget.id}`}>{info?.label || `Budget #${budget.id}`}</span>
+                            })}
+                            {(suggestion.earmarks || []).map((earmark) => {
+                              const info = activeEarmarks.find((item) => item.id === earmark.id)
+                              return <span className="booking-ai-chip booking-ai-chip--earmark" key={`${suggestion.key}-earmark-${earmark.id}`}>{info ? `${info.code} ${info.name}` : `Zweckbindung #${earmark.id}`}</span>
+                            })}
+                          </div>
+                          <div className="booking-ai-suggestion__actions">
+                            <button type="button" className="btn primary booking-ai-suggestion__apply" onClick={() => applyAISuggestion(suggestion)} title="Vorschlag übernehmen" aria-label={`${suggestion.title} übernehmen`}>+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className={validationMessage ? 'compact-booking-error' : 'compact-booking-footer-hint'} role={validationMessage ? 'alert' : undefined}>
+              {validationMessage || (afterSaveDefault === 'new' ? 'Speichert und öffnet eine neue Buchung.' : 'Strg+S zum Speichern')}
+            </div>
           </div>
           <div>
             <button type="submit" className="btn primary" disabled={saveBlocked}>Buchung speichern</button>

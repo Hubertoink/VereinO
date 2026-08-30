@@ -67,6 +67,7 @@ export type BookingAIPatternRow = {
 const AI_SUGGESTION_STORAGE_KEY = 'booking.aiSuggestions.v1'
 const AI_SUGGESTION_ENABLED_KEY = 'booking.aiSuggestions.enabled'
 export const AI_PATTERNS_CHANGED_EVENT = 'booking-ai-patterns:changed'
+const MIN_LEARNED_PATTERN_OCCURRENCES = 2
 
 const BUILT_IN_BOOKING_AI_RULES: BookingAISuggestion[] = [
   {
@@ -342,7 +343,7 @@ export function buildAISuggestions(input: {
 
   for (const [key, learned] of Object.entries(input.learning)) {
     if (!key.startsWith('text:') && !key.startsWith('phrase:')) continue
-    if (learned.disabled || learned.accepted <= 0) continue
+    if (learned.disabled || Number(learned.accepted || 0) < MIN_LEARNED_PATTERN_OCCURRENCES) continue
     const token = key.includes(':') ? key.slice(key.indexOf(':') + 1) : ''
     if (!token || !text.includes(token)) continue
     const amountMatches = learned.amountCents ? Math.abs(Math.round(input.grossAmount * 100) - learned.amountCents) <= 1 : false
@@ -461,7 +462,10 @@ export function listBookingAIPatternRows(): BookingAIPatternRow[] {
     lastUsedAt: learning[rule.key]?.lastUsedAt,
   }))
   const learned = Object.entries(learning)
-    .filter(([key]) => key.startsWith('text:') || key.startsWith('phrase:'))
+    .filter(([key, value]) =>
+      (key.startsWith('text:') || key.startsWith('phrase:')) &&
+      Number(value.accepted || 0) >= MIN_LEARNED_PATTERN_OCCURRENCES
+    )
     .map(([key, value]) => ({
       key,
       title: key.startsWith('phrase:') ? key.slice(7) : key.slice(5),

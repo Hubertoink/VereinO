@@ -161,8 +161,8 @@ export default function BudgetsView({
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div className="budget-management-surface" style={{ padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="helper">Budgets verwalten und Fortschritt verfolgen</div>
+        <div className="management-page-heading">
+          <h1>Budgets</h1>
           <button
             className="btn primary btn-with-icon"
             onClick={() =>

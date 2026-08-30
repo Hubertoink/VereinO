@@ -3670,8 +3670,6 @@ function AppInner() {
               activateKey={reportsActivateKey}
             />
           )}
-          {activePage === 'Zweckbindungen' && <h1>Zweckbindungen</h1>}
-          {activePage === 'Budgets' && <h1>Budgets</h1>}
           {activePage === 'Dashboard' && (
             <DashboardView
               today={today}

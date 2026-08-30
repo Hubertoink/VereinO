@@ -43,7 +43,7 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
               <span className="divider-v" aria-hidden="true" />
             )}
             <button
-              className={`btn ghost nav-btn has-tooltip ${isActive ? 'active' : ''} ${isAiRunning ? 'ai-nav-running' : ''}`}
+              className={`btn ghost nav-btn has-tooltip no-drag ${isActive ? 'active' : ''} ${isAiRunning ? 'ai-nav-running' : ''}`}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
               aria-label={isAiRunning ? `${item.label}: Anfrage läuft` : item.label}

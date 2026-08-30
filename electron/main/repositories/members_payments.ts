@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { getSetting } from '../services/settings'
+import { scoreContributionVoucherMatch } from '../../../shared/contributionVoucherMatching'
 
 type DB = InstanceType<typeof Database>
 
@@ -201,51 +202,30 @@ export function unmark(input: { memberId: number; periodKey: string }) {
 export function suggestVouchers(input: { name?: string; amount: number; periodKey: string; memberId?: number }) {
   const d = getDb()
   const { amount, name, periodKey } = input
-  // Widen window: from period start - 60 days up to today (helps for older dues)
+  // Automatic suggestions must belong to the requested contribution period.
   const pr = periodRange(periodKey, guessInterval(periodKey))
-  const start = new Date(pr.start); start.setUTCDate(start.getUTCDate() - 60)
-  const today = new Date()
-  const startISO = start.toISOString().slice(0,10)
-  const endISO = today.toISOString().slice(0,10)
-  
-  // Match exact amount OR multiples (2x, 3x, 4x, 5x, 6x) for combined payments
-  // Build amount conditions: amount ±0.05, 2*amount ±0.10, 3*amount ±0.15, etc.
-  const amountConditions: string[] = []
-  for (let mult = 1; mult <= 6; mult++) {
-    const target = amount * mult
-    const tolerance = 0.05 * mult
-    amountConditions.push(`ABS(v.gross_amount - ${target}) <= ${tolerance}`)
-  }
-  const amountClause = `(${amountConditions.join(' OR ')})`
-  
-  // Build name conditions: match ANY part of the name (firstname OR lastname)
-  // This helps find "Umut Mitgliedsbeitrag" when searching for "Umut Tanis"
-  let nameClause = '1=1'  // Default: no name filter
-  const nameParams: string[] = []
-  if (name) {
-    const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length >= 2)
-    if (nameParts.length > 0) {
-      const nameConditions = nameParts.map(() => 
-        `LOWER(IFNULL(v.description,'') || ' ' || IFNULL(v.counterparty,'')) LIKE ?`
-      )
-      // Match if ANY name part is found OR contains 'mitglied'/'beitrag'
-      nameClause = `(${nameConditions.join(' OR ')} OR LOWER(IFNULL(v.description,'')) LIKE '%mitglied%' OR LOWER(IFNULL(v.description,'')) LIKE '%beitrag%')`
-      nameParts.forEach(p => nameParams.push(`%${p}%`))
-    }
-  }
-  
+
   // Exclude vouchers already assigned to ANY member
   const rows = d.prepare(`
     SELECT v.id, v.voucher_no as voucherNo, v.date, v.description, v.counterparty, v.gross_amount as gross
     FROM vouchers v
     WHERE v.date BETWEEN ? AND ?
-      AND ${amountClause}
-      AND ${nameClause}
+      AND ABS(v.gross_amount - ?) <= 0.01
       AND v.id NOT IN (SELECT voucher_id FROM membership_payments WHERE voucher_id IS NOT NULL)
     ORDER BY v.date DESC
-    LIMIT 10
-  `).all(startISO, endISO, ...nameParams) as any[]
-  return { rows }
+  `).all(pr.start, pr.end, amount) as any[]
+
+  const matchingRows = rows.filter((row) => scoreContributionVoucherMatch({
+    amount,
+    periodStart: pr.start,
+    periodEnd: pr.end,
+    memberName: name,
+    voucherAmount: row.gross,
+    voucherDate: row.date,
+    voucherDescription: row.description,
+    voucherCounterparty: row.counterparty,
+  }))
+  return { rows: matchingRows.slice(0, 10) }
 }
 
 function normalize(s: string) { return s.toLowerCase() }

@@ -2043,6 +2043,32 @@ export default function BankImportView({
     <div className="bank-import-container">
       <div className="bank-page-header">
         <h1>Bankimport</h1>
+      </div>
+
+      <div className="bank-overview-row">
+        <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
+        {(
+          [
+            ['ALL', 'Gesamt', stats.total],
+            ['OPEN', 'Offen', stats.open],
+            ['LINKED', 'Zugeordnet', stats.linked],
+            ['CHECKED', 'Geprüft', stats.checked]
+          ] as const
+        ).map(([key, label, count]) => (
+          <button
+            key={key}
+            className={status === key ? 'active' : ''}
+            onClick={() => {
+              setStatus(key)
+              setPage(1)
+            }}
+          >
+            <span>{label}</span>
+            <strong>{count}</strong>
+          </button>
+        ))}
+        </div>
+
         <div className="bank-page-tools">
           <div className="bank-search-wrap">
             <input
@@ -2069,22 +2095,24 @@ export default function BankImportView({
               </button>
             )}
           </div>
-          <BankImportHistoryDropdown status={importStatus} />
-          <BankAccountFilterDropdown
-            accounts={activeAccounts}
-            value={accountId}
-            onApply={(nextAccountId) => {
-              setAccountId(nextAccountId)
-              setPage(1)
-            }}
-          />
-          <div className="filter-divider" />
-          <BankImportActionDropdown
-            onOpenImport={(file) => {
-              setInitialImportFile(file || null)
-              setShowImport(true)
-            }}
-          />
+          <div className="journal-filter-toolbar bank-import-filter-toolbar">
+            <BankImportHistoryDropdown status={importStatus} />
+            <BankAccountFilterDropdown
+              accounts={activeAccounts}
+              value={accountId}
+              onApply={(nextAccountId) => {
+                setAccountId(nextAccountId)
+                setPage(1)
+              }}
+            />
+            <div className="filter-divider" />
+            <BankImportActionDropdown
+              onOpenImport={(file) => {
+                setInitialImportFile(file || null)
+                setShowImport(true)
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -2106,29 +2134,6 @@ export default function BankImportView({
           </span>
         </div>
       )}
-
-      <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
-        {(
-          [
-            ['ALL', 'Gesamt', stats.total],
-            ['OPEN', 'Offen', stats.open],
-            ['LINKED', 'Zugeordnet', stats.linked],
-            ['CHECKED', 'Geprüft', stats.checked]
-          ] as const
-        ).map(([key, label, count]) => (
-          <button
-            key={key}
-            className={status === key ? 'active' : ''}
-            onClick={() => {
-              setStatus(key)
-              setPage(1)
-            }}
-          >
-            <span>{label}</span>
-            <strong>{count}</strong>
-          </button>
-        ))}
-      </div>
 
       <div className="bank-table-card">
         <table className="bank-table">

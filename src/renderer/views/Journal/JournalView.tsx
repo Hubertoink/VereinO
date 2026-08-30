@@ -863,7 +863,7 @@ export default function JournalView({
     return (
         <div className="journal-view">
             {/* Filter Toolbar */}
-            <div className="journal-filter-toolbar">
+            <div className="journal-filter-controls">
                 <div className="journal-filter-toolbar__search-wrap">
                     <input
                         ref={searchInputRef}
@@ -878,8 +878,33 @@ export default function JournalView({
                     />
                 </div>
 
-                <div className="filter-divider" />
+                {/* Active filter chips stay beside the search field to keep the toolbar compact. */}
+                {chips.length > 0 && (
+                    <div className="journal-filter-chips">
+                        {chips.map((c) => {
+                            const bg = c.color || undefined
+                            const fg = bg ? (parseInt(bg.slice(1), 16) > 0x7fffff ? '#222' : '#fff') : undefined
+                            return (
+                                <span key={c.key} className="chip" style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>
+                                    {c.label}
+                                    <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={bg ? { color: fg } : undefined}><AppIcon icon={IconX} size="inline" /></button>
+                                </span>
+                            )
+                        })}
+                        {hasActiveFilters && (
+                            <button
+                                className="btn ghost"
+                                title="Alle Filter zurücksetzen"
+                                onClick={resetAllFilters}
+                                style={{ padding: '4px 8px', color: 'var(--accent)' }}
+                            >
+                                <AppIcon icon={IconX} size="control" />
+                            </button>
+                        )}
+                    </div>
+                )}
 
+                <div className="journal-filter-toolbar">
                 {/* Filter-Cluster: Zeit- und Meta-Filter */}
                 <div ref={timeFilterRef} className="toolbar-icon">
                     <TimeFilterDropdown
@@ -1085,33 +1110,8 @@ export default function JournalView({
                     notify={notify}
                     />
                 </div>
-            </div>
-
-            {/* Active Filter Chips */}
-            {chips.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 8px', alignItems: 'center' }}>
-                    {chips.map((c) => {
-                        const bg = c.color || undefined
-                        const fg = bg ? (parseInt(bg.slice(1), 16) > 0x7fffff ? '#222' : '#fff') : undefined
-                        return (
-                            <span key={c.key} className="chip" style={bg ? { background: bg, color: fg, borderColor: bg } : undefined}>
-                                {c.label}
-                                <button className="chip-x" onClick={c.clear} aria-label={`Filter ${c.key} löschen`} style={bg ? { color: fg } : undefined}><AppIcon icon={IconX} size="inline" /></button>
-                            </span>
-                        )
-                    })}
-                    {hasActiveFilters && (
-                        <button
-                            className="btn ghost"
-                            title="Alle Filter zurücksetzen"
-                            onClick={resetAllFilters}
-                            style={{ padding: '4px 8px', color: 'var(--accent)' }}
-                        >
-                            <AppIcon icon={IconX} size="control" />
-                        </button>
-                    )}
+                    </div>
                 </div>
-            )}
 
             {/* Filter Totals */}
             <FilterTotals

@@ -504,7 +504,6 @@ export default function QuickAddModal({
             )
         }
         setQa(nextQa as QA)
-        rememberCurrentBookingPattern(nextQa as QA)
         setAiMenuOpen(false)
     }, [activeSuggestion, budgetsList, defaultBankAccount, defaultCashAccount, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
 

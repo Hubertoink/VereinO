@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { IconBuilding, IconChevronDown, IconChevronUp, IconPlus } from '@tabler/icons-react'
 import NewOrgModal from '../modals/NewOrgModal'
 import ConfirmSwitchOrgModal from '../modals/ConfirmSwitchOrgModal'
 import { addDataChangedListener } from '../../utils/refresh'
+import AppIcon from './AppIcon'
 
 interface Organization {
   id: string
@@ -120,9 +122,9 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
           disabled={switching}
           title={activeOrg?.name || 'Organisation wählen'}
         >
-          <span className="org-switcher-icon">🏢</span>
+          <span className="org-switcher-icon"><AppIcon icon={IconBuilding} size="inline" /></span>
           <span className="org-switcher-name">{activeOrg?.name || 'Organisation'}</span>
-          <span className="org-switcher-arrow">{isOpen ? '▲' : '▼'}</span>
+          <span className="org-switcher-arrow"><AppIcon icon={isOpen ? IconChevronUp : IconChevronDown} size="inline" /></span>
         </button>
 
         {isOpen && (
@@ -146,7 +148,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
             <div className="org-switcher-divider" />
             
             <button className="org-switcher-item org-switcher-new no-drag" onClick={handleNewOrg}>
-              <span>➕</span>
+              <span><AppIcon icon={IconPlus} size="inline" /></span>
               <span>Neue Organisation…</span>
             </button>
           </div>

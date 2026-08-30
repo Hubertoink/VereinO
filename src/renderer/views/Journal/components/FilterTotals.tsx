@@ -23,11 +23,14 @@ interface SummaryData {
     diff: number
     planned?: number
     remaining?: number
-    bySphere?: Array<{ key: string; gross: number }>
+    bySphere?: Array<{ key: string; color?: string | null; gross: number }>
+    byPrimaryClassification?: Array<{ key: string; color?: string | null; gross: number }>
     byPaymentMethod?: Array<{ key: string | null; gross: number }>
     count?: number
     transferGross?: number
-    inBySphere?: Array<{ key: string; gross: number }>
+    inBySphere?: Array<{ key: string; color?: string | null; gross: number }>
+    inByPrimaryClassification?: Array<{ key: string; color?: string | null; gross: number }>
+    classificationProfile?: 'NONPROFIT' | 'GENERAL'
     inByPaymentMethod?: Array<{ key: string | null; gross: number }>
     outByPaymentMethod?: Array<{ key: string | null; gross: number }>
     /** Net cash position per payment method (includes transfers) from cashBalance API */
@@ -145,9 +148,12 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                             outGross,
                             diff,
                             bySphere: res.bySphere,
+                            byPrimaryClassification: res.byPrimaryClassification,
+                            classificationProfile: res.classificationProfile,
                             byPaymentMethod: res.byPaymentMethod,
                             transferGross,
                             inBySphere: inRes?.bySphere,
+                            inByPrimaryClassification: inRes?.byPrimaryClassification,
                             inByPaymentMethod: inRes?.byPaymentMethod,
                             outByPaymentMethod: outRes?.byPaymentMethod,
                             cashBalanceBAR: cbRes?.BAR,
@@ -193,15 +199,21 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
     const remainingVal = values?.remaining ?? (plannedVal + diffVal)
     const summaryVal = hasPlannedBudget ? remainingVal : diffVal
     const summaryLabel = hasPlannedBudget ? 'Rest' : diffVal >= 0 ? 'Überschuss' : 'Defizit'
-    const sphereSource = type === 'IN' ? (values?.bySphere || []) : !type ? (values?.inBySphere || []) : (values?.bySphere || [])
+    const isGeneralProfile = values?.classificationProfile === 'GENERAL'
+    const classificationSource = isGeneralProfile
+        ? (type === 'IN' ? (values?.byPrimaryClassification || []) : !type ? (values?.inByPrimaryClassification || []) : (values?.byPrimaryClassification || []))
+        : (type === 'IN' ? (values?.bySphere || []) : !type ? (values?.inBySphere || []) : (values?.bySphere || []))
+    const totalClassificationSource = isGeneralProfile
+        ? (values?.byPrimaryClassification || [])
+        : (values?.bySphere || [])
     const outPaymentSource = type === 'OUT' ? (values?.byPaymentMethod || []) : !type ? (values?.outByPaymentMethod || []) : (values?.byPaymentMethod || [])
 
-    const sphereRows = sphereSource
+    const sphereRows = classificationSource
         .filter((s) => s.gross !== 0)
         .map((s) => ({
-            key: SPHERE_LABELS[s.key] || s.key,
+            key: isGeneralProfile ? s.key : (SPHERE_LABELS[s.key] || s.key),
             value: fmt.format(Math.abs(s.gross)),
-            dotColor: SPHERE_COLORS[s.key] || '#888'
+            dotColor: isGeneralProfile ? (s.color || '#888') : (SPHERE_COLORS[s.key] || '#888')
         }))
 
     const pmRows = outPaymentSource
@@ -240,8 +252,9 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
 
     return (
         <div className="filter-totals-card" ref={recentPopoverRef}>
-            {/* Stats Grid */}
-            <div className="filter-totals-stats">
+            <div className="filter-totals-compact-row">
+                {/* Stats Grid */}
+                <div className="filter-totals-stats">
                 {hasPlannedBudget && (
                     <HoverTooltip
                         className="tooltip-modal"
@@ -361,40 +374,41 @@ export default function FilterTotals({ refreshKey, from, to, paymentMethod, paym
                         </div>
                     )}
                 </HoverTooltip>
-            </div>
-            
-            {/* Sphere breakdown mini badges */}
-            {values?.bySphere && values.bySphere.filter(s => s.gross !== 0).length > 1 && (
-                <div className="filter-totals-spheres">
-                    {values.bySphere.filter(s => s.gross !== 0).map(s => (
-                        <HoverTooltip
-                            key={s.key}
-                            className="tooltip-modal"
-                            content={
-                                <TooltipList
-                                    title={SPHERE_LABELS[s.key] || s.key}
-                                    rows={[{ key: 'Betrag', value: fmt.format(Math.abs(s.gross)), dotColor: SPHERE_COLORS[s.key] || '#888' }]}
-                                    hint={inCountHint}
-                                />
-                            }
-                        >
-                            {({ ref, props }) => (
-                                <span
-                                    ref={ref}
-                                    {...props}
-                                    tabIndex={0}
-                                    className="filter-totals-sphere-badge"
-                                    style={{ '--sphere-color': SPHERE_COLORS[s.key] || '#888' } as React.CSSProperties}
-                                >
-                                    <span className="filter-totals-sphere-badge__dot" />
-                                    <span className="filter-totals-sphere-badge__label">{s.key}</span>
-                                    <span className="filter-totals-sphere-badge__value">{fmt.format(Math.abs(s.gross))}</span>
-                                </span>
-                            )}
-                        </HoverTooltip>
-                    ))}
                 </div>
-            )}
+
+                {/* Classification breakdown mini badges */}
+                {totalClassificationSource.filter(s => s.gross !== 0).length > 1 && (
+                    <div className="filter-totals-spheres">
+                        {totalClassificationSource.filter(s => s.gross !== 0).map(s => (
+                            <HoverTooltip
+                                key={s.key}
+                                className="tooltip-modal"
+                                content={
+                                    <TooltipList
+                                        title={isGeneralProfile ? s.key : (SPHERE_LABELS[s.key] || s.key)}
+                                        rows={[{ key: 'Betrag', value: fmt.format(Math.abs(s.gross)), dotColor: isGeneralProfile ? (s.color || '#888') : (SPHERE_COLORS[s.key] || '#888') }]}
+                                        hint={inCountHint}
+                                    />
+                                }
+                            >
+                                {({ ref, props }) => (
+                                    <span
+                                        ref={ref}
+                                        {...props}
+                                        tabIndex={0}
+                                        className="filter-totals-sphere-badge"
+                                        style={{ '--sphere-color': isGeneralProfile ? (s.color || '#888') : (SPHERE_COLORS[s.key] || '#888') } as React.CSSProperties}
+                                    >
+                                        <span className="filter-totals-sphere-badge__dot" />
+                                        <span className="filter-totals-sphere-badge__label">{s.key}</span>
+                                        <span className="filter-totals-sphere-badge__value">{fmt.format(Math.abs(s.gross))}</span>
+                                    </span>
+                                )}
+                            </HoverTooltip>
+                        ))}
+                    </div>
+                )}
+            </div>
             {recentKind && (
                 <div id={recentKind === 'IN' ? 'recent-income-bookings' : 'recent-expense-bookings'} className={`filter-totals-recent-popover filter-totals-recent-popover--${recentKind.toLowerCase()}`} style={{ left: recentPopoverLeft }} role="dialog" aria-label={`Letzte ${recentKind === 'IN' ? 'Einnahmen' : 'Ausgaben'}`}>
                     <div className="filter-totals-recent-popover__header">

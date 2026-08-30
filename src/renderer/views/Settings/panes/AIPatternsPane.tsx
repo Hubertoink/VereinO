@@ -1,4 +1,6 @@
 import React from 'react'
+import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react'
+import AppIcon from '../../../components/common/AppIcon'
 import {
   AI_PATTERNS_CHANGED_EVENT,
   deleteBookingAIPattern,
@@ -21,10 +23,13 @@ type Lookup = {
   earmarks: Map<number, { label: string; color?: string | null }>
 }
 
+const LEARNED_PAGE_SIZE = 8
+
 export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
   const [rows, setRows] = React.useState<BookingAIPatternRow[]>(() => listBookingAIPatternRows())
   const [enabled, setEnabled] = React.useState(() => isBookingAIPatternsEnabled())
   const [lookup, setLookup] = React.useState<Lookup>(() => ({ budgets: new Map(), earmarks: new Map() }))
+  const [learnedPage, setLearnedPage] = React.useState(1)
 
   const refresh = React.useCallback(() => {
     setRows(listBookingAIPatternRows())
@@ -74,6 +79,12 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
   const accountById = React.useMemo(() => new Map((paymentAccounts || []).map((account) => [account.id, account])), [paymentAccounts])
   const rules = rows.filter((row) => row.kind === 'rule')
   const learned = rows.filter((row) => row.kind === 'learned')
+  const learnedPageCount = Math.max(1, Math.ceil(learned.length / LEARNED_PAGE_SIZE))
+  const learnedPageRows = learned.slice((learnedPage - 1) * LEARNED_PAGE_SIZE, learnedPage * LEARNED_PAGE_SIZE)
+
+  React.useEffect(() => {
+    if (learnedPage > learnedPageCount) setLearnedPage(learnedPageCount)
+  }, [learnedPage, learnedPageCount])
 
   function toggleGlobal() {
     const next = !enabled
@@ -176,7 +187,7 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
       </table>
     </div>
   ) : (
-    <div className="card ai-pattern-empty">Noch keine gelernten Muster vorhanden.</div>
+    <div className="card ai-pattern-empty">{kind === 'learned' ? 'Noch keine gelernten Muster vorhanden.' : 'Keine Regeln vorhanden.'}</div>
   )
 
   return (
@@ -187,7 +198,7 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
             <span aria-hidden="true">✦</span> <strong>KI-Muster</strong>
           </div>
           <div className="settings-sub">
-            Steuere, welche lokalen Buchungshilfen im Buchungsmodal Vorschläge machen. Gelernte Muster entstehen beim Speichern sauber zugeordneter Buchungen.
+            Steuere, welche lokalen Buchungshilfen im Buchungsmodal Vorschläge machen. Ein Muster wird erst nach mindestens zwei passenden gespeicherten Buchungen gelernt.
           </div>
         </div>
         <label className={`ai-pattern-global-toggle ${enabled ? 'is-on' : 'is-off'}`} htmlFor="ai-patterns-enabled">
@@ -214,7 +225,21 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
 
       <div className="card settings-pane-card">
         <div className="settings-title"><strong>Gelernte Muster</strong></div>
-        {renderTable(learned, 'learned')}
+        {renderTable(learnedPageRows, 'learned')}
+        {learned.length > LEARNED_PAGE_SIZE && (
+          <div className="pagination-bar ai-pattern-pagination">
+            <div className="pagination-bar__info">
+              <div className="pagination-bar__stat"><span>Muster:</span><span className="pagination-bar__stat-value">{(learnedPage - 1) * LEARNED_PAGE_SIZE + 1}–{Math.min(learnedPage * LEARNED_PAGE_SIZE, learned.length)} von {learned.length}</span></div>
+            </div>
+            <div className="pagination-bar__controls">
+              <button className="btn pagination-bar__btn" type="button" onClick={() => setLearnedPage(1)} disabled={learnedPage <= 1} title="Erste Seite"><AppIcon icon={IconChevronsLeft} size="control" /></button>
+              <button className="btn pagination-bar__btn" type="button" onClick={() => setLearnedPage((page) => Math.max(1, page - 1))} disabled={learnedPage <= 1} title="Vorherige Seite"><AppIcon icon={IconChevronLeft} size="control" /></button>
+              <span className="pagination-bar__page">Seite <strong>{learnedPage} / {learnedPageCount}</strong></span>
+              <button className="btn pagination-bar__btn" type="button" onClick={() => setLearnedPage((page) => Math.min(learnedPageCount, page + 1))} disabled={learnedPage >= learnedPageCount} title="Nächste Seite"><AppIcon icon={IconChevronRight} size="control" /></button>
+              <button className="btn pagination-bar__btn" type="button" onClick={() => setLearnedPage(learnedPageCount)} disabled={learnedPage >= learnedPageCount} title="Letzte Seite"><AppIcon icon={IconChevronsRight} size="control" /></button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

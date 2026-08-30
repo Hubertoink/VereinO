@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { IconTrash, IconX } from '@tabler/icons-react'
-import ModalHeader from '../ModalHeader'
 import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'
+import BookingPopupFrame from './BookingPopupFrame'
 
 function contrastText(bg?: string | null) {
   if (!bg) return '#000'
@@ -99,14 +98,15 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
     return () => window.removeEventListener('keydown', onKey)
   }, [v])
 
-  return createPortal(
-    <div className="modal-overlay">
-      <div className="modal standard-floating-modal budget-floating-modal" onClick={(e) => e.stopPropagation()}>
-        <ModalHeader 
-          title={v.id ? 'Budget bearbeiten' : 'Budget anlegen'}
-          onClose={onClose}
-          closeButtonClassName="booking-modal-icon-btn booking-modal-close-btn"
-        />
+  return (
+    <BookingPopupFrame
+      title={v.id ? 'Budget bearbeiten' : 'Budget anlegen'}
+      onClose={onClose}
+      variant="compact"
+      anchorAlign="end"
+      className="standard-floating-modal budget-floating-modal"
+    >
+      <div className="budget-modal-content">
         <div className="row">
           <div className="field standard-floating-field standard-floating-field--filled">
             <label htmlFor="budget-year">Jahr <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -202,7 +202,6 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
             <button className="btn primary" onClick={save}>Speichern</button>
           </div>
         </div>
-      </div>
       {askDelete && v.id && (
         <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
           <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
@@ -254,7 +253,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
           </div>
         </div>
       )}
-    </div>,
-    document.body
+      </div>
+    </BookingPopupFrame>
   )
 }
