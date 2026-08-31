@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.6.4] - 2026-08-31
+
+### Geändert
+
+- Das Dashboard ordnet Zeitraum, Finanzkennzahlen, offene Verbindlichkeiten und Mitgliederübersicht kompakter und übersichtlicher an.
+- Die Buchungsdetails verwenden ein passendes Belegsymbol und richten die Symbole aller Aktionsbuttons einheitlich aus.
+
 ## [3.6.3] - 2026-08-31
 
 ### Geändert

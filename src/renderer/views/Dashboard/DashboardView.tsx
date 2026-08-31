@@ -281,77 +281,91 @@ export default function DashboardView({
         </div>
       </div>
       <DashboardTaskStrip items={taskItems} />
-        <div className="dashboard-grid-auto">
-          <div className="dashboard-period-row">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
-          <div className="btn-group" role="group" aria-label="Zeitraum">
-              <button className={`btn ghost ${period === 'MONAT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('MONAT')}>Monat</button>
-              <button className={`btn ghost ${period === 'JAHR' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('JAHR')}>Jahr</button>
-              <button className={`btn ghost ${period === 'DREI_JAHRE' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('DREI_JAHRE')}>3 Jahre</button>
-              <button className={`btn ghost ${period === 'GESAMT' ? 'btn-period-active' : ''}`} onClick={() => setPeriod('GESAMT')}>Gesamt</button>
+      <div className="dashboard-grid-auto">
+        <div className="dashboard-period-row">
+          <span className="dashboard-period-label">Zeitraum</span>
+          <div
+            className={`label-row dashboard-opening-balance ${period === 'GESAMT' ? 'dashboard-opening-balance--hidden' : ''}`}
+            title="Wenn aktiv: Saldo startet mit dem kumulierten Saldo vor dem gewählten Zeitraum."
+            aria-hidden={period === 'GESAMT'}
+          >
+            <label htmlFor="toggle-prev-saldo" className="helper">Anfangsbestand einbeziehen</label>
+            <input
+              id="toggle-prev-saldo"
+              type="checkbox"
+              role="switch"
+              className="toggle"
+              checked={includePrevSaldo}
+              disabled={period === 'GESAMT'}
+              onChange={(e) => setIncludePrevSaldo(e.target.checked)}
+            />
           </div>
-          {(period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 1 && (
-            <select className="input" value={String((yearSel ?? yearsAvail[0]))} onChange={(e) => setYearSel(Number(e.target.value))} aria-label={period === 'DREI_JAHRE' ? 'Endjahr auswählen' : 'Jahr auswählen'}>
+          <div
+            className={`dashboard-year-selector-slot ${((period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 1) ? '' : 'dashboard-year-selector-slot--hidden'}`}
+            aria-hidden={!((period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 1)}
+          >
+            <select
+              className="input"
+              value={String((yearSel ?? yearsAvail[0] ?? new Date().getUTCFullYear()))}
+              disabled={!((period === 'JAHR' || period === 'DREI_JAHRE') && yearsAvail.length > 1)}
+              onChange={(e) => setYearSel(Number(e.target.value))}
+              aria-label={period === 'DREI_JAHRE' ? 'Endjahr auswählen' : 'Jahr auswählen'}
+            >
               {yearsAvail.map((y) => (
                 <option key={y} value={String(y)}>{y}</option>
               ))}
             </select>
-          )}
+          </div>
+          <div className="btn-group dashboard-period-control" role="group" aria-label="Zeitraum">
+            <button type="button" className={`btn-option ${period === 'MONAT' ? 'active' : ''}`} aria-pressed={period === 'MONAT'} onClick={() => setPeriod('MONAT')}>Monat</button>
+            <button type="button" className={`btn-option ${period === 'JAHR' ? 'active' : ''}`} aria-pressed={period === 'JAHR'} onClick={() => setPeriod('JAHR')}>Jahr</button>
+            <button type="button" className={`btn-option ${period === 'DREI_JAHRE' ? 'active' : ''}`} aria-pressed={period === 'DREI_JAHRE'} onClick={() => setPeriod('DREI_JAHRE')}>3 Jahre</button>
+            <button type="button" className={`btn-option ${period === 'GESAMT' ? 'active' : ''}`} aria-pressed={period === 'GESAMT'} onClick={() => setPeriod('GESAMT')}>Gesamt</button>
+          </div>
 
-          {(period === 'MONAT' || period === 'JAHR' || period === 'DREI_JAHRE') && (
-            <div className="label-row" style={{ marginLeft: 8 }} title="Wenn aktiv: Saldo startet mit dem kumulierten Saldo vor dem gewählten Zeitraum.">
-              <label htmlFor="toggle-prev-saldo" className="helper" style={{ cursor: 'pointer' }}>Vorheriger Zeitraumssaldo</label>
-              <input
-                id="toggle-prev-saldo"
-                type="checkbox"
-                role="switch"
-                className="toggle"
-                checked={includePrevSaldo}
-                onChange={(e) => setIncludePrevSaldo(e.target.checked)}
-              />
-            </div>
-          )}
         </div>
-          <div className="dashboard-metric dashboard-metric--success">
+        <div className="dashboard-metric dashboard-metric--success">
           <div className="helper">Einnahmen ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
-            <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
+          <div className="summary-value">{eur.format(sum?.inGross || 0)}</div>
         </div>
-          <div className="dashboard-metric dashboard-metric--danger">
+        <div className="dashboard-metric dashboard-metric--danger">
           <div className="helper">Ausgaben ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'})</div>
-            <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
+          <div className="summary-value">{eur.format(sum?.outGross || 0)}</div>
         </div>
-          <div className="dashboard-metric dashboard-metric--accent">
+        <div className="dashboard-metric dashboard-metric--accent">
           <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'}{(includePrevSaldo && period !== 'GESAMT') ? ' inkl. Anfangsbestand' : ''})</div>
             {(() => {
               const base = (includePrevSaldo && period !== 'GESAMT') ? (openingSaldo || 0) : 0
               const val = Math.round(((sum?.diff || 0) + base) * 100) / 100
-              return <div className="summary-value" style={{ color: val >= 0 ? 'var(--success)' : 'var(--danger)' }}>{eur.format(val)}</div>
+              return <div className={`summary-value ${val >= 0 ? 'dashboard-value-positive' : 'dashboard-value-negative'}`}>{eur.format(val)}</div>
             })()}
         </div>
       </div>
+      <div className="dashboard-operational-grid">
         <section className="dashboard-section dashboard-section--invoices">
           <div className="chart-header-baseline">
             <div className="legend-container">
-            <strong>Offene Verbindlichkeiten</strong>
+              <strong>Offene Verbindlichkeiten</strong>
+              <span className="helper">{invOpenCount} offen</span>
+            </div>
           </div>
-        </div>
-          <div className="dashboard-metric-strip">
-            <div className="dashboard-metric dashboard-metric--warning">
-            <div className="helper">Offen gesamt</div>
-              <div className="summary-value-overflow">{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
-          </div>
-            <div className="dashboard-metric dashboard-metric--warning">
-            <div className="helper">Fällig in ≤ 5 Tagen</div>
-              <div className="summary-value-overflow" style={{ color: '#f9a825' }}>{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
-          </div>
+          <div className="dashboard-metric-strip dashboard-invoice-metrics">
             <div className="dashboard-metric dashboard-metric--danger">
-            <div className="helper">Überfällig</div>
-              <div className="summary-value-overflow" style={{ color: 'var(--danger)' }}>{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
+              <div className="helper">Überfällig</div>
+              <div className="summary-value-overflow dashboard-value-negative">{eur.format(invOverdueRemaining || 0)} <span className="helper">({invOverdueCount})</span></div>
+            </div>
+            <div className="dashboard-metric dashboard-metric--warning">
+              <div className="helper">Fällig in ≤ 5 Tagen</div>
+              <div className="summary-value-overflow dashboard-value-warning">{eur.format(invDueSoonRemaining || 0)} <span className="helper">({invDueSoonCount})</span></div>
+            </div>
+            <div className="dashboard-metric dashboard-metric--accent">
+              <div className="helper">Offen gesamt</div>
+              <div className="summary-value-overflow">{eur.format(invOpenRemaining || 0)} <span className="helper">({invOpenCount})</span></div>
+            </div>
           </div>
-        </div>
-          <div className="overflow-container-mt">
-          <div className="helper">Nächste Fälligkeiten</div>
-          {invTopDue.length > 0 ? (
+          {invTopDue.length > 0 && (
+            <div className="dashboard-due-list">
+              <div className="helper">Nächste Fälligkeiten</div>
               <div className="invoice-list-container">
               {invTopDue.map((r) => {
                 const onOpen = () => {
@@ -359,50 +373,52 @@ export default function DashboardView({
                   window.setTimeout(() => { window.dispatchEvent(new CustomEvent('open-invoice-details', { detail: { id: r.id } })) }, 0)
                 }
                 return (
-                    <div key={r.id} onClick={onOpen} title="Details öffnen" className="invoice-item-row">
-                    <div style={{ color: 'var(--text-dim)' }}>{r.dueDate || '—'}</div>
+                    <div key={r.id} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen() } }} role="button" tabIndex={0} title="Details öffnen" className="invoice-item-row">
+                    <div className="invoice-item-row__date">{r.dueDate || '—'}</div>
                 <div className="text-overflow-ellipsis">{r.party || '—'}</div>
                 <div className="text-right-bold">{eur.format(r.remaining || 0)}</div>
                   </div>
                 )
               })}
             </div>
-          ) : (
-            <div className="helper" style={{ marginTop: 6 }}>—</div>
+            </div>
           )}
-        </div>
-      </section>
+        </section>
 
-      {/* Mitgliederübersicht */}
-      <section className="dashboard-section dashboard-section--members">
-        <div className="chart-header-baseline">
-          <div className="legend-container">
-            <strong>Mitglieder</strong>
+        <section className="dashboard-section dashboard-section--members">
+          <div className="chart-header-baseline">
+            <div className="legend-container">
+              <strong>Mitglieder</strong>
+              <span className="helper">Vereinsbestand</span>
+            </div>
           </div>
-        </div>
-        <div className="dashboard-metric-strip dashboard-metric-strip--members">
-          <div className="dashboard-metric">
-            <div className="helper">Gesamt</div>
-            <div className="summary-value-overflow">{memberStats.total}</div>
+          <div className="dashboard-members-overview">
+            <div className="dashboard-members-total">
+              <span className="helper">Gesamt</span>
+              <strong>{memberStats.total}</strong>
+              <span className="helper">Mitglieder</span>
+            </div>
+            <div className="dashboard-members-secondary">
+              <div className="dashboard-member-stat dashboard-member-stat--active">
+                <span className="helper">Aktiv</span>
+                <strong>{memberStats.active}</strong>
+              </div>
+              <div className="dashboard-member-stat">
+                <span className="helper">Neu</span>
+                <strong>{memberStats.new}</strong>
+              </div>
+              <div className="dashboard-member-stat">
+                <span className="helper">Pause</span>
+                <strong>{memberStats.paused}</strong>
+              </div>
+              <div className="dashboard-member-stat">
+                <span className="helper">Ausgetreten</span>
+                <strong>{memberStats.left}</strong>
+              </div>
+            </div>
           </div>
-          <div className="dashboard-metric dashboard-metric--success">
-            <div className="helper">Aktiv</div>
-            <div className="summary-value-overflow">{memberStats.active}</div>
-          </div>
-          <div className="dashboard-metric">
-            <div className="helper">Neu</div>
-            <div className="summary-value-overflow">{memberStats.new}</div>
-          </div>
-          <div className="dashboard-metric">
-            <div className="helper">Pause</div>
-            <div className="summary-value-overflow">{memberStats.paused}</div>
-          </div>
-          <div className="dashboard-metric">
-            <div className="helper">Ausgetreten</div>
-            <div className="summary-value-overflow">{memberStats.left}</div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {(() => {
         const now = new Date()

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconClipboardText, IconFileDescription, IconPaperclip, IconTableExport } from '@tabler/icons-react'
+import { IconClipboardText, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport } from '@tabler/icons-react'
 import TagsEditor from '../TagsEditor'
 import AppIcon from '../common/AppIcon'
 import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
@@ -373,7 +373,10 @@ Status: ${statusLabel}`
             : { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
         >
           <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <h2 style={{ margin: 0, fontSize: 18 }}><AppIcon icon={IconFileDescription} size="control" /> Buchungsdetails</h2>
+            <h2 className="voucher-info-title">
+              <AppIcon icon={IconReceipt2} size="action" />
+              <span>Buchungsdetails</span>
+            </h2>
           </div>
           <div className={windowMode ? 'booking-modal-header-actions' : undefined} style={windowMode ? ({ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' } as React.CSSProperties) : { display: 'flex', alignItems: 'center', gap: 8 }}>
             {editingMeta ? (
@@ -735,28 +738,27 @@ Status: ${statusLabel}`
 
         {/* Footer mit Aktionen */}
         <div
+          className="voucher-info-footer"
           style={{
-            display: 'flex',
-            gap: 8,
             marginTop: 16,
             padding: windowMode ? '16px 16px 0' : undefined,
-            paddingTop: 16,
-            borderTop: '1px solid var(--border)',
-            flexWrap: 'wrap',
             WebkitAppRegion: 'no-drag',
             pointerEvents: 'auto'
           } as React.CSSProperties}
         >
           {!allowVoucherDeletion && !isReversalVoucher && !isReversedOriginal && onReverse ? (
-            <button className="btn danger" onClick={() => { onReverse(); }} style={{ flex: 1, minWidth: 160 }}>
-              ↺ Stornieren
+            <button className="btn danger voucher-info-footer__button" onClick={() => { onReverse(); }}>
+              <AppIcon icon={IconRotateClockwise} size="action" />
+              <span>Stornieren</span>
             </button>
           ) : null}
-          <button className="btn primary" onClick={copyAsText} style={{ flex: 1, minWidth: 160 }}>
-            <AppIcon icon={IconClipboardText} size="control" /> Als Text kopieren
+          <button className="btn primary voucher-info-footer__button" onClick={copyAsText}>
+            <AppIcon icon={IconClipboardText} size="action" />
+            <span>Als Text kopieren</span>
           </button>
-          <button className="btn primary" onClick={copyForExcel} style={{ flex: 1, minWidth: 160 }}>
-            <AppIcon icon={IconTableExport} size="control" /> Für Excel kopieren
+          <button className="btn primary voucher-info-footer__button" onClick={copyForExcel}>
+            <AppIcon icon={IconTableExport} size="action" />
+            <span>Für Excel kopieren</span>
           </button>
         </div>
 
