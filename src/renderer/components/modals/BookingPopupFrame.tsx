@@ -47,7 +47,13 @@ export default function BookingPopupFrame({
     : `modal booking-modal quick-add-modal ${className}`
   useLayoutEffect(() => {
     if (!compact || !anchorToTrigger) return
-    const trigger = document.activeElement as HTMLElement | null
+    const activeElement = document.activeElement
+    const trigger = activeElement instanceof HTMLElement
+      && activeElement !== document.body
+      && activeElement !== document.documentElement
+      && activeElement.isConnected
+      ? activeElement
+      : null
     const rect = anchorRect || trigger?.getBoundingClientRect()
     if (!rect || (!rect.width && !rect.height && !rect.right && !rect.bottom)) return
     const gap = 8

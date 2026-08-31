@@ -104,8 +104,8 @@ export default function InvoiceActionMenu({
               role="menuitem"
               className={`btn ${action.tone === 'danger' ? 'danger' : action.tone === 'primary' ? 'primary' : ''}`.trim()}
               onClick={() => {
-                setOpen(false)
                 action.onClick()
+                setOpen(false)
               }}
             >
               {action.label}

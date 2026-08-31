@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconClipboardText, IconFileDescription, IconPaperclip, IconTableExport } from '@tabler/icons-react'
 import TagsEditor from '../TagsEditor'
+import AppIcon from '../common/AppIcon'
 import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { getInternalAssignmentValidationState, isMetaAmountValid } from './voucherMetaValidation'
@@ -371,7 +373,7 @@ Status: ${statusLabel}`
             : { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
         >
           <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <h2 style={{ margin: 0, fontSize: 18 }}>📋 Buchungsdetails</h2>
+            <h2 style={{ margin: 0, fontSize: 18 }}><AppIcon icon={IconFileDescription} size="control" /> Buchungsdetails</h2>
           </div>
           <div className={windowMode ? 'booking-modal-header-actions' : undefined} style={windowMode ? ({ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' } as React.CSSProperties) : { display: 'flex', alignItems: 'center', gap: 8 }}>
             {editingMeta ? (
@@ -455,7 +457,7 @@ Status: ${statusLabel}`
                   <div className="voucher-info-row__value voucher-info-attachment-actions">
                     {voucher.hasFiles || (voucher.fileCount || 0) > 0 ? (
                       <button type="button" className="btn voucher-info-attachment-btn" onClick={onOpenAttachments} disabled={!onOpenAttachments}>
-                        📎 {voucher.fileCount || 1} {(voucher.fileCount || 1) === 1 ? 'Beleg' : 'Belege'} anzeigen
+                        <AppIcon icon={IconPaperclip} size="inline" /> {voucher.fileCount || 1} {(voucher.fileCount || 1) === 1 ? 'Beleg' : 'Belege'} anzeigen
                       </button>
                     ) : <span>Kein Anhang</span>}
                     <button
@@ -751,10 +753,10 @@ Status: ${statusLabel}`
             </button>
           ) : null}
           <button className="btn primary" onClick={copyAsText} style={{ flex: 1, minWidth: 160 }}>
-            📋 Als Text kopieren
+            <AppIcon icon={IconClipboardText} size="control" /> Als Text kopieren
           </button>
           <button className="btn primary" onClick={copyForExcel} style={{ flex: 1, minWidth: 160 }}>
-            📊 Für Excel kopieren
+            <AppIcon icon={IconTableExport} size="control" /> Für Excel kopieren
           </button>
         </div>
 

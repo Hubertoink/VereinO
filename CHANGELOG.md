@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.6.3] - 2026-08-31
+
+### Geändert
+
+- Electron und die native SQLite-Anbindung aktualisiert und den Entwicklungsstart durch einen schnellen ABI-Kompatibilitätscheck beschleunigt.
+- Die Rechnungswarteschlange startet nach dem ersten Renderer-Ladevorgang und blockiert nicht mehr den sichtbaren App-Start.
+- Emoji-Symbole in den Buchungsdetails durch konsistente Icons ersetzt.
+
+### Behoben
+
+- Das Bearbeitungsformular für Verbindlichkeiten öffnet zuverlässig und bleibt vollständig im sichtbaren Fensterbereich.
+- Electron- und `better-sqlite3`-Architektur werden unter Windows ARM64 automatisch korrekt ausgerichtet.
+
 ## [3.6.2] - 2026-08-30
 
 ### Geändert

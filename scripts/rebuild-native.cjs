@@ -1,6 +1,7 @@
 const { spawnSync } = require('node:child_process')
 
 const electronVersion = require('electron/package.json').version
+const electronPath = require('electron')
 const forcedArch = process.platform === 'win32' && process.arch === 'arm64'
   ? 'x64'
   : process.arch
@@ -27,6 +28,28 @@ function run(args) {
   return result
 }
 
+function canLoadBetterSqlite3() {
+  const probe = [
+    "const Database = require('better-sqlite3')",
+    "const database = new Database(':memory:')",
+    'database.close()'
+  ].join(';')
+  const result = spawnSync(electronPath, ['-e', probe], {
+    cwd: process.cwd(),
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    stdio: 'ignore',
+    shell: false,
+    timeout: 10000
+  })
+  return result.status === 0
+}
+
+if (process.env.VEREINO_FORCE_NATIVE_REBUILD !== '1' && canLoadBetterSqlite3()) {
+  console.log(`[rebuild:native] better-sqlite3 already matches Electron ${electronVersion} (${forcedArch}).`)
+  process.exit(0)
+}
+
+console.log(`[rebuild:native] Rebuilding better-sqlite3 for Electron ${electronVersion} (${forcedArch}).`)
 let result = run(['rebuild', 'better-sqlite3'])
 if (result.status !== 0) {
   console.error('\n[rebuild:native] Prebuild failed; falling back to source build (requires VS Build Tools on Windows).')

@@ -413,13 +413,12 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
             }
         }
     })
-    try {
-        const { startInvoiceBatchQueue } = await import('./services/invoiceBatchQueue')
-        startInvoiceBatchQueue()
-    } catch (error) {
-        console.warn('[InvoiceBatch] Hintergrundwarteschlange konnte nicht gestartet werden:', error)
-    }
     await loadRenderer(win)
+    void import('./services/invoiceBatchQueue')
+        .then(({ startInvoiceBatchQueue }) => startInvoiceBatchQueue())
+        .catch((error) => {
+            console.warn('[InvoiceBatch] Hintergrundwarteschlange konnte nicht gestartet werden:', error)
+        })
 
     // After window finished load, inform renderer if DB init failed
     if (dbInitError && win) {
