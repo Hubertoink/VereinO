@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.7.1] - 2026-09-01
+
+### Geändert
+
+- Mitgliederformulare, Einladungs- und Exportdialoge sowie Beitragsstatus als kompakte Dropdown-Flyouts umgesetzt.
+- Beitragsstatus-Historie mit internem Scrollbereich versehen und überflüssige Hinweise entfernt.
+- Archiv-Schalter für Budgets und Zweckbindungen mit sichtbarem Hintergrund dargestellt.
+
 ## [3.7.0] - 2026-09-01
 
 ### Geändert

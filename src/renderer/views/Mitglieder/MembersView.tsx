@@ -1567,10 +1567,6 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                             </table>
                         </div>
 
-                        {/* Footer */}
-                        <div className="fee-modal__footer">
-                            <div className="helper">Esc = Schließen</div>
-                        </div>
                 </BookingPopupFrame>
             )}
             {/* Confirmation dialog for "mark paid without voucher" */}
