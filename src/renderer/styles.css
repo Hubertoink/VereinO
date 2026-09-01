@@ -12462,6 +12462,137 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
   border-top: 1px solid var(--border);
 }
 
+.compact-booking-popup .member-modal-body {
+  min-height: 0;
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.compact-booking-popup .member-modal-body > .block-grid {
+  grid-template-columns: 1fr;
+  gap: 8px !important;
+  margin-top: 0 !important;
+}
+
+.compact-booking-popup .member-modal-body .card {
+  border-radius: 11px;
+}
+
+.compact-booking-popup .member-modal-status {
+  flex: 0 0 auto;
+}
+
+.compact-booking-popup .member-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 97%, transparent);
+}
+
+.compact-booking-popup .member-modal-footer > .helper {
+  font-size: 10px;
+}
+
+.compact-booking-popup .member-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.compact-booking-popup .member-modal-actions .btn {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.compact-booking-popup .invite-modal-content,
+.compact-booking-popup .members-export-content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.compact-booking-popup .members-export-content {
+  padding: 10px 14px;
+}
+
+.compact-booking-popup.member-invite-floating-modal .invite-modal-content {
+  margin: 0;
+  border-radius: 0;
+}
+
+.compact-booking-popup .invite-modal-footer,
+.compact-booking-popup .members-export-footer {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 97%, transparent);
+}
+
+.compact-booking-popup.member-fee-floating-modal {
+  height: min(690px, calc(100vh - 72px));
+  gap: 0;
+  overflow: hidden;
+}
+
+.compact-booking-popup.member-fee-floating-modal > .compact-booking-popup__content {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.compact-booking-popup.member-fee-floating-modal .fee-modal__info-bar {
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.compact-booking-popup.member-fee-floating-modal .fee-modal__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 9px 0 0;
+  background: color-mix(in oklab, var(--surface) 97%, transparent);
+}
+
+.compact-booking-popup.payments-row-status-modal {
+  height: min(690px, calc(100vh - 72px));
+  gap: 0;
+  overflow: hidden;
+}
+
+.compact-booking-popup.payments-row-status-modal > .compact-booking-popup__content {
+  min-height: 0;
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.compact-booking-popup.payments-row-status-modal > .compact-booking-popup__content > div:nth-child(2) {
+  grid-template-columns: 1fr;
+}
+
 .compact-booking-popup__content {
   min-height: 0;
   display: flex;
@@ -18692,8 +18823,9 @@ button.filter-totals-stat {
 }
 
 .quick-add-modal input[type='date']::-webkit-calendar-picker-indicator {
-  display: block;
-  -webkit-appearance: auto;
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .booking-date-input-wrap {
@@ -18708,6 +18840,12 @@ button.filter-totals-stat {
   min-width: 0;
   box-sizing: border-box;
   padding-right: 36px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.booking-date-input-wrap input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
   -webkit-appearance: none;
   appearance: none;
 }
@@ -19998,8 +20136,12 @@ textarea {
   top: 0;
   color: var(--accent);
   font-size: 0.72rem;
-  background: transparent;
+  background: var(--standard-field-bg);
   transform: translateY(-50%);
+}
+
+.standard-floating-modal .standard-floating-field:focus-within > label {
+  background: var(--standard-field-focus-bg);
 }
 
 .standard-floating-modal .standard-floating-field:focus-within::before,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { IconAlertTriangle, IconArrowDown, IconArrowUp, IconCheck, IconFileSpreadsheet, IconFileTypePdf, IconFolderOpen, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconArrowDown, IconArrowUp, IconCheck, IconFileSpreadsheet, IconFileTypePdf, IconFolderOpen } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
+import BookingPopupFrame from './BookingPopupFrame'
 
 type MemberExportField = 
   | 'memberNo' 
@@ -209,13 +210,15 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal members-export-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <header className="members-export-header">
-          <h2>Mitglieder exportieren</h2>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen" title="Schließen"><AppIcon icon={IconX} size="action" /></button>
-        </header>
-
+    <BookingPopupFrame
+      title="Mitglieder exportieren"
+      titleId="members-export-modal-title"
+      subtitle="Auswahl und Spalten für den Export festlegen"
+      onClose={onClose}
+      variant="compact"
+      anchorAlign="end"
+      className="members-export-modal standard-floating-modal"
+    >
         <div className="members-export-content">
           {/* Filter & Sort Row */}
           <div className="members-export-row">
@@ -381,7 +384,6 @@ export default function MembersExportModal({ open, onClose, currentFilter = 'ALL
             </button>
           </div>
         </footer>
-      </div>
-    </div>
+    </BookingPopupFrame>
   )
 }

@@ -8,6 +8,7 @@ import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
 import DatePickerButton from '../../components/common/DatePickerButton'
 import AppIcon from '../../components/common/AppIcon'
+import BookingPopupFrame from '../../components/modals/BookingPopupFrame'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
@@ -649,17 +650,17 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             </div>
 
             {form && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true">
-                    <div className="modal member-modal standard-floating-modal member-floating-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                            <h2 style={{ margin: 0 }}>{form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}</h2>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                <span className="badge" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>
-                                <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setForm(null)} aria-label="Schließen (ESC)" title="Schließen (ESC)">
-                                    <AppIcon icon={IconX} size="action" />
-                                </button>
-                            </div>
-                        </header>
+                <BookingPopupFrame
+                    title={form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}
+                    titleId="member-form-modal-title"
+                    subtitle="Stammdaten, Mitgliedschaft und SEPA-Mandat"
+                    onClose={() => setForm(null)}
+                    variant="compact"
+                    anchorAlign="end"
+                    className="member-modal standard-floating-modal member-floating-modal"
+                    headerAccessory={<span className="badge member-modal-status" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>}
+                >
+                    <div className="member-modal-body">
 
                         {/* Two-column layout with all fields visible */}
                         <div className="block-grid" style={{ marginTop: 12, gap: 8 }}>
@@ -799,9 +800,10 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                    </div>
+                        <div className="member-modal-footer">
                             <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-                            <div style={{ display: 'flex', gap: 8 }}>
+                            <div className="member-modal-actions">
                                 {form.mode === 'edit' && (
                                     <button className="btn danger modal-delete-btn btn-with-icon" onClick={() => {
                                         if (!form?.draft?.id) return
@@ -813,18 +815,18 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <button className="btn primary" onClick={() => { void saveMemberForm() }}>Speichern</button>
                             </div>
                         </div>
-                    </div>
-                </div>
+                </BookingPopupFrame>
             )}
             {showInvite && (
-                <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="invite-modal-title" onClick={() => setShowInvite(false)}>
-                    <div className="modal invite-modal standard-floating-modal member-invite-floating-modal" onClick={(e)=>e.stopPropagation()}>
-                        <header className="invite-modal-header">
-                            <h3 id="invite-modal-title">Einladung per E-Mail</h3>
-                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={()=>setShowInvite(false)} aria-label="Schließen" title="Schließen (ESC)">
-                                <AppIcon icon={IconX} size="action" />
-                            </button>
-                        </header>
+                <BookingPopupFrame
+                    title="Einladung per E-Mail"
+                    titleId="invite-modal-title"
+                    subtitle="Gefilterte Mitglieder gesammelt per BCC einladen"
+                    onClose={() => setShowInvite(false)}
+                    variant="compact"
+                    anchorAlign="end"
+                    className="invite-modal standard-floating-modal member-invite-floating-modal"
+                >
                         <div className="card invite-modal-content">
                             <div className="invite-summary-row">
                                 <div className="invite-summary-stats">
@@ -846,7 +848,6 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     Nur aktive einladen
                                 </label>
                             </div>
-                            <div className="helper invite-filter-hint">Aktuelle Filter: Status = {inviteActiveOnly ? 'ACTIVE' : status}, Suche = {q ? `"${q}"` : '—'}</div>
                             <div className="invite-grid">
                                 <div className={`field standard-floating-field${inviteSubject.trim() ? ' standard-floating-field--filled' : ''}`}>
                                     <label htmlFor="member-invite-subject">Betreff</label>
@@ -884,7 +885,6 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                             </div>
                                         </div>
                                     )}
-                                    <div className="helper">Die Liste basiert auf der aktuellen Ansicht (Filter & Suche) und enthält nur Kontakte mit E-Mail.</div>
                                 </div>
                             </div>
                             {inviteFeedback && <div className={`invite-feedback invite-feedback-${inviteFeedback.type}`}>{inviteFeedback.text}</div>}
@@ -896,8 +896,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <button className="btn primary" disabled={!inviteCurrentBatch.length} onClick={() => { void openInviteMailClient() }}>Im Mail-Programm öffnen ({inviteCurrentBatch.length})</button>
                             </div>
                         </div>
-                    </div>
-                </div>
+                </BookingPopupFrame>
             )}
             {showInvite && showInviteRecipients && createPortal(
                 <div
@@ -1324,63 +1323,43 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
             <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
                 <AppIcon icon={IconCalendarDue} size="control" />
             </button>
-            {open && createPortal(
-                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', overflow: 'auto' }} onClick={() => setOpen(false)}>
-                    <div className="modal fee-modal" onClick={(e)=>e.stopPropagation()}>
-                        {/* Header - Fixed */}
-                        <header className="fee-modal__header fee-modal__header--sticky">
-                            <div className="fee-modal__header-row">
-                                <div className="fee-modal__header-left">
-                                    <h3 className="fee-modal__title">Beitragsstatus</h3>
-                                    <div className="fee-modal__subtitle">
-                                        <span style={{ fontWeight: 600 }}>{name}{memberNo ? ` (${memberNo})` : ''}</span>
-                                        <span>•</span>
-                                        <span>Eintritt: {status?.joinDate || '—'}</span>
-                                        {hasLeft && (
-                                            <>
-                                                <span>•</span>
-                                                <span style={{ color: 'var(--warning)' }}>Austritt: {status?.leaveDate}</span>
-                                            </>
-                                        )}
-                                        <span>•</span>
-                                        <span>Letzte Zahlung: {status?.lastPeriod || '—'}</span>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    {hasLeft && (
-                                        <span className="fee-modal__status-badge fee-modal__status-badge--left">
-                                            Ausgetreten
-                                        </span>
-                                    )}
-                                    <span className={`fee-modal__status-badge ${status?.state === 'OVERDUE' ? 'fee-modal__status-badge--overdue' : 'fee-modal__status-badge--ok'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                                        <AppIcon icon={status?.state === 'OVERDUE' ? IconCalendarDue : IconCalendarCheck} size="inline" />
-                                        {status?.state === 'OVERDUE' ? `${status?.overdue || 0} überfällig` : 'OK'}
-                                    </span>
-                                    <button className="btn ghost" onClick={()=>setOpen(false)} aria-label="Schließen">
-                                        <AppIcon icon={IconX} size="action" />
-                                    </button>
-                                </div>
+            {open && (
+                <BookingPopupFrame
+                    title="Beitragsstatus"
+                    titleId={`member-fee-status-${memberId}`}
+                    subtitle={`${name}${memberNo ? ` (${memberNo})` : ''} · Eintritt: ${status?.joinDate || '—'} · Letzte Zahlung: ${status?.lastPeriod || '—'}`}
+                    onClose={() => setOpen(false)}
+                    variant="compact"
+                    anchorAlign="end"
+                    className="fee-modal standard-floating-modal member-fee-floating-modal"
+                    headerAccessory={(
+                        <>
+                            {hasLeft && <span className="fee-modal__status-badge fee-modal__status-badge--left">Ausgetreten</span>}
+                            <span className={`fee-modal__status-badge ${status?.state === 'OVERDUE' ? 'fee-modal__status-badge--overdue' : 'fee-modal__status-badge--ok'}`}>
+                                <AppIcon icon={status?.state === 'OVERDUE' ? IconCalendarDue : IconCalendarCheck} size="inline" />
+                                {status?.state === 'OVERDUE' ? `${status?.overdue || 0} überfällig` : 'OK'}
+                            </span>
+                        </>
+                    )}
+                >
+                    <div className="fee-modal__info-bar">
+                            <div className="fee-modal__info-item">
+                                <span className="fee-modal__info-label">Beitrag</span>
+                                <span className="fee-modal__info-value">{status?.amount ? eurFmt.format(status.amount) : '—'}</span>
                             </div>
-                            {/* Contribution Info Bar */}
-                            <div className="fee-modal__info-bar">
-                                <div className="fee-modal__info-item">
-                                    <span className="fee-modal__info-label">Beitrag</span>
-                                    <span className="fee-modal__info-value">{status?.amount ? eurFmt.format(status.amount) : '—'}</span>
-                                </div>
-                                <div className="fee-modal__info-item">
-                                    <span className="fee-modal__info-label">Intervall</span>
-                                    <span className="fee-modal__info-value">
-                                        {status?.interval === 'MONTHLY' ? 'Monatlich' : status?.interval === 'QUARTERLY' ? 'Quartal' : status?.interval === 'YEARLY' ? 'Jährlich' : '—'}
-                                    </span>
-                                </div>
-                                <div className="fee-modal__info-item">
-                                    <span className="fee-modal__info-label">Offene Beiträge</span>
-                                    <span className="fee-modal__info-value" style={{ color: due.length > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                                        {due.length > 0 ? `${due.length} × ${status?.amount ? eurFmt.format(status.amount) : '—'} = ${eurFmt.format(due.length * (status?.amount || 0))}` : 'Keine'}
-                                    </span>
-                                </div>
+                            <div className="fee-modal__info-item">
+                                <span className="fee-modal__info-label">Intervall</span>
+                                <span className="fee-modal__info-value">
+                                    {status?.interval === 'MONTHLY' ? 'Monatlich' : status?.interval === 'QUARTERLY' ? 'Quartal' : status?.interval === 'YEARLY' ? 'Jährlich' : '—'}
+                                </span>
                             </div>
-                        </header>
+                            <div className="fee-modal__info-item">
+                                <span className="fee-modal__info-label">Offene Beiträge</span>
+                                <span className="fee-modal__info-value" style={{ color: due.length > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                    {due.length > 0 ? `${due.length} × ${status?.amount ? eurFmt.format(status.amount) : '—'} = ${eurFmt.format(due.length * (status?.amount || 0))}` : 'Keine'}
+                                </span>
+                            </div>
+                        </div>
 
                         {/* Progress */}
                         {totalPeriods > 0 && (
@@ -1592,9 +1571,7 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                         <div className="fee-modal__footer">
                             <div className="helper">Esc = Schließen</div>
                         </div>
-                    </div>
-                </div>,
-                document.body
+                </BookingPopupFrame>
             )}
             {/* Confirmation dialog for "mark paid without voucher" */}
             {confirmMarkPaid && createPortal(
@@ -1917,17 +1894,23 @@ function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string
                     <AppIcon icon={IconCalendarDue} size="inline" />
                 </button>
                 {showStatus && (
-                    <div className="modal-overlay" onClick={() => setShowStatus(false)}>
-                        <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', maxWidth: 1100, display: 'grid', gap: 10 }}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0 }}>Beitragsstatus</h3>
-                                <button className="btn" onClick={()=>setShowStatus(false)}><AppIcon icon={IconX} size="control" /></button>
-                            </header>
+                    <BookingPopupFrame
+                        title="Beitragsstatus"
+                        titleId={`payment-row-status-${row.memberId}-${row.periodKey}`}
+                        subtitle={`${row.name}${row.memberNo ? ` (${row.memberNo})` : ''} · Periode ${row.periodKey}`}
+                        onClose={() => setShowStatus(false)}
+                        variant="compact"
+                        anchorAlign="end"
+                        className="standard-floating-modal payments-row-status-modal"
+                        headerAccessory={(
+                            <span className="badge" style={{ background: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--muted)'), color: '#fff' }}>
+                                {statusData?.state === 'OVERDUE' ? `Überfällig (${statusData?.overdue})` : statusData?.state === 'OK' ? 'OK' : '—'}
+                            </span>
+                        )}
+                    >
+                        <div className="payments-row-status-content">
                             <div className="helper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                 <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
-                                <span className="badge" style={{ background: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--muted)'), color: '#fff' }}>
-                                    {statusData?.state === 'OVERDUE' ? `Überfällig (${statusData?.overdue})` : statusData?.state === 'OK' ? 'OK' : '—'}
-                                </span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                                 <div className="card" style={{ padding: 10 }}>
@@ -1972,7 +1955,7 @@ function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string
                                 <button className="btn" onClick={()=>setShowStatus(false)}>Schließen</button>
                             </div>
                         </div>
-                    </div>
+                    </BookingPopupFrame>
                 )}
             </td>
             <td>{row.periodKey}</td>

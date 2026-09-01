@@ -404,7 +404,7 @@ export default function BudgetsView({
             position: 'fixed',
             bottom: 24,
             right: 24,
-            background: 'var(--card)',
+            background: 'var(--surface)',
             borderRadius: 10,
             padding: '10px 16px',
             boxShadow: '0 4px 20px rgba(0,0,0,0.25)',

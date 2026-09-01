@@ -452,6 +452,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
   const [editing, setEditing] = useState<Draft | null>(null)
   const [editingAnchor, setEditingAnchor] = useState<Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null>(null)
   const [booking, setBooking] = useState<RecurringBooking | null>(null)
+  const bookingDateInputRef = useRef<HTMLInputElement | null>(null)
   const [bookingDate, setBookingDate] = useState(localIsoDate())
   const [bookingAmount, setBookingAmount] = useState(0)
   const [actionBusy, setActionBusy] = useState(false)
@@ -683,11 +684,11 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
               <button className="btn ghost" onClick={() => setBooking(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
             </div>
             <div className="recurring-book-summary">
-              <label className="field"><span>Buchungsdatum</span><input className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /></label>
+              <label className="field"><span>Buchungsdatum</span><span className="booking-date-input-wrap"><input ref={bookingDateInputRef} className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /><DatePickerButton inputRef={bookingDateInputRef} ariaLabel="Kalender zur Auswahl des Buchungsdatums öffnen" /></span></label>
               <label className="field"><span>{booking.amountMode === 'NET' ? 'Nettobetrag' : 'Bruttobetrag'} (€)</span><input className="input" type="number" min="0.01" step="0.01" value={bookingAmount} onChange={(event) => setBookingAmount(Number(event.target.value || 0))} /></label>
               <div className="card recurring-book-preview"><span>{booking.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {booking.primaryClassificationName ? `${booking.primaryClassificationIcon ? `${booking.primaryClassificationIcon} ` : ''}${booking.primaryClassificationName}` : SPHERE_LABELS[booking.sphere]}</span><strong>{eurFmt.format(bookingAmount || 0)}</strong></div>
             </div>
-            <div className="modal-footer"><div className="helper">{booking.suggestedVoucherId ? `Hinweis: ${booking.suggestedVoucherNo || 'Eine bestehende Buchung'} wurde als möglicher Treffer erkannt. Eine neue Buchung kann eine Doppelung erzeugen.` : 'Es entsteht eine normale, nachvollziehbare Buchung.'}</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setBooking(null)}>Abbrechen</button><button className="btn primary" onClick={() => void confirmBooking()} disabled={actionBusy || !bookingDate || !(bookingAmount > 0)}>{actionBusy ? 'Bucht…' : booking.suggestedVoucherId ? 'Trotzdem erstellen' : 'Buchung erstellen'}</button></div></div>
+            <div className="modal-footer"><div className="helper">{booking.suggestedVoucherId ? `Hinweis: ${booking.suggestedVoucherNo || 'Eine bestehende Buchung'} wurde als möglicher Treffer erkannt. Eine neue Buchung kann eine Doppelung erzeugen.` : 'Es entsteht eine nachvollziehbare Buchung.'}</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setBooking(null)}>Abbrechen</button><button className="btn primary" onClick={() => void confirmBooking()} disabled={actionBusy || !bookingDate || !(bookingAmount > 0)}>{actionBusy ? 'Bucht…' : booking.suggestedVoucherId ? 'Trotzdem buchen' : 'Buchen'}</button></div></div>
           </div>
         </div>, document.body
       )}
