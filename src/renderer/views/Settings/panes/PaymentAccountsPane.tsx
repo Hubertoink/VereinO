@@ -1,6 +1,8 @@
 import React from 'react'
+import { IconPencil } from '@tabler/icons-react'
 import { PaymentAccountsPaneProps } from '../types'
 import { IconTrash } from '../../../utils/icons'
+import AppIcon from '../../../components/common/AppIcon'
 
 type PaymentAccountDraft = {
   id?: number
@@ -141,19 +143,27 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
 
       <div className="payment-account-grid">
         {sortedAccounts.map((account, index) => (
-          <div key={account.id} className="card payment-account-card" style={{ '--account-color': account.color || 'var(--border)' } as React.CSSProperties}>
-            <div className="payment-account-card__main">
-              <div>
-                <div className="payment-account-card__name">{account.name}</div>
-                <div className="helper">{KIND_LABELS[account.kind]}{account.iban ? ` · ${account.iban}` : ''}</div>
-              </div>
-              <div className="payment-account-card__badges">
-                <span className="chip">#{index + 1}</span>
-                {!account.isActive && <span className="chip">Archiviert</span>}
-              </div>
+          <div
+            key={account.id}
+            className="payment-account-card"
+            style={{
+              '--account-color': account.color || 'var(--border)',
+              '--account-background': account.color ? `${account.color}20` : 'var(--muted)'
+            } as React.CSSProperties}
+          >
+            <div className="payment-account-card__initial" title={account.color || 'Keine Farbe'}>
+              {account.name.charAt(0).toUpperCase() || '?'}
             </div>
+            <div className="payment-account-card__details">
+              <div className="payment-account-card__name">{account.name}</div>
+              <div className="helper">{KIND_LABELS[account.kind]}{account.iban ? ` · ${account.iban}` : ''}</div>
+              {!account.isActive && <span className="payment-account-card__archived">Archiviert</span>}
+            </div>
+            <span className="chip payment-account-card__number">#{index + 1}</span>
             <div className="payment-account-card__actions">
-              <button className="btn btn-edit" onClick={() => setDraft({ id: account.id, name: account.name, kind: account.kind, iban: account.iban || '', color: account.color || null, sortOrder: Math.max(1, account.sortOrder || index + 1), isActive: account.isActive !== 0 })}>✎</button>
+              <button className="btn btn-edit" onClick={() => setDraft({ id: account.id, name: account.name, kind: account.kind, iban: account.iban || '', color: account.color || null, sortOrder: Math.max(1, account.sortOrder || index + 1), isActive: account.isActive !== 0 })} title="Bearbeiten" aria-label={`${account.name} bearbeiten`}>
+                <AppIcon icon={IconPencil} size="control" />
+              </button>
               <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ id: account.id, name: account.name })} title="Löschen">
                 <IconTrash size={16} />
               </button>

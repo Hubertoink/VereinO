@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.7.2] - 2026-09-01
+
+### Geändert
+
+- Zahlungskonten verwenden nun das kompakte Kartenlayout der Tags mit Farbstreifen, Initialen und einheitlichen Icon-Aktionen.
+- Einen Renderfehler in der Kontenansicht durch den fehlenden `AppIcon`-Import behoben.
+
 ## [3.7.1] - 2026-09-01
 
 ### Geändert

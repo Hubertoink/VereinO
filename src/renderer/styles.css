@@ -11200,41 +11200,80 @@ button.dashboard-task-strip__item:hover {
 }
 
 .payment-account-card {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 10px;
+  min-width: 0;
   padding: 12px 14px;
+  background: var(--account-background);
   border-left: 4px solid var(--account-color);
   border-radius: 0;
   box-shadow: none;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
 .payment-account-card:hover {
-  transform: none;
-  box-shadow: none;
-  background: color-mix(in oklab, var(--account-color) 8%, var(--surface));
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .12);
+  background: color-mix(in oklab, var(--account-color) 14%, var(--surface));
 }
 
-.payment-account-card__main {
+.payment-account-card__initial {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--account-color);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+
+.payment-account-card__details {
+  min-width: 0;
+  flex: 1;
 }
 
 .payment-account-card__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 700;
 }
 
-.payment-account-card__badges,
-.payment-account-card__actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.payment-account-card__details .helper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-account-card__archived {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.payment-account-card__number {
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .payment-account-card__actions {
-  justify-content: flex-end;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.payment-account-card__actions .btn {
+  min-width: 40px;
+  min-height: 34px;
+  padding: 6px 8px;
 }
 
 .payment-account-modal {
