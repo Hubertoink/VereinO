@@ -338,10 +338,10 @@ function paymentMethodLabel(method?: 'BAR' | 'BANK' | null) {
     return '—'
 }
 
-function paymentAccountIcon(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null, method?: 'BAR' | 'BANK' | null, size = 12) {
-    if (kind === 'PAYPAL') return <IconPayPal size={size} />
-    if (kind === 'CASH' || method === 'BAR') return <IconCash size={size} />
-    return <IconBank size={size} />
+function paymentAccountIcon(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null, method?: 'BAR' | 'BANK' | null, size = 12, color?: string | null) {
+    if (kind === 'PAYPAL') return <IconPayPal size={size} color={color || undefined} />
+    if (kind === 'CASH' || method === 'BAR') return <IconCash size={size} color={color || undefined} />
+    return <IconBank size={size} color={color || undefined} />
 }
 
 interface JournalTableProps {
@@ -922,13 +922,12 @@ export default function JournalTable({
                             <UsageHover kind="payment" title={title} rows={rows} eurFmt={eurFmt} refreshKey={usageRefreshKey}>
                                 <button type="button" className={`badge pm-account-badge pm-transfer pm-transfer-${(from || '').toLowerCase()}-${(to || '').toLowerCase()}`} aria-label={title} style={{ borderColor: r.transferFromAccountColor || r.transferToAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); onTransferClick?.() }}>
                                     <span className="pm-icon">
-                                        {paymentAccountIcon(r.transferFromAccountKind, from)}
+                                        {paymentAccountIcon(r.transferFromAccountKind, from, 12, r.transferFromAccountColor)}
                                     </span>
                                     <span className="transfer-arrow">→</span>
                                     <span className="pm-icon">
-                                        {paymentAccountIcon(r.transferToAccountKind, to)}
+                                        {paymentAccountIcon(r.transferToAccountKind, to, 12, r.transferToAccountColor)}
                                     </span>
-                                    <span className="pm-account-badge__label">{fromLabel} → {toLabel}</span>
                                 </button>
                             </UsageHover>
                         )
@@ -946,7 +945,7 @@ export default function JournalTable({
                             return (
                                 <UsageHover kind="payment" title="Zahlungskonto" rows={rows} eurFmt={eurFmt} getUsage={accountId ? getPaymentUsage : undefined} id={accountId || undefined} refreshKey={usageRefreshKey}>
                                     <button type="button" className={`badge pm-account-badge pm-${(r.paymentMethod || '').toLowerCase()}`} aria-label={`Zahlweg: ${label}`} style={{ borderColor: r.paymentAccountColor || undefined }} onClick={(e) => { e.stopPropagation(); if (accountId) onPaymentAccountClick?.(accountId) }}>
-                                        {paymentAccountIcon(r.paymentAccountKind, r.paymentMethod)}
+                                        {paymentAccountIcon(r.paymentAccountKind, r.paymentMethod, 12, r.paymentAccountColor)}
                                         <span className="pm-account-badge__label">{label}</span>
                                     </button>
                                 </UsageHover>

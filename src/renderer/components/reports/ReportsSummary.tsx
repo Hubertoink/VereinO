@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { IconCreditCard, IconReceipt2 } from '@tabler/icons-react'
+import AppIcon from '../common/AppIcon'
+import { IconBank, IconBudget, IconCash, IconPayPal } from '../../utils/icons'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
 export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
@@ -40,8 +43,8 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
   return (
-    <div className="card" style={{ marginTop: 12, padding: 12, display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="card report-summary-card">
+      <div className="report-summary-header">
         <div>
           <strong>Summen</strong>
           <div className="helper">Für den gewählten Zeitraum und die Filter.</div>
@@ -49,27 +52,27 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
       </div>
       {loading && <div>Lade …</div>}
       {data && (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className="report-summary-content">
           {(() => {
             const inSum = (data.byType.find(t => t.key === 'IN')?.gross || 0)
             const outSum = (data.byType.find(t => t.key === 'OUT')?.gross || 0)
             const net = inSum - outSum
             const avgPerMonth = monthsCount > 0 ? (net / monthsCount) : null
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-                <div className="card" style={{ padding: 10 }}>
+              <div className="report-summary-kpis">
+                <div className="card report-summary-kpi">
                   <div className="helper">Einnahmen (Brutto)</div>
                   <div style={{ fontWeight: 600, color: '#2e7d32' }}>{eurFmt.format(inSum)}</div>
                 </div>
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card report-summary-kpi">
                   <div className="helper">Ausgaben (Brutto)</div>
                   <div style={{ fontWeight: 600, color: '#c62828' }}>{eurFmt.format(outSum)}</div>
                 </div>
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card report-summary-kpi">
                   <div className="helper">Saldo</div>
                   <div style={{ fontWeight: 600, color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
                 </div>
-                <div className="card" style={{ padding: 10 }}>
+                <div className="card report-summary-kpi">
                   <div className="helper">Ø Saldo/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
                   <div style={{ fontWeight: 600 }}>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
                 </div>
@@ -77,14 +80,14 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             )
           })()}
           {/* Netto/MwSt/Brutto totals row intentionally removed per UI simplification */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          <div className="report-summary-breakdowns">
             {/* Tax spheres for non-profits, user-defined categories otherwise */}
-            <div className="card" style={{ padding: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontSize: 16 }}>📊</span>
+            <div className="card report-summary-breakdown-card">
+              <div className="report-summary-section-title">
+                <AppIcon icon={IconBudget} size="inline" />
                 <strong>Nach {data.classificationProfile === 'GENERAL' ? data.primaryClassificationLabel : 'Sphäre'}</strong>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="report-summary-list">
                 {(data.classificationProfile === 'GENERAL' ? data.byPrimaryClassification : data.bySphere).map((r: any) => {
                   // Use rgba with low opacity for theme compatibility (works in light and dark)
                   const colors: Record<string, { bg: string; text: string }> = {
@@ -97,7 +100,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                     ? { bg: `${r.color}26`, text: r.color }
                     : colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
                   return (
-                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: c.bg }}>
+                    <div key={r.key} className="report-summary-row" style={{ background: c.bg }}>
                       <span style={{ fontWeight: 500, color: c.text, fontSize: 13 }}>{r.key}</span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
                     </div>
@@ -107,22 +110,23 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             </div>
 
             {/* Nach Zahlweg */}
-            <div className="card" style={{ padding: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontSize: 16 }}>💳</span>
+            <div className="card report-summary-breakdown-card">
+              <div className="report-summary-section-title">
+                <AppIcon icon={IconCreditCard} size="inline" />
                 <strong>Nach Zahlweg</strong>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="report-summary-list">
                 {((data.byPaymentAccount && data.byPaymentAccount.length > 0)
                   ? data.byPaymentAccount
                   : data.byPaymentMethod.filter(r => r.key === 'BAR' || r.key === 'BANK').map((r) => ({ accountId: null, key: r.key || 'Ohne Konto', kind: r.key === 'BAR' ? 'CASH' : 'BANK', color: null, gross: r.gross, net: r.net, vat: r.vat }))
                 ).map((r, i) => {
-                  const icons: Record<string, string> = { BANK: '🏦', CASH: '💵', PAYPAL: 'P', CARD: '💳', OTHER: '•' }
+                  const icons: Record<string, React.ElementType> = { BANK: IconBank, CASH: IconCash, PAYPAL: IconPayPal, CARD: IconCreditCard, OTHER: IconBudget }
                   const color = r.color || (r.kind === 'CASH' ? '#42a5f5' : r.kind === 'BANK' ? '#26a69a' : 'var(--accent)')
+                  const PaymentIcon = icons[r.kind ?? 'OTHER'] || IconBudget
                   return (
-                    <div key={`${r.accountId ?? r.key ?? 'NULL'}-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, fontSize: 13 }}>
-                        <span>{icons[r.kind ?? 'OTHER'] || '•'}</span>
+                    <div key={`${r.accountId ?? r.key ?? 'NULL'}-${i}`} className="report-summary-row" style={{ background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
+                      <span className="report-summary-row-label">
+                        <PaymentIcon size={14} color={color} aria-hidden="true" />
                         {r.key}
                       </span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
@@ -133,12 +137,12 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             </div>
 
             {/* Nach Art */}
-            <div className="card" style={{ padding: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontSize: 16 }}>📋</span>
+            <div className="card report-summary-breakdown-card">
+              <div className="report-summary-section-title">
+                <AppIcon icon={IconReceipt2} size="inline" />
                 <strong>Nach Art</strong>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="report-summary-list">
                 {data.byType.map((r) => {
                   const styles: Record<string, { bg: string; text: string; icon: string }> = {
                     IN: { bg: 'rgba(46, 125, 50, 0.12)', text: '#2e7d32', icon: '↓' },
@@ -147,8 +151,8 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                   }
                   const s = styles[r.key] || { bg: 'var(--muted)', text: 'var(--text)', icon: '•' }
                   return (
-                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 6, background: s.bg }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500, color: s.text, fontSize: 13 }}>
+                    <div key={r.key} className="report-summary-row" style={{ background: s.bg }}>
+                      <span className="report-summary-row-label" style={{ color: s.text }}>
                         <span style={{ fontWeight: 700 }}>{s.icon}</span>
                         {r.key}
                       </span>

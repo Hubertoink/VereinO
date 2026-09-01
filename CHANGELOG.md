@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.7.0] - 2026-09-01
+
+### Geändert
+
+- Reports zeigen Zahlarten mit passenden, farblich unterscheidbaren Icons und einer ausgewogeneren Diagrammaufteilung.
+- Journal und Reports verwenden eine konsistente Zahlarten-Darstellung; Transfers bleiben in der Buchungstabelle auf die Quell- und Ziel-Icons reduziert.
+- Abstände zwischen Summary-Bereichen und Verlaufsdiagrammen vereinheitlicht.
+
 ## [3.6.4] - 2026-08-31
 
 ### Geändert

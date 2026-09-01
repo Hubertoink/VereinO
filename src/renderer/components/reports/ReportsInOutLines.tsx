@@ -109,7 +109,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     return arr
   })()
   return (
-    <div className="card dither-chart-card" style={{ marginTop: 12, padding: 12 }}>
+    <div className="card report-chart-card dither-chart-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Linienverlauf Einnahmen (IN) vs. Ausgaben (OUT) – Brutto</strong>
         <div className="legend">

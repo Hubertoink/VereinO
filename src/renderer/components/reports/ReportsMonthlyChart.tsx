@@ -209,7 +209,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }
 
   return (
-    <div className="card dither-chart-card" style={{ marginTop: 12, padding: 12 }}>
+    <div className="card report-chart-card dither-chart-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
         <div className="legend">
