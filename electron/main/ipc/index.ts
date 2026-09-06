@@ -1,4 +1,5 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
+import { getWidgetAutostart, setWidgetAutostart, type createReceiptWidgetController } from '../services/receiptWidget'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataChange'
 import type { DashboardSnapshotInput } from '../../../shared/dashboard'
 import { ORGANIZATION_PROFILES, type OrganizationProfile } from '../../../shared/classification'
@@ -655,6 +656,8 @@ function filesForAiCandidate(
 }
 
 type RegisterIpcHandlersOptions = {
+  receiptWidget?: ReturnType<typeof createReceiptWidgetController>
+  showMainWindow?: () => { ok: boolean }
   openDetachedQuickAdd?: (initialState?: any) => Promise<{ ok: boolean; token: string }>
   focusDetachedQuickAdd?: (draftId: string) => { ok: boolean }
   closeDetachedQuickAdd?: (draftId: string) => { ok: boolean }
@@ -741,6 +744,23 @@ function notifyDataChanged(scopes?: DataChangeScope[]) {
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
+  ipcMain.handle('receiptWidget.open', () => options.receiptWidget?.open() ?? { ok: false })
+  ipcMain.handle('receiptWidget.close', () => options.receiptWidget?.close() ?? { ok: false })
+  ipcMain.handle('receiptWidget.showMain', () => options.showMainWindow?.() ?? { ok: false })
+  ipcMain.handle('receiptWidget.state', () => options.receiptWidget?.state() ?? { expanded: false, edge: 'right' })
+  ipcMain.handle('receiptWidget.setExpanded', (event, expanded: unknown) => {
+    if (typeof expanded !== 'boolean' || event.sender !== options.receiptWidget?.window?.webContents) throw new Error('Ungültige Widget-Anfrage.')
+    return options.receiptWidget.setExpanded(expanded)
+  })
+  ipcMain.handle('receiptWidget.move', (event, finished: unknown) => {
+    if (typeof finished !== 'boolean' || event.sender !== options.receiptWidget?.window?.webContents) throw new Error('Ungültige Widget-Anfrage.')
+    return finished ? options.receiptWidget.finishMove() : options.receiptWidget.moveToCursor()
+  })
+  ipcMain.handle('receiptWidget.getAutostart', () => getWidgetAutostart())
+  ipcMain.handle('receiptWidget.setAutostart', (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('Ungültige Autostart-Einstellung.')
+    return setWidgetAutostart(enabled)
+  })
   registerBackupAndShellHandlers()
   const getCurrentWindow = () =>
     BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
@@ -790,13 +810,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('updates.download', async () => downloadAppUpdate())
   ipcMain.handle('updates.install', async () => installAppUpdate())
   // Window controls (frameless)
-  ipcMain.handle('window.minimize', async () => {
-    const win = getCurrentWindow()
+  ipcMain.handle('window.minimize', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     win?.minimize()
     return { ok: true }
   })
-  ipcMain.handle('window.toggleMaximize', async () => {
-    const win = getCurrentWindow()
+  ipcMain.handle('window.toggleMaximize', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     if (win) {
       if (win.isMaximized()) win.unmaximize()
       else win.maximize()
@@ -804,13 +824,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     return { ok: false }
   })
-  ipcMain.handle('window.close', async () => {
-    const win = getCurrentWindow()
+  ipcMain.handle('window.close', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     win?.close()
     return { ok: true }
   })
-  ipcMain.handle('window.confirmClose', async () => {
-    const win = getCurrentWindow()
+  ipcMain.handle('window.confirmClose', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return { ok: false }
     if (!(win as any).__isDetachedQuickAddWindow && options.hasDetachedQuickAdds?.()) {
       const requested = options.requestCloseDetachedQuickAdds?.(win, true)
@@ -3978,6 +3998,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
   ipcMain.handle('organizations.switch', async (_e, payload: { orgId: string }) => {
     if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+    if (options.hasDetachedQuickAdds?.()) throw new Error('Bitte zuerst die separaten Erfassungsfenster schließen, bevor du den Verein wechselst.')
     const before = getActiveOrganization()
     const beforeId = before?.id || 'default'
     const result = switchOrganization(payload.orgId)
@@ -4002,8 +4023,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       throw err
     }
     // Signal renderer to reload
-    const win = BrowserWindow.getFocusedWindow()
-    if (win) {
+    for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send('organizations:switched', result.org)
     }
     return result
@@ -4018,6 +4038,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     'organizations.delete',
     async (_e, payload: { orgId: string; deleteData?: boolean }) => {
       if (!payload?.orgId) throw new Error('orgId ist erforderlich')
+      if (options.hasDetachedQuickAdds?.()) throw new Error('Bitte zuerst die separaten Erfassungsfenster schließen, bevor du einen Verein löschst.')
 
       const before = getActiveOrganization()
       const beforeId = before?.id || 'default'

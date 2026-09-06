@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { SettingsProps, TileKey } from './types'
 import { SettingsNav } from './SettingsNav'
 import { GeneralPane } from './panes/GeneralPane'
+import { WorkflowPane } from './panes/WorkflowPane'
 import { TablePane } from './panes/TablePane'
 import { StoragePane } from './panes/StoragePane'
 import { ImportPane } from './panes/ImportPane'
@@ -21,6 +22,7 @@ import { IconListDetails } from '@tabler/icons-react'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'general',
+  'workflow',
   'table',
   'storage',
   'docling',
@@ -139,21 +141,25 @@ export function SettingsView(props: SettingsProps) {
             notify={props.notify}
             bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
-            showBookingDraftTabs={props.showBookingDraftTabs}
-            setShowBookingDraftTabs={props.setShowBookingDraftTabs}
-            showBookingEditTabs={props.showBookingEditTabs}
-            setShowBookingEditTabs={props.setShowBookingEditTabs}
-            bookingEntryPresentation={props.bookingEntryPresentation}
-            setBookingEntryPresentation={props.setBookingEntryPresentation}
-            allowVoucherDeletion={props.allowVoucherDeletion}
-            setAllowVoucherDeletion={props.setAllowVoucherDeletion}
-            quickAddAfterSave={props.quickAddAfterSave}
-            setQuickAddAfterSave={props.setQuickAddAfterSave}
             visibleNavItems={props.visibleNavItems}
             setVisibleNavItems={props.setVisibleNavItems}
           />
         )}
         
+        {activeTile === 'workflow' && <WorkflowPane
+          showBookingDraftTabs={props.showBookingDraftTabs}
+          setShowBookingDraftTabs={props.setShowBookingDraftTabs}
+          showBookingEditTabs={props.showBookingEditTabs}
+          setShowBookingEditTabs={props.setShowBookingEditTabs}
+          bookingEntryPresentation={props.bookingEntryPresentation}
+          setBookingEntryPresentation={props.setBookingEntryPresentation}
+          allowVoucherDeletion={props.allowVoucherDeletion}
+          setAllowVoucherDeletion={props.setAllowVoucherDeletion}
+          quickAddAfterSave={props.quickAddAfterSave}
+          setQuickAddAfterSave={props.setQuickAddAfterSave}
+          notify={props.notify}
+        />}
+
         {activeTile === 'table' && (
           <TablePane
             cols={props.cols}

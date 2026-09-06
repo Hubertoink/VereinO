@@ -1,11 +1,12 @@
 import { app, BrowserWindow, shell, Menu, session, dialog, screen } from 'electron'
-import { getDb } from './db/database'
+import { getDb, getActiveOrganization } from './db/database'
 import { getSetting, setSetting } from './services/settings'
 import * as backup from './services/backup'
 import { applyMigrations } from './db/migrations'
 import { requireAllowedExternalUrl } from './services/externalUrl'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createReceiptWidgetController, WIDGET_STARTUP_ARG } from './services/receiptWidget'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -18,26 +19,43 @@ const DETACHED_QUICK_ADD_BOUNDS_SETTING = 'ui.detachedQuickAddBounds'
 let pendingMainCloseWindow: BrowserWindow | null = null
 let pendingMainCloseConfirmed = false
 let pendingSecondInstanceFocus = false
+let quitting = false
+let widgetOnlyStartup = process.argv.includes(WIDGET_STARTUP_ARG)
+let widgetIpcReady = false
+app.on('before-quit', () => { quitting = true })
+const receiptWidget = createReceiptWidgetController({
+    preload: path.join(__dirname, '../preload/index.cjs'),
+    rendererFile: path.join(__dirname, '../../dist/index.html'),
+    rendererUrl: isDev ? process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173' : undefined,
+    showMain: focusPrimaryWindow,
+    isQuitting: () => quitting
+})
 
 function focusPrimaryWindow() {
     const windows = BrowserWindow.getAllWindows()
     const primary =
-        windows.find((win) => !(win as any).__isDetachedQuickAddWindow) ?? windows[0] ?? null
+        windows.find((win) => win !== receiptWidget.window && !(win as any).__isDetachedQuickAddWindow) ?? null
     if (!primary || primary.isDestroyed()) return false
     if (primary.isMinimized()) primary.restore()
+    widgetOnlyStartup = false
     primary.show()
     primary.focus()
     return true
 }
 
 if (!hasSingleInstanceLock) {
-    dialog.showErrorBox(
+    if (!widgetOnlyStartup) dialog.showErrorBox(
         'VereinO ist bereits geöffnet',
         'Es läuft bereits eine Instanz von VereinO. Bitte verwenden Sie das bereits geöffnete Fenster.'
     )
     app.quit()
 } else {
-    app.on('second-instance', () => {
+    app.on('second-instance', (_event, argv) => {
+        if (argv.includes(WIDGET_STARTUP_ARG)) {
+            if (widgetIpcReady) void receiptWidget.open()
+            else widgetOnlyStartup = true
+            return
+        }
         pendingSecondInstanceFocus = !focusPrimaryWindow()
     })
 }
@@ -89,7 +107,7 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
         existing.focus()
         return { ok: true, token }
     }
-    detachedQuickAddInitials.set(token, initialState || null)
+    detachedQuickAddInitials.set(token, initialState?.receiptIntake ? { ...initialState, organization: getActiveOrganization() } : initialState || null)
 
     const isInvoiceScan = initialState?.mode === 'invoice'
     const savedBounds = isInvoiceScan ? undefined : getDetachedQuickAddBounds()
@@ -198,6 +216,7 @@ function requestCloseDetachedQuickAddWindows(mainWindow?: BrowserWindow | null, 
 }
 
 function cancelPendingMainClose() {
+    quitting = false
     pendingMainCloseWindow = null
     pendingMainCloseConfirmed = false
     return { ok: true }
@@ -251,7 +270,7 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
 
     let allowClose = false
 
-    win.on('ready-to-show', () => win.show())
+    win.on('ready-to-show', () => { if (!widgetOnlyStartup) win.show() })
     win.on('maximize', () => win.webContents.send('window:maximized', true))
     win.on('unmaximize', () => win.webContents.send('window:unmaximized', false))
     win.on('app-command', (event, command) => {
@@ -264,6 +283,11 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
         }
     })
     win.on('close', (event) => {
+        if (!quitting && receiptWidget.window && !receiptWidget.window.isDestroyed()) {
+            event.preventDefault()
+            win.hide()
+            return
+        }
         if (allowClose || win.webContents.isDestroyed()) return
         event.preventDefault()
         if (detachedQuickAddWindows.size > 0) {
@@ -352,6 +376,7 @@ function createMenu() {
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
     createMenu()
+    if (process.platform === 'darwin' && app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin) widgetOnlyStartup = true
     // Make startup progress visible before native modules, schema checks and the
     // complete IPC graph are initialized.
     const win = await createWindow(true)
@@ -400,6 +425,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     const { registerIpcHandlers } = await import('./ipc')
     // Register IPC first so renderer can use db.location.* to recover
     registerIpcHandlers({
+        receiptWidget,
+        showMainWindow: () => ({ ok: focusPrimaryWindow() }),
         openDetachedQuickAdd: createDetachedQuickAddWindow,
         focusDetachedQuickAdd: focusDetachedQuickAddWindow,
         closeDetachedQuickAdd: closeDetachedQuickAddWindow,
@@ -413,7 +440,11 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
             }
         }
     })
+    widgetIpcReady = true
     await loadRenderer(win)
+    if (widgetOnlyStartup && !dbInitError) {
+        try { await receiptWidget.open() } catch { focusPrimaryWindow() }
+    } else if (dbInitError) focusPrimaryWindow()
     void import('./services/invoiceBatchQueue')
         .then(({ startInvoiceBatchQueue }) => startInvoiceBatchQueue())
         .catch((error) => {

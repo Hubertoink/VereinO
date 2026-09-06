@@ -5,6 +5,27 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.9.0] - 2026-09-06
+
+### Hinzugefügt
+
+- Optionales Belegwidget am Bildschirmrand für PDFs und Bilder, erreichbar über die Einstellungen. Belege lassen sich als Buchung übernehmen oder als offene Rechnung anlegen und lokal oder mit KI auslesen.
+- Bei geöffnetem Belegwidget bleibt VereinO nach dem Schließen des Hauptfensters im Hintergrund erreichbar.
+- Das Belegwidget dockt als kleiner Tropfen am Bildschirmrand an und klappt beim Darüberziehen einer Datei animiert auf. Seine Position wird gemerkt.
+- Optionaler System-Autostart für das Belegwidget in der installierten Windows- und macOS-Version; das Hauptfenster bleibt dabei verborgen.
+
+### Geändert
+
+- Buchungsabläufe und Belegwidget-Einstellungen in das eigene Untermenü „Darstellung → Arbeitsweise“ verschoben.
+- Ungespeicherte Belege verwenden einen eigenen Schließen-Dialog im Design der App.
+- Die KI-Auswertung im Belegwidget wird ausschließlich über „Mit KI auslesen“ gestartet.
+
+### Behoben
+
+- Lange Dateinamen brechen im Schließen-Dialog um; die Aktionen bleiben vollständig sichtbar.
+- Das Hintergrundbild der Organisation erscheint nicht mehr als rechteckiger Rest hinter dem transparenten Belegwidget.
+- Separate Erfassungsfenster verhindern einen Vereinswechsel während der Bearbeitung. Fensteraktionen schließen auch bei wechselndem Fokus das zugehörige Fenster.
+
 ## [3.8.1] - 2026-09-06
 
 ### Geändert

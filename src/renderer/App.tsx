@@ -6,6 +6,8 @@ import {
 } from './views/Journal/utils/journalColumnVisibility'
 import type { UpdateModalState } from './components/modals/UpdateAvailableModal'
 import LoadingState from './components/LoadingState'
+import ReceiptWidget from './components/ReceiptWidget'
+import DiscardReceiptModal from './components/modals/DiscardReceiptModal'
 import { useQuickAdd, type QA } from './hooks/useQuickAdd'
 import type {
   LocalInvoiceScanDraftState,
@@ -578,6 +580,10 @@ function DetachedQuickAddWindow() {
   const [descSuggest, setDescSuggest] = useState<string[]>([])
   const [windowModeKind, setWindowModeKind] = useState<'create' | 'invoice' | 'edit' | 'details'>('create')
   const [invoiceDraftFile, setInvoiceDraftFile] = useState<File | null>(null)
+  const [receiptIntake, setReceiptIntake] = useState(false)
+  const [confirmDiscardReceipt, setConfirmDiscardReceipt] = useState(false)
+  const [receiptTarget, setReceiptTarget] = useState<'booking' | 'invoice'>('booking')
+  const [receiptOrganization, setReceiptOrganization] = useState<{ id: string; name: string } | null>(null)
   const [invoiceDraftState, setInvoiceDraftState] = useState<LocalInvoiceScanDraftState | null>(null)
   const [invoiceDraftGuidance, setInvoiceDraftGuidance] = useState<InvoiceAiGuidance | undefined>()
   const [editQa, setEditQa] = useState<any | null>(null)
@@ -734,6 +740,8 @@ function DetachedQuickAddWindow() {
         : []
       openedRef.current = true
       if (initial?.mode === 'invoice') {
+        setReceiptIntake(Boolean(initial.receiptIntake))
+        setReceiptOrganization(initial.organization || null)
         setWindowModeKind('invoice')
         setInvoiceDraftFile(initialFiles[0] || null)
         setInvoiceDraftState((initial?.invoiceState as LocalInvoiceScanDraftState) || null)
@@ -812,6 +820,7 @@ function DetachedQuickAddWindow() {
   }, [loaded, quickAdd, windowModeKind])
 
   const syncDetachedInvoiceDraft = useCallback(async () => {
+    if (receiptIntake) return
     if (!detachedDraftIdRef.current) return
     const encodedFiles = invoiceDraftFile
       ? [await encodeFileForUpload(invoiceDraftFile)]
@@ -824,7 +833,7 @@ function DetachedQuickAddWindow() {
       kind: 'invoice',
       detached: true
     })
-  }, [invoiceDraftFile, invoiceDraftGuidance, invoiceDraftState])
+  }, [invoiceDraftFile, invoiceDraftGuidance, invoiceDraftState, receiptIntake])
 
   useEffect(() => {
     if (windowModeKind !== 'invoice' || !loaded || !invoiceDraftFile) return
@@ -971,6 +980,7 @@ function DetachedQuickAddWindow() {
   useEffect(() => {
     return window.api?.window?.onCloseRequested?.(() => {
       if (windowModeKind === 'invoice') {
+        if (receiptIntake) { setConfirmDiscardReceipt(true); return }
         void (async () => {
           try {
             await syncDetachedInvoiceDraft()
@@ -990,7 +1000,7 @@ function DetachedQuickAddWindow() {
       }
       requestCloseDetachedCreate()
     })
-  }, [requestCloseDetachedCreate, requestCloseDetachedEdit, syncDetachedInvoiceDraft, windowModeKind])
+  }, [requestCloseDetachedCreate, requestCloseDetachedEdit, syncDetachedInvoiceDraft, windowModeKind, receiptIntake])
 
   const deleteDetachedEdit = useCallback(async () => {
     if (!editQa?.id) return
@@ -1094,8 +1104,10 @@ function DetachedQuickAddWindow() {
 
   if (windowModeKind === 'invoice') {
     return (
+      <>
       <LocalInvoiceScanModal
         onClose={() => {
+          if (receiptIntake) { setConfirmDiscardReceipt(true); return }
           void (async () => {
             try {
               await syncDetachedInvoiceDraft()
@@ -1105,10 +1117,35 @@ function DetachedQuickAddWindow() {
           })()
         }}
         onCreateInvoice={async (result) => {
+          if (receiptIntake) {
+            const active = await window.api.organizations.active()
+            if ((active.organization?.id || 'default') !== (receiptOrganization?.id || 'default')) {
+              notify('error', 'Der aktive Verein hat sich geändert. Bitte den Beleg erneut öffnen.')
+              return false
+            }
+          }
           const converted = scannedInvoiceToBooking(result)
           if (!converted.initial) {
             notify('error', `Bitte ergänze: ${(converted.missing || []).join(', ')}.`)
             return false
+          }
+          if (receiptIntake && receiptTarget === 'invoice') {
+            if (!result.fields.invoiceNumber.trim()) { notify('error', 'Bitte ergänze: Rechnungsnummer.'); return false }
+            await window.api.invoices.create({
+              date: result.fields.invoiceDate, dueDate: result.fields.dueDate || null,
+              invoiceNo: result.fields.invoiceNumber.trim(), party: result.fields.supplier.trim(), partyId: result.partyId,
+              description: result.fields.description.trim() || null, note: converted.initial.qa.note || null,
+              grossAmount: converted.initial.qa.grossAmount!,
+              paymentMethod: result.bookingMeta.paymentMethod || null, paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
+              sphere: result.bookingMeta.sphere || 'IDEELL', primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? null,
+              budgets: result.budgets, earmarks: result.earmarksAssigned,
+              budgetId: result.budgets[0]?.budgetId ?? null, earmarkId: result.earmarksAssigned[0]?.earmarkId ?? null,
+              autoPost: true, voucherType: 'OUT', files: await encodeFilesForUpload([result.file]), tags: result.tags
+            })
+            dispatchDataChanged(['invoices'])
+            await window.api.quickAdd.notifySaved({ draftId: detachedDraftIdRef.current, kind: 'invoice' })
+            await window.api.window.confirmClose()
+            return true
           }
           const encodedFiles = await encodeFilesForUpload(converted.initial.files)
           await window.api?.quickAdd?.syncDraft?.({
@@ -1125,7 +1162,15 @@ function DetachedQuickAddWindow() {
         budgetsForEdit={budgetsForEdit}
         earmarks={earmarks}
         tagDefs={tagDefs}
-        submitLabel="Als Buchung übernehmen"
+        submitLabel={receiptIntake && receiptTarget === 'invoice' ? 'Offene Rechnung anlegen' : 'Als Buchung übernehmen'}
+        intakeHeader={receiptIntake ? <div className="receipt-intake-choice">
+          <strong>{receiptOrganization?.name || 'VereinO'}</strong>
+          <div className="btn-group" role="group" aria-label="Beleg verwenden als">
+            <button type="button" className={`btn ${receiptTarget === 'booking' ? 'primary' : ''}`} aria-pressed={receiptTarget === 'booking'} onClick={() => setReceiptTarget('booking')}>Buchung erfassen</button>
+            <button type="button" className={`btn ${receiptTarget === 'invoice' ? 'primary' : ''}`} aria-pressed={receiptTarget === 'invoice'} onClick={() => setReceiptTarget('invoice')}>Offene Rechnung anlegen</button>
+          </div>
+          <span>{receiptTarget === 'booking' ? 'Eine Einnahme oder Ausgabe mit diesem Beleg erfassen.' : 'Eine noch zu bezahlende Rechnung als Verbindlichkeit vormerken.'}</span>
+        </div> : undefined}
         commentAriaLabel="Kommentar zur Buchung"
         closeOnCreate={false}
         initialFile={invoiceDraftFile || undefined}
@@ -1137,6 +1182,10 @@ function DetachedQuickAddWindow() {
         }}
         onFileChange={setInvoiceDraftFile}
       />
+      {confirmDiscardReceipt && <DiscardReceiptModal fileName={invoiceDraftFile?.name}
+        onCancel={() => { setConfirmDiscardReceipt(false); void window.api.window.cancelClose() }}
+        onDiscard={() => void window.api.window.confirmClose()} />}
+      </>
     )
   }
 
@@ -4369,13 +4418,14 @@ function AppInner() {
 }
 // Wrapper with context providers
 export default function App() {
+  const isReceiptWidget = new URLSearchParams(window.location.search).get('window') === 'receipt-widget'
   const isDetachedQuickAdd =
     new URLSearchParams(window.location.search).get('window') === 'quick-add'
   return (
     <UIPreferencesProvider>
       <ToastProvider>
         <Suspense fallback={<LoadingState message="VereinO wird geladen …" />}>
-          {isDetachedQuickAdd ? <DetachedQuickAddWindow /> : <AppInner />}
+          {isReceiptWidget ? <ReceiptWidget /> : isDetachedQuickAdd ? <DetachedQuickAddWindow /> : <AppInner />}
         </Suspense>
       </ToastProvider>
     </UIPreferencesProvider>

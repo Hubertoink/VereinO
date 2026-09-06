@@ -57,6 +57,9 @@ test.beforeAll(async () => {
   // The first window initially contains the startup screen. The invoice test
   // needs the fully initialized renderer and its IPC-backed database.
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
+  const later = page.getByRole('button', { name: 'Später', exact: true })
+  await later.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
+  if (await later.isVisible()) await later.click()
 })
 
 test.afterAll(async () => {
@@ -94,6 +97,130 @@ async function createInvoicePdf() {
   })
   return Buffer.from(await document.save())
 }
+
+test('receipt widget drops a PDF, preserves fields across modes and saves an open invoice', async () => {
+  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Belegwidget öffnen', exact: true })).toHaveCount(0)
+  await page.locator('.settings-subnav').getByTitle('Arbeitsweise', { exact: true }).click()
+  await expect(page.getByRole('switch', { name: /Beim Anmelden automatisch starten/ })).toBeDisabled()
+  await page.screenshot({ path: 'test-results/settings-workflow.png', animations: 'disabled' })
+  const widgetPromise = electronApp.waitForEvent('window')
+  await page.getByRole('button', { name: 'Belegwidget öffnen', exact: true }).click()
+  const widget = await widgetPromise
+  await expect(widget.getByRole('button', { name: 'Belegwidget aufklappen' })).toBeVisible()
+  await expect.poll(() => widget.evaluate(() => window.innerWidth)).toBe(44)
+  await widget.screenshot({ path: 'test-results/receipt-widget-droplet.png' })
+  await widget.getByRole('button', { name: 'Belegwidget aufklappen' }).click()
+  await expect(widget.getByRole('button', { name: /Beleg ablegen/ })).toBeVisible()
+  await expect.poll(() => widget.evaluate(() => window.innerWidth)).toBe(300)
+  await widget.screenshot({ path: 'test-results/receipt-widget.png', animations: 'disabled' })
+  await widget.locator('input[type="file"]').setInputFiles({ name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('invalid') })
+  await expect(widget.getByRole('alert')).toContainText('PDF oder Bild')
+
+  await widget.getByRole('button', { name: 'Belegwidget aufklappen' }).click()
+  await expect.poll(() => widget.evaluate(() => window.innerWidth)).toBe(44)
+  await widget.locator('.receipt-widget').evaluate(element => {
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['test'], 'test.pdf', { type: 'application/pdf' }))
+    element.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  })
+  await expect.poll(() => widget.evaluate(() => window.innerWidth)).toBe(300)
+  const intakePromise = electronApp.waitForEvent('window')
+  const pdf = Array.from(await createInvoicePdf())
+  await widget.locator('.receipt-widget').evaluate((element, bytes) => {
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([new Uint8Array(bytes)], 'Beige_und_Braun_Elegant_Einfach_Cafe_Rechnung_A4_Dokument_mit_besonders_langem_Dateinamen_2026.pdf', { type: 'application/pdf' }))
+    element.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  }, pdf)
+  const intake = await intakePromise
+  await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
+  await intake.getByLabel('Rechnungsnummer').fill('WIDGET-001')
+  await intake.getByRole('button', { name: 'Rechnungserfassung schließen' }).click()
+  await expect(intake.getByRole('alertdialog')).toContainText('Beige_und_Braun_Elegant_Einfach_Cafe_Rechnung_A4_Dokument_mit_besonders_langem_Dateinamen_2026.pdf')
+  await expect(intake.getByRole('button', { name: 'Weiter erfassen' })).toBeFocused()
+  const discardLayout = await intake.getByRole('alertdialog').evaluate(dialog => {
+    const bounds = dialog.getBoundingClientRect()
+    return {
+      overflow: dialog.scrollWidth > dialog.clientWidth,
+      actionsInside: Array.from(dialog.querySelectorAll('button')).every(button => {
+        const rect = button.getBoundingClientRect()
+        return rect.left >= bounds.left && rect.right <= bounds.right
+      })
+    }
+  })
+  expect(discardLayout).toEqual({ overflow: false, actionsInside: true })
+  await intake.screenshot({ path: 'test-results/receipt-discard-modal.png', animations: 'disabled' })
+  await intake.keyboard.press('Escape')
+  await expect(intake.getByRole('alertdialog')).toHaveCount(0)
+  await expect(intake.getByLabel('Rechnungsnummer')).toHaveValue('WIDGET-001')
+  const choice = intake.getByRole('group', { name: 'Beleg verwenden als' })
+  await choice.getByRole('button', { name: 'Offene Rechnung anlegen' }).click()
+  await choice.getByRole('button', { name: 'Buchung erfassen' }).click()
+  await expect(intake.getByLabel('Rechnungsnummer')).toHaveValue('WIDGET-001')
+  await choice.getByRole('button', { name: 'Offene Rechnung anlegen' }).click()
+  const switchError = await page.evaluate(async () => {
+    try { await window.api.organizations.switch({ orgId: 'default' }); return '' }
+    catch (error) { return String(error) }
+  })
+  expect(switchError).toContain('Erfassungsfenster schließen')
+  await intake.screenshot({ path: 'test-results/receipt-widget-intake.png' })
+  const closed = intake.waitForEvent('close')
+  await intake.locator('.local-invoice-scan__footer').getByRole('button', { name: 'Offene Rechnung anlegen', exact: true }).click()
+  await closed
+  const saved = await page.evaluate(async () => {
+    const response = await window.api.invoices.list({ q: 'WIDGET-001' })
+    return response.rows[0] ? window.api.invoices.get({ id: response.rows[0].id }) : null
+  })
+  expect(saved?.grossAmount).toBe(618.8)
+  expect(saved?.status).toBe('OPEN')
+  expect(saved?.files[0]?.fileName).toBe('Beige_und_Braun_Elegant_Einfach_Cafe_Rechnung_A4_Dokument_mit_besonders_langem_Dateinamen_2026.pdf')
+
+  await page.evaluate(() => window.api.window.close())
+  const mainVisible = () => electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => !win.webContents.getURL().includes('window='))?.isVisible())
+  await expect.poll(mainVisible).toBe(false)
+  await widget.getByRole('button', { name: 'Belegwidget aufklappen' }).click()
+  await widget.getByRole('button', { name: 'VereinO öffnen', exact: true }).click()
+  await expect.poll(mainVisible).toBe(true)
+  await widget.getByRole('button', { name: 'Belegwidget schließen', exact: true }).click()
+})
+
+test('receipt widget keeps local fields after AI failure and saves a booking with its file', async () => {
+  await page.evaluate(async () => {
+    await window.api.ai.settings.set({ apiKey: 'sk-test-widget-offline' })
+    await window.api.paymentAccounts.upsert({ name: 'Widget Testbank', kind: 'BANK' })
+  })
+  await electronApp.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('ai.invoice.extract')
+    ipcMain.handle('ai.invoice.extract', () => { throw new Error('Test: KI nicht erreichbar') })
+  })
+  const widgetPromise = electronApp.waitForEvent('window')
+  await page.evaluate(() => window.api.receiptWidget.open())
+  const widget = await widgetPromise
+  const intakePromise = electronApp.waitForEvent('window')
+  await widget.locator('input[type="file"]').setInputFiles({ name: 'widget-booking.pdf', mimeType: 'application/pdf', buffer: await createInvoicePdf() })
+  const intake = await intakePromise
+  await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
+  await expect(intake.getByRole('checkbox', { name: /Automatisch mit/ })).toHaveCount(0)
+  await intake.getByRole('button', { name: 'Mit KI auslesen', exact: true }).click()
+  await expect(intake.getByRole('status')).toContainText('KI nicht erreichbar')
+  await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
+  await intake.getByLabel('Rechnungsnummer').fill('WIDGET-BOOKING')
+  await intake.getByRole('button', { name: 'Als Buchung übernehmen', exact: true }).click()
+  await intake.getByRole('button', { name: 'Buchungskonto wählen', exact: true }).click()
+  await intake.getByRole('option', { name: 'Widget Testbank', exact: true }).click()
+  const closed = intake.waitForEvent('close')
+  await intake.getByRole('button', { name: 'Speichern', exact: true }).click()
+  await closed
+  const saved = await page.evaluate(async () => {
+    const result = await window.api.vouchers.list({ limit: 100 })
+    return result.rows.find(row => row.note?.includes('WIDGET-BOOKING'))
+  })
+  expect(saved?.grossAmount).toBe(618.8)
+  expect(saved?.fileCount).toBe(1)
+  expect(saved?.paymentAccountName).toBe('Widget Testbank')
+  await widget.getByRole('button', { name: 'Belegwidget aufklappen' }).click()
+  await widget.getByRole('button', { name: 'Belegwidget schließen', exact: true }).click()
+})
 
 test('opens the local invoice modal and extracts a PDF text layer', async () => {
   await page.setViewportSize({ width: 1280, height: 820 })

@@ -22,6 +22,7 @@ const iconProps = {
 
 const settingsIconColors: Record<TileKey, string> = {
   general: '#7C4DFF',
+  workflow: '#D8A534',
   table: '#2962FF',
   storage: '#00B8D4',
   docling: '#8B5CF6',
@@ -42,6 +43,8 @@ const settingsIconColors: Record<TileKey, string> = {
 
 function getSettingsIcon(key: TileKey): React.ReactNode {
   switch (key) {
+    case 'workflow':
+      return <svg {...iconProps}><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="8" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="10" cy="18" r="2" /></svg>
     case 'general':
       return (
         <svg {...iconProps}>
@@ -207,6 +210,7 @@ const GROUPS: SettingsGroup[] = [
     label: 'Darstellung',
     items: [
       { key: 'general', label: 'Darstellung', shortLabel: 'Darst.' },
+      { key: 'workflow', label: 'Arbeitsweise', shortLabel: 'Arbeit' },
       { key: 'table', label: 'Tabelle', shortLabel: 'Tab.' },
     ],
   },

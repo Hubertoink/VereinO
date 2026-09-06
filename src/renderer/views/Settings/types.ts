@@ -22,6 +22,7 @@ import type { OrganizationProfile } from '../../../../shared/classification'
 // ============================================================================
 
 export type TileKey =
+  | 'workflow'
   | 'general'
   | 'table'
   | 'storage'
@@ -206,6 +207,11 @@ export interface GeneralPaneProps {
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
   bumpDataVersion: () => void
   openSetupWizard?: () => void
+  visibleNavItems: NavKey[]
+  setVisibleNavItems: (v: NavKey[]) => void
+}
+
+export interface WorkflowPaneProps {
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
@@ -216,8 +222,7 @@ export interface GeneralPaneProps {
   setAllowVoucherDeletion: (v: boolean) => void
   quickAddAfterSave: QuickAddAfterSave
   setQuickAddAfterSave: (v: QuickAddAfterSave) => void
-  visibleNavItems: NavKey[]
-  setVisibleNavItems: (v: NavKey[]) => void
+  notify: GeneralPaneProps['notify']
 }
 
 export interface TablePaneProps {

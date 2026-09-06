@@ -239,9 +239,11 @@ export default function LocalInvoiceScanModal({
   aiGuidance,
   onDraftChange,
   onFileChange,
-  anchorRect
+  anchorRect,
+  intakeHeader
 }: {
   onClose: () => void
+  intakeHeader?: import('react').ReactNode
   onCreateInvoice: (result: LocalInvoiceScanResult) => Promise<boolean> | boolean
   budgetsForEdit: BudgetOption[]
   earmarks: EarmarkOption[]
@@ -992,6 +994,9 @@ export default function LocalInvoiceScanModal({
       }
       window.setTimeout(() => delete document.documentElement.dataset.bookingHandoff, 900)
       if (closeOnCreate) onClose()
+    } catch (error) {
+      delete document.documentElement.dataset.bookingHandoff
+      notify('error', error instanceof Error ? error.message : 'Beleg konnte nicht gespeichert werden.')
     } finally {
       setIsTransferring(false)
     }
@@ -1053,6 +1058,7 @@ export default function LocalInvoiceScanModal({
           </div>
         </header>
 
+        {intakeHeader}
         {!file && aiGuidancePanel}
 
         <input

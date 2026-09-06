@@ -20846,3 +20846,39 @@ textarea {
 .leader-shortcut-command {
   border-radius: var(--radius-surface);
 }
+
+html.receipt-widget-document, body.receipt-widget-document { margin: 0; overflow: hidden; background: transparent !important; }
+/* Organization wallpapers use a separate root layer; transparent backgrounds alone do not hide it. */
+html.receipt-widget-document::before { content: none !important; display: none !important; }
+.receipt-widget-document #root { height: 100vh; min-height: 0; background: transparent; }
+.receipt-widget { position: relative; width: 100vw; height: 100vh; color: var(--text); user-select: none; }
+.receipt-widget__droplet { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 72px; border: 1px solid var(--accent); border-right: 0; border-radius: 100% 0 0 100% / 65% 0 0 65%; background: color-mix(in srgb, var(--accent) 35%, var(--bg)); color: var(--text); cursor: grab; display: grid; place-items: center; touch-action: none; transition: background 180ms, filter 180ms; }
+.receipt-widget__droplet:active { cursor: grabbing; }
+.receipt-widget__droplet:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+.receipt-widget--left .receipt-widget__droplet { right: auto; left: 0; border: 1px solid var(--accent); border-left: 0; border-radius: 0 100% 100% 0 / 0 65% 65% 0; }
+.receipt-widget.is-dragging .receipt-widget__droplet { background: var(--accent); filter: brightness(1.15); }
+.receipt-widget__panel { position: absolute; top: 0; right: 44px; box-sizing: border-box; width: 256px; height: 210px; padding: 12px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface, var(--bg)); color: var(--text); opacity: 0; transform: translateX(20px) scale(.9); transform-origin: right center; pointer-events: none; visibility: hidden; transition: opacity 180ms ease, transform 180ms ease, visibility 180ms; }
+.receipt-widget--left .receipt-widget__panel { right: auto; left: 44px; transform-origin: left center; transform: translateX(-20px) scale(.9); }
+.receipt-widget.is-expanded .receipt-widget__panel { opacity: 1; transform: none; pointer-events: auto; visibility: visible; animation: receipt-widget-unfold 200ms ease-out; }
+@keyframes receipt-widget-unfold { from { opacity: 0; scale: .86 1; } to { opacity: 1; scale: 1; } }
+.receipt-widget__header { display: flex; align-items: center; gap: 3px; }
+.receipt-widget__header strong { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.receipt-widget__header button { background: transparent; color: inherit; border: 0; padding: 3px; cursor: pointer; display: grid; place-items: center; touch-action: none; }
+.receipt-widget__header button[aria-label="Widget verschieben"] { cursor: grab; }
+.receipt-widget__drop { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px dashed var(--border); border-radius: 10px; color: inherit; background: transparent; cursor: pointer; }
+.receipt-widget__drop span { font-size: 11px; opacity: .8; }
+.receipt-widget.is-dragging .receipt-widget__drop, .receipt-widget__drop:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.receipt-widget__error { font-size: 11px; line-height: 1.3; color: var(--danger); }
+.receipt-widget__collapse { display: flex; justify-content: center; gap: 4px; border: 0; background: transparent; color: inherit; font-size: 11px; cursor: pointer; }
+.settings-workflow-pane { display: grid; gap: 16px; }
+.receipt-discard-overlay { z-index: 20000; align-items: center; padding: 24px; }
+.receipt-discard-modal { box-sizing: border-box; width: min(480px, 100%); max-height: calc(100dvh - 48px); display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; overflow-y: auto; overflow-wrap: anywhere; }
+.receipt-discard-modal > * { min-width: 0; }
+.receipt-discard-modal__header { display: flex; align-items: center; gap: 12px; }
+.receipt-discard-modal__header svg { flex: 0 0 auto; }
+.receipt-discard-modal h2, .receipt-discard-modal p { margin: 0; }
+.receipt-discard-modal__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { .receipt-widget__panel, .receipt-widget.is-expanded .receipt-widget__panel, .receipt-widget__droplet { animation: none; transition: none; } }
+.receipt-intake-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.receipt-intake-choice > span { flex-basis: 100%; font-size: 12px; opacity: .8; }
+.receipt-intake-choice button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); color: var(--text); border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }

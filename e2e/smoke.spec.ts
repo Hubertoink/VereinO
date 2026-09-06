@@ -36,6 +36,8 @@ async function waitForVereinOWindow(app: ElectronApplication) {
 async function openBookingWorkflowSettings() {
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
+  await page.locator('.settings-cluster-trigger').filter({ hasText: 'Darstellung' }).click()
+  await page.locator('.settings-subnav').getByTitle('Arbeitsweise', { exact: true }).click()
   return page.getByRole('group', { name: 'Darstellung der Buchungserfassung' })
 }
 

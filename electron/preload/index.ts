@@ -115,6 +115,21 @@ const rendererApi = {
   workQueue: {
     summary: () => invoke('workQueue.summary')
   },
+  receiptWidget: {
+    open: () => invoke('receiptWidget.open'),
+    close: () => invoke('receiptWidget.close'),
+    showMain: () => invoke('receiptWidget.showMain'),
+    state: () => invoke('receiptWidget.state'),
+    setExpanded: (expanded) => invoke('receiptWidget.setExpanded', expanded),
+    move: (finished) => invoke('receiptWidget.move', finished),
+    getAutostart: () => invoke('receiptWidget.getAutostart'),
+    setAutostart: (enabled) => invoke('receiptWidget.setAutostart', enabled),
+    onState: (callback) => {
+      const handler = (_event: IpcRendererEvent, state: import('../../shared/receiptWidget').WidgetState) => callback(state)
+      ipcRenderer.on('receiptWidget:state', handler)
+      return () => ipcRenderer.removeListener('receiptWidget:state', handler)
+    }
+  },
   quickAdd: {
     openDetached: (payload) => invoke('quickAdd.openDetached', payload),
     detachedInitial: (payload: { token: string }) => invoke('quickAdd.detachedInitial', payload),

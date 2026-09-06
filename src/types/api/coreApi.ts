@@ -1,6 +1,7 @@
 import type { DataChangeScope } from '../../../shared/dataChange'
 import type { UploadFilePayload } from '../../../shared/filePayload'
 import type { DashboardSnapshot, DashboardSnapshotInput } from '../../../shared/dashboard'
+import type { WidgetAutostart, WidgetState } from '../../../shared/receiptWidget'
 
 export interface QuickAddPayload {
     draftId?: string | null
@@ -35,6 +36,17 @@ export interface StartupBootstrapData {
 }
 
 export interface CoreApi {
+    receiptWidget: {
+        open: () => Promise<{ ok: boolean }>
+        close: () => Promise<{ ok: boolean }>
+        showMain: () => Promise<{ ok: boolean }>
+        state: () => Promise<WidgetState>
+        setExpanded: (expanded: boolean) => Promise<WidgetState>
+        move: (finished: boolean) => Promise<WidgetState>
+        onState: (callback: (state: WidgetState) => void) => () => void
+        getAutostart: () => Promise<WidgetAutostart>
+        setAutostart: (enabled: boolean) => Promise<WidgetAutostart>
+    }
     app: {
         version: () => Promise<{ version: string; name: string }>
         bootstrap: () => Promise<StartupBootstrapData>
