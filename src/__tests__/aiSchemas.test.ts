@@ -5,7 +5,8 @@ import {
   AiInvoiceExtractInput,
   AiInvoiceExtractionResult,
   AiSettingsGetOutput,
-  AiSettingsSetInput
+  AiSettingsSetInput,
+  AiSettingsTestOutput
 } from '../../electron/main/ipc/schemas'
 import { isPdfInputFile } from '../../electron/main/services/aiDocumentRouting'
 
@@ -115,6 +116,8 @@ describe('AiSettings schemas', () => {
     expect(settings.model).toBe('gpt-5.5')
     expect(settings.textModel).toBe('gpt-5.4-mini')
     expect(settings.provider).toBe('openai')
+    expect(settings.invoiceProfile).toBe('auto')
+    expect(settings.textProfile).toBe('auto')
   })
 
   it('allows updating provider and base URL for OpenAI-compatible APIs', () => {
@@ -129,11 +132,15 @@ describe('AiSettings schemas', () => {
     const update = AiSettingsSetInput.parse({
       provider: 'mittwald',
       model: 'GLM-OCR',
-      textModel: 'Qwen3.5-0.8B'
+      textModel: 'Qwen3.5-0.8B',
+      invoiceProfile: 'fast',
+      textProfile: 'quality'
     })
 
     expect(update.provider).toBe('mittwald')
     expect(update.model).toBe('GLM-OCR')
+    expect(update.invoiceProfile).toBe('fast')
+    expect(update.textProfile).toBe('quality')
   })
 
   it('allows updating only the cheaper text model', () => {
@@ -142,6 +149,15 @@ describe('AiSettings schemas', () => {
     })
 
     expect(update.textModel).toBe('gpt-5.4-nano')
+  })
+
+  it('returns dynamically discovered Mittwald models after a connection test', () => {
+    const result = AiSettingsTestOutput.parse({
+      ok: true,
+      availableModels: ['Qwen3.6-35B-A3B-FP8', 'Qwen3.8-27B-NVFP4']
+    })
+
+    expect(result.availableModels).toEqual(['Qwen3.6-35B-A3B-FP8', 'Qwen3.8-27B-NVFP4'])
   })
 })
 

@@ -166,16 +166,19 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
     })
     setAgentSessionId(result.sessionId)
     input.onTrace(result.trace || [])
-    input.pushMessage({
-      role: 'assistant',
-      title: result.title || 'VereinO Agent',
-      body: result.answer,
-      meta: [
-        result.toolCalls.length ? `${result.toolCalls.length} Tool-Aufruf(e)` : 'Agent',
-        input.formatUsage(result.usage)
-      ].filter(Boolean).join(' · ')
-    })
-    openAgentDrafts(mergeAgentDrafts(result.drafts), userPrompt)
+    const drafts = mergeAgentDrafts(result.drafts)
+    if (!drafts.length) {
+      input.pushMessage({
+        role: 'assistant',
+        title: result.title || 'VereinO Agent',
+        body: result.answer,
+        meta: [
+          result.toolCalls.length ? `${result.toolCalls.length} Tool-Aufruf(e)` : 'Agent',
+          input.formatUsage(result.usage)
+        ].filter(Boolean).join(' · ')
+      })
+    }
+    openAgentDrafts(drafts, userPrompt)
     return true
   }
 

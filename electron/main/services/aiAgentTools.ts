@@ -13,13 +13,13 @@ import { listAiAgentAutoRules, listAiAgentMemory, upsertAiAgentAutoRule, upsertA
 import * as mp from '../repositories/members_payments'
 import { listPaymentAccounts } from '../repositories/paymentAccounts'
 import { listParties } from '../repositories/parties'
-import { listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
+import { listDueRecurringOccurrences, listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
 import { listTags } from '../repositories/tags'
 import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVouchers, summarizeVouchers } from '../repositories/vouchers'
 import type { AiContext } from './ai'
 
 export type AiAgentDraft = {
-  kind: 'booking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
+  kind: 'booking' | 'recurringBooking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
   title: string
   payload: unknown
   autoApproval?: {
@@ -2557,6 +2557,46 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
                 tags: original.tags || []
               },
               replacement
+            }
+          }
+        }
+      }
+    },
+    {
+      name: 'recurring_booking_draft_prepare',
+      description: 'Bereitet einen Sammel-Review für mehrere fällige Ausführungen einer Dauerbuchung vor. Es wird noch nichts gespeichert; die Bestätigung erstellt je Fälligkeit einen eigenen Buchungsbeleg.',
+      readOnly: false,
+      parameters: toolParameters({
+        recurringBookingId: { type: 'number' },
+        occurrenceIds: { type: 'array', items: { type: 'number' } },
+        bookingDate: { type: 'string', description: 'Optionales Belegdatum im Format JJJJ-MM-TT für alle ausgewählten Fälligkeiten.' },
+        reason: nullableString
+      }, ['recurringBookingId']),
+      run: (rawArgs) => {
+        const args = parseArgs(z.object({
+          recurringBookingId: z.number().int().positive(),
+          occurrenceIds: z.array(z.number().int().positive()).optional(),
+          bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          reason: z.string().nullable().optional()
+        }), rawArgs)
+        const draft = listDueRecurringOccurrences(args.recurringBookingId, args.occurrenceIds)
+        if (!draft.occurrences.length) {
+          return { ok: false, warning: 'Für diese Dauerbuchung sind keine ausgewählten Fälligkeiten mehr offen.' }
+        }
+        return {
+          ok: true,
+          data: {
+            message: `${draft.occurrences.length} fällige Ausführung(en) als Sammel-Review vorbereitet.`,
+            count: draft.occurrences.length,
+            totalAmount: draft.totalAmount
+          },
+          draft: {
+            kind: 'recurringBooking',
+            title: args.reason || `${draft.recurringBookingName}: ${draft.occurrences.length} fällige Ausführung(en)`,
+            payload: {
+              ...draft,
+              bookingDate: args.bookingDate || null,
+              reason: args.reason || null
             }
           }
         }

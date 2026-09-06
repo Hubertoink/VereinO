@@ -200,6 +200,48 @@ export function listRecurringBookings(input?: { status?: 'ACTIVE' | 'PAUSED' | '
   })
 }
 
+export function listDueRecurringOccurrences(recurringBookingId: number, occurrenceIds?: number[]) {
+  const d = getDb()
+  materializeDueOccurrences(d)
+  const recurring = d.prepare(`
+    SELECT rb.id, rb.name, rb.type, rb.amount_mode as amountMode, rb.amount, rb.vat_rate as vatRate,
+      rb.payment_account_id as paymentAccountId, pa.name as paymentAccountName
+    FROM recurring_bookings rb
+    LEFT JOIN payment_accounts pa ON pa.id = rb.payment_account_id
+    WHERE rb.id=?
+  `).get(recurringBookingId) as any
+  if (!recurring) throw new Error('Dauerbuchung nicht gefunden.')
+
+  const ids = (occurrenceIds || []).filter((id) => Number.isInteger(id) && id > 0)
+  const rows = d.prepare(`
+    SELECT id, scheduled_date as scheduledDate
+    FROM recurring_occurrences
+    WHERE recurring_booking_id=? AND status='DUE'
+      ${ids.length ? `AND id IN (${ids.map(() => '?').join(',')})` : ''}
+    ORDER BY scheduled_date, id
+  `).all(recurringBookingId, ...ids) as Array<{ id: number; scheduledDate: string }>
+  const amount = Number(recurring.amount)
+  const grossAmount = recurringGrossAmount(recurring.amountMode, amount, Number(recurring.vatRate || 0))
+  return {
+    recurringBookingId: Number(recurring.id),
+    recurringBookingName: recurring.name,
+    type: recurring.type,
+    amountMode: recurring.amountMode,
+    amount,
+    grossAmount,
+    vatRate: Number(recurring.vatRate || 0),
+    paymentAccountId: recurring.paymentAccountId == null ? null : Number(recurring.paymentAccountId),
+    paymentAccountName: recurring.paymentAccountName || null,
+    occurrences: rows.map((row) => ({
+      occurrenceId: Number(row.id),
+      scheduledDate: row.scheduledDate,
+      amount,
+      grossAmount
+    })),
+    totalAmount: Math.round(grossAmount * rows.length * 100) / 100
+  }
+}
+
 export function recurringBookingsSummary() {
   const d = getDb()
   materializeDueOccurrences(d)
@@ -403,7 +445,9 @@ export function bookRecurringOccurrence(input: { recurringBookingId: number; occ
         `).get(input.bankTransactionId) as any
       : null
     if (input.bankTransactionId && !bankTransaction) throw new Error('Bankbeleg nicht gefunden.')
-    if (bankTransaction?.status !== 'OPEN') throw new Error('Der Bankbeleg ist bereits erledigt.')
+    if (bankTransaction && bankTransaction.status !== 'OPEN') {
+      throw new Error('Der Bankbeleg ist bereits erledigt.')
+    }
     if (bankTransaction && bankTransaction.direction !== recurring.type) throw new Error('Bankbeleg und Dauerbuchung haben unterschiedliche Buchungsarten.')
     if (bankTransaction && Number(bankTransaction.paymentAccountId) !== Number(recurring.paymentAccountId)) {
       throw new Error('Bankbeleg und Dauerbuchung verwenden unterschiedliche Zahlkonten.')

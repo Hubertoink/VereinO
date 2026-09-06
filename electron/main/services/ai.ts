@@ -23,6 +23,13 @@ import {
 import { getSetting, setSetting } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
 import { isPdfInputFile } from './aiDocumentRouting'
+import {
+  isMittwaldThinkingModel,
+  normalizeAiTaskProfile,
+  resolveAiTaskModel,
+  toMittwaldReasoningEffort,
+  type AiTaskProfile
+} from '../../../shared/aiModelProfiles'
 
 const API_KEY_SETTING = 'ai.openai.apiKey'
 const MODEL_SETTING = 'ai.openai.model'
@@ -32,6 +39,9 @@ const PROVIDER_SETTING = 'ai.openai.provider'
 const PROXY_MODE_SETTING = 'ai.network.proxyMode'
 const PROXY_URL_SETTING = 'ai.network.proxyUrl'
 const PROXY_BYPASS_SETTING = 'ai.network.proxyBypassRules'
+const INVOICE_PROFILE_SETTING = 'ai.invoice.profile'
+const TEXT_PROFILE_SETTING = 'ai.text.profile'
+const MITTWALD_AVAILABLE_MODELS_SETTING = 'ai.mittwald.availableModels'
 const DEFAULT_PROVIDER = 'openai'
 
 type AiProvider = 'openai' | 'minimax' | 'mittwald'
@@ -59,13 +69,14 @@ const AI_PROVIDER_PRESETS: Record<AiProvider, AiProviderPreset> = {
   },
   mittwald: {
     apiBaseUrl: 'https://llm.aihosting.mittwald.de/v1',
-    defaultModel: 'GLM-OCR',
-    defaultTextModel: 'Qwen3.5-0.8B',
+    defaultModel: 'Qwen3.6-35B-A3B-FP8',
+    defaultTextModel: 'Qwen3.6-35B-A3B-FP8',
     allowedModels: [
       'GLM-OCR',
-      'Mistral-Medium-3.5-128B',
+      'Ministral-3-14B-Instruct-2512',
       'Qwen3.5-122B-A10B-FP8',
       'Qwen3.6-35B-A3B-FP8',
+      'Qwen3.8-27B-NVFP4',
       'gpt-oss-120b',
       'Qwen3.5-0.8B'
     ]
@@ -97,6 +108,8 @@ export type AiSettings = {
   defaultReasoningEffort: 'low' | 'medium' | 'high'
   provider: AiProvider
   apiBaseUrl: string
+  invoiceProfile: AiTaskProfile
+  textProfile: AiTaskProfile
   proxyMode: AiProxyMode
   proxyUrl: string
   proxyBypassRules: string
@@ -256,19 +269,55 @@ function normalizeProviderModel(
   const preset = getProviderPreset(provider)
   const fallback = kind === 'model' ? preset.defaultModel : preset.defaultTextModel
   const value = model?.trim()
+  // Mittwald expands its model catalog regularly. Models returned by /v1/models
+  // must remain selectable even when they are newer than this build.
+  if (provider === 'mittwald' && value) return value
   return value && preset.allowedModels.includes(value) ? value : fallback
+}
+
+function getStoredMittwaldModels() {
+  const stored = getSetting<unknown>(MITTWALD_AVAILABLE_MODELS_SETTING)
+  if (!Array.isArray(stored)) return []
+  return stored
+    .filter((model): model is string => typeof model === 'string')
+    .map((model) => model.trim())
+    .filter(Boolean)
+}
+
+function resolveProviderTaskModel(
+  provider: AiProvider,
+  task: 'invoice' | 'text',
+  profile: AiTaskProfile,
+  configuredModel: string
+) {
+  return resolveAiTaskModel({
+    provider,
+    task,
+    profile,
+    configuredModel,
+    availableModels: provider === 'mittwald' ? getStoredMittwaldModels() : []
+  })
+}
+
+function isMittwaldGenerationModel(modelId: string) {
+  const normalized = modelId.toLowerCase()
+  return !['embedding', 'reranker', 'whisper', 'tts'].some((kind) => normalized.includes(kind))
 }
 
 export function getAiSettings(): AiSettings {
   const apiKey = decryptSecret(getSetting<AiStoredSecret | string>(API_KEY_SETTING))
   const effort = getSetting<'low' | 'medium' | 'high'>(EFFORT_SETTING) || 'medium'
   const provider = getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
-  const model = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
-  const textModel = normalizeProviderModel(
+  const invoiceProfile = normalizeAiTaskProfile(getSetting(INVOICE_PROFILE_SETTING))
+  const textProfile = normalizeAiTaskProfile(getSetting(TEXT_PROFILE_SETTING))
+  const configuredModel = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
+  const configuredTextModel = normalizeProviderModel(
     provider,
     getSetting<string>(TEXT_MODEL_SETTING),
     'textModel'
   )
+  const model = resolveProviderTaskModel(provider, 'invoice', invoiceProfile, configuredModel)
+  const textModel = resolveProviderTaskModel(provider, 'text', textProfile, configuredTextModel)
   const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
   const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
@@ -278,6 +327,8 @@ export function getAiSettings(): AiSettings {
     defaultReasoningEffort: effort,
     provider,
     apiBaseUrl,
+    invoiceProfile,
+    textProfile,
     proxyMode: ['system', 'direct', 'manual'].includes(proxyMode) ? proxyMode : 'system',
     proxyUrl: getSetting<string>(PROXY_URL_SETTING) || '',
     proxyBypassRules: getSetting<string>(PROXY_BYPASS_SETTING) || '<local>'
@@ -290,6 +341,8 @@ export function setAiSettings(input: {
   textModel?: string
   defaultReasoningEffort?: 'low' | 'medium' | 'high'
   provider?: AiProvider
+  invoiceProfile?: AiTaskProfile
+  textProfile?: AiTaskProfile
   apiBaseUrl?: string
   proxyMode?: AiProxyMode
   proxyUrl?: string
@@ -297,18 +350,24 @@ export function setAiSettings(input: {
 }) {
   const current = getAiSettings()
   const provider = input.provider || current.provider
+  const invoiceProfile = normalizeAiTaskProfile(input.invoiceProfile ?? current.invoiceProfile)
+  const textProfile = normalizeAiTaskProfile(input.textProfile ?? current.textProfile)
 
   if (input.apiKey !== undefined) {
     const trimmed = input.apiKey.trim()
     if (trimmed) setSetting(API_KEY_SETTING, encryptSecret(trimmed))
   }
-  setSetting(MODEL_SETTING, normalizeProviderModel(provider, input.model ?? current.model, 'model'))
+  const currentModel = provider === current.provider ? current.model : undefined
+  const currentTextModel = provider === current.provider ? current.textModel : undefined
+  setSetting(MODEL_SETTING, normalizeProviderModel(provider, input.model ?? currentModel, 'model'))
   setSetting(
     TEXT_MODEL_SETTING,
-    normalizeProviderModel(provider, input.textModel ?? current.textModel, 'textModel')
+    normalizeProviderModel(provider, input.textModel ?? currentTextModel, 'textModel')
   )
   if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
   if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
+  setSetting(INVOICE_PROFILE_SETTING, invoiceProfile)
+  setSetting(TEXT_PROFILE_SETTING, textProfile)
   if (input.proxyMode) setSetting(PROXY_MODE_SETTING, input.proxyMode)
   if (input.proxyUrl !== undefined) {
     const proxyUrl = input.proxyUrl.trim()
@@ -340,6 +399,8 @@ export function setAiSettings(input: {
     defaultReasoningEffort: next.defaultReasoningEffort,
     provider: next.provider,
     apiBaseUrl: next.apiBaseUrl,
+    invoiceProfile: next.invoiceProfile,
+    textProfile: next.textProfile,
     proxyMode: next.proxyMode,
     proxyUrl: next.proxyUrl,
     proxyBypassRules: next.proxyBypassRules
@@ -459,15 +520,26 @@ export async function createAiResponse(request: any): Promise<any> {
     messages.push({ role: item?.role || 'user', content })
   }
 
-  const usesQwenThinkingModel = /^Qwen3\.(5|6)-/.test(request.model)
+  const usesQwenThinkingModel = isMittwaldThinkingModel(request.model)
+  const usesStructuredOutput = !!request.text?.format
+  const chatTemplateKwargs = usesQwenThinkingModel
+    ? usesStructuredOutput || request.model !== 'Qwen3.8-27B-NVFP4'
+      ? { enable_thinking: false }
+      : request.reasoning?.effort
+        ? {
+            reasoning_effort: toMittwaldReasoningEffort(request.reasoning.effort)
+          }
+        : undefined
+    : undefined
   const completion = await client.chat.completions.create({
     model: request.model,
     messages,
     // Low temperature helps the prompt-enforced JSON fallback stay parseable.
     temperature: request.text?.format ? 0.1 : undefined,
-    // Qwen's Thinking mode is useful for open-ended chat, but it substantially
-    // increases latency and can leave structured batch results without content.
-    ...(usesQwenThinkingModel ? { chat_template_kwargs: { enable_thinking: false } } : {})
+    // Structured extraction and classification do not benefit from thinking.
+    // In particular Qwen 3.8 otherwise defaults to expensive xhigh reasoning.
+    ...(chatTemplateKwargs ? { chat_template_kwargs: chatTemplateKwargs } : {}),
+    ...(usesStructuredOutput ? { max_tokens: 2048 } : {})
   } as any)
   const outputText = completion.choices[0]?.message?.content || ''
   let outputParsed: unknown
@@ -615,6 +687,36 @@ function normalizeInvoiceExtraction(value: unknown) {
 function parseInvoiceExtraction(response: any) {
   const raw = response?.output_parsed ?? JSON.parse(extractOutputText(response))
   return AiInvoiceExtractionResult.parse(normalizeInvoiceExtraction(raw))
+}
+
+function needsInvoiceEscalation(result: TAiInvoiceExtractionResult) {
+  return (
+    result.confidence < 0.75 ||
+    !result.supplier ||
+    !result.invoiceDate ||
+    result.grossAmount == null ||
+    !result.description ||
+    !result.evidence.length
+  )
+}
+
+function mergeAiUsage(primary: AiUsage, additional: AiUsage): AiUsage {
+  const estimatedCostUsd =
+    primary.estimatedCostUsd == null || additional.estimatedCostUsd == null
+      ? null
+      : primary.estimatedCostUsd + additional.estimatedCostUsd
+  return {
+    inputTokens: primary.inputTokens + additional.inputTokens,
+    cachedInputTokens: primary.cachedInputTokens + additional.cachedInputTokens,
+    outputTokens: primary.outputTokens + additional.outputTokens,
+    reasoningTokens: primary.reasoningTokens + additional.reasoningTokens,
+    totalTokens: primary.totalTokens + additional.totalTokens,
+    estimatedCostUsd,
+    pricingNote:
+      estimatedCostUsd == null
+        ? 'Keine vollständige lokale Preistabelle für die verwendete Modellkette.'
+        : primary.pricingNote
+  }
 }
 
 export function normalizeUsage(response: any, model: string): AiUsage {
@@ -855,19 +957,45 @@ export async function testAiConnection() {
     await configureAiNetwork(settings)
     resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
     if (settings.provider === 'mittwald') {
-      const availableModels = new Set((await createClient().models.list()).data.map((model) => model.id))
-      const missingModels = [settings.model, settings.textModel].filter(
-        (model, index, all) => !availableModels.has(model) && all.indexOf(model) === index
-      )
-      if (missingModels.length) {
-        throw new Error(`Die Mittwald-Modelle sind für diesen API-Key nicht verfügbar: ${missingModels.join(', ')}.`)
+      const availableModels = (await createClient().models.list()).data
+        .map((model) => model.id.trim())
+        .filter((modelId) => modelId && isMittwaldGenerationModel(modelId))
+        .filter((modelId, index, all) => all.indexOf(modelId) === index)
+
+      if (!availableModels.length) {
+        throw new Error(
+          'Mitwald hat für diesen API-Key keine Modelle für Text- oder Beleganalyse zurückgegeben.'
+        )
       }
-      await createAiResponse({
-        model: settings.textModel,
-        input: 'Antworte nur mit OK.',
-        text: { verbosity: 'low' },
-        reasoning: { effort: 'low' }
-      } as any)
+
+      setSetting(MITTWALD_AVAILABLE_MODELS_SETTING, availableModels)
+
+      const testModel = resolveAiTaskModel({
+        provider: 'mittwald',
+        task: 'text',
+        profile: settings.textProfile,
+        configuredModel: settings.textModel,
+        availableModels
+      })
+      const usableTestModel = availableModels.includes(testModel) && testModel !== 'GLM-OCR'
+        ? testModel
+        : availableModels.find((model) => model !== 'GLM-OCR')
+      if (usableTestModel) {
+        await createAiResponse({
+          model: usableTestModel,
+          input: 'Antworte nur mit OK.',
+          text: { verbosity: 'low' },
+          reasoning: { effort: 'low' }
+        } as any)
+      }
+
+      return {
+        ok: true,
+        availableModels,
+        proxyMode: settings.proxyMode,
+        resolvedProxy: resolvedProxy || 'DIRECT',
+        targetUrl: settings.apiBaseUrl
+      }
     } else {
       await createAiResponse({
         model: settings.model,
@@ -1179,7 +1307,7 @@ export async function analyzeInvoiceDocument(input: {
 }> {
   await validateTransientInvoiceFile(input.file)
   const settings = getAiSettings()
-  const model = settings.model
+  let model = settings.model
   let mittwaldOcrText = ''
   let ocrMs: number | null = null
   if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
@@ -1259,30 +1387,51 @@ export async function analyzeInvoiceDocument(input: {
     JSON.stringify(context)
   ].join('\n')
   const analysisStartedAt = Date.now()
-  const response = await createAiResponse({
-    model,
-    reasoning: { effort: settings.defaultReasoningEffort },
-    text: {
-      format: zodTextFormat(AiInvoiceExtractionResultStructured, 'vereino_invoice_extraction')
-    },
-    input: [
-      {
-        role: 'user',
-        content: [
-          { type: 'input_text', text: prompt },
-          // Qwen receives text from GLM-OCR: it supports images but not the
-          // PDF document proxy used by Mittwald's batch submission files.
-          ...(settings.provider === 'mittwald' && model !== 'GLM-OCR'
-            ? []
-            : [toResponseFileContent(input.file)])
-        ]
-      }
-    ]
-  } as any)
+  const analyzeWithModel = (analysisModel: string) =>
+    createAiResponse({
+      model: analysisModel,
+      reasoning: { effort: settings.defaultReasoningEffort },
+      text: {
+        format: zodTextFormat(AiInvoiceExtractionResultStructured, 'vereino_invoice_extraction')
+      },
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            // Qwen receives text from GLM-OCR: it supports images but not the
+            // PDF document proxy used by Mittwald's batch submission files.
+            ...(settings.provider === 'mittwald' && analysisModel !== 'GLM-OCR'
+              ? []
+              : [toResponseFileContent(input.file)])
+          ]
+        }
+      ]
+    } as any)
+  let response = await analyzeWithModel(model)
+  let result = parseInvoiceExtraction(response)
+  let usage = normalizeUsage(response, model)
+
+  // The fast profile is deliberately inexpensive for clean, routine documents.
+  // Uncertain extractions are retried once with the balanced invoice model.
+  if (settings.provider === 'mittwald' && settings.invoiceProfile === 'fast' && needsInvoiceEscalation(result)) {
+    const escalationModel = resolveProviderTaskModel(
+      'mittwald',
+      'invoice',
+      'auto',
+      model
+    )
+    if (escalationModel !== model) {
+      response = await analyzeWithModel(escalationModel)
+      result = parseInvoiceExtraction(response)
+      usage = mergeAiUsage(usage, normalizeUsage(response, escalationModel))
+      model = escalationModel
+    }
+  }
   return {
     model,
-    result: parseInvoiceExtraction(response),
-    usage: normalizeUsage(response, model),
+    result,
+    usage,
     timings: { ocrMs, analysisMs: Date.now() - analysisStartedAt }
   }
 }
@@ -1385,8 +1534,8 @@ export async function planAiAction(input: {
               'Wenn vorher offene Mitgliedsbeitraege genannt wurden und der Nutzer danach "hierzu/dazu eine Buchung anlegen/verknuepfen" schreibt, ist das payments create, nicht members create.',
               'Fuer "Bankbeleg/Bankimport mit bestehender Buchung verknuepfen": entity bankImport, operation linkExisting, safety REVIEW_REQUIRED. Das ist kein Storno und keine Ersatzbuchung.',
               'Fuer Fragen nach aktiven, faelligen oder kommenden Dauerbuchungen: entity recurringBookings, operation read, safety READ_ONLY. Fuer Bankbeleg mit Dauerbuchungs-Faelligkeit verbinden: entity recurringBookings, operation linkExisting, safety REVIEW_REQUIRED.',
-              'Wenn vorher ein Report/Controllingbericht besprochen wurde und der Nutzer einen anderen Zeitraum, "letzte X Monate", "was sticht heraus" oder weitere KPIs nennt, ist das entity reports, operation export/generateText, nicht members.',
-              'Fuer "Report/Bericht fuer die letzten X Monate" oder "Controlling fuer Zeitraum" ist entity reports, operation export, safety REVIEW_REQUIRED.',
+              'Tabellen, Budgetuebersichten, Berichte und Kennzahlen standardmaessig im Chat beantworten: entity reports, operation read/generateText. "In einer Tabelle ausgeben" bedeutet keinen Dateiexport.',
+              'operation export nur bei ausdruecklichem Dateiwunsch in der aktuellen Nutzernachricht, etwa "exportiere den Bericht" oder "als PDF speichern". Ein frueherer Export oder Folgefragen nach Zeitraum, Auffaelligkeiten und weiteren KPIs berechtigen nicht zu einem neuen Export.',
               'Fuer reine Fragen: operation read, safety READ_ONLY, answer nur wenn eine direkte kurze Antwort ohne Tool reicht.',
               '',
               'Erlaubtes Toolset:',

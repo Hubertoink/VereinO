@@ -288,14 +288,14 @@ test('loads split application pages on demand', async () => {
   await page.screenshot({ path: 'test-results/phase4-invoices-light.png', fullPage: true })
 
   await page.getByRole('button', { name: 'Budgets', exact: true }).click()
-  await expect(page.getByText('Budgets verwalten und Fortschritt verfolgen', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Budgets', exact: true })).toBeVisible()
   await expectReadablePageCanvas()
   await expect(page.locator('.budget-management-surface')).toBeVisible()
   await expect(page.locator('.budget-management-surface > .card')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/phase4-budgets-light.png', fullPage: true })
 
   await page.getByRole('button', { name: 'Zweckbindungen', exact: true }).click()
-  await expect(page.getByText('Zweckbindungen verwalten', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Zweckbindungen', exact: true })).toBeVisible()
   await expectReadablePageCanvas()
   await expect(page.locator('.earmark-management-surface')).toBeVisible()
   await expect(page.locator('.earmark-management-surface > .card')).toHaveCount(0)

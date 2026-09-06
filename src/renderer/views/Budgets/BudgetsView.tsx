@@ -4,6 +4,7 @@ import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import BudgetModal from '../../components/modals/BudgetModal'
+import { sortBudgetEntries } from '../../utils/compactEntrySort'
 
 type Budget = {
   id: number
@@ -62,6 +63,8 @@ export default function BudgetsView({
   const [showArchived, setShowArchived] = useState(false)
   const [tableExpanded, setTableExpanded] = useState(false)
   const [tablePage, setTablePage] = useState(1)
+  const [sortBy, setSortBy] = useState<'year' | 'name'>('year')
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [compactCards, setCompactCards] = useState<boolean>(() => {
     try { return localStorage.getItem('ui.budgets.compactCards') === 'true' } catch { return false }
   })
@@ -118,12 +121,28 @@ export default function BudgetsView({
     })
   }, [budgets, q])
 
-  const tablePageCount = Math.max(1, Math.ceil(visibleBudgets.length / TABLE_PAGE_SIZE))
+  const sortedVisibleBudgets = useMemo(
+    () => sortBudgetEntries(visibleBudgets, sortBy, sortDir),
+    [visibleBudgets, sortBy, sortDir]
+  )
+
+  const tablePageCount = Math.max(1, Math.ceil(sortedVisibleBudgets.length / TABLE_PAGE_SIZE))
   const tableRows = useMemo(() => {
-    if (!tableExpanded) return visibleBudgets.slice(0, COLLAPSED_TABLE_ROWS)
+    if (!tableExpanded) return sortedVisibleBudgets.slice(0, COLLAPSED_TABLE_ROWS)
     const start = (tablePage - 1) * TABLE_PAGE_SIZE
-    return visibleBudgets.slice(start, start + TABLE_PAGE_SIZE)
-  }, [tableExpanded, tablePage, visibleBudgets])
+    return sortedVisibleBudgets.slice(start, start + TABLE_PAGE_SIZE)
+  }, [tableExpanded, tablePage, sortedVisibleBudgets])
+
+  const toggleSort = (field: 'year' | 'name') => {
+    setSortBy((currentField) => {
+      const sameField = currentField === field
+      setSortDir((currentDirection) => {
+        if (sameField) return currentDirection === 'ASC' ? 'DESC' : 'ASC'
+        return field === 'year' ? 'DESC' : 'ASC'
+      })
+      return field
+    })
+  }
 
   useEffect(() => {
     setTablePage(1)
@@ -209,15 +228,19 @@ export default function BudgetsView({
               Kompakt
             </button>
           </div>
-          <div className="helper">{visibleBudgets.length} von {budgets.length}</div>
+          <div className="helper">{sortedVisibleBudgets.length} von {budgets.length}</div>
         </div>
 
         {/* Simple table */}
         <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
           <thead>
             <tr>
-              <th align="left">Jahr</th>
-              <th align="left">Name</th>
+              <th align="left" className="sortable" onClick={() => toggleSort('year')} style={{ cursor: 'pointer' }}>
+                Jahr {sortBy === 'year' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
+              </th>
+              <th align="left" className="sortable" onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
+                Name {sortBy === 'name' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
+              </th>
               <th align="left">Kategorie</th>
               <th align="left">Projekt</th>
               <th align="left">Zeitraum</th>
@@ -284,7 +307,7 @@ export default function BudgetsView({
                 </td>
               </tr>
             ))}
-            {visibleBudgets.length === 0 && (
+            {sortedVisibleBudgets.length === 0 && (
               <tr>
                 <td colSpan={8} className="helper">
                   Keine Budgets gefunden.
@@ -294,15 +317,15 @@ export default function BudgetsView({
           </tbody>
         </table>
 
-        {visibleBudgets.length > COLLAPSED_TABLE_ROWS && (
+        {sortedVisibleBudgets.length > COLLAPSED_TABLE_ROWS && (
           <div className="pagination-bar management-table-bar">
             <div className="pagination-bar__info">
               <div className="pagination-bar__stat">
                 <span>Sichtbar:</span>
                 <span className="pagination-bar__stat-value">
                   {tableExpanded
-                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, visibleBudgets.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, visibleBudgets.length)} von ${visibleBudgets.length}`
-                    : `${Math.min(COLLAPSED_TABLE_ROWS, visibleBudgets.length)} von ${visibleBudgets.length}`}
+                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, sortedVisibleBudgets.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, sortedVisibleBudgets.length)} von ${sortedVisibleBudgets.length}`
+                    : `${Math.min(COLLAPSED_TABLE_ROWS, sortedVisibleBudgets.length)} von ${sortedVisibleBudgets.length}`}
                 </span>
               </div>
               {tableExpanded && (
@@ -342,7 +365,7 @@ export default function BudgetsView({
 
       {/* Budget Tiles */}
       <BudgetTiles
-        budgets={visibleBudgets}
+        budgets={sortedVisibleBudgets}
         eurFmt={eurFmt}
         compact={compactCards}
         onEdit={(b) =>

@@ -95,6 +95,22 @@ jest.mock('../../electron/main/repositories/recurringBookings', () => ({
     nextDueDate: '2026-08-07',
     dueCount: 1
   }]),
+  listDueRecurringOccurrences: jest.fn(() => ({
+    recurringBookingId: 7,
+    recurringBookingName: 'Vereinssoftware',
+    type: 'OUT',
+    amountMode: 'GROSS',
+    amount: 25,
+    grossAmount: 25,
+    vatRate: 0,
+    paymentAccountId: 1,
+    paymentAccountName: 'Bank',
+    occurrences: [
+      { occurrenceId: 71, scheduledDate: '2026-07-07', amount: 25, grossAmount: 25 },
+      { occurrenceId: 72, scheduledDate: '2026-08-07', amount: 25, grossAmount: 25 }
+    ],
+    totalAmount: 50
+  })),
   recurringBookingsSummary: jest.fn(() => ({ due: 1, upcoming: 1, active: 1, paused: 0 }))
 }))
 
@@ -307,6 +323,26 @@ describe('createAiAgentTools', () => {
       scheduledDate: '2026-07-07',
       selected: true
     }])
+  })
+
+  it('prepares all open recurring occurrences as one review', async () => {
+    const tools = createAiAgentTools({ context: {} as any })
+    const tool = tools.find((item) => item.name === 'recurring_booking_draft_prepare')
+
+    expect(tool).toBeTruthy()
+    const result = await tool!.run({ recurringBookingId: 7, bookingDate: '2026-09-04' })
+
+    expect(result.ok).toBe(true)
+    expect(result.draft?.kind).toBe('recurringBooking')
+    expect(result.draft?.payload).toMatchObject({
+      recurringBookingId: 7,
+      bookingDate: '2026-09-04',
+      totalAmount: 50,
+      occurrences: [
+        { occurrenceId: 71, scheduledDate: '2026-07-07' },
+        { occurrenceId: 72, scheduledDate: '2026-08-07' }
+      ]
+    })
   })
 
   it('blocks rebook drafts for pure bank transaction linking requests', async () => {

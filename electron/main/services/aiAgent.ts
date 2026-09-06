@@ -8,6 +8,10 @@ import {
   type AiContext,
   type AiUsage
 } from './ai'
+import {
+  isMittwaldThinkingModel,
+  toMittwaldReasoningEffort
+} from '../../../shared/aiModelProfiles'
 import { buildAgentInstructions } from './aiAgentInstructions'
 import { VereinoMcpHost } from './aiMcp'
 import {
@@ -103,6 +107,17 @@ function summarizeToolResult(value: unknown) {
   return text.length > 800 ? `${text.slice(0, 800)}...` : text
 }
 
+function stableToolArguments(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableToolArguments).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableToolArguments(item)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
 function collectDrafts(result: any) {
   const drafts: AiAgentDraft[] = []
   if (result?.draft) drafts.push(result.draft)
@@ -156,13 +171,21 @@ async function createMittwaldAgentResponse(input: {
   model: string
   messages: any[]
   tools: any[]
+  reasoningEffort: 'low' | 'medium' | 'high'
+  toolChoice?: 'auto' | 'none'
 }) {
+  const chatTemplateKwargs = isMittwaldThinkingModel(input.model)
+    ? input.model === 'Qwen3.8-27B-NVFP4'
+      ? { reasoning_effort: toMittwaldReasoningEffort(input.reasoningEffort) }
+      : { enable_thinking: false }
+    : undefined
   const completion = await input.client.chat.completions.create({
     model: input.model,
     messages: input.messages,
     tools: mittwaldToolDefinitions(input.tools),
-    tool_choice: 'auto',
-    temperature: 0.2
+    tool_choice: input.toolChoice || 'auto',
+    temperature: 0.2,
+    ...(chatTemplateKwargs ? { chat_template_kwargs: chatTemplateKwargs } : {})
   } as any)
   const message = completion.choices[0]?.message
   return {
@@ -266,6 +289,8 @@ export async function runAiAgent(input: {
           .slice(0, 80)
       ),
       '',
+      `Heutiges lokales Datum: ${new Date().toISOString().slice(0, 10)}`,
+      '',
       input.uiContext ? `Aktueller UI-Kontext:\n${JSON.stringify(input.uiContext)}` : '',
       '',
       'Persistente Sitzung bisher:',
@@ -280,6 +305,7 @@ export async function runAiAgent(input: {
     let usage = emptyUsage(model)
     const drafts: AiAgentDraft[] = []
     const toolCalls: AiAgentToolTrace[] = []
+    const completedWriteTools = new Map<string, any>()
     const trace: AiAgentTraceEvent[] = [
       {
         id: `memory-${Date.now()}`,
@@ -311,7 +337,8 @@ export async function runAiAgent(input: {
           client,
           model,
           messages: mittwaldMessages,
-          tools: providerTools
+          tools: providerTools,
+          reasoningEffort: settings.defaultReasoningEffort
         })
       : await client.responses.create({
           ...baseRequest,
@@ -344,6 +371,41 @@ export async function runAiAgent(input: {
           continue
         }
 
+        const isReadOnly = !!tool.annotations?.readOnlyHint
+        const executionKey = `${tool.name}:${stableToolArguments(args)}`
+        const completed = !isReadOnly ? completedWriteTools.get(executionKey) : null
+        if (completed) {
+          const result = {
+            ...completed,
+            draft: undefined,
+            drafts: undefined,
+            data: {
+              ...(completed.data && typeof completed.data === 'object' ? completed.data : {}),
+              message: 'Dieser identische schreibende Schritt wurde bereits ausgeführt und nicht erneut wiederholt.'
+            }
+          }
+          outputs.push({
+            type: 'function_call_output',
+            call_id: call.call_id,
+            output: JSON.stringify(result)
+          })
+          toolCalls.push({
+            name: tool.name,
+            args,
+            ok: true,
+            summary: 'Identischer schreibender Tool-Aufruf übersprungen.'
+          })
+          trace.push({
+            id: `tool-result-${step}-${toolCalls.length}-${Date.now()}`,
+            kind: 'tool_result',
+            title: tool.name,
+            detail: 'Identischer schreibender Schritt wurde nicht wiederholt.',
+            ok: true,
+            payload: { result, skippedDuplicate: true }
+          })
+          continue
+        }
+
         appendAiAgentEvent(session.id, {
           role: 'tool',
           kind: 'call',
@@ -362,6 +424,7 @@ export async function runAiAgent(input: {
 
         try {
           const { agentResult: result, mcpResult } = await mcpHost.callTool(tool.name, args)
+          if (!isReadOnly && result.ok) completedWriteTools.set(executionKey, result)
           const nextDrafts = collectDrafts(result).map(applyAutoApproval)
           drafts.push(...nextDrafts)
           for (const draft of nextDrafts) {
@@ -445,7 +508,8 @@ export async function runAiAgent(input: {
           client,
           model,
           messages: mittwaldMessages,
-          tools: providerTools
+          tools: providerTools,
+          reasoningEffort: settings.defaultReasoningEffort
         })
       } else {
         response = await client.responses.create({
@@ -457,9 +521,39 @@ export async function runAiAgent(input: {
       usage = mergeUsage(usage, normalizeUsage(response, model))
     }
 
-    const answer =
-      extractOutputText(response) ||
-      'Ich habe die Aufgabe verarbeitet, aber keine ausformulierte Antwort erhalten.'
+    if (!extractOutputText(response) && !responseFunctionCalls(response).length) {
+      try {
+        const finalPrompt = 'Formuliere jetzt eine knappe, konkrete Antwort für den Nutzer auf Basis der bereits vorliegenden Tool-Ergebnisse. Rufe keine weiteren Tools auf.'
+        if (usesMittwaldChatCompletions) {
+          mittwaldMessages.push(response.mittwaldMessage)
+          mittwaldMessages.push({ role: 'user', content: finalPrompt })
+          response = await createMittwaldAgentResponse({
+            client,
+            model,
+            messages: mittwaldMessages,
+            tools: providerTools,
+            reasoningEffort: settings.defaultReasoningEffort,
+            toolChoice: 'none'
+          })
+        } else {
+          response = await client.responses.create({
+            ...baseRequest,
+            tool_choice: 'none',
+            previous_response_id: response.id,
+            input: [{ role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
+          } as any)
+        }
+        usage = mergeUsage(usage, normalizeUsage(response, model))
+      } catch {
+        // A concise fallback below is preferable to dropping a completed tool result.
+      }
+    }
+
+    const answer = extractOutputText(response) || (drafts.length
+      ? 'Ich habe den passenden Review vorbereitet. Bitte prüfe die Vorschau und bestätige sie bei Bedarf.'
+      : toolCalls.length
+        ? 'Ich habe die VereinO-Daten geprüft. Die ausgeführten Schritte sind im Agentenverlauf dokumentiert.'
+        : 'Ich konnte für diese Anfrage noch keine passenden VereinO-Daten ermitteln.')
     trace.push({
       id: `message-${Date.now()}`,
       kind: 'message',

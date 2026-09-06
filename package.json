@@ -1,6 +1,6 @@
 {
   "name": "verein-budget-planner",
-  "version": "3.7.2",
+  "version": "3.8.0",
   "private": true,
   "description": "Offline-first Electron app for non-profit finance planning (Windows/macOS/Linux)",
   "main": "dist-electron/main/index.cjs",
@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/ensure-electron-arch.cjs && node scripts/rebuild-native.cjs",
-    "dev": "electron-vite dev",
+    "dev": "node scripts/run-electron-vite.cjs dev",
     "prebuild": "node scripts/ensure-electron-arch.cjs",
     "build": "electron-vite build",
     "prepackage": "npm run build",

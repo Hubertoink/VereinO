@@ -3071,6 +3071,15 @@ html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
   color: color-mix(in oklab, var(--text) 72%, var(--bg) 28%);
 }
 
+.ai-model-profile-note {
+  display: grid;
+  gap: 3px;
+  grid-column: 1 / -1;
+  margin: 0;
+  color: color-mix(in oklab, var(--text) 68%, var(--bg) 32%);
+  font-size: 12px;
+}
+
 .ai-settings-divider {
   display: flex;
   align-items: baseline;

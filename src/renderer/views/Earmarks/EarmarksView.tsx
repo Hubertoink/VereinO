@@ -4,6 +4,7 @@ import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
+import { sortEarmarkEntries } from '../../utils/compactEntrySort'
 
 type Binding = {
   id: number
@@ -57,6 +58,8 @@ export default function EarmarksView({
   const [showArchived, setShowArchived] = useState(false)
   const [tableExpanded, setTableExpanded] = useState(false)
   const [tablePage, setTablePage] = useState(1)
+  const [sortBy, setSortBy] = useState<'name' | 'code'>('name')
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('ASC')
   const [compactCards, setCompactCards] = useState<boolean>(() => {
     try { return localStorage.getItem('ui.earmarks.compactCards') === 'true' } catch { return false }
   })
@@ -113,12 +116,28 @@ export default function EarmarksView({
     })
   }, [bindings, q])
 
-  const tablePageCount = Math.max(1, Math.ceil(visibleBindings.length / TABLE_PAGE_SIZE))
+  const sortedVisibleBindings = useMemo(
+    () => sortEarmarkEntries(visibleBindings, sortBy, sortDir),
+    [visibleBindings, sortBy, sortDir]
+  )
+
+  const tablePageCount = Math.max(1, Math.ceil(sortedVisibleBindings.length / TABLE_PAGE_SIZE))
   const tableRows = useMemo(() => {
-    if (!tableExpanded) return visibleBindings.slice(0, COLLAPSED_TABLE_ROWS)
+    if (!tableExpanded) return sortedVisibleBindings.slice(0, COLLAPSED_TABLE_ROWS)
     const start = (tablePage - 1) * TABLE_PAGE_SIZE
-    return visibleBindings.slice(start, start + TABLE_PAGE_SIZE)
-  }, [tableExpanded, tablePage, visibleBindings])
+    return sortedVisibleBindings.slice(start, start + TABLE_PAGE_SIZE)
+  }, [tableExpanded, tablePage, sortedVisibleBindings])
+
+  const toggleSort = (field: 'name' | 'code') => {
+    setSortBy((currentField) => {
+      const sameField = currentField === field
+      setSortDir((currentDirection) => {
+        if (sameField) return currentDirection === 'ASC' ? 'DESC' : 'ASC'
+        return field === 'name' ? 'ASC' : 'ASC'
+      })
+      return field
+    })
+  }
 
   useEffect(() => {
     setTablePage(1)
@@ -198,14 +217,18 @@ export default function EarmarksView({
               Kompakt
             </button>
           </div>
-          <div className="helper">{visibleBindings.length} von {bindings.length}</div>
+          <div className="helper">{sortedVisibleBindings.length} von {bindings.length}</div>
         </div>
 
         <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
           <thead>
             <tr>
-              <th align="left">Code</th>
-              <th align="left">Name</th>
+              <th align="left" className="sortable" onClick={() => toggleSort('code')} style={{ cursor: 'pointer' }}>
+                Code {sortBy === 'code' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
+              </th>
+              <th align="left" className="sortable" onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
+                Name {sortBy === 'name' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
+              </th>
               <th align="left">Zeitraum</th>
               <th align="left">Status</th>
               <th align="right">Budget</th>
@@ -265,7 +288,7 @@ export default function EarmarksView({
                 </td>
               </tr>
             ))}
-            {visibleBindings.length === 0 && (
+            {sortedVisibleBindings.length === 0 && (
               <tr>
                 <td colSpan={7} className="helper">
                   Keine Zweckbindungen gefunden.
@@ -275,15 +298,15 @@ export default function EarmarksView({
           </tbody>
         </table>
 
-        {visibleBindings.length > COLLAPSED_TABLE_ROWS && (
+        {sortedVisibleBindings.length > COLLAPSED_TABLE_ROWS && (
           <div className="pagination-bar management-table-bar">
             <div className="pagination-bar__info">
               <div className="pagination-bar__stat">
                 <span>Sichtbar:</span>
                 <span className="pagination-bar__stat-value">
                   {tableExpanded
-                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, visibleBindings.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, visibleBindings.length)} von ${visibleBindings.length}`
-                    : `${Math.min(COLLAPSED_TABLE_ROWS, visibleBindings.length)} von ${visibleBindings.length}`}
+                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, sortedVisibleBindings.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, sortedVisibleBindings.length)} von ${sortedVisibleBindings.length}`
+                    : `${Math.min(COLLAPSED_TABLE_ROWS, sortedVisibleBindings.length)} von ${sortedVisibleBindings.length}`}
                 </span>
               </div>
               {tableExpanded && (
@@ -327,7 +350,7 @@ export default function EarmarksView({
 
       {/* Usage Cards */}
       <EarmarkUsageCards
-        bindings={bindings as any}
+        bindings={sortedVisibleBindings as any}
         from={from}
         to={to}
         sphere={filterSphere}

@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.8.0] - 2026-09-06
+
+### Geändert
+
+- KI-Assistent und IPC-Schemas modularisiert sowie Modellprofile, Gesprächsverarbeitung und Prüfabläufe überarbeitet.
+- Budgets und Zweckbindungen lassen sich in der kompakten Ansicht sortieren.
+- Entwicklungsstart über ein eigenes Electron-Vite-Startskript vereinheitlicht.
+
+### Behoben
+
+- Fällige Dauerbuchungen können auch ohne verknüpften Bankbeleg gebucht werden.
+
 ## [3.7.2] - 2026-09-01
 
 ### Geändert
