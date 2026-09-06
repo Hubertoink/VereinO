@@ -131,7 +131,7 @@ function TopHeaderOrg({
       />
       <OrgSwitcher notify={notify} />
       {text ? (
-        <div className="helper text-ellipsis" title={text}>
+        <div className="helper text-ellipsis app-header__cashier" title={text}>
           {text}
         </div>
       ) : null}

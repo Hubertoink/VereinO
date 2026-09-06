@@ -2206,6 +2206,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       const { rows, total } = listVouchersAdvancedPaged({
         limit: parsed.limit,
         offset: parsed.offset ?? 0,
+        hasFiles: parsed.hasFiles,
         sort: (parsed.sort as any) || 'DESC',
         sortBy: (parsed as any).sortBy,
         paymentMethod: parsed.paymentMethod as any,

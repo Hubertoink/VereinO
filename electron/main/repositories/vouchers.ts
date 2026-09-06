@@ -739,6 +739,7 @@ export function listVouchersAdvanced(filters: {
 export function listVouchersAdvancedPaged(filters: {
     limit?: number
     offset?: number
+    hasFiles?: boolean
     sort?: 'ASC' | 'DESC'
     // Extended sort keys
     sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
@@ -759,6 +760,10 @@ export function listVouchersAdvancedPaged(filters: {
     const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, paymentAccountId, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
+    if (filters.hasFiles != null) {
+        // Resolve unique voucher IDs before pagination, even with multiple files per voucher.
+        wh.push(`v.id ${filters.hasFiles ? '' : 'NOT '}IN (SELECT DISTINCT vf.voucher_id FROM voucher_files vf WHERE vf.voucher_id IS NOT NULL)`)
+    }
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (paymentAccountId) { wh.push('(v.payment_account_id = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = ? OR v.transfer_to_account_id = ?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }

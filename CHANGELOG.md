@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.8.1] - 2026-09-06
+
+### Geändert
+
+- Belegvorschau zeigt Betrag, Buchungsart, Zahlweg und Bereich sowie einen direkten Sprung zur Buchung.
+- KI-Vorgaben im Rechnungsscan neben den erkannten Daten angeordnet und Kommentare in den Buchungsdetails übersichtlicher dargestellt.
+
+### Behoben
+
+- Die Belegübersicht findet auch ältere Belege zuverlässig und zählt Buchungen mit mehreren Anhängen nur einmal. Alle Ergebnisse lassen sich seitenweise durchblättern.
+
 ## [3.8.0] - 2026-09-06
 
 ### Geändert

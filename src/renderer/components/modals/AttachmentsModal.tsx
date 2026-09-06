@@ -1,8 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../../context/useToast'
-import { notifyDataChanged } from '../../utils/refresh'
+import { addDataChangedListener, notifyDataChanged } from '../../utils/refresh'
 import { base64ToUint8Array, encodeFileForUpload } from '../../utils/fileEncoding'
+import type { RendererApi } from '../../../types/api'
+
+type BookingDetails = Awaited<ReturnType<RendererApi['vouchers']['list']>>['rows'][number]
+const amountFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+const bookingTypeLabels = { IN: 'Einnahme', OUT: 'Ausgabe', TRANSFER: 'Transfer', INTERNAL: 'Interne Umbuchung' }
+const sphereLabels = { IDEELL: 'Ideell', ZWECK: 'Zweckbetrieb', VERMOEGEN: 'Vermögensverwaltung', WGB: 'Wirtschaftlicher Geschäftsbetrieb' }
 
 // Vite will copy the worker file and return a URL string
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -77,6 +83,36 @@ export default function AttachmentsModal({
     onChanged?: () => void
 }) {
     const { notify } = useToast()
+    const [booking, setBooking] = useState<BookingDetails | null>(null)
+    const [bookingError, setBookingError] = useState(false)
+    useEffect(() => {
+        let request = 0
+        let alive = true
+        setBooking(null)
+        setBookingError(false)
+        const loadBooking = async () => {
+            const current = ++request
+            try {
+                const result = await window.api.vouchers.list({ voucherIds: [voucher.voucherId], limit: 1 })
+                if (!alive || current !== request) return
+                setBooking(result.rows[0] ?? null)
+                setBookingError(!result.rows.length)
+            } catch {
+                if (alive && current === request) {
+                    setBooking(null)
+                    setBookingError(true)
+                }
+            }
+        }
+        void loadBooking()
+        const unsubscribe = addDataChangedListener(['vouchers'], () => { void loadBooking() })
+        return () => { alive = false; unsubscribe() }
+    }, [voucher.voucherId])
+
+    const paymentLabel = booking?.type === 'TRANSFER'
+        ? `${booking.transferFromAccountName || (booking.transferFrom === 'BAR' ? 'Bar' : 'Bank')} → ${booking.transferToAccountName || (booking.transferTo === 'BAR' ? 'Bar' : 'Bank')}`
+        : booking?.type === 'INTERNAL' ? 'Intern'
+        : booking?.paymentAccountName || (booking?.paymentMethod === 'BAR' ? 'Bar' : booking?.paymentMethod === 'BANK' ? 'Bank' : '—')
     const [files, setFiles] = useState<Array<{ id: number; fileName: string; mimeType?: string | null }>>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string>('')
@@ -381,8 +417,31 @@ export default function AttachmentsModal({
                 {/* Header */}
                 <header className="attachments-modal__header">
                     <div className="attachments-modal__title">
-                        <h2>Belege zu #{voucher.voucherNo}</h2>
+                        <h2>Belege zu <button
+                            type="button"
+                            className="attachments-modal__voucher-link"
+                            title="Zur Buchung im Journal"
+                            onClick={() => {
+                                onClose()
+                                window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
+                                    detail: { voucherId: voucher.voucherId, voucherNo: voucher.voucherNo, date: voucher.date }
+                                }))
+                            }}
+                        >#{voucher.voucherNo}</button></h2>
                         <span className="attachments-modal__subtitle">{voucher.date} · {voucher.description || '—'}</span>
+                        {booking && booking.id === voucher.voucherId ? (
+                            <dl className="attachments-modal__booking" aria-label="Buchungsinformationen">
+                                <div>
+                                    <dt>Brutto</dt>
+                                    <dd className={`attachments-modal__amount attachments-modal__amount--${booking.type.toLowerCase()}`}>{amountFormat.format(booking.grossAmount)}</dd>
+                                </div>
+                                <div><dt>Art</dt><dd>{bookingTypeLabels[booking.type]}</dd></div>
+                                <div><dt>Zahlweg</dt><dd>{paymentLabel}</dd></div>
+                                <div><dt>Bereich</dt><dd>{booking.primaryClassificationName || sphereLabels[booking.sphere]}</dd></div>
+                            </dl>
+                        ) : (
+                            <span className="attachments-modal__subtitle" role="status">{bookingError ? 'Buchungsinformationen konnten nicht geladen werden.' : 'Lade Buchungsinformationen…'}</span>
+                        )}
                     </div>
                     <button className="attachments-modal__close" onClick={onClose} aria-label="Schließen">
                         <IconClose />

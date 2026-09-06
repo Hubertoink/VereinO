@@ -143,6 +143,64 @@ test.afterEach(async () => {
   }
 })
 
+test('lists older receipts across all pages and counts vouchers with multiple attachments once', async () => {
+  await page.evaluate(async () => {
+    const bootstrap = await window.api.app.bootstrap()
+    const account = bootstrap.paymentAccounts[0]
+    if (!account) throw new Error('Receipt test needs a payment account')
+    for (let index = 0; index < 47; index++) {
+      const withFiles = index < 22
+      await window.api.vouchers.create({
+        date: withFiles ? '2024-01-01' : '2026-09-01',
+        type: 'OUT',
+        sphere: 'IDEELL',
+        description: withFiles ? `Älterer Beleg ${index + 1}` : `Ohne Beleg ${index + 1}`,
+        grossAmount: 10,
+        vatRate: 0,
+        paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK',
+        paymentAccountId: account.id,
+        files: withFiles ? [
+          { name: 'beleg.txt', mime: 'text/plain', dataBase64: btoa('Beleg') },
+          { name: 'anlage.txt', mime: 'text/plain', dataBase64: btoa('Anlage') }
+        ] : undefined
+      })
+    }
+  })
+
+  const result = await page.evaluate(() => window.api.vouchers.list({ hasFiles: true, limit: 20 }))
+  expect(result.total).toBe(22)
+  expect(result.rows).toHaveLength(20)
+  expect(result.rows.every(row => row.fileCount === 2)).toBe(true)
+  const lastPage = await page.evaluate(() => window.api.vouchers.list({ hasFiles: true, limit: 20, offset: 20 }))
+  expect(lastPage.total).toBe(22)
+  expect(lastPage.rows).toHaveLength(2)
+
+  await page.getByRole('button', { name: 'Belege', exact: true }).click()
+  const receipts = page.locator('.receipts-container')
+  const pagination = receipts.getByRole('navigation', { name: 'Belege-Seiten' })
+  await expect(receipts.locator('tbody tr')).toHaveCount(20)
+  await expect(pagination).toContainText('22 Buchungen mit Belegen · Seite 1 / 2')
+  await expect(receipts).not.toContainText('Ohne Beleg')
+  await pagination.getByRole('button', { name: 'Weiter', exact: true }).click()
+  await expect(receipts.locator('tbody tr')).toHaveCount(2)
+  await expect(receipts.getByText('Älterer Beleg 1', { exact: true })).toBeVisible()
+  await receipts.locator('tbody tr').last().getByTitle('Belege anzeigen', { exact: true }).click()
+  const bookingInfo = page.getByLabel('Buchungsinformationen', { exact: true })
+  await expect(bookingInfo).toContainText('10,00')
+  await expect(bookingInfo).toContainText('Ausgabe')
+  await expect(bookingInfo).toContainText('Zahlweg')
+  await expect(bookingInfo).toContainText('Ideell')
+  await page.screenshot({ path: 'test-results/receipt-booking-info.png', animations: 'disabled' })
+  await page.locator('.attachments-modal').getByRole('button', { name: 'Schließen', exact: true }).click()
+  await expect(pagination.getByRole('button', { name: 'Weiter', exact: true })).toBeDisabled()
+  await pagination.getByRole('button', { name: 'Zurück', exact: true }).click()
+  await expect(receipts.locator('tbody tr')).toHaveCount(20)
+  await receipts.locator('tbody tr').first().getByTitle('Belege anzeigen', { exact: true }).click()
+  await page.locator('.attachments-modal').getByTitle('Zur Buchung im Journal', { exact: true }).click()
+  await expect(page.locator('.attachments-modal')).toHaveCount(0)
+  await expect(page.locator('.journal-view').getByText('Älterer Beleg 22', { exact: true })).toBeVisible()
+})
+
 test('starts the real Electron app with its preload bridge', async () => {
   await expect(page).toHaveTitle(/VereinO/i)
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible()

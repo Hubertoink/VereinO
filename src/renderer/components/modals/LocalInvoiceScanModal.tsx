@@ -997,6 +997,20 @@ export default function LocalInvoiceScanModal({
     }
   }
 
+  const aiGuidancePanel = aiAvailable ? (
+    <details className="local-invoice-scan__ai-guidance">
+      <summary>
+        <span><SparkleIcon /> KI-Vorgaben</span>
+        <small>Optional</small>
+      </summary>
+      <div>
+        <label htmlFor="local-invoice-ai-instructions">Instruktionen für {aiProvider}</label>
+        <textarea id="local-invoice-ai-instructions" className="input" rows={2} value={aiInstructions} onChange={(event) => setAiInstructions(event.target.value)} placeholder="z. B. als Projektkosten einordnen" />
+        <small>{aiGuidanceLabel ? `Voreinstellung: ${aiGuidanceLabel}` : 'Gilt nur für diese Rechnung.'}</small>
+      </div>
+    </details>
+  ) : null
+
   return createPortal(
     <div className="modal-overlay local-invoice-scan-overlay" role="presentation" onClick={onClose}>
       <section
@@ -1039,17 +1053,7 @@ export default function LocalInvoiceScanModal({
           </div>
         </header>
 
-        {aiAvailable && <details className="local-invoice-scan__ai-guidance">
-          <summary>
-            <span><SparkleIcon /> KI-Vorgaben</span>
-            <small>Optional</small>
-          </summary>
-          <div>
-            <label htmlFor="local-invoice-ai-instructions">Instruktionen für {aiProvider}</label>
-            <textarea id="local-invoice-ai-instructions" className="input" rows={3} value={aiInstructions} onChange={(event) => setAiInstructions(event.target.value)} placeholder="z. B. als Projektkosten einordnen und den Lieferanten besonders prüfen" />
-            <small>{aiGuidanceLabel ? `Voreinstellung: ${aiGuidanceLabel}` : 'Die Vorgabe wird nur bei der KI-Auswertung dieser Rechnung verwendet.'}</small>
-          </div>
-        </details>}
+        {!file && aiGuidancePanel}
 
         <input
           ref={fileInputRef}
@@ -1093,6 +1097,8 @@ export default function LocalInvoiceScanModal({
           </button>
         ) : (
           <div className="local-invoice-scan__workspace">
+            <div className="local-invoice-scan__document-column">
+            {aiGuidancePanel}
             <section className="local-invoice-scan__preview-panel" aria-label="Dokumentvorschau">
               <div className="local-invoice-scan__panel-heading">
                 <div className="local-invoice-scan__file-info">
@@ -1241,6 +1247,7 @@ export default function LocalInvoiceScanModal({
               )}
             </section>
 
+            </div>
             <section
               className="local-invoice-scan__result-panel"
               aria-label="Erkannte Rechnungsdaten"

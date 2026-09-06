@@ -137,6 +137,17 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
   await expect(dialog.getByLabel('Umsatzsteuer (€)')).toHaveValue('98.80')
   await expect(dialog.getByLabel('IBAN')).toHaveValue('DE89370400440532013000')
   await expect(dialog.getByRole('button', { name: 'Mit KI auslesen' })).toBeVisible()
+  await dialog.locator('.local-invoice-scan__ai-guidance summary').click()
+  const guidanceLayout = await dialog.evaluate((element) => {
+    const guidance = element.querySelector('.local-invoice-scan__ai-guidance')!.getBoundingClientRect()
+    const preview = element.querySelector('.local-invoice-scan__preview-panel')!.getBoundingClientRect()
+    const result = element.querySelector('.local-invoice-scan__result-panel')!.getBoundingClientRect()
+    return { guidanceWidth: guidance.width, previewWidth: preview.width, guidanceTop: guidance.top, resultTop: result.top, previewHeight: preview.height }
+  })
+  expect(Math.abs(guidanceLayout.guidanceWidth - guidanceLayout.previewWidth)).toBeLessThan(1)
+  expect(Math.abs(guidanceLayout.guidanceTop - guidanceLayout.resultTop)).toBeLessThan(1)
+  expect(guidanceLayout.previewHeight).toBeGreaterThan(200)
+  await page.screenshot({ path: 'test-results/invoice-guidance-layout.png', animations: 'disabled' })
 
   const fieldLayout = await dialog.locator('.local-invoice-scan__fields').evaluate((container) => {
     const supplier = container.querySelector<HTMLInputElement>('#local-invoice-party')

@@ -8236,6 +8236,23 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   background: color-mix(in oklab, var(--accent) 6%, var(--surface));
 }
 
+.local-invoice-scan__document-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.local-invoice-scan__document-column > .local-invoice-scan__ai-guidance {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.local-invoice-scan__document-column > .local-invoice-scan__preview-panel {
+  flex: 1;
+}
+
 .local-invoice-scan__ai-guidance summary {
   display: flex;
   align-items: center;
@@ -8269,7 +8286,9 @@ body.detached-quick-add-body .local-invoice-scan__header select {
 }
 
 .local-invoice-scan__ai-guidance textarea {
-  min-height: 66px;
+  min-height: 48px;
+  max-height: 120px;
+  font-size: 12px;
   resize: vertical;
 }
 
@@ -8818,6 +8837,12 @@ body:has(.local-invoice-scan) .app-main {
   align-items: center;
   gap: 6px;
   justify-self: center;
+}
+
+@media (max-width: 1280px) {
+  .app-header-top .app-header__cashier {
+    display: none;
+  }
 }
 
 @media (max-width: 1050px) {
@@ -15633,7 +15658,42 @@ button.filter-totals-stat {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
+
+.attachments-modal__booking {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.attachments-modal__booking > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.attachments-modal__booking dt {
+  color: var(--text-dim);
+}
+
+.attachments-modal__booking dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.attachments-modal__booking .attachments-modal__amount {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.attachments-modal__amount--in { color: var(--success); }
+.attachments-modal__amount--out { color: var(--danger); }
 
 .attachments-modal__title h2 {
   margin: 0;
@@ -15646,8 +15706,31 @@ button.filter-totals-stat {
   color: var(--text-dim);
 }
 
+.attachments-modal__voucher-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+}
+
+.attachments-modal__voucher-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+.attachments-modal__voucher-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .attachments-modal__close {
   width: 32px;
+  flex-shrink: 0;
   height: 32px;
   padding: 0;
   border: none;
@@ -16804,7 +16887,7 @@ button.filter-totals-stat {
 
 .bank-overview-row {
   display: grid;
-  grid-template-columns: minmax(430px, 1fr) minmax(440px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -17054,7 +17137,7 @@ button.filter-totals-stat {
 .bank-search-wrap {
   position: relative;
   flex: 1 1 420px;
-  min-width: 360px;
+  min-width: 0;
   max-width: min(520px, 100%);
 }
 
@@ -17238,7 +17321,7 @@ button.filter-totals-stat {
 
 .bank-status-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -20024,14 +20107,16 @@ textarea {
 .settings-content .settings-layout-control,
 .settings-content .settings-toggle-card {
   border-radius: 0;
-  border-right: 0;
-  border-left: 0;
+  border: 0;
   background: transparent;
   box-shadow: none;
 }
 
 .settings-content .settings-layout-panel {
   padding: 12px 0;
+}
+
+.settings-content .settings-layout-panel + .settings-layout-panel {
   border-top: 1px solid var(--border);
 }
 
@@ -20039,7 +20124,6 @@ textarea {
 .settings-content .settings-toggle-card {
   min-height: 0;
   padding: 10px 0;
-  border-top: 1px solid var(--border);
 }
 
 .settings-content .settings-layout-grid {

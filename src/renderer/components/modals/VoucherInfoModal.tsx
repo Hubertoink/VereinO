@@ -441,20 +441,6 @@ Status: ${statusLabel}`
                 ) : null}
               </div>
               <div className="voucher-info-primary-grid__right">
-                <div className={`voucher-info-row voucher-info-note-row${editingMeta ? ' voucher-info-note-row--editing' : ''}`}>
-                  <span className="voucher-info-row__label">Kommentar:</span>
-                  {editingMeta ? (
-                    <textarea
-                      className="input booking-note-textarea voucher-info-row__value"
-                      rows={3}
-                      value={metaNote}
-                      onChange={(e) => setMetaNote(e.target.value)}
-                      placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..."
-                    />
-                  ) : (
-                    <span className="voucher-info-row__value" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{voucher.note || '-'}</span>
-                  )}
-                </div>
                 <div className="voucher-info-row voucher-info-attachment-row">
                   <span className="voucher-info-row__label">Anhang:</span>
                   <div className="voucher-info-row__value voucher-info-attachment-actions">
@@ -477,6 +463,20 @@ Status: ${statusLabel}`
                   </div>
                 </div>
               </div>
+            </div>
+            <div className={`voucher-info-row voucher-info-note-row${editingMeta ? ' voucher-info-note-row--editing' : ''}`}>
+              <span className="voucher-info-row__label">Kommentar:</span>
+              {editingMeta ? (
+                <textarea
+                  className="input booking-note-textarea voucher-info-row__value"
+                  rows={3}
+                  value={metaNote}
+                  onChange={(e) => setMetaNote(e.target.value)}
+                  placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..."
+                />
+              ) : (
+                <span className="voucher-info-row__value" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{voucher.note || '-'}</span>
+              )}
             </div>
           </div>
 

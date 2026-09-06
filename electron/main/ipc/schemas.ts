@@ -100,6 +100,7 @@ export const VouchersListInput = z
   .object({
     limit: z.number().min(1).max(100).default(20),
     offset: z.number().min(0).default(0).optional(),
+    hasFiles: z.boolean().optional(),
     sort: z.enum(['ASC', 'DESC']).optional(),
     // New sortable columns for Buchungen
     sortBy: z

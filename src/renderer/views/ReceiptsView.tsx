@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { IconPaperclip } from '@tabler/icons-react'
 import { addDataChangedListener } from '../utils/refresh'
 import AttachmentsModal from '../components/modals/AttachmentsModal'
@@ -9,31 +9,43 @@ type ReceiptTarget = { voucherId: number; voucherNo: string; date: string; descr
 export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVoucher?: ReceiptTarget | null; onVoucherOpened?: () => void }) {
     const [rows, setRows] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string | null; fileCount?: number }>>([])
     const [page, setPage] = useState(1)
-    const [limit, setLimit] = useState(20)
+    const limit = 20
     const [total, setTotal] = useState(0)
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const requestId = useRef(0)
     const [attachmentsModal, setAttachmentsModal] = useState<null | { voucherId: number; voucherNo: string; date: string; description: string }>(null)
 
-    async function load() {
+    const load = useCallback(async () => {
+        const currentRequest = ++requestId.current
         setLoading(true)
+        setError(null)
         try {
-            const res = await window.api?.vouchers.list?.({ limit, offset: (page - 1) * limit, sort: 'DESC' })
-            if (res) {
-                const withFiles = res.rows.filter(r => (r.fileCount || 0) > 0)
-                setRows(withFiles.map(r => ({ id: r.id, voucherNo: r.voucherNo, date: r.date, description: r.description || '', fileCount: r.fileCount || 0 })))
-                setTotal(res.total)
+            const res = await window.api.vouchers.list({ limit, offset: (page - 1) * limit, sort: 'DESC', hasFiles: true })
+            if (currentRequest !== requestId.current) return
+            const lastPage = Math.max(1, Math.ceil(res.total / limit))
+            if (page > lastPage) {
+                setPage(lastPage)
+                return
             }
+            setRows(res.rows)
+            setTotal(res.total)
+        } catch {
+            if (currentRequest === requestId.current) setError('Belege konnten nicht geladen werden. Bitte erneut versuchen.')
         } finally {
-            setLoading(false)
+            if (currentRequest === requestId.current) setLoading(false)
         }
-    }
-
-    useEffect(() => { load() }, [page, limit])
+    }, [page])
 
     useEffect(() => {
+        void load()
         const onChanged = () => { void load() }
-        return addDataChangedListener(['vouchers'], onChanged)
-    }, [page, limit])
+        const unsubscribe = addDataChangedListener(['vouchers'], onChanged)
+        return () => {
+            unsubscribe()
+            requestId.current++
+        }
+    }, [load])
 
     useEffect(() => {
         if (!openVoucher) return
@@ -61,7 +73,8 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                 <div className="helper">Buchungen mit angehängten Dateien</div>
             </div>
             {loading && <div>Lade …</div>}
-            {!loading && rows.length > 0 && (
+            {error && <div role="alert">{error} <button className="btn" onClick={() => { void load() }}>Erneut versuchen</button></div>}
+            {!loading && !error && rows.length > 0 && (
                 <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
                     <thead>
                         <tr>
@@ -99,7 +112,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                     </tbody>
                 </table>
             )}
-            {!loading && rows.length === 0 && (
+            {!loading && !error && rows.length === 0 && (
                 <div className="receipts-empty" style={{ padding: 16, marginTop: 12 }}>
                     <div style={{ display: 'grid', gap: 6 }}>
                         <div><strong>Keine Belege gefunden</strong></div>
@@ -110,6 +123,15 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                         </div>
                     </div>
                 </div>
+            )}
+            {!error && total > 0 && (
+                <nav className="pagination-bar" aria-label="Belege-Seiten">
+                    <span>{total} Buchungen mit Belegen · Seite {page} / {Math.max(1, Math.ceil(total / limit))}</span>
+                    <div className="inline-flex items-center gap-8">
+                        <button className="btn" disabled={loading || page === 1} onClick={() => setPage(p => p - 1)}>Zurück</button>
+                        <button className="btn" disabled={loading || page * limit >= total} onClick={() => setPage(p => p + 1)}>Weiter</button>
+                    </div>
+                </nav>
             )}
             {attachmentsModal && (
                 <AttachmentsModal
