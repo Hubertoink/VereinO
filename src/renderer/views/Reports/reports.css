@@ -62,3 +62,17 @@
   .reports-plus .report-summary-row { gap: 10px; }
   .reports-plus .donut-chart-wrapper { flex-wrap: wrap; }
 }
+
+/* Report actions and breakdowns share the tile's available content width. */
+@media (max-width: 1100px) {
+ .reports-plus .dp-page-heading { flex-wrap: wrap; gap: 14px; }
+ .reports-plus .report-toolbar-actions { flex-wrap: wrap; min-width: 0; }
+ .reports-plus .donut-chart-wrapper { flex-wrap: wrap; }
+}
+@media (max-width: 800px) {
+ .reports-plus .report-summary-breakdowns { grid-template-columns: minmax(0, 1fr); }
+ .reports-plus .dp-card { padding: 16px; }
+ .reports-plus .report-summary-row { flex-wrap: wrap; gap: 8px; }
+ .reports-plus .report-summary-row > span:last-child { margin-left: auto; }
+ .reports-plus .report-toolbar-actions { width: 100%; }
+}

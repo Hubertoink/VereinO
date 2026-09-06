@@ -223,3 +223,21 @@
 .dp-table-series { display: inline-flex; align-items: center; gap: 7px; }
 .dp-table-series i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .dp-assignment-switch { align-self: flex-start; margin: 14px 0 4px; }
+
+/* Leave room for navigation in half-screen windows, without shrinking chart labels. */
+@media (max-width: 1100px) {
+ .dp-coverage, .dp-members { grid-column: span 6; }
+ .dp-open { grid-column: 1 / -1; }
+ .dp-card-heading { flex-wrap: wrap; }
+ .dp-card-heading h2 { min-width: 0; overflow-wrap: anywhere; }
+ .dp-card footer { flex-wrap: wrap; }
+}
+@media (max-width: 800px) {
+ .dp-coverage, .dp-members, .dp-open { grid-column: 1 / -1; }
+ .dp-page-heading { flex-wrap: wrap; }
+ .dp-page-heading > div { min-width: 0; }
+ .dp-page-heading p, .dp-segments { flex-wrap: wrap; }
+ .dp-segments { max-width: 100%; }
+ .dp-segments button { padding: 8px 12px; }
+ .dp-distribution-list span, .dp-budget-tile { overflow-wrap: anywhere; }
+}

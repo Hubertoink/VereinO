@@ -115,8 +115,8 @@ async function createDetachedQuickAddWindow(initialState?: any): Promise<{ ok: b
         width: isInvoiceScan ? 760 : 1180,
         height: isInvoiceScan ? 600 : 760,
         ...(savedBounds || {}),
-        minWidth: isInvoiceScan ? 760 : 860,
-        minHeight: isInvoiceScan ? 600 : 620,
+        minWidth: process.platform === 'linux' ? 0 : isInvoiceScan ? 760 : 640,
+        minHeight: process.platform === 'linux' ? 0 : isInvoiceScan ? 600 : 560,
         resizable: !isInvoiceScan,
         maximizable: !isInvoiceScan,
         show: false,
@@ -250,10 +250,11 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
-        // Fits comfortably into a 50/50 snap on a 1920 px wide display while
-        // preventing layouts that are too narrow to remain useful.
-        minWidth: 900,
-        minHeight: 640,
+        // Let Linux compositors size their tiles. A hard minimum can make the
+        // Wayland surface larger than its tile (e.g. 629 DIP at 150% scale),
+        // clipping even the window controls outside the visible window.
+        minWidth: process.platform === 'linux' ? 0 : 640,
+        minHeight: process.platform === 'linux' ? 0 : 560,
         show: false,
         autoHideMenuBar: true,
         frame: false,

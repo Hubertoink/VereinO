@@ -232,6 +232,7 @@ export default function BudgetsView({
         </div>
 
         {/* Simple table */}
+        <div className="management-table-scroll" tabIndex={0} role="region" aria-label="Budgettabelle">
         <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
           <thead>
             <tr>
@@ -316,6 +317,7 @@ export default function BudgetsView({
             )}
           </tbody>
         </table>
+        </div>
 
         {sortedVisibleBudgets.length > COLLAPSED_TABLE_ROWS && (
           <div className="pagination-bar management-table-bar">

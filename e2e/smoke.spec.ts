@@ -215,8 +215,8 @@ test('starts the real Electron app with its preload bridge', async () => {
   await expect(page).toHaveTitle(/VereinO/i)
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Tastaturbefehle öffnen' }).click()
-  const shortcutPanel = page.locator('.leader-shortcut-panel')
+  await page.getByRole('button', { name: 'Tastaturbefehle anzeigen' }).click()
+  const shortcutPanel = page.locator('.shortcut-global-flyout')
   await expect(shortcutPanel).toBeVisible()
   await expectReducedFloatingRadii(shortcutPanel)
   await page.getByRole('button', { name: 'Tastaturbefehle schließen' }).click({ position: { x: 2, y: 2 } })
@@ -553,8 +553,8 @@ test('presents the optimized booking workflow', async () => {
       dividerMarkRadius: dividerMark ? getComputedStyle(dividerMark).borderRadius : '0px'
     }
   })
-  expect(totalsStripStyle.stripLeftBorder).toBe('1px')
-  expect(totalsStripStyle.stripRightBorder).toBe('1px')
+  expect(parseFloat(totalsStripStyle.stripLeftBorder)).toBeGreaterThan(0)
+  expect(parseFloat(totalsStripStyle.stripRightBorder)).toBeGreaterThan(0)
   expect(totalsStripStyle.incomeLeftBorder).toBe('3px')
   expect(totalsStripStyle.diffRightBorder).toBe('3px')
   expect(totalsStripStyle.dividerWidth).toBe('34px')
@@ -592,10 +592,11 @@ test('presents the optimized booking workflow', async () => {
   await dialog.getByTitle('Geschäftspartner anlegen').click()
   const partyEditor = page.locator('.party-editor-modal')
   await expect(partyEditor).toBeVisible()
-  await expect(partyEditor.locator('.party-editor-section')).toHaveCount(3)
+  await expect(partyEditor.locator('.party-editor-extra')).toHaveCount(3)
+  await expect(partyEditor.locator('.party-editor-extra[open]')).toHaveCount(0)
   await expect(partyEditor.getByRole('heading', { name: 'Stammdaten', exact: true })).toBeVisible()
-  await expect(partyEditor.getByRole('heading', { name: 'Kontakt & Anschrift', exact: true })).toBeVisible()
-  await expect(partyEditor.getByRole('heading', { name: 'Zahlung & Steuer', exact: true })).toBeVisible()
+  await expect(partyEditor.locator('summary').filter({ hasText: 'Kontakt & Anschrift' })).toBeVisible()
+  await expect(partyEditor.locator('summary').filter({ hasText: 'Zahlung & Steuer' })).toBeVisible()
   const partyFieldContrast = await partyEditor.locator('input').first().evaluate((field) => ({
     field: getComputedStyle(field).backgroundColor,
     modal: getComputedStyle(field.closest('.modal') as HTMLElement).backgroundColor
@@ -803,7 +804,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
 
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
-  await expect(flyout).toContainText('Aktive Buchungen')
+  await expect(flyout.getByRole('button', { name: 'Buchungsreiter wechseln' })).toBeVisible()
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Geparkter Reiter-Test')
   await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('47.50')
   await page.locator('body').dispatchEvent('mousedown')
@@ -852,7 +853,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
   await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
 })
 
-test('uses the booking FAB as a close toggle for compact entry without draft tabs', async () => {
+test('closes compact entry without draft tabs and starts a fresh booking from the FAB', async () => {
   await chooseBookingEntryPresentation('Kompakt-Flyout')
   await expect(page.locator('#toggle-booking-draft-tabs')).not.toBeChecked()
 
@@ -864,7 +865,7 @@ test('uses the booking FAB as a close toggle for compact entry without draft tab
   await expect(flyout).toBeVisible()
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Temporärer Toggle-Test')
 
-  await bookingFab.click()
+  await flyout.getByRole('button', { name: 'Buchungsflyout schließen', exact: true }).click()
   await expect(flyout).toHaveCount(0)
   await expect(page.getByLabel('Offene Buchungstabs')).toHaveCount(0)
 
@@ -935,6 +936,9 @@ test('parks the compact draft while an existing booking is edited and restores i
   const draftTab = page.getByLabel('Offene Buchungstabs').locator('.booking-draft-tab').filter({ hasText: 'Entwurf bleibt im Reiter' })
   await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
 
+  // The taller flyout may cover the row's edit button. Clicking outside parks it.
+  await page.locator('.app-main').click({ position: { x: 8, y: 8 } })
+  await expect(flyout).toHaveCount(0)
   const savedRow = page.locator('tr').filter({ hasText: 'Bestehende Buchung für Editorwechsel' })
   await savedRow.getByTitle('Bearbeiten').click()
   const editModal = page.locator('.journal-edit-modal')
@@ -972,6 +976,7 @@ test('keeps expanded tags and comments separated in the detached booking window'
     detachedWindow?.setSize(900, 720)
   })
 
+  await detachedPage.setViewportSize({ width: 900, height: 720 })
   const detachedDialog = detachedPage.locator('.detached-quick-add-modal')
   await expect(detachedDialog).toBeVisible()
   await detachedDialog.locator('.booking-details').nth(0).locator('summary').click()

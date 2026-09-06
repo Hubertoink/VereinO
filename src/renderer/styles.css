@@ -498,6 +498,7 @@ label.settings-toggle-card {
   .settings-subnav {
     flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
     padding-bottom: 2px;
     scrollbar-width: thin;
   }
@@ -549,10 +550,6 @@ label.settings-toggle-card {
 
   .settings-cluster-trigger {
     font-size: 13px;
-  }
-
-  .settings-cluster-trigger::after {
-    bottom: -10px;
   }
 
   .settings-tab {
@@ -745,6 +742,9 @@ label.settings-toggle-card {
   display: grid;
   place-items: end center;
   padding: 24px;
+  box-sizing: border-box;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .leader-shortcut-backdrop {
@@ -758,7 +758,9 @@ label.settings-toggle-card {
 
 .leader-shortcut-panel {
   position: relative;
-  width: min(760px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: min(760px, 100%);
+  min-width: 0;
   max-height: min(560px, calc(100vh - 48px));
   overflow: auto;
   border: 1px solid color-mix(in oklab, var(--border) 82%, var(--accent));
@@ -874,6 +876,8 @@ label.settings-toggle-card {
 .leader-shortcut-command-copy {
   display: grid;
   gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .leader-shortcut-command small {
   color: var(--text-dim);
@@ -1847,8 +1851,8 @@ label.settings-toggle-card {
 .invoices-table thead th,
 .members-board-table thead th,
 .members-table thead th,
-.budget-management-surface > table thead th,
-.earmark-management-surface > table thead th {
+.budget-management-surface > .management-table-scroll > table thead th,
+.earmark-management-surface > .management-table-scroll > table thead th {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-dim);
@@ -3549,8 +3553,8 @@ tbody tr:nth-child(even):hover {
 .invoices-table thead th,
 .members-board-table thead th,
 .members-table thead th,
-.budget-management-surface > table thead th,
-.earmark-management-surface > table thead th {
+.budget-management-surface > .management-table-scroll > table thead th,
+.earmark-management-surface > .management-table-scroll > table thead th {
   position: sticky;
   top: -16px;
   background: var(--surface);
@@ -3561,8 +3565,8 @@ tbody tr:nth-child(even):hover {
 .invoices-table thead th::after,
 .members-board-table thead th::after,
 .members-table thead th::after,
-.budget-management-surface > table thead th::after,
-.earmark-management-surface > table thead th::after {
+.budget-management-surface > .management-table-scroll > table thead th::after,
+.earmark-management-surface > .management-table-scroll > table thead th::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -3577,8 +3581,8 @@ tbody tr:nth-child(even):hover {
 .invoices-table thead th,
 .members-board-table thead th,
 .members-table thead th,
-.budget-management-surface > table thead th,
-.earmark-management-surface > table thead th {
+.budget-management-surface > .management-table-scroll > table thead th,
+.earmark-management-surface > .management-table-scroll > table thead th {
   box-shadow:
     0 2px 8px -1px rgba(0, 0, 0, 0.2),
     0 4px 12px -2px rgba(0, 0, 0, 0.15),
@@ -7783,11 +7787,16 @@ body.detached-quick-add-body .local-invoice-scan__header select {
 
 /* Local invoice capture: compact review layout */
 .local-invoice-scan-overlay {
-  padding: 28px;
+  box-sizing: border-box;
+  padding: clamp(10px, 3vw, 28px);
 }
 
-.local-invoice-scan {
-  width: min(1280px, 96vw);
+.modal.local-invoice-scan {
+  box-sizing: border-box;
+  width: min(1280px, 100%);
+  padding: 0;
+  min-width: 0;
+  max-width: 100%;
   max-height: min(920px, 92vh);
 }
 
@@ -8252,7 +8261,7 @@ body.detached-quick-add-body .local-invoice-scan__header select {
 
 /* The invoice capture starts beside its toolbar button. Once a file has been
    selected it intentionally expands into the larger review workspace. */
-.local-invoice-scan--flyout {
+.modal.local-invoice-scan--flyout {
   width: min(460px, calc(100vw - 32px));
   max-height: min(520px, calc(100vh - 32px));
 }
@@ -8803,7 +8812,7 @@ body:has(.local-invoice-scan) .app-main {
    ========================== */
 .app-root-grid {
   display: grid;
-  grid-template-rows: 56px 1fr;
+  grid-template-rows: 56px minmax(0, 1fr);
   min-width: 0;
   height: 100vh;
   overflow: hidden;
@@ -8815,7 +8824,7 @@ body:has(.local-invoice-scan) .app-main {
 }
 /* Side-nav mode: sidebar + content */
 .app-root-grid--side {
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 64px minmax(0, 1fr);
   grid-template-areas: 'top top' 'side main';
 }
 
@@ -9074,7 +9083,21 @@ body:has(.local-invoice-scan) .app-main {
   flex-direction: column;
   padding: 8px 4px;
   border-right: 1px solid var(--border);
-  overflow: visible;
+  box-sizing: border-box;
+  background: var(--surface);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+/* Header and navigation form one continuous surface. The separator belongs
+   to the page content, so it never crosses the top of the sidebar. */
+.app-root-grid--side .app-header {
+  border-bottom: 0;
+}
+.app-root-grid--side .app-main {
+  border-top: 1px solid var(--border);
 }
 .side-nav {
   overflow: visible;
@@ -9262,6 +9285,7 @@ body:has(.local-invoice-scan) .app-main {
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
+  min-height: 0;
 }
 .app-logo {
   border-radius: 4px;
@@ -9919,6 +9943,7 @@ label .req-asterisk {
 .report-chart-card {
   margin-top: 12px;
   padding: 12px;
+  min-width: 0;
 }
 
 .reports-chart-grid,
@@ -9938,7 +9963,18 @@ label .req-asterisk {
 }
 
 .reports-chart-stack {
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 12px;
+}
+
+.reports-header {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.reports-header .report-toolbar-actions {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .report-summary-card {
@@ -10010,7 +10046,7 @@ label .req-asterisk {
 
 @media (max-width: 900px) {
   .reports-chart-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -11430,6 +11466,8 @@ button.dashboard-task-strip__item:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Chart container with relative positioning for tooltip */
@@ -13045,7 +13083,8 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
 
 html[data-glass-modals='true'] .modal-header,
 html[data-glass-modals='true'] .activity-report-modal__header,
-html[data-glass-modals='true'] .app-header {
+html[data-glass-modals='true'] .app-header,
+html[data-glass-modals='true'] .app-sidebar {
   background: color-mix(in oklab, var(--surface) 75%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -18336,6 +18375,9 @@ button.filter-totals-stat {
   margin: 4px 0 0;
   padding: 8px 0 4px;
   border-radius: 0;
+  /* Floating field labels must scroll behind the pinned save actions. */
+  z-index: 5;
+  background: var(--surface);
 }
 
 .quick-add-modal .booking-footer-error {
@@ -20736,21 +20778,21 @@ textarea {
   }
 }
 
-.budget-management-surface > table,
-.earmark-management-surface > table {
+.budget-management-surface > .management-table-scroll > table,
+.earmark-management-surface > .management-table-scroll > table {
   border-collapse: collapse;
 }
 
-.budget-management-surface > table th,
-.budget-management-surface > table td,
-.earmark-management-surface > table th,
-.earmark-management-surface > table td {
+.budget-management-surface > .management-table-scroll > table th,
+.budget-management-surface > .management-table-scroll > table td,
+.earmark-management-surface > .management-table-scroll > table th,
+.earmark-management-surface > .management-table-scroll > table td {
   border-bottom: 1px solid var(--table-row-sep, var(--border));
   padding: 8px 10px;
 }
 
-.budget-management-surface > table tbody tr:hover,
-.earmark-management-surface > table tbody tr:hover {
+.budget-management-surface > .management-table-scroll > table tbody tr:hover,
+.earmark-management-surface > .management-table-scroll > table tbody tr:hover {
   background: color-mix(in oklab, var(--accent) 10%, var(--surface));
 }
 
@@ -21009,3 +21051,57 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .voucher-info-tags-editor .tag-suggestion-btn { min-height: 0; padding: 3px 6px; border-radius: 5px; font-size: 11px; font-weight: 600; line-height: 1.2; }
 
 .date-filter-input .booking-date-picker-button { color: var(--text); }
+
+/* Tiled windows: preserve useful content at 640 logical pixels and above. */
+.journal-compact-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.journal-compact-toolbar .btn { min-height: 30px; }
+.journal-table--compact { table-layout: fixed; }
+.journal-table--compact th:first-child,
+.journal-table--compact td:first-child { width: auto; }
+.journal-table--compact td { white-space: normal; overflow-wrap: anywhere; }
+.journal-compact-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.journal-compact-meta .journal-details-button { padding: 2px 6px; min-height: 24px; font-size: 11px; }
+.journal-table--compact .journal-description-text { -webkit-line-clamp: 3; line-clamp: 3; }
+
+@media (max-width: 960px) {
+  .app-main { padding: 12px; }
+  .compact-booking-flyout-anchor,
+  .compact-booking-flyout-anchor--journal-end,
+  .advances-purchase-flyout-anchor {
+    right: 12px;
+    width: min(560px, calc(100vw - 24px));
+  }
+}
+
+/* Let controls and rows share page scrolling when filters consume most height. */
+@media (max-height: 700px), (max-width: 740px) {
+  .app-main--journal { overflow-y: auto; }
+  .journal-view { height: auto; min-height: 100%; }
+  .journal-table-section { flex: 1 0 auto; }
+  .journal-table-card { height: auto; }
+  .journal-table-card .journal-table-scroll-wrapper { max-height: 60vh; min-height: 160px; }
+}
+.journal-table--compact + .journal-table-end { min-width: 0; width: 100%; }
+@media (max-width: 740px) {
+  .journal-filter-controls > .journal-filter-toolbar { box-sizing: border-box; min-width: 0; }
+}
+
+.budget-management-surface,
+.earmark-management-surface { min-width: 0; }
+.management-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }

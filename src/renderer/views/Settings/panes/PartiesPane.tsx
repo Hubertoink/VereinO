@@ -1,4 +1,6 @@
 import React from 'react'
+import { IconPencil } from '@tabler/icons-react'
+import AppIcon from '../../../components/common/AppIcon'
 import type { TParty, TPartyRole } from '../../../../../electron/main/ipc/schemas'
 import { PartyEditorModal } from '../../../components/common/PartySelector'
 import { PARTY_ROLE_LABELS } from '../../../components/common/partyLabels'
@@ -112,7 +114,7 @@ export function PartiesPane({ notify }: Props) {
                               : <><polyline points="7 13 12 18 17 13" /><polyline points="7 6 12 11 17 6" /></>}
                           </svg>
                         </button>
-                        <button type="button" className="btn btn-edit" onClick={() => setDraft(party)} aria-label="Geschäftspartner bearbeiten" title="Bearbeiten">✎</button>
+                        <button type="button" className="btn btn-edit" onClick={() => setDraft(party)} aria-label="Geschäftspartner bearbeiten" title="Bearbeiten"><AppIcon icon={IconPencil} size="control" /></button>
                       </div>
                     </td>
                   </tr>

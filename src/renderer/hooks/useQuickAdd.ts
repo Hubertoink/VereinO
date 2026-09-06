@@ -56,14 +56,16 @@ function createDraftId() {
 }
 
 /** Read user booking habits from localStorage */
-function getBookingHabits(): { type: 'IN' | 'OUT'; paymentMethod: 'BAR' | 'BANK'; mode: 'NET' | 'GROSS' } {
+function getBookingHabits(): { type: QA['type']; paymentMethod: 'BAR' | 'BANK'; mode: 'NET' | 'GROSS' } {
     const defaults = { type: 'IN' as const, paymentMethod: 'BAR' as const, mode: 'GROSS' as const }
     try {
         const raw = localStorage.getItem('bookingHabits')
         if (!raw) return defaults
         const h = JSON.parse(raw)
-        // Determine most frequent for each field
-        const topType = getMostFrequent(h.types, ['IN', 'OUT']) as 'IN' | 'OUT' || defaults.type
+        // Prefer the last successful booking type; retain other learned defaults.
+        const topType: QA['type'] = ['IN', 'OUT', 'TRANSFER', 'INTERNAL'].includes(h.lastType)
+            ? h.lastType
+            : (getMostFrequent(h.types, ['IN', 'OUT']) as 'IN' | 'OUT' || defaults.type)
         const topPM = getMostFrequent(h.paymentMethods, ['BAR', 'BANK']) as 'BAR' | 'BANK' || defaults.paymentMethod
         const topMode = getMostFrequent(h.modes, ['NET', 'GROSS']) as 'NET' | 'GROSS' || defaults.mode
         return { type: topType, paymentMethod: topPM, mode: topMode }
@@ -88,6 +90,7 @@ function trackBookingHabit(type: string, paymentMethod: string | undefined, mode
     try {
         const raw = localStorage.getItem('bookingHabits')
         const h = raw ? JSON.parse(raw) : { types: {}, paymentMethods: {}, modes: {} }
+        if (['IN', 'OUT', 'TRANSFER', 'INTERNAL'].includes(type)) h.lastType = type
         if (!h.types) h.types = {}
         if (!h.paymentMethods) h.paymentMethods = {}
         if (!h.modes) h.modes = {}
@@ -144,13 +147,13 @@ export function useQuickAdd(
             date: today,
             type: habits.type,
             sphere: 'IDEELL',
-            mode: habits.mode,
+            mode: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? 'GROSS' : habits.mode,
             grossAmount: undefined,
             netAmount: undefined,
             vatRate: 0,
             description: '',
             note: '',
-            paymentMethod: habits.paymentMethod
+            paymentMethod: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? undefined : habits.paymentMethod
         }
     }, [today])
 

@@ -1,6 +1,6 @@
 {
   "name": "verein-budget-planner",
-  "version": "3.9.5",
+  "version": "3.9.6",
   "private": true,
   "description": "Offline-first Electron app for non-profit finance planning (Windows/macOS/Linux)",
   "main": "dist-electron/main/index.cjs",
@@ -28,7 +28,8 @@
     "rebuild:native": "node scripts/ensure-electron-arch.cjs && node scripts/rebuild-native.cjs",
     "postinstall": "playwright install",
     "package": "electron-builder -c electron-builder.yml",
-    "start": "npm run dev"
+    "start": "npm run dev",
+    "test:essential": "playwright test --config playwright.essential.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

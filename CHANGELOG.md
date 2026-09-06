@@ -7,9 +7,27 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [3.9.6] - 2026-09-09
+
+### Hinzugefügt
+
+- Alt blendet Tastatur-Badges direkt an Navigation und Bedienelementen ein. Globale Befehle erscheinen in einem kompakten Flyout: Alt + N für neue Buchungen und Alt + A für das eingeblendete KI-Modul. Fenstersteuerungen sind ausgeschlossen.
+- Fehlende Pflichtfelder in der kompakten Buchungserfassung werden als einzelne Badges angezeigt und verschwinden nach dem Ausfüllen.
+
 ### Geändert
 
+- Buchungs-Flyout nutzt die verfügbare Fensterhöhe bis knapp über den unteren Rand. Titel und kleiner Reiter-Dropdown teilen sich eine Zeile; Hinweise stehen neben dem Speichern-Button.
+- Neue Buchungen übernehmen die zuletzt erfolgreich gespeicherte Buchungsart, einschließlich Umbuchungen und interner Buchungen.
+- Geschäftspartnerdialog mit kompakten Stammdaten, einklappbaren Zusatzangaben und dauerhaft erreichbarer Fußzeile. Neue Geschäftspartner sind als „Lieferant & Kunde“ vorbelegt.
+- Kunden und Dienstleister erhalten ein Icon in den Buchungsdetails. Der Bearbeiten-Button hebt sich farblich vom Anhang-Button ab; die Geschäftspartnerverwaltung verwendet das übliche Stift-Icon.
+- Navigation, Suchfelder, Filter, Buchungsdialoge und die klassische Kompakttabelle bleiben in schmalen Fenstern bedienbar. Dashboard, Reports und Buchungen Plus sind für geteilte Linux-Fenster optimiert.
 - Der schwebende Buchungsbutton entfällt bei Dauerbuchungen.
+
+### Behoben
+
+- Enter im Geschäftspartnerfeld wählt einen bestehenden Partner aus oder öffnet dessen Anlage, ohne die Buchung abzusenden. Eingaben bleiben beim Wechsel zwischen Kunden- und Buchungsdialog erhalten.
+- Filterwechsel in Buchungen Plus behalten Liste und Summen während des Nachladens sichtbar und vermeiden springende Inhalte.
+- AltGr, Tastaturwiederholungen und Fokuswechsel lösen keine unbeabsichtigten Alt-Befehle aus. Globale Befehle funktionieren auch aus Eingabefeldern; Dialogaktionen werden im Vordergrund berücksichtigt.
 
 ## [3.9.5] - 2026-09-08
 

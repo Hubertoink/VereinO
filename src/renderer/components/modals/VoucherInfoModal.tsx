@@ -1,3 +1,4 @@
+import PartyName from '../common/PartyName'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
@@ -436,7 +437,7 @@ Status: ${statusLabel}`
               <div className="voucher-info-purpose">
                 <div className="voucher-info-purpose__heading"><span className="voucher-info-eyebrow">Verwendungszweck</span><span className="voucher-info-classification"><IconTag size={14} />{classificationValue}</span></div>
                 <h3>{voucher.description || 'Keine Beschreibung'}</h3>
-                {voucher.counterparty ? <p>{voucher.counterparty}</p> : null}
+                {voucher.counterparty ? <p><PartyName name={voucher.counterparty} /></p> : null}
               </div>
             </div>
             <div className="voucher-info-facts">

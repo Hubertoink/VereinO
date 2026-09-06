@@ -1515,11 +1515,13 @@ function AppInner() {
     quickAddAfterSave,
     setQuickAddAfterSave
   } = useUIPreferences()
+  const [shortcutBookingFlyout, setShortcutBookingFlyout] = useState(false)
+  const effectiveBookingEntryPresentation = shortcutBookingFlyout ? 'flyout' : bookingEntryPresentation
   const bookingsOpenDetached = bookingEntryPresentation === 'detached'
 
   // ── Auto-switch: force side-nav when window is too narrow for top-nav ──
   const NAV_SWITCH_THRESHOLD = 960
-  const [narrowOverride, setNarrowOverride] = useState(false)
+  const [narrowOverride, setNarrowOverride] = useState(() => window.innerWidth < NAV_SWITCH_THRESHOLD)
 
   useEffect(() => {
     const check = () => setNarrowOverride(window.innerWidth < NAV_SWITCH_THRESHOLD)
@@ -2195,7 +2197,7 @@ function AppInner() {
     notify,
     showBookingDraftTabs,
     quickAddAfterSave,
-    bookingEntryPresentation
+    effectiveBookingEntryPresentation
   )
   const [forceFullBookingDialog, setForceFullBookingDialog] = useState(false)
   const previousBookingEntryPresentationRef = useRef(bookingEntryPresentation)
@@ -2205,18 +2207,21 @@ function AppInner() {
   }, [activeDraftId, bookingEntryPresentation])
 
   useEffect(() => {
-    if (!quickAdd) setForceFullBookingDialog(false)
+    if (!quickAdd) {
+      setForceFullBookingDialog(false)
+      setShortcutBookingFlyout(false)
+    }
   }, [quickAdd])
 
   useEffect(() => {
-    if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+    if (effectiveBookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
       window.dispatchEvent(new Event('compact-booking-flyout-opened'))
     }
-  }, [activeDraftKind, bookingEntryPresentation, quickAdd])
+  }, [activeDraftKind, effectiveBookingEntryPresentation, quickAdd])
 
   useEffect(() => {
     if (
-      bookingEntryPresentation !== 'flyout'
+      effectiveBookingEntryPresentation !== 'flyout'
       || !quickAdd
       || activeDraftKind !== 'booking'
       || forceFullBookingDialog
@@ -2230,23 +2235,24 @@ function AppInner() {
         '.compact-booking-flyout-anchor',
         '.fab-buchung',
         '.select-dropdown__menu--portal',
-        '.party-selector__menu--portal'
+        '.party-selector__menu--portal',
+        '.party-editor-overlay'
       ].join(', '))) return
       parkQuickAdd()
     }
 
     document.addEventListener('mousedown', parkOnOutsideMouseDown, true)
     return () => document.removeEventListener('mousedown', parkOnOutsideMouseDown, true)
-  }, [activeDraftKind, bookingEntryPresentation, forceFullBookingDialog, parkQuickAdd, quickAdd])
+  }, [activeDraftKind, effectiveBookingEntryPresentation, forceFullBookingDialog, parkQuickAdd, quickAdd])
 
   useEffect(() => {
     const parkForInvoiceFlyout = () => {
-      if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+      if (effectiveBookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
         parkQuickAdd()
       }
     }
     const parkForBookingEditor = () => {
-      if (bookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
+      if (effectiveBookingEntryPresentation === 'flyout' && quickAdd && activeDraftKind === 'booking') {
         parkQuickAdd()
       }
     }
@@ -2256,7 +2262,7 @@ function AppInner() {
       window.removeEventListener('invoice-upload-flyout-opened', parkForInvoiceFlyout)
       window.removeEventListener('booking-editor-opened', parkForBookingEditor)
     }
-  }, [activeDraftKind, bookingEntryPresentation, parkQuickAdd, quickAdd])
+  }, [activeDraftKind, effectiveBookingEntryPresentation, parkQuickAdd, quickAdd])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -2588,8 +2594,7 @@ function AppInner() {
     }
   }, [notify, openQuickAdd])
 
-  // These values are displayed and changed by the global shortcut menu, so they
-  // must be initialized before shortcutCommands is created.
+  // Journal display preferences.
   const [page, setPage] = useState<number>(() => {
     try {
       return Number(localStorage.getItem('journal.page') || '1')
@@ -2612,272 +2617,29 @@ function AppInner() {
     return shortcuts
   }, [isClassicBookings, registeredPageShortcuts, triggerBookingEntry])
 
-  const navigateAndFocus = useCallback((page: NavKey, selector: string) => {
-    setActivePage(page)
-    window.setTimeout(() => {
-      const input = document.querySelector(selector) as HTMLInputElement | null
-      input?.focus()
-      input?.select()
-    }, 100)
-  }, [])
-
-  const shortcutCommands = useMemo<ShortcutCommand[]>(() => {
-    const pageActions = activePageShortcuts.map((shortcut) => ({
-      key: shortcut.key,
-      label: shortcut.label,
-      action: shortcut.action
-    }))
-
-    return [
-      {
-        key: 'n',
-        label: 'Neue Buchung',
-        description: 'Öffnet einen neuen Buchungsentwurf',
-        action: triggerBookingEntry
-      },
-      {
-        key: 'g',
-        label: 'Gehe zu …',
-        description: 'Bereich in VereinO öffnen',
-        children: visibleNavigationItems.map((item) => ({
-          key: goToShortcutKeys[item.key],
-          label: item.label,
-          icon: (
-            <span className={navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}>
-              {getNavIcon(item.key)}
-            </span>
-          ),
-          action: () => setActivePage(item.key)
-        }))
-      },
-      {
-        key: 's',
-        label: 'Suche …',
-        description: 'Bereich öffnen und Suchfeld fokussieren',
-        children: [
-          {
-            key: 'b',
-            label: 'Buchungen',
-            action: () => navigateAndFocus('Buchungen', bookingView === 'plus' ? '.bp-search input' : '.journal-filter-toolbar__search')
-          },
-          {
-            key: 'k',
-            label: 'Bankimport',
-            action: () => navigateAndFocus('Bankimport', '.bank-import-search')
-          },
-          {
-            key: 'v',
-            label: 'Verbindlichkeiten',
-            action: () => navigateAndFocus('Verbindlichkeiten', '.invoices-search')
-          },
-          {
-            key: 'm',
-            label: 'Mitglieder',
-            action: () => navigateAndFocus('Mitglieder', '.members-search')
-          },
-          {
-            key: 'o',
-            label: 'Vorschüsse',
-            action: () => navigateAndFocus('Vorschuesse', 'input[placeholder^="Suchen (Person"]')
-          }
-        ]
-      },
-      ...(pageActions.length
-        ? [
-            {
-              key: 'a',
-              label: `Aktionen: ${navItems.find((item) => item.key === activePage)?.label ?? activePage} …`,
-              description: 'Funktionen des aktuellen Bereichs',
-              children: pageActions
-            }
-          ]
-        : []),
-      {
-        key: 'e',
-        label: 'Einstellungen & Verwaltung …',
-        description: 'Häufige Verwaltungsbereiche direkt öffnen',
-        icon: (
-          <span className={navIconColorMode === 'color' ? 'icon-color-Einstellungen' : ''}>
-            {getNavIcon('Einstellungen')}
-          </span>
-        ),
-        children: [
-          {
-            key: 'n',
-            label: 'Navigation & Layout …',
-            description: 'Menü und Buchungstabelle direkt anpassen',
-            icon: <span aria-hidden>🧭</span>,
-            children: [
-              {
-                key: 'm',
-                label: 'Menü-Layout …',
-                description: `Aktuell: ${navLayout === 'left' ? 'Links' : 'Oben'}`,
-                children: [
-                  { key: 'l', label: 'Links (klassisch)', action: () => setNavLayout('left') },
-                  { key: 'o', label: 'Oben (Icons)', action: () => setNavLayout('top') }
-                ]
-              },
-              {
-                key: 'h',
-                label: 'Zeilenhöhe …',
-                description: `Aktuell: ${journalRowDensity === 'compact' ? 'Kompakt' : 'Normal'}`,
-                children: [
-                  { key: 'n', label: 'Normal', action: () => setJournalRowDensity('normal') },
-                  { key: 'k', label: 'Kompakt', action: () => setJournalRowDensity('compact') }
-                ]
-              },
-              {
-                key: 'z',
-                label: 'Buchungen: Zeilenlayout …',
-                description: `Aktuell: ${{ both: 'Linien + Zebra', lines: 'Nur Linien', zebra: 'Nur Zebra', none: 'Ohne Linien/Zebra' }[journalRowStyle]}`,
-                children: [
-                  { key: 'l', label: 'Linien + Zebra', action: () => setJournalRowStyle('both') },
-                  { key: 'i', label: 'Nur Linien', action: () => setJournalRowStyle('lines') },
-                  { key: 'z', label: 'Nur Zebra', action: () => setJournalRowStyle('zebra') },
-                  { key: 'o', label: 'Ohne Linien/Zebra', action: () => setJournalRowStyle('none') }
-                ]
-              },
-              {
-                key: 'f',
-                label: 'Farbige Menüicons umschalten',
-                description: `Aktuell: ${navIconColorMode === 'color' ? 'Ein' : 'Aus'}`,
-                action: () => setNavIconColorMode(navIconColorMode === 'color' ? 'mono' : 'color')
-              },
-              {
-                key: 'b',
-                label: 'Buchungsreiter umschalten',
-                description: `Aktuell: ${showBookingDraftTabs ? 'Ein' : 'Aus'}`,
-                action: () => setShowBookingDraftTabs(!showBookingDraftTabs)
-              },
-              {
-                key: 'e',
-                label: 'Buchungserfassung öffnen als …',
-                description: `Aktuell: ${{ modal: 'Dialog', flyout: 'Kompakt-Flyout', detached: 'Eigenes Fenster' }[bookingEntryPresentation]}`,
-                children: [
-                  { key: 'd', label: 'Dialog', action: () => setBookingEntryPresentation('modal') },
-                  { key: 'f', label: 'Kompakt-Flyout', action: () => setBookingEntryPresentation('flyout') },
-                  { key: 'e', label: 'Eigenes Fenster', action: () => setBookingEntryPresentation('detached') }
-                ]
-              },
-              {
-                key: 's',
-                label: 'Nach dem Speichern …',
-                description: `Aktuell: ${quickAddAfterSave === 'close' ? 'Schließen' : 'Neue Buchung'}`,
-                children: [
-                  {
-                    key: 's',
-                    label: 'Buchungserfassung schließen',
-                    action: () => setQuickAddAfterSave('close')
-                  },
-                  {
-                    key: 'n',
-                    label: 'Neue Buchung öffnen',
-                    action: () => setQuickAddAfterSave('new')
-                  }
-                ]
-              },
-              {
-                key: 'd',
-                label: 'Buchungen löschen …',
-                description: `Aktuell: ${allowVoucherDeletion ? 'Endgültiges Löschen erlaubt' : 'Nur Storno'}`,
-                children: [
-                  {
-                    key: 's',
-                    label: 'Nur Storno erlauben',
-                    action: () => setAllowVoucherDeletion(false)
-                  },
-                  {
-                    key: 'e',
-                    label: 'Endgültiges Löschen erlauben',
-                    action: () => setAllowVoucherDeletion(true)
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            key: 'a',
-            label: 'Anzeige & Lesbarkeit …',
-            description: 'Eintragszahl und Datumsformat direkt anpassen',
-            icon: <span aria-hidden>🔎</span>,
-            children: [
-              {
-                key: 'e',
-                label: 'Buchungen: Anzahl der Einträge …',
-                description: `Aktuell: ${journalLimit}`,
-                children: [
-                  {
-                    key: '2',
-                    label: '20 Einträge',
-                    action: () => {
-                      setJournalLimit(20)
-                      setPage(1)
-                    }
-                  },
-                  {
-                    key: '5',
-                    label: '50 Einträge',
-                    action: () => {
-                      setJournalLimit(50)
-                      setPage(1)
-                    }
-                  },
-                  {
-                    key: '0',
-                    label: '100 Einträge',
-                    action: () => {
-                      setJournalLimit(100)
-                      setPage(1)
-                    }
-                  }
-                ]
-              },
-              {
-                key: 'd',
-                label: 'Datumsformat …',
-                description: `Aktuell: ${dateFmt === 'ISO' ? '2025-01-15' : dateFmt === 'DOT' ? '15.01.2025' : '15. Jan 2025'}`,
-                children: [
-                  { key: 'i', label: 'ISO · 2025-01-15', action: () => setDateFmt('ISO') },
-                  { key: 'l', label: 'Lesbar · 15. Jan 2025', action: () => setDateFmt('PRETTY') },
-                  { key: 't', label: 'TT.MM.JJJJ · 15.01.2025', action: () => setDateFmt('DOT') }
-                ]
-              }
-            ]
-          },
-          { key: 'd', label: 'Darstellung', action: () => openSettingsTile('general') },
-          { key: 't', label: 'Tabelle', action: () => openSettingsTile('table') },
-          { key: 's', label: 'Speicher & Backup', action: () => openSettingsTile('storage') },
-          { key: 'i', label: 'Import', action: () => openSettingsTile('import') },
-          { key: 'o', label: 'Organisation', action: () => openSettingsTile('org') },
-          { key: 'p', label: 'Spenden', action: () => openSettingsTile('donations') },
-          { key: 'g', label: 'Tags', action: () => openSettingsTile('tags') },
-          { key: 'm', label: 'KI-Muster', action: () => openSettingsTile('aiPatterns') },
-          { key: 'k', label: 'Kassenprüfung', action: () => openSettingsTile('cashCheck') },
-          { key: 'j', label: 'Jahresabschluss', action: () => openSettingsTile('yearEnd') },
-          { key: 'u', label: 'Updates', action: () => openSettingsTile('updates') }
-        ]
+  const shortcutCommands = useMemo<ShortcutCommand[]>(() => [
+    {
+      key: 'n', label: 'Neue Buchung', global: true,
+      description: 'Buchungserfassung als Flyout öffnen',
+      action: () => {
+        openQuickAdd()
+        setShortcutBookingFlyout(true)
       }
-    ]
-  }, [
-    activePage,
-    activePageShortcuts,
-    bookingView,
-    allowVoucherDeletion,
-    bookingEntryPresentation,
-    bookingsOpenDetached,
-    dateFmt,
-    journalLimit,
-    journalRowDensity,
-    journalRowStyle,
-    navIconColorMode,
-    navLayout,
-    navigateAndFocus,
-    triggerBookingEntry,
-    openSettingsTile,
-    quickAddAfterSave,
-    showBookingDraftTabs,
-    visibleNavigationItems
-  ])
+    },
+    ...(visibleNavigationItems.some(item => item.key === 'KI') ? [{
+      key: 'a', label: 'KI aufrufen', global: true,
+      target: '[data-shortcut-nav="KI"]',
+      action: () => setActivePage('KI')
+    }] : []),
+    ...visibleNavigationItems.filter(item => item.key !== 'KI').map((item) => ({
+      key: goToShortcutKeys[item.key], label: item.label,
+      target: `[data-shortcut-nav="${item.key}"]`,
+      action: () => setActivePage(item.key)
+    })),
+    ...activePageShortcuts.map((shortcut) => ({
+      key: shortcut.key, label: shortcut.label, action: shortcut.action
+    }))
+  ], [activePageShortcuts, openQuickAdd, visibleNavigationItems])
 
   async function createSampleVoucher() {
     try {
@@ -3556,7 +3318,7 @@ function AppInner() {
         ) : null}
         {isTopNav && <div className="app-header__drag-spacer" aria-hidden="true" />}
         {/* Window controls */}
-        <div className="app-header__controls no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
+        <div className="app-header__controls no-drag" data-shortcut-ignore style={{ WebkitAppRegion: 'no-drag' } as any}>
           <button
             className="btn ghost icon-btn"
             title="Minimieren"
@@ -4027,11 +3789,11 @@ function AppInner() {
       <LeaderShortcuts commands={shortcutCommands} />
 
       {/* Quick-Add: full dialog or optional compact flyout */}
-      {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
-        <div className="compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed" aria-hidden="true" />
+      {quickAdd && activeDraftKind === 'booking' && effectiveBookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
+        <div className={`compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed${shortcutBookingFlyout ? ' compact-booking-flyout-dismiss--shortcut' : ''}`} aria-hidden="true" />
       )}
-      {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
-        <div className={`compact-booking-flyout-anchor${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
+      {quickAdd && activeDraftKind === 'booking' && effectiveBookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
+        <div className={`compact-booking-flyout-anchor${shortcutBookingFlyout ? ' compact-booking-flyout-anchor--shortcut' : ''}${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
           <CompactBookingFlyout
             key={activeDraftId ?? 'compact-quick-add'}
             qa={qa}
@@ -4061,7 +3823,7 @@ function AppInner() {
           />
         </div>
       )}
-      {quickAdd && activeDraftKind === 'booking' && (bookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
+      {quickAdd && activeDraftKind === 'booking' && (effectiveBookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
         <QuickAddModal
           key={activeDraftId ?? 'quick-add'}
           qa={qa}

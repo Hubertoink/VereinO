@@ -144,31 +144,35 @@ export default function FilterDropdown({
     }
   }, [open])
 
-  // Adjust position if panel would overflow viewport
-  useEffect(() => {
-    if (!open || !panelRef.current) return
+  // Render outside scrolling page containers and follow the trigger when a
+  // compositor resizes the tile. Measure layout sizes without animation transforms.
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current || !buttonRef.current) return
     const panel = panelRef.current
-    // Reset any prior auto-adjustment
-    panel.style.left = ''
-    panel.style.right = ''
-    panel.style.maxHeight = ''
-
-    const rect = panel.getBoundingClientRect()
-    // Check right overflow
-    if (rect.right > window.innerWidth - 16) {
-      panel.style.left = 'auto'
-      panel.style.right = '0'
+    const button = buttonRef.current
+    const updatePosition = () => {
+      const anchor = button.getBoundingClientRect()
+      const margin = 12
+      const panelWidth = panel.offsetWidth
+      const preferredLeft = alignRight ? anchor.right - panelWidth : anchor.left
+      const left = Math.max(margin, Math.min(preferredLeft, window.innerWidth - panelWidth - margin))
+      const top = Math.max(margin, Math.min(anchor.bottom + 8, window.innerHeight - 160))
+      panel.style.left = `${left}px`
+      panel.style.top = `${top}px`
+      panel.style.maxHeight = `${Math.max(0, window.innerHeight - top - margin)}px`
     }
-    // Check left overflow (rare but possible on narrow screens)
-    if (rect.left < 16) {
-      panel.style.left = '0'
-      panel.style.right = 'auto'
+    updatePosition()
+    const observer = new ResizeObserver(updatePosition)
+    observer.observe(button)
+    observer.observe(panel)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
     }
-    // Check bottom overflow
-    if (rect.bottom > window.innerHeight - 16) {
-      panel.style.maxHeight = `${Math.max(0, window.innerHeight - rect.top - 16)}px`
-    }
-  }, [open])
+  }, [open, alignRight, width])
 
   return (
     <div className="filter-dropdown">
@@ -216,7 +220,7 @@ export default function FilterDropdown({
           document.body
         )}
 
-      {open && (
+      {open && createPortal(
         <div
           ref={panelRef}
           className="filter-dropdown__panel"
@@ -224,7 +228,11 @@ export default function FilterDropdown({
             width: typeof width === 'number' ? `${width}px` : width,
             maxWidth: 'calc(100vw - 24px)',
             boxSizing: 'border-box',
-            ...(alignRight ? { right: 0, left: 'auto' } : { left: 0, right: 'auto' })
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 'auto',
+            zIndex: 6500
           }}
           role="dialog"
           aria-modal="false"
@@ -247,7 +255,8 @@ export default function FilterDropdown({
           </header>
 
           <div className="filter-dropdown__content">{children}</div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

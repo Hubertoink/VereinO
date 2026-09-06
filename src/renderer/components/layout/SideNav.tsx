@@ -45,10 +45,12 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, p
             )}
             <button
               className={`btn ghost nav-btn has-tooltip tooltip-right ${isActive ? 'active' : ''} ${isAiRunning ? 'ai-nav-running' : ''}`}
+              data-shortcut-nav={item.key}
               onClick={() => onNavigate(item.key)}
               aria-current={isActive ? 'page' : undefined}
               aria-label={isAiRunning ? `${item.label}: Anfrage läuft` : item.label}
               data-tooltip={item.label}
+              title={item.label}
             >
               <span className={`icon-wrapper ${colorClass}`}>
                 {getNavIcon(item.key)}

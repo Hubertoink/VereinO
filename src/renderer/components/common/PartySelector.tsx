@@ -4,6 +4,7 @@ import { IconX } from '@tabler/icons-react'
 import type { TParty, TPartyRole, TPartyUpsertInput } from '../../../../electron/main/ipc/schemas'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 import AppIcon from './AppIcon'
+import './party.css'
 import { PARTY_ROLE_LABELS } from './partyLabels'
 
 export type PartySelection = { partyId: number | null; name: string }
@@ -83,12 +84,17 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
   }
 
   return createPortal(
-    <div className="modal-overlay party-editor-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal party-editor-modal" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-overlay party-editor-overlay" role="dialog" aria-modal="true" aria-label={initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'} onClick={onClose} onKeyDown={(event) => {
+      // Portals still bubble through the booking form's React tree.
+      event.stopPropagation()
+      if (event.key === 'Escape') { event.preventDefault(); onClose() }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save() }
+    }}>
+      <form className="modal party-editor-modal" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void save() }}>
         <header className="party-editor-modal__header">
           <div>
             <h2>{initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'}</h2>
-            <div className="helper">Die Angaben stehen danach in Buchungen und Rechnungen zur Auswahl.</div>
+            <div className="helper">Name und Rolle genügen. Weitere Angaben sind optional.</div>
           </div>
           <button type="button" className="btn ghost party-editor-modal__close" onClick={onClose} aria-label="Schließen">
             <AppIcon icon={IconX} size="control" />
@@ -100,14 +106,15 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
             <div className="party-editor-grid">
               <label className={floatingClass(draft.name)}><span>Name *</span><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus /></label>
               <label className={floatingClass(draft.role, true)}><span>Rolle</span><select className="input" value={draft.role} onChange={(e) => set('role', e.target.value as TPartyRole)}>{Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className={`${floatingClass(draft.legalName)} party-editor-grid__full`}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
-              <label className={`${floatingClass(draft.contactName)} party-editor-grid__full`}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
             </div>
           </section>
 
-          <section className="party-editor-section" aria-labelledby="party-editor-contact-data">
-            <h3 id="party-editor-contact-data">Kontakt & Anschrift</h3>
+          <details className="party-editor-section party-editor-extra">
+            <summary>Kontakt & Anschrift</summary>
             <div className="party-editor-grid">
+              <label className={`${floatingClass(draft.legalName)} party-editor-grid__full`}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
+              <label className={`${floatingClass(draft.contactName)} party-editor-grid__full`}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
+
               <label className={floatingClass(draft.email)}><span>E-Mail</span><input className="input" type="email" value={draft.email || ''} onChange={(e) => set('email', e.target.value)} /></label>
               <label className={floatingClass(draft.phone)}><span>Telefon</span><input className="input" value={draft.phone || ''} onChange={(e) => set('phone', e.target.value)} /></label>
               <label className={`${floatingClass(draft.street)} party-editor-grid__full`}><span>Straße</span><input className="input" value={draft.street || ''} onChange={(e) => set('street', e.target.value)} /></label>
@@ -115,10 +122,10 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
               <label className={floatingClass(draft.city)}><span>Ort</span><input className="input" value={draft.city || ''} onChange={(e) => set('city', e.target.value)} /></label>
               <label className={floatingClass(draft.country, true)}><span>Land</span><input className="input" value={draft.country || ''} onChange={(e) => set('country', e.target.value)} /></label>
             </div>
-          </section>
+          </details>
 
-          <section className="party-editor-section" aria-labelledby="party-editor-finance-data">
-            <h3 id="party-editor-finance-data">Zahlung & Steuer</h3>
+          <details className="party-editor-section party-editor-extra">
+            <summary>Zahlung & Steuer</summary>
             <div className="party-editor-grid">
               <label className={floatingClass(draft.iban)}><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
               <label className={floatingClass(draft.bic)}><span>BIC</span><input className="input" value={draft.bic || ''} onChange={(e) => set('bic', e.target.value)} /></label>
@@ -127,16 +134,18 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
               <label className={floatingClass(draft.paymentTermDays)}><span>Zahlungsziel (Tage)</span><input className="input" type="number" min="0" value={draft.paymentTermDays ?? ''} onChange={(e) => set('paymentTermDays', e.target.value === '' ? null : Number(e.target.value))} /></label>
               <label className={floatingClass(draft.isActive, true)}><span>Status</span><select className="input" value={draft.isActive === false ? '0' : '1'} onChange={(e) => set('isActive', e.target.value === '1')}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></label>
             </div>
-          </section>
+          </details>
 
+          <details className="party-editor-section party-editor-extra"><summary>Notiz</summary>
           <label className={`${floatingClass(draft.note)} party-editor-grid__full party-floating-field--textarea`}><span>Notiz</span><textarea className="input" rows={3} value={draft.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
+          </details>
           {error && <div className="helper error-text">{error}</div>}
         </div>
         <footer className="party-editor-modal__footer">
           <button type="button" className="btn" onClick={onClose}>Abbrechen</button>
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Speichert…' : 'Speichern'}</button>
+          <button type="submit" className="btn primary" disabled={busy}>{busy ? 'Speichert…' : 'Speichern'}</button>
         </footer>
-      </div>
+      </form>
     </div>,
     document.body
   )
@@ -165,6 +174,8 @@ type PartyMenuPosition = {
 export default function PartySelector({ valueId, valueName, role, inputId, ariaLabel, placeholder, invalid, menuPlacement = 'auto', onChange }: PartySelectorProps) {
   const [parties, setParties] = React.useState<TParty[]>([])
   const [open, setOpen] = React.useState(false)
+  const [activeIndex, setActiveIndex] = React.useState(-1)
+  const menuId = React.useId()
   const [creating, setCreating] = React.useState(false)
   const [menuPosition, setMenuPosition] = React.useState<PartyMenuPosition | null>(null)
   const rootRef = React.useRef<HTMLDivElement | null>(null)
@@ -173,8 +184,8 @@ export default function PartySelector({ valueId, valueName, role, inputId, ariaL
 
   const load = React.useCallback(async () => {
     try {
-      // Show every active partner. Role is a helpful default for creating a new
-      // entry, but must never hide an existing entry from a booking form.
+      // Show every active partner. The contextual role prioritizes matches,
+      // but must never hide an existing entry from a booking form.
       const result = await window.api.parties.list({ activeOnly: true, limit: 200 })
       setParties(result.rows)
     } catch {
@@ -236,7 +247,52 @@ export default function PartySelector({ valueId, valueName, role, inputId, ariaL
     })
     .slice(0, 8)
 
+  const selectParty = (party: TParty) => {
+    onChange({ partyId: party.id, name: party.name })
+    setOpen(false)
+    setActiveIndex(-1)
+  }
+  const createParty = () => { setOpen(false); setActiveIndex(-1); setCreating(true) }
+  const returnToInput = () => {
+    setCreating(false)
+    inputRef.current?.focus()
+    setOpen(false)
+  }
+  const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      // Never let the booking form interpret Enter in this field as Submit.
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.repeat || event.nativeEvent.isComposing || event.keyCode === 229) return
+      const highlighted = open && activeIndex >= 0 ? matches[activeIndex] : undefined
+      const exact = parties.find(party => party.name.localeCompare(valueName.trim(), 'de', { sensitivity: 'accent' }) === 0)
+      if (highlighted) selectParty(highlighted)
+      else if (open && activeIndex === matches.length) createParty()
+      else if (exact) selectParty(exact)
+      else if (valueName.trim()) createParty()
+      return
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      event.stopPropagation()
+      setOpen(true)
+      setActiveIndex(index => event.key === 'ArrowDown' ? (index + 1) % (matches.length + 1) : (index <= 0 ? matches.length : index - 1))
+    }
+    if (event.key === 'Escape' && open) {
+      event.preventDefault()
+      event.stopPropagation()
+      setOpen(false)
+      setActiveIndex(-1)
+    }
+    if (event.key === 'Tab') { setOpen(false); setActiveIndex(-1) }
+  }
+
+  React.useEffect(() => {
+    if (open && activeIndex >= 0) menuRef.current?.querySelectorAll('[role="option"]')[activeIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [open, activeIndex])
+
   const updateText = (name: string) => {
+    setActiveIndex(-1)
     const exact = parties.find((party) => party.name.localeCompare(name.trim(), 'de', { sensitivity: 'accent' }) === 0)
     onChange({ partyId: exact?.id ?? null, name })
     setOpen(true)
@@ -245,17 +301,20 @@ export default function PartySelector({ valueId, valueName, role, inputId, ariaL
   const menu = open && menuPosition && createPortal(
     <div
       ref={menuRef}
+      id={menuId}
+      role="listbox"
+      aria-label="Geschäftspartner"
       className="party-selector__menu party-selector__menu--portal"
       style={menuPosition}
     >
-      {matches.map((party) => (
-        <button key={party.id} type="button" className={party.id === valueId ? 'is-selected' : ''} onClick={() => { onChange({ partyId: party.id, name: party.name }); setOpen(false) }}>
+      {matches.map((party, index) => (
+        <button key={party.id} type="button" id={`${menuId}-${index}`} role="option" aria-selected={party.id === valueId} className={`${party.id === valueId ? 'is-selected' : ''}${activeIndex === index ? ' is-highlighted' : ''}`} onClick={() => selectParty(party)}>
           <span><strong>{party.name}</strong>{party.legalName && party.legalName !== party.name ? <small>{party.legalName}</small> : null}</span>
           <small>{PARTY_ROLE_LABELS[party.role]}</small>
         </button>
       ))}
       {!matches.length && <div className="party-selector__empty">Kein passender Geschäftspartner. Freitext bleibt möglich.</div>}
-      <button type="button" className="party-selector__create" onClick={() => { setOpen(false); setCreating(true) }}>+ „{valueName.trim() || 'Neuen Partner'}“ anlegen</button>
+      <button type="button" id={`${menuId}-${matches.length}`} role="option" aria-selected={false} className={`party-selector__create${activeIndex === matches.length ? ' is-highlighted' : ''}`} onClick={createParty}>+ „{valueName.trim() || 'Neuen Partner'}“ anlegen</button>
     </div>,
     document.body
   )
@@ -272,14 +331,20 @@ export default function PartySelector({ valueId, valueName, role, inputId, ariaL
           style={invalid ? { borderColor: 'var(--danger)' } : undefined}
           onFocus={() => { setOpen(true); void load() }}
           onChange={(event) => updateText(event.target.value)}
+          onKeyDown={onInputKeyDown}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          aria-activedescendant={open && activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
           aria-label={ariaLabel}
           autoComplete="off"
         />
         {valueName && <button type="button" className="btn ghost party-selector__clear" onClick={() => onChange({ partyId: null, name: '' })} aria-label="Geschäftspartner entfernen">×</button>}
-        <button type="button" className="btn party-selector__add" onClick={() => setCreating(true)} title="Geschäftspartner anlegen">+</button>
+        <button type="button" className="btn party-selector__add" onClick={createParty} title="Geschäftspartner anlegen">+</button>
       </div>
       {menu}
-      {creating && <PartyEditorModal initial={{ name: valueName.trim(), role: role || 'BOTH' }} onClose={() => setCreating(false)} onSaved={(party) => { setCreating(false); void load(); onChange({ partyId: party.id, name: party.name }) }} />}
+      {creating && <PartyEditorModal initial={{ name: valueName.trim(), role: 'BOTH' }} onClose={returnToInput} onSaved={(party) => { returnToInput(); void load(); onChange({ partyId: party.id, name: party.name }) }} />}
     </div>
   )
 }

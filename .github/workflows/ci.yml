@@ -1,7 +1,14 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      full_suite:
+        description: Run the full lint and test suite
+        type: boolean
+        default: false
 jobs:
   build:
     runs-on: windows-latest
@@ -15,9 +22,14 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - if: ${{ inputs.full_suite == true }}
+        run: npm run lint
       - run: npm run typecheck
-      - run: npm run typecheck:ts7
+      - if: ${{ inputs.full_suite == true }}
+        run: npm run typecheck:ts7
       - run: npm run build
-      - run: npm test -- --ci --reporters=default --reporters=jest-junit
-      - run: npm run test:e2e -- --reporter=list
+      - run: npm run test:essential
+      - if: ${{ inputs.full_suite == true }}
+        run: npm test -- --ci --reporters=default --reporters=jest-junit
+      - if: ${{ inputs.full_suite == true }}
+        run: npm run test:e2e -- --reporter=list

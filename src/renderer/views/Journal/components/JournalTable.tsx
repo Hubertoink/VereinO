@@ -444,7 +444,20 @@ export default function JournalTable({
             .catch(() => { if (alive) setIsGeneralProfile(false) })
         return () => { alive = false }
     }, [])
-    const visibleOrder = order.filter(k => cols[k])
+    const scrollWrapperRef = useRef<HTMLDivElement>(null)
+    const [narrow, setNarrow] = useState(false)
+    const [showFullTable, setShowFullTable] = useState(false)
+    const compact = narrow && !showFullTable
+    // Observe the space left after navigation and page padding, not screen pixels.
+    // The compact projection never writes to the user's column preferences.
+    useEffect(() => {
+        const element = scrollWrapperRef.current
+        if (!element) return
+        const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 900))
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [])
+    const visibleOrder = compact ? ['date', 'description', 'gross'] : order.filter(k => cols[k])
     const [headerMenu, setHeaderMenu] = useState<{ columnKey: string; x: number; y: number } | null>(null)
 
     const budgetUsageCache = useRef(new Map<number, any>())
@@ -780,6 +793,12 @@ export default function JournalTable({
         ) : k === 'description' ? (
             <td key={k}>
                 <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {compact && (
+                        <div className="journal-compact-meta">
+                            <span>{r.type === 'IN' ? 'Einnahme' : r.type === 'OUT' ? 'Ausgabe' : 'Umbuchung'}</span>
+                            {onRowDoubleClick && <button type="button" className="btn ghost journal-details-button" onClick={() => onRowDoubleClick(r)} aria-label={`Details zu ${r.description || r.voucherNo || 'Buchung'}`}>Details</button>}
+                        </div>
+                    )}
                     {(() => {
                         const fullText = r.description?.trim() || ''
                         if (!fullText) {
@@ -1027,11 +1046,15 @@ export default function JournalTable({
     )
     return (
         <>
-            <div className="journal-table-scroll-wrapper">
-                <table className="journal-table resizable-table" cellPadding={6} ref={tableRef} style={{ minWidth: visibleTableWidth, width: `max(100%, ${visibleTableWidth}px)` }}>
+            {narrow && <div className="journal-compact-toolbar">
+                <span className="helper">{compact ? 'Kompaktansicht' : 'Alle eingestellten Spalten'}</span>
+                <button type="button" className="btn ghost" aria-pressed={showFullTable} onClick={() => setShowFullTable(value => !value)}>{compact ? 'Alle Spalten' : 'Kompaktansicht'}</button>
+            </div>}
+            <div className="journal-table-scroll-wrapper" ref={scrollWrapperRef}>
+                <table className={`journal-table resizable-table${compact ? ' journal-table--compact' : ''}`} cellPadding={6} ref={tableRef} style={{ minWidth: compact ? 0 : visibleTableWidth, width: compact ? '100%' : `max(100%, ${visibleTableWidth}px)` }}>
                     <colgroup>
                         {visibleOrder.map((k) => (
-                            <col key={k} style={{ width: getColWidth(k) }} />
+                            <col key={k} style={{ width: compact ? (k === 'description' ? undefined : 118) : getColWidth(k) }} />
                         ))}
                     </colgroup>
                     <thead>
@@ -1043,11 +1066,15 @@ export default function JournalTable({
                                 return React.cloneElement(th, {
                                     key: k,
                                     className: `${th.props.className || ''} resizable-th`.trim(),
-                                    onContextMenu: (event: React.MouseEvent) => openHeaderMenu(event, k),
+                                    draggable: !compact,
+                                    onDragStart: compact ? undefined : th.props.onDragStart,
+                                    onDragOver: compact ? undefined : th.props.onDragOver,
+                                    onDrop: compact ? undefined : th.props.onDrop,
+                                    onContextMenu: compact ? undefined : (event: React.MouseEvent) => openHeaderMenu(event, k),
                                     children: (
                                         <>
                                             {th.props.children}
-                                            {!isLast && !FIXED_JOURNAL_COLUMNS.has(k) && <ResizeHandle colKey={k} />}
+                                            {!compact && !isLast && !FIXED_JOURNAL_COLUMNS.has(k) && <ResizeHandle colKey={k} />}
                                         </>
                                     )
                                 })

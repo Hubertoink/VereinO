@@ -1,3 +1,4 @@
+import './compactBookingFlyout.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { QA } from '../hooks/useQuickAdd'
 import {
@@ -313,6 +314,16 @@ export default function CompactBookingFlyout({
   const saveBlocked = !qa.date || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount
     || hasInvalidAssignments || hasOutOfRange
     || (qa.type === 'INTERNAL' && !internalValidation.hasValidAssignments)
+  const missingFields = [
+    ...(!qa.date ? [{ label: 'Datum', hint: 'Buchungsdatum wählen' }] : []),
+    ...(hasInvalidAmount ? [{ label: 'Betrag', hint: 'Betrag größer als 0 € eingeben' }] : []),
+    ...(qa.type === 'TRANSFER'
+      ? [
+          ...(!qa.transferFromAccountId ? [{ label: 'Quellkonto', hint: 'Quellkonto wählen' }] : []),
+          ...(!qa.transferToAccountId ? [{ label: 'Zielkonto', hint: 'Zielkonto wählen' }] : [])
+        ]
+      : hasMissingAccount ? [{ label: 'Konto', hint: 'Buchungskonto wählen' }] : [])
+  ]
   const validationMessage = (() => {
     if (!qa.date) return 'Bitte ein Buchungsdatum wählen.'
     if (hasInvalidAmount) return 'Bitte einen Betrag größer als 0 € eingeben.'
@@ -538,8 +549,7 @@ export default function CompactBookingFlyout({
     <section className={`compact-booking-flyout compact-booking-flyout--${qa.type.toLowerCase()}`} role="dialog" aria-labelledby="compact-booking-title">
       <header className="compact-booking-flyout__header">
         <div>
-          <strong id="compact-booking-title">Buchung erfassen</strong>
-          <small>{draftTabsEnabled ? `Aktive Buchungen · ${draftTabs.length} offen` : 'Kompakte Erfassung'}</small>
+          <strong id="compact-booking-title" title="Buchung erfassen">Buchung erfassen</strong>
         </div>
         {draftTabsEnabled && draftTabs.length > 0 && (
           <div className="compact-booking-flyout__tab-switcher">
@@ -889,9 +899,11 @@ export default function CompactBookingFlyout({
                 )}
               </div>
             )}
-            <div className={validationMessage ? 'compact-booking-error' : 'compact-booking-footer-hint'} role={validationMessage ? 'alert' : undefined}>
+            {missingFields.length > 0 ? <div className="compact-booking-required" role="status" aria-label="Noch erforderliche Felder">
+              {missingFields.map(field => <span className="compact-booking-required__badge" key={field.label} title={field.hint} aria-label={field.hint}>{field.label}</span>)}
+            </div> : <div className={validationMessage ? 'compact-booking-error' : 'compact-booking-footer-hint'} role={validationMessage ? 'alert' : undefined}>
               {validationMessage || (afterSaveDefault === 'new' ? 'Speichert und öffnet eine neue Buchung.' : 'Strg+S zum Speichern')}
-            </div>
+            </div>}
           </div>
           <div>
             <button type="submit" className="btn primary" disabled={saveBlocked}>Buchung speichern</button>

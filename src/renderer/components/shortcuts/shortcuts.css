@@ -1,0 +1,17 @@
+.shortcut-hints { position: fixed; inset: 0; z-index: 100000; pointer-events: none; }
+.shortcut-badge { position: fixed; display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid var(--accent); border-radius: 5px; background: var(--surface, #202532); color: var(--text, #fff); box-shadow: 0 2px 8px #0006; font: 700 12px/1 ui-monospace, monospace; animation: shortcut-fade-in 140ms ease-out; }
+.shortcut-global-flyout { position: absolute; bottom: 18px; left: 88px; width: min(340px, calc(100vw - 108px)); padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface, #202532); color: var(--text, #fff); box-shadow: 0 8px 30px #0005; pointer-events: auto; animation: shortcut-fade-in 140ms ease-out; }
+.shortcut-global-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.shortcut-global-heading button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 22px; }
+.shortcut-global-command { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2, transparent); color: inherit; cursor: pointer; }
+.shortcut-global-command:hover { border-color: var(--accent); }
+.shortcut-global-command kbd { white-space: nowrap; color: var(--accent); }
+.shortcut-global-flyout small { display: block; margin-top: 12px; color: var(--text-dim); font-size: 11px; }
+@keyframes shortcut-fade-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .shortcut-badge, .shortcut-global-flyout { animation: none; } }
+
+/* Global booking entry stays above the page's existing dialogs. */
+.compact-booking-flyout-anchor.compact-booking-flyout-anchor--shortcut { z-index: 14501; }
+.compact-booking-flyout-dismiss.compact-booking-flyout-dismiss--shortcut { z-index: 14500; }
+body:has(.compact-booking-flyout-anchor--shortcut) .select-dropdown__menu--portal,
+body:has(.compact-booking-flyout-anchor--shortcut) .party-selector__menu--portal { z-index: 14502; }

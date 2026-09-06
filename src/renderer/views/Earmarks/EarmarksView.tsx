@@ -220,6 +220,7 @@ export default function EarmarksView({
           <div className="helper">{sortedVisibleBindings.length} von {bindings.length}</div>
         </div>
 
+        <div className="management-table-scroll" tabIndex={0} role="region" aria-label="Zweckbindungstabelle">
         <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
           <thead>
             <tr>
@@ -297,6 +298,7 @@ export default function EarmarksView({
             )}
           </tbody>
         </table>
+        </div>
 
         {sortedVisibleBindings.length > COLLAPSED_TABLE_ROWS && (
           <div className="pagination-bar management-table-bar">
