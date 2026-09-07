@@ -180,6 +180,8 @@ test('lists older receipts across all pages and counts vouchers with multiple at
   await page.getByRole('button', { name: 'Belege', exact: true }).click()
   const receipts = page.locator('.receipts-container')
   const pagination = receipts.getByRole('navigation', { name: 'Belege-Seiten' })
+  await expect(receipts.locator('.receipt-card')).toHaveCount(20)
+  await receipts.getByRole('button', { name: 'Tabellenansicht', exact: true }).click()
   await expect(receipts.locator('tbody tr')).toHaveCount(20)
   await expect(pagination).toContainText('22 Buchungen mit Belegen · Seite 1 / 2')
   await expect(receipts).not.toContainText('Ohne Beleg')
@@ -402,7 +404,8 @@ test('loads split application pages on demand', async () => {
   await expectReadablePageCanvas()
 
   await page.getByRole('button', { name: 'Belege', exact: true }).click()
-  await expect(page.getByText('Buchungen mit angehängten Dateien', { exact: true })).toBeVisible()
+  await expect(page.locator('.receipts-container').getByRole('heading', { name: 'Belege', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Kartenansicht', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expectReadablePageCanvas()
 
   await page.getByRole('button', { name: 'Reports', exact: true }).click()
