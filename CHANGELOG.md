@@ -5,6 +5,24 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.9.2] - 2026-09-07
+
+### Hinzugefügt
+
+- Belege öffnen standardmäßig als Karten mit kleinen PDF- und Bildvorschauen sowie den wichtigsten Buchungsinformationen. Tabellenansicht und Datumssortierung bleiben verfügbar.
+- Buchungsdetails zeigen vorhandene Anhänge direkt als anklickbare Vorschau. PDF-Vorschauen werden aus der ersten Seite verkleinert und bei Bedarf lokal zwischengespeichert.
+- Kommentare in den Buchungsdetails lassen sich separat kopieren.
+
+### Geändert
+
+- Buchungsdetails mit prominentem Betrag und Verwendungszweck sowie separaten Bereichen für Buchungsinformationen, Anhang und Kommentar neu angeordnet.
+- Bearbeiten ist direkt über die Fußleiste erreichbar; „Für Excel kopieren“ ist grün hervorgehoben.
+- Abstände der Dauerbuchungsansicht an die anderen Ansichten angeglichen.
+
+### Behoben
+
+- Nach dem Schließen der Anhänge erscheinen die Buchungsdetails wieder, auch bei Escape und in separaten Fenstern. Ungespeicherte Eingaben bleiben erhalten und die Anhanganzahl wird aktualisiert.
+
 ## [3.9.1] - 2026-09-07
 
 ### Geändert

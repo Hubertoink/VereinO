@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconClipboardText, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag } from '@tabler/icons-react'
 import TagsEditor from '../TagsEditor'
+import ReceiptThumbnail, { type ReceiptPreviewCache } from '../ReceiptThumbnail'
 import AppIcon from '../common/AppIcon'
-import { IconAttachment, IconBank, IconCash, IconArrow } from '../../utils/icons'
+import { IconBank, IconCash } from '../../utils/icons'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { getInternalAssignmentValidationState, isMetaAmountValid } from './voucherMetaValidation'
 
@@ -68,6 +69,7 @@ interface VoucherInfoModalProps {
     tags: string[]
   }) => Promise<void> | void
   windowMode?: boolean
+  suspended?: boolean
 }
 
 const IconEdit = ({ size = 28 }: { size?: number }) => (
@@ -86,8 +88,14 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
   </svg>
 )
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false }: VoucherInfoModalProps) {
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const previewCache = useRef<ReceiptPreviewCache>(new Map())
+  const [previewRevision, setPreviewRevision] = useState(0)
+  useEffect(() => {
+    previewCache.current.clear()
+    setPreviewRevision(value => value + 1)
+  }, [voucher.id, voucher.fileCount, voucher.hasFiles, suspended])
   const typeLabel = voucher.type === 'IN' ? 'Einnahme' : voucher.type === 'OUT' ? 'Ausgabe' : voucher.type === 'INTERNAL' ? 'Interne Umbuchung' : 'Umbuchung'
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   const classificationLabel = isGeneralProfile ? 'Kategorie' : 'Sphäre'
@@ -264,8 +272,9 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     }
   }
 
-  // Escape key handler
+  // Only the active dialog handles Escape; keep drafts while attachments are open.
   useEffect(() => {
+    if (suspended) return
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -274,7 +283,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  }, [onClose, suspended])
 
   // Kopier-Funktionen
   const copyAsText = () => {
@@ -318,6 +327,7 @@ Status: ${statusLabel}`
       className={`modal-overlay voucher-info-modal-overlay${windowMode ? ' voucher-info-modal-overlay--window' : ''}`}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="voucher-info-heading"
       onMouseDown={(e) => {
         if (windowMode) {
           e.stopPropagation()
@@ -333,7 +343,7 @@ Status: ${statusLabel}`
       style={{
         position: 'fixed',
         inset: 0,
-        display: 'flex',
+        display: suspended ? 'none' : 'flex',
         alignItems: windowMode ? 'stretch' : 'center',
         justifyContent: 'center',
         background: windowMode ? 'transparent' : 'color-mix(in oklab, var(--surface) 65%, transparent)',
@@ -373,10 +383,11 @@ Status: ${statusLabel}`
             : { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
         >
           <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <h2 className="voucher-info-title">
+            <h2 id="voucher-info-heading" className="voucher-info-title">
               <AppIcon icon={IconReceipt2} size="action" />
               <span>Buchungsdetails</span>
             </h2>
+            <p className="voucher-info-subtitle">Alle Informationen zu dieser Buchung</p>
           </div>
           <div className={windowMode ? 'booking-modal-header-actions' : undefined} style={windowMode ? ({ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' } as React.CSSProperties) : { display: 'flex', alignItems: 'center', gap: 8 }}>
             {editingMeta ? (
@@ -412,119 +423,33 @@ Status: ${statusLabel}`
 
         {/* Content */}
         <div className="voucher-info-modal__content" style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto', padding: windowMode ? '12px 16px 0' : undefined } as React.CSSProperties}>
-          <div className={`card voucher-info-card${editingMeta ? ' voucher-info-card--meta-editing' : ''}`} style={{ padding: 12, display: 'grid', gap: 8, overflow: 'visible' }}>
-            <div className="voucher-info-primary-grid">
-              <div className="voucher-info-primary-grid__left">
-                <div className="voucher-info-row">
-                  <span className="voucher-info-row__label">Datum:</span>
-                  <span className="voucher-info-row__value" style={{ fontWeight: 600 }}>{fmtDate(voucher.date)}</span>
-                </div>
-                <div className="voucher-info-row">
-                  <span className="voucher-info-row__label">Belegnummer:</span>
-                  <span className="voucher-info-row__value">{voucher.voucherNo}</span>
-                </div>
-                {statusLabel !== 'Aktiv' ? (
-                  <div className="voucher-info-row">
-                    <span className="voucher-info-row__label">Status:</span>
-                    <span className={`voucher-info-row__value badge ${isReversalVoucher ? 'badge-storno' : 'badge-storniert'}`}>{statusLabel}</span>
-                  </div>
-                ) : null}
-                <div className="voucher-info-row">
-                  <span className="voucher-info-row__label">Beschreibung:</span>
-                  <span className="voucher-info-row__value" style={{ wordBreak: 'break-word' }}>{voucher.description || '-'}</span>
-                </div>
-                {voucher.counterparty ? (
-                  <div className="voucher-info-row">
-                    <span className="voucher-info-row__label">Geschäftspartner:</span>
-                    <span className="voucher-info-row__value" style={{ wordBreak: 'break-word' }}>{voucher.counterparty}</span>
-                  </div>
-                ) : null}
+          <section className="card voucher-info-card voucher-info-summary">
+            <div className="voucher-info-summary__main">
+              <div className={`voucher-info-amount voucher-info-amount--${voucher.type.toLowerCase()}`}>
+                <span className="voucher-info-eyebrow">Betrag</span>
+                <strong><span className="voucher-info-amount__icon">{voucher.type === 'IN' ? <IconArrowUp size={22} /> : voucher.type === 'OUT' ? <IconArrowDown size={22} /> : <IconArrowsExchange size={22} />}</span>{eurFmt.format(voucher.grossAmount)}</strong>
+                <span className={`badge ${voucher.type.toLowerCase()}`}>{typeLabel}</span>
               </div>
-              <div className="voucher-info-primary-grid__right">
-                <div className="voucher-info-row voucher-info-attachment-row">
-                  <span className="voucher-info-row__label">Anhang:</span>
-                  <div className="voucher-info-row__value voucher-info-attachment-actions">
-                    {voucher.hasFiles || (voucher.fileCount || 0) > 0 ? (
-                      <button type="button" className="btn voucher-info-attachment-btn" onClick={onOpenAttachments} disabled={!onOpenAttachments}>
-                        <AppIcon icon={IconPaperclip} size="inline" /> {voucher.fileCount || 1} {(voucher.fileCount || 1) === 1 ? 'Beleg' : 'Belege'} anzeigen
-                      </button>
-                    ) : <span>Kein Anhang</span>}
-                    <button
-                      type="button"
-                      className="btn ghost voucher-info-attachment-btn voucher-info-attachment-btn--add"
-                      onClick={onOpenAttachments}
-                      disabled={!onOpenAttachments}
-                      title="Anhang hinzufügen"
-                      aria-label="Anhang hinzufügen"
-                    >
-                      <span className="voucher-info-attachment-btn__plus" aria-hidden="true">+</span>
-                      <IconAttachment size={14} />
-                    </button>
-                  </div>
-                </div>
+              <div className="voucher-info-purpose">
+                <div className="voucher-info-purpose__heading"><span className="voucher-info-eyebrow">Verwendungszweck</span><span className="voucher-info-classification"><IconTag size={14} />{classificationValue}</span></div>
+                <h3>{voucher.description || 'Keine Beschreibung'}</h3>
+                {voucher.counterparty ? <p>{voucher.counterparty}</p> : null}
               </div>
             </div>
-            <div className={`voucher-info-row voucher-info-note-row${editingMeta ? ' voucher-info-note-row--editing' : ''}`}>
-              <span className="voucher-info-row__label">Kommentar:</span>
-              {editingMeta ? (
-                <textarea
-                  className="input booking-note-textarea voucher-info-row__value"
-                  rows={3}
-                  value={metaNote}
-                  onChange={(e) => setMetaNote(e.target.value)}
-                  placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..."
-                />
-              ) : (
-                <span className="voucher-info-row__value" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{voucher.note || '-'}</span>
-              )}
+            <div className="voucher-info-facts">
+              <div><IconCalendar size={21} /><span><small>Datum</small><strong>{fmtDate(voucher.date)}</strong></span></div>
+              <div><IconReceipt2 size={21} /><span><small>Belegnummer</small><strong>{voucher.voucherNo}</strong></span></div>
+              <div>{voucher.paymentMethod === 'BAR' ? <IconCash size={21} /> : voucher.type === 'TRANSFER' || voucher.type === 'INTERNAL' ? <IconArrowsExchange size={21} /> : <IconBank size={21} />}<span><small>Zahlweg</small><strong>{paymentLabel}</strong></span></div>
             </div>
-          </div>
-
-          <div className="card voucher-info-card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Brutto:</span>
-              <span style={{ 
-                fontWeight: 700, 
-                fontSize: 16,
-                color: voucher.type === 'IN' ? 'var(--success)' : voucher.type === 'OUT' ? 'var(--danger)' : 'var(--warning)'
-              }}>
-                {eurFmt.format(voucher.grossAmount)}
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Art:</span>
-              <div>
-                <span className={`badge ${voucher.type.toLowerCase()}`}>{voucher.type}</span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>{classificationLabel}:</span>
-              <span>{classificationValue}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8, alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zahlweg:</span>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {voucher.type === 'TRANSFER' ? (
-                  <span className={`badge pm-transfer pm-transfer-${(voucher.transferFrom || '').toLowerCase()}-${(voucher.transferTo || '').toLowerCase()}`}>
-                    <span className="pm-icon">{voucher.transferFrom === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
-                    <span className="transfer-arrow">→</span>
-                    <span className="pm-icon">{voucher.transferTo === 'BAR' ? <IconCash size={16} /> : <IconBank size={16} />}</span>
-                  </span>
-                ) : voucher.type === 'INTERNAL' ? (
-                  <span className="badge pm-internal">intern</span>
-                ) : voucher.paymentMethod ? (
-                  <span className={`badge pm-${voucher.paymentMethod.toLowerCase()}`}>
-                    {voucher.paymentMethod === 'BAR' ? <IconCash size={18} /> : <IconBank size={18} />}
-                  </span>
-                ) : (
-                  <span>-</span>
-                )}
-                <span>{paymentLabel}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card voucher-info-card" style={{ padding: 12, display: 'grid', gap: 8, overflow: 'visible' }}>
+            {statusLabel !== 'Aktiv' ? <span className={`badge ${isReversalVoucher ? 'badge-storno' : 'badge-storniert'}`}>{statusLabel}</span> : null}
+          </section>
+          <div className={`voucher-info-details-grid${editingMeta ? ' voucher-info-details-grid--editing' : ''}`}>
+            <section className="card voucher-info-card voucher-info-information">
+              <h3 className="voucher-info-section-title"><IconInfoCircle size={18} />Buchungsinformationen</h3>
+              <div className="voucher-info-detail-row"><span>Art</span><div><span className={`badge ${voucher.type.toLowerCase()}`}>{typeLabel}</span></div></div>
+              <div className="voucher-info-detail-row"><span>{classificationLabel}</span><span>{classificationValue}</span></div>
+              <div className="voucher-info-detail-row"><span>Zahlweg</span><span>{paymentLabel}</span></div>
+              <div className="voucher-info-assignments">
             {isLockedByStorno ? (
               <div className="voucher-info-meta-notice">
                 Diese Buchung ist Teil einer Storno-Kette. Budget, Zweckbindung, Tags und Kommentar bleiben unverändert; Anhänge können weiterhin ergänzt werden.
@@ -545,7 +470,7 @@ Status: ${statusLabel}`
                 Zweckbindungs-Summe {eurFmt.format(totalEarmarkAmount)} übersteigt den Bruttobetrag {eurFmt.format(grossLimit)}.
               </div>
             ) : null}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px minmax(0, 1fr)', gap: 8, alignItems: 'start' }}>
+            <div className="voucher-info-detail-row">
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Budget:</span>
               {editingMeta ? (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -622,7 +547,7 @@ Status: ${statusLabel}`
                 </div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px minmax(0, 1fr)', gap: 8, alignItems: 'start' }}>
+            <div className="voucher-info-detail-row">
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Zweckbindung:</span>
               {editingMeta ? (
                 <div style={{ display: 'grid', gap: 8 }}>
@@ -699,7 +624,7 @@ Status: ${statusLabel}`
                 </div>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px minmax(0, 1fr)', gap: 8, alignItems: 'start' }}>
+            <div className="voucher-info-detail-row">
               <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Tags:</span>
               {editingMeta ? (
                 <div className="voucher-info-tags-editor">
@@ -733,7 +658,27 @@ Status: ${statusLabel}`
                 </div>
               )}
             </div>
+              </div>
+            </section>
+            <section className="card voucher-info-card voucher-info-attachments">
+              <h3 className="voucher-info-section-title"><IconPaperclip size={18} />Anhang</h3>
+              {voucher.hasFiles || (voucher.fileCount || 0) > 0 ? (
+                <button type="button" className="voucher-info-attachment-thumbnail" onClick={onOpenAttachments} disabled={!onOpenAttachments} aria-label="Belege anzeigen">
+                  {!suspended && <ReceiptThumbnail voucherId={voucher.id} cache={previewCache.current} revision={previewRevision} />}
+                  <span><IconPaperclip size={15} />{voucher.fileCount || 1} {(voucher.fileCount || 1) === 1 ? 'Beleg' : 'Belege'} anzeigen</span>
+                </button>
+              ) : (
+                <div className="voucher-info-attachment-preview"><IconFilePlus size={36} stroke={1.5} /><strong>Kein Anhang</strong><p>Zu dieser Buchung wurde kein Anhang hinterlegt.</p></div>
+              )}
+              <button type="button" className="btn voucher-info-add-attachment" onClick={onOpenAttachments} disabled={!onOpenAttachments}><IconPaperclip size={16} />Anhang hinzufügen</button>
+            </section>
           </div>
+          <section className="card voucher-info-card voucher-info-comment">
+            <h3 className="voucher-info-section-title"><IconMessage size={18} /><label htmlFor={editingMeta ? 'voucher-info-note' : undefined}>Kommentar</label></h3>
+            {editingMeta ? <textarea id="voucher-info-note" className="input booking-note-textarea" rows={3} value={metaNote} onChange={(e) => setMetaNote(e.target.value)} placeholder="Interne Notiz, Rückfrage, Ablagehinweis ..." /> : (
+              <div className="voucher-info-comment__text"><span>{voucher.note || 'Kein Kommentar'}</span>{voucher.note ? <button type="button" className="btn ghost" aria-label="Kommentar kopieren" title="Kommentar kopieren" onClick={() => { navigator.clipboard.writeText(voucher.note || '').then(() => notify('success', 'Kommentar kopiert', 2000)).catch(() => notify('error', 'Kopieren fehlgeschlagen', 2000)) }}><IconClipboardText size={18} /></button> : null}</div>
+            )}
+          </section>
         </div>
 
         {/* Footer mit Aktionen */}
@@ -752,14 +697,15 @@ Status: ${statusLabel}`
               <span>Stornieren</span>
             </button>
           ) : null}
-          <button className="btn primary voucher-info-footer__button" onClick={copyAsText}>
+          <button className="btn voucher-info-footer__button" onClick={copyAsText}>
             <AppIcon icon={IconClipboardText} size="action" />
             <span>Als Text kopieren</span>
           </button>
-          <button className="btn primary voucher-info-footer__button" onClick={copyForExcel}>
+          <button className="btn ghost voucher-info-footer__button voucher-info-excel-btn" onClick={copyForExcel}>
             <AppIcon icon={IconTableExport} size="action" />
             <span>Für Excel kopieren</span>
           </button>
+          {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 
         <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 0, fontSize: 11, textAlign: 'center' }}>

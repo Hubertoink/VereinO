@@ -4592,6 +4592,70 @@ svg text {
   }
 }
 
+/* Booking detail hierarchy follows the summary, information and attachment cards. */
+.voucher-info-subtitle { margin: 5px 0 0 28px; color: var(--text-dim); font-size: 12px; }
+.voucher-info-summary, .voucher-info-information, .voucher-info-attachments, .voucher-info-comment { padding: 16px; border-radius: 12px; min-width: 0; }
+.voucher-info-summary { display: grid; gap: 18px; background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.voucher-info-summary__main { display: grid; grid-template-columns: minmax(160px, .85fr) minmax(0, 1.4fr); gap: 22px; }
+.voucher-info-eyebrow { font-size: 11px; color: var(--text-dim); }
+.voucher-info-amount { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; }
+.voucher-info-amount strong { display: flex; align-items: center; gap: 9px; font-size: clamp(23px, 4vw, 30px); line-height: 1.2; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.voucher-info-amount--in strong { color: var(--success); }
+.voucher-info-amount--out strong { color: var(--danger); }
+.voucher-info-amount--transfer strong, .voucher-info-amount--internal strong { color: var(--warning); }
+.voucher-info-amount__icon { display: inline-flex; padding: 6px; border-radius: 50%; background: color-mix(in srgb, currentColor 16%, transparent); }
+.voucher-info-purpose { min-width: 0; border-left: 1px solid var(--border); padding-left: 22px; }
+.voucher-info-purpose__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.voucher-info-classification { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; padding: 4px 8px; font-size: 11px; background: color-mix(in srgb, var(--accent) 12%, transparent); overflow-wrap: anywhere; }
+.voucher-info-purpose h3 { margin: 10px 0 5px; font-size: 18px; line-height: 1.35; overflow-wrap: anywhere; }
+.voucher-info-purpose p { margin: 0; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.voucher-info-facts { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 10px; }
+.voucher-info-facts > div { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+.voucher-info-facts svg { flex-shrink: 0; color: var(--text-dim); }
+.voucher-info-facts span { min-width: 0; }
+.voucher-info-facts small { display: block; color: var(--text-dim); font-size: 10px; margin-bottom: 3px; }
+.voucher-info-facts strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.voucher-info-details-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+.voucher-info-details-grid--editing { grid-template-columns: minmax(0, 1fr); }
+.voucher-info-section-title { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.voucher-info-section-title svg { color: var(--accent); flex-shrink: 0; }
+.voucher-info-information { display: grid; align-content: start; gap: 10px; }
+.voucher-info-information .voucher-info-section-title { margin-bottom: 0; }
+.voucher-info-detail-row { display: grid; grid-template-columns: 105px minmax(0, 1fr); align-items: start; gap: 10px; font-size: 12px; }
+.voucher-info-detail-row > :first-child { color: var(--text-dim); font-weight: 500; }
+.voucher-info-detail-row > * { min-width: 0; overflow-wrap: anywhere; }
+.voucher-info-assignments { display: grid; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
+.voucher-info-attachments { display: flex; flex-direction: column; }
+.voucher-info-attachment-preview { flex: 1; min-height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 16px; border: 1px dashed var(--border); border-radius: 8px; font-size: 12px; }
+.voucher-info-attachment-preview > svg { color: var(--text-dim); }
+.voucher-info-attachment-preview p { color: var(--text-dim); margin: 0; font-size: 11px; max-width: 180px; }
+.voucher-info-add-attachment { margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; font-size: 12px; }
+.voucher-info-comment__text { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: color-mix(in srgb, var(--text) 3%, var(--surface)); border: 1px solid var(--border); border-radius: 8px; }
+.voucher-info-comment__text > span { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.6; }
+.voucher-info-comment__text > button { flex-shrink: 0; padding: 5px; }
+.voucher-info-comment textarea { width: 100%; box-sizing: border-box; }
+.voucher-info-modal .btn.voucher-info-excel-btn {
+  background: #217346;
+  border-color: #217346;
+  color: #fff;
+}
+.voucher-info-modal .btn.voucher-info-excel-btn:hover {
+  background: #185c37;
+  border-color: #185c37;
+}
+.voucher-info-modal .btn.voucher-info-excel-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+@media (max-width: 540px) {
+  .voucher-info-summary__main { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .voucher-info-purpose { border-left: 0; border-top: 1px solid var(--border); padding: 14px 0 0; }
+  .voucher-info-facts { grid-template-columns: minmax(0, 1fr); }
+  .voucher-info-details-grid { grid-template-columns: minmax(0, 1fr); }
+  .voucher-info-details-grid--editing .voucher-info-detail-row { grid-template-columns: minmax(0, 1fr); }
+  .voucher-info-details-grid--editing .voucher-info-detail-row > div > div { display: flex !important; flex-wrap: wrap; }
+}
+
 .voucher-info-meta-error,
 .voucher-info-meta-notice {
   padding: 10px 12px;
@@ -18330,6 +18394,7 @@ button.filter-totals-stat {
   display: grid;
   gap: 14px;
   min-width: 0;
+  padding: 14px;
 }
 
 .recurring-page-header,
@@ -20882,3 +20947,38 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .receipt-intake-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .receipt-intake-choice > span { flex-basis: 100%; font-size: 12px; opacity: .8; }
 .receipt-intake-choice button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); color: var(--text); border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+
+/* Compact receipt gallery, with raster previews instead of embedded documents. */
+.receipts-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.receipts-header h1 { margin: 0 0 5px; }
+.receipts-toolbar, .receipts-view-switch { display: flex; align-items: center; gap: 8px; }
+.receipts-toolbar { flex-wrap: wrap; }
+.receipts-view-switch .btn { display: inline-flex; align-items: center; justify-content: center; }
+.receipts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.receipt-card { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; transition: border-color .15s, box-shadow .15s; }
+.receipt-card:hover, .receipt-card:focus-within { border-color: var(--accent); box-shadow: 0 3px 14px color-mix(in srgb, var(--accent) 12%, transparent); }
+.receipt-card__open { display: flex; flex-direction: column; align-items: stretch; flex: 1; min-width: 0; width: 100%; padding: 12px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; gap: 8px; }
+.receipt-card__open:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 10px; }
+.receipt-card__badges { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; font-size: 11px; }
+.receipt-card__badges .badge { font-size: 10px; }
+.receipt-card__classification { padding: 3px 7px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-size: 10px; overflow-wrap: anywhere; text-align: right; }
+.receipt-thumbnail { height: 146px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--text) 5%, var(--surface)); border-radius: 7px; overflow: hidden; }
+.receipt-thumbnail img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box; }
+.receipt-thumbnail__fallback { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; color: var(--text-dim); padding: 12px; font-size: 11px; overflow-wrap: anywhere; min-width: 0; }
+.receipt-card h2 { margin: 2px 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.receipt-card__counterparty { color: var(--text-dim); font-size: 11px; overflow-wrap: anywhere; }
+.receipt-card__detail { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.receipt-card__detail svg { flex-shrink: 0; }
+.receipt-card__amount { font-size: 16px; font-variant-numeric: tabular-nums; }
+.receipt-card__amount--out { color: var(--danger); }
+.receipt-card__amount--in { color: var(--success); }
+.receipt-card__count { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 4px 7px; background: color-mix(in srgb, var(--text) 6%, var(--surface)); border-radius: 12px; font-size: 11px; margin-top: auto; }
+.receipt-card footer { border-top: 1px solid var(--border); margin: 0 12px; padding: 5px 0; }
+.receipt-card footer .btn { display: flex; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; padding: 5px 0; color: var(--text-dim); font-size: 11px; overflow-wrap: anywhere; text-align: left; }
+@media (max-width: 500px) { .receipts-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.voucher-info-attachment-thumbnail { display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 10px; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.voucher-info-attachment-thumbnail:hover, .voucher-info-attachment-thumbnail:focus-visible { border-color: var(--accent); }
+.voucher-info-attachment-thumbnail .receipt-thumbnail { height: 155px; }
+.voucher-info-attachment-thumbnail > span { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.voucher-info-attachment-thumbnail:disabled { cursor: default; opacity: .65; }

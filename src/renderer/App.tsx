@@ -1194,6 +1194,7 @@ function DetachedQuickAddWindow() {
       <>
         <VoucherInfoModal
           voucher={detailVoucher}
+          suspended={!!detailAttachmentsVoucher}
           onClose={() => window.api?.window?.confirmClose?.()}
           eurFmt={eurFmt}
           fmtDate={fmtDate}

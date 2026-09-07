@@ -2083,6 +2083,7 @@ export default function JournalView({
                 {infoVoucher && (
                     <VoucherInfoModal
                         voucher={infoVoucher}
+                        suspended={!!attachmentsVoucher}
                         onClose={() => setInfoVoucher(null)}
                         eurFmt={eurFmt}
                         fmtDate={fmtDate}
@@ -2141,7 +2142,6 @@ export default function JournalView({
                                 date: infoVoucher.date,
                                 description: infoVoucher.description || '',
                             })
-                            setInfoVoucher(null)
                         }}
                     />
                 )}
@@ -2150,6 +2150,12 @@ export default function JournalView({
                         voucher={attachmentsVoucher}
                         onClose={() => setAttachmentsVoucher(null)}
                         onChanged={async () => {
+                            const result = await window.api?.attachments.list?.({ voucherId: attachmentsVoucher.voucherId })
+                            if (result) {
+                                setInfoVoucher((current) => current?.id === attachmentsVoucher.voucherId
+                                    ? { ...current, hasFiles: result.files.length > 0, fileCount: result.files.length }
+                                    : current)
+                            }
                             await loadRecent()
                         }}
                     />
