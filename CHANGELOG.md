@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.9.1] - 2026-09-07
+
+### Geändert
+
+- Das Tastaturbefehle-Menü lässt sich durch erneutes Drücken und Loslassen von Alt wieder schließen.
+
+### Behoben
+
+- Tastaturbefehle funktionieren direkt nach einem Menüwechsel per Maus, ohne zusätzlichen Klick in den Inhalt.
+- Alt+Tab und andere Alt-Tastenkombinationen lösen das Tastaturbefehle-Menü nicht aus. Ein Fokuswechsel verwirft einen begonnenen Alt-Tastendruck.
+
 ## [3.9.0] - 2026-09-06
 
 ### Hinzugefügt

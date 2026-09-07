@@ -24,7 +24,6 @@ function isEditableTarget(target: EventTarget | null) {
     || tag === 'input'
     || tag === 'textarea'
     || tag === 'select'
-    || !!element.closest('button, a, [role="button"], [role="menuitem"]')
 }
 
 function hasBlockingDialog() {
@@ -60,16 +59,19 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Alt' }: LeaderShortcu
   }
 
   useEffect(() => {
+    // Only a standalone Alt press toggles the guide. Windows may consume Tab
+    // during Alt+Tab, so losing focus must also cancel the pending press.
+    let altPending = false
+    const cancelAlt = () => { altPending = false }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!open) {
-        if (event.key !== 'Alt' || event.repeat || event.ctrlKey || event.metaKey) return
-        if (isEditableTarget(event.target) || hasBlockingDialog()) return
-        event.preventDefault()
-        setOpen(true)
-        setPath([])
-        setInvalidKey('')
+      if (event.key === 'Alt') {
+        if (event.repeat) return
+        altPending = !event.ctrlKey && !event.metaKey && !event.shiftKey
+          && (open || (!isEditableTarget(event.target) && !hasBlockingDialog()))
         return
       }
+      cancelAlt()
+      if (!open || event.ctrlKey || event.metaKey || event.altKey) return
 
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -82,8 +84,6 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Alt' }: LeaderShortcu
         else close()
         return
       }
-      if (event.ctrlKey || event.metaKey || event.altKey) return
-
       const key = event.key.toLowerCase()
       const command = currentCommands.find((candidate) => candidate.key.toLowerCase() === key)
       if (!command) {
@@ -98,8 +98,36 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Alt' }: LeaderShortcu
       selectCommand(command)
     }
 
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== 'Alt') return
+      const shouldToggle = altPending
+      cancelAlt()
+      if (!shouldToggle || event.ctrlKey || event.metaKey || event.shiftKey || !document.hasFocus()) return
+      if (!open && (isEditableTarget(event.target) || hasBlockingDialog())) return
+      event.preventDefault()
+      if (open) close()
+      else {
+        setOpen(true)
+        setPath([])
+        setInvalidKey('')
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.hidden) cancelAlt()
+    }
+
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', cancelAlt)
+    window.addEventListener('pointerdown', cancelAlt, true)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', cancelAlt)
+      window.removeEventListener('pointerdown', cancelAlt, true)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [commands, currentCommands, open, path.length])
 
   return (
@@ -130,7 +158,7 @@ export function LeaderShortcuts({ commands, leaderLabel = 'Alt' }: LeaderShortcu
               <div className="leader-shortcut-help">
                 {invalidKey ? <span className="leader-shortcut-invalid">„{invalidKey}“ ist hier nicht belegt</span> : null}
                 {path.length ? <span><kbd>⌫</kbd> zurück</span> : null}
-                <span><kbd>Esc</kbd> schließen</span>
+                <span><kbd>Alt</kbd> / <kbd>Esc</kbd> schließen</span>
               </div>
             </header>
 
