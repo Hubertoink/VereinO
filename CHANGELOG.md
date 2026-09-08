@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Geändert
+
+- Der schwebende Buchungsbutton entfällt bei Dauerbuchungen.
+
 ## [3.9.5] - 2026-09-08
 
 ### Hinzugefügt

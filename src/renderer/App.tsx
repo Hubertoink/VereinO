@@ -4173,6 +4173,7 @@ function AppInner() {
         </div>
       ) : (
         !isPlusBookings &&
+        activePage !== 'Dauerbuchungen' &&
         activePage !== 'Einstellungen' &&
         activePage !== 'Mitglieder' &&
         activePage !== 'Verbindlichkeiten' &&
