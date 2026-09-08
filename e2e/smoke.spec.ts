@@ -44,7 +44,7 @@ async function openBookingWorkflowSettings() {
 async function chooseBookingView(name: 'Buchungen (klassisch)' | 'Buchungen Plus') {
   await openBookingWorkflowSettings()
   await page.getByRole('group', { name: 'Buchungsansicht', exact: true }).getByRole('button', { name, exact: true }).click()
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
 }
 
 async function chooseBookingEntryPresentation(name: 'Dialog' | 'Kompakt-Flyout' | 'Eigenes Fenster') {
@@ -293,7 +293,7 @@ test('loads split application pages on demand', async () => {
   await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
   await expectReadablePageCanvas()
 
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Suche', exact: true })).toBeVisible()
   await expectReadablePageCanvas()
   await page.getByRole('button', { name: 'Dauerbuchungen', exact: true }).click()
@@ -421,7 +421,7 @@ test('loads split application pages on demand', async () => {
 })
 
 test('selects a single invoice in a compact flyout before opening recognition', async () => {
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
 
   await page.locator('.invoice-split-fab__new').click()
   const uploadFlyout = page.locator('.invoice-single-upload-flyout')
@@ -450,7 +450,7 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined)
   if (await laterButton.isVisible()) await laterButton.click()
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
 
   const splitControl = page.locator('.invoice-split-fab')
   await expect(splitControl).toBeVisible()
@@ -530,7 +530,7 @@ test('presents the optimized booking workflow', async () => {
   await laterButton.waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined)
   if (await laterButton.isVisible()) await laterButton.click()
   await chooseBookingEntryPresentation('Dialog')
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   const totalCards = page.locator('.filter-totals-stat')
   await expect(totalCards).toHaveCount(3)
   const totalCardBackgrounds = await totalCards.evaluateAll((cards) =>
@@ -737,7 +737,7 @@ test('presents the optimized booking workflow', async () => {
 test('routes new bookings through the configured dialog, flyout, and detached window', async () => {
   await chooseBookingEntryPresentation('Dialog')
 
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
   const dialog = page.locator('.quick-add-modal')
   await expect(dialog).toBeVisible()
@@ -746,7 +746,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
 
   await chooseBookingEntryPresentation('Kompakt-Flyout')
   await expect.poll(() => page.evaluate(() => localStorage.getItem('ui.bookingEntryPresentation'))).toBe('flyout')
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
@@ -776,7 +776,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
 
   await chooseBookingEntryPresentation('Eigenes Fenster')
   await expect.poll(() => page.evaluate(() => localStorage.getItem('ui.bookingEntryPresentation'))).toBe('detached')
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   const detachedWindowPromise = electronApp.waitForEvent('window')
   await page.locator('.fab-buchung').click()
   const detachedPage = await detachedWindowPromise
@@ -798,7 +798,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
   await bookingTabsSwitch.check()
   await expect(bookingTabsSwitch).toBeChecked()
 
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
 
   const flyout = page.locator('.compact-booking-flyout')
@@ -856,7 +856,7 @@ test('uses the booking FAB as a close toggle for compact entry without draft tab
   await chooseBookingEntryPresentation('Kompakt-Flyout')
   await expect(page.locator('#toggle-booking-draft-tabs')).not.toBeChecked()
 
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   const bookingFab = page.locator('.fab-buchung')
   const flyout = page.locator('.compact-booking-flyout')
 
@@ -875,7 +875,7 @@ test('uses the booking FAB as a close toggle for compact entry without draft tab
 
 test('saves a compact booking exactly once and keeps optional fields progressive', async () => {
   await chooseBookingEntryPresentation('Kompakt-Flyout')
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
 
   const flyout = page.locator('.compact-booking-flyout')
@@ -926,7 +926,7 @@ test('parks the compact draft while an existing booking is edited and restores i
   })
 
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await expect(page.getByText('Bestehende Buchung für Editorwechsel', { exact: true })).toBeVisible()
 
   await page.locator('.fab-buchung').click()
@@ -955,7 +955,7 @@ test('keeps expanded tags and comments separated in the detached booking window'
   await page.setViewportSize({ width: 1200, height: 780 })
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   if (await laterButton.isVisible()) await laterButton.click()
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
 
   const dialog = page.locator('.quick-add-modal')
@@ -1025,7 +1025,7 @@ test('distributes untouched budget amounts evenly and preserves manual values', 
   })
 
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
 
   const dialog = page.locator('.quick-add-modal')
@@ -1277,7 +1277,7 @@ test('Buchungen Plus shares draft tabs and the expanded editor with detached win
   await editor.getByRole('button', { name: 'Schließen', exact: true }).click()
   await closed
   await expect(tab).not.toContainText('abgedockt')
-  await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
+  await page.getByLabel('Buchungen', { exact: true }).click()
   await expect(page.locator('.booking-draft-tab').filter({ hasText: 'Entwurf Plus und Journal' })).toBeVisible()
 })
 
