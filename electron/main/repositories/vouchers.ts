@@ -1,3 +1,4 @@
+import { voucherAuditState } from './voucherAuditState'
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -637,7 +638,7 @@ export function listVouchersAdvanced(filters: {
     offset?: number
     sort?: 'ASC' | 'DESC'
     // Extended sort keys
-    sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
+    sortBy?: 'date' | 'description' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -719,12 +720,13 @@ export function listVouchersAdvanced(filters: {
     // Map sort key to SQL expression (include aliases from SELECT)
     const orderExpr = (() => {
         switch (sortBy) {
+            case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
             case 'gross': return 'v.gross_amount'
             case 'net': return 'v.net_amount'
             case 'attachments': return 'fileCount'
             case 'budget': return 'budgetLabel COLLATE NOCASE'
             case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'payment': return "COALESCE(paymentAccountName, v.payment_method, '') COLLATE NOCASE"
             case 'sphere': return 'v.sphere'
             case 'date': default: return 'v.date'
         }
@@ -742,7 +744,7 @@ export function listVouchersAdvancedPaged(filters: {
     hasFiles?: boolean
     sort?: 'ASC' | 'DESC'
     // Extended sort keys
-    sortBy?: 'date' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
+    sortBy?: 'date' | 'description' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -793,12 +795,13 @@ export function listVouchersAdvancedPaged(filters: {
     // Determine ORDER BY expression
     const orderExpr = (() => {
         switch (sortBy) {
+            case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
             case 'gross': return 'v.gross_amount'
             case 'net': return 'v.net_amount'
             case 'attachments': return 'fileCount'
             case 'budget': return 'budgetLabel COLLATE NOCASE'
             case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return 'v.payment_method COLLATE NOCASE'
+            case 'payment': return "COALESCE(paymentAccountName, v.payment_method, '') COLLATE NOCASE"
             case 'sphere': return 'v.sphere'
             case 'date': default: return 'v.date'
         }
@@ -1367,6 +1370,7 @@ export function updateVoucher(input: {
     // Capture tags before update for audit
     const beforeTags = getTagsForVoucher(input.id)
     const currentFull = { ...current, tags: beforeTags }
+    const auditStateBefore = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
 
     // System lock: cash-check vouchers are audit-relevant and must not be editable
     const cashCheckRef = d.prepare('SELECT id FROM cash_checks WHERE voucher_id = ? LIMIT 1').get(input.id) as any
@@ -1561,7 +1565,8 @@ export function updateVoucher(input: {
         `).get(input.id) as any
         const afterTags = getTagsForVoucher(input.id)
         const afterFull = { ...after, tags: afterTags }
-        writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
+        const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
+        if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
     } catch { /* ignore audit failures */ }
     return { id: input.id, warnings }
 }
@@ -1589,6 +1594,7 @@ export function updateVoucherMeta(input: {
     if (current.originalId) throw new Error('Stornobuchungen können nachträglich nicht geändert werden.')
     if (current.reversedById) throw new Error('Stornierte Buchungen können nachträglich nicht geändert werden.')
     const grossLimit = Math.abs(Number(current.grossAmount || 0))
+    const auditStateBefore = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
 
     const beforeFull = {
         ...current,
@@ -1666,7 +1672,8 @@ export function updateVoucherMeta(input: {
             budgets: getVoucherBudgets(input.id),
             earmarks: getVoucherEarmarks(input.id),
         }
-        writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE_META', { before: beforeFull, after: afterFull, changes: input })
+        const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
+        if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE_META', { before: beforeFull, after: afterFull, changes: input })
     } catch { /* ignore audit failures */ }
 
     return { id: input.id }

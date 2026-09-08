@@ -1,4 +1,6 @@
 import React from 'react'
+import { IconPlus, IconCalendar, IconWallet, IconCurrencyEuro, IconUser, IconTags, IconPaperclip, IconNotes, IconLink, IconReceipt2, IconArrowDownLeft, IconArrowUpRight, IconArrowsExchange, IconUsers, IconBulb, IconLayoutGrid, IconUpload } from '@tabler/icons-react'
+import './quickAddLayout.css'
 import TagsEditor from '../TagsEditor'
 import HoverTooltip from '../common/HoverTooltip'
 import PartySelector from '../common/PartySelector'
@@ -567,7 +569,12 @@ export default function QuickAddModal({
     }, [])
 
     React.useEffect(() => {
-        window.setTimeout(() => focusInput(amountInputRef.current), 0)
+        const timer = window.setTimeout(() => {
+            if ((modalRef.current?.clientWidth || 0) <= 950) {
+                modalRef.current?.querySelector<HTMLButtonElement>('.booking-kind-switch button[aria-pressed="true"]')?.focus({ preventScroll: true })
+            } else focusInput(amountInputRef.current)
+        }, 0)
+        return () => window.clearTimeout(timer)
     }, [focusInput])
 
     const clampDragOffset = React.useCallback((x: number, y: number) => {
@@ -696,7 +703,7 @@ export default function QuickAddModal({
         >
             <div
                 ref={modalRef}
-                className={`modal booking-modal quick-add-modal booking-modal--type-${qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}`}
+                className={`modal booking-modal quick-add-modal booking-editor booking-modal--type-${qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}`}
                 onClick={(e) => e.stopPropagation()}
                 style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
@@ -708,19 +715,7 @@ export default function QuickAddModal({
                     onPointerUp={endDrag}
                     onPointerCancel={endDrag}
                 >
-                    <h2>{title || '+ Buchung'}</h2>
-                    <BookingKindSwitch
-                        className="booking-kind-switch"
-                        value={qa.type}
-                        ariaLabel="Buchungsart wählen"
-                        options={[
-                            { value: 'IN', label: 'Einnahme' },
-                            { value: 'OUT', label: 'Ausgabe' },
-                            { value: 'TRANSFER', label: 'Umbuchung' },
-                            { value: 'INTERNAL', label: 'Intern' }
-                        ]}
-                        onChange={(value) => selectBookingType(value as QA['type'])}
-                    />
+                    <div className="booking-editor-title"><span className="booking-editor-title-icon"><IconPlus size={23} /></span><div><h2>{title || 'Neue Buchung'}</h2><p>Erfasse eine Einnahme, Ausgabe, Umbuchung oder interne Buchung.</p></div></div>
                     <div className="booking-modal-header-actions">
                         {onDetach && (
                             <button className="btn ghost booking-modal-icon-btn" type="button" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
@@ -770,29 +765,35 @@ export default function QuickAddModal({
                     className="quick-add-form"
                     onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) handleSave(); }}
                 >
+                    <BookingKindSwitch
+                        className="booking-kind-switch"
+                        value={qa.type}
+                        ariaLabel="Buchungsart wählen"
+                        options={[
+                            { value: 'IN', label: 'Einnahme', icon: <IconArrowDownLeft size={18} /> },
+                            { value: 'OUT', label: 'Ausgabe', icon: <IconArrowUpRight size={18} /> },
+                            { value: 'TRANSFER', label: 'Umbuchung', icon: <IconArrowsExchange size={18} /> },
+                            { value: 'INTERNAL', label: 'Intern', icon: <IconUsers size={18} /> }
+                        ]}
+                        onChange={(value) => selectBookingType(value as QA['type'])}
+                    />
+
                     {/* Live Summary */}
                     <div className={`summary-card booking-ai-summary ${aiSuggestions.length ? 'booking-ai-summary--active' : ''}`}>
                         <div className="booking-ai-summary__main">
-                            <div className="summary-text-bold">
-                                {(() => {
-                                    const date = fmtDate(qa.date)
-                                    const type = qa.type
-                                    const pm = qa.type === 'TRANSFER'
-                                        ? `${(qa as any).transferFromAccountName || paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.name || paymentMethodLabel((qa as any).transferFrom)} → ${(qa as any).transferToAccountName || paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.name || paymentMethodLabel((qa as any).transferTo)}`
-                                        : qa.type === 'INTERNAL'
-                                            ? 'Intern'
-                                            : ((qa as any).paymentAccountName || paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.name || 'Konto fehlt')
-                                    const amount = (() => {
-                                        if (qa.type === 'TRANSFER') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                        if ((qa as any).mode === 'GROSS') return eurFmt.format(Number((qa as any).grossAmount || 0))
-                                        const n = Number(qa.netAmount || 0); const v = Number(qa.vatRate || 0); const g = Math.round((n * (1 + v / 100)) * 100) / 100
-                                        return eurFmt.format(g)
-                                    })()
-                                    const sphere = qa.sphere
-                                    const amountColor = type === 'IN' ? 'var(--success)' : type === 'OUT' ? 'var(--danger)' : 'inherit'
-                                    return <>{BOOKING_TYPE_LABELS[type]} · <span style={{ color: amountColor }}>{amount}</span> · {pm} · {date}{type !== 'TRANSFER' ? ` · ${SPHERE_LABELS[sphere]}` : ''}</>
-                                })()}
+                            <div className="booking-overview-heading"><IconReceipt2 size={21} /><div><h3>Buchungsübersicht</h3><p>Deine Eingaben auf einen Blick</p></div></div>
+                            <div className="booking-overview-card">
+                                <div className="booking-overview-type"><span className="booking-overview-type-icon">{qa.type === 'IN' ? <IconArrowDownLeft size={26} /> : qa.type === 'OUT' ? <IconArrowUpRight size={26} /> : <IconArrowsExchange size={26} />}</span><div><strong>{BOOKING_TYPE_LABELS[qa.type]}</strong><small>{qa.type !== 'TRANSFER' ? (primaryClassification?.profile === 'GENERAL' ? primaryClassification.values.find(value => value.id === qa.primaryClassificationValueId)?.name || 'Kategorie wählen' : SPHERE_LABELS[qa.sphere]) : 'Zwischen zwei Konten'}</small></div></div>
+                                <dl className="booking-overview-facts">
+                                    <div><dt><IconCalendar size={16} />Datum</dt><dd>{fmtDate(qa.date)}</dd></div>
+                                    <div><dt><IconWallet size={16} />{qa.type === 'TRANSFER' ? 'Konten' : 'Konto'}</dt><dd className="booking-overview-account">{qa.type === 'TRANSFER' ? <><span style={{ color: paymentAccountsById.get(Number(qa.transferFromAccountId))?.color || undefined }}>{qa.transferFromAccountName || paymentAccountsById.get(Number(qa.transferFromAccountId))?.name || paymentMethodLabel(qa.transferFrom)}</span> → <span style={{ color: paymentAccountsById.get(Number(qa.transferToAccountId))?.color || undefined }}>{qa.transferToAccountName || paymentAccountsById.get(Number(qa.transferToAccountId))?.name || paymentMethodLabel(qa.transferTo)}</span></> : qa.type === 'INTERNAL' ? 'Intern' : <span style={{ color: financeAccountColor }}>{qa.paymentAccountName || paymentAccountsById.get(Number(qa.paymentAccountId))?.name || 'Nicht ausgewählt'}</span>}</dd></div>
+                                    <div className="booking-overview-amount"><dt><IconCurrencyEuro size={16} />Betrag (brutto)</dt><dd>{eurFmt.format(qa.type === 'TRANSFER' || qa.mode === 'GROSS' ? Number(qa.grossAmount || 0) : Math.round(Number(qa.netAmount || 0) * (1 + Number(qa.vatRate || 0) / 100) * 100) / 100)}</dd></div>
+                                    {(qa.type === 'IN' || qa.type === 'OUT') && <div><dt><IconUser size={16} />Geschäftspartner</dt><dd>{qa.counterparty || 'Nicht angegeben'}</dd></div>}
+                                    <div><dt><IconTags size={16} />Tags</dt><dd className="booking-overview-tags">{qa.tags?.length ? qa.tags.map(tag => { const background = resolveTagDisplayColor(tag, tagDefs); return <span className="booking-overview-tag" key={tag} style={{ background: background || undefined, color: getContrastTextColor(background) }}>{tag}</span> }) : 'Keine'}</dd></div>
+                                    <div><dt><IconPaperclip size={16} />Anhänge</dt><dd>{files.length + existingFiles.length || 'Keine'}</dd></div>
+                                </dl>
                             </div>
+                            <div className="booking-overview-tip"><IconBulb size={20} /><p>{qa.type === 'INTERNAL' ? 'Quelle und Ziel müssen ausgeglichen sein: Quelle negativ, Ziel positiv zuordnen.' : qa.type === 'TRANSFER' ? 'Wähle das abgebende und das empfangende Konto. Eine Umbuchung verändert den Gesamtsaldo nicht.' : 'Wähle Brutto für den Gesamtbetrag oder Netto mit dem passenden Steuersatz. Die Umrechnung erfolgt automatisch.'}</p></div>
                         </div>
                         {aiSuggestions.length > 0 && (
                             <div className="booking-ai-assist" ref={aiAssistRef}>
@@ -994,7 +995,7 @@ export default function QuickAddModal({
                     <div className="block-grid block-grid-mb booking-primary-grid">
                         {/* Block A – Basisinfos */}
                         <div className="form-card">
-                            <div className="helper helper-mb">Basis</div>
+                            <h3 className="booking-editor-section-title"><IconCalendar size={18} />Grunddaten<span>Datum, Bereich und Konto auswählen</span></h3>
                             <div className="row booking-basis-fields">
                                 <div className={`field booking-floating-field${qa.date ? ' booking-floating-field--filled' : ''}`}>
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
@@ -1155,7 +1156,7 @@ export default function QuickAddModal({
 
                         {/* Block B – Finanzdetails */}
                         <div className="form-card card-finance" style={{ '--booking-account-color': financeAccountColor || 'var(--accent)' } as React.CSSProperties}>
-                            <div className="helper helper-mb">Finanzen</div>
+                            <h3 className="booking-editor-section-title"><IconCurrencyEuro size={18} />Betrag & Geschäftspartner</h3>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
                                     <div className="field field-full-width finance-amount-highlight">
@@ -1265,7 +1266,7 @@ export default function QuickAddModal({
                         </div>
                     </div>
 
-                    <div className="form-card booking-description-card">
+                    <div className="form-card booking-description-card"><h3 className="booking-editor-section-title"><IconNotes size={18} />Beschreibung</h3>
                         <div className="field field-full-width booking-floating-field booking-floating-field--filled">
                             <label htmlFor="quick-add-description">Beschreibung</label>
                             <SuggestionInput
@@ -1281,7 +1282,7 @@ export default function QuickAddModal({
                     <div className={`form-card booking-assignments-card${qa.type === 'INTERNAL' ? ' booking-assignments-card--required' : ''}`}>
                         <div className="booking-section-heading">
                             <div>
-                                <strong>Zuordnungen</strong>
+                                <strong className="booking-editor-section-title"><IconLink size={18} />Zuordnungen</strong>
                                 <div className="helper">Optional für Einnahmen und Ausgaben, erforderlich für interne Buchungen.</div>
                             </div>
                             {(budgetsList.length > 0 || earmarksList.length > 0) && (
@@ -1510,12 +1511,12 @@ export default function QuickAddModal({
                             </div>
                         </div>
 
-                    <div className="block-grid block-grid-mb booking-secondary-grid">
+                    <div className="block-grid block-grid-mb booking-secondary-grid"><h3 className="booking-editor-section-title"><IconLayoutGrid size={18} />Weitere Informationen</h3>
                         <div className="form-card booking-optional-card">
                             <details className="booking-details">
                                 <summary>
                                     <span className="booking-details__heading">
-                                        <span>Tags</span>
+                                        <span className="booking-editor-field-title"><IconTags size={16} />Tags</span>
                                         {((qa as any).tags || []).length > 0 && (
                                             <>
                                                 <span className="badge booking-tag-count">{((qa as any).tags || []).length}</span>
@@ -1553,7 +1554,7 @@ export default function QuickAddModal({
                             </details>
                             <details className="booking-details">
                                 <summary>
-                                    <span>Kommentar</span>
+                                    <span className="booking-editor-field-title"><IconNotes size={16} />Kommentar</span>
                                     {(qa as any).note && (
                                         <span className="booking-comment-preview" title={(qa as any).note}>
                                             {(qa as any).note}
@@ -1580,7 +1581,7 @@ export default function QuickAddModal({
                         >
                             <div className="attachment-header">
                                 <div className="attachment-title">
-                                    <strong>Anhänge</strong>
+                                    <strong className="booking-editor-field-title"><IconPaperclip size={16} />Anhänge</strong>
                                     {hasAnyAttachment && <div className="helper">Dateien hierher ziehen</div>}
                                 </div>
                                 <div className="attachment-actions attachment-actions--header">
@@ -1627,7 +1628,7 @@ export default function QuickAddModal({
                                 </ul>
                             ) : (
                                 <div className="quick-add-dropzone" onClick={openFilePicker}>
-                                    <div className="quick-add-dropzone__icon">📎</div>
+                                    <div className="quick-add-dropzone__icon"><IconUpload size={24} /></div>
                                     <div className="helper">Dateien hierher ziehen oder klicken</div>
                                 </div>
                             )}

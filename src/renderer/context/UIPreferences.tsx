@@ -323,6 +323,9 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
+  const [bookingView, setBookingView] = useState<'classic' | 'plus'>(() => localStorage.getItem('ui.bookingView') === 'plus' ? 'plus' : 'classic')
+  useEffect(() => { safeLocalStorageSet('ui.bookingView', bookingView) }, [bookingView])
+
   const [showBookingDraftTabs, setShowBookingDraftTabs] = useState<boolean>(() => {
     const stored = localStorage.getItem('ui.showBookingDraftTabs')
     return stored === 'true' // default false
@@ -478,6 +481,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         setJournalRowStyle,
         journalRowDensity,
         setJournalRowDensity,
+        bookingView,
+        setBookingView,
         showBookingDraftTabs,
         setShowBookingDraftTabs,
         showBookingEditTabs,

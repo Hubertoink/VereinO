@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
+import SelectDropdown from '../common/SelectDropdown'
 import TagsEditor from '../TagsEditor'
 import ReceiptThumbnail, { type ReceiptPreviewCache } from '../ReceiptThumbnail'
 import AppIcon from '../common/AppIcon'
@@ -70,6 +71,8 @@ interface VoucherInfoModalProps {
   }) => Promise<void> | void
   windowMode?: boolean
   suspended?: boolean
+  embedded?: boolean
+  initialEditing?: boolean
 }
 
 const IconEdit = ({ size = 28 }: { size?: number }) => (
@@ -88,7 +91,7 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
   </svg>
 )
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false }: VoucherInfoModalProps) {
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
   const previewCache = useRef<ReceiptPreviewCache>(new Map())
   const [previewRevision, setPreviewRevision] = useState(0)
@@ -167,7 +170,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     ? enrichedEarmarks.map(e => e.code).join(', ') 
     : '-'
   const tagsDisplay = voucher.tags && voucher.tags.length > 0 ? voucher.tags.join(', ') : '-'
-  const [editingMeta, setEditingMeta] = useState(false)
+  const [editingMeta, setEditingMeta] = useState(initialEditing)
   const [savingMeta, setSavingMeta] = useState(false)
   const [metaNote, setMetaNote] = useState(voucher.note || '')
   const [metaBudgets, setMetaBudgets] = useState<Array<{ budgetId: number; amount: number }>>([])
@@ -192,8 +195,8 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     setMetaEarmarks(earmarkAssignments.map((e) => ({ earmarkId: e.earmarkId, amount: Number(e.amount || voucher.grossAmount || 0) })))
     setMetaTags(voucher.tags || [])
     setMetaError('')
-    setEditingMeta(false)
-  }, [voucher.id])
+    setEditingMeta(initialEditing)
+  }, [voucher.id, initialEditing])
 
   const availableBudgets = useMemo(() => (budgets || []).filter((budget) => !budget?.isArchived), [budgets])
   const availableEarmarks = useMemo(() => (earmarks || []).filter((earmark) => earmark?.isActive !== 0 && earmark?.isActive !== false), [earmarks])
@@ -274,7 +277,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
 
   // Only the active dialog handles Escape; keep drafts while attachments are open.
   useEffect(() => {
-    if (suspended) return
+    if (suspended || embedded) return
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -283,7 +286,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose, suspended])
+  }, [onClose, suspended, embedded])
 
   // Kopier-Funktionen
   const copyAsText = () => {
@@ -322,11 +325,11 @@ Status: ${statusLabel}`
     })
   }
 
-  return createPortal(
+  const content = (
     <div
-      className={`modal-overlay voucher-info-modal-overlay${windowMode ? ' voucher-info-modal-overlay--window' : ''}`}
-      role="dialog"
-      aria-modal="true"
+      className={embedded ? 'voucher-info-embedded' : `modal-overlay voucher-info-modal-overlay${windowMode ? ' voucher-info-modal-overlay--window' : ''}`}
+      role={embedded ? 'region' : 'dialog'}
+      aria-modal={embedded ? undefined : true}
       aria-labelledby="voucher-info-heading"
       onMouseDown={(e) => {
         if (windowMode) {
@@ -340,7 +343,7 @@ Status: ${statusLabel}`
           return
         }
       }}
-      style={{
+      style={embedded ? undefined : {
         position: 'fixed',
         inset: 0,
         display: suspended ? 'none' : 'flex',
@@ -358,7 +361,7 @@ Status: ${statusLabel}`
         className={`modal voucher-info-modal${windowMode ? ' voucher-info-modal--window' : ''}`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        style={{
+        style={embedded ? undefined : {
           width: windowMode ? '100vw' : 'min(680px, 96vw)',
           height: windowMode ? '100dvh' : undefined,
           maxHeight: windowMode ? '100dvh' : '92vh',
@@ -387,7 +390,7 @@ Status: ${statusLabel}`
               <AppIcon icon={IconReceipt2} size="action" />
               <span>Buchungsdetails</span>
             </h2>
-            <p className="voucher-info-subtitle">Alle Informationen zu dieser Buchung</p>
+            <p className="voucher-info-subtitle">{embedded ? 'Budget, Zweckbindung, Tags und Kommentar bearbeiten' : 'Alle Informationen zu dieser Buchung'}</p>
           </div>
           <div className={windowMode ? 'booking-modal-header-actions' : undefined} style={windowMode ? ({ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' } as React.CSSProperties) : { display: 'flex', alignItems: 'center', gap: 8 }}>
             {editingMeta ? (
@@ -475,23 +478,22 @@ Status: ${statusLabel}`
               {editingMeta ? (
                 <div style={{ display: 'grid', gap: 8 }}>
                   {metaBudgets.map((item, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px auto', gap: 8, alignItems: 'center', minWidth: 0 }}>
-                      <select
-                        className="input"
-                        style={!item.budgetId ? { borderColor: 'var(--danger)' } : undefined}
-                        value={item.budgetId || ''}
-                        onChange={(e) => {
+                    <div key={idx} className="voucher-info-assignment-editor" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px auto', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                      <SelectDropdown
+                        ariaLabel="Budget wählen"
+                        placeholder="Budget wählen"
+                        invalid={!item.budgetId}
+                        value={item.budgetId ? String(item.budgetId) : ''}
+                        onChange={(value) => {
                           const next = [...metaBudgets]
-                          next[idx] = { ...next[idx], budgetId: Number(e.target.value) }
+                          next[idx] = { ...next[idx], budgetId: Number(value) }
                           setMetaBudgets(next)
                         }}
-                      >
-                        <option value="">Budget wählen</option>
-                        {item.budgetId && !availableBudgets.some((budget) => budget.id === item.budgetId) ? (
-                          <option value={item.budgetId}>{`Aktuelles archiviertes Budget #${item.budgetId}`}</option>
-                        ) : null}
-                        {availableBudgets.map((b) => <option key={b.id} value={b.id}>{b.label || `#${b.id}`}</option>)}
-                      </select>
+                        options={[
+                          ...(item.budgetId && !availableBudgets.some(entry => entry.id === item.budgetId) ? [{ value: String(item.budgetId), label: `Aktuelles archiviertes Budget #${item.budgetId}` }] : []),
+                          ...availableBudgets.map(item => ({ value: String(item.id), label: item.label || `#${item.id}`, color: item.color || undefined }))
+                        ]}
+                      />
                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
                         <input
                           className="input"
@@ -509,7 +511,7 @@ Status: ${statusLabel}`
                         />
                         <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>€</span>
                       </div>
-                      <button className="btn ghost" type="button" onClick={() => setMetaBudgets(metaBudgets.filter((_, i) => i !== idx))}>Entfernen</button>
+                      <button className="btn ghost voucher-info-assignment-remove" type="button" aria-label="Budgetzuordnung entfernen" title="Budgetzuordnung entfernen" onClick={() => setMetaBudgets(metaBudgets.filter((_, i) => i !== idx))}><IconX size={18} stroke={2.5} /></button>
                     </div>
                   ))}
                   <button className="btn" type="button" style={{ justifySelf: 'start' }} onClick={() => setMetaBudgets([...metaBudgets, { budgetId: 0, amount: Math.abs(Number(voucher.grossAmount || 0)) }])}>+ Budget</button>
@@ -552,23 +554,22 @@ Status: ${statusLabel}`
               {editingMeta ? (
                 <div style={{ display: 'grid', gap: 8 }}>
                   {metaEarmarks.map((item, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px auto', gap: 8, alignItems: 'center', minWidth: 0 }}>
-                      <select
-                        className="input"
-                        style={!item.earmarkId ? { borderColor: 'var(--danger)' } : undefined}
-                        value={item.earmarkId || ''}
-                        onChange={(e) => {
+                    <div key={idx} className="voucher-info-assignment-editor" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px auto', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                      <SelectDropdown
+                        ariaLabel="Zweckbindung wählen"
+                        placeholder="Zweckbindung wählen"
+                        invalid={!item.earmarkId}
+                        value={item.earmarkId ? String(item.earmarkId) : ''}
+                        onChange={(value) => {
                           const next = [...metaEarmarks]
-                          next[idx] = { ...next[idx], earmarkId: Number(e.target.value) }
+                          next[idx] = { ...next[idx], earmarkId: Number(value) }
                           setMetaEarmarks(next)
                         }}
-                      >
-                        <option value="">Zweckbindung wählen</option>
-                        {item.earmarkId && !availableEarmarks.some((earmark) => earmark.id === item.earmarkId) ? (
-                          <option value={item.earmarkId}>{`Aktuelle inaktive Zweckbindung #${item.earmarkId}`}</option>
-                        ) : null}
-                        {availableEarmarks.map((em) => <option key={em.id} value={em.id}>{em.code} - {em.name}</option>)}
-                      </select>
+                        options={[
+                          ...(item.earmarkId && !availableEarmarks.some(entry => entry.id === item.earmarkId) ? [{ value: String(item.earmarkId), label: `Aktuelle inaktive Zweckbindung #${item.earmarkId}` }] : []),
+                          ...availableEarmarks.map(item => ({ value: String(item.id), label: `${item.code} - ${item.name}`, color: item.color || undefined }))
+                        ]}
+                      />
                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
                         <input
                           className="input"
@@ -586,7 +587,7 @@ Status: ${statusLabel}`
                         />
                         <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>€</span>
                       </div>
-                      <button className="btn ghost" type="button" onClick={() => setMetaEarmarks(metaEarmarks.filter((_, i) => i !== idx))}>Entfernen</button>
+                      <button className="btn ghost voucher-info-assignment-remove" type="button" aria-label="Zweckbindungzuordnung entfernen" title="Zweckbindungzuordnung entfernen" onClick={() => setMetaEarmarks(metaEarmarks.filter((_, i) => i !== idx))}><IconX size={18} stroke={2.5} /></button>
                     </div>
                   ))}
                   <button className="btn" type="button" style={{ justifySelf: 'start' }} onClick={() => setMetaEarmarks([...metaEarmarks, { earmarkId: 0, amount: Math.abs(Number(voucher.grossAmount || 0)) }])}>+ Zweckbindung</button>
@@ -697,7 +698,7 @@ Status: ${statusLabel}`
               <span>Stornieren</span>
             </button>
           ) : null}
-          <button className="btn voucher-info-footer__button" onClick={copyAsText}>
+          <button className="btn voucher-info-footer__button voucher-info-copy-btn" onClick={copyAsText}>
             <AppIcon icon={IconClipboardText} size="action" />
             <span>Als Text kopieren</span>
           </button>
@@ -705,14 +706,15 @@ Status: ${statusLabel}`
             <AppIcon icon={IconTableExport} size="action" />
             <span>Für Excel kopieren</span>
           </button>
-          {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
+          {embedded && <button className="btn" disabled={savingMeta} onClick={onClose}>Abbrechen</button>}
+          {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{!embedded && (editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />)}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 
         <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 0, fontSize: 11, textAlign: 'center' }}>
           Esc = Schließen
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   )
+  return embedded ? content : createPortal(content, document.body)
 }

@@ -3,6 +3,8 @@ import HoverTooltip from '../../../components/common/HoverTooltip'
 import ReceiptWidgetSettings from '../components/ReceiptWidgetSettings'
 
 export function WorkflowPane({
+  bookingView,
+  setBookingView,
   showBookingDraftTabs,
   setShowBookingDraftTabs,
   showBookingEditTabs,
@@ -26,6 +28,17 @@ export function WorkflowPane({
           </div>
 
           <div className="settings-layout-grid settings-layout-grid--wide">
+            <div className="settings-layout-control">
+              <div className="settings-layout-label-row">
+                <label>Buchungsansicht</label>
+                <span>Wähle die Buchungsseite für Navigation und Verweise auf Buchungen.</span>
+              </div>
+              <div className="btn-group" role="group" aria-label="Buchungsansicht">
+                <button type="button" className={`btn-option ${bookingView === 'classic' ? 'active' : ''}`} aria-pressed={bookingView === 'classic'} onClick={() => setBookingView('classic')}>Buchungen (klassisch)</button>
+                <button type="button" className={`btn-option ${bookingView === 'plus' ? 'active' : ''}`} aria-pressed={bookingView === 'plus'} onClick={() => setBookingView('plus')}>Buchungen Plus</button>
+              </div>
+              <div className="helper">{bookingView === 'plus' ? 'Kalender, Filter und Buchungsdetails nebeneinander.' : 'Kompakte Tabelle mit allen Buchungen.'}</div>
+            </div>
             <label className="settings-toggle-card" htmlFor="toggle-booking-draft-tabs">
               <span className="settings-toggle-card__copy">
                 <strong>Buchungsreiter</strong>

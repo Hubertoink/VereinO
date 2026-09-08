@@ -36,9 +36,9 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
     return { key: r.key, gross: r.gross, frac, start, end }
   })
   return (
-    <div className="card report-chart-card dither-chart-card">
-      <div className="report-chart-header">
-        <strong>Nach Sphäre</strong>
+    <div className="dp-card report-chart-card">
+      <div className="dp-card-heading report-chart-header">
+        <h2>Verteilung nach Sphäre</h2>
         <div className="legend-container">
           <div className="legend">
             {rows.map(r => (

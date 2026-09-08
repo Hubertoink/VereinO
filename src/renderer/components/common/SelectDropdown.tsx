@@ -106,7 +106,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false) }
           if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             setOpen(true)
@@ -123,7 +123,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
         <span className="select-dropdown__chevron" aria-hidden="true" />
       </button>
       {open && menuPosition && createPortal(
-        <div ref={menuRef} className="select-dropdown__menu select-dropdown__menu--portal" style={menuPosition} role="listbox">
+        <div ref={menuRef} className="select-dropdown__menu select-dropdown__menu--portal" style={menuPosition} role="listbox" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus() } }}>
           {options.map((option) => (
             <button
               key={option.value}

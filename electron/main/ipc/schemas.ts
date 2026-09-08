@@ -104,7 +104,7 @@ export const VouchersListInput = z
     sort: z.enum(['ASC', 'DESC']).optional(),
     // New sortable columns for Buchungen
     sortBy: z
-      .enum(['date', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere'])
+      .enum(['date', 'description', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere'])
       .optional(),
     paymentMethod: PaymentMethod.optional(),
     paymentAccountId: z.number().nullable().optional(),
@@ -763,6 +763,7 @@ export const AdvancesListOutput = z.object({
       amount: z.number(),
       settledAmount: z.number(),
       purchaseAmount: z.number().optional(),
+      spentAmount: z.number().optional(),
       openAmount: z.number(),
       settlementCount: z.number(),
       purchaseCount: z.number().optional(),

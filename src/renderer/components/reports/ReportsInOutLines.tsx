@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sphere, PaymentMethod } from './types'
 
 export default function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
@@ -9,9 +9,6 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [containerW, setContainerW] = useState<number>(0)
-  const ditherId = useId().replace(/:/g, '')
-  const incomeAuraId = `in-line-aura-${ditherId}`
-  const expenseAuraId = `out-line-aura-${ditherId}`
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -30,7 +27,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     const t1 = setTimeout(measure, 120)
     const t2 = setTimeout(measure, 360)
     return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVis); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
-  }, [])
+  }, [loading])
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -60,7 +57,7 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
   const months = Array.from(new Set([...(inBuckets.map(b => b.month)), ...(outBuckets.map(b => b.month))])).sort()
   const maxVal = Math.max(1, ...months.map(m => Math.max(Math.abs(inBuckets.find(b => b.month === m)?.gross || 0), Math.abs(outBuckets.find(b => b.month === m)?.gross || 0))))
-  const margin = { top: 22, right: 22, bottom: 42, left: 60 }
+  const margin = { top: 22, right: 35, bottom: 48, left: 100 }
   const innerH = 188
   const height = innerH + margin.top + margin.bottom
   let baseStep = 54
@@ -69,9 +66,9 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
   let step = baseStep
   if (containerW && months.length > 1) {
     const innerW = width - (margin.left + margin.right)
-    step = Math.max(40, Math.min(140, Math.floor(innerW / (months.length - 1))))
+    step = innerW / (months.length - 1)
   }
-  const xFor = (idx: number) => margin.left + idx * step
+  const xFor = (idx: number) => months.length === 1 ? (margin.left + width - margin.right) / 2 : margin.left + idx * step
   const yFor = (val: number) => margin.top + (innerH - Math.round((Math.abs(val) / maxVal) * innerH))
   const monthLabel = (m: string, withYear = false) => {
     const [y, mm] = m.split('-').map(Number)
@@ -109,17 +106,17 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     return arr
   })()
   return (
-    <div className="card report-chart-card dither-chart-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Linienverlauf Einnahmen (IN) vs. Ausgaben (OUT) – Brutto</strong>
+    <div className="dp-card report-chart-card">
+      <div className="dp-card-heading report-chart-header">
+        <h2>Einnahmen & Ausgaben im Vergleich</h2>
         <div className="legend">
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-in"></span>Einnahmen</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-out"></span>Ausgaben</span>
         </div>
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div ref={containerRef} style={{ overflowX: 'hidden', position: 'relative', width: '100%' }}>
+        <div ref={containerRef} className="report-chart-scroll">
           {(() => {
             const idx = (typeof hoverIdx === 'number' ? hoverIdx : null)
             if (idx == null) return null
@@ -129,18 +126,14 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
             const gx = xFor(idx)
             const tooltipX = (gx / width) * 100
             return (
-              <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12, zIndex: 10 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabel(m, true)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(inn)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(out))}</strong></div>
+              <div className="report-chart-tooltip" style={{ left: `clamp(0px, calc(${tooltipX}% - 120px), max(0px, 100% - 240px))` }}>
+                <strong>{monthLabel(m, true)}</strong>
+                <div><span>Einnahmen</span><b>{eurFmt.format(inn)}</b></div>
+                <div><span>Ausgaben</span><b>{eurFmt.format(Math.abs(out))}</b></div>
               </div>
             )
           })()}
           <svg width={width} height={height} role="img" aria-label="IN vs OUT">
-            <defs>
-              <filter id={incomeAuraId} x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
-              <filter id={expenseAuraId} x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
-            </defs>
             {/* Y-Achse Grid + Labels */}
             {yTicks.map((v, i) => (
               <g key={i}>
@@ -148,10 +141,8 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                 <text x={margin.left - 6} y={yFor(v) + 4} fill="var(--text-dim)" fontSize={11} fontWeight={500} textAnchor="end">{eurFmt.format(v)}</text>
               </g>
             ))}
-            <polyline fill="none" stroke="var(--success)" strokeWidth="6" opacity="0.22" filter={`url(#${incomeAuraId})`} points={points(inBuckets)} />
-            <polyline fill="none" stroke="var(--danger)" strokeWidth="6" opacity="0.2" filter={`url(#${expenseAuraId})`} points={points(outBuckets)} />
-            <polyline fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={points(inBuckets)} />
-            <polyline fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 5" points={points(outBuckets)} />
+            <polyline fill="none" stroke="var(--dp-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points(inBuckets)} />
+            <polyline fill="none" stroke="var(--dp-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" points={points(outBuckets)} />
             {months.map((m, i) => (
               <g key={m} style={{ cursor: 'pointer' }}>
                 {(() => {
@@ -171,13 +162,13 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                       }} />
                   )
                 })()}
-                <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--success)">
+                <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--dp-accent)">
                   <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(inBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
                 </circle>
-                <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--danger)">
+                <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--dp-amber)">
                   <title>{`OUT ${monthLabel(m, true)}: ${eurFmt.format(outBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
                 </circle>
-                <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, false)}</text>
+                <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, years.length > 1)}</text>
               </g>
             ))}
             {yearText && (

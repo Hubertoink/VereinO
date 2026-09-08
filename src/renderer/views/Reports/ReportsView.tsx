@@ -1,4 +1,6 @@
 import React from 'react'
+import '../DashboardPlus/dashboardPlus.css'
+import './reports.css'
 import { Sphere, VoucherType, PaymentMethod } from '../../components/reports/types'
 import ReportsSummary from '../../components/reports/ReportsSummary'
 import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
@@ -159,10 +161,10 @@ export default function ReportsView(props: {
   }
 
   return (
-    <>
-      <header className="flex justify-between items-center mb-16">
+    <div className="dashboard-plus reports-plus">
+      <header className="dp-page-heading">
         <div>
-          <h1 style={{ margin: 0 }}>Report</h1>
+          <h1>Report</h1>
           <p className="helper">Auswertungen für den gewählten Zeitraum und die Filter.</p>
         </div>
 
@@ -300,7 +302,7 @@ export default function ReportsView(props: {
         <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
         <ReportsInOutLines activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
-    </>
+    </div>
   )
 }
 

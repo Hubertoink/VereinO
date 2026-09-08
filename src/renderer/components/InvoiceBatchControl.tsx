@@ -31,8 +31,10 @@ export default function InvoiceBatchControl({
   onNewInvoice,
   onReview,
   notify,
-  paymentAccounts
+  paymentAccounts,
+  variant = 'floating'
 }: {
+  variant?: 'floating' | 'inline'
   onNewInvoice: (file: File, guidance?: InvoiceAiGuidance) => void | Promise<void>
   onReview: (id: number) => void
   notify: (type: 'success' | 'error' | 'info' | 'warn', text: string) => void
@@ -194,7 +196,7 @@ export default function InvoiceBatchControl({
 
   return (
     <div
-      className={`invoice-batch-control${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
+      className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
       onDragEnter={(event) => {
         event.preventDefault()
         if (singleOpen) setSingleDragging(true)
@@ -216,10 +218,11 @@ export default function InvoiceBatchControl({
         setDragging(false)
         setSingleDragging(false)
         const files = Array.from(event.dataTransfer.files)
-        if (singleOpen) openSingleInvoice(files)
+        if (singleOpen || (variant === 'inline' && !open && files.length === 1)) openSingleInvoice(files)
         else void importFiles(files)
       }}
     >
+      {variant === 'inline' && <span className="invoice-inline-hint"><strong>Belege auslesen</strong><small>PDF(s) oder Bilder hierher ziehen</small></span>}
       <div className="invoice-split-fab" role="group" aria-label="Rechnungen erfassen">
         <button
           className="invoice-split-fab__new"
@@ -235,7 +238,7 @@ export default function InvoiceBatchControl({
           title="Einzelne Rechnung erfassen"
           aria-expanded={singleOpen}
         >
-          <span aria-hidden="true">+</span><span className="invoice-split-fab__label">Rechnung</span>
+          <span aria-hidden="true">+</span><span className="invoice-split-fab__label">{variant === 'inline' ? 'Beleg auslesen' : 'Rechnung'}</span>
         </button>
         <button
           className="invoice-split-fab__batch"
@@ -254,6 +257,7 @@ export default function InvoiceBatchControl({
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M7 2h7l4 4v16H7z"/><path d="M14 2v5h5M10 13h5M12.5 10.5v5"/>
           </svg>
+          {variant === 'inline' && <span>Batch-KI</span>}
           {rows.length > 0 && <span className="invoice-split-fab__badge">{rows.length}</span>}
         </button>
       </div>

@@ -1,3 +1,4 @@
+import DateFilterInput from '../common/DateFilterInput'
 import React, { useEffect, useState } from 'react'
 
 export default function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
@@ -22,11 +23,11 @@ export default function TimeFilterModal({ open, onClose, yearsAvail, from, to, o
         <div className="row">
           <div className="field">
             <label>Von</label>
-            <input className="input" type="date" value={f} onChange={(e) => setF(e.target.value)} />
+            <DateFilterInput label="Von" value={f} onChange={setF} />
           </div>
           <div className="field">
             <label>Bis</label>
-            <input className="input" type="date" value={t} onChange={(e) => setT(e.target.value)} />
+            <DateFilterInput label="Bis" value={t} onChange={setT} />
           </div>
           <div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Schnellauswahl Jahr</label>

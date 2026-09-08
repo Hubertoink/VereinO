@@ -46,6 +46,7 @@ import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
+const BookingsPlusView = lazy(() => import('./views/BookingsPlus/BookingsPlusView'))
 const RecurringBookingsView = lazy(() => import('./views/RecurringBookings/RecurringBookingsView'))
 const TagsManagerModal = lazy(() => import('./components/modals/TagsManagerModal'))
 const AutoBackupPromptModal = lazy(() => import('./components/modals/AutoBackupPromptModal'))
@@ -59,7 +60,7 @@ const SetupWizardModal = lazy(() => import('./components/modals/SetupWizardModal
 const SettingsView = lazy(() =>
   import('./views/Settings/SettingsView').then((module) => ({ default: module.SettingsView }))
 )
-const DashboardView = lazy(() => import('./views/Dashboard/DashboardView'))
+const DashboardPlusView = lazy(() => import('./views/DashboardPlus/DashboardPlusView'))
 const InvoicesView = lazy(() => import('./views/InvoicesView'))
 const MembersView = lazy(() => import('./views/Mitglieder/MembersView'))
 const ReceiptsView = lazy(() => import('./views/ReceiptsView'))
@@ -150,7 +151,9 @@ type PageShortcutAction = {
 
 const goToShortcutKeys = {
   Dashboard: 'd',
+  DashboardPlus: 'f',
   Buchungen: 'b',
+  BuchungenPlus: 'j',
   Dauerbuchungen: 'u',
   Bankimport: 'k',
   Verbindlichkeiten: 'v',
@@ -1501,6 +1504,8 @@ function AppInner() {
     setGlassModals,
     showBookingDraftTabs,
     setShowBookingDraftTabs,
+    bookingView,
+    setBookingView,
     showBookingEditTabs,
     setShowBookingEditTabs,
     bookingEntryPresentation,
@@ -1591,11 +1596,15 @@ function AppInner() {
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
   const [activePage, setActivePage] = useState<NavKey>(() => {
     try {
-      return (localStorage.getItem('activePage') as NavKey) || 'Buchungen'
+      const saved = localStorage.getItem('activePage') as NavKey
+      return saved === 'DashboardPlus' ? 'Dashboard' : saved === 'BuchungenPlus' ? 'Buchungen' : saved || 'Buchungen'
     } catch {
       return 'Buchungen'
     }
   })
+  const isClassicBookings = activePage === 'Buchungen' && bookingView === 'classic'
+  const isPlusBookings = activePage === 'Buchungen' && bookingView === 'plus'
+  const [bookingJumpRevision, setBookingJumpRevision] = useState(0)
   const pageHistoryRef = useRef<NavKey[]>([])
   const pageHistoryIndexRef = useRef(-1)
   const pageHistoryTargetRef = useRef<NavKey | null>(null)
@@ -1630,7 +1639,7 @@ function AppInner() {
     }
   }, [])
   useEffect(() => {
-    if (activePage !== 'Buchungen') {
+    if (!isClassicBookings) {
       setFabNearJournalEnd(false)
       return
     }
@@ -1655,7 +1664,7 @@ function AppInner() {
       cancelled = true
       cleanup?.()
     }
-  }, [activePage, refreshKey])
+  }, [isClassicBookings, refreshKey])
   const [aiBusy, setAiBusy] = useState(false)
   const [aiViewMounted, setAiViewMounted] = useState(() => activePage === 'KI')
   const requiredNavItems = useMemo(
@@ -1688,7 +1697,11 @@ function AppInner() {
         if (!alive) return
 
         if (Array.isArray(saved?.value)) {
-          setVisibleNavItemsState(normalizeVisibleNavItems(saved.value))
+          const next = normalizeVisibleNavItems(saved.value)
+          setVisibleNavItemsState(next)
+          if (JSON.stringify(next) !== JSON.stringify(saved.value)) {
+            await window.api.settings.set({ key: VISIBLE_NAV_ITEMS_SETTING_KEY, value: next })
+          }
           return
         }
 
@@ -1748,7 +1761,7 @@ function AppInner() {
   const profileAllowedNavSet = useMemo(() => {
     if (organizationProfile !== 'GENERAL') return new Set(navItems.map((item) => item.key))
     return new Set<NavKey>([
-      'Dashboard', 'Buchungen', 'Dauerbuchungen', 'Bankimport', 'Verbindlichkeiten',
+      'Dashboard', 'DashboardPlus', 'Buchungen', 'BuchungenPlus', 'Dauerbuchungen', 'Bankimport', 'Verbindlichkeiten',
       'Vorschuesse', 'Budgets', 'KI', 'Belege', 'Reports', 'Einstellungen'
     ])
   }, [organizationProfile])
@@ -2042,6 +2055,7 @@ function AppInner() {
     function onVoucherJump(ev: any) {
       try {
         const detail = ev?.detail || {}
+        setBookingJumpRevision(value => value + 1)
         const voucherId = detail.voucherId ? Number(detail.voucherId) : null
         const voucherNo = typeof detail.voucherNo === 'string' ? detail.voucherNo.trim() : ''
         const voucherDate = typeof detail.date === 'string' ? detail.date : ''
@@ -2067,7 +2081,7 @@ function AppInner() {
         } else if (typeof detail.q === 'string' && detail.q.trim()) {
           setQ(detail.q.trim())
         } else if (voucherId) {
-          setQ(String(voucherId))
+          setQ(`#${voucherId}`)
         } else {
           setQ('')
         }
@@ -2587,7 +2601,7 @@ function AppInner() {
 
   const activePageShortcuts = useMemo<PageShortcutAction[]>(() => {
     const shortcuts = [...registeredPageShortcuts]
-    if (activePage === 'Buchungen') {
+    if (isClassicBookings) {
       shortcuts.unshift({
         id: 'journal-quick-add',
         key: 'q',
@@ -2596,7 +2610,7 @@ function AppInner() {
       })
     }
     return shortcuts
-  }, [activePage, registeredPageShortcuts, triggerBookingEntry])
+  }, [isClassicBookings, registeredPageShortcuts, triggerBookingEntry])
 
   const navigateAndFocus = useCallback((page: NavKey, selector: string) => {
     setActivePage(page)
@@ -2644,7 +2658,7 @@ function AppInner() {
           {
             key: 'b',
             label: 'Buchungen',
-            action: () => navigateAndFocus('Buchungen', '.journal-filter-toolbar__search')
+            action: () => navigateAndFocus('Buchungen', bookingView === 'plus' ? '.bp-search input' : '.journal-filter-toolbar__search')
           },
           {
             key: 'k',
@@ -2847,6 +2861,7 @@ function AppInner() {
   }, [
     activePage,
     activePageShortcuts,
+    bookingView,
     allowVoucherDeletion,
     bookingEntryPresentation,
     bookingsOpenDetached,
@@ -2963,6 +2978,18 @@ function AppInner() {
   const [filterBudgetId, setFilterBudgetId] = useState<number | null>(null)
   const [filterTag, setFilterTag] = useState<string | null>(null)
   const [q, setQ] = useState<string>('')
+  const bookingLinkFilters = useMemo(() => ({
+    q, from, to, type: filterType || '', sphere: filterSphere || '',
+    account: filterPaymentAccountId ? String(filterPaymentAccountId) : '',
+    budget: filterBudgetId ? String(filterBudgetId) : '',
+    earmark: filterEarmark ? String(filterEarmark) : '', tag: filterTag || ''
+  }), [q, from, to, filterType, filterSphere, filterPaymentAccountId, filterBudgetId, filterEarmark, filterTag])
+  const resetBookingLinkFilters = useCallback(() => {
+    resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, setFrom, setTo })
+    setFilterPrimaryClassificationValueId(null)
+    setFlashId(null)
+    setPage(1)
+  }, [])
   // Reports filter states (separate to avoid interference with Buchungen)
   const [reportsFrom, setReportsFrom] = useState<string>('')
   const [reportsTo, setReportsTo] = useState<string>('')
@@ -3463,7 +3490,7 @@ function AppInner() {
   useEffect(() => {
     // Ein Buchungsentwurf kann direkt aus der KI geöffnet werden. Dann sind
     // dieselben Stammdaten wie im Journal erforderlich, auch ohne Seitenwechsel.
-    if (activePage === 'Buchungen' || quickAdd) {
+    if (isClassicBookings || isPlusBookings || quickAdd) {
       loadBindings()
       loadBudgets()
       loadEarmarks()
@@ -3471,7 +3498,7 @@ function AppInner() {
     if (activePage === 'Reports') {
       loadBudgets()
     }
-  }, [activePage, quickAdd])
+  }, [activePage, isClassicBookings, isPlusBookings, quickAdd])
 
   // (earmarks loaded above)
 
@@ -3580,7 +3607,7 @@ function AppInner() {
       )}
 
       {/* Main content */}
-      <main className={`app-main${activePage === 'Buchungen' ? ' app-main--journal' : ''}`}>
+      <main className={`app-main${isClassicBookings ? ' app-main--journal' : isPlusBookings ? ' app-main--bookings-plus' : ''}`}>
         <Suspense fallback={<LoadingState message="Bereich wird geladen…" />}>
           {activePage === 'Reports' && (
             <ReportsView
@@ -3720,51 +3747,12 @@ function AppInner() {
               activateKey={reportsActivateKey}
             />
           )}
-          {activePage === 'Dashboard' && (
-            <DashboardView
-              today={today}
-              onGoToInvoices={() => setActivePage('Verbindlichkeiten')}
-              onGoToBankImport={() => setActivePage('Bankimport')}
-              onGoToMembers={() => setActivePage('Mitglieder')}
-              onGoToSubmissions={() => setActivePage('Einreichungen')}
-              onGoToVoucher={({ voucherId, recordDate }) => {
-                // Reset filters so the voucher can be found reliably
-                resetVoucherFilters({
-                  setFilterEarmark,
-                  setFilterBudgetId,
-                  setFilterTag,
-                  setFilterType,
-                  setFilterPM,
-                  setFilterPaymentAccountId,
-                  setFilterSphere,
-                  setQ,
-                  keepDateRange: true
-                })
-                setQ(voucherId ? `#${voucherId}` : '')
-
-                // Pin to the voucher date to avoid time-range filtering issues
-                if (recordDate) {
-                  setFrom(recordDate)
-                  setTo(recordDate)
-                } else {
-                  setFrom('')
-                  setTo('')
-                }
-
-                setFlashId(voucherId)
-                window.setTimeout(() => {
-                  setFlashId((cur) => (cur === voucherId ? null : cur))
-                }, 5000)
-
-                // Ensure state updates apply before navigation
-                setTimeout(() => {
-                  setActivePage('Buchungen')
-                  setPage(1)
-                }, 0)
-              }}
-            />
-          )}
-          {activePage === 'Buchungen' && (
+          {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} onGoToBookings={() => setActivePage('Buchungen')} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
+            resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, keepDateRange: true })
+            setQ(`#${voucherId}`); setFrom(recordDate?.slice(0, 10) || ''); setTo(recordDate?.slice(0, 10) || ''); setFlashId(voucherId); setPage(1); setActivePage('Buchungen')
+            window.setTimeout(() => setFlashId(current => current === voucherId ? null : current), 5000)
+          }} />}
+          {isClassicBookings && (
             <JournalView
               flashId={flashId}
               setFlashId={setFlashId}
@@ -3827,6 +3815,9 @@ function AppInner() {
               allowVoucherDeletion={allowVoucherDeletion}
             />
           )}
+          {isPlusBookings && (
+            <BookingsPlusView onResetFilters={resetBookingLinkFilters} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
+          )}
           {activePage === 'Dauerbuchungen' && (
             <RecurringBookingsView notify={notify} />
           )}
@@ -3869,6 +3860,8 @@ function AppInner() {
               glassModals={glassModals}
               setGlassModals={setGlassModals}
               showBookingDraftTabs={showBookingDraftTabs}
+              bookingView={bookingView}
+              setBookingView={setBookingView}
               setShowBookingDraftTabs={setShowBookingDraftTabs}
               showBookingEditTabs={showBookingEditTabs}
               setShowBookingEditTabs={setShowBookingEditTabs}
@@ -4035,7 +4028,10 @@ function AppInner() {
 
       {/* Quick-Add: full dialog or optional compact flyout */}
       {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
-        <div className={`compact-booking-flyout-anchor${activePage === 'Buchungen' ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
+        <div className="compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed" aria-hidden="true" />
+      )}
+      {quickAdd && activeDraftKind === 'booking' && bookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
+        <div className={`compact-booking-flyout-anchor${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
           <CompactBookingFlyout
             key={activeDraftId ?? 'compact-quick-add'}
             qa={qa}
@@ -4154,7 +4150,7 @@ function AppInner() {
       )}
       {/* removed: Confirm mark as paid modal */}
       {/* Journal action */}
-      {activePage === 'Buchungen' ? (
+      {isClassicBookings ? (
         <div
           className={`journal-fab-cluster${fabNearJournalEnd ? ' journal-fab-cluster--journal-end' : ''}`}
           role="group"
@@ -4176,6 +4172,7 @@ function AppInner() {
           </button>
         </div>
       ) : (
+        !isPlusBookings &&
         activePage !== 'Einstellungen' &&
         activePage !== 'Mitglieder' &&
         activePage !== 'Verbindlichkeiten' &&
@@ -4256,7 +4253,7 @@ function AppInner() {
       )}
       {/* Time Filter Modal for Buchungen */}
       <TimeFilterModal
-        open={activePage === 'Buchungen' && showTimeFilter}
+        open={isClassicBookings && showTimeFilter}
         onClose={() => setShowTimeFilter(false)}
         yearsAvail={yearsAvail}
         from={from}
@@ -4268,7 +4265,7 @@ function AppInner() {
       />
       {/* Meta Filter Modal (Sphäre, Zweckbindung, Budget) */}
       <MetaFilterModal
-        open={activePage === 'Buchungen' && showMetaFilter}
+        open={isClassicBookings && showMetaFilter}
         onClose={() => setShowMetaFilter(false)}
         earmarks={earmarks}
         budgets={budgets}

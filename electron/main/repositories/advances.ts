@@ -65,7 +65,7 @@ export function listAdvances(params?: {
 
   if (params?.q && params.q.trim()) {
     const like = `%${params.q.trim()}%`
-    wh.push('(a.recipient_name LIKE ? OR IFNULL(m.name, "") LIKE ? OR IFNULL(a.notes, "") LIKE ?)')
+    wh.push("(a.recipient_name LIKE ? OR IFNULL(m.name, '') LIKE ? OR IFNULL(a.notes, '') LIKE ?)")
     vals.push(like, like, like)
   }
   if (params?.memberId != null) {
@@ -115,6 +115,8 @@ export function listAdvances(params?: {
         IFNULL(SUM(CASE WHEN p.voucher_id IS NULL AND p.type = 'OUT' THEN p.gross_amount ELSE 0 END), 0)
         - IFNULL(SUM(CASE WHEN p.voucher_id IS NULL AND p.type = 'IN' THEN p.gross_amount ELSE 0 END), 0)
       )) as openAmount,
+      (SELECT IFNULL(SUM(CASE WHEN ap.type = 'IN' THEN -ap.gross_amount ELSE ap.gross_amount END), 0)
+       FROM member_advance_purchases ap WHERE ap.advance_id = a.id) as spentAmount,
       COUNT(s.id) as settlementCount,
       COUNT(p.id) as purchaseCount,
       CASE WHEN IFNULL(a.resolved_at, '') <> '' THEN 'RESOLVED' ELSE 'OPEN' END as status
@@ -146,6 +148,7 @@ export function listAdvances(params?: {
 export function getAdvanceById(input: { id: number }) {
   const d = getDb()
   const hasPaymentAccountColumn = ensureAdvancePurchasePaymentAccountColumn(d)
+  const hasPrimaryClassificationColumn = ensureAdvancePurchasePrimaryClassificationColumn(d)
   const row = d.prepare(`
     SELECT
       a.id,
@@ -179,6 +182,7 @@ export function getAdvanceById(input: { id: number }) {
       p.date,
       p.type,
       p.sphere,
+      ${hasPrimaryClassificationColumn ? 'p.primary_classification_value_id' : 'NULL'} as primaryClassificationValueId,
       p.description,
       p.net_amount as netAmount,
       p.gross_amount as grossAmount,

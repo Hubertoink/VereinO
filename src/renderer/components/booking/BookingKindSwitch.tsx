@@ -1,6 +1,6 @@
 import React from 'react'
 
-export type BookingKindOption = { value: string; label: string }
+export type BookingKindOption = { value: string; label: string; icon?: React.ReactNode }
 
 export default function BookingKindSwitch({
   value,
@@ -25,6 +25,7 @@ export default function BookingKindSwitch({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
         >
+          {option.icon}
           {option.label}
         </button>
       ))}

@@ -25,6 +25,8 @@ interface UIPreferencesContextValue {
   setJournalRowStyle: (val: JournalRowStyle) => void
   journalRowDensity: JournalRowDensity
   setJournalRowDensity: (val: JournalRowDensity) => void
+  bookingView: 'classic' | 'plus'
+  setBookingView: (value: 'classic' | 'plus') => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (val: boolean) => void
   showBookingEditTabs: boolean

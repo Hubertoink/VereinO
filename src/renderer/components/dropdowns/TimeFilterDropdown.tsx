@@ -1,3 +1,4 @@
+import DateFilterInput from '../common/DateFilterInput'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { IconCalendar } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
@@ -66,11 +67,11 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
       <div className="filter-dropdown__grid">
         <div className="filter-dropdown__field">
           <label className="filter-dropdown__label">Von</label>
-          <input className="input" type="date" value={f} onChange={(e) => setF(e.target.value)} />
+          <DateFilterInput label="Von" value={f} onChange={setF} />
         </div>
         <div className="filter-dropdown__field">
           <label className="filter-dropdown__label">Bis</label>
-          <input className="input" type="date" value={t} onChange={(e) => setT(e.target.value)} />
+          <DateFilterInput label="Bis" value={t} onChange={setT} />
         </div>
       </div>
 

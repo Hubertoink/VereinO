@@ -6963,6 +6963,11 @@ body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !i
   background: transparent;
   -webkit-app-region: no-drag;
 }
+.compact-booking-flyout-dismiss--dimmed {
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.4);
+  animation: modalFadeIn 0.2s ease-out;
+}
 .compact-booking-flyout-anchor--journal { bottom: 140px; }
 .compact-booking-flyout-anchor--journal-end { right: 128px; }
 .advances-purchase-flyout-anchor {
@@ -20854,6 +20859,15 @@ textarea {
   background: var(--surface);
 }
 
+/* Separate finance flyouts from the page with a close and a soft shadow. */
+:is(
+  .compact-booking-flyout,
+  .invoice-batch-flyout,
+  .local-invoice-scan--flyout
+) {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.32);
+}
+
 /* Modal and popover radius contract: outer floating surfaces use 8 px,
    nested content surfaces 6 px, and controls 4 px. */
 :is(
@@ -20982,3 +20996,16 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .voucher-info-attachment-thumbnail .receipt-thumbnail { height: 155px; }
 .voucher-info-attachment-thumbnail > span { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; }
 .voucher-info-attachment-thumbnail:disabled { cursor: default; opacity: .65; }
+
+.voucher-info-assignment-editor .select-dropdown__trigger { min-width: 0; width: 100%; }
+.voucher-info-assignment-editor .voucher-info-assignment-remove { width: 32px; height: 32px; min-width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--text-dim); }
+.voucher-info-assignment-editor .voucher-info-assignment-remove:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
+
+/* Keep detail editing as compact as the booking entry tag picker. */
+.voucher-info-tags-editor .tags-editor-input { min-height: 36px; padding: 4px 8px; gap: 4px; border-radius: 9px; }
+.voucher-info-tags-editor .tags-editor-text-input { min-width: 64px; min-height: 24px; padding: 0; font-size: 12px; }
+.voucher-info-tags-editor .tags-editor-input .chip { min-height: 22px; padding: 3px 7px; font-size: 11px; line-height: 1; }
+.voucher-info-tags-editor .tags-suggestions { gap: 4px; padding: 4px; margin-top: 4px; align-content: flex-start; }
+.voucher-info-tags-editor .tag-suggestion-btn { min-height: 0; padding: 3px 6px; border-radius: 5px; font-size: 11px; font-weight: 600; line-height: 1.2; }
+
+.date-filter-input .booking-date-picker-button { color: var(--text); }

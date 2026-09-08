@@ -147,6 +147,8 @@ export function SettingsView(props: SettingsProps) {
         )}
         
         {activeTile === 'workflow' && <WorkflowPane
+          bookingView={props.bookingView}
+          setBookingView={props.setBookingView}
           showBookingDraftTabs={props.showBookingDraftTabs}
           setShowBookingDraftTabs={props.setShowBookingDraftTabs}
           showBookingEditTabs={props.showBookingEditTabs}

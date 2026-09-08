@@ -420,7 +420,7 @@ export default function AttachmentsModal({
                         <h2>Belege zu <button
                             type="button"
                             className="attachments-modal__voucher-link"
-                            title="Zur Buchung im Journal"
+                            title="Zur Buchung"
                             onClick={() => {
                                 onClose()
                                 window.dispatchEvent(new CustomEvent('apply-voucher-jump', {

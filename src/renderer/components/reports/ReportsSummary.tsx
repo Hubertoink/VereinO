@@ -43,10 +43,10 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
   return (
-    <div className="card report-summary-card">
+    <div className="report-summary-card">
       <div className="report-summary-header">
         <div>
-          <strong>Summen</strong>
+          <h2>Finanzübersicht</h2>
           <div className="helper">Für den gewählten Zeitraum und die Filter.</div>
         </div>
       </div>
@@ -60,21 +60,21 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             const avgPerMonth = monthsCount > 0 ? (net / monthsCount) : null
             return (
               <div className="report-summary-kpis">
-                <div className="card report-summary-kpi">
+                <div className="dp-card report-summary-kpi">
                   <div className="helper">Einnahmen (Brutto)</div>
-                  <div style={{ fontWeight: 600, color: '#2e7d32' }}>{eurFmt.format(inSum)}</div>
+                  <div style={{ color: 'var(--success)' }}>{eurFmt.format(inSum)}</div>
                 </div>
-                <div className="card report-summary-kpi">
+                <div className="dp-card report-summary-kpi">
                   <div className="helper">Ausgaben (Brutto)</div>
-                  <div style={{ fontWeight: 600, color: '#c62828' }}>{eurFmt.format(outSum)}</div>
+                  <div style={{ color: 'var(--danger)' }}>{eurFmt.format(outSum)}</div>
                 </div>
-                <div className="card report-summary-kpi">
+                <div className="dp-card dp-balance report-summary-kpi report-summary-kpi--balance">
                   <div className="helper">Saldo</div>
-                  <div style={{ fontWeight: 600, color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
+                  <div style={{ color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
                 </div>
-                <div className="card report-summary-kpi">
+                <div className="dp-card report-summary-kpi">
                   <div className="helper">Ø Saldo/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
-                  <div style={{ fontWeight: 600 }}>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
+                  <div>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
                 </div>
               </div>
             )
@@ -82,10 +82,10 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
           {/* Netto/MwSt/Brutto totals row intentionally removed per UI simplification */}
           <div className="report-summary-breakdowns">
             {/* Tax spheres for non-profits, user-defined categories otherwise */}
-            <div className="card report-summary-breakdown-card">
-              <div className="report-summary-section-title">
+            <div className="dp-card report-summary-breakdown-card">
+              <div className="dp-card-heading report-summary-section-title">
                 <AppIcon icon={IconBudget} size="inline" />
-                <strong>Nach {data.classificationProfile === 'GENERAL' ? data.primaryClassificationLabel : 'Sphäre'}</strong>
+                <h2>Nach {data.classificationProfile === 'GENERAL' ? data.primaryClassificationLabel : 'Sphäre'}</h2>
               </div>
               <div className="report-summary-list">
                 {(data.classificationProfile === 'GENERAL' ? data.byPrimaryClassification : data.bySphere).map((r: any) => {
@@ -100,7 +100,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                     ? { bg: `${r.color}26`, text: r.color }
                     : colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
                   return (
-                    <div key={r.key} className="report-summary-row" style={{ background: c.bg }}>
+                    <div key={r.key} className="report-summary-row" style={{ '--report-row-color': c.text } as React.CSSProperties}>
                       <span style={{ fontWeight: 500, color: c.text, fontSize: 13 }}>{r.key}</span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
                     </div>
@@ -110,10 +110,10 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             </div>
 
             {/* Nach Zahlweg */}
-            <div className="card report-summary-breakdown-card">
-              <div className="report-summary-section-title">
+            <div className="dp-card report-summary-breakdown-card">
+              <div className="dp-card-heading report-summary-section-title">
                 <AppIcon icon={IconCreditCard} size="inline" />
-                <strong>Nach Zahlweg</strong>
+                <h2>Nach Zahlweg</h2>
               </div>
               <div className="report-summary-list">
                 {((data.byPaymentAccount && data.byPaymentAccount.length > 0)
@@ -124,7 +124,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                   const color = r.color || (r.kind === 'CASH' ? '#42a5f5' : r.kind === 'BANK' ? '#26a69a' : 'var(--accent)')
                   const PaymentIcon = icons[r.kind ?? 'OTHER'] || IconBudget
                   return (
-                    <div key={`${r.accountId ?? r.key ?? 'NULL'}-${i}`} className="report-summary-row" style={{ background: 'var(--muted)', borderLeft: `3px solid ${color}` }}>
+                    <div key={`${r.accountId ?? r.key ?? 'NULL'}-${i}`} className="report-summary-row" style={{ '--report-row-color': color } as React.CSSProperties}>
                       <span className="report-summary-row-label">
                         <PaymentIcon size={14} color={color} aria-hidden="true" />
                         {r.key}
@@ -137,24 +137,24 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
             </div>
 
             {/* Nach Art */}
-            <div className="card report-summary-breakdown-card">
-              <div className="report-summary-section-title">
+            <div className="dp-card report-summary-breakdown-card">
+              <div className="dp-card-heading report-summary-section-title">
                 <AppIcon icon={IconReceipt2} size="inline" />
-                <strong>Nach Art</strong>
+                <h2>Nach Art</h2>
               </div>
               <div className="report-summary-list">
                 {data.byType.map((r) => {
                   const styles: Record<string, { bg: string; text: string; icon: string }> = {
-                    IN: { bg: 'rgba(46, 125, 50, 0.12)', text: '#2e7d32', icon: '↓' },
-                    OUT: { bg: 'rgba(198, 40, 40, 0.12)', text: '#c62828', icon: '↑' },
-                    TRANSFER: { bg: 'rgba(25, 118, 210, 0.12)', text: '#1976d2', icon: '↔' }
+                    IN: { bg: 'rgba(46, 125, 50, 0.12)', text: 'var(--success)', icon: '↓' },
+                    OUT: { bg: 'rgba(198, 40, 40, 0.12)', text: 'var(--danger)', icon: '↑' },
+                    TRANSFER: { bg: 'rgba(25, 118, 210, 0.12)', text: 'var(--accent)', icon: '↔' }
                   }
                   const s = styles[r.key] || { bg: 'var(--muted)', text: 'var(--text)', icon: '•' }
                   return (
-                    <div key={r.key} className="report-summary-row" style={{ background: s.bg }}>
+                    <div key={r.key} className="report-summary-row" style={{ '--report-row-color': s.text } as React.CSSProperties}>
                       <span className="report-summary-row-label" style={{ color: s.text }}>
                         <span style={{ fontWeight: 700 }}>{s.icon}</span>
-                        {r.key}
+                        {({ IN: 'Einnahmen', OUT: 'Ausgaben', TRANSFER: 'Umbuchungen' } as Record<string, string>)[r.key] || r.key}
                       </span>
                       <span style={{ fontWeight: 600, color: s.text, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
                     </div>

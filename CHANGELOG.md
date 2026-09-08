@@ -5,6 +5,34 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [3.9.5] - 2026-09-08
+
+### Hinzugefügt
+
+- Buchungen Plus mit Kalender, Such- und Filterfunktionen, farbigen Zuordnungen, Belegvorschau und seitlicher Detailansicht. Die klassische Buchungstabelle bleibt unter Einstellungen → Darstellung → Arbeitsweise auswählbar.
+- Neues Dashboard mit Monatsverlauf, Ausgabendeckung, Vereinsmitteln, Mitglieder- und Kontenübersicht sowie offenen Posten. Budgets und Zweckbindungen sind direkt erreichbar.
+- Monatsdiagramme mit Einnahmen-/Ausgabenwahl, Gruppierung nach Tags, Sphären oder Kategorien und Tabellenansicht. Mehrfach-Tags teilen Beträge centgenau; Rückbuchungen bleiben vorzeichenrichtig.
+- Dashboard mit letzten Aktionen, Buchungsverweisen und KI-Fragefeld für Auswertungen.
+- Vorschussliste mit Verbrauchsbalken und Prozentanzeige. Neue Vorschüsse lassen sich in einem kompakten Flyout mit optionalen Zuordnungen und Notizen erfassen.
+
+### Geändert
+
+- Dashboard Plus ersetzt das bisherige Dashboard. Das neue Icon verwendet die ursprüngliche Dashboard-Farbe; doppelte Navigationseinträge und Vorschau-Badges entfallen.
+- Verweise aus Dashboard, Belegen und anderen Bereichen öffnen die gewählte Buchungsansicht mit der passenden Buchung beziehungsweise den zugehörigen Filtern.
+- Vorschüsse erhalten eine klar gegliederte Personenliste, einen hervorgehobenen Detailbereich und Buchungszeilen im Stil von Buchungen Plus mit farbigen Budget-, Zweckbindungs- und Tag-Badges.
+- Buchungsformulare und abgedockte Fenster verwenden eine gemeinsame Gliederung mit Abschnitts-Icons und einer Übersicht der Beträge, Konten und Zuordnungen.
+- Reports und Diagramme sind optisch an das neue Dashboard und die aktiven Theme-Farben angeglichen.
+- Buchungen Plus unterstützt vorhandene Entwurfsreiter, ähnliche Buchungen und direkte Belegerkennung. Anhang-Icon und Anzahl stehen neben dem Zahlweg-Badge; das kompakte Zurücksetzen-Badge verändert die Zeilenhöhe nicht.
+
+### Behoben
+
+- Der abgedunkelte Hintergrund des Buchungs-Flyouts blockiert weder den Buchungsbutton noch das Wechseln zu bestehenden Buchungen.
+- Suche und Statusfilter der Vorschüsse funktionieren wieder: Leere Texte in der SQL-Abfrage werden korrekt behandelt. Überholte Suchantworten überschreiben keine neueren Ergebnisse.
+- Zurückgesetzte Buchungslink-Filter erscheinen nach einem Seitenwechsel nicht erneut.
+- Unverändertes Speichern von Buchungen und Metadaten erzeugt keine zusätzlichen Einträge in den letzten Aktionen.
+- Buchungen Plus respektiert den geschützten Buchungsmodus und lädt Budget- sowie Zweckbindungsdaten auch beim direkten Einstieg.
+- Verbrauchsdaten der Vorschüsse bleiben nach dem Auflösen verfügbar; erledigte Vorschüsse werden nicht als offener Betrag summiert.
+
 ## [3.9.2] - 2026-09-07
 
 ### Hinzugefügt

@@ -1,10 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../context/useToast'
 import CompactBookingFlyout from '../../components/CompactBookingFlyout'
 import DatePickerButton from '../../components/common/DatePickerButton'
 import type { QA } from '../../hooks/useQuickAdd'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { encodeFilesForUpload } from '../../utils/fileEncoding'
+
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { IconUser, IconReceipt2, IconChevronRight } from '@tabler/icons-react'
+import './advances.css'
+import BookingPopupFrame from '../../components/modals/BookingPopupFrame'
+import SelectDropdown from '../../components/common/SelectDropdown'
+import AdvancePurchaseList from './AdvancePurchaseList'
+
+const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).map(part => part[0]).slice(0, 2).join('').toLocaleUpperCase('de-DE')
 
 type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 
@@ -18,6 +27,7 @@ type AdvanceRow = {
   issuedAt: string
   amount: number
   settledAmount: number
+  spentAmount?: number
   purchaseAmount?: number
   openAmount: number
   settlementCount: number
@@ -30,7 +40,7 @@ type AdvanceRow = {
   resolvedAt?: string | null
 }
 
-type AdvanceDetail = AdvanceRow & {
+export type AdvanceDetail = AdvanceRow & {
   settlements: Array<{
     id: number
     advanceId: number
@@ -139,17 +149,19 @@ export default function AdvancesView() {
     return (s?: string) => dateFmt === 'PRETTY' ? pretty(s) : dateFmt === 'DOT' ? dot(s) : (s || '')
   }, [dateFmt])
 
-  const getBookedAmount = (amount: number, openAmount: number) => {
-    const booked = Number(amount || 0) - Number(openAmount || 0)
-    return booked > 0 ? booked : 0
-  }
-
   const [rows, setRows] = useState<AdvanceRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
+  const searchQuery = useDebouncedValue(q.trim(), 250)
+  const [listError, setListError] = useState('')
+  const listRequest = useRef(0)
+  const detailRequest = useRef(0)
+  const [page, setPage] = useState(0)
   const [status, setStatus] = useState<AdvanceStatus>('OPEN')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const selectedIdRef = useRef(selectedId)
+  selectedIdRef.current = selectedId
   const [detail, setDetail] = useState<AdvanceDetail | null>(null)
 
   const [budgets, setBudgets] = useState<
@@ -168,6 +180,26 @@ export default function AdvancesView() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createBusy, setCreateBusy] = useState(false)
+  const createBusyRef = useRef(false)
+  const createFormRef = useRef<HTMLFormElement>(null)
+  const closeCreate = useCallback(() => { if (!createBusyRef.current) setCreateOpen(false) }, [])
+  useEffect(() => {
+    if (!createOpen) return
+    const trigger = document.activeElement as HTMLElement | null
+    const timer = window.setTimeout(() => createFormRef.current?.querySelector<HTMLInputElement>('input')?.focus(), 0)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      if (event.key === 'Escape') { event.preventDefault(); closeCreate() }
+      if (event.key === 'Tab') {
+        const elements = Array.from(createFormRef.current?.closest('[role=dialog]')?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary') || []).filter(element => element.getClientRects().length > 0)
+        const first = elements[0], last = elements[elements.length - 1]
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.clearTimeout(timer); window.removeEventListener('keydown', onKey); trigger?.focus() }
+  }, [createOpen, closeCreate])
   const createIssuedAtRef = useRef<HTMLInputElement | null>(null)
   const [createDraft, setCreateDraft] = useState({
     recipientName: '',
@@ -240,36 +272,45 @@ export default function AdvancesView() {
     fileInputRef.current?.click()
   }
 
-  async function loadList() {
+  const loadList = useCallback(async () => {
+    const request = ++listRequest.current
     setLoading(true)
+    setListError('')
     try {
       const res = await (window as any).api?.advances?.list?.({
-        q: q.trim() || undefined,
+        q: searchQuery || undefined,
         status,
         limit: pageLimit,
-        offset: 0
+        offset: page * pageLimit
       })
+      if (request !== listRequest.current) return
+      if (page > 0 && page * pageLimit >= Number(res?.total || 0)) { setPage(0); return }
       const list = (res?.rows || []) as AdvanceRow[]
       setRows(list)
       setTotal(Number(res?.total || 0))
       if (list.length === 0) {
         setSelectedId(null)
         setDetail(null)
-      } else if (!selectedId || !list.some((row) => row.id === selectedId)) {
-        setSelectedId(list[0].id)
+      } else {
+        setSelectedId(current => current != null && list.some(row => row.id === current) ? current : list[0].id)
       }
     } catch (e: any) {
-      notify('error', e?.message || String(e))
+      if (request !== listRequest.current) return
+      console.error('Vorschüsse konnten nicht geladen werden:', e)
+      setListError('Vorschüsse konnten nicht geladen werden. Bitte erneut versuchen.')
+      setRows([]); setTotal(0); setSelectedId(null); setDetail(null)
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
-  }
+  }, [searchQuery, status, page])
 
   async function loadDetail(id: number) {
+    const request = ++detailRequest.current
     try {
       const res = await (window as any).api?.advances?.get?.({ id })
-      setDetail((res as AdvanceDetail) || null)
+      if (request === detailRequest.current && selectedIdRef.current === id) setDetail((res as AdvanceDetail) || null)
     } catch (e: any) {
+      if (request !== detailRequest.current || selectedIdRef.current !== id) return
       notify('error', e?.message || String(e))
       setDetail(null)
     }
@@ -350,38 +391,43 @@ export default function AdvancesView() {
   }, [])
 
   useEffect(() => {
-    loadList()
-  }, [q, status])
+    void loadList()
+    return () => { listRequest.current++ }
+  }, [loadList])
 
   useEffect(() => {
-    if (selectedId != null) loadDetail(selectedId)
+    setDetail(null)
+    if (selectedId != null) void loadDetail(selectedId)
+    return () => { detailRequest.current++ }
   }, [selectedId])
 
   const totals = useMemo(() => {
-    const openSum = rows.reduce((sum, row) => sum + Number(row.openAmount || 0), 0)
-    const paidSum = rows.reduce((sum, row) => sum + getBookedAmount(row.amount, row.openAmount), 0)
+    const openSum = rows.filter(row => row.status === 'OPEN').reduce((sum, row) => sum + Number(row.openAmount || 0), 0)
+    const issuedSum = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
     return {
       openSum,
-      paidSum,
+      issuedSum,
       openCount: rows.filter((row) => row.status === 'OPEN').length
     }
   }, [rows])
 
   const detailBookedAmount = useMemo(() => {
     if (!detail) return 0
-    return getBookedAmount(detail.amount, detail.openAmount)
+    return (detail.purchases || []).reduce((sum, purchase) => sum + (purchase.type === 'IN' ? -1 : 1) * purchase.grossAmount, 0)
   }, [detail])
 
   async function submitCreate() {
+    if (createBusyRef.current) return
     const amount = Number(String(createDraft.amount).replace(',', '.'))
     if (!createDraft.recipientName.trim()) return notify('error', 'Empfänger ist erforderlich')
     if (!createDraft.issuedAt) return notify('error', 'Ausgabedatum ist erforderlich')
     if (!isFinite(amount) || amount <= 0) return notify('error', 'Betrag muss positiv sein')
     if (isGeneralProfile && !createDraft.primaryClassificationValueId) return notify('error', 'Kategorie ist erforderlich')
 
+    createBusyRef.current = true
     setCreateBusy(true)
     try {
-      await (window as any).api?.advances?.create?.({
+      const created = await (window as any).api?.advances?.create?.({
         recipientName: createDraft.recipientName.trim(),
         issuedAt: createDraft.issuedAt,
         amount,
@@ -400,12 +446,15 @@ export default function AdvancesView() {
         earmarkId: '',
         primaryClassificationValueId: ''
       })
+      setQ(''); setStatus('OPEN'); setPage(0)
       await loadList()
+      if (created?.id) setSelectedId(created.id)
       notify('success', 'Vorschuss erfasst')
       dispatchDataChanged(['vouchers', 'members'])
     } catch (e: any) {
       notify('error', e?.message || String(e))
     } finally {
+      createBusyRef.current = false
       setCreateBusy(false)
     }
   }
@@ -623,7 +672,7 @@ export default function AdvancesView() {
       <header className="advances-header">
         <div>
           <h1 style={{ margin: 0 }}>Vorschüsse</h1>
-          <p className="helper">Erfasst Auszahlungen an Mitglieder/Personen und löst sie bei Rechnungs- oder Belegbearbeitung wieder auf.</p>
+
         </div>
         <button className="btn primary" type="button" onClick={() => setCreateOpen(true)}>+ Vorschuss</button>
       </header>
@@ -641,8 +690,8 @@ export default function AdvancesView() {
             <div className="advances-summary-value">{eurFmt.format(totals.openSum)}</div>
           </div>
           <div className="advances-summary-card">
-            <div className="helper">Bereits verbucht</div>
-            <div className="advances-summary-value">{eurFmt.format(totals.paidSum)}</div>
+            <div className="helper">Ausgegebener Betrag</div>
+            <div className="advances-summary-value">{eurFmt.format(totals.issuedSum)}</div>
           </div>
           <div className="advances-summary-card">
             <div className="helper">Offene Vorschüsse</div>
@@ -657,7 +706,6 @@ export default function AdvancesView() {
             <h2 id="advances-list-title">Vorschussliste</h2>
             <p className="helper">Vorschuss auswählen und Buchungen oder Auflösung bearbeiten.</p>
           </div>
-          <span className="helper">{total} Eintrag{total === 1 ? '' : 'e'}</span>
         </div>
 
         <div className="advances-layout">
@@ -667,63 +715,52 @@ export default function AdvancesView() {
               className="input"
               placeholder="Suchen (Person, Notiz)…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); setPage(0) }}
               aria-label="Vorschüsse durchsuchen"
             />
-            <select className="input" value={status} onChange={(e) => setStatus(e.target.value as AdvanceStatus)} aria-label="Status filtern">
-              <option value="OPEN">Offen</option>
-              <option value="RESOLVED">Erledigt</option>
-              <option value="ALL">Alle</option>
-            </select>
+            <SelectDropdown value={status} onChange={value => { setStatus(value as AdvanceStatus); setPage(0) }} ariaLabel="Status filtern" options={[{ value: 'OPEN', label: 'Offen' }, { value: 'RESOLVED', label: 'Erledigt' }, { value: 'ALL', label: 'Alle' }]} />
           </div>
 
-          {loading ? (
-            <div className="helper">Lade Vorschüsse…</div>
-          ) : rows.length === 0 ? (
-            <div className="helper">Keine Vorschüsse gefunden.</div>
+          <div className="advances-list-feedback" role="status">{loading ? 'Lade Vorschüsse…' : `${total} Vorschuss${total === 1 ? '' : 'e'}${q || status !== 'ALL' ? ' in dieser Auswahl' : ''}`}</div>
+          {listError ? (
+            <div className="advances-empty" role="alert"><p>{listError}</p><button className="btn" onClick={() => void loadList()}>Erneut versuchen</button></div>
+          ) : !loading && rows.length === 0 ? (
+            <div className="advances-empty"><IconReceipt2 size={30} /><strong>Keine Vorschüsse gefunden</strong><span className="helper">Passe die Suche oder den Statusfilter an.</span></div>
           ) : (
-            <div className="advances-list-table-wrap">
-              <table className="table advances-list-table">
-                <thead>
-                  <tr>
-                    <th>Empfänger</th>
-                    <th>Ausgegeben</th>
-                    <th>Offen</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className={row.id === selectedId ? 'advances-row-active' : ''} aria-selected={row.id === selectedId} onClick={() => setSelectedId(row.id)}>
-                      <td>
-                        <div>{row.memberName || row.recipientName}</div>
-                        <div className="helper">{fmtDate(row.issuedAt)}</div>
-                      </td>
-                      <td>{eurFmt.format(row.amount)}</td>
-                      <td>{eurFmt.format(row.openAmount)}</td>
-                      <td>
-                        <span className={`advances-status ${row.status === 'OPEN' ? 'open' : 'resolved'}`}>
-                          {row.status === 'OPEN' ? 'Offen' : 'Erledigt'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="advances-recipient-list" aria-label="Vorschüsse nach Empfänger" aria-busy={loading}>
+              {rows.map(row => (
+                <li key={row.id}>
+                  <button type="button" className={`advances-recipient-row${row.id === selectedId ? ' advances-row-active' : ''}`} aria-pressed={row.id === selectedId} onClick={() => setSelectedId(row.id)}>
+                    <span className="advances-avatar" aria-hidden="true">{initials(row.memberName || row.recipientName)}</span>
+                    <span className="advances-recipient-copy"><strong>{row.memberName || row.recipientName}</strong><span>Ausgegeben am {fmtDate(row.issuedAt)}</span><span className={`advances-status ${row.status === 'OPEN' ? 'open' : 'resolved'}`}>{row.status === 'OPEN' ? 'Offen' : 'Erledigt'}</span></span>
+                    <span className="advances-recipient-amount"><strong>{eurFmt.format(row.amount)}</strong><span>{row.status === 'OPEN' ? `${eurFmt.format(row.openAmount)} offen` : 'Abgeschlossen'}</span></span>
+                    <IconChevronRight size={15} aria-hidden="true" />
+                    <span className="advances-progress" title={`${eurFmt.format(row.spentAmount ?? row.purchaseAmount ?? 0)} von ${eurFmt.format(row.amount)} ausgegeben`}>
+                      <progress aria-label={`Ausgegeben: ${row.memberName || row.recipientName}`} max={row.amount} value={Math.max(0, Math.min(row.amount, row.spentAmount ?? row.purchaseAmount ?? 0))} />
+                      <span>{Math.max(0, Math.round((row.spentAmount ?? row.purchaseAmount ?? 0) / row.amount * 100))} %</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
+          {total > pageLimit && <nav className="advances-pagination" aria-label="Vorschussseiten"><button className="btn ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Zurück</button><span>{page + 1} / {Math.ceil(total / pageLimit)}</span><button className="btn ghost" disabled={(page + 1) * pageLimit >= total || loading} onClick={() => setPage(value => value + 1)}>Weiter</button></nav>}
         </section>
 
         <section className="advances-detail-card">
           {!detail ? (
-            <div className="helper">Wähle links einen Vorschuss aus.</div>
+            <div className="advances-empty advances-empty--detail"><IconUser size={32} /><strong>{selectedId != null ? 'Vorschuss wird geladen…' : 'Kein Vorschuss ausgewählt'}</strong><span className="helper">Wähle einen Eintrag aus der Vorschussliste.</span></div>
           ) : (
             <>
+              <section className="advances-person-card" aria-label="Ausgewählter Vorschuss">
               <div className="advances-detail-header">
-                <div>
-                  <h2 style={{ margin: 0 }}>{detail.memberName || detail.recipientName}</h2>
-                  <div className="helper">Ausgegeben am {fmtDate(detail.issuedAt)}</div>
+                <div className="advances-person">
+                  <span className="advances-avatar advances-avatar--large" aria-hidden="true">{initials(detail.memberName || detail.recipientName)}</span>
+                  <div><h2>{detail.memberName || detail.recipientName}</h2><div className="helper">{detail.memberId ? 'Vereinsmitglied' : 'Vorschussempfänger'} · Ausgegeben am {fmtDate(detail.issuedAt)}</div></div>
                 </div>
+                <span className={`advances-status ${detail.status === 'OPEN' ? 'open' : 'resolved'}`}>{detail.status === 'OPEN' ? 'Offen' : 'Erledigt'}</span>
+              </div>
+              <div className="advances-person-actions">
                 <div className="advances-detail-actions">
                   <button className="btn" type="button" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }} disabled={detail.status !== 'OPEN'}>+ Buchung</button>
                   <button className="btn primary" type="button" onClick={resolveSelectedAdvance} disabled={detail.status !== 'OPEN'}>Auflösen</button>
@@ -736,59 +773,23 @@ export default function AdvancesView() {
                   <div>{eurFmt.format(detail.amount)}</div>
                 </div>
                 <div className={detailBookedAmount > detail.amount ? 'advances-kpi-overdrawn' : ''}>
-                  <div className="helper">Verbucht</div>
+                  <div className="helper">Erfasste Ausgaben</div>
                   <div>{eurFmt.format(detailBookedAmount)}</div>
                 </div>
                 <div className={detail.openAmount < 0 ? 'advances-kpi-negative' : ''}>
                   <div className="helper">Offen</div>
-                  <div>{eurFmt.format(detail.openAmount)}</div>
+                  <div>{eurFmt.format(detail.status === 'OPEN' ? detail.openAmount : 0)}</div>
                 </div>
               </div>
 
-              {detail.notes ? <div className="helper">Notiz: {detail.notes}</div> : null}
+              </section>
+              {detail.notes ? <div className="advances-note"><strong>Notiz</strong><p>{detail.notes}</p></div> : null}
 
-              <h3 className="advances-subtitle">Buchungen</h3>
+              <h3 className="advances-subtitle">Buchungen <span className="helper">({detail.purchases?.length || 0})</span></h3>
               {(!detail.purchases || detail.purchases.length === 0) ? (
-                <div className="helper">Noch keine Buchungen vorhanden.</div>
+                <div className="advances-empty"><IconReceipt2 size={32} /><strong>Noch keine Buchungen vorhanden</strong><span className="helper">Erfasse die Ausgaben und die zugehörigen Belege für diesen Vorschuss.</span>{detail.status === 'OPEN' && <button className="btn" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }}>+ Buchung hinzufügen</button>}</div>
               ) : (
-                <div className="advances-list-table-wrap">
-                  <table className="table advances-list-table">
-                    <thead>
-                      <tr>
-                        <th>Datum</th>
-                        <th>Beschreibung</th>
-                        <th>Zahlweg</th>
-                        <th>Betrag</th>
-                        <th>Status</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.purchases.map((p) => (
-                        <tr key={p.id}>
-                          <td>{fmtDate(p.date)}</td>
-                          <td>
-                            <div style={{ fontWeight: 500 }}>{p.description || '—'}</div>
-                            <div className="helper">{p.type} · {p.sphere}</div>
-                          </td>
-                          <td>{p.paymentAccountName || p.paymentMethod || '—'}</td>
-                          <td>{eurFmt.format(p.grossAmount)}</td>
-                          <td>{p.voucherId ? 'Gebucht' : 'Entwurf'}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                              {!p.voucherId && detail.status === 'OPEN' ? (
-                                <>
-                                  <button className="btn btn-edit" type="button" aria-label="Buchung bearbeiten" title="Bearbeiten" onClick={() => startEditPurchase(p)}>✎</button>
-                                  <button className="btn ghost danger" type="button" aria-label="Buchung entfernen" onClick={() => deletePurchaseRow(p.id)}>×</button>
-                                </>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AdvancePurchaseList purchases={detail.purchases} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} categories={categories} generalProfile={isGeneralProfile} editable={detail.status === 'OPEN'} onEdit={startEditPurchase} onDelete={deletePurchaseRow} fmtDate={fmtDate} />
               )}
 
               {/* Löschen ganz unten rechts */}
@@ -804,70 +805,24 @@ export default function AdvancesView() {
       </section>
 
       {createOpen && (
-        <div className="modal-overlay" onClick={() => setCreateOpen(false)} role="dialog" aria-modal="true">
-          <div className="modal standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-            <div className="advances-modal-header">
-              <h2 style={{ margin: 0 }}>Vorschuss erfassen</h2>
-              <AdvanceModalCloseButton onClick={() => setCreateOpen(false)} />
-            </div>
-            <div className="row">
-              <div className={`field standard-floating-field${createDraft.recipientName.trim() ? ' standard-floating-field--filled' : ''}`}>
-                <label htmlFor="advance-recipient">Empfänger *</label>
-                <input id="advance-recipient" className="input" value={createDraft.recipientName} onChange={(e) => setCreateDraft((prev) => ({ ...prev, recipientName: e.target.value }))} placeholder="z. B. Max Mustermann" />
+        <BookingPopupFrame title="Vorschuss erfassen" titleId="advance-create-title" variant="compact" anchorAlign="end" className="advance-create-flyout" onClose={closeCreate}>
+          <form ref={createFormRef} className="advance-create-form" onSubmit={event => { event.preventDefault(); void submitCreate() }}>
+            <div className="advance-create-fields">
+              <label className="advance-create-field" htmlFor="advance-recipient">Empfänger *<input id="advance-recipient" className="input" required value={createDraft.recipientName} onChange={event => setCreateDraft(current => ({ ...current, recipientName: event.target.value }))} placeholder="Name der Person" /></label>
+              <div className="advance-create-row">
+                <label className="advance-create-field" htmlFor="advance-amount">Betrag (€) *<input id="advance-amount" className="input" required inputMode="decimal" value={createDraft.amount} onChange={event => setCreateDraft(current => ({ ...current, amount: event.target.value }))} placeholder="0,00" /></label>
+                <label className="advance-create-field" htmlFor="advance-issued-at">Ausgabedatum *<span className="booking-date-input-wrap"><input id="advance-issued-at" ref={createIssuedAtRef} type="date" className="input" required value={createDraft.issuedAt} onChange={event => setCreateDraft(current => ({ ...current, issuedAt: event.target.value }))} /><DatePickerButton inputRef={createIssuedAtRef} ariaLabel="Kalender zur Auswahl des Ausgabedatums öffnen" /></span></label>
               </div>
+              {isGeneralProfile && <div className="advance-create-field"><label htmlFor="advance-primary-category">Kategorie *</label><SelectDropdown id="advance-primary-category" ariaLabel="Kategorie" value={createDraft.primaryClassificationValueId} placeholder="Kategorie wählen" options={categories.map(category => ({ value: String(category.id), label: category.name }))} onChange={value => setCreateDraft(current => ({ ...current, primaryClassificationValueId: value }))} /></div>}
+              <details className="advance-create-optional"><summary>Zuordnung & Notiz <span>optional</span></summary>
+                <div className="advance-create-field"><label htmlFor="advance-budget">Budget</label><SelectDropdown id="advance-budget" ariaLabel="Budget" value={createDraft.budgetId} options={[{ value: '', label: 'Keine Zuordnung' }, ...budgets.map(budget => ({ value: String(budget.id), label: budget.label, color: budget.color || undefined }))]} onChange={value => setCreateDraft(current => ({ ...current, budgetId: value }))} /></div>
+                <div className="advance-create-field"><label htmlFor="advance-earmark">Zweckbindung</label><SelectDropdown id="advance-earmark" ariaLabel="Zweckbindung" value={createDraft.earmarkId} options={[{ value: '', label: 'Keine Zuordnung' }, ...earmarks.map(earmark => ({ value: String(earmark.id), label: `${earmark.code} – ${earmark.name}`, color: earmark.color || undefined }))]} onChange={value => setCreateDraft(current => ({ ...current, earmarkId: value }))} /></div>
+                <label className="advance-create-field" htmlFor="advance-notes">Notiz<textarea id="advance-notes" className="input" rows={2} value={createDraft.notes} onChange={event => setCreateDraft(current => ({ ...current, notes: event.target.value }))} /></label>
+              </details>
             </div>
-            <div className="row">
-              <div className="field standard-floating-field standard-floating-field--filled">
-                <label htmlFor="advance-issued-at">Ausgabedatum *</label>
-                <span className="booking-date-input-wrap">
-                  <input id="advance-issued-at" ref={createIssuedAtRef} type="date" className="input" value={createDraft.issuedAt} onChange={(e) => setCreateDraft((prev) => ({ ...prev, issuedAt: e.target.value }))} />
-                  <DatePickerButton inputRef={createIssuedAtRef} ariaLabel="Kalender zur Auswahl des Ausgabedatums öffnen" />
-                </span>
-              </div>
-              <div className={`field standard-floating-field${createDraft.amount.trim() ? ' standard-floating-field--filled' : ''}`}>
-                <label htmlFor="advance-amount">Betrag (€) *</label>
-                <input id="advance-amount" className="input" value={createDraft.amount} onChange={(e) => setCreateDraft((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0,00" />
-              </div>
-            </div>
-            <div className="row">
-              {isGeneralProfile && <div className="field standard-floating-field standard-floating-field--filled">
-                <label htmlFor="advance-primary-category">Kategorie *</label>
-                <select id="advance-primary-category" className="input" value={createDraft.primaryClassificationValueId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, primaryClassificationValueId: e.target.value }))}>
-                  <option value="">Kategorie wählen</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>
-                  ))}
-                </select>
-              </div>}
-              <div className="field standard-floating-field standard-floating-field--filled">
-                <label htmlFor="advance-budget">Budget (optional)</label>
-                <select id="advance-budget" className="input" value={createDraft.budgetId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, budgetId: e.target.value }))}>
-                  <option value="">Nicht gesetzt</option>
-                  {budgets.map((budget) => (
-                    <option key={budget.id} value={budget.id}>{budget.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field standard-floating-field standard-floating-field--filled">
-                <label htmlFor="advance-earmark">Zweckbindung (optional)</label>
-                <select id="advance-earmark" className="input" value={createDraft.earmarkId} onChange={(e) => setCreateDraft((prev) => ({ ...prev, earmarkId: e.target.value }))}>
-                  <option value="">Nicht gesetzt</option>
-                  {earmarks.map((earmark) => (
-                    <option key={earmark.id} value={earmark.id}>{earmark.code} – {earmark.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className={`field standard-floating-field${createDraft.notes.trim() ? ' standard-floating-field--filled' : ''}`}>
-              <label htmlFor="advance-notes">Notiz (optional)</label>
-              <textarea id="advance-notes" className="input" rows={3} value={createDraft.notes} onChange={(e) => setCreateDraft((prev) => ({ ...prev, notes: e.target.value }))} />
-            </div>
-            <div className="advances-modal-actions">
-              <button className="btn" type="button" onClick={() => setCreateOpen(false)}>Abbrechen</button>
-              <button className="btn primary" type="button" disabled={createBusy} onClick={submitCreate}>Speichern</button>
-            </div>
-          </div>
-        </div>
+            <footer className="advance-create-footer"><button className="btn ghost" type="button" disabled={createBusy} onClick={closeCreate}>Abbrechen</button><button className="btn primary" type="submit" disabled={createBusy}>{createBusy ? 'Speichert…' : 'Vorschuss erfassen'}</button></footer>
+          </form>
+        </BookingPopupFrame>
       )}
 
       {settleOpen && detail && (
@@ -877,7 +832,7 @@ export default function AdvancesView() {
               <h2 style={{ margin: 0 }}>Vorschuss auflösen</h2>
               <AdvanceModalCloseButton onClick={() => setSettleOpen(false)} />
             </div>
-            <div className="helper">Offener Betrag: {eurFmt.format(detail.openAmount)}</div>
+            <div className="helper">Offener Betrag: {eurFmt.format(detail.status === 'OPEN' ? detail.openAmount : 0)}</div>
             <div className="row">
               <div className="field standard-floating-field standard-floating-field--filled">
                 <label htmlFor="advance-settled-at">Auflösungsdatum *</label>

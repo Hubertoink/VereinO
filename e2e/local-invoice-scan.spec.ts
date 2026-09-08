@@ -208,6 +208,7 @@ test('receipt widget keeps local fields after AI failure and saves a booking wit
   await intake.getByRole('button', { name: 'Als Buchung übernehmen', exact: true }).click()
   await intake.getByRole('button', { name: 'Buchungskonto wählen', exact: true }).click()
   await intake.getByRole('option', { name: 'Widget Testbank', exact: true }).click()
+  await expect.poll(() => intake.locator('.booking-validation-badge').allTextContents()).toEqual([])
   const closed = intake.waitForEvent('close')
   await intake.getByRole('button', { name: 'Speichern', exact: true }).click()
   await closed

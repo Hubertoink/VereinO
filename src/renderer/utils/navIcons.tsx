@@ -20,15 +20,8 @@ export function getNavIcon(key: NavKey): React.ReactNode {
 
   switch (key) {
     case 'Dashboard':
-      // Grid/Layout icon
-      return (
-        <svg {...iconProps}>
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-        </svg>
-      )
+    case 'DashboardPlus':
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="3" /><path d="M7 15v2M12 11v6M17 7v10M7 7h2" /></svg>
     case 'Buchungen':
       // List/Journal icon
       return (
@@ -41,6 +34,8 @@ export function getNavIcon(key: NavKey): React.ReactNode {
           <line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
       )
+    case 'BuchungenPlus':
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 3v18M16 3v18M11 8h2M11 12h2M11 16h2" /></svg>
     case 'Dauerbuchungen':
       // Lucide CalendarSync: Kalender + Wiederholung
       return (

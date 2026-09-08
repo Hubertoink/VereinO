@@ -113,7 +113,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                                         type="button"
                                         className="btn ghost"
                                         onClick={() => jumpToVoucher(r)}
-                                        title="Zur Buchung im Journal"
+                                        title="Zur Buchung"
                                         style={{ padding: 0, border: 0, background: 'transparent', color: 'var(--primary)', fontWeight: 600 }}
                                     >
                                         {r.voucherNo}
@@ -148,7 +148,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
                                 <div className="receipt-card__detail"><IconBuildingBank size={15} />{payment}</div>
                                 <span className="receipt-card__count"><IconPaperclip size={14} />{row.fileCount || 1} {(row.fileCount || 1) === 1 ? 'Beleg' : 'Belege'}</span>
                             </button>
-                            <footer><button className="btn ghost" onClick={() => jumpToVoucher(row)} title="Zur Buchung im Journal">{row.voucherNo}<span aria-hidden="true">↗</span></button></footer>
+                            <footer><button className="btn ghost" onClick={() => jumpToVoucher(row)} title="Zur Buchung">{row.voucherNo}<span aria-hidden="true">↗</span></button></footer>
                         </article>
                     })}
                 </div>

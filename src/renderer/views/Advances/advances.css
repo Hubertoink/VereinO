@@ -1,0 +1,115 @@
+/* Flat recipient list and focused detail area, using the application theme. */
+.advances-page { border: 0; border-radius: 0; gap: 20px; }
+.advances-page .helper { color: var(--text-dim); }
+.advances-page .advances-layout { grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); gap: 20px; border: 0; }
+.advances-page .advances-list-card, .advances-page .advances-detail-card { min-width: 0; background: var(--surface); padding: 0; border: 0; align-content: start; }
+.advances-page .advances-list-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; gap: 0; }
+.advances-page .advances-toolbar { grid-template-columns: minmax(0, 1fr) 105px; padding: 12px 12px 6px; }
+.advances-toolbar .input { box-sizing: border-box; min-width: 0; width: 100%; }
+.advances-list-feedback { padding: 4px 14px 10px; font-size: 11px; color: var(--text-dim); min-height: 28px; }
+.advances-recipient-list { list-style: none; padding: 0; margin: 0; max-height: 620px; overflow-y: auto; }
+.advances-recipient-list li { border-top: 1px solid var(--border); }
+.advances-recipient-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 12px; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 0; padding: 15px 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+.advances-recipient-row:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.advances-recipient-row.advances-row-active { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); box-shadow: inset 3px 0 var(--accent); }
+.advances-recipient-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.advances-avatar { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 20%, var(--surface)); color: var(--text); font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.advances-row-active .advances-avatar, .advances-avatar--large { background: color-mix(in srgb, var(--accent) 50%, var(--surface)); }
+.advances-recipient-copy, .advances-recipient-amount { display: grid; gap: 5px; min-width: 0; }
+.advances-recipient-copy > strong { font-size: 13px; overflow-wrap: anywhere; }
+.advances-recipient-copy > span:not(.advances-status), .advances-recipient-amount > span { font-size: 10px; color: var(--text-dim); }
+.advances-recipient-copy .advances-status { justify-self: start; font-size: 10px; padding: 1px 7px; }
+.advances-recipient-amount { text-align: right; font-variant-numeric: tabular-nums; }
+.advances-recipient-amount > strong { font-size: 12px; white-space: nowrap; }
+.advances-recipient-row > svg { color: var(--text-dim); }
+.advances-person-card { border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--accent) 4%, var(--surface)); padding: 20px; display: grid; gap: 16px; }
+.advances-person { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.advances-person h2 { font-size: 21px; margin: 0 0 5px; overflow-wrap: anywhere; }
+.advances-avatar--large { width: 46px; height: 46px; font-size: 17px; }
+.advances-page .advances-detail-header { align-items: center; }
+.advances-detail-header > .advances-status { flex-shrink: 0; }
+.advances-person-actions { display: flex; justify-content: flex-end; }
+.advances-page .advances-detail-kpis { gap: 0; }
+.advances-page .advances-detail-kpis > div { padding: 12px 14px; border: 0; border-top: 1px solid var(--border); }
+.advances-page .advances-detail-kpis > div + div { border-left: 1px solid var(--border); }
+.advances-detail-kpis > div > div:last-child { margin-top: 6px; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.advances-note { padding: 12px 16px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); font-size: 12px; }
+.advances-note p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
+.advances-page .advances-subtitle { margin-top: 12px; }
+.advances-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 18px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
+.advances-empty > svg { color: var(--text-dim); }
+.advances-empty > strong { font-size: 14px; }
+.advances-empty--detail { min-height: 260px; }
+.advances-pagination { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-top: 1px solid var(--border); font-size: 11px; }
+@media (max-width: 1100px) {
+  .advances-page .advances-layout { grid-template-columns: minmax(0, 1fr); }
+  .advances-recipient-list { max-height: 320px; }
+}
+@media (max-width: 620px) {
+  .advances-page { padding: 10px; }
+  .advances-person-card { padding: 14px; }
+  .advances-page .advances-detail-header { align-items: flex-start; flex-wrap: wrap; }
+  .advances-person h2 { font-size: 18px; }
+  .advances-page .advances-detail-kpis { grid-template-columns: 1fr; }
+  .advances-page .advances-detail-kpis > div + div { border-left: 0; }
+  .advances-recipient-row { gap: 7px; }
+}
+
+.advances-header > .btn { white-space: nowrap; flex-shrink: 0; }
+
+/* Keep the page header on the application background, like the other pages. */
+.advances-page { background: transparent; }
+.advances-page .advances-detail-card { background: transparent; }
+.advances-header h1 { font-size: 24px; }
+.advances-progress { grid-column: 2 / -2; display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text-dim); }
+.advances-progress progress { flex: 1; min-width: 0; width: 100%; height: 5px; border: 0; border-radius: 999px; overflow: hidden; appearance: none; background: var(--border); }
+.advances-progress progress::-webkit-progress-bar { background: var(--border); border-radius: 999px; }
+.advances-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
+.advances-progress progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
+.advance-purchases { display: grid; gap: 8px; }
+.advance-purchase { display: grid; grid-template-columns: 36px 32px minmax(120px, 1fr) minmax(75px, 130px) auto 66px; align-items: center; gap: 12px; padding: 16px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.advance-purchase-date { display: grid; text-align: center; font-size: 10px; line-height: 1.4; }
+.advance-purchase-date strong { font-size: 20px; }
+.advance-purchase-kind { display: grid; place-items: center; width: 32px; height: 36px; border-radius: 10px; }
+.advance-purchase .is-income { color: var(--success); }
+.advance-purchase .is-expense { color: var(--danger); }
+.advance-purchase-kind.is-income { background: color-mix(in srgb, var(--success) 14%, var(--surface)); }
+.advance-purchase-kind.is-expense { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
+.advance-purchase-copy { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.advance-purchase-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.advance-purchase-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); font-size: 10px; }
+.advance-purchase-badge.is-posted { background: color-mix(in srgb, var(--success) 16%, var(--surface)); }
+.advance-purchase-badge.is-draft { background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+.advance-purchase-payment { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.advance-payment-badge { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 5px; padding: 3px 5px; font-size: 10px; min-width: 0; }
+.advance-payment-badge svg { flex-shrink: 0; }
+.advance-payment-badge > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.advance-purchase-files { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; flex-shrink: 0; }
+.advance-purchase-amount { font-size: 13px; white-space: nowrap; text-align: right; }
+.advance-purchase-actions { display: flex; gap: 4px; }
+.advance-purchase-actions .btn { display: inline-flex; align-items: center; justify-content: center; padding: 5px; }
+.advance-create-form { display: flex; flex-direction: column; min-height: 0; }
+.advance-create-fields { display: grid; gap: 16px; padding: 16px; overflow: auto; }
+.advance-create-field { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.advance-create-field .input { box-sizing: border-box; min-width: 0; width: 100%; }
+.advance-create-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.advance-create-optional { border-top: 1px solid var(--border); padding-top: 12px; }
+.advance-create-optional summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.advance-create-optional summary span { color: var(--text-dim); font-weight: 400; }
+.advance-create-optional > .advance-create-field { margin-top: 14px; }
+.advance-create-footer { flex-shrink: 0; padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); }
+.advance-create-flyout .compact-booking-popup__content { padding: 0; }
+@media (min-width: 1101px) and (max-width: 1350px) {
+  .advance-purchase { grid-template-columns: 32px minmax(100px, 1fr) auto 66px; gap: 8px; }
+  .advance-purchase-kind { display: none; }
+  .advance-purchase-payment { grid-column: 2; grid-row: 2; }
+  .advance-purchase-amount { grid-column: 3; grid-row: 1; }
+  .advance-purchase-actions { grid-column: 4; grid-row: 1; }
+}
+@media (max-width: 700px) {
+  .advance-purchase { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 8px; }
+  .advance-purchase-kind { display: none; }
+  .advance-purchase-payment { grid-column: 2; }
+  .advance-purchase-actions { grid-column: 3; justify-content: flex-end; }
+  .advance-purchase-amount { grid-column: 3; grid-row: 1; }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
 function monthKeys(from?: string, to?: string): string[] {
@@ -30,12 +30,6 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [containerW, setContainerW] = useState<number>(0)
-  const ditherId = useId().replace(/:/g, '')
-  const incomeGradientId = `report-income-gradient-${ditherId}`
-  const expenseGradientId = `report-expense-gradient-${ditherId}`
-  const incomePatternId = `report-income-dither-${ditherId}`
-  const expensePatternId = `report-expense-dither-${ditherId}`
-  const saldoAuraId = `report-saldo-aura-${ditherId}`
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -54,7 +48,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     const t1 = setTimeout(measure, 120)
     const t2 = setTimeout(measure, 360)
     return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVisibility); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
-  }, [])
+  }, [loading])
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -119,12 +113,14 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const scaleVals = (() => {
     const vals: number[] = []
     for (const s of series) { vals.push(Math.abs(s.inGross)); vals.push(Math.abs(s.outGross)); }
-    for (const v of saldo) vals.push(Math.abs(v))
+    for (const v of saldo) vals.push(v)
     return vals
   })()
   const maxValRaw = Math.max(1, ...scaleVals)
   const maxVal = maxValRaw
-  const margin = { top: 22, right: 28, bottom: 42, left: 75 }
+  const minVal = Math.min(0, ...saldo, ...series.map(entry => entry.inGross))
+  const valueRange = maxVal - minVal
+  const margin = { top: 22, right: 28, bottom: 48, left: 100 }
   const innerH = 180
   const defaultGroupW = 44
   const barW = 16
@@ -135,7 +131,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const yBase = margin.top
   const yAxisX = margin.left - 2
   const innerW = width - (margin.left + margin.right)
-  const groupW = months.length > 0 ? Math.max(40, Math.min(90, Math.floor((innerW - (months.length - 1) * gap) / months.length))) : defaultGroupW
+  const groupW = innerW / Math.max(1, months.length)
   const monthLabel = (m: string, withYear = false) => {
     const [y, mm] = m.split('-').map(Number)
     const d = new Date(Date.UTC(y, (mm - 1) as number, 1))
@@ -156,8 +152,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     if (years.length === 0) return ''
     return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`
   }, [props.from, props.to, years])
-  const xFor = (idx: number) => margin.left + idx * (groupW + gap)
-  const yFor = (val: number) => yBase + (innerH - Math.round((Math.abs(val) / maxVal) * innerH))
+  const xFor = (idx: number) => margin.left + (idx + 0.5) * groupW - barW
+  const yFor = (val: number) => yBase + (maxVal - val) / valueRange * innerH
   
   // Y-Achse Ticks
   function niceStep(max: number) {
@@ -173,9 +169,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     return step
   }
   const yTicks = (() => {
-    const step = niceStep(maxVal)
+    const step = niceStep(valueRange)
     const arr: number[] = []
-    for (let v = 0; v <= maxVal; v += step) arr.push(Math.round(v))
+    for (let v = Math.ceil(minVal / step) * step; v <= maxVal; v += step) arr.push(v)
     return arr
   })()
 
@@ -209,18 +205,18 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }
 
   return (
-    <div className="card report-chart-card dither-chart-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Monatsverlauf (Balken: IN/OUT · Linie: kumulierter Saldo)</strong>
+    <div className="dp-card report-chart-card">
+      <div className="dp-card-heading report-chart-header">
+        <h2>Monatliche Entwicklung</h2>
         <div className="legend">
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#2e7d32' }}></span>IN</span>
-          <span className="legend-item"><span className="legend-swatch" style={{ background: '#c62828' }}></span>OUT</span>
-          <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--accent)' }}></span>Saldo</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-in"></span>Einnahmen</span>
+          <span className="legend-item"><span className="legend-swatch legend-swatch-out"></span>Ausgaben</span>
+          <span className="legend-item"><span className="legend-swatch report-swatch-balance"></span>Kumulierter Saldo</span>
         </div>
       </div>
       {loading && <div>Lade …</div>}
       {!loading && (
-        <div ref={containerRef} style={{ overflowX: 'hidden', position: 'relative', width: '100%' }}>
+        <div ref={containerRef} className="report-chart-scroll">
           {(() => {
             const focusIdx = (typeof hoverIdx === 'number' ? hoverIdx : null)
             const idx = focusIdx
@@ -230,23 +226,16 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             const gx = xFor(idx) + barW
             const tooltipX = (gx / width) * 100
             return (
-              <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{monthLabelFull(s.month)} {s.month.slice(0, 4)}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eurFmt.format(s.inGross)}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eurFmt.format(Math.abs(s.outGross))}</strong></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--warning)' }}>Netto</span> <strong style={{ color: 'var(--warning)' }}>{eurFmt.format(net)}</strong></div>
-                <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--accent)' }}>Saldo kumuliert</span> <strong style={{ color: 'var(--accent)' }}>{eurFmt.format(saldo[idx] || 0)}</strong></div>
+              <div className="report-chart-tooltip" style={{ left: `clamp(0px, calc(${tooltipX}% - 120px), max(0px, 100% - 240px))` }}>
+                <strong>{monthLabelFull(s.month)} {s.month.slice(0, 4)}</strong>
+                <div><span>Einnahmen</span><b>{eurFmt.format(s.inGross)}</b></div>
+                <div><span>Ausgaben</span><b>{eurFmt.format(Math.abs(s.outGross))}</b></div>
+                <div><span>Netto</span><b>{eurFmt.format(net)}</b></div>
+                <div className="report-tooltip-total"><span>Saldo kumuliert</span><b>{eurFmt.format(saldo[idx] || 0)}</b></div>
               </div>
             )
           })()}
           <svg ref={svgRef} width={width} height={height} role="img" aria-label="Monatsverlauf" onMouseMove={mouseMove} onMouseLeave={() => setHoverIdx(null)}>
-            <defs>
-              <linearGradient id={incomeGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--success)" stopOpacity="0.4" /><stop offset="100%" stopColor="var(--success)" stopOpacity="0.92" /></linearGradient>
-              <linearGradient id={expenseGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity="0.38" /><stop offset="100%" stopColor="var(--danger)" stopOpacity="0.88" /></linearGradient>
-              <pattern id={incomePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.65" fill="var(--success)" opacity="0.94" /><circle cx="4" cy="2.5" r="0.5" fill="var(--success)" opacity="0.6" /><circle cx="2.5" cy="5" r="0.45" fill="var(--success)" opacity="0.42" /></pattern>
-              <pattern id={expensePatternId} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M -2 6 L 6 -2 M 0 8 L 8 0 M 4 10 L 10 4" stroke="var(--danger)" strokeWidth="1.1" opacity="0.85" /></pattern>
-              <filter id={saldoAuraId} x="-20%" y="-30%" width="140%" height="160%"><feGaussianBlur stdDeviation="4" /></filter>
-            </defs>
             {/* Y-Achse Grid + Labels */}
             {yTicks.map((v, i) => (
               <g key={`ytick-${i}`}>
@@ -256,23 +245,15 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
             ))}
             {series.map((s, i) => {
               const gx = xFor(i)
-              const hIn = Math.round((Math.abs(s.inGross) / maxVal) * innerH)
-              const hOut = Math.round((Math.abs(s.outGross) / maxVal) * innerH)
-              const yIn = yBase + (innerH - hIn)
-              const yOut = yBase + (innerH - hOut)
-              const saldoMonth = s.inGross + s.outGross
+              const hIn = Math.abs(yFor(s.inGross) - yFor(0))
+              const hOut = Math.abs(yFor(Math.abs(s.outGross)) - yFor(0))
+              const yIn = Math.min(yFor(0), yFor(s.inGross))
+              const yOut = yFor(Math.abs(s.outGross))
               return (
                 <g key={i}>
-                  <rect x={gx} y={yIn} width={barW} height={hIn} fill={`url(#${incomeGradientId})`} rx={3} />
-                  <rect x={gx} y={yIn} width={barW} height={hIn} fill={`url(#${incomePatternId})`} opacity="0.76" rx={3} />
-                  <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill={`url(#${expenseGradientId})`} rx={3} />
-                  <rect x={gx + barW + 6} y={yOut} width={barW} height={hOut} fill={`url(#${expensePatternId})`} opacity="0.8" rx={3} />
-                  {(() => {
-                    const hNet = Math.round((Math.abs(saldoMonth) / maxVal) * innerH)
-                    const yNet = yBase + (innerH - hNet)
-                    return <rect x={gx + barW - 2} y={yNet} width={6} height={hNet} fill="var(--warning)" rx={2} opacity={0.9} />
-                  })()}
-                  <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, false)}</text>
+                  <rect x={gx - 3} y={yIn} width={barW} height={hIn} fill="var(--dp-accent)" rx={2} />
+                  <rect x={gx + barW + 3} y={yOut} width={barW} height={hOut} fill="var(--dp-amber)" rx={2} />
+                  <text x={gx + barW} y={yBase + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(s.month, years.length > 1)}</text>
                 </g>
               )
             })}
@@ -281,7 +262,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
                 {saldo.map((v, i) => {
                   const x = xFor(i) + barW
                   const y = yFor(v)
-                  return <circle key={`p-${i}`} cx={x} cy={y} r={2} fill={'var(--accent)'} />
+                  return <circle key={`p-${i}`} cx={x} cy={y} r={2.5} fill="var(--dp-mint)" />
                 })}
                 {saldo.map((v, i) => {
                   if (i === 0) return null
@@ -289,11 +270,11 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
                   const y1 = yFor(saldo[i - 1])
                   const x2 = xFor(i) + barW
                   const y2 = yFor(v)
-                  return <g key={`l-${i}`}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--accent)" strokeWidth={6} opacity="0.2" filter={`url(#${saldoAuraId})`} /><line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--accent)" strokeWidth={2.2} strokeLinecap="round" /></g>
+                  return <line key={`l-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--dp-mint)" strokeWidth={2} strokeLinecap="round" />
                 })}
               </g>
             )}
-            <line x1={yAxisX} y1={yBase} x2={yAxisX} y2={yBase + innerH} stroke="var(--border)" />
+            <line x1={yAxisX} y1={yFor(0)} x2={width - margin.right} y2={yFor(0)} stroke="var(--border)" />
             {yearText && (
               <text x={Math.round(width / 2)} y={yBase + innerH + 34} textAnchor="middle" fontSize="11" fill="var(--text-dim)">{yearText}</text>
             )}

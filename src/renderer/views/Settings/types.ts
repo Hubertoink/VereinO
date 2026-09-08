@@ -149,6 +149,8 @@ export interface SettingsProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
+  bookingView: 'classic' | 'plus'
+  setBookingView: (value: 'classic' | 'plus') => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean
@@ -212,6 +214,8 @@ export interface GeneralPaneProps {
 }
 
 export interface WorkflowPaneProps {
+  bookingView: 'classic' | 'plus'
+  setBookingView: (value: 'classic' | 'plus') => void
   showBookingDraftTabs: boolean
   setShowBookingDraftTabs: (v: boolean) => void
   showBookingEditTabs: boolean

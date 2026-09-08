@@ -1,3 +1,5 @@
+import { IconPlus, IconPencil, IconTrash, IconRotateClockwise, IconCalendarRepeat, IconLink, IconCheck, IconHistory, IconReceipt2, IconChevronRight } from '@tabler/icons-react'
+import { activityAction, activityFallback, bookingKindLabel, paymentKindLabel, sphereLabel } from './activityPresentation'
 import React, { useEffect, useMemo, useState } from 'react'
 import BalanceAreaChart from './BalanceAreaChart'
 import IncomeExpenseBars from './IncomeExpenseBars'
@@ -536,10 +538,11 @@ function DashboardTaskStrip({ items }: { items: DashboardTaskItem[] }) {
   )
 }
 
-function DashboardRecentActivity({
-  onGoToVoucher
+export function DashboardRecentActivity({
+  onGoToVoucher, table = false
 }: {
   onGoToVoucher?: (args: GoToVoucherArgs) => void
+  table?: boolean
 }) {
   const [rows, setRows] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(false)
@@ -629,7 +632,7 @@ function DashboardRecentActivity({
       if (a === 'CREATE') {
         const v = d.data || {}
         const amount = v.grossAmount ?? v.netAmount ?? 0
-        const label = `${v.type || ''} ${v.paymentMethod || ''}`.trim()
+        const label = [bookingKindLabel(v.type), paymentKindLabel(v.paymentMethod)].filter(Boolean).join(' · ')
           const desc = (v.description || '').trim()
           return { title: `Beleg ${label} ${eur.format(amount)} erstellt${desc ? ' · '+desc.slice(0, 80) : ''}`, details: '' }
       }
@@ -650,11 +653,11 @@ function DashboardRecentActivity({
         }
         add('description', d.before?.description, d.after?.description)
         add('date', d.before?.date, d.after?.date)
-        add('type', d.before?.type, d.after?.type)
-        add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod)
+        add('type', d.before?.type, d.after?.type, bookingKindLabel)
+        add('paymentMethod', d.before?.paymentMethod, d.after?.paymentMethod, paymentKindLabel)
         add('grossAmount', d.before?.grossAmount, d.after?.grossAmount, (x:any)=> eur.format(Number(x||0)))
         add('vatRate', d.before?.vatRate, d.after?.vatRate, (x:any)=> `${x ?? 0}%`)
-        add('sphere', d.before?.sphere, d.after?.sphere)
+        add('sphere', d.before?.sphere, d.after?.sphere, sphereLabel)
         // Zweckbindung: Code anzeigen statt ID
         add('earmarkId', d.before?.earmarkId, d.after?.earmarkId, formatEarmarkLabel)
         // Budget: Name anzeigen statt ID
@@ -671,6 +674,7 @@ function DashboardRecentActivity({
       }
       if (a === 'UPDATE_META') {
         const changes: string[] = []
+        if ((d.before?.note ?? '') !== (d.after?.note ?? '')) changes.push('Kommentar geändert')
         const beforeBudget = summarizeAssignments(d.before?.budgets, formatBudgetLabel, 'budgetId')
         const afterBudget = summarizeAssignments(d.after?.budgets, formatBudgetLabel, 'budgetId')
         const beforeEarmark = summarizeAssignments(d.before?.earmarks, formatEarmarkLabel, 'earmarkId')
@@ -730,7 +734,7 @@ function DashboardRecentActivity({
       }
     }
     // Fallback
-    return { title: `${a} ${e} #${row.entityId || ''}`.trim(), details: '' }
+    return { title: activityFallback(e, a, row.entityId), details: voucherText.replace(/^ · /, '') }
   }
 
   const ActionIcon = ({ kind, color }: { kind: string; color: string }) => {
@@ -804,6 +808,18 @@ function DashboardRecentActivity({
       </svg>
     )
   }
+
+  if (table) return <article className="dp-card dp-cash-table dp-activity"><div className="dp-card-heading"><h2>Letzte Aktionen</h2><span className="dp-card-note">Die letzten 20 Ereignisse · alle Zeiträume</span></div>{loading ? <p role="status">Aktivitäten werden geladen …</p> : !rows.length ? <p>Keine Aktionen vorhanden.</p> : <div className="dp-table-scroll"><table><thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Belegdatum</th><th>Öffnen</th></tr></thead><tbody>{rows.map(row => {
+    const info = describe(row)
+    const entity = String(row.entity || '').toUpperCase()
+    const id = Number(['VOUCHER', 'VOUCHERS'].includes(entity) ? row.entityId : row.voucherId || row.diff?.voucherId || 0)
+    const canOpen = id > 0 && String(row.action).toUpperCase() !== 'DELETE'
+    const action = String(row.action || '').toUpperCase()
+    const Icon = action === 'CREATE' ? IconPlus : action === 'BOOK' || entity.startsWith('RECURRING') ? IconCalendarRepeat : action === 'DELETE' || action === 'CLEAR_ALL' ? IconTrash : action === 'REVERSE' ? IconRotateClockwise : action === 'LINK' ? IconLink : action === 'CHECK' ? IconCheck : action.startsWith('UPDATE') || action.startsWith('BATCH_ASSIGN') ? IconPencil : IconHistory
+    const tone = ['DELETE', 'CLEAR_ALL', 'REJECT'].includes(action) ? 'danger' : ['REVERSE', 'REOPEN', 'SKIP'].includes(action) ? 'warning' : ['CREATE', 'BOOK', 'CHECK', 'APPROVE'].includes(action) ? 'success' : 'info'
+    const timestamp = row.createdAt ? new Date(row.createdAt) : null
+    return <tr key={row.id}><td className="dp-activity-time">{timestamp ? <><strong>{timestamp.getDate()}</strong><span>{timestamp.toLocaleDateString('de-DE', { month: 'short' })}</span><span>{timestamp.getFullYear()}</span><small>{timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</small></> : '—'}</td><td><div className={`dp-activity-event dp-activity-event--${tone}`}><span className="dp-activity-symbol"><Icon size={19} stroke={1.8} /></span><div><span className="dp-activity-badge">{activityAction(action)}</span><strong>{info.title}</strong>{info.details && <small>{info.details}</small>}</div></div></td><td>{row.recordDate ? new Date(`${row.recordDate.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE') : '—'}</td><td>{canOpen && onGoToVoucher && <button className="btn ghost dp-activity-open" aria-label="Buchung öffnen" onClick={() => onGoToVoucher({ voucherId: id, recordDate: row.recordDate })}><IconReceipt2 size={17} /><span>Buchung öffnen</span><IconChevronRight size={14} /></button>}</td></tr>
+  })}</tbody></table></div>}</article>
 
   return (
     <div className="card" style={{ padding: 12 }}>
