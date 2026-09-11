@@ -7,6 +7,13 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [3.9.8] - 2026-09-11
+
+### Hinzugefügt
+
+- Doppelklick auf eine Buchung in Buchungen Plus öffnet die vollständigen Buchungsdetails.
+- Die Seitennavigation in Buchungen Plus bietet einen Doppelpfeil-Button zum direkten Sprung auf die erste Seite.
+
 ## [3.9.7] - 2026-09-11
 
 ### Geändert
