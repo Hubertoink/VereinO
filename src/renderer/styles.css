@@ -7447,7 +7447,7 @@ body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !i
 }
 
 .local-invoice-scan__result-panel > .local-invoice-scan__panel-heading {
-  margin: -14px -14px 12px;
+  margin: 0;
 }
 
 .local-invoice-scan__file-info {
@@ -7685,22 +7685,6 @@ body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !i
   border-top: 1px solid var(--border);
 }
 
-@media (max-width: 900px) {
-  .local-invoice-scan {
-    max-height: 92vh;
-    overflow: auto;
-  }
-
-  .local-invoice-scan__workspace {
-    grid-template-columns: 1fr;
-    overflow: visible;
-  }
-
-  .local-invoice-scan__preview {
-    max-height: 52vh;
-  }
-}
-
 /* The invoice scanner uses the detached booking window as a real window surface,
    not as a second modal floating inside that window. */
 body.detached-quick-add-body .local-invoice-scan-overlay {
@@ -7729,34 +7713,6 @@ body.detached-quick-add-body .local-invoice-scan__header button,
 body.detached-quick-add-body .local-invoice-scan__header input,
 body.detached-quick-add-body .local-invoice-scan__header select {
   -webkit-app-region: no-drag;
-}
-
-/* Below this width both panes share one scrollable column. This keeps the
-   recognized fields reachable instead of squeezing them below the footer. */
-@media (max-width: 900px) {
-  .local-invoice-scan {
-    overflow: hidden;
-  }
-
-  .local-invoice-scan__workspace {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-
-  .local-invoice-scan__preview-panel {
-    min-height: 440px;
-  }
-
-  .local-invoice-scan__result-panel {
-    min-height: auto;
-    overflow: visible;
-  }
-
-  .local-invoice-scan__result-body {
-    overflow: visible;
-  }
 }
 
 @media (max-width: 640px) {
@@ -7798,6 +7754,19 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   min-width: 0;
   max-width: 100%;
   max-height: min(920px, 92vh);
+}
+
+/* Keep the title and transfer action outside the scrolling workspace. */
+.local-invoice-scan__header,
+.local-invoice-scan__footer,
+.local-invoice-scan__preview-panel > .local-invoice-scan__panel-heading {
+  flex-shrink: 0;
+}
+
+/* Native dark controls already supply a light calendar icon. */
+:root[data-theme] .local-invoice-scan input[type='date']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 1;
 }
 
 .local-invoice-scan__header-actions,
@@ -8399,17 +8368,43 @@ body:has(.local-invoice-scan) .app-main {
   }
 }
 
+/* Stacked review uses one outer scroll area; grid rows must fit their content. */
 @media (max-width: 900px) {
   .local-invoice-scan__workspace {
     grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
-  .local-invoice-scan__preview-panel {
-    min-height: 480px;
+  .local-invoice-scan__document-column {
+    min-height: auto;
+  }
+
+  .local-invoice-scan__document-column > .local-invoice-scan__preview-panel {
+    flex: none;
+    height: clamp(240px, 45vh, 480px);
+    min-height: 0;
+  }
+
+  .local-invoice-scan__preview {
+    min-height: 0;
   }
 
   .local-invoice-scan__result-panel {
+    min-height: auto;
     max-height: none;
+    overflow: visible;
+  }
+
+  .local-invoice-scan__result-body {
+    overflow: visible;
+  }
+
+  .local-invoice-scan__panel-heading,
+  .local-invoice-scan__preview-actions {
+    flex-wrap: wrap;
   }
 }
 

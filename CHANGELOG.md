@@ -7,6 +7,17 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [3.9.7] - 2026-09-11
+
+### Geändert
+
+- Buchungen Plus nutzt kompaktere Kopfzeilen, Summen und Suchfelder. Die Aktionen zur Buchungs- und Rechnungserfassung passen sich schmalen Fenstern an.
+
+### Behoben
+
+- Kalendericons in „Rechnung erfassen“ sind im Darktheme hell sichtbar.
+- In schmalen Fenstern stehen Dokumentvorschau und erkannte Rechnungsdaten ohne Überlagerungen untereinander. Ein gemeinsamer Scrollbereich hält alle Felder erreichbar; Kopfzeile und Übernehmen-Button bleiben sichtbar.
+
 ## [3.9.6] - 2026-09-09
 
 ### Hinzugefügt
