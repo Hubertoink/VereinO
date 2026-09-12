@@ -63,6 +63,13 @@
 .bp-row-text > small { color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bp-row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .bp-tag { border-radius: 12px; padding: 3px 7px; background: color-mix(in srgb, var(--accent) 15%, var(--surface)); font-size: 10px; line-height: 1.2; overflow-wrap: anywhere; }
+.bp-badge-filter { border: 0; font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
+.bookings-plus button.bp-badge-filter { min-height: 0; min-width: 0; height: auto; font-size: 10px; font-weight: inherit; line-height: 1.2; padding: 3px 7px; }
+.bookings-plus button.bp-assignment-badge { padding: 3px 6px; }
+.bp-badge-filter:hover { text-decoration: underline; filter: brightness(1.1); }
+.bp-badge-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bp-row[role="button"] { cursor: pointer; }
+.bp-row[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .bp-row .bp-row-tags { max-height: 22px; overflow: hidden; }
 .bp-row-payment { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--text-dim); font-size: 11px; overflow-wrap: anywhere; }
 .bp-row-payment small { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -174,7 +181,7 @@
 .bp-assignment-badge > svg { flex-shrink: 0; }
 .bp-assignment-badge > span { overflow-wrap: anywhere; }
 .bp-invoice-tools { margin-bottom: 10px; position: relative; z-index: 10; }
-.bp-invoice-tools .invoice-batch-control--inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 8px; min-height: 36px; border: 1px dashed var(--border); border-radius: 10px; background: var(--surface); }
+.bp-invoice-tools .invoice-batch-control--inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 0 0 8px; min-height: 36px; border: 1px dashed var(--border); border-radius: 10px; background: var(--surface); }
 .bp-invoice-tools .invoice-batch-control--dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .invoice-inline-hint { display: grid; gap: 3px; min-width: 0; }
 .invoice-inline-hint strong { font-size: 12px; }

@@ -43,6 +43,7 @@ export default function InvoiceBatchControl({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const singleInputRef = useRef<HTMLInputElement | null>(null)
   const allowBatchAutoOpenRef = useRef(true)
+  const lastInsidePointerDownRef = useRef<PointerEvent | null>(null)
   const [queue, setQueue] = useState<TAiInvoiceBatchListOutput | null>(null)
   const [open, setOpen] = useState(false)
   const [singleOpen, setSingleOpen] = useState(false)
@@ -52,6 +53,21 @@ export default function InvoiceBatchControl({
   const [singleError, setSingleError] = useState('')
   const [guidanceInstructions, setGuidanceInstructions] = useState('')
   const [guidanceDefaults, setGuidanceDefaults] = useState<NonNullable<InvoiceAiGuidance['defaults']>>({})
+
+  useEffect(() => {
+    if (!open && !singleOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      // React capture also includes the guidance dropdowns rendered in portals.
+      if (lastInsidePointerDownRef.current === event) return
+      allowBatchAutoOpenRef.current = false
+      setOpen(false)
+      setSingleOpen(false)
+      setDragging(false)
+      setSingleDragging(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open, singleOpen])
 
   const guidance: InvoiceAiGuidance | undefined = (() => {
     const instructions = guidanceInstructions.trim()
@@ -197,6 +213,7 @@ export default function InvoiceBatchControl({
   return (
     <div
       className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
+      onPointerDownCapture={(event) => { lastInsidePointerDownRef.current = event.nativeEvent }}
       onDragEnter={(event) => {
         event.preventDefault()
         if (singleOpen) setSingleDragging(true)
@@ -238,7 +255,9 @@ export default function InvoiceBatchControl({
           title="Einzelne Rechnung erfassen"
           aria-expanded={singleOpen}
         >
-          <span aria-hidden="true">+</span><span className="invoice-split-fab__label">{variant === 'inline' ? 'Beleg auslesen' : 'Rechnung'}</span>
+          <svg className="invoice-split-fab__plus" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d="M12 4v16M4 12h16" />
+          </svg><span className="invoice-split-fab__label">{variant === 'inline' ? 'Beleg auslesen' : 'Rechnung'}</span>
         </button>
         <button
           className="invoice-split-fab__batch"

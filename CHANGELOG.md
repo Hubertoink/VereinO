@@ -7,6 +7,22 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [3.9.9] - 2026-09-12
+
+### Hinzugefügt
+
+- Tags und Budgets in Buchungen Plus aktivieren per Klick den passenden Filter, sowohl in der Buchungsliste als auch in der Detailansicht. Weitere Filter bleiben erhalten.
+
+### Geändert
+
+- Die Kopieraktionen für Text und Excel befinden sich in den Buchungsdetails im Drei-Punkte-Menü neben dem Bearbeiten-Symbol.
+- Buchungsdetails, „Beleg auslesen“ und „Batch-KI“ schließen beim Klick außerhalb.
+
+### Behoben
+
+- Anklickbare Tags und Budget-Badges behalten ihre kompakte Größe.
+- Das Plus-Symbol und die Abstände bei „Beleg auslesen“ werden einheitlich dargestellt.
+
 ## [3.9.8] - 2026-09-11
 
 ### Hinzugefügt

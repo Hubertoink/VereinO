@@ -6838,9 +6838,9 @@ textarea:focus {
 .invoice-batch-control--dragging .invoice-split-fab { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 25%, transparent); }
 .invoice-split-fab button { border: 0; color: inherit; background: transparent; cursor: pointer; }
 .invoice-split-fab__new { min-width: 48px; padding: 0 13px; display: flex; align-items: center; justify-content: center; gap: 0; transition: background .2s, gap .25s; }
-.invoice-split-fab__new > span:first-child { font-size: 24px; font-weight: 300; }
+.invoice-split-fab__plus { display: block; flex-shrink: 0; }
 .invoice-split-fab__label { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .25s, opacity .2s; }
-.invoice-split-fab:hover .invoice-split-fab__new { gap: 8px; }
+.invoice-batch-control:not(.invoice-batch-control--inline) .invoice-split-fab:hover .invoice-split-fab__new { gap: 8px; }
 .invoice-split-fab:hover .invoice-split-fab__label { max-width: 100px; opacity: 1; }
 .invoice-split-fab__batch { width: 42px; position: relative; display: grid; place-items: center; border-left: 1px solid color-mix(in oklab, #b475ff 44%, var(--border)) !important; color: color-mix(in oklab, #b475ff 78%, white) !important; background: color-mix(in oklab, #b475ff 10%, transparent) !important; }
 .invoice-split-fab button:hover, .invoice-split-fab button:focus-visible { background: color-mix(in oklab, var(--warning) 22%, transparent); outline: none; }

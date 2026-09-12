@@ -1,7 +1,8 @@
 import PartyName from '../common/PartyName'
+import './voucherInfoActions.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconDotsVertical, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
 import SelectDropdown from '../common/SelectDropdown'
 import TagsEditor from '../TagsEditor'
 import ReceiptThumbnail, { type ReceiptPreviewCache } from '../ReceiptThumbnail'
@@ -94,6 +95,19 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
 
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false }: VoucherInfoModalProps) {
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false)
+  const copyMenuRef = useRef<HTMLDivElement>(null)
+  const copyMenuButtonRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => { setCopyMenuOpen(false) }, [voucher.id, suspended])
+  useEffect(() => {
+    if (!copyMenuOpen) return
+    copyMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+    const dismiss = (event: PointerEvent) => {
+      if (!copyMenuRef.current?.contains(event.target as Node)) setCopyMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [copyMenuOpen])
   const previewCache = useRef<ReceiptPreviewCache>(new Map())
   const [previewRevision, setPreviewRevision] = useState(0)
   useEffect(() => {
@@ -343,6 +357,7 @@ Status: ${statusLabel}`
           e.stopPropagation()
           return
         }
+        if (!embedded && !suspended && e.target === e.currentTarget) onClose()
       }}
       style={embedded ? undefined : {
         position: 'fixed',
@@ -419,6 +434,59 @@ Status: ${statusLabel}`
                 <IconEdit size={24} />
               </button>
             ) : null}
+            <div
+              className="voucher-info-actions"
+              ref={copyMenuRef}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setCopyMenuOpen(false)
+              }}
+              onKeyDown={(event) => {
+                if (!copyMenuOpen) return
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setCopyMenuOpen(false)
+                  copyMenuButtonRef.current?.focus()
+                } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                  event.preventDefault()
+                  const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+                  const index = items.indexOf(document.activeElement as HTMLButtonElement)
+                  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+                  items[next]?.focus()
+                }
+              }}
+            >
+              <button
+                ref={copyMenuButtonRef}
+                type="button"
+                className="btn ghost booking-modal-icon-btn"
+                aria-label="Weitere Aktionen"
+                title="Weitere Aktionen"
+                aria-haspopup="menu"
+                aria-expanded={copyMenuOpen}
+                onClick={() => setCopyMenuOpen(value => !value)}
+                onKeyDown={(event) => {
+                  if (!copyMenuOpen && event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    setCopyMenuOpen(true)
+                  }
+                }}
+              >
+                <IconDotsVertical size={22} />
+              </button>
+              {copyMenuOpen && (
+                <div className="voucher-info-actions__menu" role="menu" aria-label="Kopieraktionen">
+                  <button type="button" className="btn ghost" role="menuitem" onClick={() => { copyAsText(); setCopyMenuOpen(false); copyMenuButtonRef.current?.focus() }}>
+                    <AppIcon icon={IconClipboardText} size="action" />
+                    <span>Als Text kopieren</span>
+                  </button>
+                  <button type="button" className="btn ghost" role="menuitem" onClick={() => { copyForExcel(); setCopyMenuOpen(false); copyMenuButtonRef.current?.focus() }}>
+                    <AppIcon icon={IconTableExport} size="action" />
+                    <span>Für Excel kopieren</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={onClose} aria-label="Schließen" title="Schließen (ESC)" style={{ fontSize: windowMode ? undefined : 20 }}>
               ✕
             </button>
@@ -699,14 +767,6 @@ Status: ${statusLabel}`
               <span>Stornieren</span>
             </button>
           ) : null}
-          <button className="btn voucher-info-footer__button voucher-info-copy-btn" onClick={copyAsText}>
-            <AppIcon icon={IconClipboardText} size="action" />
-            <span>Als Text kopieren</span>
-          </button>
-          <button className="btn ghost voucher-info-footer__button voucher-info-excel-btn" onClick={copyForExcel}>
-            <AppIcon icon={IconTableExport} size="action" />
-            <span>Für Excel kopieren</span>
-          </button>
           {embedded && <button className="btn" disabled={savingMeta} onClick={onClose}>Abbrechen</button>}
           {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{!embedded && (editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />)}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
