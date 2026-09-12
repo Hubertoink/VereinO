@@ -1,5 +1,6 @@
 ﻿
 import React, { useEffect, useMemo, useState } from 'react'
+import './setupBookingView.css'
 import { compressImageFileToDataUrl } from '../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
 import { dispatchDataChanged } from '../../utils/refresh'
@@ -42,6 +43,7 @@ function ToggleButtons<T extends string>({ value, onChange, options }: {
 
 export default function SetupWizardModal({
     onClose,
+    bookingView, setBookingView,
     navLayout, setNavLayout,
     navIconColorMode, setNavIconColorMode,
     colorTheme, setColorTheme,
@@ -60,6 +62,8 @@ export default function SetupWizardModal({
     notify
 }: {
     onClose: () => void
+    bookingView: 'classic' | 'plus'
+    setBookingView: (value: 'classic' | 'plus') => void
     navLayout: NavLayout
     setNavLayout: (v: NavLayout) => void
     navIconColorMode: NavIconColorMode
@@ -230,6 +234,7 @@ export default function SetupWizardModal({
             await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
 
             // Persist UI preferences
+            try { localStorage.setItem('ui.bookingView', bookingView) } catch {}
             try { localStorage.setItem('ui.navLayout', navLayout) } catch {}
             try { localStorage.setItem('ui.navIconColorMode', navIconColorMode) } catch {}
             try { localStorage.setItem('ui.colorTheme', colorTheme) } catch {}
@@ -247,10 +252,11 @@ export default function SetupWizardModal({
             try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch {}
             try { document.documentElement.setAttribute('data-glass-modals', String(glassModals)) } catch {}
 
-            // Persist table column settings (from state; if not set ensure preset applied)
-            if (tablePreset !== 'custom') applyTablePreset(tablePreset)
-            try { localStorage.setItem('journalCols', JSON.stringify(colsVisible)) } catch {}
-            try { localStorage.setItem('journalColsOrder', JSON.stringify(colsOrder)) } catch {}
+            // Plus does not use configurable columns; preserve the classic settings.
+            if (bookingView === 'classic') {
+                try { localStorage.setItem('journalCols', JSON.stringify(colsVisible)) } catch {}
+                try { localStorage.setItem('journalColsOrder', JSON.stringify(colsOrder)) } catch {}
+            }
 
             // Tags upsert
             const toCreate: Array<{ name: string; color?: string }> = []
@@ -440,7 +446,7 @@ export default function SetupWizardModal({
                         <li>Organisation: Name und Kassier/Nutzer</li>
                         <li>Darstellung: Menü, Farben, Hintergrund, Glaseffekt und Datumsformat</li>
                         <li>Workflow: Buchungsreiter, eigenes Buchungsfenster, Speichern-Verhalten und Storno/Löschen</li>
-                        <li>Buchungsansicht: Spaltenanordnung und Sichtbarkeit</li>
+                        <li>Buchungsansicht: Plus oder klassisch wählen; Spalten und Zeilenlayout für die klassische Tabelle anpassen</li>
                         <li>Tags und Backups: Startwerte und Sicherungsmodus</li>
                     </ul>
                 </div>
@@ -606,7 +612,7 @@ export default function SetupWizardModal({
                     {/* Preview row */}
                     <div className="setup-preview-row">
                         <MiniNavPreview />
-                        <MiniTablePreview />
+                        {bookingView === 'classic' && <MiniTablePreview />}
                     </div>
                 </div>
             )
@@ -708,7 +714,25 @@ export default function SetupWizardModal({
             }
             return (
                 <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Lege Zeilenhöhe, Zeilenlayout und die sichtbaren Spalten in der Buchungsübersicht fest.</div>
+                    <div className="helper">Wie möchtest du deine Buchungen ansehen? Du kannst die Ansicht später unter Einstellungen → Darstellung → Arbeitsweise wechseln.</div>
+                    <fieldset className="setup-booking-views">
+                        <legend>Buchungsansicht wählen</legend>
+                        {(['plus', 'classic'] as const).map(view => (
+                            <label key={view} className={`setup-booking-choice${bookingView === view ? ' is-selected' : ''}`}>
+                                <span className="setup-booking-choice__heading"><input type="radio" name="setup-booking-view" value={view} checked={bookingView === view} onChange={() => setBookingView(view)} /><strong>{view === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</strong></span>
+                                <span className="setup-booking-choice__description">{view === 'plus' ? 'Kalender, schnelle Filter und Buchungsdetails nebeneinander.' : 'Tabellenübersicht mit frei wählbaren Spalten und Zeilenlayout.'}</span>
+                                <span className={`setup-booking-preview setup-booking-preview--${view}`} aria-hidden="true">
+                                    {view === 'plus' ? <>
+                                        <span className="setup-booking-preview__sidebar"><b>September</b><span className="setup-booking-preview__calendar">{Array.from({ length: 21 }, (_, index) => <span key={index} className={index === 10 ? 'is-selected' : undefined}>{index + 1}</span>)}</span><b>Filter</b><span className="setup-booking-preview__tag">Spende</span></span>
+                                        <span className="setup-booking-preview__list"><b>Buchungen</b><span className="setup-booking-preview__row is-selected"><span>11 Sep<strong>Mitgliedsbeitrag</strong><small>Ideell · Bank</small></span><b>+50,00 €</b></span><span className="setup-booking-preview__row"><span>12 Sep<strong>Material</strong><small>Vereinsbedarf</small></span><b>−12,90 €</b></span></span>
+                                        <span className="setup-booking-preview__details"><b>Details</b><span>Mitgliedsbeitrag</span><strong>+50,00 €</strong><span>Bank</span><span className="setup-booking-preview__tag">Mitgliedschaft</span></span>
+                                    </> : <span className="setup-booking-preview__table"><span><b>Datum</b><b>Beschreibung</b><b>Zahlweg</b><b>Betrag</b></span><span><span>11 Sep</span><span>Mitgliedsbeitrag</span><span>Bank</span><b>+50,00 €</b></span><span><span>12 Sep</span><span>Material</span><span>Bank</span><b>−12,90 €</b></span><span><span>13 Sep</span><span>Spende</span><span>Bank</span><b>+25,00 €</b></span></span>}
+                                </span>
+                            </label>
+                        ))}
+                    </fieldset>
+                    {bookingView === 'plus' ? <div className="helper">Buchungen Plus ist direkt einsatzbereit. Kalender und Filter grenzen die Liste ein; ein Klick auf eine Buchung zeigt ihre Details. Tags und Budgets lassen sich direkt als Filter anklicken.</div> : <>
+                    <div className="helper">Passe Zeilenhöhe, Zeilenlayout und sichtbare Spalten für Buchungen klassisch an.</div>
                     <div className="setup-toggle-row">
                         <div className="setup-field">
                             <label>Zeilenhöhe</label>
@@ -766,7 +790,7 @@ export default function SetupWizardModal({
                         </div>
                     )}
                     <div className="card" style={{ padding: 10 }}>
-                        <div className="helper">Vorschau der Buchungsansicht</div>
+                        <div className="helper">Vorschau: Buchungen klassisch</div>
                         <div style={{ overflowX: 'auto' }}>
                             <table cellPadding={4} style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, minWidth:  colsOrder.length * 80, fontSize: 12 }}>
                                 <thead>
@@ -788,6 +812,7 @@ export default function SetupWizardModal({
                             </table>
                         </div>
                     </div>
+                    </>}
                 </div>
             )
         }
@@ -829,6 +854,7 @@ export default function SetupWizardModal({
                     <div><span>Organisation</span><strong>{formatSummaryValue(orgName)}</strong></div>
                     <div><span>Darstellung</span><strong>{COLOR_THEME_OPTIONS.find((theme) => theme.id === colorTheme)?.name || colorTheme}</strong></div>
                     <div><span>Buchungserfassung</span><strong>{{ modal: 'Dialog', flyout: 'Kompakt-Flyout', detached: 'Eigenes Fenster' }[bookingEntryPresentation]}</strong></div>
+                    <div><span>Buchungsansicht</span><strong>{bookingView === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</strong></div>
                     <div><span>Nach Speichern</span><strong>{quickAddAfterSave === 'new' ? 'Neue Buchung' : 'Schließen'}</strong></div>
                 </div>
                 <div className="row">
@@ -873,7 +899,7 @@ export default function SetupWizardModal({
 
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { /* avoid closing by overlay */ }}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'clamp(1000px, 92vw, 1400px)', display: 'grid', gap: 12 }}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(1400px, 92vw)', display: 'grid', gap: 12 }}>
                 <Header />
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {setupSteps.map((label, i) => (

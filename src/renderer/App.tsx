@@ -4059,6 +4059,8 @@ function AppInner() {
       {showSetupWizard && (
         <SetupWizardModal
           onClose={() => setShowSetupWizard(false)}
+          bookingView={bookingView}
+          setBookingView={setBookingView}
           navLayout={navLayout}
           setNavLayout={(v) => {
             setNavLayout(v)

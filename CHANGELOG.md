@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-12
+
+### Geändert
+
+- Der Erste-Schritte-Assistent bietet Buchungen Plus und Buchungen klassisch mit kleinen Vorschauen zur Auswahl. Spalten, Zeilenhöhe und Zeilenlayout werden nur für die klassische Ansicht angeboten; Plus lässt vorhandene klassische Spalteneinstellungen unverändert.
+
 ## [3.9.9] - 2026-09-12
 
 ### Hinzugefügt
