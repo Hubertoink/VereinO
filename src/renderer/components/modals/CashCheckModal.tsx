@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { dispatchDataChanged } from '../../utils/refresh'
 
 type BudgetRow = {
@@ -193,7 +194,7 @@ export default function CashCheckModal(props: {
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, display: 'grid', gap: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -308,6 +309,6 @@ export default function CashCheckModal(props: {
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   )
 }

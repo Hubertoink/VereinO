@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { IconPencil } from '@tabler/icons-react'
 import { PaymentAccountsPaneProps } from '../types'
 import { IconTrash } from '../../../utils/icons'
@@ -174,7 +175,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
 
       {busy && <div className="helper">Lade Konten…</div>}
 
-      {draft && (
+      {draft && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDraft}>
           <div className="modal payment-account-modal" onClick={(e) => e.stopPropagation()}>
             <header className="payment-account-modal__header">
@@ -230,10 +231,10 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
               <button className="btn primary" onClick={() => { void saveDraft() }}>Speichern</button>
             </footer>
           </div>
-        </div>
+        </div>, document.body
       )}
 
-      {showColorPicker && draft && (
+      {showColorPicker && draft && createPortal(
         <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
           <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="color-picker-header">
@@ -266,10 +267,10 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
               }}>Übernehmen</button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
 
-      {deleteConfirm && (
+      {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -282,7 +283,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
               <button className="btn danger" onClick={() => { void deleteAccount() }}>Löschen</button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   )

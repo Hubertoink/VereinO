@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-09-17
+
+### Behoben
+
+- Dialoge für Zahlungskonten und Kassenprüfungen werden auch bei Vereinsorganisationen mit Hintergrund- und Glaseffekten vollständig über den Einstellungen angezeigt und nicht mehr innerhalb der Einstellungskarte abgeschnitten. Dies gilt ebenfalls für die Farbauswahl, die Löschbestätigung und die Eingabe der Kassenprüfer.
+
 ## [4.0.0] - 2026-09-12
 
 ### Geändert
