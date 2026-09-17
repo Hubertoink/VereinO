@@ -141,9 +141,18 @@ function normalizeSuggestionText(value: string) {
     .trim()
 }
 
+let storageScope = ''
+/** Web accounts must never reuse the desktop/browser-wide learning store. */
+export function setBookingAIPatternScope(scope: string) {
+  storageScope = scope
+}
+function scopedStorageKey(key: string) {
+  return storageScope ? `${key}:${storageScope}` : key
+}
+
 export function readAISuggestionLearning(): Record<string, BookingAIPattern> {
   try {
-    const raw = localStorage.getItem(AI_SUGGESTION_STORAGE_KEY)
+    const raw = localStorage.getItem(scopedStorageKey(AI_SUGGESTION_STORAGE_KEY))
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
@@ -154,14 +163,14 @@ export function readAISuggestionLearning(): Record<string, BookingAIPattern> {
 
 function writeAISuggestionLearning(data: Record<string, BookingAIPattern>) {
   try {
-    localStorage.setItem(AI_SUGGESTION_STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(scopedStorageKey(AI_SUGGESTION_STORAGE_KEY), JSON.stringify(data))
     window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
   } catch {}
 }
 
 export function isBookingAIPatternsEnabled() {
   try {
-    return localStorage.getItem(AI_SUGGESTION_ENABLED_KEY) !== 'false'
+    return localStorage.getItem(scopedStorageKey(AI_SUGGESTION_ENABLED_KEY)) !== 'false'
   } catch {
     return true
   }
@@ -169,7 +178,7 @@ export function isBookingAIPatternsEnabled() {
 
 export function setBookingAIPatternsEnabled(enabled: boolean) {
   try {
-    localStorage.setItem(AI_SUGGESTION_ENABLED_KEY, String(enabled))
+    localStorage.setItem(scopedStorageKey(AI_SUGGESTION_ENABLED_KEY), String(enabled))
     window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
   } catch {}
 }

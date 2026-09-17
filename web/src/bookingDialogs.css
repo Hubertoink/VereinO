@@ -1,0 +1,149 @@
+.web-booking-editor {
+  right: 24px;
+  bottom: 24px;
+  width: min(600px, calc(100vw - 48px));
+}
+.web-booking-editor .compact-booking-flyout {
+  max-height: calc(100dvh - 48px);
+  box-sizing: border-box;
+  width: 100%;
+}
+.web-booking-editor .compact-booking-flyout__form,
+.web-booking-editor .compact-booking-flyout__body {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.web-booking-editor .compact-booking-flyout__body {
+  grid-template-columns: minmax(0, 1fr);
+  overflow-x: hidden;
+}
+.web-booking-editor .compact-booking-flyout__body > *,
+.web-booking-editor .compact-booking-section {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.web-booking-editor input,
+.web-booking-editor select,
+.web-booking-editor textarea {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.web-booking-editor .tags-editor-input {
+  flex-wrap: wrap;
+}
+.web-booking-editor .chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.web-draft-review {
+  width: min(920px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+.web-draft-review[open] {
+  display: flex;
+  flex-direction: column;
+}
+.web-draft-review::backdrop {
+  background: #0008;
+  backdrop-filter: blur(3px);
+}
+.web-draft-review__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  flex-shrink: 0;
+}
+.web-draft-review__header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 22px;
+}
+.web-draft-review__header p {
+  color: var(--text-dim);
+  margin: 6px 0 0;
+}
+.web-draft-review__body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 0 24px 20px;
+  display: grid;
+  gap: 16px;
+}
+.web-draft-review .voucher-info-card {
+  margin: 0;
+  min-width: 0;
+}
+.web-draft-review .voucher-info-purpose h3,
+.web-draft-review .voucher-info-purpose p,
+.web-draft-review .voucher-info-detail-row {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.web-draft-review .voucher-info-information {
+  display: grid;
+  gap: 12px;
+}
+.web-draft-review .input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+.web-draft-review__footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.web-draft-review__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .web-booking-editor {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+  }
+  .web-booking-editor .compact-booking-flyout {
+    max-height: calc(100dvh - 24px);
+  }
+  .web-booking-editor .compact-booking-core-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .web-draft-review__header,
+  .web-draft-review__footer {
+    padding: 12px;
+  }
+  .web-draft-review__body {
+    padding: 0 12px 12px;
+  }
+  .web-draft-review .voucher-info-summary__main,
+  .web-draft-review .voucher-info-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .web-draft-review .voucher-info-purpose {
+    border-left: 0;
+    padding-left: 0;
+  }
+}

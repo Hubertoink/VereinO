@@ -1,6 +1,7 @@
+import './membersView.css'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
+import { IconEye, IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
 import LoadingState from '../../components/LoadingState'
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
@@ -23,11 +24,15 @@ type MemberContributionFilter = 'ALL' | 'DUE' | 'NOT_DUE' | 'NO_PLAN'
 type MemberIntervalFilter = 'ALL' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 type MemberBoardFilter = 'ALL' | 'ANY' | 'NONE' | 'V1' | 'V2' | 'KASSIER' | 'KASSENPR1' | 'KASSENPR2' | 'SCHRIFT'
 
-interface MembersViewProps {
+export interface MembersViewProps {
+    membersApi?: { list: (input?: any) => Promise<any>; create: (input: any) => Promise<any>; update: (input: any) => Promise<any>; delete: (input: any) => Promise<any> }
+    canWrite?: boolean
+    desktopActions?: boolean
+    contributionHistory?: boolean
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
-export default function MembersView({ registerPageShortcuts }: MembersViewProps = {}) {
+export default function MembersView({ registerPageShortcuts, membersApi, canWrite = true, desktopActions = true, contributionHistory = true }: MembersViewProps = {}) {
     const [q, setQ] = useState('')
     const debouncedQ = useDebouncedValue(q, 250)
     const loadRequestIdRef = useRef(0)
@@ -39,13 +44,14 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
     useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
     useEffect(() => { try { localStorage.setItem('members.sort', sort) } catch { } }, [sort])
-    const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
+    const [rows, setRows] = useState<Array<{ id: number; version?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
     const [total, setTotal] = useState(0)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
     const [busy, setBusy] = useState(false)
+    const [loadError, setLoadError] = useState('')
     const [showPayments, setShowPayments] = useState(false)
-    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
+    const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; version?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
         mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
@@ -98,7 +104,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 const acc: any[] = []
                 do {
                     // Load ALL members regardless of filters to get complete board overview
-                    const res = await (window as any).api?.members?.list?.({ limit: pageSize, offset: ofs, sortBy: 'memberNo', sort: 'ASC' })
+                    const res = await (membersApi || (window as any).api?.members)?.list?.({ limit: pageSize, offset: ofs, sortBy: 'memberNo', sort: 'ASC' })
                     const rows = (res?.rows || []) as any[]
                     total = res?.total ?? rows.length
                     acc.push(...rows)
@@ -120,7 +126,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         const onChanged = () => setBoardRefresh(v => v + 1)
         const removeDataChangedListener = addDataChangedListener(['members'], onChanged)
         return () => { alive = false; removeDataChangedListener() }
-    }, [boardRefresh])
+    }, [boardRefresh, membersApi])
 
     const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
     function validateIBAN(iban?: string | null): { ok: boolean; msg?: string } {
@@ -167,6 +173,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     }, [form?.draft.address])
 
     const openCreateMember = useCallback(() => {
+        if (!canWrite) return
         setRequiredTouched(false)
         setMissingRequired([])
         setAddrStreet('')
@@ -194,13 +201,14 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 next_due_date: null
             }
         })
-    }, [])
+    }, [canWrite])
 
     const load = useCallback(async () => {
         const requestId = ++loadRequestIdRef.current
         setBusy(true)
+        setLoadError('')
         try {
-            const res = await (window as any).api?.members?.list?.({
+            const res = await (membersApi || (window as any).api?.members)?.list?.({
                 q: debouncedQ || undefined,
                 status,
                 contributionFilter,
@@ -215,15 +223,15 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             setRows(res?.rows || [])
             setTotal(res?.total || 0)
         } catch (e: any) {
-            if (requestId === loadRequestIdRef.current) console.error('members.list failed', e)
+            if (requestId === loadRequestIdRef.current) setLoadError(e?.message || 'Mitglieder konnten nicht geladen werden.')
         } finally {
             if (requestId === loadRequestIdRef.current) setBusy(false)
         }
-    }, [boardFilter, contributionFilter, debouncedQ, intervalFilter, limit, offset, sort, sortBy, status])
+    }, [boardFilter, contributionFilter, debouncedQ, intervalFilter, limit, offset, sort, sortBy, status, membersApi])
     useEffect(() => { void load() }, [load])
 
     const saveMemberForm = useCallback(async () => {
-        if (!form) return
+        if (!form || !canWrite) return
         try {
             setRequiredTouched(true)
             const missing: string[] = []
@@ -241,7 +249,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 const pageSize = 200
                 let hasMore = true
                 while (hasMore) {
-                    const batch = await (window as any).api?.members?.list?.({ limit: pageSize, offset: memberOffset })
+                    const batch = await (membersApi || (window as any).api?.members)?.list?.({ limit: pageSize, offset: memberOffset })
                     const rows = batch?.rows || []
                     allMembers.push(...rows)
                     hasMore = rows.length === pageSize
@@ -269,9 +277,9 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             const addrCombined = [addrStreet, [addrZip, addrCity].filter(Boolean).join(' ')].filter(Boolean).join(', ')
             const payload = { ...form.draft, address: addrCombined || form.draft.address || null }
             if (form.mode === 'create') {
-                await (window as any).api?.members?.create?.(payload)
+                await (membersApi || (window as any).api?.members)?.create?.(payload)
             } else {
-                await (window as any).api?.members?.update?.(payload)
+                await (membersApi || (window as any).api?.members)?.update?.(payload)
             }
             setForm(null)
             setRequiredTouched(false)
@@ -282,15 +290,15 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         } catch (e: any) {
             alert(e?.message || String(e))
         }
-    }, [addrCity, addrStreet, addrZip, form])
+    }, [addrCity, addrStreet, addrZip, form, canWrite, membersApi, load])
 
     useEffect(() => {
-        if (!registerPageShortcuts) return
+        if (!registerPageShortcuts || !canWrite) return
         registerPageShortcuts([
             { id: 'members-quick-add', key: 'q', label: 'Neu', action: openCreateMember }
         ])
         return () => registerPageShortcuts([])
-    }, [openCreateMember, registerPageShortcuts])
+    }, [openCreateMember, registerPageShortcuts, canWrite])
 
     useEffect(() => {
         if (!showInvite) return
@@ -309,7 +317,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                 let withoutEmailCount = 0
                 do {
                     const effectiveStatus = inviteActiveOnly ? 'ACTIVE' : status
-                    const res = await (window as any).api?.members?.list?.({ q: q || undefined, status: effectiveStatus, limit: pageSize, offset: ofs })
+                    const res = await (membersApi || (window as any).api?.members)?.list?.({ q: q || undefined, status: effectiveStatus, limit: pageSize, offset: ofs })
                     const rows = res?.rows || []
                     totalCount = res?.total || rows.length
                     candidateCount += rows.length
@@ -458,6 +466,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                         contributionFilter={contributionFilter}
                         intervalFilter={intervalFilter}
                         boardFilter={boardFilter}
+                        contributionHistory={contributionHistory}
                         onApply={(values) => {
                             setStatus(values.status)
                             setContributionFilter(values.contributionFilter)
@@ -507,13 +516,14 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     ) : null })()}
                 </div>
                 <div className="members-header-right">
-                    <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}><AppIcon icon={IconFileExport} size="action" /></button>
-                    <button className="btn btn-with-icon" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}><AppIcon icon={IconMail} size="control" />Einladen (E-Mail)</button>
-                    <button className="btn btn-accent btn-with-icon" onClick={openCreateMember}>
+                    {desktopActions && <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}><AppIcon icon={IconFileExport} size="action" /></button>}
+                    {desktopActions && <button className="btn btn-with-icon" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}><AppIcon icon={IconMail} size="control" />Einladen (E-Mail)</button>}
+                    {canWrite && <button className="btn btn-accent btn-with-icon" onClick={openCreateMember}>
                         <AppIcon icon={IconPlus} size="control" />Neu
-                    </button>
+                    </button>}
                 </div>
             </div>
+            {loadError && <div className="helper" role="alert" style={{ color: 'var(--danger)' }}>{loadError}</div>}
             <div className="members-board-card">
                 <div className="members-board-header">
                     <h2 className="members-board-title">Vorstand</h2>
@@ -582,7 +592,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <td>
                                     <span>{r.name}</span>
                                     {r.boardRole && (() => { const map: any = { V1: { label: '1. Vorsitz', color: '#00C853' }, V2: { label: '2. Vorsitz', color: '#4CAF50' }, KASSIER: { label: 'Kassier', color: '#03A9F4' }, KASSENPR1: { label: '1. Prüfer', color: '#FFC107' }, KASSENPR2: { label: '2. Prüfer', color: '#FFD54F' }, SCHRIFT: { label: 'Schriftführer', color: '#9C27B0' } }; const def = map[r.boardRole] || null; return def ? (<span className="badge" style={{ marginLeft: 8, background: def.color, color: '#fff' }}>{def.label}</span>) : null })()}
-                                    {((r as any).contribution_amount != null && (r as any).contribution_amount > 0 && !!(r as any).contribution_interval) ? (
+                                    {(contributionHistory && (r as any).contribution_amount != null && (r as any).contribution_amount > 0 && !!(r as any).contribution_interval) ? (
                                         <MemberStatusButton memberId={r.id} name={r.name} memberNo={r.memberNo || undefined} />
                                     ) : null}
                                 </td>
@@ -600,8 +610,9 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     </td>
                                 )}
                                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                                <button className="btn btn-edit" title="Bearbeiten" onClick={() => setForm({ mode: 'edit', draft: {
+                                <button className="btn btn-edit" title={canWrite ? "Bearbeiten" : "Details anzeigen"} onClick={() => setForm({ mode: 'edit', draft: {
                                     id: r.id,
+                                    ...(r.version != null ? { version: r.version } : {}),
                                     memberNo: r.memberNo ?? null,
                                     name: r.name,
                                     email: r.email ?? null,
@@ -619,7 +630,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                     leave_date: (r as any).leave_date ?? null,
                                     notes: (r as any).notes ?? null,
                                     next_due_date: (r as any).next_due_date ?? null
-                                } })}><AppIcon icon={IconPencil} size="control" /></button>
+                                } })}><AppIcon icon={canWrite ? IconPencil : IconEye} size="control" /></button>
                             </td>
                         </tr>
                     ))}
@@ -651,7 +662,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
 
             {form && (
                 <BookingPopupFrame
-                    title={form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}
+                    title={!canWrite ? 'Mitglied ansehen' : form.mode === 'create' ? 'Mitglied anlegen' : 'Mitglied bearbeiten'}
                     titleId="member-form-modal-title"
                     subtitle="Stammdaten, Mitgliedschaft und SEPA-Mandat"
                     onClose={() => setForm(null)}
@@ -661,6 +672,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     headerAccessory={<span className="badge member-modal-status" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>}
                 >
                     <div className="member-modal-body">
+                        <fieldset disabled={!canWrite} style={{ display: 'contents' }}>
 
                         {/* Two-column layout with all fields visible */}
                         <div className="block-grid" style={{ marginTop: 12, gap: 8 }}>
@@ -800,19 +812,20 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             </div>
                         </div>
 
+                    </fieldset>
                     </div>
                         <div className="member-modal-footer">
-                            <div className="helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
+                            <div className="helper">{canWrite ? 'Ctrl+S = Speichern · Esc = Abbrechen' : 'Lesender Zugriff · Esc = Schließen'}</div>
                             <div className="member-modal-actions">
-                                {form.mode === 'edit' && (
+                                {canWrite && form.mode === 'edit' && (
                                     <button className="btn danger modal-delete-btn btn-with-icon" onClick={() => {
                                         if (!form?.draft?.id) return
                                         const label = `${form.draft.name}${form.draft.memberNo ? ` (${form.draft.memberNo})` : ''}`
                                         setDeleteConfirm({ id: form.draft.id, label })
                                     }}><AppIcon icon={IconTrash} size="control" />Löschen</button>
                                 )}
-                                <button className="btn" onClick={() => setForm(null)}>Abbrechen</button>
-                                <button className="btn primary" onClick={() => { void saveMemberForm() }}>Speichern</button>
+                                <button className="btn" onClick={() => setForm(null)}>{canWrite ? 'Abbrechen' : 'Schließen'}</button>
+                                {canWrite && <button className="btn primary" onClick={() => { void saveMemberForm() }}>Speichern</button>}
                             </div>
                         </div>
                 </BookingPopupFrame>
@@ -980,8 +993,8 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     document.body
                 )
             )}
-            {deleteConfirm && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+            {deleteConfirm && createPortal(
+                <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Mitglied löschen" style={{ zIndex: 5100 }} onClick={() => setDeleteConfirm(null)}>
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0 }}>Mitglied löschen</h3>
@@ -997,7 +1010,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             <button className="btn danger" disabled={deleteBusy} onClick={async () => {
                                 setDeleteBusy(true)
                                 try {
-                                    await (window as any).api?.members?.delete?.({ id: deleteConfirm.id })
+                                    await (membersApi || (window as any).api?.members)?.delete?.({ id: deleteConfirm.id, ...(form?.draft.version != null ? { version: form.draft.version } : {}) })
                                     setDeleteConfirm(null)
                                     setForm(null)
                                     await load()
@@ -1007,7 +1020,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                             }}>Endgültig löschen</button>
                         </div>
                     </div>
-                </div>
+                </div>, document.body
             )}
         </div>
     )
@@ -1024,12 +1037,14 @@ interface VoucherSuggestion {
 }
 
 function MemberFilterDropdown({
+    contributionHistory = true,
     status,
     contributionFilter,
     intervalFilter,
     boardFilter,
     onApply
 }: {
+    contributionHistory?: boolean
     status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
     contributionFilter: MemberContributionFilter
     intervalFilter: MemberIntervalFilter
@@ -1112,8 +1127,8 @@ function MemberFilterDropdown({
                     <label className="filter-dropdown__label">Beiträge</label>
                     <select className="input" value={draftContributionFilter} onChange={(e) => setDraftContributionFilter(e.target.value as MemberContributionFilter)}>
                         <option value="ALL">Alle</option>
-                        <option value="DUE">Fällig</option>
-                        <option value="NOT_DUE">Nicht fällig</option>
+                        {contributionHistory && <option value="DUE">Fällig</option>}
+                        {contributionHistory && <option value="NOT_DUE">Nicht fällig</option>}
                         <option value="NO_PLAN">Ohne Beitragsplan</option>
                     </select>
                 </div>

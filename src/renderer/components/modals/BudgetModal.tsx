@@ -20,6 +20,7 @@ const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600
 
 export type BudgetModalValue = {
   id?: number
+  version?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   primaryClassificationValueId?: number | null
@@ -68,8 +69,9 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
     const name = (v.name || '').trim()
     if (!name) { setNameError('Bitte Namen angeben'); nameRef.current?.focus(); return }
     if (isGeneralProfile && !v.primaryClassificationValueId) { setNameError('Bitte Kategorie wählen'); return }
-    await (window as any).api?.budgets.upsert?.({
+    try { await (window as any).api?.budgets.upsert?.({
       id: v.id as any,
+      ...(v.version == null ? {} : { version: v.version }),
       year: v.year,
       sphere: v.sphere,
       primaryClassificationValueId: v.primaryClassificationValueId ?? null,
@@ -87,6 +89,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
       enforceTimeRange: v.enforceTimeRange ? true : false
     })
     onSaved()
+    } catch (error) { setNameError(error instanceof Error ? error.message : String(error)) }
   }
 
   useEffect(() => {
@@ -213,7 +216,7 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
             <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
             <div className="delete-modal-actions">
               <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
-              <button className="btn danger" onClick={async () => { await (window as any).api?.budgets.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
+              <button className="btn danger" onClick={async () => { try { await (window as any).api?.budgets.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() } catch (error) { setNameError(error instanceof Error ? error.message : String(error)); setAskDelete(false) } }}>Ja, löschen</button>
             </div>
           </div>
         </div>

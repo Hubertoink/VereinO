@@ -1,0 +1,6 @@
+/* Keep the shared compact form grid when a read-only fieldset groups its controls. */
+.compact-booking-popup .member-modal-body > fieldset > .block-grid {
+  grid-template-columns: 1fr;
+  gap: 8px !important;
+  margin-top: 0 !important;
+}

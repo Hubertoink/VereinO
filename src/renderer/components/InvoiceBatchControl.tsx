@@ -1,3 +1,5 @@
+import type { ComponentType, ReactNode } from 'react'
+import type { RendererApi } from '../../types/api'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
 import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
@@ -32,14 +34,22 @@ export default function InvoiceBatchControl({
   onReview,
   notify,
   paymentAccounts,
-  variant = 'floating'
+  variant = 'floating',
+  apiOverride,
+  webMode = false,
+  flyoutPortal: Flyout = InlineFlyout
 }: {
+  apiOverride?: RendererApi['ai']['invoiceBatch']
+  webMode?: boolean
+  flyoutPortal?: ComponentType<{anchor: HTMLElement | null; children: ReactNode}>
   variant?: 'floating' | 'inline'
   onNewInvoice: (file: File, guidance?: InvoiceAiGuidance) => void | Promise<void>
   onReview: (id: number) => void
   notify: (type: 'success' | 'error' | 'info' | 'warn', text: string) => void
   paymentAccounts: Array<{ id: number; name: string; kind?: string | null; isActive?: number }>
 }) {
+  const batchApi = apiOverride || window.api.ai.invoiceBatch
+  const controlRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const singleInputRef = useRef<HTMLInputElement | null>(null)
   const allowBatchAutoOpenRef = useRef(true)
@@ -65,8 +75,10 @@ export default function InvoiceBatchControl({
       setDragging(false)
       setSingleDragging(false)
     }
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); setSingleOpen(false); controlRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded="true"]')?.focus() } }
     document.addEventListener('pointerdown', closeOnOutsideClick)
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => { document.removeEventListener('pointerdown', closeOnOutsideClick); document.removeEventListener('keydown', closeOnEscape) }
   }, [open, singleOpen])
 
   const guidance: InvoiceAiGuidance | undefined = (() => {
@@ -78,12 +90,12 @@ export default function InvoiceBatchControl({
   })()
 
   const reload = useCallback(async () => {
-    try { setQueue(await window.api.ai.invoiceBatch.list()) } catch { /* startup/recovery */ }
-  }, [])
+    try { setQueue(await batchApi.list()) } catch { /* startup/recovery */ }
+  }, [batchApi])
 
   useEffect(() => {
     void reload()
-    const off = window.api.ai.invoiceBatch.onChanged((change) => {
+    const off = batchApi.onChanged((change) => {
       if (change?.packetSplit) {
         const { fileName, invoiceCount, uncertainCount, duplicateCount } = change.packetSplit
         notify(
@@ -127,7 +139,7 @@ export default function InvoiceBatchControl({
         fileName: file.name,
         dataBytes: new Uint8Array(await file.arrayBuffer())
       })))
-      const result = await window.api.ai.invoiceBatch.import({ files: payload, guidance })
+      const result = await batchApi.import({ files: payload, guidance })
       const duplicates = result.duplicates || []
       const duplicateNames = new Set(duplicates.map((item) => item.fileName))
       const reused = (result.reused || []).filter((fileName) => !duplicateNames.has(fileName))
@@ -171,7 +183,7 @@ export default function InvoiceBatchControl({
       ? paymentAccounts.find((account) => account.id === guidanceDefaults.paymentAccountId)?.name || 'Bankkonto'
       : guidanceDefaults.paymentMethod === 'BANK' ? 'Bank' : guidanceDefaults.paymentMethod === 'BAR' ? 'Kasse' : ''
   ].filter(Boolean).join(' · ')
-  const guidanceFields = (
+  const guidanceFields = !webMode && (
     <details className="invoice-ai-guidance">
       <summary><span><strong>KI-Vorgaben</strong><small>Hinweis, Sphäre und Buchungskonto</small></span><em>Optional</em></summary>
       <div className="invoice-ai-guidance__body">
@@ -198,8 +210,8 @@ export default function InvoiceBatchControl({
       setSingleError('Bitte eine PDF-, PNG-, JPG- oder WebP-Datei auswählen.')
       return
     }
-    if (file.size > MAX_SINGLE_INVOICE_BYTES) {
-      setSingleError('Die Rechnung darf maximal 25 MB groß sein.')
+    if (file.size > (webMode ? 10 * 1024 * 1024 : MAX_SINGLE_INVOICE_BYTES)) {
+      setSingleError(`Die Rechnung darf maximal ${webMode ? 10 : 25} MB groß sein.`)
       return
     }
     setSingleError('')
@@ -212,6 +224,7 @@ export default function InvoiceBatchControl({
 
   return (
     <div
+      ref={controlRef}
       className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
       onPointerDownCapture={(event) => { lastInsidePointerDownRef.current = event.nativeEvent }}
       onDragEnter={(event) => {
@@ -252,6 +265,7 @@ export default function InvoiceBatchControl({
             setSingleError('')
             setSingleOpen((value) => !value)
           }}
+          aria-label="Einzelne Rechnung erfassen"
           title="Einzelne Rechnung erfassen"
           aria-expanded={singleOpen}
         >
@@ -270,6 +284,7 @@ export default function InvoiceBatchControl({
             setSingleError('')
             setOpen((value) => !value)
           }}
+          aria-label="Mehrere PDF-Rechnungen vorbereiten"
           title="Mehrere PDF-Rechnungen vorbereiten"
           aria-expanded={open}
         >
@@ -302,7 +317,7 @@ export default function InvoiceBatchControl({
       />
 
       {singleOpen && (
-        <section className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
+        <Flyout anchor={controlRef.current}><section className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
           <header>
             <div>
               <strong>Rechnung erfassen</strong>
@@ -347,20 +362,20 @@ export default function InvoiceBatchControl({
             </span>
             <strong>Rechnung hier ablegen</strong>
             <span>oder Datei auswählen</span>
-            <small>PDF, PNG, JPG oder WebP · maximal 25 MB</small>
+            <small>PDF, PNG, JPG oder WebP · maximal {webMode ? 10 : 25} MB</small>
             {singleError && <span className="invoice-single-upload-flyout__error" role="alert">{singleError}</span>}
           </button>
-        </section>
+        </section></Flyout>
       )}
 
       {open && (
-        <section className="invoice-batch-flyout" aria-label="KI-Rechnungsentwürfe">
+        <Flyout anchor={controlRef.current}><section className="invoice-batch-flyout" aria-label="KI-Rechnungsentwürfe">
           <header>
             <div><strong>KI-Rechnungsentwürfe</strong><small>{readyCount ? `${readyCount} bereit` : duplicateCount ? `${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'}` : busyCount ? `${busyCount} in Vorbereitung` : 'Keine offenen Entwürfe'}</small></div>
             <button className="btn ghost" onClick={() => setOpen(false)} aria-label="Flyout schließen">✕</button>
           </header>
           {!queue?.aiAvailable && !queue?.doclingAvailable && (
-            <p className="invoice-batch-flyout__notice">Für die Hintergrundanalyse muss ein KI-API-Key oder die lokale Docling-Verarbeitung aktiv sein.</p>
+            <p className="invoice-batch-flyout__notice">{webMode ? 'Für die Analyse muss ein Admin die KI in den Einstellungen aktivieren und einen API-Schlüssel hinterlegen.' : 'Für die Hintergrundanalyse muss ein KI-API-Key oder die lokale Docling-Verarbeitung aktiv sein.'}</p>
           )}
           {!queue?.aiAvailable && queue?.doclingAvailable && (
             <p className="invoice-batch-flyout__notice">Lokaler Docling-Modus: Grunddaten werden offline vorbereitet; Zuordnung und Scanpaket-Grenzen bitte vollständig prüfen.</p>
@@ -370,7 +385,7 @@ export default function InvoiceBatchControl({
             {rows.map((item: BatchItem) => (
               <article key={item.id} className={`invoice-batch-item invoice-batch-item--${item.status.toLowerCase()}${item.isDuplicate ? ' invoice-batch-item--duplicate' : ''}`}>
                 <span className={`invoice-batch-item__state${['QUEUED', 'PROCESSING'].includes(item.status) ? ' is-spinning' : ''}`} aria-hidden="true" />
-                <button className="invoice-batch-item__main" disabled={item.status !== 'NEEDS_REVIEW'} onClick={() => onReview(item.id)}>
+                <button className="invoice-batch-item__main" disabled={item.status !== 'NEEDS_REVIEW'} onClick={() => { if (webMode) setOpen(false); onReview(item.id) }}>
                   <strong title={item.fileName}>{item.fileName}</strong>
                   <small title={item.error || undefined}>{item.isDuplicate ? `Mögliches Duplikat${item.duplicateVoucherNo ? ` von ${item.duplicateVoucherNo}` : ''}` : item.status === 'FAILED' && item.error ? item.error : STATUS_LABELS[item.status] || item.status}</small>
                   {item.packet && (
@@ -399,34 +414,34 @@ export default function InvoiceBatchControl({
                     className="btn ghost invoice-batch-item__manual-run"
                     title="Trotzdem mit KI auslesen"
                     aria-label={`${item.fileName} trotzdem mit KI auslesen`}
-                    onClick={async () => { await window.api.ai.invoiceBatch.retry({ id: item.id }); await reload() }}
+                    onClick={async () => { await batchApi.retry({ id: item.id }); await reload() }}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m12 3-1.2 5.8L5 10l5.8 1.2L12 17l1.2-5.8L19 10l-5.8-1.2L12 3Z"/><path d="m18 16 3 3-3 3"/></svg>
                   </button>
                 )}
                 {item.status === 'FAILED' && (
-                  <button className="btn ghost invoice-batch-item__retry" onClick={async () => { await window.api.ai.invoiceBatch.retry({ id: item.id }); await reload() }}>↻</button>
+                  <button className="btn ghost invoice-batch-item__retry" onClick={async () => { await batchApi.retry({ id: item.id }); await reload() }}>↻</button>
                 )}
                 <button
                   className={`btn ghost invoice-batch-item__discard${item.status === 'PROCESSING' ? ' invoice-batch-item__discard--processing' : ''}`}
                   title={item.status === 'PROCESSING' ? 'KI-Auswertung abbrechen und PDF verwerfen' : 'PDF verwerfen'}
                   aria-label={`${item.fileName} ${item.status === 'PROCESSING' ? 'KI-Auswertung abbrechen und verwerfen' : 'verwerfen'}`}
-                  onClick={async () => { await window.api.ai.invoiceBatch.discard({ id: item.id }); await reload() }}
+                  onClick={async () => { try { await batchApi.discard({ id: item.id }); await reload() } catch (error) { notify('error', error instanceof Error ? error.message : String(error)) } }}
                 >
                   ×
                 </button>
               </article>
             ))}
-            {!rows.length && <div className="invoice-batch-flyout__empty">Lege PDFs im Submit-Ordner ab oder wähle sie hier aus.</div>}
+            {!rows.length && <div className="invoice-batch-flyout__empty">{webMode ? 'Wähle PDF-Rechnungen für die KI-Prüfung aus.' : 'Lege PDFs im Submit-Ordner ab oder wähle sie hier aus.'}</div>}
           </div>
           <footer>
-            <button className="btn ghost invoice-batch-flyout__folder-action" onClick={() => void window.api.ai.invoiceBatch.openFolder()}>
+            {!webMode && <button className="btn ghost invoice-batch-flyout__folder-action" onClick={() => void batchApi.openFolder()}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <path d="M3 8.5V6a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v.5" />
               </svg>
               <span>Submit-Ordner</span>
-            </button>
+            </button>}
             <button className="btn invoice-batch-flyout__batch-action" disabled={uploading} onClick={() => inputRef.current?.click()}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M7 2h7l4 4v16H7z" /><path d="M14 2v5h5M10 14h5M12.5 11.5v5" />
@@ -434,8 +449,10 @@ export default function InvoiceBatchControl({
               <span>{uploading ? 'Wird hinzugefügt …' : 'Batch-PDFs'}</span>
             </button>
           </footer>
-        </section>
+        </section></Flyout>
       )}
     </div>
   )
 }
+
+function InlineFlyout({children}:{anchor:HTMLElement|null;children:ReactNode}) { return <>{children}</> }

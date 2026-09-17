@@ -1,23 +1,10 @@
-// Fastify module augmentation for JWT
-import '@fastify/jwt'
-
-declare module '@fastify/jwt' {
-  interface FastifyJWT {
-    payload: {
-      userId: number
-      organizationId: number
-      email: string
-    }
-    user: {
-      userId: number
-      organizationId: number
-      email: string
-    }
-  }
-}
-
+import { SessionUser } from '../middleware/auth.js'
+import { preHandlerHookHandler } from 'fastify'
 declare module 'fastify' {
+  interface FastifyRequest {
+    user: SessionUser
+  }
   interface FastifyInstance {
-    authenticate: any
+    authenticate: preHandlerHookHandler
   }
 }

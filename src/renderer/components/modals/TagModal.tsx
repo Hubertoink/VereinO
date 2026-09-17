@@ -18,7 +18,9 @@ const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600
 
 export type TagValue = { id?: number; name: string; color?: string | null }
 
-export default function TagModal({ value, onClose, onSaved, notify }: { value: TagValue; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+export default function TagModal({ value, onClose, onSaved, notify, onSave }: { onSave?: (value: TagValue) => Promise<void>; value: TagValue; onClose: () => void; onSaved: () => void; notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+    const [busy, setBusy] = useState(false)
+    const [saveError, setSaveError] = useState('')
     const [v, setV] = useState(value)
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
@@ -26,7 +28,7 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
     useEffect(() => { setV(value); setDraftColor(value.color || '#00C853'); setDraftError('') }, [value])
     const canSave = (v.name || '').trim().length > 0
     return createPortal(
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={v.id ? 'Tag bearbeiten' : 'Neuer Tag'} onClick={onClose}>
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -62,7 +64,7 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
                     <div className="field">
                         <label>Name</label>
                         <input 
-                            className="input" 
+                            className="input" aria-label="Name"
                             value={v.name} 
                             onChange={(e) => setV({ ...v, name: e.target.value })} 
                             placeholder="z.B. Mitgliedsbeitrag, Material, Event..."
@@ -122,20 +124,25 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
                     </div>
                 </div>
                 
+                {saveError && <p role="alert" style={{ color: 'var(--danger)' }}>{saveError}</p>}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
                     <button className="btn" onClick={onClose}>Abbrechen</button>
-                    <button className="btn primary" disabled={!canSave} onClick={async () => {
+                    <button className="btn primary" disabled={!canSave || busy} onClick={async () => {
+                        if (busy) return
+                        setBusy(true); setSaveError('')
                         try {
                             const payload = { ...v, name: (v.name || '').trim() }
                             if (!payload.name) { notify?.('error', 'Bitte einen Namen eingeben'); return }
-                            await (window as any).api?.tags?.upsert?.(payload as any)
+                            if (onSave) await onSave(payload)
+                            else await (window as any).api?.tags?.upsert?.(payload as any)
                             window.dispatchEvent(new Event('tags-changed'))
                             onSaved()
                         } catch (e: any) {
                             const msg = e?.message || String(e)
+                            setSaveError(msg)
                             if (notify) notify('error', msg)
                             else alert(msg)
-                        }
+                        } finally { setBusy(false) }
                     }}>Speichern</button>
                 </div>
             </div>

@@ -12,6 +12,8 @@ import ExportOptionsModal from '../../components/modals/ExportOptionsModal'
 import ActivityReportEditorModal from './ActivityReportEditorModal'
 
 export default function ReportsView(props: {
+  primaryClassificationValueId?: number | null
+  setPrimaryClassificationValueId?: (id: number | null) => void
   from: string
   to: string
   setFrom: (v: string) => void
@@ -29,16 +31,19 @@ export default function ReportsView(props: {
   setFilterBudgetId: (v: number | null) => void
   budgets: Array<{ id: number; name?: string | null; categoryName?: string | null; projectName?: string | null; year: number }>
   earmarks: Array<{ id: number; code: string; name?: string | null }>
+  exportContent?: React.ReactNode
   showExportOptions: boolean
   setShowExportOptions: (open: boolean) => void
-  exportOptions: Omit<React.ComponentProps<typeof ExportOptionsModal>, 'open' | 'onClose' | 'flyout'>
+  exportOptions?: Omit<React.ComponentProps<typeof ExportOptionsModal>, 'open' | 'onClose' | 'flyout'>
   showActivityReportEditor: boolean
   setShowActivityReportEditor: (open: boolean) => void
-  activityReportOptions: Omit<React.ComponentProps<typeof ActivityReportEditorModal>, 'open' | 'onClose' | 'flyout'>
+  activityReportOptions?: Omit<React.ComponentProps<typeof ActivityReportEditorModal>, 'open' | 'onClose' | 'flyout'>
   refreshKey: number
   activateKey: number
 }) {
   const {
+    primaryClassificationValueId,
+    setPrimaryClassificationValueId,
     from,
     to,
     setFrom,
@@ -59,6 +64,7 @@ export default function ReportsView(props: {
     showExportOptions,
     setShowExportOptions,
     exportOptions,
+    exportContent,
     showActivityReportEditor,
     setShowActivityReportEditor,
     activityReportOptions,
@@ -66,7 +72,7 @@ export default function ReportsView(props: {
     activateKey
   } = props
 
-  const hasActiveFilters = filterSphere || filterType || filterPM || filterEarmark != null || filterBudgetId != null || from || to
+  const hasActiveFilters = primaryClassificationValueId != null || filterSphere || filterType || filterPM || filterEarmark != null || filterBudgetId != null || from || to
 
   const fmtDateDe = (iso: string) => {
     const s = (iso || '').trim()
@@ -103,6 +109,7 @@ export default function ReportsView(props: {
       })
     }
 
+    if (primaryClassificationValueId != null) list.push({ key: 'category', label: 'Kategorie gefiltert', onClear: () => setPrimaryClassificationValueId?.(null) })
     if (filterSphere) {
       list.push({
         key: 'sphere',
@@ -191,20 +198,22 @@ export default function ReportsView(props: {
               filterPM={filterPM}
               filterTag={null}
               sphere={filterSphere}
+              primaryClassificationValueId={primaryClassificationValueId}
               earmarkId={filterEarmark}
               budgetId={filterBudgetId}
               tooltip="Filter nach Art, Sphäre, Zahlweg, Zweckbindung, Budget"
-              onApply={({ filterType: ft, filterPM: pm, sphere: sp, earmarkId, budgetId }) => {
+              onApply={({ filterType: ft, filterPM: pm, sphere: sp, primaryClassificationValueId: categoryId, earmarkId, budgetId }) => {
                 setFilterType(ft)
                 setFilterPM(pm)
                 setFilterSphere(sp)
+                setPrimaryClassificationValueId?.(categoryId ?? null)
                 setFilterEarmark(earmarkId)
                 setFilterBudgetId(budgetId)
               }}
             />
           </div>
 
-          <FilterDropdown
+          {activityReportOptions && <FilterDropdown
             trigger={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 20h9" />
@@ -227,9 +236,9 @@ export default function ReportsView(props: {
               onClose={() => setShowActivityReportEditor(false)}
               flyout
             />
-          </FilterDropdown>
+          </FilterDropdown>}
 
-          <FilterDropdown
+          {(exportOptions || exportContent) && <FilterDropdown
             trigger={
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -248,13 +257,13 @@ export default function ReportsView(props: {
             open={showExportOptions}
             onOpenChange={setShowExportOptions}
           >
-            <ExportOptionsModal
+            {exportContent || (exportOptions && <ExportOptionsModal
               {...exportOptions}
               open={showExportOptions}
               onClose={() => setShowExportOptions(false)}
               flyout
-            />
-          </FilterDropdown>
+            />)}
+          </FilterDropdown>}
         </div>
       </header>
 
@@ -272,6 +281,7 @@ export default function ReportsView(props: {
               title="Alle Filter zurücksetzen"
               onClick={() => {
                 setFilterSphere(null)
+                setPrimaryClassificationValueId?.(null)
                 setFilterType(null)
                 setFilterPM(null)
                 setFilterEarmark(null)
@@ -293,14 +303,14 @@ export default function ReportsView(props: {
       )}
 
       {/* KPIs and charts */}
-      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+      <ReportsSummary primaryClassificationValueId={primaryClassificationValueId ?? undefined} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       <div className="reports-chart-grid">
-        <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
-        <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsSphereDonut primaryClassificationValueId={primaryClassificationValueId ?? undefined} refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsPaymentMethodBars primaryClassificationValueId={primaryClassificationValueId ?? undefined} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
       <div className="reports-chart-stack">
-        <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
-        <ReportsInOutLines activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsMonthlyChart activateKey={activateKey} primaryClassificationValueId={primaryClassificationValueId ?? undefined} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsInOutLines activateKey={activateKey} primaryClassificationValueId={primaryClassificationValueId ?? undefined} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
     </div>
   )

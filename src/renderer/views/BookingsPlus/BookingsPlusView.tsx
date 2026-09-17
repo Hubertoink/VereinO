@@ -15,7 +15,19 @@ import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagCol
 import { calendarDays, isoDate, kinds, monthRange, mutationBlock, paymentLabel, signedAmount, similarQuery, spheres, type BookingPlusRow } from './bookingPlusHelpers'
 import './bookingsPlus.css'
 
+type BookingCapabilities = {
+    editBooking: boolean
+    editMetadata: boolean
+    attachments: boolean
+    invoiceCapture: boolean
+    invoiceBatch: boolean
+    deleteBooking: boolean
+    assignments: boolean
+}
+
 type Props = {
+    capabilities?: Partial<BookingCapabilities>
+    onEditBooking?: (row: BookingPlusRow) => void | Promise<void>
     onResetFilters: () => void
     externalFilters?: Partial<Filter>
     jumpRevision?: number
@@ -26,6 +38,8 @@ type Props = {
     onCloseBookingDraft?: (id: string) => void
     fmtDate: (date: string) => string
     onNewBooking: () => void
+    onOpenInvoiceCapture?: () => void
+    invoiceControl?: React.ReactNode
     onNewInvoice: React.ComponentProps<typeof InvoiceBatchControl>['onNewInvoice']
     onReviewInvoice: (id: number) => void
     notify: (type: 'info' | 'success' | 'error', message: string) => void
@@ -44,7 +58,8 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ onResetFilters, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+export default function BookingsPlusView({ onResetFilters, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onOpenInvoiceCapture, invoiceControl, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile, capabilities, onEditBooking }: Props) {
+    const can = { editBooking: true, editMetadata: true, attachments: true, invoiceCapture: true, invoiceBatch: true, deleteBooking: true, assignments: true, ...capabilities }
     const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters }))
     const q = useDebouncedValue(filters.q.trim(), 250)
     const batchNotify = useCallback((type: 'info' | 'success' | 'error' | 'warn', message: string) => notify(type === 'warn' ? 'info' : type, message), [notify])
@@ -196,9 +211,16 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         setMonth(isoDate(date).slice(0, 7))
     }
     const edit = async () => {
-        if (!selected || busy) return
+        if (!selected || busy || !can.editBooking) return
+        if (onEditBooking) {
+            const reason = mutationBlock(selected, closedUntil)
+            if (reason) { notify('info', reason); return }
+            setBusy(true)
+            try { await onEditBooking(selected) } catch (error) { notify('error', error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+            return
+        }
         if (!allowVoucherDeletion) {
-            if (!selected.originalId && !selected.reversedById) setMetaEditing(true)
+            if (can.editMetadata && !selected.originalId && !selected.reversedById) setMetaEditing(true)
             return
         }
         const reason = mutationBlock(selected, closedUntil)
@@ -210,7 +232,7 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         } catch (error) { notify('error', error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
     }
     const saveMeta: NonNullable<React.ComponentProps<typeof VoucherInfoModal>['onSaveMeta']> = async payload => {
-        if (!selected || selected.originalId || selected.reversedById) throw new Error('Diese Buchung kann nicht geändert werden.')
+        if (!can.editMetadata || !selected || selected.originalId || selected.reversedById) throw new Error('Diese Buchung kann nicht geändert werden.')
         const id = selected.id
         await window.api.vouchers.updateMeta({ id, ...payload })
         const result = await window.api.vouchers.list({ limit: 1, voucherIds: [id] })
@@ -219,7 +241,7 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         refresh(); dispatchDataChanged(['vouchers'])
     }
     const remove = async () => {
-        if (!confirm || busy) return
+        if (!confirm || busy || !can.deleteBooking) return
         setBusy(true)
         try {
             if (allowVoucherDeletion) await window.api.vouchers.delete({ id: confirm.id })
@@ -285,15 +307,15 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
                     {tagDefs.length > 0 && <div>{chipFilter('tag', 'Tags', tagDefs.filter((tag, index) => allTagsOpen || index < 6 || tag.name === filters.tag).map(item => ({ value: item.name, label: item.name, color: resolveTagDisplayColor(item.name, tagDefs) })))}{tagDefs.length > 6 && <button className="btn ghost bp-more-tags" onClick={() => setAllTagsOpen(value => !value)} aria-expanded={allTagsOpen}>{allTagsOpen ? 'Weniger Tags' : `Alle ${tagDefs.length} Tags`}</button>}</div>}
                     <details className="bp-more-filters" open={moreFiltersOpen} onToggle={event => setMoreFiltersOpen(event.currentTarget.open)}><summary>Weitere Filter{(filters.from || filters.to || filters.budget || filters.earmark) && <span className="bp-active-filter-count">{[filters.from || filters.to, filters.budget, filters.earmark].filter(Boolean).length} aktiv</span>}</summary>
                         <div className="bp-date-range"><label className="bp-field">Von<DateFilterInput label="Von" value={filters.from} onChange={value => update('from', value)} /></label><label className="bp-field">Bis<DateFilterInput label="Bis" value={filters.to} onChange={value => update('to', value)} /></label></div>
-                        {selectFilter('budget', 'Budget', budgets.map(item => ({ value: String(item.id), label: item.label })))}
-                        {selectFilter('earmark', 'Zweckbindung', earmarks.map(item => ({ value: String(item.id), label: `${item.code} · ${item.name}` })))}
+                        {can.assignments && selectFilter('budget', 'Budget', budgets.map(item => ({ value: String(item.id), label: item.label })))}
+                        {can.assignments && selectFilter('earmark', 'Zweckbindung', earmarks.map(item => ({ value: String(item.id), label: `${item.code} · ${item.name}` })))}
                     </details>
                 </section>
             </div>
         </aside>
         <section className="bp-workspace">
             <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><label className="bp-search bp-header-search"><IconSearch size={18} /><input type="search" className="input" value={filters.q} onChange={event => update('q', event.target.value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" aria-label="Buchungen suchen" />{filters.q && <button type="button" className="btn ghost" aria-label="Suche leeren" onClick={() => update('q', '')}><IconX size={16} /></button>}</label><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
-            <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
+            <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button>{can.invoiceCapture && (invoiceControl || (can.invoiceBatch ? <InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /> : <button className="btn" onClick={onOpenInvoiceCapture}><IconReceipt2 size={19} />Rechnung erfassen</button>))}</div>
             {showBookingDraftTabs && bookingDraftTabs.length > 0 && <div className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}
             <div className="bp-main-columns">
                 <section className="bp-panel bp-list" aria-label="Buchungsliste" aria-busy={loading}>
@@ -302,7 +324,7 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
                     <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
                     <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
                         <time className="bp-date" dateTime={row.date}><strong>{Number(row.date.slice(8, 10))}</strong><span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('de-DE', { month: 'short' })}</span><small>{row.date.slice(0, 4)}</small></time>
-                        <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{assignmentBadges(row)}</span></span>
+                        <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{can.assignments && assignmentBadges(row)}</span></span>
                         <span className="bp-row-payment">{paymentBadge(row)}{(row.fileCount || 0) > 0 && <small><IconPaperclip size={13} />{row.fileCount}</small>}</span><strong className={`bp-row-amount ${signedAmount(row) < 0 ? 'bp-negative' : row.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(row))}<IconChevronRight size={14} /></strong>
                     </div>)}</div>}
                     </div>
@@ -312,23 +334,23 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
                 <aside ref={inspector} tabIndex={-1} className={`bp-panel bp-inspector${detailOpen ? ' bp-inspector--open' : ''}${metaEditing ? ' bp-inspector--editing' : ''}`} role={narrow && detailOpen ? 'dialog' : undefined} aria-modal={narrow && detailOpen ? true : undefined} aria-label="Ausgewählte Buchung">
                     <div className="bp-section-heading"><strong>Buchungsdetails</strong><button className="btn ghost bp-detail-close" aria-label="Details schließen" onClick={closeDetails}><IconX size={19} /></button></div>
                     {selected && <div className="bp-voucher-number"><div><span>Belegnummer</span><strong>{selected.voucherNo}</strong></div><button type="button" className="btn ghost" aria-label="Belegnummer kopieren" title="Belegnummer kopieren" onClick={() => { navigator.clipboard.writeText(selected.voucherNo).then(() => notify('success', 'Belegnummer kopiert')).catch(() => notify('error', 'Kopieren fehlgeschlagen')) }}><IconCopy size={18} /></button></div>}
-                    {selected && metaEditing ? <VoucherInfoModal key={selected.id} embedded initialEditing voucher={selected} onClose={() => setMetaEditing(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onOpenAttachments={() => setAttachments(selected)} /> : selected ? <>
+                    {selected && metaEditing ? <VoucherInfoModal key={selected.id} embedded initialEditing voucher={selected} onClose={() => setMetaEditing(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} showAttachments={can.attachments} showAssignments={can.assignments} onSaveMeta={can.editMetadata ? saveMeta : undefined} onOpenAttachments={can.attachments ? () => setAttachments(selected) : undefined} /> : selected ? <>
                         <div className="bp-inspector-scroll">
-                            {(selected.fileCount || 0) > 0 && <button className="bp-preview-button" onClick={() => setAttachments(selected)} aria-label="Belege anzeigen"><ReceiptThumbnail key={selected.id} voucherId={selected.id} cache={cache.current} revision={revision} /></button>}
+                            {can.attachments && (selected.fileCount || 0) > 0 && <button className="bp-preview-button" onClick={() => setAttachments(selected)} aria-label="Belege anzeigen"><ReceiptThumbnail key={selected.id} voucherId={selected.id} cache={cache.current} revision={revision} /></button>}
                             <h2>{selected.description || 'Ohne Beschreibung'}</h2>{selected.counterparty && <p className="bp-dim"><PartyName name={selected.counterparty} /></p>}<strong className={`bp-detail-amount ${signedAmount(selected) < 0 ? 'bp-negative' : selected.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(selected))}</strong>
                             <dl className="bp-detail-facts"><div><dt>Datum</dt><dd>{prettyDate(selected.date)}</dd></div><div><dt>Zahlweg</dt><dd>{paymentBadge(selected)}</dd></div><div><dt>{generalProfile ? 'Kategorie' : 'Sphäre'}</dt><dd>{classificationLabel(selected)}</dd></div><div><dt>Art</dt><dd><span className={`bp-type-badge bp-kind-icon--${selected.type.toLowerCase()}`}>{selected.type === 'IN' ? <IconArrowDown size={15} /> : selected.type === 'OUT' ? <IconArrowUp size={15} /> : <IconArrowsExchange size={15} />}{kinds[selected.type]}</span></dd></div></dl>
                             <h3>Tags</h3><div className="bp-row-tags">{selected.tags?.length ? tags(selected.tags) : <span className="bp-dim">Keine Tags</span>}</div>
-                            <h3>Zuordnungen</h3><div className="bp-assignment"><span>Budget</span><strong>{assignmentBadges(selected, true) || '—'}</strong><span>Zweckbindung</span><strong>{selected.earmarksAssigned?.map(item => item.code || item.name).join(', ') || selected.earmarkCode || '—'}</strong></div>
-                            <h3>Beleg / Notiz</h3><div className="bp-note">{selected.note || 'Keine Notiz hinterlegt.'}</div><button className="btn bp-attachment" onClick={() => setAttachments(selected)}><IconPaperclip size={16} />{selected.fileCount ? `${selected.fileCount} Beleg${selected.fileCount === 1 ? '' : 'e'} anzeigen / ergänzen` : 'Beleg hinzufügen'}</button>
+                            {can.assignments && <><h3>Zuordnungen</h3><div className="bp-assignment"><span>Budget</span><strong>{assignmentBadges(selected, true) || '—'}</strong><span>Zweckbindung</span><strong>{selected.earmarksAssigned?.map(item => item.code || item.name).join(', ') || selected.earmarkCode || '—'}</strong></div></>}
+                            <h3>Beleg / Notiz</h3><div className="bp-note">{selected.note || 'Keine Notiz hinterlegt.'}</div>{can.attachments && <button className="btn bp-attachment" onClick={() => setAttachments(selected)}><IconPaperclip size={16} />{selected.fileCount ? `${selected.fileCount} Beleg${selected.fileCount === 1 ? '' : 'e'} anzeigen / ergänzen` : 'Beleg hinzufügen'}</button>}
                             {blocked && <p className="bp-dim">{blocked}</p>}
 
                         </div>
-                        <footer className="bp-detail-actions"><div><button className="btn bp-edit-booking" disabled={!!editBlocked || busy} onClick={() => { void edit() }}><IconPencil size={16} />Bearbeiten</button><button className="btn" onClick={() => setInfoOpen(true)} title="Vollständige Buchungsinfo" aria-label="Vollständige Buchungsinfo"><IconReceipt2 size={18} /></button><button className="btn danger" disabled={!!blocked || busy} onClick={() => setConfirm(selected)} title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'} aria-label={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}><IconTrash size={17} /></button></div><button className="btn ghost" disabled={!similarQuery(selected)} onClick={() => { setSimilarTo(current => current?.id === selected.id ? null : selected); if (narrow) closeDetails() }} aria-expanded={!!similarTo}><IconSearch size={16} />Ähnliche Buchungen</button></footer>
+                        <footer className="bp-detail-actions"><div>{can.editBooking && <button className="btn bp-edit-booking" disabled={!!editBlocked || busy} onClick={() => { void edit() }}><IconPencil size={16} />Bearbeiten</button>}<button className="btn" onClick={() => setInfoOpen(true)} title="Vollständige Buchungsinfo" aria-label="Vollständige Buchungsinfo"><IconReceipt2 size={18} /></button>{can.deleteBooking && <button className="btn danger" disabled={!!blocked || busy} onClick={() => setConfirm(selected)} title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'} aria-label={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}><IconTrash size={17} /></button>}</div><button className="btn ghost" disabled={!similarQuery(selected)} onClick={() => { setSimilarTo(current => current?.id === selected.id ? null : selected); if (narrow) closeDetails() }} aria-expanded={!!similarTo}><IconSearch size={16} />Ähnliche Buchungen</button></footer>
                     </> : <p className="bp-empty">Wähle eine Buchung aus der Liste.</p>}
                 </aside>
             </div>
         </section>
-        {infoOpen && selected && <VoucherInfoModal voucher={selected} onClose={() => setInfoOpen(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onReverse={!blocked ? () => setConfirm(selected) : undefined} onOpenAttachments={() => setAttachments(selected)} />}
+        {infoOpen && selected && <VoucherInfoModal voucher={selected} onClose={() => setInfoOpen(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} showAttachments={can.attachments} showAssignments={can.assignments} onSaveMeta={can.editMetadata ? saveMeta : undefined} onReverse={can.deleteBooking && !blocked ? () => setConfirm(selected) : undefined} onOpenAttachments={can.attachments ? () => setAttachments(selected) : undefined} />}
         {attachments && <AttachmentsModal voucher={{ voucherId: attachments.id, voucherNo: attachments.voucherNo, date: attachments.date, description: attachments.description || '' }} onClose={() => { setAttachments(null); refresh() }} onChanged={refresh} />}
         {confirm && <div className="modal-overlay bp-confirm" role="dialog" aria-modal="true" aria-labelledby="bp-confirm-title"><div className="modal"><h2 id="bp-confirm-title">Buchung {allowVoucherDeletion ? 'löschen' : 'stornieren'}?</h2><p>{confirm.voucherNo} · {confirm.description}</p><p>{allowVoucherDeletion ? 'Die Buchung wird endgültig gelöscht.' : 'Die Originalbuchung bleibt erhalten. Es wird eine Gegenbuchung erstellt.'}</p><div className="bp-confirm-actions"><button className="btn" autoFocus disabled={busy} onClick={() => setConfirm(null)}>Abbrechen</button><button className="btn danger" disabled={busy} onClick={() => { void remove() }}>{busy ? 'Wird gespeichert …' : allowVoucherDeletion ? 'Löschen' : 'Stornieren'}</button></div></div></div>}
     </div>

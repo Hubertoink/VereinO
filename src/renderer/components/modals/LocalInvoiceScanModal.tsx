@@ -240,8 +240,12 @@ export default function LocalInvoiceScanModal({
   onDraftChange,
   onFileChange,
   anchorRect,
-  intakeHeader
+  intakeHeader,
+  apiOverride,
+  webMode = false
 }: {
+  apiOverride?: typeof window.api
+  webMode?: boolean
   onClose: () => void
   intakeHeader?: import('react').ReactNode
   onCreateInvoice: (result: LocalInvoiceScanResult) => Promise<boolean> | boolean
@@ -258,6 +262,7 @@ export default function LocalInvoiceScanModal({
   onFileChange?: (file: File | null) => void
   anchorRect?: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'> | null
 }) {
+  const serviceApi = apiOverride || window.api
   const { notify } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -331,7 +336,7 @@ export default function LocalInvoiceScanModal({
 
   useEffect(() => {
     let active = true
-    void window.api.classifications.primary.list().then((result) => {
+    void serviceApi.classifications.primary.list().then((result) => {
       if (!active) return
       setIsGeneralProfile(result.profile === 'GENERAL')
       setCategories(result.values.filter((value) => value.isActive !== false))
@@ -371,7 +376,7 @@ export default function LocalInvoiceScanModal({
 
   useEffect(() => {
     let cancelled = false
-    void window.api.ai.settings
+    void serviceApi.ai.settings
       .get()
       .then((settings) => {
         if (cancelled) return
@@ -397,9 +402,11 @@ export default function LocalInvoiceScanModal({
     const bodyOverflow = document.body.style.overflow
     const bodyOverscrollBehavior = document.body.style.overscrollBehavior
     const rootOverflow = document.documentElement.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.body.style.overscrollBehavior = 'contain'
-    document.documentElement.style.overflow = 'hidden'
+    if (!webMode) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.overscrollBehavior = 'contain'
+      document.documentElement.style.overflow = 'hidden'
+    }
     closeButtonRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCloseRef.current()
@@ -407,9 +414,11 @@ export default function LocalInvoiceScanModal({
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = bodyOverflow
-      document.body.style.overscrollBehavior = bodyOverscrollBehavior
-      document.documentElement.style.overflow = rootOverflow
+      if (!webMode) {
+        document.body.style.overflow = bodyOverflow
+        document.body.style.overscrollBehavior = bodyOverscrollBehavior
+        document.documentElement.style.overflow = rootOverflow
+      }
       previouslyFocused?.focus?.()
     }
   }, [])
@@ -562,9 +571,9 @@ export default function LocalInvoiceScanModal({
       setAnalysisMessage('Bitte eine PDF-, PNG-, JPG- oder WebP-Datei auswählen.')
       return
     }
-    if (nextFile.size > MAX_FILE_BYTES) {
+    if (nextFile.size > (webMode ? MAX_AI_FILE_BYTES : MAX_FILE_BYTES)) {
       setAnalysisState('error')
-      setAnalysisMessage('Die Rechnung darf maximal 25 MB groß sein.')
+      setAnalysisMessage(`Die Rechnung darf maximal ${webMode ? 10 : 25} MB groß sein.`)
       return
     }
 
@@ -587,7 +596,7 @@ export default function LocalInvoiceScanModal({
     setAnalysisMessage('Dokument wird gelesen …')
     setDuplicate(null)
     setDuplicateCheckInProgress(true)
-    void window.api.ai.invoice.checkDuplicate({
+    void serviceApi.ai.invoice.checkDuplicate({
       file: {
         fileName: nextFile.name,
         mimeType,
@@ -621,11 +630,11 @@ export default function LocalInvoiceScanModal({
       try {
         if (restored) return false
         if (mimeType === 'image/webp') return false
-        const status = await window.api.docling.status()
+        const status = await serviceApi.docling.status()
         if (!status.enabled) return false
         setAnalysisState('analyzing')
         setAnalysisMessage('Docling analysiert Text, OCR und Dokumentlayout lokal …')
-        const result = await window.api.docling.extract({
+        const result = await serviceApi.docling.extract({
           fileName: nextFile.name,
           mimeType,
           dataBytes: new Uint8Array(await nextFile.arrayBuffer())
@@ -658,7 +667,7 @@ export default function LocalInvoiceScanModal({
 
     const applyLocalOcr = async (pdfDocument?: any) => {
       try {
-        if (restored) return null
+        if (restored || webMode) return null
         setAnalysisState('analyzing')
         setAnalysisMessage('Lokale OCR liest den Scan …')
         const images: Array<{ dataBytes: Uint8Array }> = []
@@ -687,7 +696,7 @@ export default function LocalInvoiceScanModal({
           images.push({ dataBytes: new Uint8Array(await nextFile.arrayBuffer()) })
         }
 
-        const result = await window.api.ocr.extract({ images })
+        const result = await serviceApi.ocr.extract({ images })
         if (requestRef.current !== requestId) return null
         if (pdfDocument) {
           setOcrWordsByPage(
@@ -739,7 +748,7 @@ export default function LocalInvoiceScanModal({
       if (!handledByDocling) {
         setAnalysisState('ocr-needed')
         setAnalysisMessage(
-          `Bildvorschau bereit. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
+          webMode ? 'Bildvorschau bereit. Mit KI auslesen oder Werte selbst eintragen.' : `Bildvorschau bereit. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
         )
       }
       return
@@ -906,7 +915,7 @@ export default function LocalInvoiceScanModal({
     setAnalysisState('analyzing')
     setAnalysisMessage(`${aiProvider} liest die Rechnung aus …`)
     try {
-      const analyzed = await window.api.ai.invoice.extract({
+      const analyzed = await serviceApi.ai.invoice.extract({
         file: {
           fileName: file.name,
           mimeType,
@@ -926,6 +935,7 @@ export default function LocalInvoiceScanModal({
             ? result.paymentMethod
             : 'BANK'
         ),
+        primaryClassificationValueId: (result as TAiInvoiceExtractionResult & { primaryClassificationValueId?: number | null }).primaryClassificationValueId,
         paymentAccountId: activeAiGuidance?.defaults?.paymentAccountId ?? result.paymentAccountId
       })
       if (result.budgets.length) {
@@ -1002,7 +1012,7 @@ export default function LocalInvoiceScanModal({
     }
   }
 
-  const aiGuidancePanel = aiAvailable ? (
+  const aiGuidancePanel = aiAvailable && !webMode ? (
     <details className="local-invoice-scan__ai-guidance">
       <summary>
         <span><SparkleIcon /> KI-Vorgaben</span>
@@ -1017,7 +1027,7 @@ export default function LocalInvoiceScanModal({
   ) : null
 
   return createPortal(
-    <div className="modal-overlay local-invoice-scan-overlay" role="presentation" onClick={onClose}>
+    <div className={`modal-overlay local-invoice-scan-overlay${webMode ? ' web-invoice-overlay' : ''}`} role="presentation" onClick={onClose}>
       <section
         className={`modal local-invoice-scan${!file && anchorRect ? ' local-invoice-scan--flyout' : ''}`}
         role="dialog"
@@ -1094,7 +1104,7 @@ export default function LocalInvoiceScanModal({
             </span>
             <strong>Rechnung hier ablegen</strong>
             <span>oder Datei auswählen</span>
-            <small>PDF, PNG, JPG oder WebP · maximal 25 MB</small>
+            <small>PDF, PNG, JPG oder WebP · maximal {webMode ? 10 : 25} MB</small>
             {analysisState === 'error' && (
               <span className="local-invoice-scan__drop-error" role="alert">
                 {analysisMessage}
@@ -1282,7 +1292,7 @@ export default function LocalInvoiceScanModal({
                 <div className="local-invoice-scan__fields">
                   <div className="local-invoice-scan__field">
                     <span>Lieferant / Rechnungsteller</span>
-                    <PartySelector
+                    {webMode ? <input className="input" aria-label="Lieferant / Rechnungssteller" value={fields.supplier} onChange={event => updateField('supplier', event.target.value)} /> : <PartySelector
                       valueId={partyId}
                       valueName={fields.supplier}
                       role="SUPPLIER"
@@ -1294,7 +1304,7 @@ export default function LocalInvoiceScanModal({
                         setPartyId(selection.partyId)
                         setFields((current) => ({ ...current, supplier: selection.name }))
                       }}
-                    />
+                    />}
                   </div>
                   <Field
                     label="Rechnungsnummer"
@@ -1359,7 +1369,7 @@ export default function LocalInvoiceScanModal({
                   </div>
                 </div>
 
-                <section
+                <section hidden={webMode}
                   className="local-invoice-scan__optional"
                   aria-label="Optionale Buchungsangaben"
                 >

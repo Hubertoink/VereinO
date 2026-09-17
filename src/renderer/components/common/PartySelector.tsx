@@ -10,6 +10,7 @@ import { PARTY_ROLE_LABELS } from './partyLabels'
 export type PartySelection = { partyId: number | null; name: string }
 
 type PartyEditorModalProps = {
+  onSave?: (draft: TPartyUpsertInput) => Promise<TParty>
   initial?: Partial<TParty> & { role?: TPartyRole }
   onClose: () => void
   onSaved: (party: TParty) => void
@@ -19,7 +20,7 @@ function nullable(value: string) {
   return value.trim() || null
 }
 
-export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModalProps) {
+export function PartyEditorModal({ initial, onClose, onSaved, onSave }: PartyEditorModalProps) {
   const [draft, setDraft] = React.useState<TPartyUpsertInput>({
     id: initial?.id,
     name: initial?.name || '',
@@ -56,7 +57,7 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
     setBusy(true)
     setError('')
     try {
-      const result = await window.api.parties.upsert({
+      const payload = {
         ...draft,
         name: draft.name.trim(),
         legalName: nullable(draft.legalName || ''),
@@ -72,8 +73,11 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
         taxNumber: nullable(draft.taxNumber || ''),
         vatId: nullable(draft.vatId || ''),
         note: nullable(draft.note || '')
-      })
-      const party = await window.api.parties.get({ id: result.id })
+      }
+      const party = onSave ? await onSave(payload) : await (async () => {
+        const result = await window.api.parties.upsert(payload)
+        return window.api.parties.get({ id: result.id })
+      })()
       dispatchDataChanged(['parties'])
       onSaved(party)
     } catch (e: any) {

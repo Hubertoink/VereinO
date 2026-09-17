@@ -1,6 +1,6 @@
 import './compactBookingFlyout.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { QA } from '../hooks/useQuickAdd'
+import type { QA } from '../types/bookingEntry'
 import {
   AI_PATTERNS_CHANGED_EVENT,
   buildAISuggestions,
@@ -51,6 +51,20 @@ type PaymentAccount = {
 }
 
 type Props = {
+  primaryClassification?: { profile: string; label: string; values: Array<{ id: number; name: string; icon?: string | null; color?: string | null; isActive?: boolean }> }
+  allowedOptionalSections?: OptionalSection[]
+  attachmentAccept?: string
+  attachmentsContent?: React.ReactNode
+  allowTaxMode?: boolean
+  allowAISuggestions?: boolean
+  learnOnSave?: boolean
+  transformAISuggestions?: (suggestions: BookingAISuggestion[]) => BookingAISuggestion[]
+  freeTextCounterparty?: boolean
+  busy?: boolean
+  error?: string
+  title?: string
+  saveLabel?: string
+  readOnlyCore?: boolean
   qa: QA
   setQa: (qa: QA) => void
   kindOptions?: Array<{ value: QA['type']; label: string }>
@@ -135,6 +149,20 @@ function initialSections(qa: QA, files: File[]) {
 }
 
 export default function CompactBookingFlyout({
+  primaryClassification,
+  allowedOptionalSections,
+  attachmentAccept = '.png,.jpg,.jpeg,.pdf,.doc,.docx',
+  attachmentsContent,
+  allowTaxMode = true,
+  allowAISuggestions = true,
+  learnOnSave = true,
+  transformAISuggestions,
+  freeTextCounterparty = false,
+  busy = false,
+  error,
+  title = 'Buchung erfassen',
+  saveLabel = 'Buchung speichern',
+  readOnlyCore = false,
   qa,
   setQa,
   kindOptions = [
@@ -174,6 +202,7 @@ export default function CompactBookingFlyout({
 
   useEffect(() => {
     let alive = true
+    if (primaryClassification) { setClassification(primaryClassification); return }
     void window.api?.classifications?.primary?.list?.()
       .then((result) => {
         if (!alive || !result) return
@@ -181,7 +210,7 @@ export default function CompactBookingFlyout({
       })
       .catch(() => { if (alive) setClassification(null) })
     return () => { alive = false }
-  }, [])
+  }, [primaryClassification])
 
   const gross = grossAmount(qa)
   const budgets = (qa.budgets || []) as BudgetAssignment[]
@@ -208,7 +237,7 @@ export default function CompactBookingFlyout({
     ?? activeAccounts[0]
 
   const aiLearning = useMemo(() => readAISuggestionLearning(), [aiLearningVersion])
-  const aiSuggestions = useMemo(
+  const rawAISuggestions = useMemo(
     () => buildAISuggestions({
       description: qa.description || '',
       grossAmount: gross,
@@ -236,6 +265,8 @@ export default function CompactBookingFlyout({
       window.removeEventListener('storage', refreshLearning)
     }
   }, [])
+
+  const aiSuggestions = transformAISuggestions ? transformAISuggestions(rawAISuggestions) : rawAISuggestions
 
   useEffect(() => {
     if (!aiSuggestions.length) setAiMenuOpen(false)
@@ -520,8 +551,8 @@ export default function CompactBookingFlyout({
   }
 
   const save = () => {
-    if (saveBlocked) return
-    rememberBookingAIPattern({
+    if (saveBlocked || busy) return
+    if (allowAISuggestions && learnOnSave) rememberBookingAIPattern({
       description: qa.description || '',
       grossAmount: gross,
       tags: qa.tags || [],
@@ -549,7 +580,7 @@ export default function CompactBookingFlyout({
     <section className={`compact-booking-flyout compact-booking-flyout--${qa.type.toLowerCase()}`} role="dialog" aria-labelledby="compact-booking-title">
       <header className="compact-booking-flyout__header">
         <div>
-          <strong id="compact-booking-title" title="Buchung erfassen">Buchung erfassen</strong>
+          <strong id="compact-booking-title" title={title}>{title}</strong>
         </div>
         {draftTabsEnabled && draftTabs.length > 0 && (
           <div className="compact-booking-flyout__tab-switcher">
@@ -569,9 +600,9 @@ export default function CompactBookingFlyout({
       </header>
 
       <form className="compact-booking-flyout__form" onSubmit={(event) => { event.preventDefault(); save() }}>
-        <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
+        <input ref={fileInputRef} type="file" multiple hidden accept={attachmentAccept} onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
-          <BookingKindSwitch
+          <BookingKindSwitch disabled={readOnlyCore}
             value={qa.type}
             ariaLabel="Buchungsart wählen"
             options={kindOptions}
@@ -582,8 +613,8 @@ export default function CompactBookingFlyout({
             <label className="compact-booking-field">
               <span>Datum *</span>
               <span className="booking-date-input-wrap">
-                <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
-                <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
+                <input ref={dateInputRef} readOnly={readOnlyCore} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
+                {!readOnlyCore && <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />}
               </span>
             </label>
 
@@ -668,7 +699,7 @@ export default function CompactBookingFlyout({
             ) : qa.type !== 'INTERNAL' ? (
               <label className="compact-booking-field">
                 <span>Konto *</span>
-                <SelectDropdown placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
+                <SelectDropdown disabled={readOnlyCore} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
                   const id = value ? Number(value) : null
                   const account = accountsById.get(Number(id || 0))
                   patchQa({ paymentAccountId: id, paymentAccountName: account?.name ?? null, paymentMethod: accountMethod(account?.kind) })
@@ -680,8 +711,8 @@ export default function CompactBookingFlyout({
 
             <label className="compact-booking-field compact-booking-field--amount">
               <span>Betrag *</span>
-              <span className={`compact-booking-amount-control${qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' ? ' compact-booking-amount-control--with-vat' : ''}`}>
-                {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && (
+              <span style={!allowTaxMode ? { gridTemplateColumns: 'minmax(0, 1fr)' } : undefined} className={`compact-booking-amount-control${qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' ? ' compact-booking-amount-control--with-vat' : ''}`}>
+                {allowTaxMode && qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && (
                   <SelectDropdown value={qa.mode ?? 'GROSS'} onChange={(value) => {
                     const mode = value as 'NET' | 'GROSS'
                     if (mode === 'NET') patchQa({ mode, netAmount: qa.netAmount ?? qa.grossAmount ?? 0, vatRate: qa.vatRate || 19 })
@@ -689,7 +720,7 @@ export default function CompactBookingFlyout({
                   }} ariaLabel="Netto oder Brutto Modus" options={[{ value: 'GROSS', label: 'Brutto' }, { value: 'NET', label: 'Netto' }]} />
                 )}
                 <span className="adorn-wrap">
-                  <input ref={amountInputRef} className={`input amount-input${hasInvalidAmount ? ' input-error' : ''}`} type="number" step="0.01" value={(qa.type === 'TRANSFER' || qa.type === 'INTERNAL' || qa.mode === 'GROSS') ? qa.grossAmount ?? '' : qa.netAmount ?? ''} onFocus={(event) => event.currentTarget.select()} onChange={(event) => {
+                  <input readOnly={readOnlyCore} ref={amountInputRef} className={`input amount-input${hasInvalidAmount ? ' input-error' : ''}`} type="number" step="0.01" value={(qa.type === 'TRANSFER' || qa.type === 'INTERNAL' || qa.mode === 'GROSS') ? qa.grossAmount ?? '' : qa.netAmount ?? ''} onFocus={(event) => event.currentTarget.select()} onChange={(event) => {
                     const value = event.target.value === '' ? undefined : Number(event.target.value)
                     const usesGrossInput = qa.type === 'TRANSFER' || qa.type === 'INTERNAL' || qa.mode === 'GROSS'
                     const nextGross = usesGrossInput
@@ -717,7 +748,7 @@ export default function CompactBookingFlyout({
           </label>
 
           <BookingOptionalArea
-            actions={optionalButtons.map((item) => ({ ...item, active: visibleSections.has(item.key) }))}
+            actions={optionalButtons.filter((item) => !allowedOptionalSections || allowedOptionalSections.includes(item.key)).map((item) => ({ ...item, active: visibleSections.has(item.key) }))}
             onToggle={(key) => setSectionVisible(key as OptionalSection)}
           >
 
@@ -731,7 +762,9 @@ export default function CompactBookingFlyout({
                 <strong>{qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</strong>
                 <button type="button" onClick={() => removeSection('party')} aria-label="Geschäftspartner entfernen">×</button>
               </div>
-              <PartySelector
+              {freeTextCounterparty ? (
+                <SuggestionInput ariaLabel={qa.type === 'OUT' ? 'Lieferant oder Zahlungsempfänger' : 'Kunde oder Zahlungspflichtiger'} value={qa.counterparty || ''} suggestions={[]} onChange={(value) => patchQa({ counterparty: value })} placeholder={qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'} />
+              ) : <PartySelector
                 valueId={qa.partyId}
                 valueName={qa.counterparty || ''}
                 role={qa.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
@@ -739,7 +772,7 @@ export default function CompactBookingFlyout({
                 ariaLabel={qa.type === 'OUT' ? 'Lieferant oder Zahlungsempfänger' : 'Kunde oder Zahlungspflichtiger'}
                 menuPlacement="top"
                 onChange={(selection) => patchQa({ partyId: selection.partyId, counterparty: selection.name })}
-              />
+              />}
             </div>
           )}
 
@@ -838,15 +871,17 @@ export default function CompactBookingFlyout({
             <div className="compact-booking-optional-section" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); onDropFiles(event.dataTransfer.files) }}>
               <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => removeSection('attachments')} aria-label="Anhänge entfernen">×</button></div>
               <button type="button" className="compact-booking-add-row" onClick={openFilePicker}>+ Datei auswählen</button>
+              {attachmentsContent}
               {!!files.length && <div className="compact-booking-files">{files.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${file.name} entfernen`}>×</button></span>)}</div>}
             </div>
           )}
           </BookingOptionalArea>
         </div>
 
+        {error && <div className="compact-booking-error" role="alert" style={{ padding: '8px 14px' }}>{error}</div>}
         <footer className="compact-booking-flyout__footer">
           <div className="compact-booking-flyout__footer-main">
-            {aiSuggestions.length > 0 && (
+            {allowAISuggestions && aiSuggestions.length > 0 && (
               <div className="booking-ai-assist compact-booking-ai-assist" ref={aiAssistRef}>
                 <button
                   type="button"
@@ -906,7 +941,7 @@ export default function CompactBookingFlyout({
             </div>}
           </div>
           <div>
-            <button type="submit" className="btn primary" disabled={saveBlocked}>Buchung speichern</button>
+            <button type="submit" className="btn primary" disabled={saveBlocked || busy}>{busy ? 'Wird gespeichert …' : saveLabel}</button>
           </div>
         </footer>
       </form>

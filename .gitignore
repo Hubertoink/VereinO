@@ -11,3 +11,8 @@ Thumbs.db
 /.vscode/*.db
 playwright-report/
 test-results/
+
+# Web deployment secrets and local database fixtures
+.env.web
+.env.web.*
+!.env.web.example

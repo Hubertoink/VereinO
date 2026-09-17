@@ -1,0 +1,2 @@
+ALTER TABLE web_drafts ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE web_bookings ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';

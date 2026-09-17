@@ -11,6 +11,8 @@ type MentionOption = {
 }
 
 type Props = {
+  maxLength?: number
+  acceptedFiles?: string
   placement: 'initial' | 'followup'
   busy: boolean
   prompt: string
@@ -34,6 +36,8 @@ type Props = {
 
 /** Reine Composer-Darstellung; Dateien, Mentions und Senden bleiben beim jeweiligen Hook. */
 export function AiComposer({
+  maxLength,
+  acceptedFiles = '.pdf,.xlsx,.xls,.csv,.tsv,image/png,image/jpeg',
   placement,
   busy,
   prompt,
@@ -72,6 +76,8 @@ export function AiComposer({
         <textarea
           ref={promptInputRef}
           className="input ai-prompt-input"
+          aria-label="Deine Frage"
+          maxLength={maxLength}
           value={prompt}
           disabled={busy}
           onChange={(event) => onPromptChange(event.target.value, event.target.selectionStart || 0)}
@@ -91,7 +97,7 @@ export function AiComposer({
         </div>}
         {!busy && isDraggingFiles && <div className="ai-prompt-drop-hint" aria-hidden="true">Dateien hier ablegen, um sie an die Anfrage anzuhängen</div>}
         <button className="btn primary ai-send-btn" type="button" disabled={busy || (!prompt.trim() && !files.length)} onClick={onSubmit}>{busy ? <span className="ai-send-spinner" aria-hidden="true" /> : 'Senden'}</button>
-        <input ref={fileInputRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.tsv,image/png,image/jpeg" hidden onChange={(event) => { onAppendFiles(event.target.files); event.target.value = '' }} />
+        <input ref={fileInputRef} type="file" multiple accept={acceptedFiles} aria-label="Beleg auswählen" hidden onChange={(event) => { onAppendFiles(event.target.files); event.target.value = '' }} />
       </div>
     </section>
   )

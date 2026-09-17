@@ -1,5 +1,8 @@
 # VereinO Docker Backend Migration Plan
 
+> Historischer Entwurf (2025). Für den aktuellen Entwicklungsstand und die vereinbarten
+> Rollen siehe [Web-/Mehrbenutzerplan](docs/WEB_MULTIUSER_PLAN.md).
+
 ## Ziel
 Hybrid-Modus: Lokale SQLite-Nutzung ODER Cloud-Backend über Docker/Mittwald
 

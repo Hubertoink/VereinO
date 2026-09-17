@@ -16,7 +16,7 @@ type ReceiptRow = Awaited<ReturnType<RendererApi['vouchers']['list']>>['rows'][n
 
 type ReceiptTarget = { voucherId: number; voucherNo: string; date: string; description: string }
 
-export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVoucher?: ReceiptTarget | null; onVoucherOpened?: () => void }) {
+export default function ReceiptsView({ openVoucher, onVoucherOpened, onGoToBooking }: { openVoucher?: ReceiptTarget | null; onVoucherOpened?: () => void; onGoToBooking?: (id: number) => void }) {
     const [rows, setRows] = useState<ReceiptRow[]>([])
     const [view, setView] = useState<'grid' | 'list'>('grid')
     const [sort, setSort] = useState<'ASC' | 'DESC'>('DESC')
@@ -70,6 +70,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
     // AttachmentsModal handles listing, preview and download
 
     function jumpToVoucher(row: { id: number; voucherNo: string; date: string }) {
+        if (onGoToBooking) { onGoToBooking(row.id); return }
         const ev = new CustomEvent('apply-voucher-jump', {
             detail: {
                 voucherId: row.id,
@@ -177,6 +178,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
             {attachmentsModal && (
                 <AttachmentsModal
                     voucher={attachmentsModal}
+                    onGoToBooking={onGoToBooking}
                     onClose={() => setAttachmentsModal(null)}
                     onChanged={() => { previewCache.current.delete(attachmentsModal.voucherId); setPreviewRevision(value => value + 1); void load() }}
                 />

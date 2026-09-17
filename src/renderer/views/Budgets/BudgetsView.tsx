@@ -8,6 +8,7 @@ import { sortBudgetEntries } from '../../utils/compactEntrySort'
 
 type Budget = {
   id: number
+  version?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   primaryClassificationValueId?: number | null
@@ -28,6 +29,7 @@ type Budget = {
 
 type BudgetEdit = {
   id?: number
+  version?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   primaryClassificationValueId?: number | null
@@ -50,9 +52,11 @@ const TABLE_PAGE_SIZE = 10
 
 export default function BudgetsView({
   onGoToBookings,
-  notify
+  notify,
+  readOnly = false
 }: {
   onGoToBookings: (budgetId: number) => void
+  readOnly?: boolean
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -88,8 +92,8 @@ export default function BudgetsView({
   }
 
   useEffect(() => {
-    loadBudgets()
-    const onChanged = () => loadBudgets()
+    void loadBudgets().catch(error => notify('error', String(error)))
+    const onChanged = () => { void loadBudgets().catch(error => notify('error', String(error))) }
     return addDataChangedListener(['budgets', 'vouchers'], onChanged)
   }, [showArchived])
 
@@ -156,6 +160,7 @@ export default function BudgetsView({
     const nextArchived = !b.isArchived
     await (window as any).api?.budgets.upsert?.({
       id: b.id,
+      version: b.version,
       year: b.year,
       sphere: b.sphere,
       primaryClassificationValueId: b.primaryClassificationValueId ?? null,
@@ -182,7 +187,7 @@ export default function BudgetsView({
       <div className="budget-management-surface" style={{ padding: 12 }}>
         <div className="management-page-heading">
           <h1>Budgets</h1>
-          <button
+          {!readOnly && <button
             className="btn primary btn-with-icon"
             onClick={() =>
               setEditBudget({
@@ -199,7 +204,7 @@ export default function BudgetsView({
             }
           >
             <AppIcon icon={IconPlus} size="control" />Neu
-          </button>
+          </button>}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -275,7 +280,7 @@ export default function BudgetsView({
                   )}
                 </td>
                 <td align="right">{b.amountPlanned > 0 ? eurFmt.format(b.amountPlanned) : '—'}</td>
-                <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                <td align="center" style={{ whiteSpace: 'nowrap' }}>{!readOnly && <>
                   <button
                     className="btn"
                     onClick={() => setArchiveConfirm(b)}
@@ -287,6 +292,7 @@ export default function BudgetsView({
                     onClick={() =>
                       setEditBudget({
                         id: b.id,
+                        version: b.version,
                         year: b.year,
                         sphere: b.sphere,
                         primaryClassificationValueId: b.primaryClassificationValueId ?? null,
@@ -305,7 +311,7 @@ export default function BudgetsView({
                       })
                     }
                   ><AppIcon icon={IconPencil} size="control" /></button>
-                </td>
+                </>}</td>
               </tr>
             ))}
             {sortedVisibleBudgets.length === 0 && (
@@ -370,9 +376,10 @@ export default function BudgetsView({
         budgets={sortedVisibleBudgets}
         eurFmt={eurFmt}
         compact={compactCards}
-        onEdit={(b) =>
+        onEdit={readOnly ? undefined : (b) =>
           setEditBudget({
             id: b.id,
+            version: b.version,
             year: b.year,
             sphere: b.sphere,
             primaryClassificationValueId: b.primaryClassificationValueId ?? null,
@@ -394,12 +401,12 @@ export default function BudgetsView({
       />
 
       {/* Edit Modal */}
-      {editBudget && (
+      {!readOnly && editBudget && (
         <BudgetModal value={editBudget as any} onClose={() => setEditBudget(null)} onSaved={handleSaved} />
       )}
 
       {/* Archive Confirm Modal */}
-      {archiveConfirm && (
+      {!readOnly && archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -413,7 +420,7 @@ export default function BudgetsView({
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setArchiveConfirm(null)}>Abbrechen</button>
-              <button className="btn primary btn-with-icon" onClick={() => doArchive(archiveConfirm)}>
+              <button className="btn primary btn-with-icon" onClick={() => { void doArchive(archiveConfirm).catch(error => notify('error', error instanceof Error ? error.message : String(error))) }}>
                 <AppIcon icon={archiveConfirm.isArchived ? IconChevronsUp : IconChevronsDown} size="inline" />
                 {archiveConfirm.isArchived ? 'Wiederherstellen' : 'Archivieren'}
               </button>

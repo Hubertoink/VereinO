@@ -77,12 +77,18 @@ export default function AttachmentsModal({
     voucher,
     onClose,
     onChanged,
+    onGoToBooking,
+    api: suppliedApi,
 }: {
     voucher: { voucherId: number; voucherNo: string; date: string; description: string }
     onClose: () => void
     onChanged?: () => void
+    api?: Pick<RendererApi, 'attachments' | 'vouchers'>
+    onGoToBooking?: (id: number) => void
 }) {
     const { notify } = useToast()
+    const attachmentApi = suppliedApi || window.api
+    const [permissions, setPermissions] = useState({ canUpload: true, canDelete: true, canOpenExternal: true, acceptedFileTypes: '.png,.jpg,.jpeg,.pdf,.doc,.docx' })
     const [booking, setBooking] = useState<BookingDetails | null>(null)
     const [bookingError, setBookingError] = useState(false)
     useEffect(() => {
@@ -93,7 +99,7 @@ export default function AttachmentsModal({
         const loadBooking = async () => {
             const current = ++request
             try {
-                const result = await window.api.vouchers.list({ voucherIds: [voucher.voucherId], limit: 1 })
+                const result = await attachmentApi.vouchers.list({ voucherIds: [voucher.voucherId], limit: 1 })
                 if (!alive || current !== request) return
                 setBooking(result.rows[0] ?? null)
                 setBookingError(!result.rows.length)
@@ -144,9 +150,10 @@ export default function AttachmentsModal({
         previewCacheRef.current.clear()
         pdfDocCacheRef.current.clear()
         pdfDocRef.current = null
-        ;(window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
+        ;(attachmentApi as any)?.attachments.list?.({ voucherId: voucher.voucherId })
             .then((res: any) => {
                 if (!alive) return
+                setPermissions({ canUpload: res?.canUpload !== false, canDelete: res?.canDelete !== false, canOpenExternal: res?.canOpenExternal !== false, acceptedFileTypes: res?.acceptedFileTypes || '.png,.jpg,.jpeg,.pdf,.doc,.docx' })
                 const rows = res?.files || []
                 setFiles(rows)
                 setSelectedId(rows[0]?.id ?? null)
@@ -188,7 +195,7 @@ export default function AttachmentsModal({
         const isPdf = mt === 'application/pdf' || /\.(pdf)$/i.test(name)
         if (!isImg && !isPdf) return
         try {
-            const res = await (window as any).api?.attachments.read?.({ fileId: id })
+            const res = await (attachmentApi as any)?.attachments.read?.({ fileId: id })
             if (!res || currentPreviewRequestRef.current !== requestId) return
             const bytes = res.dataBytes instanceof Uint8Array
                 ? res.dataBytes
@@ -345,18 +352,18 @@ export default function AttachmentsModal({
     }
 
     async function handleAddFiles(fileList: FileList | null) {
-        if (!fileList || !fileList.length) return
+        if (!permissions.canUpload || !fileList || !fileList.length) return
         try {
             for (const f of Array.from(fileList)) {
                 const encoded = await encodeFileForUpload(f)
-                await (window as any).api?.attachments.add?.({
+                await (attachmentApi as any)?.attachments.add?.({
                     voucherId: voucher.voucherId,
                     fileName: encoded.name,
                     dataBytes: encoded.dataBytes,
                     mimeType: encoded.mime
                 })
             }
-            const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
+            const res = await (attachmentApi as any)?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
             try { onChanged?.() } catch { }
@@ -371,8 +378,9 @@ export default function AttachmentsModal({
     async function handleDownload() {
         if (!selected) return
         try {
-            const r = await (window as any).api?.attachments.saveAs?.({ fileId: selected.id })
+            const r = await (attachmentApi as any)?.attachments.saveAs?.({ fileId: selected.id })
             if (r?.filePath) notify('success', 'Gespeichert: ' + r.filePath)
+            else if (r?.downloadStarted) notify('success', 'Download gestartet')
         } catch (e: any) {
             const m = e?.message || String(e)
             if (/Abbruch/i.test(m)) return
@@ -381,13 +389,13 @@ export default function AttachmentsModal({
     }
 
     async function handleDelete() {
-        if (!confirmDelete) return
+        if (!permissions.canDelete || !confirmDelete) return
         try {
-            await (window as any).api?.attachments.delete?.({ fileId: confirmDelete.id })
+            await (attachmentApi as any)?.attachments.delete?.({ fileId: confirmDelete.id })
             revokePreview(previewCacheRef.current.get(confirmDelete.id) || null)
             previewCacheRef.current.delete(confirmDelete.id)
             pdfDocCacheRef.current.delete(confirmDelete.id)
-            const res = await (window as any).api?.attachments.list?.({ voucherId: voucher.voucherId })
+            const res = await (attachmentApi as any)?.attachments.list?.({ voucherId: voucher.voucherId })
             setFiles(res?.files || [])
             setSelectedId((res?.files || [])[0]?.id ?? null)
             setPreview(null)
@@ -423,6 +431,7 @@ export default function AttachmentsModal({
                             title="Zur Buchung"
                             onClick={() => {
                                 onClose()
+                                if (onGoToBooking) { onGoToBooking(voucher.voucherId); return }
                                 window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
                                     detail: { voucherId: voucher.voucherId, voucherNo: voucher.voucherNo, date: voucher.date }
                                 }))
@@ -458,29 +467,29 @@ export default function AttachmentsModal({
                         <aside className="attachments-modal__sidebar">
                             <div className="attachments-modal__sidebar-header">
                                 <span className="attachments-modal__file-count">{files.length} Datei{files.length !== 1 ? 'en' : ''}</span>
-                                <button 
+                                {permissions.canUpload && <button
                                     className="attachments-modal__icon-btn" 
                                     onClick={() => fileInputRef.current?.click?.()} 
                                     title="Datei(en) hinzufügen"
                                 >
                                     <IconPlus />
-                                </button>
+                                </button>}
                             </div>
                             <input 
                                 ref={fileInputRef} 
                                 type="file" 
                                 multiple 
                                 hidden 
-                                accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" 
+                                accept={permissions.acceptedFileTypes} disabled={!permissions.canUpload}
                                 onChange={(e) => handleAddFiles(e.target.files)} 
                             />
                             <div className="attachments-modal__file-list">
                                 {files.length === 0 && (
                                     <div className="attachments-modal__empty">
                                         <span>Keine Dateien</span>
-                                        <button className="btn btn-sm" onClick={() => fileInputRef.current?.click?.()}>
+                                        {permissions.canUpload && <button className="btn btn-sm" onClick={() => fileInputRef.current?.click?.()}>
                                             Datei hinzufügen
-                                        </button>
+                                        </button>}
                                     </div>
                                 )}
                                 {files.map(f => (
@@ -529,13 +538,13 @@ export default function AttachmentsModal({
                                             )}
                                         </div>
                                         <div className="attachments-modal__toolbar-actions">
-                                            <button 
+                                            {permissions.canOpenExternal && <button
                                                 className="attachments-modal__icon-btn" 
-                                                onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}
+                                                onClick={() => (attachmentApi as any)?.attachments.open?.({ fileId: selected.id })}
                                                 title="Extern öffnen"
                                             >
                                                 <IconExternalLink />
-                                            </button>
+                                            </button>}
                                             <button 
                                                 className="attachments-modal__icon-btn" 
                                                 onClick={handleDownload}
@@ -543,13 +552,13 @@ export default function AttachmentsModal({
                                             >
                                                 <IconDownload />
                                             </button>
-                                            <button 
+                                            {permissions.canDelete && <button
                                                 className="attachments-modal__icon-btn attachments-modal__icon-btn--danger" 
                                                 onClick={() => setConfirmDelete({ id: selected.id, fileName: selected.fileName })}
                                                 title="Löschen"
                                             >
                                                 <IconTrash />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </div>
                                     {/* Preview content */}
@@ -562,9 +571,9 @@ export default function AttachmentsModal({
                                                     <IconFile />
                                                     <span>{pdfError}</span>
                                                     <div className="attachments-modal__no-preview-actions">
-                                                        <button className="btn btn-sm" onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}>
+                                                        {permissions.canOpenExternal && <button className="btn btn-sm" onClick={() => (attachmentApi as any)?.attachments.open?.({ fileId: selected.id })}>
                                                             Extern öffnen
-                                                        </button>
+                                                        </button>}
                                                         <button className="btn btn-sm" onClick={handleDownload}>
                                                             Herunterladen
                                                         </button>
@@ -578,9 +587,9 @@ export default function AttachmentsModal({
                                                 <IconFile />
                                                 <span>Keine Vorschau verfügbar</span>
                                                 <div className="attachments-modal__no-preview-actions">
-                                                    <button className="btn btn-sm" onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}>
+                                                    {permissions.canOpenExternal && <button className="btn btn-sm" onClick={() => (attachmentApi as any)?.attachments.open?.({ fileId: selected.id })}>
                                                         Extern öffnen
-                                                    </button>
+                                                    </button>}
                                                     <button className="btn btn-sm" onClick={handleDownload}>
                                                         Herunterladen
                                                     </button>

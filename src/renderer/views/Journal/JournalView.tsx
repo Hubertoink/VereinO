@@ -51,6 +51,8 @@ type PageShortcutAction = {
 }
 
 interface JournalViewProps {
+    onExternalEdit?: (row: VoucherRow) => void
+    readOnly?: boolean
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
     // Props die von App.tsx kommen
     flashId: number | null
@@ -117,6 +119,8 @@ interface JournalViewProps {
 }
 
 export default function JournalView({
+    readOnly = false,
+    onExternalEdit,
     flashId,
     setFlashId,
     registerPageShortcuts,
@@ -1082,7 +1086,7 @@ export default function JournalView({
                 <div className="filter-divider" />
 
                 {/* Aktionen-Cluster: Batch-Zuweisung */}
-                <div ref={batchAssignRef} className="toolbar-icon">
+                <div ref={batchAssignRef} className="toolbar-icon" hidden={readOnly}>
                     <BatchAssignDropdown
                     earmarks={earmarks}
                     tagDefs={tagDefs}
@@ -1145,7 +1149,7 @@ export default function JournalView({
                                 <span className="pagination-bar__stat-value">{activePage} / {Math.max(1, Math.ceil((totalRows || 0) / journalLimit))}</span>
                             </div>
                             <div className="helper" style={{ marginLeft: 8 }}>
-                                Doppelklick für Details{!allowVoucherDeletion ? ' – Stornieren in Details' : ''}
+                                Doppelklick für Details{!readOnly && !allowVoucherDeletion ? ' – Stornieren in Details' : ''}
                             </div>
                         </div>
                         {bookingTabs.length > 0 && (
@@ -1181,7 +1185,7 @@ export default function JournalView({
                     <JournalTable
                         rows={rows}
                         order={journalOrder}
-                        cols={journalCols}
+                        cols={readOnly ? { ...journalCols, actions: false } : journalCols}
                         onSetColumnVisibility={(columnKey, visible) => setCols({ ...journalCols, [columnKey]: visible } as Record<ColKey, boolean>)}
                         onReorder={(o: any) => setOrder(o as any)}
                         earmarks={earmarks}
@@ -2083,6 +2087,7 @@ export default function JournalView({
                 {infoVoucher && (
                     <VoucherInfoModal
                         voucher={infoVoucher}
+                        onExternalEdit={onExternalEdit ? () => { onExternalEdit(infoVoucher); setInfoVoucher(null) } : undefined}
                         suspended={!!attachmentsVoucher}
                         onClose={() => setInfoVoucher(null)}
                         eurFmt={eurFmt}
@@ -2093,7 +2098,7 @@ export default function JournalView({
                         tagDefs={tagDefs}
                         allowVoucherDeletion={allowVoucherDeletion}
                         windowMode={bookingsOpenDetached}
-                        onSaveMeta={async (payload) => {
+                        onSaveMeta={readOnly ? undefined : async (payload) => {
                             const res = await window.api?.vouchers.updateMeta?.({
                                 id: infoVoucher.id,
                                 note: payload.note,
@@ -2132,7 +2137,7 @@ export default function JournalView({
                             await loadRecent()
                             dispatchDataChanged(['vouchers'])
                         }}
-                        onReverse={() => {
+                        onReverse={readOnly ? undefined : () => {
                             setDeleteRow({ id: infoVoucher.id, voucherNo: infoVoucher.voucherNo, description: infoVoucher.description ?? null, fromEdit: false })
                         }}
                         onOpenAttachments={() => {

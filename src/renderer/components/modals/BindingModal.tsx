@@ -21,6 +21,7 @@ const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', 
 
 export type BindingModalValue = {
   id?: number
+  version?: number
   code: string
   name: string
   description?: string | null
@@ -37,6 +38,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
   const [requiredTouched, setRequiredTouched] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
+  const [saveError, setSaveError] = useState('')
   const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
   const startDateRef = useRef<HTMLInputElement | null>(null)
@@ -48,8 +50,9 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
     const name = (v.name || '').trim()
     const code = (v.code || '').trim()
     if (!name || !code) return
-    await (window as any).api?.bindings.upsert?.({
+    try { await (window as any).api?.bindings.upsert?.({
       id: v.id as any,
+      ...(v.version == null ? {} : { version: v.version }),
       code,
       name,
       description: v.description ?? null,
@@ -61,6 +64,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
       enforceTimeRange: v.enforceTimeRange ? true : false
     })
     onSaved()
+    } catch (error) { setSaveError(error instanceof Error ? error.message : String(error)) }
   }
 
   useEffect(() => {
@@ -173,6 +177,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             </div>
           </div>
         </div>
+        {saveError && <p role="alert" className="error-text">{saveError}</p>}
         <div className="modal-footer">
           <div className="helper m-0">Ctrl+S = Speichern · Esc = Abbrechen</div>
           <div className="modal-actions">
@@ -194,7 +199,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <div className="helper">Hinweis: Die Zuordnung bestehender Buchungen bleibt erhalten; es wird nur die Zweckbindung entfernt.</div>
             <div className="delete-modal-actions">
               <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
-              <button className="btn danger" onClick={async () => { await (window as any).api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
+              <button className="btn danger" onClick={async () => { try { await (window as any).api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() } catch (error) { setSaveError(error instanceof Error ? error.message : String(error)); setAskDelete(false) } }}>Ja, löschen</button>
             </div>
           </div>
         </div>

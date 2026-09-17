@@ -33,6 +33,7 @@ type PendingRecurringAction = { row: RecurringBooking; kind: 'skip' | 'pause' | 
 
 type RecurringBooking = {
   id: number
+  version?: number
   name: string
   type: 'IN' | 'OUT'
   sphere: Sphere
@@ -158,6 +159,7 @@ function fmtDate(value?: string | null) {
 function draftFromRow(row: RecurringBooking): Draft {
   return {
     id: row.id,
+    ...(row.version != null ? {version: row.version} : {}),
     name: row.name,
     type: row.type,
     sphere: row.sphere,
@@ -188,6 +190,8 @@ function draftFromRow(row: RecurringBooking): Draft {
 
 function RecurringBookingModal({
   value,
+  backendApi,
+  webMode = false,
   paymentAccounts,
   budgets,
   earmarks,
@@ -198,6 +202,8 @@ function RecurringBookingModal({
   notify
 }: {
   value: Draft
+  backendApi?: any
+  webMode?: boolean
   paymentAccounts: PaymentAccount[]
   budgets: Lookup[]
   earmarks: Lookup[]
@@ -212,21 +218,25 @@ function RecurringBookingModal({
   const nextDueDateInputRef = useRef<HTMLInputElement | null>(null)
   const endDateInputRef = useRef<HTMLInputElement | null>(null)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [visibleExtras, setVisibleExtras] = useState<Set<'budget' | 'earmark' | 'tags' | 'comment'>>(() => new Set([
     ...(value.budgets.length ? ['budget' as const] : []),
     ...(value.earmarks.length ? ['earmark' as const] : []),
     ...(value.tags.length ? ['tags' as const] : []),
     ...(value.note ? ['comment' as const] : [])
   ]))
+  const [classificationReady, setClassificationReady] = useState(!webMode)
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
   const [categories, setCategories] = useState<PrimaryClassification[]>([])
   useEffect(() => {
     let active = true
-    window.api.classifications.primary.list().then((result) => {
+    const request = webMode ? backendApi.primaryClassification() : window.api.classifications.primary.list()
+    request.then((result: { profile: string; values: PrimaryClassification[] }) => {
       if (!active) return
       setIsGeneralProfile(result.profile === 'GENERAL')
       setCategories(result.values)
-    }).catch(() => { if (active) setIsGeneralProfile(false) })
+      setClassificationReady(true)
+    }).catch(() => { if (active && webMode) notify('error', 'Kategorien konnten nicht geladen werden. Bitte das Formular erneut öffnen.') })
     return () => { active = false }
   }, [])
   const tagDefs = useMemo(() => tagNames.map((name, index) => ({ id: index + 1, name })), [tagNames])
@@ -258,6 +268,8 @@ function RecurringBookingModal({
   }
 
   const save = async () => {
+    if (savingRef.current) return
+    if (!classificationReady) return
     if (!draft.name.trim()) {
       notify('error', 'Bitte eine Bezeichnung angeben.')
       return
@@ -282,9 +294,10 @@ function RecurringBookingModal({
       notify('error', 'Die Zuordnungssumme darf den Bruttobetrag nicht überschreiten.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
-      await window.api.recurringBookings.upsert({
+      await (backendApi || window.api.recurringBookings).upsert({
         ...draft,
         name: draft.name.trim(),
         description: draft.description?.trim() || null,
@@ -301,6 +314,7 @@ function RecurringBookingModal({
     } catch (error: any) {
       notify('error', String(error?.message || error))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -355,14 +369,14 @@ function RecurringBookingModal({
 
             <section className="card form-card booking-section booking-section--finances">
               <div className="booking-section-heading"><strong>Finanzen</strong></div>
-              <div className={`recurring-finance-row${draft.amountMode === 'NET' ? ' recurring-finance-row--net' : ''}`}>
-                <SelectDropdown value={draft.amountMode} onChange={(value) => setDraft({ ...draft, amountMode: value as 'NET' | 'GROSS', vatRate: value === 'GROSS' ? 0 : draft.vatRate || 19 })} ariaLabel="Brutto oder Netto" options={[{ value: 'GROSS', label: 'Brutto' }, { value: 'NET', label: 'Netto' }]} />
+              <div style={webMode ? {gridTemplateColumns: 'minmax(0, 1fr)'} : undefined} className={`recurring-finance-row${draft.amountMode === 'NET' ? ' recurring-finance-row--net' : ''}`}>
+                {!webMode && <SelectDropdown value={draft.amountMode} onChange={(value) => setDraft({ ...draft, amountMode: value as 'NET' | 'GROSS', vatRate: value === 'GROSS' ? 0 : draft.vatRate || 19 })} ariaLabel="Brutto oder Netto" options={[{ value: 'GROSS', label: 'Brutto' }, { value: 'NET', label: 'Netto' }]} />}
                 <div className="booking-floating-control booking-floating-control--filled finance-amount-highlight"><label htmlFor="recurring-amount">{draft.amountMode === 'NET' ? 'Netto' : 'Brutto'} *</label><span className="adorn-wrap"><input id="recurring-amount" className="input" type="number" min="0.01" step="0.01" value={draft.amount || ''} onChange={(event) => setDraft({ ...draft, amount: Number(event.target.value || 0) })} /><span className="adorn-suffix">€</span></span></div>
                 {draft.amountMode === 'NET' && <SelectDropdown value={String(draft.vatRate)} onChange={(value) => setDraft({ ...draft, vatRate: Number(value) })} ariaLabel="Umsatzsteuer" options={[{ value: '0', label: '0% (steuerfrei)' }, { value: '7', label: '7% USt.' }, { value: '19', label: '19% USt.' }]} />}
               </div>
               <div className="field booking-floating-field booking-floating-field--filled booking-finance-party">
                 <label htmlFor="recurring-counterparty">{draft.type === 'IN' ? 'Kunde / Zahlungspflichtiger' : 'Lieferant / Zahlungsempfänger'}</label>
-                <PartySelector valueName={draft.counterparty || ''} role={draft.type === 'IN' ? 'CUSTOMER' : 'SUPPLIER'} inputId="recurring-counterparty" ariaLabel={draft.type === 'IN' ? 'Kunde oder Zahlungspflichtiger' : 'Lieferant oder Zahlungsempfänger'} onChange={({ name }) => setDraft({ ...draft, counterparty: name })} />
+                {webMode ? <input id="recurring-counterparty" className="input" value={draft.counterparty || ''} onChange={(event) => setDraft({...draft,counterparty:event.target.value})} /> : <PartySelector valueName={draft.counterparty || ''} role={draft.type === 'IN' ? 'CUSTOMER' : 'SUPPLIER'} inputId="recurring-counterparty" ariaLabel={draft.type === 'IN' ? 'Kunde oder Zahlungspflichtiger' : 'Lieferant oder Zahlungsempfänger'} onChange={({ name }) => setDraft({ ...draft, counterparty: name })} />}
               </div>
             </section>
           </div>
@@ -390,7 +404,7 @@ function RecurringBookingModal({
             </section>
           </div>
 
-          <BookingOptionalArea
+          {!webMode && <BookingOptionalArea
             actions={[
               { key: 'budget', label: 'Budget', active: visibleExtras.has('budget'), count: draft.budgets.length },
               { key: 'earmark', label: 'Zweckbindung', active: visibleExtras.has('earmark'), count: draft.earmarks.length },
@@ -432,18 +446,18 @@ function RecurringBookingModal({
               <div className="compact-booking-section-title"><strong>Kommentar</strong><button type="button" onClick={() => toggleExtra('comment')} aria-label="Kommentar entfernen">×</button></div>
               <textarea className="input" rows={3} value={draft.note || ''} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Interne Notiz oder Ablagehinweis …" />
             </div>}
-          </BookingOptionalArea>
+          </BookingOptionalArea>}
           </div>
 
           <footer className="modal-footer-actions">
             <div className="booking-footer-status helper">Ctrl+S = Speichern · Esc = Abbrechen</div>
-            <div className="booking-modal-save-actions"><button type="button" className="btn" onClick={onClose}>Abbrechen</button><button type="submit" className="btn primary" disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</button></div>
+            <div className="booking-modal-save-actions"><button type="button" className="btn" onClick={onClose}>Abbrechen</button><button type="submit" className="btn primary" disabled={saving || !classificationReady}>{saving ? 'Speichert…' : 'Speichern'}</button></div>
           </footer>
         </form>
   </BookingPopupFrame>
 }
 
-export default function RecurringBookingsView({ notify }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+export default function RecurringBookingsView({ notify, backendApi, webMode = false, canManage = true }: { backendApi?: any; webMode?: boolean; canManage?: boolean; notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
   const [rows, setRows] = useState<RecurringBooking[]>([])
   const [summary, setSummary] = useState({ due: 0, upcoming: 0, active: 0, paused: 0 })
   const [loading, setLoading] = useState(true)
@@ -469,12 +483,12 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
     setLoading(true)
     try {
       const [listResult, summaryResult, accountsResult, budgetsResult, earmarksResult, tagsResult] = await Promise.all([
-        window.api.recurringBookings.list({ status: status === 'ALL' ? undefined : status, q: q.trim() || undefined }),
-        window.api.recurringBookings.summary(),
-        window.api.paymentAccounts.list(),
-        window.api.budgets.list({ includeArchived: true }),
-        window.api.bindings.list({ activeOnly: false }),
-        window.api.tags.list({ includeUsage: false })
+        (backendApi || window.api.recurringBookings).list({ status: status === 'ALL' ? undefined : status, q: q.trim() || undefined }),
+        (backendApi || window.api.recurringBookings).summary(),
+        webMode ? Promise.resolve({rows:[{id:1,name:'Bank',kind:'BANK',isActive:1},{id:2,name:'Kasse',kind:'CASH',isActive:1}]}) : window.api.paymentAccounts.list(),
+        webMode ? Promise.resolve({rows:[]}) : window.api.budgets.list({ includeArchived: true }),
+        webMode ? Promise.resolve({rows:[]}) : window.api.bindings.list({ activeOnly: false }),
+        webMode ? Promise.resolve({rows:[]}) : window.api.tags.list({ includeUsage: false })
       ])
       setRows(listResult.rows as RecurringBooking[])
       setSummary(summaryResult)
@@ -502,7 +516,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
 
   const setRowStatus = async (row: RecurringBooking, nextStatus: Status) => {
     try {
-      await window.api.recurringBookings.setStatus({ id: row.id, status: nextStatus })
+      await (backendApi || window.api.recurringBookings).setStatus({ id: row.id, status: nextStatus, ...(row.version != null ? {version:row.version}: {}) })
       notify('success', nextStatus === 'ACTIVE' ? 'Dauerbuchung aktiviert' : nextStatus === 'PAUSED' ? 'Dauerbuchung pausiert' : 'Dauerbuchung beendet')
       await load()
     } catch (error: any) {
@@ -512,7 +526,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
 
   const skipNext = async (row: RecurringBooking) => {
     try {
-      await window.api.recurringBookings.skip({ recurringBookingId: row.id })
+      await (backendApi || window.api.recurringBookings).skip({ recurringBookingId: row.id, ...(row.version != null ? {version:row.version,expectedDueDate:row.nextDueDate}: {}) })
       notify('success', 'Fälligkeit übersprungen')
       await load()
     } catch (error: any) {
@@ -542,7 +556,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
     if (!booking || !(bookingAmount > 0)) return
     setActionBusy(true)
     try {
-      const result = await window.api.recurringBookings.book({ recurringBookingId: booking.id, bookingDate, amount: bookingAmount })
+      const result = await (backendApi || window.api.recurringBookings).book({ recurringBookingId: booking.id, bookingDate, amount: bookingAmount, ...(booking.version != null ? {version:booking.version,expectedDueDate:booking.nextDueDate}: {}) })
       notify('success', `Buchung erstellt: ${result.voucherNo}`)
       setBooking(null)
       await load()
@@ -557,7 +571,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
     if (!row.suggestedVoucherId) return
     setLinkingRecurringId(row.id)
     try {
-      const result = await window.api.recurringBookings.link({
+      const result = await (backendApi || window.api.recurringBookings).link({
         recurringBookingId: row.id,
         voucherId: row.suggestedVoucherId
       })
@@ -595,7 +609,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
           </div>
           <RecurringStatusFilterDropdown value={status} onChange={setStatus} />
           <div className="filter-divider" />
-          <button className="btn primary btn-with-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}><AppIcon icon={IconCalendarPlus} size="control" />Dauerbuchung</button>
+          {canManage && <button className="btn primary btn-with-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}><AppIcon icon={IconCalendarPlus} size="control" />Dauerbuchung</button>}
         </div>
       </div>
 
@@ -608,7 +622,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
               {rows.map((row) => (
                 <tr key={row.id} className={row.dueCount > 0 ? 'recurring-row-due' : undefined}>
                   <td>
-                    <strong>{row.name}</strong>
+                    <strong title={row.description || undefined}>{row.name}</strong>
                     <small>{[row.counterparty, row.primaryClassificationName ? `${row.primaryClassificationIcon ? `${row.primaryClassificationIcon} ` : ''}${row.primaryClassificationName}` : SPHERE_LABELS[row.sphere], row.budgetLabel, row.earmarkLabel].filter(Boolean).join(' · ') || row.description || '—'}</small>
                   </td>
                   <td>{FREQUENCY_LABELS[row.frequency]}</td>
@@ -625,7 +639,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                   <td>{row.paymentAccountName || '—'}</td>
                   <td><span className={`recurring-status recurring-status--${row.status.toLowerCase()}`}>{row.status === 'ACTIVE' ? 'Aktiv' : row.status === 'PAUSED' ? 'Pausiert' : 'Beendet'}</span></td>
                   <td>
-                    <div className="recurring-actions">
+                    {canManage && <div className="recurring-actions">
                       {row.dueCount > 0 && row.suggestedVoucherId && (
                         <button
                           className="btn primary btn-with-icon"
@@ -645,12 +659,12 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                           {row.suggestedVoucherId ? <><AppIcon icon={IconReceipt2} size="inline" />Trotzdem neu</> : <><AppIcon icon={IconCalendarCheck} size="inline" />Jetzt buchen</>}
                         </button>
                       )}
-                      <button className="btn ghost recurring-action-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(draftFromRow(row)) }} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><AppIcon icon={IconPencil} size="control" /></button>
+                      {(!webMode || row.status !== 'ENDED') && <button className="btn ghost recurring-action-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(draftFromRow(row)) }} title="Bearbeiten" aria-label={`${row.name} bearbeiten`}><AppIcon icon={IconPencil} size="control" /></button>}
                       {row.dueCount > 0 && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'skip' })} title="Fälligkeit überspringen" aria-label={`Fälligkeit von ${row.name} überspringen`}><AppIcon icon={IconCalendarX} size="control" /></button>}
                       {row.status === 'ACTIVE' && <button className="btn ghost recurring-action-icon" onClick={() => setPendingAction({ row, kind: 'pause' })} title="Dauerbuchung pausieren" aria-label={`${row.name} pausieren`}><AppIcon icon={IconPlayerPause} size="control" /></button>}
                       {row.status === 'PAUSED' && <button className="btn btn-with-icon" onClick={() => void setRowStatus(row, 'ACTIVE')}><AppIcon icon={IconPlayerPlay} size="inline" />Aktivieren</button>}
                       {row.status !== 'ENDED' && <button className="btn danger btn-with-icon" onClick={() => setPendingAction({ row, kind: 'end' })}><AppIcon icon={IconCircleX} size="inline" />Beenden</button>}
-                    </div>
+                    </div>}
                   </td>
                 </tr>
               ))}
@@ -661,7 +675,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
         </div>
       </div>
 
-      {editing && <RecurringBookingModal value={editing} paymentAccounts={paymentAccounts} budgets={budgets} earmarks={earmarks} tagNames={tagNames} anchorRect={editingAnchor} notify={notify} onClose={() => { setEditing(null); setEditingAnchor(null) }} onSaved={() => { setEditing(null); setEditingAnchor(null); void load() }} />}
+      {editing && <RecurringBookingModal backendApi={backendApi} webMode={webMode} value={editing} paymentAccounts={paymentAccounts} budgets={budgets} earmarks={earmarks} tagNames={tagNames} anchorRect={editingAnchor} notify={notify} onClose={() => { setEditing(null); setEditingAnchor(null) }} onSaved={() => { setEditing(null); setEditingAnchor(null); void load() }} />}
 
       {pendingAction && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">

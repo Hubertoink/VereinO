@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict'
+export async function verifyBankImport({admin,editor,user}) {
+ const buffer=Buffer.from('Buchungstag;Betrag;Waehrung;Name;Verwendungszweck;Referenz\n15.09.2026;-19,95;EUR;Sportladen;Web Bankimport Material;TEST-001\n15.09.2026;42,00;EUR;Mitglied;Web Bankimport Beitrag;TEST-002\n')
+ await admin.locator('[data-shortcut-nav="Bankimport"]').click()
+ await admin.getByRole('heading',{name:'Bankimport',exact:true}).waitFor()
+ async function importCsv() {
+  await admin.getByRole('button',{name:'Import',exact:true}).click()
+  await admin.locator('.bank-import-action-dropdown input[type=file]').setInputFiles({name:'konto.csv',mimeType:'text/csv',buffer})
+  await admin.getByRole('heading',{name:'Bankdaten importieren',exact:true}).waitFor()
+  await admin.getByText('2 gültig',{exact:true}).waitFor()
+  const response=admin.waitForResponse(r=>r.url().endsWith('/api/bank-imports/commit')&&r.request().method()==='POST')
+  await admin.getByRole('button',{name:'2 Beleg(e) importieren',exact:true}).click()
+  const reply=await response
+  assert.equal(reply.status(),201)
+  const result=await reply.json()
+  if(result.duplicates || result.errors.length) await admin.getByRole('button',{name:'Fertig',exact:true}).click()
+  else await admin.locator('.bank-import-modal').waitFor({state:'hidden'})
+  return result
+ }
+ const first=await importCsv()
+ assert.equal(first.imported,2)
+ const second=await importCsv()
+ assert.equal(second.imported,0)
+ assert.equal(second.duplicates,2)
+ await admin.locator('.bank-table tbody tr').filter({hasText:'Web Bankimport Material'}).click()
+ await admin.getByRole('button',{name:'Buchung anlegen',exact:true}).click()
+ const form=admin.getByRole('dialog',{name:'Buchung erfassen',exact:true})
+ assert.equal(await form.getByLabel('Brutto-Betrag',{exact:true}).getAttribute('readonly'),'')
+ await form.getByRole('button',{name:'Buchung speichern',exact:true}).click()
+ await form.waitFor({state:'hidden'})
+ const rows=await admin.evaluate(async()=>(await(await fetch('/api/bookings')).json()).bookings.filter(row=>row.description==='Web Bankimport Material'))
+ assert.equal(rows.length,1)
+ assert.equal(rows[0].grossAmountCents,1995)
+ assert.equal(rows[0].type,'OUT')
+ await editor.locator('[data-shortcut-nav="Bankimport"]').click()
+ await editor.locator('.bank-table tbody tr').filter({hasText:'Web Bankimport Beitrag'}).click()
+ assert.equal(await editor.getByRole('button',{name:'Buchung anlegen',exact:true}).count(),0)
+ await editor.getByRole('button',{name:'Schließen',exact:true}).last().click()
+ assert.equal(await user.locator('[data-shortcut-nav="Bankimport"]').count(),0)
+ assert.equal(await user.evaluate(async()=>(await fetch('/api/bank-transactions')).status),403)
+}

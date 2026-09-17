@@ -3,6 +3,9 @@ import { TileKey } from './types'
 import type { OrganizationProfile } from '../../../../shared/classification'
 
 interface SettingsNavProps {
+  showSupplementaryCategories?: boolean
+  accountSections?: 'personal' | 'admin'
+  visibleTiles?: TileKey[]
   active: TileKey
   onSelect: (key: TileKey) => void
   organizationProfile: OrganizationProfile
@@ -21,6 +24,8 @@ const iconProps = {
 }
 
 const settingsIconColors: Record<TileKey, string> = {
+  account: '#7C4DFF',
+  users: '#26A69A',
   general: '#7C4DFF',
   workflow: '#D8A534',
   table: '#2962FF',
@@ -43,6 +48,10 @@ const settingsIconColors: Record<TileKey, string> = {
 
 function getSettingsIcon(key: TileKey): React.ReactNode {
   switch (key) {
+    case 'account':
+      return <svg {...iconProps}><circle cx="12" cy="8" r="4" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></svg>
+    case 'users':
+      return <svg {...iconProps}><circle cx="9" cy="8" r="3" /><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 15a5 5 0 0 1 4 5v1" /></svg>
     case 'workflow':
       return <svg {...iconProps}><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="8" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="10" cy="18" r="2" /></svg>
     case 'general':
@@ -199,7 +208,7 @@ function getSettingsIcon(key: TileKey): React.ReactNode {
 }
 
 type SettingsGroup = {
-  key: 'display' | 'data' | 'club' | 'admin'
+  key: 'display' | 'data' | 'club' | 'admin' | 'account'
   label: string
   items: Array<{ key: TileKey; label: string; shortLabel: string }>
 }
@@ -247,12 +256,18 @@ const GROUPS: SettingsGroup[] = [
   },
 ]
 
-export function SettingsNav({ active, onSelect, organizationProfile }: SettingsNavProps) {
-  const groups = React.useMemo(() => organizationProfile === 'NONPROFIT'
-    ? GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => item.key !== 'categories') }))
-    : GROUPS, [organizationProfile])
+export function SettingsNav({ active, onSelect, organizationProfile, visibleTiles, accountSections, showSupplementaryCategories }: SettingsNavProps) {
+  const groups = React.useMemo(() => [...GROUPS, ...(accountSections ? [{
+    key: 'account' as const, label: 'Zugang', items: [
+      { key: 'account' as const, label: 'Mein Konto', shortLabel: 'Konto' },
+      ...(accountSections === 'admin' ? [{ key: 'users' as const, label: 'Benutzerverwaltung', shortLabel: 'Benutzer' }] : [])
+    ]
+  }] : [])].map(group => ({ ...group,
+    label: group.key === 'club' && organizationProfile === 'GENERAL' ? 'Organisation' : group.label,
+    items: group.items.filter(item => (organizationProfile !== 'NONPROFIT' || showSupplementaryCategories || item.key !== 'categories') && (!visibleTiles || visibleTiles.includes(item.key)))
+  })).filter(group => group.items.length > 0), [organizationProfile, visibleTiles, accountSections, showSupplementaryCategories])
   const activeGroupKey =
-    groups.find((group) => group.items.some((item) => item.key === active))?.key ?? groups[0].key
+    groups.find((group) => group.items.some((item) => item.key === active))?.key ?? GROUPS[0].key
 
   const [openGroupKey, setOpenGroupKey] = React.useState<SettingsGroup['key'] | null>(null)
 
@@ -263,6 +278,7 @@ export function SettingsNav({ active, onSelect, organizationProfile }: SettingsN
   const visibleGroupKey = openGroupKey ?? activeGroupKey
   const visibleGroup = groups.find((group) => group.key === visibleGroupKey) ?? groups[0]
 
+  if (!visibleGroup) return null
   return (
     <div
       className="settings-nav-shell"
@@ -306,6 +322,7 @@ export function SettingsNav({ active, onSelect, organizationProfile }: SettingsN
             onClick={() => onSelect(tile.key)}
             aria-current={active === tile.key ? 'page' : undefined}
             title={tile.label}
+            aria-label={tile.label}
           >
             <span
               className="settings-tab-icon"

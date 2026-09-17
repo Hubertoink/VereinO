@@ -28,6 +28,7 @@ function getStatusColor(pct: number): { bg: string; text: string; label: string;
 
 export interface BudgetTileBudget {
   id: number
+  version?: number
   year: number
   sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   primaryClassificationValueId?: number | null
@@ -46,7 +47,7 @@ export interface BudgetTileBudget {
   enforceTimeRange?: number
 }
 
-export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, compact = false }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void; compact?: boolean }) {
+export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, compact = false }: { budgets: BudgetTileBudget[]; eurFmt: Intl.NumberFormat; onEdit?: (b: BudgetTileBudget) => void; onGoToBookings?: (budgetId: number) => void; compact?: boolean }) {
   const [usage, setUsage] = useState<Record<number, { spent: number; inflow: number; count: number; lastDate: string | null; countInside?: number; countOutside?: number; startDate?: string | null; endDate?: string | null }>>({})
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   const formatRange = (start?: string | null, end?: string | null) => {
@@ -157,7 +158,7 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
                     <span className="budget-compact-card__bookings-icon" aria-hidden="true"><AppIcon icon={IconListDetails} size="inline" /></span>
                     <span><strong>Buchungen</strong><small>{totalCount} Buchung{totalCount !== 1 ? 'en' : ''}</small></span>
                   </button>
-                  <button className="btn btn-edit budget-compact-card__edit" onClick={() => onEdit(b)} title="Bearbeiten"><AppIcon icon={IconPencil} size="control" /></button>
+                  {onEdit && <button className="btn btn-edit budget-compact-card__edit" onClick={() => onEdit(b)} title="Bearbeiten"><AppIcon icon={IconPencil} size="control" /></button>}
                 </div>
               </div>
             )
@@ -265,11 +266,11 @@ export default function BudgetTiles({ budgets, eurFmt, onEdit, onGoToBookings, c
                   >
                     <AppIcon icon={IconListDetails} size="control" />Buchungen
                   </button>
-                  <button 
+                  {onEdit && <button
                     className="btn btn-edit" 
                     onClick={() => onEdit(b)} 
                     title="Bearbeiten"
-                  ><AppIcon icon={IconPencil} size="control" /></button>
+                  ><AppIcon icon={IconPencil} size="control" /></button>}
                 </div>
               </div>
             </div>

@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict'
+
+export async function verifyUnifiedAccount({admin,base}) {
+  await admin.locator('[data-shortcut-nav="Einstellungen"]').click()
+  await admin.locator('.settings-cluster-trigger').filter({hasText:'Zugang'}).click()
+  await admin.getByRole('button',{name:'Benutzerverwaltung',exact:true}).click()
+  assert.equal(await admin.locator('.web-settings-tabs').count(),0)
+  await admin.locator('.settings-content').getByLabel('E-Mail',{exact:true}).fill('accountcheck@pilot.test')
+  await admin.getByLabel('Startpasswort',{exact:true}).fill('account-initial-password')
+  await admin.locator('select[name=role]').selectOption('USER')
+  await admin.getByRole('button',{name:'Benutzer anlegen',exact:true}).click()
+  await admin.getByRole('cell',{name:'accountcheck@pilot.test',exact:true}).waitFor()
+  const account=await admin.context().browser().newPage({viewport:{width:390,height:900}})
+  try {
+    await account.goto(base)
+    await account.getByLabel('E-Mail',{exact:true}).fill('accountcheck@pilot.test')
+    await account.getByLabel('Passwort',{exact:true}).fill('account-initial-password')
+    await account.getByRole('button',{name:'Anmelden',exact:true}).click()
+    await account.getByRole('heading',{name:'Buchungsentwürfe',exact:true}).waitFor()
+    await account.locator('[data-shortcut-nav="Einstellungen"]').click()
+    await account.locator('.settings-cluster-trigger').filter({hasText:'Zugang'}).click()
+    await account.locator('.settings-container').waitFor()
+    assert.equal(await account.getByRole('button',{name:'Benutzerverwaltung',exact:true}).count(),0)
+    await account.getByLabel('Aktuelles Passwort',{exact:true}).fill('account-initial-password')
+    await account.getByLabel('Neues Passwort',{exact:true}).fill('account-changed-password')
+    await account.getByRole('button',{name:'Passwort speichern',exact:true}).click()
+    await account.getByRole('button',{name:'Anmelden',exact:true}).waitFor()
+    await account.getByLabel('E-Mail',{exact:true}).fill('accountcheck@pilot.test')
+    await account.getByLabel('Passwort',{exact:true}).fill('account-changed-password')
+    await account.getByRole('button',{name:'Anmelden',exact:true}).click()
+    await account.getByRole('heading',{name:'Buchungsentwürfe',exact:true}).waitFor()
+    await account.locator('[data-shortcut-nav="Einstellungen"]').click()
+    await account.locator('.settings-cluster-trigger').filter({hasText:'Zugang'}).click()
+    await account.locator('.settings-container').waitFor()
+    assert(await account.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+    await account.screenshot({path:'/tmp/vereino-unified-account-mobile.png',fullPage:true})
+  } finally {await account.close()}
+}

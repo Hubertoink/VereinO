@@ -1,0 +1,79 @@
+.web-viewport-popover {
+  z-index: 4500;
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay, 0 12px 36px #0005);
+}
+.web-viewport-popover > .invoice-batch-flyout {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+.web-ai-panel {
+  padding: 16px;
+}
+.web-ai-panel > header {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
+  margin: -16px -16px 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.web-ai-panel h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.web-ai-panel .settings-pane-card {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.web-ai-panel .settings-toggle-card {
+  padding: 10px 12px;
+  min-height: 0;
+}
+.web-ai-panel .settings-sub {
+  font-size: 13px;
+  margin: 10px 0;
+}
+.web-ai-panel .field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.web-ai-panel .settings-pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.web-ai-panel .input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+.web-ai-panel fieldset {
+  margin: 0;
+  min-width: 0;
+}

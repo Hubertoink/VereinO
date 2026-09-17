@@ -4,7 +4,7 @@ import AppIcon from '../common/AppIcon'
 import { IconBank, IconBudget, IconCash, IconPayPal } from '../../utils/icons'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
+export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number; primaryClassificationValueId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<null | {
     totals: { net: number; vat: number; gross: number }
@@ -21,17 +21,17 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, sphere: props.sphere, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
+    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, sphere: props.sphere, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, primaryClassificationValueId: props.primaryClassificationValueId, budgetId: props.budgetId })
       .then((res: any) => { if (!cancelled) setData(res) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.primaryClassificationValueId, props.refreshKey])
 
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, primaryClassificationValueId: props.primaryClassificationValueId, budgetId: props.budgetId }),
+      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, primaryClassificationValueId: props.primaryClassificationValueId, budgetId: props.budgetId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
       const months = new Set<string>()
@@ -40,7 +40,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
       setMonthsCount(months.size)
     }).catch(() => setMonthsCount(0))
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.primaryClassificationValueId, props.refreshKey])
 
   return (
     <div className="report-summary-card">

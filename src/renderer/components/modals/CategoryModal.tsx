@@ -7,7 +7,8 @@ const ICONS = ['🏷️', '📁', '🧾', '🛒', '🚗', '🏗️', '💡', '�
 
 export type CategoryValue = { id?: number; name: string; color?: string | null; icon?: string | null }
 
-export default function CategoryModal({ value, onClose, onSaved, notify }: {
+export default function CategoryModal({ value, onClose, onSaved, notify, onSave }: {
+  onSave?: (value: CategoryValue) => Promise<void>
   value: CategoryValue
   onClose: () => void
   onSaved: () => void
@@ -17,6 +18,7 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [draftColor, setDraftColor] = useState(value.color || '#00C853')
   const [colorError, setColorError] = useState('')
+  const [saveError, setSaveError] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -29,11 +31,14 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
     const name = draft.name.trim()
     if (!name || busy) return
     setBusy(true)
+    setSaveError('')
     try {
-      if (draft.id) await window.api.classifications.primary.update({ id: draft.id, name, color: draft.color || null, icon: draft.icon || null })
+      if (onSave) await onSave({ ...draft, name })
+      else if (draft.id) await window.api.classifications.primary.update({ id: draft.id, name, color: draft.color || null, icon: draft.icon || null })
       else await window.api.classifications.primary.create({ name, color: draft.color || null, icon: draft.icon || null })
       onSaved()
     } catch (error: any) {
+      setSaveError(error?.message || String(error))
       notify('error', error?.message || String(error))
     } finally {
       setBusy(false)
@@ -42,7 +47,7 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
 
   const previewColor = draft.color || 'var(--muted)'
   return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={onClose}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={draft.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'} onMouseDown={onClose}>
       <div className="modal" style={{ maxWidth: 500 }} onMouseDown={(event) => event.stopPropagation()}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>🏷️</span><h2 style={{ margin: 0 }}>{draft.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'}</h2></div>
@@ -55,7 +60,7 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
         </div>
 
         <div style={{ display: 'grid', gap: 16 }}>
-          <div className="field"><label>Name</label><input className="input" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="z. B. Material, Vertrieb oder Projekt A" autoFocus /></div>
+          <div className="field"><label>Name</label><input className="input" aria-label="Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="z. B. Material, Vertrieb oder Projekt A" autoFocus /></div>
           <div className="field"><label>Zeichen</label><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}><button type="button" onClick={() => setDraft({ ...draft, icon: null })} style={{ minWidth: 76, height: 32, padding: '0 9px', borderRadius: 8, border: !draft.icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: !draft.icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', color: 'var(--text)', cursor: 'pointer' }}>Kein Zeichen</button>{ICONS.map((icon) => <button key={icon} type="button" onClick={() => setDraft({ ...draft, icon })} style={{ width: 32, height: 32, borderRadius: 8, border: draft.icon === icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: draft.icon === icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', cursor: 'pointer' }}>{icon}</button>)}</div></div>
           <div className="field">
             <label>Farbe</label>
@@ -63,6 +68,7 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button type="button" className="btn" onClick={() => setShowColorPicker(true)} style={{ flex: 1 }}>🎨 Eigene Farbe…</button><button type="button" className="btn" onClick={() => setDraft({ ...draft, color: null })} style={{ flex: 1 }}>Keine Farbe</button></div>
           </div>
         </div>
+        {saveError && <p role="alert" style={{ color: 'var(--danger)' }}>{saveError}</p>}
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={!draft.name.trim() || busy} onClick={() => void save()}>{busy ? 'Speichert…' : 'Speichern'}</button></footer>
       </div>
       {showColorPicker && <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={() => setShowColorPicker(false)}><div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onMouseDown={(event) => event.stopPropagation()}>

@@ -1,5 +1,5 @@
 # Backend API
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -19,18 +19,18 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apk add --no-cache python3 make g++
+# Install runtime dependencies, including PDF rendering for KI document analysis
+RUN apk add --no-cache python3 make g++ poppler-utils
 
 # Copy package files
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -39,6 +39,9 @@ COPY --from=builder /app/migrations ./migrations
 # Copy startup script
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+USER node
 
 # Expose port
 EXPOSE 3000

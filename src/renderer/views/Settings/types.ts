@@ -22,6 +22,8 @@ import type { OrganizationProfile } from '../../../../shared/classification'
 // ============================================================================
 
 export type TileKey =
+  | 'account'
+  | 'users'
   | 'workflow'
   | 'general'
   | 'table'

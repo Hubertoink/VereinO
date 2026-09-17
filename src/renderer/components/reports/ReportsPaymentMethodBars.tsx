@@ -16,7 +16,7 @@ type AccountBarRow = {
   outGross: number
 }
 
-export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; earmarkId?: number; budgetId?: number }) {
+export default function ReportsPaymentMethodBars(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; earmarkId?: number; budgetId?: number; primaryClassificationValueId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<AccountBarRow[]>([])
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -29,7 +29,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
         (window as any).api?.reports.summary?.({
           from: props.from, to: props.to, sphere: props.sphere,
           type,
-          earmarkId: props.earmarkId, budgetId: props.budgetId
+          earmarkId: props.earmarkId, primaryClassificationValueId: props.primaryClassificationValueId, budgetId: props.budgetId
         })
       )
     ).then((results) => {
@@ -51,7 +51,7 @@ export default function ReportsPaymentMethodBars(props: { refreshKey?: number; f
       setData(Array.from(rows.values()).filter(row => row.inGross || row.outGross))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.type, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.earmarkId, props.budgetId, props.primaryClassificationValueId, props.refreshKey])
   const maxVal = Math.max(1, ...data.flatMap(row => [Math.abs(row.inGross), Math.abs(row.outGross)]))
   return (
     <div className="dp-card report-chart-card">

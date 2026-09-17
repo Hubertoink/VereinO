@@ -62,9 +62,12 @@ interface VoucherInfoModalProps {
   earmarks?: Array<{ id: number; code: string; name: string; color?: string | null; isActive?: number | boolean }>
   budgets?: Array<{ id: number; label: string; color?: string | null; isArchived?: number }>
   tagDefs?: Array<{ id: number; name: string; color?: string | null }>
+  showAttachments?: boolean
+  showAssignments?: boolean
   allowVoucherDeletion?: boolean
   onReverse?: () => void
   onOpenAttachments?: () => void
+  onExternalEdit?: () => void
   onSaveMeta?: (payload: {
     note: string | null
     budgets: Array<{ budgetId: number; amount: number }>
@@ -93,7 +96,7 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
   </svg>
 )
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onExternalEdit, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false, showAttachments = true, showAssignments = true }: VoucherInfoModalProps) {
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
   const [copyMenuOpen, setCopyMenuOpen] = useState(false)
   const copyMenuRef = useRef<HTMLDivElement>(null)
@@ -515,13 +518,13 @@ Status: ${statusLabel}`
             </div>
             {statusLabel !== 'Aktiv' ? <span className={`badge ${isReversalVoucher ? 'badge-storno' : 'badge-storniert'}`}>{statusLabel}</span> : null}
           </section>
-          <div className={`voucher-info-details-grid${editingMeta ? ' voucher-info-details-grid--editing' : ''}`}>
+          <div className={`voucher-info-details-grid${editingMeta ? ' voucher-info-details-grid--editing' : ''}`} style={!showAttachments ? { gridTemplateColumns: '1fr' } : undefined}>
             <section className="card voucher-info-card voucher-info-information">
               <h3 className="voucher-info-section-title"><IconInfoCircle size={18} />Buchungsinformationen</h3>
               <div className="voucher-info-detail-row"><span>Art</span><div><span className={`badge ${voucher.type.toLowerCase()}`}>{typeLabel}</span></div></div>
               <div className="voucher-info-detail-row"><span>{classificationLabel}</span><span>{classificationValue}</span></div>
               <div className="voucher-info-detail-row"><span>Zahlweg</span><span>{paymentLabel}</span></div>
-              <div className="voucher-info-assignments">
+              {showAssignments && <div className="voucher-info-assignments">
             {isLockedByStorno ? (
               <div className="voucher-info-meta-notice">
                 Diese Buchung ist Teil einer Storno-Kette. Budget, Zweckbindung, Tags und Kommentar bleiben unverändert; Anhänge können weiterhin ergänzt werden.
@@ -728,9 +731,9 @@ Status: ${statusLabel}`
                 </div>
               )}
             </div>
-              </div>
+              </div>}
             </section>
-            <section className="card voucher-info-card voucher-info-attachments">
+            {showAttachments && <section className="card voucher-info-card voucher-info-attachments">
               <h3 className="voucher-info-section-title"><IconPaperclip size={18} />Anhang</h3>
               {voucher.hasFiles || (voucher.fileCount || 0) > 0 ? (
                 <button type="button" className="voucher-info-attachment-thumbnail" onClick={onOpenAttachments} disabled={!onOpenAttachments} aria-label="Belege anzeigen">
@@ -741,7 +744,7 @@ Status: ${statusLabel}`
                 <div className="voucher-info-attachment-preview"><IconFilePlus size={36} stroke={1.5} /><strong>Kein Anhang</strong><p>Zu dieser Buchung wurde kein Anhang hinterlegt.</p></div>
               )}
               <button type="button" className="btn voucher-info-add-attachment" onClick={onOpenAttachments} disabled={!onOpenAttachments}><IconPaperclip size={16} />Anhang hinzufügen</button>
-            </section>
+            </section>}
           </div>
           <section className="card voucher-info-card voucher-info-comment">
             <h3 className="voucher-info-section-title"><IconMessage size={18} /><label htmlFor={editingMeta ? 'voucher-info-note' : undefined}>Kommentar</label></h3>
@@ -768,6 +771,7 @@ Status: ${statusLabel}`
             </button>
           ) : null}
           {embedded && <button className="btn" disabled={savingMeta} onClick={onClose}>Abbrechen</button>}
+          {onExternalEdit && !isLockedByStorno && <button className="btn primary voucher-info-footer__button" onClick={onExternalEdit}><IconEdit size={18}/><span>Bearbeiten</span></button>}
           {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{!embedded && (editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />)}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 

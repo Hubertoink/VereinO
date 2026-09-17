@@ -1,10 +1,14 @@
+import { ZodError } from 'zod'
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
 
-export function errorHandler(
-  error: FastifyError,
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
+export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: 'Validation Error',
+      message: 'Bitte die Eingaben prüfen.',
+      details: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message }))
+    })
+  }
   const statusCode = error.statusCode || 500
 
   request.log.error({

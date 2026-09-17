@@ -14,7 +14,8 @@ type PaymentAccount = {
   isActive: number
 }
 
-type BankTransaction = {
+export type BankTransaction = {
+  version?: number
   id: number
   bookingDate: string
   valueDate?: string | null
@@ -187,6 +188,8 @@ type BankTransactionMatch = {
   expectedGrossAmount?: number
   variableAmount?: boolean
 }
+
+export const BankImportWebContext = React.createContext<{ api: any; canManage: boolean } | null>(null)
 
 type Props = {
   paymentAccounts: PaymentAccount[]
@@ -420,6 +423,7 @@ function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null
 }
 
 function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File) => void }) {
+  const web = React.useContext(BankImportWebContext)
   const closeRef = React.useRef<(() => void) | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const [dragActive, setDragActive] = useState(false)
@@ -428,8 +432,8 @@ function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File
   const selectFile = (fileList: FileList | null) => {
     const nextFile = fileList?.[0]
     if (!nextFile) return
-    if (!/\.(xml|csv)$/i.test(nextFile.name)) {
-      setError('Bitte eine CAMT-XML- oder CSV-Datei auswählen.')
+    if (!(web ? /\.csv$/i : /\.(xml|csv)$/i).test(nextFile.name)) {
+      setError(web ? 'Bitte eine CSV-Datei auswählen.' : 'Bitte eine CAMT-XML- oder CSV-Datei auswählen.')
       return
     }
     setError('')
@@ -452,7 +456,7 @@ function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xml,.csv,text/csv,application/xml,text/xml"
+          accept={web ? ".csv,text/csv" : ".xml,.csv,text/csv,application/xml,text/xml"}
           hidden
           onChange={(event) => selectFile(event.target.files)}
         />
@@ -478,7 +482,7 @@ function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File
           <span className="bank-import-action-dropzone__icon" aria-hidden="true"><AppIcon icon={IconFileUpload} size="action" /></span>
           <strong>Bankdatei hier ablegen</strong>
           <span>oder Datei auswählen</span>
-          <small>CAMT-XML oder CSV</small>
+          <small>{web ? 'CSV' : 'CAMT-XML oder CSV'}</small>
           {error && <span className="bank-import-action-dropzone__error">{error}</span>}
         </button>
       </div>
@@ -779,6 +783,7 @@ function BankImportResultModal({
   onClose: () => void
   busy: boolean
 }) {
+  const web = React.useContext(BankImportWebContext)
   const selectedCount = selectedRows.length
 
   return createPortal(
@@ -805,7 +810,7 @@ function BankImportResultModal({
             <div className="bank-section-title">
               <div>
                 <strong>Erkannte Duplikate</strong>
-                <span className="helper">Zum bewussten Importieren die jeweilige Zeile auswählen.</span>
+                <span className="helper">{web ? 'Diese Zeilen wurden bereits importiert und werden nicht erneut übernommen.' : 'Zum bewussten Importieren die jeweilige Zeile auswählen.'}</span>
               </div>
             </div>
             <div className="bank-duplicate-list">
@@ -815,12 +820,12 @@ function BankImportResultModal({
                   <div
                     key={row.sourceRow}
                     className={`bank-duplicate-row ${selected ? 'active' : ''}`}
-                    role="button"
-                    tabIndex={0}
+                    role={web ? undefined : "button"}
+                    tabIndex={web ? undefined : 0}
                     aria-pressed={selected}
-                    onClick={() => onToggleRow(row.sourceRow)}
+                    onClick={web ? undefined : () => onToggleRow(row.sourceRow)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
+                      if (!web && (event.key === 'Enter' || event.key === ' ')) {
                         event.preventDefault()
                         onToggleRow(row.sourceRow)
                       }
@@ -883,7 +888,7 @@ function BankImportResultModal({
         )}
 
         <footer className="bank-modal-footer">
-          {result.duplicateRows.length > 0 && (
+          {!web && result.duplicateRows.length > 0 && (
             <button
               className="btn"
               disabled={busy || selectedCount === 0}
@@ -915,6 +920,7 @@ function BankImportModal({
   onImported: () => void
   notify: Props['notify']
 }) {
+  const web = React.useContext(BankImportWebContext)
   const paymentAccountRef = React.useRef<HTMLSelectElement | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
@@ -930,6 +936,7 @@ function BankImportModal({
   const [reviewWithAi, setReviewWithAi] = useState(false)
 
   useEffect(() => {
+    if (web) return
     let active = true
     void window.api.ai.settings.get()
       .then((settings) => {
@@ -948,7 +955,7 @@ function BankImportModal({
     setBusy(true)
     setError('')
     try {
-      const result = (await window.api.bankImports.preview({
+      const result = (await (web?.api || window.api).bankImports.preview({
         fileBytes: nextBytes,
         fileName: nextFile.name,
         mapping: nextMapping
@@ -969,8 +976,8 @@ function BankImportModal({
 
   const chooseFile = async (nextFile?: File) => {
     if (!nextFile) return
-    if (!/\.(xml|csv)$/i.test(nextFile.name)) {
-      setError('Bitte wähle eine CAMT-XML- oder CSV-Datei.')
+    if (!(web ? /\.csv$/i : /\.(xml|csv)$/i).test(nextFile.name)) {
+      setError(web ? 'Bitte wähle eine CSV-Datei.' : 'Bitte wähle eine CAMT-XML- oder CSV-Datei.')
       return
     }
     setFile(nextFile)
@@ -994,7 +1001,7 @@ function BankImportModal({
     setBusy(true)
     setError('')
     try {
-      const result = (await window.api.bankImports.commit({
+      const result = (await (web?.api || window.api).bankImports.commit({
         fileBytes,
         fileName: file.name,
         paymentAccountId,
@@ -1035,7 +1042,7 @@ function BankImportModal({
     setBusy(true)
     setError('')
     try {
-      const result = (await window.api.bankImports.commit({
+      const result = (await (web?.api || window.api).bankImports.commit({
         fileBytes,
         fileName: file.name,
         paymentAccountId,
@@ -1084,21 +1091,22 @@ function BankImportModal({
         <header className="bank-modal-header">
           <div>
             <h2>Bankdaten importieren</h2>
-            <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
+            <p>{web ? 'CSV prüfen und als offene Bankbelege übernehmen.' : 'CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.'}</p>
           </div>
           <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
+        {web && <p className="helper" style={{ padding: '0 20px' }}>Bereits importierte Zeilen werden angezeigt und übersprungen. Ohne eindeutige Bankreferenz können überlappende Auszüge mit identischen Zahlungen nicht sicher unterschieden werden. Prüfe die Duplikatliste vor einem weiteren Import. Maximal 5000 Zeilen pro CSV.</p>}
         <div className="bank-import-drop">
           <strong>{file?.name || 'Kontoauszug auswählen'}</strong>
           <span className="helper">
-            XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.
+            {web ? 'CSV; die Originaldatei wird nicht als Anhang gespeichert.' : 'XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.'}
           </span>
           <label className="btn">
             Datei wählen
             <input
               type="file"
-              accept=".xml,.csv,text/csv,application/xml,text/xml"
+              accept={web ? ".csv,text/csv" : ".xml,.csv,text/csv,application/xml,text/xml"}
               hidden
               onChange={(event) => void chooseFile(event.target.files?.[0])}
             />
@@ -1440,6 +1448,7 @@ function BankReviewModal({
   onOpenVoucher: Props['onOpenVoucher']
   notify: Props['notify']
 }) {
+  const web = React.useContext(BankImportWebContext)
   const [matches, setMatches] = useState<BankTransactionMatch[]>([])
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
   const [busy, setBusy] = useState(false)
@@ -1448,6 +1457,7 @@ function BankReviewModal({
   const actionMenuRef = React.useRef<HTMLDivElement | null>(null)
 
   const loadMatches = useCallback(async () => {
+    if (web) { setLoading(false); return }
     if (transaction.status !== 'OPEN') return
     setLoading(true)
     try {
@@ -1548,7 +1558,7 @@ function BankReviewModal({
             </span>
           </div>
           <div className="bank-header-actions">
-            <div className="bank-action-menu" ref={actionMenuRef}>
+            {!web && <div className="bank-action-menu" ref={actionMenuRef}>
               <button
                 className="btn bank-action-menu__trigger"
                 onClick={() => setActionMenuOpen((open) => !open)}
@@ -1608,7 +1618,7 @@ function BankReviewModal({
                   )}
                 </div>
               )}
-            </div>
+            </div>}
             <button
               className="btn ghost booking-modal-icon-btn booking-modal-close-btn"
               type="button"
@@ -1668,7 +1678,11 @@ function BankReviewModal({
           </div>
         </section>
 
-        {transaction.status === 'OPEN' ? (
+        {web ? (
+          <section className="bank-resolution-card">
+            {transaction.status === 'OPEN' ? (web.canManage ? <button className="btn primary" onClick={() => { onCreateBooking(transaction); onClose() }}>Buchung anlegen</button> : <span>Offener Bankbeleg · Lesender Zugriff</span>) : <button className="bank-voucher-link" onClick={openLinkedVoucher}>Buchung {transaction.voucherNo || transaction.voucherId} öffnen</button>}
+          </section>
+        ) : transaction.status === 'OPEN' ? (
           <div className="bank-review-layout">
             <section className="bank-review-section">
               <div className="bank-section-title">
@@ -1940,6 +1954,7 @@ export default function BankImportView({
   onCreateBooking,
   onOpenVoucher
 }: Props) {
+  const web = React.useContext(BankImportWebContext)
   const [rows, setRows] = useState<BankTransaction[]>([])
   const [stats, setStats] = useState({ total: 0, open: 0, linked: 0, checked: 0 })
   const [total, setTotal] = useState(0)
@@ -1987,7 +2002,7 @@ export default function BankImportView({
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await window.api.bankTransactions.list({
+      const result = await (web?.api || window.api).bankTransactions.list({
         status,
         paymentAccountId: accountId || undefined,
         q: query || undefined,
@@ -2008,7 +2023,7 @@ export default function BankImportView({
 
   const loadImportStatus = useCallback(async () => {
     try {
-      const result = await window.api.bankTransactions.importStatus()
+      const result = await (web?.api || window.api).bankTransactions.importStatus()
       setImportStatus(result as BankImportStatus)
     } catch {
       setImportStatus(null)
@@ -2054,7 +2069,7 @@ export default function BankImportView({
             ['LINKED', 'Zugeordnet', stats.linked],
             ['CHECKED', 'Geprüft', stats.checked]
           ] as const
-        ).map(([key, label, count]) => (
+        ).filter(([key]) => !web || key !== 'CHECKED').map(([key, label, count]) => (
           <button
             key={key}
             className={status === key ? 'active' : ''}
@@ -2106,12 +2121,12 @@ export default function BankImportView({
               }}
             />
             <div className="filter-divider" />
-            <BankImportActionDropdown
+            {(!web || web.canManage) && <BankImportActionDropdown
               onOpenImport={(file) => {
                 setInitialImportFile(file || null)
                 setShowImport(true)
               }}
-            />
+            />}
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { sortEarmarkEntries } from '../../utils/compactEntrySort'
 
 type Binding = {
   id: number
+  version?: number
   code: string
   name: string
   description?: string | null
@@ -21,6 +22,7 @@ type Binding = {
 
 type BindingEdit = {
   id?: number
+  version?: number
   code: string
   name: string
   description?: string | null
@@ -41,13 +43,15 @@ export default function EarmarksView({
   filterSphere,
   onGoToBookings,
   onLoadEarmarks,
-  notify
+  notify,
+  readOnly = false
 }: {
   from?: string
   to?: string
   filterSphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   onGoToBookings: (earmarkId: number) => void
   onLoadEarmarks: () => Promise<void>
+  readOnly?: boolean
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
   const [bindings, setBindings] = useState<Binding[]>([])
@@ -82,8 +86,8 @@ export default function EarmarksView({
   }
 
   useEffect(() => {
-    loadBindings()
-    const onChanged = () => loadBindings()
+    void loadBindings().catch(error => notify('error', String(error)))
+    const onChanged = () => { void loadBindings().catch(error => notify('error', String(error))) }
     return addDataChangedListener(['earmarks', 'vouchers'], onChanged)
   }, [showArchived])
 
@@ -151,6 +155,7 @@ export default function EarmarksView({
     const nextActive = !b.isActive
     await (window as any).api?.bindings.upsert?.({
       id: b.id,
+      version: b.version,
       code: b.code,
       name: b.name,
       description: b.description ?? null,
@@ -172,7 +177,7 @@ export default function EarmarksView({
       <div className="earmark-management-surface" style={{ padding: 12, marginBottom: 12 }}>
         <div className="management-page-heading">
           <h1>Zweckbindungen</h1>
-          <button
+          {!readOnly && <button
             className="btn primary btn-with-icon"
             onClick={() =>
               setEditBinding({
@@ -188,7 +193,7 @@ export default function EarmarksView({
             }
           >
             <AppIcon icon={IconPlus} size="control" />Neu
-          </button>
+          </button>}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -262,7 +267,7 @@ export default function EarmarksView({
                     '—'
                   )}
                 </td>
-                <td align="center" style={{ whiteSpace: 'nowrap' }}>
+                <td align="center" style={{ whiteSpace: 'nowrap' }}>{!readOnly && <>
                   <button
                     className="btn"
                     onClick={() => setArchiveConfirm(b)}
@@ -274,6 +279,7 @@ export default function EarmarksView({
                     onClick={() =>
                       setEditBinding({
                         id: b.id,
+                        version: b.version,
                         code: b.code,
                         name: b.name,
                         description: b.description ?? null,
@@ -286,7 +292,7 @@ export default function EarmarksView({
                       })
                     }
                   ><AppIcon icon={IconPencil} size="control" /></button>
-                </td>
+                </>}</td>
               </tr>
             ))}
             {sortedVisibleBindings.length === 0 && (
@@ -345,7 +351,7 @@ export default function EarmarksView({
           </div>
         )}
 
-        {editBinding && (
+        {!readOnly && editBinding && (
           <BindingModal value={editBinding} onClose={() => setEditBinding(null)} onSaved={handleSaved} />
         )}
       </div>
@@ -357,9 +363,10 @@ export default function EarmarksView({
         to={to}
         sphere={filterSphere}
         compact={compactCards}
-        onEdit={(b: any) =>
+        onEdit={readOnly ? undefined : (b: any) =>
           setEditBinding({
             id: b.id,
+            version: b.version,
             code: b.code,
             name: b.name,
             description: b.description ?? null,
@@ -375,7 +382,7 @@ export default function EarmarksView({
       />
 
       {/* Archive Confirm Modal */}
-      {archiveConfirm && (
+      {!readOnly && archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -389,7 +396,7 @@ export default function EarmarksView({
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn" onClick={() => setArchiveConfirm(null)}>Abbrechen</button>
-              <button className="btn primary btn-with-icon" onClick={() => doArchive(archiveConfirm)}>
+              <button className="btn primary btn-with-icon" onClick={() => { void doArchive(archiveConfirm).catch(error => notify('error', error instanceof Error ? error.message : String(error))) }}>
                 <AppIcon icon={archiveConfirm.isActive ? IconChevronsDown : IconChevronsUp} size="inline" />
                 {archiveConfirm.isActive ? 'Archivieren' : 'Wiederherstellen'}
               </button>

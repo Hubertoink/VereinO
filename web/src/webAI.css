@@ -1,0 +1,37 @@
+.web-ai-proposal {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.web-ai-review-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.web-ai-review-row strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.local-invoice-scan__optional[hidden] {
+  display: none;
+}
+.local-invoice-scan__workspace,
+.local-invoice-scan__preview-panel,
+.local-invoice-scan__form-panel {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+/* The browser has no Electron titlebar: reserve only the visible viewport gutter. */
+.modal-overlay.web-invoice-overlay {
+  padding: 12px;
+  align-items: center;
+  overflow: hidden;
+  height: 100dvh;
+}
+.web-invoice-overlay .modal.local-invoice-scan {
+  max-height: min(920px, calc(100dvh - 24px));
+}

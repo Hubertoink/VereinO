@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSphereDonut(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
+export default function ReportsSphereDonut(props: { refreshKey?: number; from?: string; to?: string; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number; primaryClassificationValueId?: number }) {
+  const [label, setLabel] = useState('Sphäre')
   const [loading, setLoading] = useState(false)
-  const [rows, setRows] = useState<Array<{ key: Sphere; gross: number }>>([])
+  const [rows, setRows] = useState<Array<{ key: string; gross: number; color?: string | null }>>([])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -11,16 +12,19 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
+    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, primaryClassificationValueId: props.primaryClassificationValueId, budgetId: props.budgetId })
       .then((res: any) => {
         if (cancelled || !res) return
-        setRows(res.bySphere.map((r: any) => ({ key: r.key, gross: r.gross })))
+        setLabel(res.primaryClassificationLabel || 'Sphäre')
+        setRows((res.classificationProfile === 'GENERAL' ? res.byPrimaryClassification || [] : res.bySphere).map((r: any) => ({ key: r.key, gross: r.gross, color: r.color })))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.primaryClassificationValueId, props.refreshKey])
   const total = rows.reduce((a, b) => a + Math.abs(b.gross), 0) || 1
   const colors: Record<string, string> = { IDEELL: '#7e57c2', ZWECK: '#26a69a', VERMOEGEN: '#8d6e63', WGB: '#42a5f5' }
+  const palette = ['#7e57c2', '#26a69a', '#8d6e63', '#42a5f5', '#ef8d32']
+  rows.forEach((row, index) => { colors[row.key] = row.color || colors[row.key] || palette[index % palette.length] })
   const size = { w: 320, h: 220 }
   const cx = 110
   const cy = 110
@@ -38,7 +42,7 @@ export default function ReportsSphereDonut(props: { refreshKey?: number; from?: 
   return (
     <div className="dp-card report-chart-card">
       <div className="dp-card-heading report-chart-header">
-        <h2>Verteilung nach Sphäre</h2>
+        <h2>Verteilung nach {label}</h2>
         <div className="legend-container">
           <div className="legend">
             {rows.map(r => (

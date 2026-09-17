@@ -1,0 +1,78 @@
+name: Web pilot checks
+on:
+  push:
+    branches: [feature/web-multiuser]
+    paths: ['backend/**', 'web/**', 'src/**', 'shared/**', 'electron/**', 'assets/**', 'build/**', 'compose.web.yml', 'deploy/web/**', '.github/workflows/web-pilot.yml']
+  pull_request:
+    paths: ['backend/**', 'web/**', 'src/**', 'shared/**', 'electron/**', 'assets/**', 'build/**', 'compose.web.yml', 'deploy/web/**', '.github/workflows/web-pilot.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vereino
+          POSTGRES_PASSWORD: integration-only
+          POSTGRES_DB: vereino_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vereino -d vereino_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://vereino:integration-only@localhost:5432/vereino_test
+      TEST_DATABASE_URL: postgresql://vereino:integration-only@localhost:5432/vereino_test
+      TEST_DATABASE: '1'
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            web/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix web
+      - run: npm run build --prefix backend
+      - run: npm run migrate --prefix backend
+      - name: Migration repeat is safe
+        run: npm run migrate --prefix backend
+      - run: npm test --prefix backend
+      - run: npm run build --prefix web
+      - run: npm run test:adapter --prefix web
+      - name: Validate compose and build containers
+        env:
+          DB_PASSWORD: compose-check-only
+          SETUP_TOKEN: compose-check-only-123456789
+          APP_ORIGIN: http://localhost:8080
+        run: |
+          docker compose -f compose.web.yml config --quiet
+          docker compose -f compose.web.yml build
+      - name: Install browser
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Run browser pilot against a fresh database
+        env:
+          PGURL: postgresql://vereino:integration-only@localhost:5432/vereino_test
+          DATABASE_URL: postgresql://vereino:integration-only@localhost:5432/vereino_browser_test
+          PORT: '3001'
+          APP_ORIGIN: http://localhost:5174
+          COOKIE_SECURE: 'false'
+          SETUP_TOKEN: pilot-browser-setup-token-123456
+          VEREINO_API_URL: http://127.0.0.1:3001
+          PILOT_E2E: '1'
+        run: |
+          psql "$PGURL" -c 'CREATE DATABASE vereino_browser_test'
+          npm run migrate --prefix backend
+          npm start --prefix backend > /tmp/vereino-api.log 2>&1 &
+          npm run dev --prefix web -- --host 127.0.0.1 --port 5174 --strictPort > /tmp/vereino-web.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/health && curl -fsS http://localhost:5174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:browser --prefix web
+          npm run test:live --prefix web
