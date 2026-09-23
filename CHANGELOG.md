@@ -7,6 +7,22 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-09-23
+
+### Geändert
+
+- Inter wird lokal mitgeliefert und sorgt für eine einheitliche, offline verfügbare Oberflächenschrift mit gleich breiten Ziffern für Zahlen und Beträge.
+- Reports zeigen die Verteilung als kompakte Ringgrafik mit Beträgen und Anteilen; bei allgemeinen Organisationen werden Kategorien statt Sphären verwendet.
+- Bei Vorschüssen steht „+ Buchung“ direkt neben der Buchungsliste. Das Ausgabedatum wird ausgeschrieben angezeigt.
+
+### Behoben
+
+- Buchungen Plus behält den ausgewählten Monat oder Tag beim Seitenwechsel bei.
+- Neue Buchungen starten ohne vorausgewähltes Datum; Speichern erfordert eine bewusste Datumsauswahl.
+- Bei aktiviertem endgültigem Löschen öffnet „Bearbeiten“ in Buchungen Plus die gewählte Buchungsdarstellung, einschließlich Kompakt-Flyout.
+- Das Kalender-Symbol in der Kassenprüfung und weiteren nativen Datumsfeldern folgt wieder dem hellen bzw. dunklen Theme.
+- Die Kassenprüfung verwendet denselben Kalender-Button wie „Buchung erfassen“.
+
 ## [4.0.1] - 2026-09-17
 
 ### Behoben

@@ -46,6 +46,6 @@ test('Alt+N opens a booking flyout from other pages and foreground dialogs', asy
     await page.screenshot({ path: 'test-results/shortcut-booking-flyout.png', animations: 'disabled' })
   } finally {
     await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined)
-    await fs.rm(userData, { recursive: true, force: true })
+    await fs.rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })

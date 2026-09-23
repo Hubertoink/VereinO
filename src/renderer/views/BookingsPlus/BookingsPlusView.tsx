@@ -17,6 +17,8 @@ import './bookingsPlus.css'
 
 type Props = {
     onResetFilters: () => void
+    calendarSelection: { month: string; from: string; to: string }
+    onCalendarSelectionChange: (selection: { month: string; from: string; to: string }) => void
     externalFilters?: Partial<Filter>
     jumpRevision?: number
     flashId?: number | null
@@ -26,6 +28,8 @@ type Props = {
     onCloseBookingDraft?: (id: string) => void
     fmtDate: (date: string) => string
     onNewBooking: () => void
+    onEditBooking: (row: BookingPlusRow) => void | Promise<void>
+    bookingEntryPresentation: 'modal' | 'flyout' | 'detached'
     onNewInvoice: React.ComponentProps<typeof InvoiceBatchControl>['onNewInvoice']
     onReviewInvoice: (id: number) => void
     notify: (type: 'info' | 'success' | 'error', message: string) => void
@@ -44,8 +48,8 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ onResetFilters, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
-    const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters }))
+export default function BookingsPlusView({ onResetFilters, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+    const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters, from: calendarSelection.from, to: calendarSelection.to }))
     const q = useDebouncedValue(filters.q.trim(), 250)
     const batchNotify = useCallback((type: 'info' | 'success' | 'error' | 'warn', message: string) => notify(type === 'warn' ? 'info' : type, message), [notify])
     const [classifications, setClassifications] = useState<Array<{ id: number; name: string }>>([])
@@ -54,7 +58,11 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         if (generalProfile) void window.api.classifications.primary.list().then(result => { if (alive) setClassifications(result.values) }).catch(() => { if (alive) notify('error', 'Kategorien konnten nicht geladen werden.') })
         return () => { alive = false }
     }, [generalProfile, notify])
-    const [month, setMonth] = useState(() => isoDate(new Date()).slice(0, 7))
+    const [month, setMonth] = useState(() => calendarSelection.month)
+    const lastJumpRevision = useRef(jumpRevision)
+    useEffect(() => {
+        onCalendarSelectionChange({ month, from: filters.from, to: filters.to })
+    }, [month, filters.from, filters.to, onCalendarSelectionChange])
     const [receiptDays, setReceiptDays] = useState<Set<string>>(new Set())
     const [calendarState, setCalendarState] = useState<'loading' | 'ready' | 'error'>('loading')
     const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
@@ -99,8 +107,10 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         return () => media.removeEventListener('change', changed)
     }, [])
     useEffect(() => {
-        if (!externalFilters) return
+        if (!externalFilters || lastJumpRevision.current === jumpRevision) return
+        lastJumpRevision.current = jumpRevision
         setFilters({ ...emptyFilters, ...externalFilters }); setPage(1)
+        if (externalFilters.from) setMonth(externalFilters.from.slice(0, 7))
         setSelected(null); setMetaEditing(false); setSimilarTo(null)
     }, [externalFilters, jumpRevision])
     useEffect(() => {
@@ -112,7 +122,7 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
     const refresh = useCallback(() => { cache.current.clear(); setRevision(value => value + 1) }, [])
     useEffect(() => addDataChangedListener(['vouchers'], refresh), [refresh])
     useEffect(() => window.api.organizations.onSwitched(() => {
-        setFilters(emptyFilters); setPage(1); setRows([]); setSummary(null); setTotal(0); setSelected(null); setDetailOpen(false)
+        setFilters(emptyFilters); setMonth(isoDate(new Date()).slice(0, 7)); setPage(1); setRows([]); setSummary(null); setTotal(0); setSelected(null); setDetailOpen(false)
         setInfoOpen(false); setMetaEditing(false); setAttachments(null); setConfirm(null); setSimilarTo(null); refresh()
     }), [refresh])
     useEffect(() => {
@@ -203,6 +213,10 @@ export default function BookingsPlusView({ onResetFilters, externalFilters, jump
         }
         const reason = mutationBlock(selected, closedUntil)
         if (reason) { notify('info', reason); return }
+        if (bookingEntryPresentation !== 'detached') {
+            await onEditBooking(selected)
+            return
+        }
         setBusy(true)
         try {
             const result = await window.api.quickAdd.openDetached({ mode: 'edit', draftId: `edit-${selected.id}`, voucherId: selected.id, qa: selected, files: [] })

@@ -147,6 +147,7 @@ test('core views and compact booking flyout fit a small tile', async () => {
   await expectFits('[role="dialog"]')
   await dialog.getByRole('button', { name: 'Buchungskonto wählen' }).click()
   await page.getByRole('option').first().click()
+  await dialog.getByLabel('Datum der Buchung').fill('2026-09-09')
   await dialog.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('23.45')
   await dialog.getByPlaceholder('Was wurde gebucht?').fill('Im kleinen Flyout gespeichert')
   await page.locator('body').dispatchEvent('mousedown')
@@ -189,6 +190,7 @@ test('dialog and detached entry remain usable at 640 pixels', async () => {
   }
   await dialog.getByRole('button', { name: 'Buchungskonto wählen' }).click()
   await page.getByRole('option').first().click()
+  await dialog.locator('#quick-add-date').fill('2026-09-09')
   await dialog.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('42.50')
   await dialog.locator('#quick-add-description').fill('Im kleinen Dialog gespeichert')
   await page.locator('body').dispatchEvent('mousedown')

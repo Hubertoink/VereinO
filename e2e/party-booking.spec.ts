@@ -78,6 +78,6 @@ test('customer creation stays above the booking flyout and preserves the booking
     expect(counts).toEqual({ parties: 1, vouchers: 0 })
   } finally {
     await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined)
-    await fs.rm(userData, { recursive: true, force: true })
+    await fs.rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })

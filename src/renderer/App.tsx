@@ -25,6 +25,7 @@ import OrgSwitcher from './components/common/OrgSwitcher'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
 import CompactBookingFlyout from './components/CompactBookingFlyout'
 import QuickAddModal from './components/modals/QuickAddModal'
+import { getInternalAssignmentValidationState } from './components/modals/voucherMetaValidation'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 import { getNavIcon } from './utils/navIcons'
@@ -259,6 +260,11 @@ function bookingEditTitle(row: any) {
     : 'Buchung bearbeiten'
 }
 
+function currentLocalMonth() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 const BANK_DESCRIPTION_IBAN_PATTERN = /\b[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
 const BANK_DESCRIPTION_IBAN_WITH_LABEL_PATTERN =
   /\b(?:IBAN|KONTO|KTO)\s*:?\s*[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,30}\b/gi
@@ -308,6 +314,10 @@ function serializeBookingForm(row: any) {
     type: row.type || null,
     sphere: row.sphere || null,
     description: (row.description || '').trim(),
+    note: (row.note || '').trim(),
+    counterparty: (row.counterparty || '').trim(),
+    partyId: row.partyId ?? null,
+    primaryClassificationValueId: row.primaryClassificationValueId ?? null,
     paymentMethod: row.paymentMethod || null,
     paymentAccountId: row.paymentAccountId || null,
     transferFrom: row.transferFrom || null,
@@ -334,20 +344,24 @@ function serializeBookingForm(row: any) {
 
 function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: string } {
   if (!row?.id) return { error: 'Buchung konnte nicht gespeichert werden: ID fehlt.' }
+  if (!row.date) return { error: 'Bitte wähle ein Buchungsdatum aus.' }
   const blockReason = voucherMutationBlockReason(row)
   if (blockReason) return { error: blockReason }
   if (row.type === 'TRANSFER' && (!row.transferFromAccountId || !row.transferToAccountId)) {
     return { error: 'Bitte wähle Quell- und Zielkonto für den Transfer aus.' }
   }
+  if (row.type !== 'TRANSFER' && row.type !== 'INTERNAL' && !row.paymentAccountId) {
+    return { error: 'Bitte wähle ein Buchungskonto aus.' }
+  }
 
   const budgets = Array.isArray(row.budgets)
     ? row.budgets
-        .filter((b: any) => b.budgetId && Number(b.amount) > 0)
+        .filter((b: any) => b.budgetId && (row.type === 'INTERNAL' ? Number(b.amount) !== 0 : Number(b.amount) > 0))
         .map((b: any) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
     : []
   const earmarks = Array.isArray(row.earmarksAssigned)
     ? row.earmarksAssigned
-        .filter((e: any) => e.earmarkId && Number(e.amount) > 0)
+        .filter((e: any) => e.earmarkId && (row.type === 'INTERNAL' ? Number(e.amount) !== 0 : Number(e.amount) > 0))
         .map((e: any) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
     : []
 
@@ -367,8 +381,15 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
   }
 
   const grossAmount = bookingFormGrossAmount(row)
+  if (!Number.isFinite(grossAmount) || grossAmount <= 0) {
+    return { error: 'Bitte gib einen Betrag größer als 0 € ein.' }
+  }
+  const internalValidation = getInternalAssignmentValidationState({ budgets, earmarks, isInternal: row.type === 'INTERNAL', grossAmount })
+  if (!internalValidation.hasValidAssignments) {
+    return { error: internalValidation.budgetHint || internalValidation.earmarkHint }
+  }
   const totalBudgetAmount = budgets.reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0)
-  if (totalBudgetAmount > grossAmount * 1.001) {
+  if (row.type !== 'INTERNAL' && totalBudgetAmount > grossAmount * 1.001) {
     return {
       error: `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`
     }
@@ -377,7 +398,7 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
     (sum: number, e: any) => sum + Number(e.amount || 0),
     0
   )
-  if (totalEarmarkAmount > grossAmount * 1.001) {
+  if (row.type !== 'INTERNAL' && totalEarmarkAmount > grossAmount * 1.001) {
     return {
       error: `Die Summe der Zweckbindungs-Beträge (${totalEarmarkAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`
     }
@@ -387,6 +408,9 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
     id: Number(row.id),
     date: row.date,
     description: row.description ?? null,
+    note: row.note?.trim() ? row.note.trim() : null,
+    counterparty: row.counterparty?.trim() || null,
+    partyId: row.partyId ?? null,
     type: row.type,
     sphere: row.sphere,
     earmarkId: earmarks.length > 0 ? earmarks[0].earmarkId : null,
@@ -412,8 +436,8 @@ function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: s
     payload.vatRate = 0
     payload.amountMode = 'GROSS'
   } else {
-    payload.paymentMethod = row.paymentMethod ?? null
-    payload.paymentAccountId = row.paymentAccountId ?? null
+    payload.paymentMethod = row.type === 'INTERNAL' ? null : row.paymentMethod ?? null
+    payload.paymentAccountId = row.type === 'INTERNAL' ? null : row.paymentAccountId ?? null
     payload.transferFrom = null
     payload.transferTo = null
     payload.transferFromAccountId = null
@@ -1607,6 +1631,21 @@ function AppInner() {
   const isClassicBookings = activePage === 'Buchungen' && bookingView === 'classic'
   const isPlusBookings = activePage === 'Buchungen' && bookingView === 'plus'
   const [bookingJumpRevision, setBookingJumpRevision] = useState(0)
+  const [plusCalendarSelection, setPlusCalendarSelection] = useState(() => ({
+    month: currentLocalMonth(), from: '', to: ''
+  }))
+  const [plusEditQa, setPlusEditQa] = useState<(QA & { id: number }) | null>(null)
+  const [plusEditInitialSnapshot, setPlusEditInitialSnapshot] = useState('')
+  const [plusEditFiles, setPlusEditFiles] = useState<File[]>([])
+  const [plusEditExpanded, setPlusEditExpanded] = useState(false)
+  const [plusEditDiscardOpen, setPlusEditDiscardOpen] = useState(false)
+  const [plusEditSaving, setPlusEditSaving] = useState(false)
+  const plusEditFileInputRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => window.api?.organizations?.onSwitched?.(() => {
+    setPlusCalendarSelection({ month: currentLocalMonth(), from: '', to: '' })
+    setPlusEditQa(null)
+    setPlusEditFiles([])
+  }), [])
   const pageHistoryRef = useRef<NavKey[]>([])
   const pageHistoryIndexRef = useRef(-1)
   const pageHistoryTargetRef = useRef<NavKey | null>(null)
@@ -2073,9 +2112,11 @@ function AppInner() {
         if (voucherDate) {
           setFrom(voucherDate)
           setTo(voucherDate)
+          setPlusCalendarSelection(current => ({ ...current, month: voucherDate.slice(0, 7), from: voucherDate, to: voucherDate }))
         } else {
           setFrom('')
           setTo('')
+          setPlusCalendarSelection(current => ({ ...current, from: '', to: '' }))
         }
 
         if (voucherNo) {
@@ -2752,6 +2793,60 @@ function AppInner() {
     setFlashId(null)
     setPage(1)
   }, [])
+  const openPlusEdit = useCallback(async (row: { id: number }) => {
+    try {
+      const result = await window.api.vouchers.list({ limit: 1, voucherIds: [row.id] })
+      const current = result.rows[0]
+      if (!current) throw new Error('Buchung wurde nicht gefunden.')
+      const form = voucherRowToBookingForm(current) as QA & { id: number }
+      setPlusEditQa(form)
+      setPlusEditInitialSnapshot(serializeBookingForm(form))
+      setPlusEditFiles([])
+      setPlusEditExpanded(false)
+      setPlusEditDiscardOpen(false)
+      window.dispatchEvent(new Event('booking-editor-opened'))
+    } catch (error) {
+      notify('error', error instanceof Error ? error.message : String(error))
+    }
+  }, [notify])
+  const closePlusEdit = useCallback(() => {
+    setPlusEditQa(null)
+    setPlusEditFiles([])
+    setPlusEditDiscardOpen(false)
+    setPlusEditExpanded(false)
+  }, [])
+  const requestClosePlusEdit = useCallback(() => {
+    if (plusEditSaving) return
+    if (plusEditQa && (serializeBookingForm(plusEditQa) !== plusEditInitialSnapshot || plusEditFiles.length > 0)) {
+      setPlusEditDiscardOpen(true)
+    } else closePlusEdit()
+  }, [closePlusEdit, plusEditFiles.length, plusEditInitialSnapshot, plusEditQa, plusEditSaving])
+  const savePlusEdit = useCallback(async () => {
+    if (!plusEditQa || plusEditSaving) return
+    const { payload, error } = buildVoucherUpdatePayloadFromForm(plusEditQa)
+    if (error) { notify('error', error); return }
+    setPlusEditSaving(true)
+    try {
+      const result = await window.api.vouchers.update(payload)
+      for (const file of plusEditFiles) {
+        const encoded = await encodeFileForUpload(file)
+        await window.api.attachments.add({
+          voucherId: plusEditQa.id,
+          fileName: file.name,
+          dataBytes: encoded.dataBytes,
+          mimeType: file.type || undefined
+        })
+      }
+      notify('success', 'Buchung gespeichert')
+      result?.warnings?.forEach(message => notify('info', 'Warnung: ' + message))
+      closePlusEdit()
+      dispatchDataChanged(['vouchers'])
+    } catch (error) {
+      notify('error', friendlyVoucherError(error))
+    } finally {
+      setPlusEditSaving(false)
+    }
+  }, [closePlusEdit, notify, plusEditFiles, plusEditQa, plusEditSaving])
   // Reports filter states (separate to avoid interference with Buchungen)
   const [reportsFrom, setReportsFrom] = useState<string>('')
   const [reportsTo, setReportsTo] = useState<string>('')
@@ -3511,7 +3606,7 @@ function AppInner() {
           )}
           {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} onGoToBookings={() => setActivePage('Buchungen')} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
             resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, keepDateRange: true })
-            setQ(`#${voucherId}`); setFrom(recordDate?.slice(0, 10) || ''); setTo(recordDate?.slice(0, 10) || ''); setFlashId(voucherId); setPage(1); setActivePage('Buchungen')
+            setQ(`#${voucherId}`); setFrom(recordDate?.slice(0, 10) || ''); setTo(recordDate?.slice(0, 10) || ''); setPlusCalendarSelection(current => ({ month: recordDate?.slice(0, 7) || current.month, from: recordDate?.slice(0, 10) || '', to: recordDate?.slice(0, 10) || '' })); setFlashId(voucherId); setPage(1); setActivePage('Buchungen')
             window.setTimeout(() => setFlashId(current => current === voucherId ? null : current), 5000)
           }} />}
           {isClassicBookings && (
@@ -3578,7 +3673,7 @@ function AppInner() {
             />
           )}
           {isPlusBookings && (
-            <BookingsPlusView onResetFilters={resetBookingLinkFilters} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
+            <BookingsPlusView onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
           )}
           {activePage === 'Dauerbuchungen' && (
             <RecurringBookingsView notify={notify} />
@@ -3787,6 +3882,77 @@ function AppInner() {
       </main>
 
       <LeaderShortcuts commands={shortcutCommands} />
+
+      {plusEditQa && bookingEntryPresentation === 'flyout' && !plusEditExpanded && (
+        <>
+          <div className="compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed" aria-hidden="true" />
+          <div className="compact-booking-flyout-anchor">
+            <CompactBookingFlyout
+              key={`edit-${plusEditQa.id}`}
+              title="Buchung bearbeiten"
+              saveLabel={plusEditSaving ? 'Speichert …' : 'Änderungen speichern'}
+              qa={plusEditQa}
+              setQa={next => setPlusEditQa({ ...next, id: plusEditQa.id })}
+              onSave={savePlusEdit}
+              onClose={requestClosePlusEdit}
+              onExpand={() => setPlusEditExpanded(true)}
+              files={plusEditFiles}
+              setFiles={setPlusEditFiles}
+              onDropFiles={fileList => { if (fileList) setPlusEditFiles(current => [...current, ...Array.from(fileList)]) }}
+              openFilePicker={() => plusEditFileInputRef.current?.click()}
+              fileInputRef={plusEditFileInputRef}
+              budgetsForEdit={budgetsForEdit}
+              earmarks={earmarks}
+              paymentAccounts={paymentAccounts}
+              tagDefs={tagDefs}
+              descSuggest={descSuggest}
+              afterSaveDefault="close"
+              draftTabsEnabled={false}
+              draftTabs={[]}
+              activeDraftId={null}
+              onSelectDraft={() => {}}
+              onNewDraft={() => {}}
+            />
+          </div>
+        </>
+      )}
+      {plusEditQa && (bookingEntryPresentation === 'modal' || plusEditExpanded) && (
+        <QuickAddModal
+          key={`edit-${plusEditQa.id}`}
+          title="Buchung bearbeiten"
+          saveLabel={plusEditSaving ? 'Speichert …' : 'Änderungen speichern'}
+          showSaveMenu={false}
+          qa={plusEditQa}
+          setQa={next => setPlusEditQa({ ...next, id: plusEditQa.id })}
+          onSave={savePlusEdit}
+          onClose={requestClosePlusEdit}
+          onRequestClose={requestClosePlusEdit}
+          files={plusEditFiles}
+          setFiles={setPlusEditFiles}
+          onDropFiles={fileList => { if (fileList) setPlusEditFiles(current => [...current, ...Array.from(fileList)]) }}
+          openFilePicker={() => plusEditFileInputRef.current?.click()}
+          fileInputRef={plusEditFileInputRef}
+          fmtDate={fmtDate}
+          eurFmt={eurFmt}
+          budgetsForEdit={budgetsForEdit}
+          earmarks={earmarks}
+          paymentAccounts={paymentAccounts}
+          tagDefs={tagDefs}
+          descSuggest={descSuggest}
+        />
+      )}
+      {plusEditDiscardOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="card" role="alertdialog" aria-label="Ungespeicherte Änderungen" style={{ maxWidth: 420, padding: 24 }}>
+            <h3>Ungespeicherte Änderungen</h3>
+            <p>Möchtest du die Änderungen an dieser Buchung verwerfen?</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="btn" onClick={() => setPlusEditDiscardOpen(false)}>Weiter bearbeiten</button>
+              <button type="button" className="btn danger" onClick={closePlusEdit}>Änderungen verwerfen</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick-Add: full dialog or optional compact flyout */}
       {quickAdd && activeDraftKind === 'booking' && effectiveBookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (

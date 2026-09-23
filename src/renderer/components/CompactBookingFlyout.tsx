@@ -52,6 +52,8 @@ type PaymentAccount = {
 
 type Props = {
   qa: QA
+  title?: string
+  saveLabel?: string
   setQa: (qa: QA) => void
   kindOptions?: Array<{ value: QA['type']; label: string }>
   onSave: () => void | Promise<void>
@@ -136,6 +138,8 @@ function initialSections(qa: QA, files: File[]) {
 
 export default function CompactBookingFlyout({
   qa,
+  title = 'Buchung erfassen',
+  saveLabel = 'Buchung speichern',
   setQa,
   kindOptions = [
     { value: 'IN', label: 'Einnahme' },
@@ -549,7 +553,7 @@ export default function CompactBookingFlyout({
     <section className={`compact-booking-flyout compact-booking-flyout--${qa.type.toLowerCase()}`} role="dialog" aria-labelledby="compact-booking-title">
       <header className="compact-booking-flyout__header">
         <div>
-          <strong id="compact-booking-title" title="Buchung erfassen">Buchung erfassen</strong>
+          <strong id="compact-booking-title" title={title}>{title}</strong>
         </div>
         {draftTabsEnabled && draftTabs.length > 0 && (
           <div className="compact-booking-flyout__tab-switcher">
@@ -906,7 +910,7 @@ export default function CompactBookingFlyout({
             </div>}
           </div>
           <div>
-            <button type="submit" className="btn primary" disabled={saveBlocked}>Buchung speichern</button>
+            <button type="submit" className="btn primary" disabled={saveBlocked}>{saveLabel}</button>
           </div>
         </footer>
       </form>

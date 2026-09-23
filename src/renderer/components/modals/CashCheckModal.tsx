@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import DatePickerButton from '../common/DatePickerButton'
 import { dispatchDataChanged } from '../../utils/refresh'
 
 type BudgetRow = {
@@ -34,6 +35,7 @@ export default function CashCheckModal(props: {
   onCreated?: () => void
 }) {
   const { open, year, notify, onClose, onCreated } = props
+  const dateInputRef = React.useRef<HTMLInputElement>(null)
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
   const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -216,8 +218,11 @@ export default function CashCheckModal(props: {
 
         <div className="row" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="field">
-            <label>Stichtag</label>
+            <label htmlFor="cash-check-date">Stichtag</label>
+            <span className="booking-date-input-wrap">
             <input
+              id="cash-check-date"
+              ref={dateInputRef}
               className="input"
               type="date"
               min={yearStart}
@@ -228,6 +233,8 @@ export default function CashCheckModal(props: {
                 setDate(e.target.value)
               }}
             />
+              <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender für Stichtag öffnen" />
+            </span>
           </div>
           <div className="field">
             <label>Budget (optional)</label>

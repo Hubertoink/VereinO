@@ -122,7 +122,7 @@ function bookingGrossAmount(qa: QA) {
  * Extracted from App.tsx for better maintainability
  */
 export function useQuickAdd(
-    today: string, 
+    _today: string,
     create: (p: any) => Promise<any>, 
     onOpenFilePicker?: () => void,
     notify?: (type: 'success' | 'error' | 'info', text: string) => void,
@@ -144,7 +144,7 @@ export function useQuickAdd(
     const makeDefaults = useCallback((): QA => {
         const habits = getBookingHabits()
         return {
-            date: today,
+            date: '',
             type: habits.type,
             sphere: 'IDEELL',
             mode: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? 'GROSS' : habits.mode,
@@ -155,12 +155,12 @@ export function useQuickAdd(
             note: '',
             paymentMethod: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? undefined : habits.paymentMethod
         }
-    }, [today])
+    }, [])
 
     const makeNextDefaults = useCallback((previous: QA): QA => {
         const mode = (previous as any).mode === 'NET' ? 'NET' : 'GROSS'
         const next: QA = {
-            date: previous.date || today,
+            date: '',
             type: previous.type,
             sphere: previous.sphere,
             mode,
@@ -187,7 +187,7 @@ export function useQuickAdd(
         }
 
         return next
-    }, [today])
+    }, [])
 
     const activeDraft = useMemo(
         () => drafts.find((draft) => draft.id === activeDraftId) ?? null,

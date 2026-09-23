@@ -8,7 +8,7 @@ let styles: string
 test.beforeAll(async () => {
   const result = await build({
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
-      import React from 'react'
+      import React, { useState } from 'react'
       import { createRoot } from 'react-dom/client'
       import BookingsPlusView from './src/renderer/views/BookingsPlus/BookingsPlusView'
       const rows = [
@@ -16,16 +16,27 @@ test.beforeAll(async () => {
         { id: 2, date: '2026-09-08', voucherNo: 'OUT-2', type: 'OUT', sphere: 'IDEELL', grossAmount: 100, description: 'Ausgabe Test', tags: [] }
       ]
       window.pendingFilters = []
+      window.editCalls = []
+      window.detachedCalls = []
       window.api = {
         organizations: { onSwitched: () => () => {} },
+        quickAdd: { openDetached: async payload => { window.detachedCalls.push(payload); return { ok: true } } },
         vouchers: { list: async (filter) => {
-          const selected = rows.filter(row => !filter.type || row.type === filter.type)
+          const selected = rows.filter(row => (!filter.type || row.type === filter.type) && (!filter.from || row.date >= filter.from) && (!filter.to || row.date <= filter.to))
           if (filter.limit === 20 && filter.type) await new Promise(resolve => window.pendingFilters.push(resolve))
           return { rows: selected, total: selected.length }
         }},
         reports: { summary: async filter => ({ byType: filter.type ? [{ key: filter.type, gross: filter.type === 'IN' ? 350 : 100 }] : [{ key: 'IN', gross: 350 }, { key: 'OUT', gross: 100 }] }) }
       }
-      createRoot(document.getElementById('root')).render(<BookingsPlusView onResetFilters={() => {}} fmtDate={date => date} onNewBooking={() => {}} onNewInvoice={() => {}} onReviewInvoice={() => {}} notify={() => {}} paymentAccounts={[]} budgets={[]} earmarks={[]} tagDefs={[]} allowVoucherDeletion={false} generalProfile={false} />)
+      function Harness() {
+        const [visible, setVisible] = useState(true)
+        const [calendarSelection, setCalendarSelection] = useState({ month: '2026-09', from: '', to: '' })
+        return <>
+          <button id="navigate" onClick={() => setVisible(value => !value)}>{visible ? 'Weg' : 'Zurück'}</button>
+          {visible && <BookingsPlusView onResetFilters={() => {}} calendarSelection={calendarSelection} onCalendarSelectionChange={setCalendarSelection} fmtDate={date => date} onNewBooking={() => {}} onEditBooking={row => { window.editCalls.push(row.id) }} bookingEntryPresentation="flyout" onNewInvoice={() => {}} onReviewInvoice={() => {}} notify={() => {}} paymentAccounts={[]} budgets={[]} earmarks={[]} tagDefs={[]} allowVoucherDeletion={true} generalProfile={false} />}
+        </>
+      }
+      createRoot(document.getElementById('root')).render(<Harness />)
     ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' },
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'unrelated-widgets', setup(build) {
@@ -59,4 +70,35 @@ test('filter refresh keeps rows, totals and panel geometry until results arrive'
   await expect(page.locator('.bp-row')).toHaveCount(1)
   await expect(page.locator('.bp-row')).toContainText('Einnahme Test')
   await expect(page.locator('.bp-row')).toBeEnabled()
+})
+
+test('selected day and month survive leaving Buchungen Plus', async ({ page }) => {
+  await page.setContent('<div id="root"></div>')
+  await page.addScriptTag({ content: script })
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.getByRole('button', { name: /09\. Sept\. 2026/ }).click()
+  await expect(page.locator('.bp-row')).toHaveCount(1)
+  await page.locator('#navigate').click()
+  await page.locator('#navigate').click()
+  await expect(page.getByRole('button', { name: /09\. Sept\. 2026/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.bp-row')).toHaveCount(1)
+  await page.getByRole('button', { name: /September 2026/i }).click()
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.locator('#navigate').click()
+  await page.locator('#navigate').click()
+  await expect(page.getByRole('button', { name: /September 2026/i })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Gesamter Verlauf' }).click()
+  await page.locator('#navigate').click()
+  await page.locator('#navigate').click()
+  await expect(page.getByRole('button', { name: 'Gesamter Verlauf' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('edit in flyout mode does not open a detached window', async ({ page }) => {
+  await page.setContent('<div id="root"></div>')
+  await page.addScriptTag({ content: script })
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Bearbeiten' }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).editCalls)).toEqual([1])
+  expect(await page.evaluate(() => (window as any).detachedCalls)).toEqual([])
 })

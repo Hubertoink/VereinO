@@ -15,6 +15,19 @@ import AdvancePurchaseList from './AdvancePurchaseList'
 
 const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).map(part => part[0]).slice(0, 2).join('').toLocaleUpperCase('de-DE')
 
+const issuedDateFormatter = new Intl.DateTimeFormat('de-DE', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC'
+})
+
+function formatIssuedDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return value
+  return issuedDateFormatter.format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))))
+}
+
 type DateFmt = 'ISO' | 'PRETTY' | 'DOT'
 
 type AdvanceStatus = 'OPEN' | 'RESOLVED' | 'ALL'
@@ -732,7 +745,7 @@ export default function AdvancesView() {
                 <li key={row.id}>
                   <button type="button" className={`advances-recipient-row${row.id === selectedId ? ' advances-row-active' : ''}`} aria-pressed={row.id === selectedId} onClick={() => setSelectedId(row.id)}>
                     <span className="advances-avatar" aria-hidden="true">{initials(row.memberName || row.recipientName)}</span>
-                    <span className="advances-recipient-copy"><strong>{row.memberName || row.recipientName}</strong><span>Ausgegeben am {fmtDate(row.issuedAt)}</span><span className={`advances-status ${row.status === 'OPEN' ? 'open' : 'resolved'}`}>{row.status === 'OPEN' ? 'Offen' : 'Erledigt'}</span></span>
+                    <span className="advances-recipient-copy"><strong>{row.memberName || row.recipientName}</strong><span>Ausgegeben am {formatIssuedDate(row.issuedAt)}</span><span className={`advances-status ${row.status === 'OPEN' ? 'open' : 'resolved'}`}>{row.status === 'OPEN' ? 'Offen' : 'Erledigt'}</span></span>
                     <span className="advances-recipient-amount"><strong>{eurFmt.format(row.amount)}</strong><span>{row.status === 'OPEN' ? `${eurFmt.format(row.openAmount)} offen` : 'Abgeschlossen'}</span></span>
                     <IconChevronRight size={15} aria-hidden="true" />
                     <span className="advances-progress" title={`${eurFmt.format(row.spentAmount ?? row.purchaseAmount ?? 0)} von ${eurFmt.format(row.amount)} ausgegeben`}>
@@ -756,13 +769,12 @@ export default function AdvancesView() {
               <div className="advances-detail-header">
                 <div className="advances-person">
                   <span className="advances-avatar advances-avatar--large" aria-hidden="true">{initials(detail.memberName || detail.recipientName)}</span>
-                  <div><h2>{detail.memberName || detail.recipientName}</h2><div className="helper">{detail.memberId ? 'Vereinsmitglied' : 'Vorschussempfänger'} · Ausgegeben am {fmtDate(detail.issuedAt)}</div></div>
+                  <div><h2>{detail.memberName || detail.recipientName}</h2><div className="helper">{detail.memberId ? 'Vereinsmitglied' : 'Vorschussempfänger'} · Ausgegeben am {formatIssuedDate(detail.issuedAt)}</div></div>
                 </div>
                 <span className={`advances-status ${detail.status === 'OPEN' ? 'open' : 'resolved'}`}>{detail.status === 'OPEN' ? 'Offen' : 'Erledigt'}</span>
               </div>
               <div className="advances-person-actions">
                 <div className="advances-detail-actions">
-                  <button className="btn" type="button" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }} disabled={detail.status !== 'OPEN'}>+ Buchung</button>
                   <button className="btn primary" type="button" onClick={resolveSelectedAdvance} disabled={detail.status !== 'OPEN'}>Auflösen</button>
                 </div>
               </div>
@@ -785,7 +797,10 @@ export default function AdvancesView() {
               </section>
               {detail.notes ? <div className="advances-note"><strong>Notiz</strong><p>{detail.notes}</p></div> : null}
 
-              <h3 className="advances-subtitle">Buchungen <span className="helper">({detail.purchases?.length || 0})</span></h3>
+              <div className="advances-bookings-header">
+                <h3 className="advances-subtitle">Buchungen <span className="helper">({detail.purchases?.length || 0})</span></h3>
+                <button className="btn" type="button" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }} disabled={detail.status !== 'OPEN'}>+ Buchung</button>
+              </div>
               {(!detail.purchases || detail.purchases.length === 0) ? (
                 <div className="advances-empty"><IconReceipt2 size={32} /><strong>Noch keine Buchungen vorhanden</strong><span className="helper">Erfasse die Ausgaben und die zugehörigen Belege für diesen Vorschuss.</span>{detail.status === 'OPEN' && <button className="btn" onClick={() => { setEditPurchaseId(null); setPurchaseQa(buildAdvancePurchaseQa(paymentAccounts)); setPurchaseModalOpen(true) }}>+ Buchung hinzufügen</button>}</div>
               ) : (

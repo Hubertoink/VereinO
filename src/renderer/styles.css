@@ -1,3 +1,20 @@
+/* Locally bundled Inter; license: public/licenses/Inter.txt. */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/inter/InterVariable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/inter/InterVariable-Italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --radius: 12px;
 
@@ -2811,13 +2828,22 @@ body {
   color: var(--text);
   font-family:
     Inter,
-    'Plus Jakarta Sans',
     Segoe UI,
     system-ui,
     -apple-system,
     sans-serif;
   line-height: 1.4;
+  font-optical-sizing: auto;
+  font-variant-numeric: tabular-nums;
   overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-variant-numeric: inherit;
 }
 
 h1 {
@@ -5690,9 +5716,10 @@ input[type='date'] {
   font-family: inherit;
 }
 
-/* Chromium: tune calendar icon for dark backgrounds */
+/* Chromium already supplies a white icon with color-scheme: dark.
+   Inverting it again makes the calendar invisible on dark inputs. */
 :root[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(1.1) contrast(0.9);
+  filter: none;
 }
 
 /* Improve focus ring visibility against dark surfaces */
@@ -5744,9 +5771,9 @@ input[type='date'] {
   appearance: textfield;
 }
 
-/* Make the calendar icon visible on dark themes */
+/* Native calendar icons follow the active light/dark color scheme. */
 input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(0.85);
+  filter: none;
   opacity: 0.9;
 }
 
@@ -8522,7 +8549,7 @@ body:has(.local-invoice-scan) .app-main {
   display: grid;
   place-items: center;
   color: var(--text-dim);
-  font-family: system-ui, sans-serif;
+  font-family: inherit;
 }
 .suspense-box {
   display: flex;

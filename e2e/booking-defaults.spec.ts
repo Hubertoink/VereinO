@@ -13,9 +13,11 @@ test.beforeAll(async () => {
         const hook = useQuickAdd('2026-09-09', async () => window.failSave ? null : { id: 1 }, undefined, undefined, true)
         return <div>
           <output id="type">{hook.quickAdd ? hook.qa.type : 'closed'}</output>
+          <output id="date">{hook.quickAdd ? hook.qa.date : 'closed'}</output>
           <button id="new" onClick={() => hook.openQuickAdd()}>Neu</button>
-          <button id="configure" onClick={() => hook.setQa({ ...hook.qa, type: window.nextType, mode: 'GROSS', grossAmount: 350, paymentAccountId: 1, transferFromAccountId: 1, transferToAccountId: 2, budgets: window.nextType === 'INTERNAL' ? [{ budgetId: 1, amount: -350 }, { budgetId: 2, amount: 350 }] : [] })}>Ausfüllen</button>
+          <button id="configure" onClick={() => hook.setQa({ ...hook.qa, date: '2026-09-09', type: window.nextType, mode: 'GROSS', grossAmount: 350, paymentAccountId: 1, transferFromAccountId: 1, transferToAccountId: 2, budgets: window.nextType === 'INTERNAL' ? [{ budgetId: 1, amount: -350 }, { budgetId: 2, amount: 350 }] : [] })}>Ausfüllen</button>
           <button id="save" onClick={() => hook.onQuickSave()}>Speichern</button>
+          <button id="save-new" onClick={() => hook.onQuickSave('new')}>Speichern und neu</button>
           <button id="cancel" onClick={hook.parkQuickAdd}>Abbrechen</button>
         </div>
       }
@@ -35,6 +37,7 @@ test.beforeEach(async ({ page }) => {
 for (const type of ['IN', 'OUT', 'TRANSFER', 'INTERNAL']) {
   test(`a successful ${type} booking becomes the default, even after remount`, async ({ page }) => {
     await page.locator('#new').click()
+    await expect(page.locator('#date')).toBeEmpty()
     await page.evaluate(value => { (window as any).nextType = value }, type)
     await page.locator('#configure').click()
     await page.locator('#save').click()
@@ -43,8 +46,21 @@ for (const type of ['IN', 'OUT', 'TRANSFER', 'INTERNAL']) {
     await page.addScriptTag({ content: script })
     await page.locator('#new').click()
     await expect(page.locator('#type')).toHaveText(type)
+    await expect(page.locator('#date')).toBeEmpty()
   })
 }
+
+test('a new draft requires an explicitly chosen date, including after saving', async ({ page }) => {
+  await page.locator('#new').click()
+  await expect(page.locator('#date')).toBeEmpty()
+  await page.locator('#save').click()
+  await expect(page.locator('#type')).toHaveText('IN')
+  await page.evaluate(() => { (window as any).nextType = 'IN' })
+  await page.locator('#configure').click()
+  await page.locator('#save-new').click()
+  await expect(page.locator('#type')).toHaveText('IN')
+  await expect(page.locator('#date')).toBeEmpty()
+})
 
 test('cancelled and failed bookings do not change the last saved type', async ({ page }) => {
   await page.locator('#new').click()

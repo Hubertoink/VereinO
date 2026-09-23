@@ -35,7 +35,9 @@
 .advances-detail-kpis > div > div:last-child { margin-top: 6px; font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .advances-note { padding: 12px 16px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); font-size: 12px; }
 .advances-note p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
-.advances-page .advances-subtitle { margin-top: 12px; }
+.advances-bookings-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.advances-page .advances-bookings-header .advances-subtitle { margin: 0; }
+.advances-bookings-header > .btn { flex-shrink: 0; white-space: nowrap; }
 .advances-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 18px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
 .advances-empty > svg { color: var(--text-dim); }
 .advances-empty > strong { font-size: 14px; }

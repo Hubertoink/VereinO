@@ -76,6 +76,11 @@ for (const glass of [false, true]) {
     await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
     await page.getByRole('button', { name: 'Kassenprüfung öffnen', exact: true }).click()
     dialog = await checkOverlay('Neue Kassenprüfung')
+    await dialog.locator('input[type="date"]').evaluate((input: HTMLInputElement) => {
+      input.showPicker = () => { input.dataset.pickerOpened = 'true' }
+    })
+    await dialog.getByRole('button', { name: 'Kalender für Stichtag öffnen' }).click()
+    await expect(dialog.locator('input[type="date"]')).toHaveAttribute('data-picker-opened', 'true')
     await expect(dialog).toContainText('123,00')
     await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
     await page.getByRole('button', { name: 'Prüfer öffnen', exact: true }).click()
