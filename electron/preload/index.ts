@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron'
 import type { QuickAddPayload, RendererApi, UpdateState } from '../../src/types/api'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../shared/dataChange'
 import type { OrganizationProfile } from '../../shared/classification'
+import { cleanIpcErrorMessage } from '../../shared/ipcError'
 
 type AsyncApiMethod = (...args: never[]) => Promise<unknown>
 
@@ -68,9 +69,9 @@ function cleanInvoke<Path extends RendererInvokePath>(
   return request.catch((error: unknown) => {
     // Remove "Error invoking remote method 'channel': " prefix
     const msg = error instanceof Error ? error.message : String(error)
-    const match = msg.match(/Error invoking remote method '[^']+': (.+)/)
-    if (match) {
-      throw new Error(match[1])
+    const cleaned = cleanIpcErrorMessage(msg)
+    if (cleaned !== msg) {
+      throw new Error(cleaned)
     }
     throw error
   }) as ReturnType<RendererMethodAt<Path>>

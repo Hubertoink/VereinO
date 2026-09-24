@@ -1,6 +1,7 @@
 export type RecurringMatchInput = {
   scheduledDate: string
   bookingDate: string
+  bookingValueDate?: string | null
   recurringType: 'IN' | 'OUT'
   bookingType: 'IN' | 'OUT'
   expectedGrossAmount: number
@@ -49,7 +50,11 @@ export function scoreRecurringMatch(input: RecurringMatchInput) {
   const scheduled = dateNumber(input.scheduledDate)
   const booked = dateNumber(input.bookingDate)
   if (!Number.isFinite(scheduled) || !Number.isFinite(booked)) return null
-  const dateDistance = Math.abs(scheduled - booked) / 86_400_000
+  const valueDate = dateNumber(input.bookingValueDate || '')
+  const bookingDateDistance = Math.abs(scheduled - booked) / 86_400_000
+  const valueDateDistance = Number.isFinite(valueDate) ? Math.abs(scheduled - valueDate) / 86_400_000 : Infinity
+  const dateDistance = Math.min(bookingDateDistance, valueDateDistance)
+  const matchedDateSource = valueDateDistance < bookingDateDistance ? 'VALUE_DATE' : 'BOOKING_DATE'
   if (dateDistance > 14) return null
 
   const amountMatches = round2(input.expectedGrossAmount) === round2(input.bookingGrossAmount)
@@ -80,5 +85,5 @@ export function scoreRecurringMatch(input: RecurringMatchInput) {
   const textScore = Math.min(20, sharedWords * 10) + (containsText ? 10 : 0)
   const score = Math.max(0, Math.min(100, Math.round(20 + dateScore + amountScore + textScore)))
 
-  return { score, dateDistance, sharedWords, amountMatches }
+  return { score, dateDistance, sharedWords, amountMatches, matchedDateSource }
 }

@@ -1057,12 +1057,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       })
     }
     const transactions = openRows.map((transaction) => {
-      const matches = findBankTransactionMatches({ id: transaction.id })
-        .filter((match: any) => Number(match.score || 0) > 0)
-        .slice(0, 5)
+      // Give the AI a wider candidate window, including weak local scores.
+      // Type, amount, reversal and existing-link exclusions still apply.
+      const matches = findBankTransactionMatches({ id: transaction.id, forAiReview: true })
+        .slice(0, 20)
       return {
         id: transaction.id,
         bookingDate: transaction.bookingDate,
+        valueDate: transaction.valueDate,
         direction: transaction.direction,
         amount: Number(transaction.amount),
         currency: transaction.currency,
@@ -1087,6 +1089,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const matchesByTransactionId = new Map(
       transactions.map((row) => [Number(row.id), row.matches || []])
     )
+    const voucherSuggestionCounts = new Map<number, number>()
+    for (const suggestion of reviewed.result.suggestions) {
+      if (suggestion.action === 'LINK_EXISTING' && suggestion.voucherId) {
+        voucherSuggestionCounts.set(suggestion.voucherId, (voucherSuggestionCounts.get(suggestion.voucherId) || 0) + 1)
+      }
+    }
     const suggestions = reviewed.result.suggestions
       .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
       .map((suggestion) => {
@@ -1094,21 +1102,27 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
         if (suggestion.action === 'LINK_EXISTING') {
           const match = matches.find(
-            (item: any) => Number(item.id) === Number(suggestion.voucherId)
+            (item: any) => item.matchKind === 'VOUCHER' && Number(item.id) === Number(suggestion.voucherId)
           )
-          if (!match) {
+          if (!match || (voucherSuggestionCounts.get(Number(suggestion.voucherId)) || 0) > 1) {
             return {
               ...suggestion,
               action: 'NEEDS_MANUAL_REVIEW' as const,
               voucherId: null,
               voucherNo: null,
-              reason: `${suggestion.reason} Lokaler Treffer konnte nicht sicher validiert werden.`,
+              reason: `${suggestion.reason} Die vorgeschlagene Buchung ist nicht eindeutig zuordenbar. Bitte manuell prüfen.`,
               transaction
             }
           }
           return {
             ...suggestion,
-            voucherNo: suggestion.voucherNo || match.voucherNo || null,
+            voucherNo: match.voucherNo || null,
+            matchedVoucher: {
+              grossAmount: Number(match.grossAmount),
+              date: match.date,
+              description: match.description || null
+            },
+            warnings: [...suggestion.warnings, ...(match.paymentAccountWarning ? [match.paymentAccountWarning] : [])],
             transaction
           }
         }

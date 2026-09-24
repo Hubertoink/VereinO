@@ -4,7 +4,6 @@ import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
 import { z } from 'zod'
 import {
-  AiBankImportReviewResult,
   AiBankImportReviewResultStructured,
   AiBookingAnalysisResult,
   AiBookingAnalysisResultStructured,
@@ -23,6 +22,7 @@ import {
 import { getSetting, setSetting } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
 import { isPdfInputFile } from './aiDocumentRouting'
+import { validateBankReviewResult } from './aiBankReviewValidation'
 import {
   isMittwaldThinkingModel,
   normalizeAiTaskProfile,
@@ -195,6 +195,7 @@ type ExpandedAiInputFile = {
 export type AiBankReviewTransaction = {
   id: number
   bookingDate: string
+  valueDate?: string | null
   direction: 'IN' | 'OUT'
   amount: number
   currency?: string | null
@@ -521,7 +522,7 @@ export async function createAiResponse(request: any): Promise<any> {
   }
 
   const usesQwenThinkingModel = isMittwaldThinkingModel(request.model)
-  const usesStructuredOutput = !!request.text?.format
+  const usesStructuredOutput = ['json_schema', 'json_object'].includes(request.text?.format?.type)
   const chatTemplateKwargs = usesQwenThinkingModel
     ? usesStructuredOutput || request.model !== 'Qwen3.8-27B-NVFP4'
       ? { enable_thinking: false }
@@ -531,7 +532,7 @@ export async function createAiResponse(request: any): Promise<any> {
           }
         : undefined
     : undefined
-  const completion = await client.chat.completions.create({
+  const chatRequest = {
     model: request.model,
     messages,
     // Low temperature helps the prompt-enforced JSON fallback stay parseable.
@@ -539,16 +540,53 @@ export async function createAiResponse(request: any): Promise<any> {
     // Structured extraction and classification do not benefit from thinking.
     // In particular Qwen 3.8 otherwise defaults to expensive xhigh reasoning.
     ...(chatTemplateKwargs ? { chat_template_kwargs: chatTemplateKwargs } : {}),
-    ...(usesStructuredOutput ? { max_tokens: 2048 } : {})
-  } as any)
-  const outputText = completion.choices[0]?.message?.content || ''
+    ...(request.max_output_tokens != null || usesStructuredOutput
+      ? { max_tokens: request.max_output_tokens ?? 4096 }
+      : {})
+  }
+  let completion = await client.chat.completions.create(chatRequest as any)
+  let invalidJson = false
+  if (usesStructuredOutput && completion.choices[0]?.finish_reason !== 'length') {
+    try { parseMittwaldJson(completion.choices[0]?.message?.content || '') }
+    catch { invalidJson = true }
+  }
+  // Never parse a cut-off response as if it were complete. Retry once with room
+  // for the entire JSON document, bounded to avoid unbounded provider requests.
+  if (usesStructuredOutput && (invalidJson || (completion.choices[0]?.finish_reason === 'length' && chatRequest.max_tokens < 16384))) {
+    const firstUsage = completion.usage
+    completion = await client.chat.completions.create({
+      ...chatRequest,
+      max_tokens: invalidJson ? chatRequest.max_tokens : Math.min(16384, chatRequest.max_tokens * 2),
+      messages: invalidJson
+        ? [...messages, { role: 'user', content: 'Die Antwort war nicht als JSON auswertbar. Antworte erneut auf die ursprüngliche Aufgabe, ausschließlich mit einem vollständigen JSON-Objekt gemäß dem Schema. Keine Einleitung, kein Markdown.' }]
+        : messages
+    } as any)
+    if (firstUsage && completion.usage) {
+      completion.usage = {
+        ...completion.usage,
+        prompt_tokens: firstUsage.prompt_tokens + completion.usage.prompt_tokens,
+        completion_tokens: firstUsage.completion_tokens + completion.usage.completion_tokens,
+        total_tokens: firstUsage.total_tokens + completion.usage.total_tokens,
+        prompt_tokens_details: { cached_tokens: (firstUsage.prompt_tokens_details?.cached_tokens || 0) + (completion.usage.prompt_tokens_details?.cached_tokens || 0) },
+        completion_tokens_details: { reasoning_tokens: (firstUsage.completion_tokens_details?.reasoning_tokens || 0) + (completion.usage.completion_tokens_details?.reasoning_tokens || 0) }
+      }
+    }
+  }
+  const choice = completion.choices[0]
+  const outputText = choice?.message?.content || ''
   let outputParsed: unknown
-  if (request.text?.format) {
+  if (usesStructuredOutput) {
+    if (choice?.finish_reason === 'length') {
+      throw new Error('Mittwald hat die KI-Antwort wegen des Ausgabelimits abgeschnitten. Bitte weniger Belege auf einmal prüfen.')
+    }
+    if (!outputText.trim()) {
+      throw new Error('Mittwald ist erreichbar, hat aber keine auswertbare KI-Antwort geliefert. Bitte die Prüfung erneut starten.')
+    }
     try {
       outputParsed = parseMittwaldJson(outputText)
     } catch {
       throw new Error(
-        'Mittwald hat kein gültiges JSON für die angeforderte strukturierte Antwort geliefert.'
+        'Mittwald ist erreichbar, hat die KI-Antwort aber nicht im benötigten JSON-Format geliefert. Bitte die Prüfung erneut starten.'
       )
     }
   }
@@ -981,12 +1019,20 @@ export async function testAiConnection() {
         ? testModel
         : availableModels.find((model) => model !== 'GLM-OCR')
       if (usableTestModel) {
-        await createAiResponse({
+        const connectionSchema = z.object({ ok: z.literal(true) })
+        const response = await createAiResponse({
           model: usableTestModel,
-          input: 'Antworte nur mit OK.',
-          text: { verbosity: 'low' },
+          input: 'Bestätige die Verbindung mit dem JSON-Objekt {"ok":true}.',
+          text: { format: zodTextFormat(connectionSchema, 'vereino_connection_test'), verbosity: 'low' },
           reasoning: { effort: 'low' }
         } as any)
+        try {
+          parseStructured(response, connectionSchema)
+        } catch {
+          throw new Error('Mittwald ist erreichbar, hat aber keine passende strukturierte Testantwort geliefert.')
+        }
+      } else {
+        throw new Error('Mittwald hat kein Textmodell für die Prüfung strukturierter Antworten bereitgestellt.')
       }
 
       return {
@@ -1647,6 +1693,28 @@ export async function reviewBankImportTransactions(input: {
   }
   const settings = getAiSettings()
   const model = input.model || settings.textModel
+  // Prompt-enforced JSON is substantially larger than a connection-test reply.
+  // Keep Mittwald reviews small; IPC validates conflicts across the combined result.
+  if (settings.provider === 'mittwald' && input.transactions.length > 5) {
+    const suggestions: TAiBankImportReviewResult['suggestions'] = []
+    const warnings: string[] = []
+    let usage: AiUsage | null = null
+    for (let offset = 0; offset < input.transactions.length; offset += 5) {
+      const reviewed = await reviewBankImportTransactions({
+        ...input,
+        model,
+        transactions: input.transactions.slice(offset, offset + 5)
+      })
+      suggestions.push(...reviewed.result.suggestions)
+      warnings.push(...reviewed.result.warnings)
+      if (reviewed.usage) usage = usage ? mergeAiUsage(usage, reviewed.usage) : reviewed.usage
+    }
+    return {
+      model,
+      result: { suggestions, summary: `${input.transactions.length} Bankbelege geprüft.`, warnings: [...new Set(warnings)] },
+      usage
+    }
+  }
   const prompt = [
     'Du bist ein vorsichtiger Bankimport-Assistent fuer einen deutschen Verein.',
     'Denke wie ein Kassier: Jeder offene Bankbeleg soll entweder mit einer vorhandenen Buchung verknuepft, als neue Buchung vorbereitet, als nicht buchungsrelevant markiert oder bewusst manuell geklaert werden. Lass Bankbelege nicht unverbunden, wenn du eine Buchung daraus erzeugst.',
@@ -1661,12 +1729,16 @@ export async function reviewBankImportTransactions(input: {
     'Verknuepfe nur mit voucherId aus den mitgegebenen matches.',
     'Fuer APPLY_RECURRING uebernimm recurringBookingId, recurringBookingName, occurrenceId und scheduledDate exakt aus einem RECURRING-Match. Erfinde keine IDs oder Termine.',
     'LINK_EXISTING nur bei passendem Typ, Betrag und hoher Plausibilitaet.',
+    'Die matches enthalten auch schwach bewertete Kandidaten in einem erweiterten Zeitraum. Bewerte Zweck, Gegenpartei, Referenzen, Buchungsdatum und Wertstellung selbst; der lokale score ist keine Wahrscheinlichkeit.',
+    'Gleiches Datum und gleicher Betrag sind starke Hinweise, aber bei mehreren plausiblen Buchungen kein eindeutiger Nachweis. Bei uneindeutigen Treffern NEEDS_MANUAL_REVIEW verwenden.',
+    'Abweichende Zahlkonten immer in warnings nennen und nur mit klaren weiteren Belegen LINK_EXISTING vorschlagen. Niemals dieselbe vorhandene Buchung mehreren Bankbelegen vorschlagen.',
     'Wenn ein lokaler Treffer passt, ist LINK_EXISTING vorrangig. Erstelle dann keine neue Buchung.',
     'CREATE_BOOKING erzeugt nur einen Vorschlag, keine finale Buchung.',
     'CREATE_BOOKING wird spaeter mit dem Bankbeleg verknuepft; die Beschreibung soll den Zahler/Zweck nachvollziehbar enthalten, aber keine IBAN-Fuelltexte.',
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
     'Wenn Budget-/Zweckbindungs-IDs unsicher sind, lasse diese Listen leer und schreibe eine Warnung.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
+    'Halte reason, warnings und evidence kurz. Liefere fuer jeden mitgegebenen Bankbeleg genau einen Vorschlag und keine weiteren Bankbelege.',
     '',
     'VereinO-Kontext:',
     JSON.stringify(compactContext(input.context)),
@@ -1682,6 +1754,7 @@ export async function reviewBankImportTransactions(input: {
       format: zodTextFormat(AiBankImportReviewResultStructured, 'vereino_bank_import_review'),
       verbosity: 'low'
     },
+    ...(settings.provider === 'mittwald' ? { max_output_tokens: 8192 } : {}),
     input: [
       {
         role: 'user',
@@ -1692,9 +1765,7 @@ export async function reviewBankImportTransactions(input: {
 
   return {
     model,
-    result: AiBankImportReviewResult.parse(
-      parseStructured(response, AiBankImportReviewResultStructured)
-    ),
+    result: validateBankReviewResult(response.output_parsed ?? JSON.parse(extractOutputText(response)), input.transactions.map((transaction) => transaction.id)),
     usage: normalizeUsage(response, model)
   } as any
 }

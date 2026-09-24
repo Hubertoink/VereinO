@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconX } from '@tabler/icons-react'
+import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
@@ -43,6 +43,7 @@ type BankTransaction = {
 }
 
 type BankAiSuggestion = {
+  matchedVoucher?: { grossAmount: number; date: string; description: string | null } | null
   action: 'LINK_EXISTING' | 'APPLY_RECURRING' | 'CREATE_BOOKING' | 'MARK_CHECKED' | 'NEEDS_MANUAL_REVIEW'
   confidence: number
   reason: string
@@ -186,6 +187,7 @@ type BankTransactionMatch = {
   recurringBookingName?: string | null
   expectedGrossAmount?: number
   variableAmount?: boolean
+  matchedDateSource?: 'BOOKING_DATE' | 'VALUE_DATE'
 }
 
 type Props = {
@@ -524,17 +526,21 @@ function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
 
 function BankMatchRow({
   match,
+  transaction,
   busy,
   onLink,
   onApplyRecurring
 }: {
   match: BankTransactionMatch
+  transaction: BankTransaction
   busy: boolean
   onLink: (voucherId: number) => void
   onApplyRecurring: (match: BankTransactionMatch) => void
 }) {
   const scoreValue = Number(match.score || 0)
   const score = matchScorePresentation(scoreValue)
+  const bookingAmount = match.matchKind === 'RECURRING' ? match.expectedGrossAmount : match.grossAmount
+  const difference = bookingAmount == null ? null : Math.round((bookingAmount - transaction.amount) * 100) / 100
 
   return (
     <div className="bank-match-row">
@@ -547,6 +553,16 @@ function BankMatchRow({
         <span>
           {formatDate(match.date)} · {match.description || 'Ohne Beschreibung'}
         </span>
+        <div className="bank-match-amounts">
+          <span>{match.matchKind === 'RECURRING' ? 'Sollbetrag' : 'Buchungswert'}: <strong>{bookingAmount == null ? '–' : euro.format(bookingAmount)}</strong></span>
+          <span>Bankbeleg: <strong>{euro.format(transaction.amount)}</strong></span>
+          {difference != null && (
+            <span className={difference === 0 ? 'text-success' : 'bank-match-warning'}>
+              {difference === 0 ? 'Beträge stimmen überein' : `Abweichung: ${euro.format(difference)}`}
+            </span>
+          )}
+        </div>
+        {match.matchedDateSource === 'VALUE_DATE' && <span>Datumsabgleich über Wertstellung</span>}
         {match.matchKind === 'VOUCHER' && match.recurringBookingName && (
           <span>Bereits aus Dauerbuchung „{match.recurringBookingName}“ gebucht</span>
         )}
@@ -569,8 +585,8 @@ function BankMatchRow({
         className={`fee-suggestion__score fee-suggestion__score--${score.level}`}
         title={
           scoreValue >= 15
-            ? `Übereinstimmung: ${Math.round(scoreValue)} %`
-            : `Sehr schwacher Treffer: ${Math.round(scoreValue)} %`
+            ? `Übereinstimmung: ${Math.round(scoreValue)} von 100 Punkten`
+            : `Sehr schwacher Treffer: ${Math.round(scoreValue)} von 100 Punkten`
         }
         aria-label={
           scoreValue >= 15
@@ -650,7 +666,7 @@ function ManualAssignmentModal({
           <div>
             <h2>Manuelle Zuweisung</h2>
             <p>
-              {transaction.counterparty || 'Ohne Gegenpartei'} · {euro.format(transaction.amount)} ·{' '}
+              {transaction.counterparty || 'Ohne Gegenpartei'} · {formatDate(transaction.bookingDate)} · {euro.format(transaction.amount)} ·{' '}
               {transaction.direction}
             </p>
           </div>
@@ -1688,6 +1704,7 @@ function BankReviewModal({
                     <BankMatchRow
                       key={`${match.matchKind || 'VOUCHER'}-${match.id}`}
                       match={match}
+                      transaction={transaction}
                       busy={busy}
                       onLink={(voucherId) => {
                           void link(voucherId)
@@ -1847,15 +1864,29 @@ function BankAiSuggestionModal({
     onClose()
   }
 
+  const existing = suggestion.action === 'LINK_EXISTING'
+  const newBooking = suggestion.action === 'CREATE_BOOKING'
+  const recurring = suggestion.action === 'APPLY_RECURRING'
+  const target = existing ? suggestion.matchedVoucher : suggestion.bookingCandidate
+  const targetDate = recurring ? suggestion.scheduledDate : target?.date
+  const targetAmount = recurring ? transaction.amount : target?.grossAmount
+  const amountDifference = targetAmount == null ? null : Math.round((targetAmount - transaction.amount) * 100) / 100
+  const confidence = Math.round(suggestion.confidence * 100)
+  const strongMatch = (existing || recurring) && confidence >= 80 && !suggestion.warnings.length && (!existing || amountDifference === 0)
+
   return createPortal(
-    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal bank-ai-suggestion-modal">
-        <header className="bank-modal-header">
+    <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" aria-labelledby="bank-ai-review-title" onMouseDown={(event) => !busy && event.target === event.currentTarget && onClose()}>
+      <div className={`modal bank-ai-suggestion-modal${newBooking ? ' bank-ai-draft-modal' : ''}`}>
+        <header className="bank-modal-header bank-ai-review-header">
           <div>
-            <h2>KI-Vorschlag für Bankbeleg #{transaction.id}</h2>
-            <p>{transaction.counterparty || transaction.purpose || 'Ohne Beschreibung'}</p>
+            <h2 id="bank-ai-review-title">{newBooking ? 'Neue Buchung aus Bankbeleg' : existing || recurring ? 'KI-Zuordnungsempfehlung' : 'KI-Prüfung'}</h2>
+            <p>Bankbeleg #{transaction.id} · {formatDate(transaction.bookingDate)}</p>
           </div>
-          <button className="btn ghost" type="button" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
+          <div className={`bank-ai-confidence${strongMatch ? ' bank-ai-confidence--high' : ''}`}>
+            <strong>{newBooking ? 'Entwurf · noch nicht gebucht' : strongMatch ? 'Hohe Übereinstimmung' : actionLabel}</strong>
+            <span>{newBooking ? 'KI-Vorschlag zur Erfassung' : `KI-Einschätzung: ${confidence} %`}</span>
+          </div>
+          <button className="btn ghost" type="button" disabled={busy} onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <section className="bank-ai-suggestion-card">
@@ -1865,26 +1896,51 @@ function BankAiSuggestionModal({
               KI prüft den Bankbeleg mit den aktuellen Treffern …
             </div>
           )}
-          <span className="bank-ai-suggestion-action">{actionLabel}</span>
-          <strong>{suggestion.reason}</strong>
-          <span className="helper">Sicherheit: {Math.round(suggestion.confidence * 100)} %</span>
-          {suggestion.action === 'LINK_EXISTING' && (
-            <span className="helper">Vorgeschlagene Buchung: {suggestion.voucherNo || `#${suggestion.voucherId}`}</span>
-          )}
-          {suggestion.action === 'APPLY_RECURRING' && (
-            <span className="helper">Dauerbuchung: {suggestion.recurringBookingName || `#${suggestion.recurringBookingId}`}</span>
-          )}
-          {suggestion.bookingCandidate && (
-            <div className="bank-ai-booking-preview">
-              <span>{formatDate(suggestion.bookingCandidate.date)} · {suggestion.bookingCandidate.type === 'IN' ? 'Einnahme' : 'Ausgabe'}</span>
-              <strong>{suggestion.bookingCandidate.description}</strong>
-              <span>{euro.format(suggestion.bookingCandidate.grossAmount)}</span>
-            </div>
-          )}
+          <p className="bank-ai-intro">{existing
+            ? 'Die KI empfiehlt, diesen Bankbeleg der folgenden bestehenden Buchung zuzuordnen.'
+            : newBooking ? 'Die KI schlägt vor, eine neue Buchung zu erstellen. Prüfe und bearbeite den Entwurf; gespeichert wird erst im Buchungsformular.'
+            : recurring ? 'Die KI empfiehlt, diesen Bankbeleg mit einer Dauerbuchung zu verbuchen.' : actionLabel}</p>
+          <div className={`bank-ai-comparison${newBooking ? ' bank-ai-draft-layout' : !existing ? ' bank-ai-comparison--no-arrow' : ''}`}>
+            <section className="bank-ai-comparison-card">
+              <header><h3>{newBooking ? 'Quelle: importierter Bankbeleg' : 'Bankbeleg'}</h3><p>{transaction.direction === 'OUT' ? 'Ausgang vom Konto' : 'Eingang auf dem Konto'}</p></header>
+              <dl>
+                <div><dt>Datum</dt><dd>{formatDate(transaction.bookingDate)}</dd></div>
+                {transaction.valueDate && <div><dt>Wertstellung</dt><dd>{formatDate(transaction.valueDate)}</dd></div>}
+                <div><dt>Gegenpartei</dt><dd>{transaction.counterparty || 'Ohne Gegenpartei'}</dd></div>
+                <div><dt>Zahlkonto</dt><dd>{transaction.paymentAccountName}</dd></div>
+                <div><dt>Verwendungszweck</dt><dd>{transaction.purpose || '–'}</dd></div>
+                {transaction.bankReference && <div><dt>Bankreferenz</dt><dd>{transaction.bankReference}</dd></div>}
+              </dl>
+              <div className="bank-ai-comparison-amount"><span>Betrag</span><strong>{euro.format(transaction.amount)}</strong></div>
+            </section>
+            {existing && <span className="bank-ai-comparison-arrow" aria-hidden="true">↔</span>}
+            <section className="bank-ai-comparison-card">
+              <header><h3>{existing ? 'Vorgeschlagene Buchung' : recurring ? 'Dauerbuchung' : newBooking ? 'Entwurf für eine neue Buchung' : 'Prüfergebnis'}</h3>
+                <p>{existing ? 'Bereits in der Buchhaltung vorhanden' : recurring ? 'Wird beim Übernehmen gebucht' : newBooking ? 'Diese Buchung wird erst nach deiner Prüfung und dem Speichern angelegt.' : 'Keine Buchung zur Zuordnung vorgeschlagen'}</p></header>
+              {(existing || recurring || suggestion.bookingCandidate) ? <>
+                <dl>
+                  <div><dt>{recurring ? 'Fälligkeit' : 'Datum'}</dt><dd>{formatDate(targetDate)}</dd></div>
+                  {existing && <div><dt>Buchungsnummer</dt><dd>{suggestion.voucherNo || `#${suggestion.voucherId}`}</dd></div>}
+                  <div><dt>Beschreibung</dt><dd>{recurring ? suggestion.recurringBookingName || 'Ohne Bezeichnung' : target?.description || 'Keine Beschreibung verfügbar'}</dd></div>
+                </dl>
+                <div className="bank-ai-comparison-amount"><span>{newBooking ? 'Vorgeschlagener Betrag' : recurring ? 'Zu buchender Betrag' : 'Buchungswert'}</span><strong>{targetAmount == null ? 'Nicht verfügbar' : euro.format(targetAmount)}</strong></div>
+              </> : <p>{suggestion.action === 'MARK_CHECKED' ? 'Der Bankbeleg soll ohne Buchung als geprüft markiert werden.' : 'Bitte den Bankbeleg und mögliche Buchungen manuell vergleichen.'}</p>}
+            </section>
+          </div>
+          <section className="bank-ai-reasoning">
+            <h3>{newBooking ? 'Warum schlägt die KI eine neue Buchung vor?' : existing || recurring ? 'Warum diese Zuordnung?' : 'Begründung der KI'}</h3>
+            <p>{suggestion.reason}</p>
+            {existing && amountDifference != null && <div className="bank-ai-comparison-facts">
+              <div><strong className={amountDifference === 0 ? 'text-success' : 'bank-match-warning'}>{amountDifference === 0 ? 'Beträge stimmen überein' : 'Beträge weichen ab'}</strong>
+                <span>{amountDifference === 0 ? `${euro.format(transaction.amount)} = ${euro.format(targetAmount!)}` : `Differenz: ${euro.format(amountDifference)}`}</span></div>
+              <div><strong>Datumsvergleich</strong><span>{formatDate(transaction.bookingDate)} ↔ {formatDate(targetDate)}</span></div>
+            </div>}
+            {!!suggestion.evidence.length && <ul className="bank-ai-evidence">{suggestion.evidence.map((item, index) => <li key={index}>{item}</li>)}</ul>}
+          </section>
           {suggestion.warnings.length > 0 && (
-            <ul className="bank-ai-suggestion-warnings">
+            <div className="bank-ai-review-warnings"><strong>Bitte beachten</strong><ul className="bank-ai-suggestion-warnings">
               {suggestion.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-            </ul>
+            </ul></div>
           )}
         </section>
 
@@ -1894,7 +1950,7 @@ function BankAiSuggestionModal({
             {refreshing ? 'KI prüft …' : 'KI erneut prüfen'}
           </button>
           {suggestion.action === 'CREATE_BOOKING' && suggestion.bookingCandidate && (
-            <button className="btn primary" type="button" disabled={busy} onClick={openBookingDraft}>Buchungsvorschlag öffnen</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={openBookingDraft}>Entwurf prüfen und bearbeiten</button>
           )}
           {suggestion.action === 'LINK_EXISTING' && suggestion.voucherId && (
             <button className="btn primary" type="button" disabled={busy} onClick={() => void complete(
@@ -1958,6 +2014,8 @@ export default function BankImportView({
   const [aiSuggestionTransaction, setAiSuggestionTransaction] = useState<BankTransaction | null>(null)
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
+  const [reviewingWithAi, setReviewingWithAi] = useState(false)
+  const aiReviewInFlight = React.useRef(false)
   const limit = 50
 
   const toggleSort = (
@@ -2038,6 +2096,28 @@ export default function BankImportView({
   )
   const pageCount = Math.max(1, Math.ceil(total / limit))
   const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
+  const openVisibleIds = rows.filter((row) => row.status === 'OPEN').map((row) => row.id)
+
+  const reviewVisibleWithAi = async () => {
+    if (aiReviewInFlight.current || loading || !openVisibleIds.length) return
+    aiReviewInFlight.current = true
+    setReviewingWithAi(true)
+    notify('info', `KI prüft passende Zuordnungen für ${openVisibleIds.length} offene Bankbelege …`)
+    try {
+      const result = await window.api.ai.bankImports.reviewOpen({ transactionIds: openVisibleIds })
+      const matches = result.suggestions.filter((suggestion) =>
+        suggestion.action === 'LINK_EXISTING' || suggestion.action === 'APPLY_RECURRING'
+      ).length
+      const manual = result.suggestions.filter((suggestion) => suggestion.action === 'NEEDS_MANUAL_REVIEW').length
+      notify(manual ? 'info' : 'success', `${result.suggestions.length} Bankbelege geprüft · ${matches} Zuordnungsvorschläge${manual ? ` · ${manual} manuell prüfen` : ''}. Über das KI-Symbol in der Spalte „Zuordnung“ öffnen.`)
+      await load()
+    } catch (reason: any) {
+      notify('error', `KI-Prüfung fehlgeschlagen: ${reason?.message || String(reason)}`)
+    } finally {
+      aiReviewInFlight.current = false
+      setReviewingWithAi(false)
+    }
+  }
 
   return (
     <div className="bank-import-container">
@@ -2106,6 +2186,18 @@ export default function BankImportView({
               }}
             />
             <div className="filter-divider" />
+            <button
+              className="btn ghost bank-ai-review-button"
+              type="button"
+              disabled={loading || reviewingWithAi || !openVisibleIds.length}
+              onClick={() => void reviewVisibleWithAi()}
+              title={`KI prüft die ${openVisibleIds.length} offenen Bankbelege auf dieser Seite unter Berücksichtigung der aktuellen Filter. Zuordnungen werden als Vorschläge gespeichert.`}
+              aria-label="Sichtbare offene Bankbelege mit KI prüfen"
+              aria-busy={reviewingWithAi}
+            >
+              <AppIcon icon={IconSparkles} size="control" />
+              {reviewingWithAi ? 'KI prüft …' : 'KI prüfen'}
+            </button>
             <BankImportActionDropdown
               onOpenImport={(file) => {
                 setInitialImportFile(file || null)
@@ -2207,7 +2299,7 @@ export default function BankImportView({
                         )}
                         <span
                           className={`bank-match-indicator bank-match-indicator--${match.level}`}
-                          title={match.level === 'none' ? match.label : `${match.label}: ${Math.round(Number(row.matchScore))} %`}
+                          title={match.level === 'none' ? match.label : `${match.label}: ${Math.round(Number(row.matchScore))} von 100 Punkten`}
                           aria-label={match.label}
                         >
                           {match.stars}

@@ -7,6 +7,27 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-24
+
+### Hinzugefügt
+
+- KI-Prüfung für sichtbare offene Bankbelege direkt im Bankimport, mit überprüfbaren Vorschlägen und Statusmeldungen als Toast.
+- Direkter Vergleich von Bankbeleg und bestehender Buchung mit Datum, Betrag und KI-Begründung.
+
+### Geändert
+
+- Neue KI-Buchungsvorschläge erscheinen als eigener Entwurf mit Bankbeleg als Quelle und werden erst im Buchungsformular gespeichert.
+- Passende Buchungen zeigen Buchungswert, Bankbelegbetrag und mögliche Differenzen. Die manuelle Zuweisung zeigt zusätzlich das Importdatum.
+- Die Zuordnung berücksichtigt auch die Wertstellung, bewertet identische Beträge stärker und priorisiert passende Zahlkonten vor der Ergebnisbegrenzung.
+- Die KI erhält einen erweiterten Suchraum für bestehende Buchungen; mehrdeutige Zuordnungen bleiben zur manuellen Prüfung offen.
+
+### Behoben
+
+- Mittwald prüft Bankbelege in kleinen Paketen mit größerem Antwortlimit und einem begrenzten Wiederholungsversuch bei abgeschnittenen oder ungültigen JSON-Antworten.
+- Fehlende optionale KI-Angaben brechen nicht mehr den gesamten Durchlauf ab. Ungültige Pflichtangaben werden beim betroffenen Beleg zur manuellen Prüfung angezeigt.
+- Bankbuchungsvorschläge erfordern keine Dokumentquelle. Der Mittwald-Verbindungstest prüft eine strukturierte Antwort.
+- Mehrzeilige Fehlermeldungen bleiben bei der Weitergabe an die Oberfläche vollständig erhalten.
+
 ## [4.1.0] - 2026-09-23
 
 ### Geändert

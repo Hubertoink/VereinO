@@ -294,12 +294,16 @@ const BANK_TRANSACTION_SELECT = `
     btai.booking_candidate_json as aiSuggestionBookingCandidateJson,
     btai.warnings_json as aiSuggestionWarningsJson,
     btai.evidence_json as aiSuggestionEvidenceJson,
-    btai.reviewed_at as aiSuggestionReviewedAt
+    btai.reviewed_at as aiSuggestionReviewedAt,
+    av.gross_amount as aiVoucherGrossAmount,
+    av.date as aiVoucherDate,
+    av.description as aiVoucherDescription
   FROM bank_transactions bt
   JOIN payment_accounts pa ON pa.id = bt.payment_account_id
   JOIN bank_import_batches bib ON bib.id = bt.batch_id
   LEFT JOIN vouchers v ON v.id = bt.voucher_id
   LEFT JOIN bank_transaction_ai_suggestions btai ON btai.transaction_id = bt.id
+  LEFT JOIN vouchers av ON av.id = btai.voucher_id
 `
 
 function withAiSuggestion(row: Record<string, any>) {
@@ -318,6 +322,9 @@ function withAiSuggestion(row: Record<string, any>) {
     aiSuggestionWarningsJson,
     aiSuggestionEvidenceJson,
     aiSuggestionReviewedAt,
+    aiVoucherGrossAmount,
+    aiVoucherDate,
+    aiVoucherDescription,
     ...transaction
   } = row
   return {
@@ -335,7 +342,12 @@ function withAiSuggestion(row: Record<string, any>) {
       bookingCandidate: jsonValue(aiSuggestionBookingCandidateJson, null),
       warnings: jsonValue<string[]>(aiSuggestionWarningsJson, []),
       evidence: jsonValue<string[]>(aiSuggestionEvidenceJson, []),
-      reviewedAt: aiSuggestionReviewedAt ?? null
+      reviewedAt: aiSuggestionReviewedAt ?? null,
+      matchedVoucher: aiVoucherGrossAmount == null ? null : {
+        grossAmount: Number(aiVoucherGrossAmount),
+        date: aiVoucherDate,
+        description: aiVoucherDescription
+      }
     }
   }
 }
@@ -628,25 +640,29 @@ export function findBankTransactionMatches(input: {
   id: number
   q?: string
   manual?: boolean
+  forAiReview?: boolean
   recurringOccurrencesMaterialized?: boolean
 }) {
   const d = getDb()
   const transaction = getBankTransaction(input.id) as any
   const manual = Boolean(input.manual)
+  // Value date and posting date can differ (e.g. weekends or delayed settlement).
+  const dateDistanceSql = `MIN(ABS(julianday(v.date) - julianday(?)), ABS(julianday(v.date) - julianday(?)))`
+  const valueDate = transaction.valueDate || transaction.bookingDate
   const where = [
     `v.reversed_by_id IS NULL`,
     `NOT EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
   ]
   const params: unknown[] = [input.id]
   if (manual) {
-    where.push(`ABS(julianday(v.date) - julianday(?)) <= 31`)
-    params.push(transaction.bookingDate)
+    where.push(`${dateDistanceSql} <= 31`)
+    params.push(transaction.bookingDate, valueDate)
   } else {
     where.push(`v.type = ?`)
     where.push(`ROUND(v.gross_amount, 2) = ROUND(?, 2)`)
     params.push(transaction.direction, transaction.amount)
-    where.push(`ABS(julianday(v.date) - julianday(?)) <= 14`)
-    params.push(transaction.bookingDate)
+    where.push(`${dateDistanceSql} <= ?`)
+    params.push(transaction.bookingDate, valueDate, input.forAiReview ? 31 : 14)
   }
   if (input.q?.trim()) {
     where.push(`(v.voucher_no LIKE ? OR COALESCE(v.description, '') LIKE ? OR COALESCE(v.note, '') LIKE ?)`)
@@ -664,16 +680,20 @@ export function findBankTransactionMatches(input: {
     LEFT JOIN recurring_occurrences ro ON ro.voucher_id = v.id AND ro.status = 'BOOKED'
     LEFT JOIN recurring_bookings rb ON rb.id = ro.recurring_booking_id
     WHERE ${where.join(' AND ')}
-    ORDER BY ABS(julianday(v.date) - julianday(?)) ASC, v.date DESC, v.id DESC
+    ORDER BY ${manual ? '' : 'CASE WHEN v.payment_account_id = ? THEN 0 ELSE 1 END,'}
+      ${dateDistanceSql} ASC, v.date DESC, v.id DESC
     LIMIT 100
-  `).all(...params, transaction.bookingDate) as any[]
+  `).all(...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
 
   const sourceWords = wordSet([transaction.counterparty, transaction.purpose].filter(Boolean).join(' '))
   const voucherMatches = rows.map((row) => {
     const targetWords = wordSet([row.description, row.note].filter(Boolean).join(' '))
     let sharedWords = 0
     for (const word of sourceWords) if (targetWords.has(word)) sharedWords++
-    const dateDistance = Math.abs((Date.parse(row.date) - Date.parse(transaction.bookingDate)) / 86400000)
+    const bookingDateDistance = Math.abs((Date.parse(row.date) - Date.parse(transaction.bookingDate)) / 86400000)
+    const valueDateDistance = Math.abs((Date.parse(row.date) - Date.parse(valueDate)) / 86400000)
+    const dateDistance = Math.min(bookingDateDistance, valueDateDistance)
+    const matchedDateSource = valueDateDistance < bookingDateDistance ? 'VALUE_DATE' : 'BOOKING_DATE'
     const paymentAccountMismatch = Number(row.paymentAccountId || 0) !== Number(transaction.paymentAccountId || 0)
     const paymentAccountWarning = paymentAccountMismatch
       ? `Zahlkonto abweichend: Buchung ${row.paymentAccountName || 'ohne Konto'} statt ${transaction.paymentAccountName || 'ohne Konto'}`
@@ -681,7 +701,10 @@ export function findBankTransactionMatches(input: {
     const dateScore = Math.max(0, 35 - Math.min(35, dateDistance * 7))
     const textScore = Math.min(45, sharedWords * 15)
     const accountScore = paymentAccountMismatch ? -20 : 20
-    let score = Math.max(0, Math.min(100, dateScore + textScore + accountScore))
+    const amountMatches = round2(row.grossAmount) === round2(transaction.amount)
+    const typeMatches = row.type === transaction.direction
+    const amountScore = amountMatches && typeMatches ? 25 : 0
+    let score = Math.max(0, Math.min(100, amountScore + dateScore + textScore + accountScore))
     if (!manual) {
       if (paymentAccountMismatch && sharedWords === 0 && dateDistance > 2) score = 0
       if (!paymentAccountMismatch && sharedWords === 0 && dateDistance > 7) score = Math.min(score, 10)
@@ -689,7 +712,7 @@ export function findBankTransactionMatches(input: {
       if (paymentAccountMismatch) score = Math.max(5, score)
       if (sharedWords === 0 && dateDistance > 20) score = Math.max(1, Math.min(score, 15))
     }
-    return { ...row, matchKind: 'VOUCHER', dateDistance, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
+    return { ...row, matchKind: 'VOUCHER', dateDistance, matchedDateSource, amountMatches, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
   }).sort((a, b) => {
     if (!manual && Number(a.paymentAccountMismatch) !== Number(b.paymentAccountMismatch)) return Number(a.paymentAccountMismatch) - Number(b.paymentAccountMismatch)
     return a.dateDistance - b.dateDistance || b.score - a.score
@@ -718,10 +741,10 @@ export function findBankTransactionMatches(input: {
     WHERE ro.status = 'DUE'
       AND rb.type = ?
       AND rb.payment_account_id = ?
-      AND ABS(julianday(ro.scheduled_date) - julianday(?)) <= 14
-    ORDER BY ABS(julianday(ro.scheduled_date) - julianday(?)), ro.id
+      AND MIN(ABS(julianday(ro.scheduled_date) - julianday(?)), ABS(julianday(ro.scheduled_date) - julianday(?))) <= 14
+    ORDER BY MIN(ABS(julianday(ro.scheduled_date) - julianday(?)), ABS(julianday(ro.scheduled_date) - julianday(?))), ro.id
     LIMIT 50
-  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, transaction.bookingDate) as any[]
+  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, valueDate, transaction.bookingDate, valueDate) as any[]
 
   const upcomingCandidates = d.prepare(`
     SELECT NULL as occurrenceId, rb.next_due_date as scheduledDate,
@@ -735,20 +758,21 @@ export function findBankTransactionMatches(input: {
     WHERE rb.status = 'ACTIVE'
       AND rb.type = ?
       AND rb.payment_account_id = ?
-      AND ABS(julianday(rb.next_due_date) - julianday(?)) <= 14
+      AND MIN(ABS(julianday(rb.next_due_date) - julianday(?)), ABS(julianday(rb.next_due_date) - julianday(?))) <= 14
       AND NOT EXISTS (
         SELECT 1 FROM recurring_occurrences ro
         WHERE ro.recurring_booking_id = rb.id AND ro.scheduled_date = rb.next_due_date
       )
-    ORDER BY ABS(julianday(rb.next_due_date) - julianday(?)), rb.id
+    ORDER BY MIN(ABS(julianday(rb.next_due_date) - julianday(?)), ABS(julianday(rb.next_due_date) - julianday(?))), rb.id
     LIMIT 50
-  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, transaction.bookingDate) as any[]
+  `).all(transaction.direction, transaction.paymentAccountId, transaction.bookingDate, valueDate, transaction.bookingDate, valueDate) as any[]
 
   const recurringMatches = [...recurringCandidates, ...upcomingCandidates].flatMap((candidate) => {
     const expectedGrossAmount = recurringGrossAmount(candidate.amountMode, candidate.amount, candidate.vatRate)
     const match = scoreRecurringMatch({
       scheduledDate: candidate.scheduledDate,
       bookingDate: transaction.bookingDate,
+      bookingValueDate: transaction.valueDate,
       recurringType: candidate.type,
       bookingType: transaction.direction,
       expectedGrossAmount,

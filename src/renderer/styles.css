@@ -17107,13 +17107,93 @@ button.filter-totals-stat {
 }
 
 .bank-ai-suggestion-modal {
-  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
 }
 
 .bank-ai-suggestion-card {
   display: grid;
-  gap: 10px;
-  padding: 18px;
+  gap: 18px;
+  padding: 18px 0;
+}
+
+.bank-ai-review-header {
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.bank-ai-review-header > div:first-child {
+  flex: 1;
+}
+
+.bank-ai-confidence {
+  display: grid;
+  gap: 3px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  font-size: 12px;
+}
+
+.bank-ai-confidence span { color: var(--text-dim); }
+.bank-ai-confidence--high { background: color-mix(in srgb, var(--success) 9%, var(--surface)); }
+.bank-ai-confidence--high strong { color: var(--success); }
+.bank-ai-intro { margin: 0; }
+
+.bank-ai-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.bank-ai-comparison-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 2%, var(--surface));
+}
+
+.bank-ai-comparison-card h3,
+.bank-ai-reasoning h3 { margin: 0; font-size: 14px; }
+.bank-ai-comparison-card header p { margin: 5px 0 0; color: var(--text-dim); font-size: 12px; }
+.bank-ai-comparison-card dl { margin: 16px 0; font-size: 13px; }
+.bank-ai-comparison-card dl > div { display: grid; grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.2fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.bank-ai-comparison-card dt { color: var(--text-dim); }
+.bank-ai-comparison-card dd { margin: 0; overflow-wrap: anywhere; font-weight: 500; }
+.bank-ai-comparison-arrow { align-self: center; text-align: center; color: var(--text-dim); font-size: 26px; }
+.bank-ai-comparison-amount { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: auto; padding: 10px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); font-size: 14px; }
+.bank-ai-comparison-amount strong { font-size: 17px; }
+.bank-ai-reasoning { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.bank-ai-reasoning > p { margin: 10px 0 0; font-size: 14px; line-height: 1.5; }
+.bank-ai-comparison-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; font-size: 13px; }
+.bank-ai-comparison-facts > div { display: grid; gap: 5px; }
+.bank-ai-comparison-facts span { color: var(--text-dim); }
+.bank-ai-evidence { margin: 12px 0 0; padding-left: 18px; color: var(--text-dim); font-size: 13px; }
+.bank-ai-review-warnings { display: grid; gap: 8px; padding: 12px 16px; border: 1px solid var(--warning); border-radius: 9px; font-size: 13px; }
+.bank-ai-suggestion-modal .bank-modal-footer { flex-wrap: wrap; gap: 8px; }
+
+.bank-ai-comparison--no-arrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bank-ai-draft-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.bank-ai-draft-layout > .bank-ai-comparison-card:first-child { padding: 12px 16px; background: transparent; }
+.bank-ai-draft-layout > .bank-ai-comparison-card:first-child dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 8px 0; }
+.bank-ai-draft-layout > .bank-ai-comparison-card:last-child { border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.bank-ai-draft-layout > .bank-ai-comparison-card:last-child h3 { font-size: 16px; }
+.bank-ai-draft-layout > .bank-ai-comparison-card:last-child dl { margin: 8px 0 14px; }
+.bank-ai-draft-modal .bank-ai-confidence { border: 1px dashed var(--border); background: transparent; }
+
+@media (max-width: 680px) {
+  .bank-ai-review-header { flex-wrap: wrap; }
+  .bank-ai-review-header > div:first-child { flex-basis: calc(100% - 60px); }
+  .bank-ai-confidence { order: 3; }
+  .bank-ai-comparison { grid-template-columns: minmax(0, 1fr); }
+  .bank-ai-draft-layout > .bank-ai-comparison-card:first-child dl { grid-template-columns: minmax(0, 1fr); }
+  .bank-ai-comparison-arrow { display: none; }
+  .bank-ai-comparison-facts { grid-template-columns: minmax(0, 1fr); }
 }
 
 .bank-ai-refresh-state {
@@ -18002,6 +18082,33 @@ button.filter-totals-stat {
   color: var(--warning);
   font-size: 12px;
   font-weight: 600;
+}
+
+.bank-match-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0;
+}
+
+.bank-match-amounts strong {
+  color: var(--text);
+}
+
+.bank-match-amounts .text-success {
+  color: var(--success);
+}
+
+.bank-match-amounts .bank-match-warning {
+  color: var(--warning);
+}
+
+.bank-ai-review-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  color: var(--accent);
 }
 
 .bank-match-score {

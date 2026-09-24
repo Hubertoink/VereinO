@@ -148,6 +148,11 @@ export const AiBankImportAction = z.enum([
 ])
 export const AiBankImportReviewSuggestion = z
   .object({
+    matchedVoucher: z.object({
+      grossAmount: z.number(),
+      date: z.string(),
+      description: z.string().nullable()
+    }).nullable().optional(),
     transactionId: z.number().int().positive(),
     action: AiBankImportAction,
     confidence: z.number().min(0).max(1).default(0.5),
@@ -205,7 +210,8 @@ export const AiBankImportReviewSuggestionStructured = z
     recurringBookingName: z.string().nullable(),
     occurrenceId: z.number().int().positive().nullable(),
     scheduledDate: z.string().nullable(),
-    bookingCandidate: AiBookingCandidateStructured.nullable(),
+    // Bank transactions have no document attachment or page-number source.
+    bookingCandidate: AiBookingCandidateStructured.omit({ source: true }).nullable(),
     warnings: z.array(z.string()),
     evidence: z.array(z.string())
   })
