@@ -1,6 +1,7 @@
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn()
 }))
+jest.mock('../../electron/main/db/database', () => ({ getDb: jest.fn(), withTransaction: jest.fn() }))
 
 jest.mock('../../electron/main/repositories/bankTransactions', () => ({
   listBankTransactions: jest.fn(),

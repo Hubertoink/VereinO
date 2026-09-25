@@ -8,9 +8,10 @@ import type { ReportsApi } from './reportsApi'
 import type { SystemApi } from './systemApi'
 import type { BankImportsApi } from './bankImportsApi'
 import type { AiApi } from './aiApi'
+import type { ReimbursementsApi } from '../../../shared/reimbursements'
 
 export interface RendererApi
-    extends AiApi,
+    extends ReimbursementsApi, AiApi,
         CoreApi,
         BankImportsApi,
         FinanceApi,

@@ -12,6 +12,7 @@ import { addDataChangedListener, dispatchDataChanged } from '../utils/refresh'
 import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
 import InvoiceActionMenu from './invoicesShared/InvoiceActionMenu'
+import ReimbursementsDialog from './reimbursements/ReimbursementsDialog'
 import LocalInvoiceScanModal, { type LocalInvoiceScanResult } from '../components/modals/LocalInvoiceScanModal'
 import type {
   EditInvoiceFile,
@@ -83,7 +84,7 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
 
   return {
     id: row?.id,
-    date: row?.date || new Date().toISOString().slice(0, 10),
+    date: row?.date ?? '',
     dueDate: row?.dueDate ?? null,
     invoiceNo: row?.invoiceNo ?? '',
     party: row?.party ?? '',
@@ -110,6 +111,7 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
 
 export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
   const { notify } = useToast()
+  const [showReimbursements, setShowReimbursements] = useState(false)
 
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'>('ALL')
@@ -720,9 +722,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
 
   return (
     <div className="invoices-container">
+
       <div className="invoices-header">
-        <h1>Verbindlichkeiten</h1>
-        <div className="invoices-filters">
+        <h1>{showReimbursements ? 'Kostenerstattungen' : 'Verbindlichkeiten'}</h1>
+        {!showReimbursements && <div className="invoices-filters">
           <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)..." value={q} onChange={(e) => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
           <InvoiceFilterDropdown
             status={status}
@@ -758,12 +761,16 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
           <div className="filter-divider" />
           <button className="btn primary invoices-toolbar-action invoices-scan-button btn-with-icon" onClick={(event) => { setInvoiceScanAnchor(event.currentTarget.getBoundingClientRect()); setShowInvoiceScan(true) }}><AppIcon icon={IconFileImport} size="control" />Rechnung erfassen</button>
           <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={openCreate}><AppIcon icon={IconPlus} size="control" />Neu</button>
-        </div>
+        </div>}
       </div>
 
-      {error && <div className="invoices-text-danger">{error}</div>}
+      <div className="reimbursement-view-toggle" role="group" aria-label="Ansicht auswählen">
+        <button className="btn" aria-pressed={!showReimbursements} onClick={() => setShowReimbursements(false)}>Verbindlichkeiten</button>
+        <button className="btn" aria-pressed={showReimbursements} onClick={() => setShowReimbursements(true)}>Kostenerstattungen</button>
+      </div>
+      {!showReimbursements && error && <div className="invoices-text-danger">{error}</div>}
 
-      {loading ? (
+      {showReimbursements ? <ReimbursementsDialog embedded notify={notify} onClose={() => setShowReimbursements(false)} /> : loading ? (
         <LoadingState message="Lade Verbindlichkeiten..." />
       ) : (
         <>

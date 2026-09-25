@@ -18,6 +18,7 @@ type ReviewQueueState = Pick<
   | 'pendingInvoiceActions'
   | 'pendingMembers'
   | 'pendingMemberUpdates'
+  | 'pendingReimbursements'
   | 'pendingPartyActions'
   | 'pendingPlannerQuestion'
   | 'pendingTagActions'
@@ -42,6 +43,7 @@ export function buildAiReviewQueue({
   pendingInvoiceActions,
   pendingMembers,
   pendingMemberUpdates,
+  pendingReimbursements,
   pendingPartyActions,
   pendingPlannerQuestion,
   pendingTagActions,
@@ -52,6 +54,7 @@ export function buildAiReviewQueue({
   selectedJob
 }: ReviewQueueState): AgentReviewQueueItem[] {
   const items: AgentReviewQueueItem[] = []
+  if (pendingReimbursements) items.push({ id: 'reimbursements', title: 'Kostenerstattungen', summary: 'Zuordnungen und Vorgangsdaten', status: pendingReimbursements.status === 'APPLIED' ? 'DONE' : 'OPEN', count: pendingReimbursements.changes.length, anchorId: 'ai-review-reimbursements' })
   if (pendingPlannerQuestion?.status === 'OPEN') {
     items.push({
       id: 'planner-question',

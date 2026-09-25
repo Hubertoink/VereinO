@@ -743,7 +743,10 @@ function notifyDataChanged(scopes?: DataChangeScope[]) {
   }
 }
 
+import { registerReimbursementHandlers } from './reimbursements'
+
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
+  registerReimbursementHandlers()
   ipcMain.handle('receiptWidget.open', () => options.receiptWidget?.open() ?? { ok: false })
   ipcMain.handle('receiptWidget.close', () => options.receiptWidget?.close() ?? { ok: false })
   ipcMain.handle('receiptWidget.showMain', () => options.showMainWindow?.() ?? { ok: false })

@@ -1,3 +1,4 @@
+import type { ReimbursementReviewState } from '../../../../shared/reimbursementActions'
 import type { AgentMasterDataChange } from './AgentMasterDataChangeCard'
 import type { AiInvoiceActionState } from './AgentInvoiceActionCard'
 import type { AiVoucherReverseState } from './AgentVoucherReverseCard'
@@ -43,6 +44,7 @@ export type AiMentionOption = {
 }
 
 export type AiChatSnapshot = {
+  pendingReimbursements?: ReimbursementReviewState | null
   messages?: AiMessage[]
   agentSessionId?: string | null
   selectedJobId?: number | null

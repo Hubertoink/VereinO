@@ -42,7 +42,7 @@ function normalizeLookup(value: unknown) {
 
 function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
   const merged: TAiAgentRunOutput['drafts'] = []
-  const mergeableKinds = new Set(['memberUpdate', 'contributionPaymentLink', 'tagChange', 'partyChange', 'voucherUpdate', 'budgetChange', 'earmarkChange'])
+  const mergeableKinds = new Set(['reimbursementAction', 'memberUpdate', 'contributionPaymentLink', 'tagChange', 'partyChange', 'voucherUpdate', 'budgetChange', 'earmarkChange'])
   const byKind = new Map<string, TAiAgentRunOutput['drafts'][number]>()
 
   for (const draft of drafts) {
@@ -118,6 +118,9 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
     const wantsVereinoData = /(geschaftspartner|lieferant|kunde|kunden|handler|zahlungsempfanger|zahlungspflichtiger|buchung|buchungen|dauerbuchung|dauerbuchungen|abo|abos|beleg|belege|journal|budget|tag|tags|zweck|zweckbindung|konto|zahlungskonto|bank|mitglied|mitglieder|beitrag|beitraege|rechnung|rechnungen|rechnungsnummer|forderung|forderungen|verbindlichkeit|verbindlichkeiten|offener posten|offene posten|zahlung|zahlungen|sphaere|sphare|out|in|report|bericht|controlling|auswertung|pdf|csv|xlsx|excel)/.test(normalized)
     const wantsSpecificAgentTask = (wantsWrite || wantsReportExport) && wantsVereinoData && /(geschaftspartner|lieferant|kunde|kunden|handler|zahlungsempfanger|zahlungspflichtiger|mitglied|mitglieder|budget|budgets|zweck|zweckbindung|tag|tags|buchung|buchungen|dauerbuchung|dauerbuchungen|abo|abos|bank|bankimport|zahlungskonto|konto|beitrag|beitraege|rechnung|rechnungen|rechnungsnummer|forderung|forderungen|verbindlichkeit|verbindlichkeiten|offener posten|offene posten|sphaere|sphare|report|bericht|controlling|journal|auswertung|pdf|csv|xlsx|excel)/.test(normalized)
     const hasOpenReview = input.hasOpenReviewWorkflow()
+    // Let the model discover capabilities from the tool catalog for ordinary text requests.
+    // Existing review/file workflows retain their specialized routing below.
+    if (!hasOpenReview) return normalized.length > 0
     const wantsOpenReviewFollowup = hasOpenReview && !!agentSessionId && (wantsWrite || wantsVereinoData || (normalized.length > 0 && normalized.length <= 80))
     if (hasOpenReview && !wantsRebook && !wantsSpecificAgentTask && !wantsOpenReviewFollowup) return false
     return wantsReportExport || wantsContentPdfExport || wantsExploration || (wantsWrite && wantsVereinoData) || (!!agentSessionId && wantsVereinoData) || wantsOpenReviewFollowup

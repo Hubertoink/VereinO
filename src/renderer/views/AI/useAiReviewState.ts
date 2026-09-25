@@ -1,3 +1,4 @@
+import type { ReimbursementReviewState } from '../../../../shared/reimbursementActions'
 import { useState } from 'react'
 import type {
   AiBankLinkState,
@@ -28,6 +29,7 @@ type Input = {
 
 /** Owns every review draft that is persisted as part of the AI chat. */
 export function useAiReviewState({ initialChat, sanitizeMemberState }: Input) {
+  const [pendingReimbursements, setPendingReimbursements] = useState<ReimbursementReviewState | null>(initialChat.pendingReimbursements || null)
   const [bankReview, setBankReview] = useState<AiBankReviewState | null>(
     initialChat.bankReview || null
   )
@@ -77,6 +79,7 @@ export function useAiReviewState({ initialChat, sanitizeMemberState }: Input) {
   const [agentTrace, setAgentTrace] = useState<TAiAgentTraceEvent[]>(initialChat.agentTrace || [])
 
   const restore = (snapshot: AiChatSnapshot) => {
+    setPendingReimbursements(snapshot.pendingReimbursements || null)
     setBankReview(snapshot.bankReview || null)
     setPendingMembers(sanitizeMemberState(snapshot.pendingMembers))
     setPendingMemberUpdates(snapshot.pendingMemberUpdates || null)
@@ -100,6 +103,7 @@ export function useAiReviewState({ initialChat, sanitizeMemberState }: Input) {
   const reset = () => restore({})
 
   return {
+    pendingReimbursements, setPendingReimbursements,
     bankReview,
     setBankReview,
     pendingMembers,

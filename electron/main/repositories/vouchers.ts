@@ -1711,6 +1711,10 @@ export function clearAllVouchers() {
         const countRow = d.prepare('SELECT COUNT(1) as c FROM vouchers').get() as any
         const deleted = Number(countRow?.c || 0)
 
+        // These records only track allocations of the bookings being cleared.
+        d.prepare('DELETE FROM reimbursement_links').run()
+        d.prepare('DELETE FROM reimbursements').run()
+
         // Clear self-referencing FKs (no CASCADE) so vouchers can be deleted
         d.prepare('UPDATE vouchers SET reversed_by_id = NULL, original_id = NULL').run()
 

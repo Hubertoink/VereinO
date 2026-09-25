@@ -2,6 +2,7 @@ export const DATA_CHANGE_SCOPES = [
   'vouchers',
   'members',
   'invoices',
+  'reimbursements',
   'submissions',
   'bank-imports',
   'budgets',

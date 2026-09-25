@@ -302,6 +302,19 @@ const rendererApi = {
     },
     resolve: (payload) => invoke('advances.resolve', payload)
   },
+  reimbursements: {
+    linkedVoucherIds: () => cleanInvoke('reimbursements.linkedVoucherIds'),
+    applyActions: (payload) => cleanInvoke('reimbursements.applyActions', payload),
+    applyAction: (payload) => cleanInvoke('reimbursements.applyAction', payload),
+    list: (payload) => cleanInvoke('reimbursements.list', payload),
+    get: (payload) => cleanInvoke('reimbursements.get', payload),
+    create: (payload) => cleanInvoke('reimbursements.create', payload),
+    update: (payload) => cleanInvoke('reimbursements.update', payload),
+    link: (payload) => cleanInvoke('reimbursements.link', payload),
+    unlink: (payload) => cleanInvoke('reimbursements.unlink', payload),
+    delete: (payload) => cleanInvoke('reimbursements.delete', payload),
+    candidates: (payload) => cleanInvoke('reimbursements.candidates', payload)
+  },
   invoices: {
     create: (payload) => invoke('invoices.create', payload),
     update: (payload) => invoke('invoices.update', payload),

@@ -29,6 +29,7 @@ type Input = {
   setPendingContributionLinks: Setter
   setPendingInvoiceActions: Setter
   setPendingTagActions: Setter
+  setPendingReimbursements: Setter
   setPendingPartyActions: Setter
   setPendingBudgetActions: Setter
   setPendingEarmarkActions: Setter
@@ -43,6 +44,11 @@ export function prepareAiAgentDraft({ draft, userPrompt, pushMessage, ...setters
   const reviewMessage = (title: string, body: string) =>
     pushMessage({ role: 'assistant', title, body, meta: `Agent-Review${autoMeta}` })
 
+  if (draft.kind === 'reimbursementAction') {
+    setters.setPendingReimbursements({ changes: (payload?.changes || []).map((change: any, i: number) => ({ ...change, id: `reimbursement-${Date.now()}-${i}`, selected: true })), sourcePrompt: userPrompt, status: 'DRAFT' })
+    reviewMessage('Kostenerstattung vorbereitet', 'Bitte die Änderungen unten prüfen und freigeben.')
+    return
+  }
   if (draft.kind === 'recurringBooking') {
     const occurrences = (payload?.occurrences || []) as AiRecurringBookingOccurrence[]
     if (!payload?.recurringBookingId || !occurrences.length) return

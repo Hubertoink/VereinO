@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
+import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
@@ -1461,6 +1462,7 @@ function BankReviewModal({
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [showManualAssign, setShowManualAssign] = useState(false)
+  const [showReimbursement, setShowReimbursement] = useState(false)
   const actionMenuRef = React.useRef<HTMLDivElement | null>(null)
 
   const loadMatches = useCallback(async () => {
@@ -1598,6 +1600,11 @@ function BankReviewModal({
                         Ohne Buchung erledigen
                       </button>
                     </>
+                  )}
+                  {transaction.status === 'LINKED' && transaction.voucherId && (
+                    <button className="btn" onClick={() => { setActionMenuOpen(false); setShowReimbursement(true) }}>
+                      {transaction.direction === 'IN' ? 'Als Erstattung zuordnen' : 'Erstattung erwarten'}
+                    </button>
                   )}
                   {transaction.status === 'LINKED' && transaction.voucherId && (
                     <button
@@ -1751,6 +1758,13 @@ function BankReviewModal({
           </section>
         )}
 
+        {showReimbursement && transaction.voucherId && <ReimbursementsDialog
+          notify={notify}
+          voucher={{ id: transaction.voucherId, type: transaction.direction, grossAmount: transaction.amount, description: transaction.purpose }}
+          startCreate={transaction.direction === 'OUT'}
+          onClose={() => setShowReimbursement(false)}
+          onNavigate={onClose}
+        />}
         {showManualAssign && (
           <ManualAssignmentModal
             transaction={transaction}

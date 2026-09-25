@@ -1,3 +1,4 @@
+import { createReimbursementTools } from './aiReimbursementTools'
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs/promises'
@@ -19,7 +20,7 @@ import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVo
 import type { AiContext } from './ai'
 
 export type AiAgentDraft = {
-  kind: 'booking' | 'recurringBooking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
+  kind: 'reimbursementAction' | 'booking' | 'recurringBooking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
   title: string
   payload: unknown
   autoApproval?: {
@@ -624,6 +625,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     return 'Für diese allgemeine Organisation muss eine aktive Kategorie über primaryClassificationValueId gewählt werden.'
   }
   return [
+    ...createReimbursementTools(),
     {
       name: 'vereino_context_overview',
       description: 'Liefert eine kompakte Übersicht über Verein, Stammdaten, aktuelle Kennzahlen, Konten, Tags, Budgets, Mitglieder-, Rechnungs- und Dauerbuchungsstatus.',

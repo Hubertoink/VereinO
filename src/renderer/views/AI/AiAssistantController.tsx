@@ -1,3 +1,4 @@
+import { AgentReimbursementCard } from './AgentReimbursementCard'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import './AIView.css'
 import { dispatchDataChanged } from '../../utils/refresh'
@@ -326,7 +327,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     setPendingContributionLinks,
     pendingTagActions,
     setPendingTagActions,
+    pendingReimbursements,
     pendingPartyActions,
+    setPendingReimbursements,
     setPendingPartyActions,
     pendingVoucherTagActions,
     setPendingVoucherTagActions,
@@ -370,6 +373,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       { id: 'recurring-booking', state: pendingRecurringBooking, terminalStatuses: ['APPLIED'] },
       { id: 'contribution-links', state: pendingContributionLinks, terminalStatuses: ['APPLIED'] },
       { id: 'tag-actions', state: pendingTagActions, terminalStatuses: ['APPLIED'] },
+      { id: 'reimbursements', state: pendingReimbursements, terminalStatuses: ['APPLIED'] },
       { id: 'party-actions', state: pendingPartyActions, terminalStatuses: ['APPLIED'] },
       { id: 'voucher-tag-actions', state: pendingVoucherTagActions, terminalStatuses: ['APPLIED'] },
       { id: 'voucher-updates', state: pendingVoucherUpdates, terminalStatuses: ['APPLIED'] },
@@ -396,6 +400,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       setPendingContributionLinks,
       setPendingInvoiceActions,
       setPendingTagActions,
+      setPendingReimbursements,
       setPendingPartyActions,
       setPendingBudgetActions,
       setPendingEarmarkActions
@@ -478,6 +483,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         tagActions: pendingTagActions
           ? { status: pendingTagActions.status, count: pendingTagActions.changes.length }
           : null,
+        reimbursements: pendingReimbursements,
         partyActions: pendingPartyActions
           ? {
               status: pendingPartyActions.status,
@@ -626,6 +632,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     pendingInvoiceActions,
     pendingMembers,
     pendingMemberUpdates,
+    pendingReimbursements,
     pendingPartyActions,
     pendingPlannerQuestion,
     pendingTagActions,
@@ -787,6 +794,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         pendingRecurringBooking,
         pendingContributionLinks,
         pendingTagActions,
+        pendingReimbursements,
         pendingPartyActions,
         pendingVoucherTagActions,
         pendingVoucherUpdates,
@@ -815,6 +823,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     pendingInvoiceActions,
     pendingMembers,
     pendingMemberUpdates,
+    pendingReimbursements,
     pendingPartyActions,
     pendingPlannerQuestion,
     pendingRecurringBooking,
@@ -864,6 +873,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         pendingInvoiceActions,
         pendingMembers,
         pendingMemberUpdates,
+        pendingReimbursements,
         pendingPartyActions,
         pendingPlannerQuestion,
         pendingTagActions,
@@ -885,6 +895,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       pendingInvoiceActions,
       pendingMembers,
       pendingMemberUpdates,
+      pendingReimbursements,
       pendingPartyActions,
       pendingPlannerQuestion,
       pendingTagActions,
@@ -905,6 +916,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     !!pendingRecurringBooking ||
     !!pendingContributionLinks ||
     !!pendingTagActions ||
+    !!pendingReimbursements ||
     !!pendingPartyActions ||
     !!pendingVoucherTagActions ||
     !!pendingVoucherUpdates ||
@@ -2503,6 +2515,24 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     } finally {
       setBusy(false)
     }
+  }
+
+  const applyPendingReimbursements = async () => {
+    if (busy || !pendingReimbursements) return
+    setBusy(true)
+    try {
+      const selected = pendingReimbursements.changes.filter(change => change.selected && !change.applied)
+      if (!selected.length) return
+      await window.api.reimbursements.applyActions({ changes: selected.map(({ command, expectedState }) => ({ command, expectedState })) })
+      setPendingReimbursements(current => {
+        if (!current) return current
+        const changes = current.changes.map(row => selected.some(change => change.id === row.id) ? { ...row, applied: true } : row)
+        return { ...current, changes, status: changes.every(row => row.applied) ? 'APPLIED' : 'DRAFT' }
+      })
+      dispatchDataChanged(['reimbursements'])
+      notify('success', 'Kostenerstattungen aktualisiert.')
+    } catch (error) { notify('error', error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
   }
 
   const applyPendingPartyActions = async () => {
@@ -5042,6 +5072,10 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
               onApply={() => void applyPendingInvoiceActions()}
             />
           )}
+
+          {pendingReimbursements && <AgentReimbursementCard state={pendingReimbursements} busy={busy}
+            onToggle={id => setPendingReimbursements(current => current ? { ...current, changes: current.changes.map(change => change.id === id ? { ...change, selected: !change.selected } : change) } : current)}
+            onDismiss={() => setPendingReimbursements(null)} onApply={() => void applyPendingReimbursements()} />}
 
           {pendingPartyActions && (
             <AgentMasterDataChangeCard

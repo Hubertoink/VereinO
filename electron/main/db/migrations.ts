@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import { ensureReimbursementTables } from './reimbursements'
 import { CLASSIFICATION_SCHEME_KEYS, NONPROFIT_SPHERE_KEYS } from '../../../shared/classification'
 type DB = InstanceType<typeof Database>
 
@@ -1789,6 +1790,7 @@ export function applyMigrations(db: DB) {
   ensureBankImportTables(db)
   ensurePartyTables(db)
   ensureRecurringBookingTables(db)
+  ensureReimbursementTables(db)
 
   const applied = getAppliedVersions(db)
   let migrationApplied = false
@@ -1874,5 +1876,6 @@ export function applyMigrations(db: DB) {
     ensureBankImportTables(db)
     ensurePartyTables(db)
     ensureRecurringBookingTables(db)
+    ensureReimbursementTables(db)
   }
 }

@@ -522,6 +522,7 @@ export const AiAgentDraft = z.object({
     'earmarkChange',
     'bankLink',
     'invoiceAction',
+    'reimbursementAction',
     'reportExport'
   ]),
   title: z.string(),

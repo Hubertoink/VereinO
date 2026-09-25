@@ -1,4 +1,7 @@
 import PartyName from '../common/PartyName'
+import ReimbursementsDialog from '../../views/reimbursements/ReimbursementsDialog'
+import type { Reimbursement } from '../../../../shared/reimbursements'
+import { addDataChangedListener } from '../../utils/refresh'
 import './voucherInfoActions.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -94,6 +97,15 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
 )
 
 export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false }: VoucherInfoModalProps) {
+  const [reimbursementDialog, setReimbursementDialog] = useState<{ id?: number; create?: boolean } | null>(null)
+  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([])
+  useEffect(() => {
+    let active = true
+    const load = () => void window.api.reimbursements.list({ voucherId: voucher.id }).then(rows => { if (active) setReimbursements(rows) }).catch(() => { if (active) setReimbursements([]) })
+    setReimbursements([]); setReimbursementDialog(null); load()
+    const unsubscribe = addDataChangedListener(['reimbursements'], load)
+    return () => { active = false; unsubscribe() }
+  }, [voucher.id])
   const [isGeneralProfile, setIsGeneralProfile] = useState(false)
   const [copyMenuOpen, setCopyMenuOpen] = useState(false)
   const copyMenuRef = useRef<HTMLDivElement>(null)
@@ -292,7 +304,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
 
   // Only the active dialog handles Escape; keep drafts while attachments are open.
   useEffect(() => {
-    if (suspended || embedded) return
+    if (suspended || embedded || reimbursementDialog) return
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -301,7 +313,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose, suspended, embedded])
+  }, [onClose, suspended, embedded, reimbursementDialog])
 
   // Kopier-Funktionen
   const copyAsText = () => {
@@ -362,7 +374,7 @@ Status: ${statusLabel}`
       style={embedded ? undefined : {
         position: 'fixed',
         inset: 0,
-        display: suspended ? 'none' : 'flex',
+        display: suspended || reimbursementDialog ? 'none' : 'flex',
         alignItems: windowMode ? 'stretch' : 'center',
         justifyContent: 'center',
         background: windowMode ? 'transparent' : 'color-mix(in oklab, var(--surface) 65%, transparent)',
@@ -475,7 +487,10 @@ Status: ${statusLabel}`
                 <IconDotsVertical size={22} />
               </button>
               {copyMenuOpen && (
-                <div className="voucher-info-actions__menu" role="menu" aria-label="Kopieraktionen">
+                <div className="voucher-info-actions__menu" role="menu" aria-label="Weitere Aktionen">
+                  {!voucher.originalId && !voucher.reversedById && (voucher.type === 'OUT' || voucher.type === 'IN') && <button type="button" className="btn ghost" role="menuitem" onClick={() => { setCopyMenuOpen(false); setReimbursementDialog({ create: voucher.type === 'OUT' }) }}>
+                    <AppIcon icon={IconArrowsExchange} size="action" /><span>{voucher.type === 'OUT' ? 'Erstattung erwarten' : 'Als Erstattung zuordnen'}</span>
+                  </button>}
                   <button type="button" className="btn ghost" role="menuitem" onClick={() => { copyAsText(); setCopyMenuOpen(false); copyMenuButtonRef.current?.focus() }}>
                     <AppIcon icon={IconClipboardText} size="action" />
                     <span>Als Text kopieren</span>
@@ -495,6 +510,7 @@ Status: ${statusLabel}`
 
         {/* Content */}
         <div className="voucher-info-modal__content" style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto', padding: windowMode ? '12px 16px 0' : undefined } as React.CSSProperties}>
+          {!!reimbursements.length && <div className="reimbursement-voucher-links">{reimbursements.map(row => <button key={row.id} className="reimbursement-text-link" onClick={() => setReimbursementDialog({ id: row.id })}>Kostenerstattung: {row.title} · {row.status === 'PAID' ? 'Erstattet' : row.status === 'PARTIAL' ? 'Teilweise erstattet' : 'Offen'} · {eurFmt.format(row.remainingCents / 100)} offen</button>)}</div>}
           <section className="card voucher-info-card voucher-info-summary">
             <div className="voucher-info-summary__main">
               <div className={`voucher-info-amount voucher-info-amount--${voucher.type.toLowerCase()}`}>
@@ -777,5 +793,5 @@ Status: ${statusLabel}`
       </div>
     </div>
   )
-  return embedded ? content : createPortal(content, document.body)
+  return <>{embedded ? content : createPortal(content, document.body)}{reimbursementDialog && <ReimbursementsDialog notify={notify} voucher={voucher} initialId={reimbursementDialog.id} startCreate={reimbursementDialog.create} onClose={() => setReimbursementDialog(null)} onNavigate={onClose} />}</>
 }
