@@ -19,6 +19,7 @@ test.beforeAll(async () => {
       window.editCalls = []
       window.detachedCalls = []
       window.api = {
+        reimbursements: { linkedVoucherIds: async () => [2] },
         organizations: { onSwitched: () => () => {} },
         quickAdd: { openDetached: async payload => { window.detachedCalls.push(payload); return { ok: true } } },
         vouchers: { list: async (filter) => {
@@ -76,6 +77,8 @@ test('selected day and month survive leaving Buchungen Plus', async ({ page }) =
   await page.setContent('<div id="root"></div>')
   await page.addScriptTag({ content: script })
   await expect(page.locator('.bp-row')).toHaveCount(2)
+  await expect(page.locator('.bp-row').filter({ hasText: 'Ausgabe Test' }).getByRole('img', { name: 'Kostenerstattung verknüpft' })).toBeVisible()
+  await expect(page.locator('.bp-row').filter({ hasText: 'Einnahme Test' }).getByRole('img', { name: 'Kostenerstattung verknüpft' })).toHaveCount(0)
   await page.getByRole('button', { name: /09\. Sept\. 2026/ }).click()
   await expect(page.locator('.bp-row')).toHaveCount(1)
   await page.locator('#navigate').click()

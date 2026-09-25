@@ -7,22 +7,19 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-### Geändert
-
-- Sichtbarer Tabellenwechsel zwischen Verbindlichkeiten und Kostenerstattungen, Erstattungskennzeichnung in Buchungen Plus und kompakte Tabellen für Ausgaben und Erstattungszahlungen.
-
-- „Erstattung erwarten“ aus Buchungsdetails nutzt die aktuelle Ausgabe direkt: kompakter Dialog im Stil der Buchungserfassung mit fester Buchungsreferenz, Betrag, Partner und aufklappbaren Zusatzangaben.
-
-- Kostenerstattungsdialoge erscheinen vor den Buchungsdetails; die VereinO-KI kennt die Bedienwege und Grenzen der Kostenerstattungsfunktion.
-
-- Das Datum neuer Verbindlichkeiten bleibt leer und muss bewusst angegeben werden; vorhandene oder aus Belegen erkannte Daten bleiben erhalten.
+## [4.4.0] - 2026-09-25
 
 ### Hinzugefügt
 
-- KI-Werkzeuge zum Lesen und Suchen von Kostenerstattungen und verfügbaren Buchungen sowie zum Vorbereiten von Anlage, Änderungen, Zuordnungen und Löschungen. Änderungen erscheinen zur Freigabe im Chat und werden auf zwischenzeitlich geänderte Daten geprüft.
+- Kostenerstattungen verknüpfen vorhandene Ausgaben mit Rückzahlungen von Kooperationspartnern. Mehrere Ausgaben, Teilzahlungen und aufgeteilte Sammelzahlungen werden mit offenen Restbeträgen nachvollziehbar verwaltet, ohne zusätzliche Finanzbuchungen zu erzeugen.
+- KI-Werkzeuge suchen und lesen Erstattungsvorgänge und bereiten Anlage, Bearbeitung, Zuordnung und Entfernen zur Freigabe im Chat vor. Veraltete Vorschläge und zu hohe Zuordnungen werden abgefangen; mehrere Änderungen werden gemeinsam gespeichert.
+- Sichtbarer Wechsel zwischen Verbindlichkeiten und Kostenerstattungen sowie ein Erstattungssymbol bei verknüpften Buchungen in Buchungen Plus.
 
-- Dezente Kostenerstattungsverwaltung bei den Verbindlichkeiten und in den weiteren Buchungsaktionen: Ausgaben mit Kooperationspartner, Fälligkeit und Erstattungszahlungen verknüpfen.
-- Teil- und Sammelerstattungen mit offenen Restbeträgen und direkten Verweisen auf die zugehörigen Buchungen; ohne zusätzliche Finanzbuchungen.
+### Geändert
+
+- Kompakte Erstattungsdialoge mit Datum, Buchungsreferenz, Teilbetrag und optionalen Zusatzangaben. Beim Einstieg aus Buchungsdetails wird die aktuelle Ausgabe direkt übernommen.
+- Erstattungsübersichten verwenden den Tabellenstil der Verbindlichkeiten und einen Statusfilter. Die Tabelle bleibt hinter geöffneten Details sichtbar.
+- Das Datum neuer Verbindlichkeiten bleibt leer und muss bewusst angegeben werden. Vorhandene und aus Belegen erkannte Daten bleiben erhalten.
 
 ## [4.3.0] - 2026-09-25
 
