@@ -65,7 +65,8 @@ export const VoucherCreateInput = z
     earmarks: z.array(VoucherEarmarkAssignment).optional(),
     files: z.array(UploadFileInput).optional(),
     tags: z.array(z.string()).optional(),
-    bankTransactionId: z.number().int().positive().optional()
+    bankTransactionId: z.number().int().positive().optional(),
+    acknowledgedBankVoucherIds: z.array(z.number().int().positive()).optional()
   })
   .refine((v) => v.netAmount != null || v.grossAmount != null, {
     message: 'Either netAmount or grossAmount must be provided'
@@ -1160,7 +1161,7 @@ const BankImportDuplicateRow = z.object({
   purpose: z.string().nullable(),
   endToEndId: z.string().nullable(),
   bankReference: z.string().nullable(),
-  duplicateBy: z.enum(['REFERENCE', 'FINGERPRINT']),
+  duplicateBy: z.enum(['REFERENCE', 'FINGERPRINT', 'POTENTIAL']),
   duplicateValue: z.string(),
   existing: z.object({
     id: z.number(),
@@ -1248,7 +1249,10 @@ export const BankImportStatusOutput = z.object({
     })
   )
 })
-export const BankTransactionMatchesOutput = z.object({ rows: z.array(z.record(z.any())) })
+export const BankTransactionMatchesOutput = z.object({
+  rows: z.array(z.record(z.any())),
+  alreadyLinked: z.array(z.record(z.any()))
+})
 
 export type TBankImportPreviewInput = z.infer<typeof BankImportPreviewInput>
 export type TBankImportPreviewOutput = z.infer<typeof BankImportPreviewOutput>

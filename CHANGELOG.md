@@ -7,6 +7,15 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-09-25
+
+### Behoben
+
+- Die manuelle Bankzuordnung zeigt nur Buchungen desselben Zahlkontos.
+- Bereits zugeordnete Buchungen bleiben mit Hinweis auf den bestehenden Bankbeleg sichtbar, statt aus der Suche zu verschwinden.
+- Bei möglichen Doppelbuchungen muss eine zusätzliche Buchung ausdrücklich bestätigt werden. Die Prüfung erfolgt auch beim Speichern und bei KI-Vorschlägen.
+- Die Duplikaterkennung beim Bankimport berücksichtigt unterschiedliche Exportfelder und fehlende Referenzen. Mögliche Duplikate werden zur Prüfung zurückgehalten und können bewusst importiert werden.
+
 ## [4.2.0] - 2026-09-24
 
 ### Hinzugefügt

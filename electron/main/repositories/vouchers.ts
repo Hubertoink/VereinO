@@ -8,7 +8,7 @@ import { nextVoucherSequence, makeVoucherNo } from '../services/numbering'
 import { writeAudit } from '../services/audit'
 import { ensureTag, getTagsForVoucher, setVoucherTags } from './tags'
 import { getDefaultPaymentAccountIdForMethod, getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
-import { linkBankTransaction } from './bankTransactions'
+import { assertBankBookingCreationReviewed, linkBankTransaction } from './bankTransactions'
 import { filePayloadToBuffer } from '../services/filePayload'
 import { getOrganizationProfileDefinition, resolvePrimaryClassificationValueId } from './classifications'
 import type { FileDataPayload, UploadFilePayload } from '../../../shared/filePayload'
@@ -296,8 +296,12 @@ export function createVoucher(input: {
     files?: UploadFilePayload[]
     tags?: string[]
     bankTransactionId?: number
+    acknowledgedBankVoucherIds?: number[]
 }) {
     return withTransaction((d: DB) => {
+        if (input.bankTransactionId) {
+            assertBankBookingCreationReviewed(input.bankTransactionId, input.acknowledgedBankVoucherIds)
+        }
         const warnings: string[] = []
         ensurePeriodOpen(input.date, d)
         const date = new Date(input.date)

@@ -150,7 +150,7 @@ type ImportCommitResult = {
     purpose?: string | null
     endToEndId?: string | null
     bankReference?: string | null
-    duplicateBy: 'REFERENCE' | 'FINGERPRINT'
+    duplicateBy: 'REFERENCE' | 'FINGERPRINT' | 'POTENTIAL'
     duplicateValue: string
     existing: {
       id: number
@@ -171,6 +171,7 @@ type ImportCommitResult = {
 
 type BankTransactionMatch = {
   id: number
+  linkedBankTransactionId?: number | null
   matchKind?: 'VOUCHER' | 'RECURRING'
   voucherNo?: string | null
   date?: string | null
@@ -193,7 +194,7 @@ type BankTransactionMatch = {
 type Props = {
   paymentAccounts: PaymentAccount[]
   notify: (type: 'success' | 'error' | 'info', text: string) => void
-  onCreateBooking: (transaction: BankTransaction) => void
+  onCreateBooking: (transaction: BankTransaction, acknowledgedBankVoucherIds?: number[]) => void
   onOpenVoucher: (voucherId: number, voucherNo?: string | null, date?: string) => void
 }
 
@@ -518,7 +519,8 @@ function MappingSelect({
   )
 }
 
-function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
+function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT' | 'POTENTIAL') {
+  if (reason === 'POTENTIAL') return 'Mögliches Duplikat: gleiche Umsatzdaten'
   return reason === 'REFERENCE'
     ? 'Bankreferenz / End-to-End-ID'
     : 'Fingerprint aus Konto, Datum, Betrag und Text'
@@ -633,7 +635,7 @@ function ManualAssignmentModal({
         q: query || undefined,
         manual: true
       })
-      setResults(result.rows as BankTransactionMatch[])
+      setResults([...result.rows, ...result.alreadyLinked] as BankTransactionMatch[])
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
     } finally {
@@ -650,7 +652,7 @@ function ManualAssignmentModal({
 
   useEffect(() => {
     setSelectedVoucherId((current) =>
-      current && results.some((row) => row.id === current) ? current : null
+      current && results.some((row) => row.id === current && !row.linkedBankTransactionId) ? current : null
     )
   }, [results])
 
@@ -683,7 +685,8 @@ function ManualAssignmentModal({
               autoFocus
             />
             <span className="helper">
-              Hier siehst du alle Buchungen rund um den Zeitraum. Die Entscheidung triffst du
+              Hier siehst du Buchungen desselben Zahlkontos im Abstand
+              von bis zu 31 Tagen zum Buchungs- oder Wertstellungsdatum. Die Entscheidung triffst du
               manuell.
             </span>
           </div>
@@ -711,11 +714,12 @@ function ManualAssignmentModal({
                     <tr
                       key={match.id}
                       className={selectedVoucherId === match.id ? 'is-selected' : undefined}
-                      onClick={() => setSelectedVoucherId(match.id)}
+                      onClick={() => !match.linkedBankTransactionId && setSelectedVoucherId(match.id)}
                     >
                       <td>
                         <input
                           type="radio"
+                          disabled={!!match.linkedBankTransactionId}
                           name={`manual-assign-${transaction.id}`}
                           checked={selectedVoucherId === match.id}
                           onChange={() => setSelectedVoucherId(match.id)}
@@ -727,6 +731,11 @@ function ManualAssignmentModal({
                         <div className="bank-manual-assign-description">
                           <strong>{match.voucherNo || `#${match.id}`}</strong>
                           <span>{match.description || 'Ohne Beschreibung'}</span>
+                          {match.linkedBankTransactionId && (
+                            <span className="bank-match-warning">
+                              Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet – nicht erneut zuweisbar.
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>{euro.format(Number(match.grossAmount ?? transaction.amount ?? 0))}</td>
@@ -1457,6 +1466,9 @@ function BankReviewModal({
   notify: Props['notify']
 }) {
   const [matches, setMatches] = useState<BankTransactionMatch[]>([])
+  const [alreadyLinked, setAlreadyLinked] = useState<BankTransactionMatch[]>([])
+  const [matchesLoaded, setMatchesLoaded] = useState(false)
+  const [duplicateReviewed, setDuplicateReviewed] = useState(false)
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
@@ -1466,11 +1478,15 @@ function BankReviewModal({
   const loadMatches = useCallback(async () => {
     if (transaction.status !== 'OPEN') return
     setLoading(true)
+    setMatchesLoaded(false)
+    setDuplicateReviewed(false)
     try {
       const result = await window.api.bankTransactions.matches({
         id: transaction.id
       })
       setMatches(result.rows as BankTransactionMatch[])
+      setAlreadyLinked(result.alreadyLinked as BankTransactionMatch[])
+      setMatchesLoaded(true)
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
     } finally {
@@ -1579,9 +1595,10 @@ function BankReviewModal({
                     <>
                       <button
                         className="btn"
+                        disabled={busy || loading || !matchesLoaded || (alreadyLinked.length > 0 && !duplicateReviewed)}
                         onClick={() => {
                           setActionMenuOpen(false)
-                          onCreateBooking(transaction)
+                          onCreateBooking(transaction, duplicateReviewed ? alreadyLinked.map((match) => match.id) : [])
                           onClose()
                         }}
                       >
@@ -1686,6 +1703,34 @@ function BankReviewModal({
 
         {transaction.status === 'OPEN' ? (
           <div className="bank-review-layout">
+            {!loading && alreadyLinked.length > 0 && (
+              <section className="bank-review-section" aria-label="Bereits zugeordnete Buchungen">
+                <strong>Mögliche Doppelbuchung: passende Buchungen sind bereits zugeordnet</strong>
+                <p>Prüfe die bestehenden Zuordnungen, bevor du eine weitere Buchung anlegst.
+                  Falls dieser Bankbeleg denselben Umsatz erneut enthält, kannst du ihn ohne neue Buchung erledigen.</p>
+                {alreadyLinked.map((match) => (
+                  <div className="bank-match-row" key={match.id}>
+                    <div>
+                      <strong>{match.voucherNo} · {euro.format(Number(match.grossAmount))}</strong>
+                      <span>{formatDate(match.date)} · {match.description}</span>
+                      <span className="bank-match-warning">Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet</span>
+                    </div>
+                    <button className="btn" onClick={() => {
+                      onOpenVoucher(match.id, match.voucherNo, match.date || undefined)
+                      onClose()
+                    }}>Buchung öffnen</button>
+                  </div>
+                ))}
+                <button className="btn" disabled={busy} onClick={() => {
+                  onCheckWithoutBooking(transaction)
+                  onClose()
+                }}>Ohne neue Buchung erledigen</button>
+                <label className="helper">
+                  <input type="checkbox" checked={duplicateReviewed} onChange={(event) => setDuplicateReviewed(event.target.checked)} />
+                  Ich habe die Zuordnungen geprüft. Dies ist ein zusätzlicher Umsatz, für den eine neue Buchung nötig ist.
+                </label>
+              </section>
+            )}
             <section className="bank-review-section">
               <div className="bank-section-title">
                 <div className="bank-section-title__label">
@@ -1715,7 +1760,9 @@ function BankReviewModal({
                     />
                   ))}
                 {!loading && matches.length === 0 && (
-                  <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>
+                  <div className="bank-empty-small">{alreadyLinked.length
+                    ? 'Keine weitere, noch nicht zugeordnete Buchung gefunden.'
+                    : 'Keine kompatible Buchung gefunden.'}</div>
                 )}
               </div>
             </section>

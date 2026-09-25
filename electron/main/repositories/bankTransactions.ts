@@ -9,7 +9,7 @@ import { materializeDueOccurrences } from './recurringOccurrences'
 
 type DB = InstanceType<typeof Database>
 type BankStatus = 'OPEN' | 'LINKED' | 'CHECKED'
-type DuplicateReason = 'REFERENCE' | 'FINGERPRINT'
+type DuplicateReason = 'REFERENCE' | 'FINGERPRINT' | 'POTENTIAL'
 
 function round2(value: number) {
   return Math.round(Number(value) * 100) / 100
@@ -31,7 +31,7 @@ function jsonValue<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
-function meaningfulReference(row: ParsedBankTransaction) {
+function meaningfulReference(row: Pick<ParsedBankTransaction, 'bankReference' | 'endToEndId'>) {
   const candidates = [row.bankReference, row.endToEndId]
   return candidates.find((value) => {
     const key = normalized(value)
@@ -69,8 +69,9 @@ function duplicateValueFor(row: ParsedBankTransaction) {
   ].join(' | ')
 }
 
-function existingTransactionForFingerprint(d: DB, fingerprint: string) {
-  return d.prepare(`
+function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number) {
+  const fingerprint = fingerprintFor(row, paymentAccountId)
+  const candidates = d.prepare(`
     SELECT
       bt.id,
       bt.status,
@@ -78,6 +79,8 @@ function existingTransactionForFingerprint(d: DB, fingerprint: string) {
       bt.direction,
       bt.amount,
       bt.counterparty,
+      bt.counterparty_iban as counterpartyIban,
+      bt.fingerprint,
       bt.purpose,
       bt.end_to_end_id as endToEndId,
       bt.bank_reference as bankReference,
@@ -86,16 +89,42 @@ function existingTransactionForFingerprint(d: DB, fingerprint: string) {
     FROM bank_transactions bt
     JOIN payment_accounts pa ON pa.id = bt.payment_account_id
     JOIN bank_import_batches bib ON bib.id = bt.batch_id
-    WHERE bt.fingerprint = ?
-    ORDER BY bt.id DESC
-    LIMIT 1
-  `).get(fingerprint) as Record<string, any> | undefined
+    WHERE bt.fingerprint = ? OR (
+      bt.payment_account_id = ? AND bt.booking_date = ? AND bt.direction = ?
+      AND ROUND(bt.amount, 2) = ROUND(?, 2) AND bt.currency = ?
+    )
+    ORDER BY CASE WHEN bt.fingerprint = ? THEN 0 ELSE 1 END, bt.id DESC
+  `).all(fingerprint, paymentAccountId, row.bookingDate, row.direction, row.amount, row.currency, fingerprint) as Record<string, any>[]
+  const contentKey = (value?: string | null) => normalized(value).replace(/[^\p{L}\p{N}]/gu, '')
+  for (const existing of candidates) {
+    if (existing.fingerprint === fingerprint) return { existing, duplicateBy: duplicateReasonFor(row) }
+    // Exports may omit one reference or prefer the bank reference over End-to-End-ID.
+    const referenceKeys = ['bankReference', 'endToEndId'] as const
+    const knownReferences = referenceKeys.filter((key) => meaningfulReference({ bankReference: row[key] })
+      && meaningfulReference({ bankReference: existing[key] }))
+    if (knownReferences.includes('bankReference') && normalized(row.bankReference) !== normalized(existing.bankReference)) continue
+    if (knownReferences.some((key) => normalized(row[key]) === normalized(existing[key]))) {
+      return { existing, duplicateBy: 'REFERENCE' as const }
+    }
+    if (knownReferences.length) continue
+    // Missing CSV fields must not defeat the comparison with a richer CAMT export.
+    // Amount/date alone are deliberately insufficient: recurring contributions can coincide.
+    const purpose = contentKey(row.purpose)
+    if (!purpose || purpose !== contentKey(existing.purpose)) continue
+    if (['counterparty', 'counterpartyIban'].some((key) => {
+      const incoming = contentKey(row[key as 'counterparty' | 'counterpartyIban'])
+      const previous = contentKey(existing[key])
+      return incoming && previous && incoming !== previous
+    })) continue
+    return { existing, duplicateBy: 'POTENTIAL' as const }
+  }
+  return null
 }
 
 function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number) {
-  const fingerprint = fingerprintFor(row, paymentAccountId)
-  const existing = existingTransactionForFingerprint(d, fingerprint)
-  if (!existing) return null
+  const duplicate = existingTransactionForRow(d, row, paymentAccountId)
+  if (!duplicate) return null
+  const { existing, duplicateBy } = duplicate
   return {
     sourceRow: row.sourceRow,
     bookingDate: row.bookingDate,
@@ -107,7 +136,7 @@ function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccount
     purpose: row.purpose ?? null,
     endToEndId: row.endToEndId ?? null,
     bankReference: row.bankReference ?? null,
-    duplicateBy: duplicateReasonFor(row),
+    duplicateBy,
     duplicateValue: duplicateValueFor(row),
     existing
   }
@@ -211,11 +240,10 @@ export function commitBankImport(input: {
         continue
       }
       const fingerprint = fingerprintFor(row, paymentAccountId)
-      const existing = d.prepare('SELECT id FROM bank_transactions WHERE fingerprint = ?').get(fingerprint) as { id: number } | undefined
-      if (existing && !forcedRows.has(row.sourceRow)) {
+      const duplicate = duplicateRecordForRow(d, row, paymentAccountId)
+      if (duplicate && !forcedRows.has(row.sourceRow)) {
         duplicates++
-        const duplicate = duplicateRecordForRow(d, row, paymentAccountId)
-        if (duplicate) duplicateRows.push(duplicate)
+        duplicateRows.push(duplicate)
         continue
       }
       const inserted = insert.run(
@@ -642,6 +670,7 @@ export function findBankTransactionMatches(input: {
   manual?: boolean
   forAiReview?: boolean
   recurringOccurrencesMaterialized?: boolean
+  linkedOnly?: boolean
 }) {
   const d = getDb()
   const transaction = getBankTransaction(input.id) as any
@@ -651,10 +680,16 @@ export function findBankTransactionMatches(input: {
   const valueDate = transaction.valueDate || transaction.bookingDate
   const where = [
     `v.reversed_by_id IS NULL`,
-    `NOT EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
+    `${input.linkedOnly ? '' : 'NOT '}EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
   ]
   const params: unknown[] = [input.id]
+  if (input.linkedOnly) {
+    where.push(`v.payment_account_id = ?`)
+    params.push(transaction.paymentAccountId)
+  }
   if (manual) {
+    where.push(`v.payment_account_id = ?`)
+    params.push(transaction.paymentAccountId)
     where.push(`${dateDistanceSql} <= 31`)
     params.push(transaction.bookingDate, valueDate)
   } else {
@@ -673,6 +708,7 @@ export function findBankTransactionMatches(input: {
     SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.description, v.note,
       v.gross_amount as grossAmount, v.payment_account_id as paymentAccountId,
       pa.name as paymentAccountName, pa.color as paymentAccountColor,
+      (SELECT other.id FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ? ORDER BY other.id LIMIT 1) as linkedBankTransactionId,
       ro.id as recurringOccurrenceId, rb.id as recurringBookingId,
       rb.name as recurringBookingName
     FROM vouchers v
@@ -683,7 +719,7 @@ export function findBankTransactionMatches(input: {
     ORDER BY ${manual ? '' : 'CASE WHEN v.payment_account_id = ? THEN 0 ELSE 1 END,'}
       ${dateDistanceSql} ASC, v.date DESC, v.id DESC
     LIMIT 100
-  `).all(...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
+  `).all(input.id, ...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
 
   const sourceWords = wordSet([transaction.counterparty, transaction.purpose].filter(Boolean).join(' '))
   const voucherMatches = rows.map((row) => {
@@ -718,7 +754,7 @@ export function findBankTransactionMatches(input: {
     return a.dateDistance - b.dateDistance || b.score - a.score
   })
 
-  if (manual) return voucherMatches
+  if (manual || input.linkedOnly) return voucherMatches
 
   // A close existing voucher is the safest target. In particular, do not offer the next
   // recurring period when the bank transaction most likely belongs to the one just booked.
@@ -810,4 +846,13 @@ export function findBankTransactionMatches(input: {
   return [...recurringMatches, ...voucherMatches]
     .sort((a: any, b: any) => b.score - a.score || a.dateDistance - b.dateDistance)
     .slice(0, 100)
+}
+
+export function assertBankBookingCreationReviewed(id: number, acknowledgedVoucherIds: number[] = []) {
+  const unreviewed = findBankTransactionMatches({ id, linkedOnly: true })
+    .filter((match) => !acknowledgedVoucherIds.includes(match.id))
+  if (unreviewed.length) {
+    const match = unreviewed[0]
+    throw new Error(`Mögliche Doppelbuchung: Buchung ${match.voucherNo} ist bereits Bankbeleg #${match.linkedBankTransactionId} zugeordnet. Bitte im Bankimport prüfen und eine zusätzliche Buchung dort ausdrücklich bestätigen.`)
+  }
 }

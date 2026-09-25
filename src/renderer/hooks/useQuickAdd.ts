@@ -33,6 +33,7 @@ type QA = {
     earmarksAssigned?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
     bankTransactionId?: number
+    acknowledgedBankVoucherIds?: number[]
 }
 
 type QuickAddDraft = {
@@ -446,6 +447,7 @@ export function useQuickAdd(
         if (Array.isArray((activeDraft.qa as any).tags)) payload.tags = (activeDraft.qa as any).tags
         if (typeof (activeDraft.qa as any).bankTransactionId === 'number') {
             payload.bankTransactionId = (activeDraft.qa as any).bankTransactionId
+            payload.acknowledgedBankVoucherIds = activeDraft.qa.acknowledgedBankVoucherIds
         }
 
         if (activeDraft.files.length) {

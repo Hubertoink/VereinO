@@ -1074,6 +1074,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         bankReference: transaction.bankReference,
         paymentAccountId: transaction.paymentAccountId,
         paymentAccountName: transaction.paymentAccountName,
+        alreadyLinked: findBankTransactionMatches({ id: transaction.id, linkedOnly: true }),
         matches
       }
     })
@@ -1100,6 +1101,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       .map((suggestion) => {
         const transaction = transactionById.get(Number(suggestion.transactionId))
         const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
+        const alreadyLinked = transactions.find((row) => row.id === Number(suggestion.transactionId))?.alreadyLinked || []
+        if (alreadyLinked.length && (suggestion.action === 'CREATE_BOOKING' || suggestion.action === 'APPLY_RECURRING')) {
+          return {
+            ...suggestion,
+            action: 'NEEDS_MANUAL_REVIEW' as const,
+            bookingCandidate: null,
+            reason: `Mögliche Doppelbuchung: ${alreadyLinked.map((match) => `${match.voucherNo} (Bankbeleg #${match.linkedBankTransactionId})`).join(', ')} bereits zugeordnet. Bitte bestehende Zuordnungen im Bankimport prüfen.`,
+            transaction
+          }
+        }
         if (suggestion.action === 'LINK_EXISTING') {
           const match = matches.find(
             (item: any) => item.matchKind === 'VOUCHER' && Number(item.id) === Number(suggestion.voucherId)
@@ -2614,7 +2625,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
   ipcMain.handle('bankTransactions.matches', async (_e, payload) => {
     const parsed = BankTransactionMatchesInput.parse(payload)
-    return BankTransactionMatchesOutput.parse({ rows: findBankTransactionMatches(parsed) })
+    return BankTransactionMatchesOutput.parse({
+      rows: findBankTransactionMatches(parsed),
+      alreadyLinked: findBankTransactionMatches({ ...parsed, linkedOnly: true })
+    })
   })
   ipcMain.handle('bankTransactions.link', async (_e, payload) => {
     const parsed = BankTransactionLinkInput.parse(payload)
