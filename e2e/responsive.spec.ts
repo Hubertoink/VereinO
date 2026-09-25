@@ -143,6 +143,7 @@ test('core views and compact booking flyout fit a small tile', async () => {
   await page.locator('.fab-buchung').click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await screenshot('booking-640-short')
   await expectFits('[role="dialog"]')
   await dialog.getByRole('button', { name: 'Buchungskonto wählen' }).click()
@@ -180,6 +181,7 @@ test('dialog and detached entry remain usable at 640 pixels', async () => {
   await page.locator('.fab-buchung').click()
   const dialog = page.locator('.quick-add-modal')
   await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   for (const width of [960, 800, 640, 629]) {
     await page.setViewportSize({ width, height: 560 })
     await dialog.locator('form').evaluate((el) => {
@@ -217,6 +219,7 @@ test('dialog and detached entry remain usable at 640 pixels', async () => {
   await detached.setViewportSize({ width: 640, height: 560 })
   const detachedDialog = detached.locator('.detached-quick-add-modal')
   await expect(detachedDialog).toBeVisible()
+  await detachedDialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await detachedDialog.locator('form').evaluate((el) => {
     el.scrollTop = 0
   })

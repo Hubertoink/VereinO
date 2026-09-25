@@ -3821,7 +3821,7 @@ function AppInner() {
             <BankImportView
               paymentAccounts={paymentAccounts}
               notify={notify}
-              onCreateBooking={(transaction) => {
+              onCreateBooking={(transaction, acknowledgedBankVoucherIds) => {
                 openQuickAdd({
                   qa: {
                     date: transaction.bookingDate,
@@ -3840,7 +3840,8 @@ function AppInner() {
                     paymentMethod: 'BANK',
                     paymentAccountId: transaction.paymentAccountId,
                     paymentAccountName: transaction.paymentAccountName,
-                    bankTransactionId: transaction.id
+                    bankTransactionId: transaction.id,
+                    acknowledgedBankVoucherIds
                   }
                 })
               }}

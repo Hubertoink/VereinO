@@ -9,7 +9,7 @@ import { materializeDueOccurrences } from './recurringOccurrences'
 
 type DB = InstanceType<typeof Database>
 type BankStatus = 'OPEN' | 'LINKED' | 'CHECKED'
-type DuplicateReason = 'REFERENCE' | 'FINGERPRINT'
+type DuplicateReason = 'REFERENCE' | 'FINGERPRINT' | 'RAW' | 'POTENTIAL'
 
 function round2(value: number) {
   return Math.round(Number(value) * 100) / 100
@@ -31,7 +31,7 @@ function jsonValue<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
-function meaningfulReference(row: ParsedBankTransaction) {
+function meaningfulReference(row: Pick<ParsedBankTransaction, 'bankReference' | 'endToEndId'>) {
   const candidates = [row.bankReference, row.endToEndId]
   return candidates.find((value) => {
     const key = normalized(value)
@@ -69,8 +69,19 @@ function duplicateValueFor(row: ParsedBankTransaction) {
   ].join(' | ')
 }
 
-function existingTransactionForFingerprint(d: DB, fingerprint: string) {
-  return d.prepare(`
+// Compare the complete source row independently of the user's column mapping.
+function rawKey(raw: Record<string, unknown>): string | null {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical)
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)]))
+    return typeof value === 'string' ? value.trim() : value
+  }
+  return raw && Object.keys(raw).length ? JSON.stringify(canonical(raw)) : null
+}
+
+function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
+  const fingerprint = fingerprintFor(row, paymentAccountId)
+  const candidates = d.prepare(`
     SELECT
       bt.id,
       bt.status,
@@ -78,6 +89,9 @@ function existingTransactionForFingerprint(d: DB, fingerprint: string) {
       bt.direction,
       bt.amount,
       bt.counterparty,
+      bt.counterparty_iban as counterpartyIban,
+      bt.fingerprint,
+      bt.raw_json as rawJson,
       bt.purpose,
       bt.end_to_end_id as endToEndId,
       bt.bank_reference as bankReference,
@@ -86,16 +100,36 @@ function existingTransactionForFingerprint(d: DB, fingerprint: string) {
     FROM bank_transactions bt
     JOIN payment_accounts pa ON pa.id = bt.payment_account_id
     JOIN bank_import_batches bib ON bib.id = bt.batch_id
-    WHERE bt.fingerprint = ?
-    ORDER BY bt.id DESC
-    LIMIT 1
-  `).get(fingerprint) as Record<string, any> | undefined
+    WHERE bt.payment_account_id = ? AND bt.booking_date = ? AND bt.direction = ?
+      AND ROUND(bt.amount, 2) = ROUND(?, 2) AND bt.currency = ?
+    ORDER BY CASE WHEN bt.fingerprint = ? THEN 0 ELSE 1 END, bt.id DESC
+  `).all(paymentAccountId, row.bookingDate, row.direction, row.amount, row.currency, fingerprint) as Record<string, any>[]
+  for (const existing of candidates) {
+    if (consumed.has(Number(existing.id))) continue
+    const original = rawKey(row.raw)
+    if (original && original === rawKey(jsonValue(existing.rawJson, {}))) return { existing, duplicateBy: 'RAW' as const }
+    if (existing.fingerprint === fingerprint || fingerprintFor(existing as ParsedBankTransaction, paymentAccountId) === fingerprint) return { existing, duplicateBy: duplicateReasonFor(row) }
+    // Exports may omit one reference or prefer the bank reference over End-to-End-ID.
+    const referenceKeys = ['bankReference', 'endToEndId'] as const
+    const knownReferences = referenceKeys.filter((key) => meaningfulReference({ bankReference: row[key] })
+      && meaningfulReference({ bankReference: existing[key] }))
+    if (knownReferences.includes('bankReference') && normalized(row.bankReference) !== normalized(existing.bankReference)) continue
+    if (knownReferences.some((key) => normalized(row[key]) === normalized(existing[key]))) {
+      return { existing, duplicateBy: 'REFERENCE' as const }
+    }
+    if (knownReferences.length) continue
+    // Without a reliable identity, matching core data is only a review candidate.
+    if (!allowPotential) continue
+    return { existing, duplicateBy: 'POTENTIAL' as const }
+  }
+  return null
 }
 
-function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number) {
-  const fingerprint = fingerprintFor(row, paymentAccountId)
-  const existing = existingTransactionForFingerprint(d, fingerprint)
-  if (!existing) return null
+function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
+  const duplicate = existingTransactionForRow(d, row, paymentAccountId, consumed, allowPotential)
+  if (!duplicate) return null
+  const { existing, duplicateBy } = duplicate
+  consumed.add(Number(existing.id))
   return {
     sourceRow: row.sourceRow,
     bookingDate: row.bookingDate,
@@ -107,7 +141,7 @@ function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccount
     purpose: row.purpose ?? null,
     endToEndId: row.endToEndId ?? null,
     bankReference: row.bankReference ?? null,
-    duplicateBy: duplicateReasonFor(row),
+    duplicateBy,
     duplicateValue: duplicateValueFor(row),
     existing
   }
@@ -142,13 +176,21 @@ export function previewBankImport(input: {
 }) {
   const parsed = parseBankStatement(input.fileBase64, input.fileName, input.mapping)
   const paymentAccountId = resolvePaymentAccountId(parsed, input.paymentAccountId)
+  const duplicateRows = paymentAccountId ? [...importDuplicates(getDb(), parsed.rows, paymentAccountId).values()] : []
+  const purposeColumn = parsed.headers.find((header) => /verwendungszweck/i.test(header))
+  const selectedPurpose = input.mapping?.purpose === undefined ? parsed.suggestedMapping.purpose : input.mapping.purpose
+  const warnings = purposeColumn && selectedPurpose !== purposeColumn
+    ? [`Die Spalte „${purposeColumn}“ ist vorhanden, wird aber nicht als Verwendungszweck verwendet. Bitte prüfe die Spaltenzuordnung.`]
+    : []
   return {
     format: parsed.format,
     headers: parsed.headers,
     suggestedMapping: parsed.suggestedMapping,
     accountIbans: parsed.accountIbans,
     detectedPaymentAccountId: paymentAccountId,
-    rows: parsed.rows.slice(0, 200).map((row) => ({
+    duplicateRows,
+    warnings,
+    rows: parsed.rows.map((row) => ({
       sourceRow: row.sourceRow,
       bookingDate: row.bookingDate,
       valueDate: row.valueDate ?? null,
@@ -176,6 +218,7 @@ export function commitBankImport(input: {
   paymentAccountId?: number | null
   mapping?: BankCsvMapping
   forceImportSourceRows?: number[]
+  additionalImportSourceRows?: number[]
 }) {
   return withTransaction((d: DB) => {
     const parsed = parseBankStatement(input.fileBase64, input.fileName, input.mapping)
@@ -183,6 +226,9 @@ export function commitBankImport(input: {
     if (!paymentAccountId) throw new Error('Bitte wähle das Zahlkonto für diesen Import.')
     validatePaymentAccount(paymentAccountId, d)
     const forcedRows = new Set((input.forceImportSourceRows || []).map((row) => Number(row)).filter((row) => Number.isFinite(row) && row > 0))
+    const additionalRows = new Set(input.additionalImportSourceRows || [])
+    // Snapshot all matches before inserting: repeated source rows represent separate occurrences.
+    const duplicateMatches = importDuplicates(d, parsed.rows, paymentAccountId)
     const rowsToProcess = forcedRows.size > 0
       ? parsed.rows.filter((row) => forcedRows.has(row.sourceRow))
       : parsed.rows
@@ -210,13 +256,16 @@ export function commitBankImport(input: {
         errors.push({ row: row.sourceRow, message: row.errors.join(' ') })
         continue
       }
-      const fingerprint = fingerprintFor(row, paymentAccountId)
-      const existing = d.prepare('SELECT id FROM bank_transactions WHERE fingerprint = ?').get(fingerprint) as { id: number } | undefined
-      if (existing && !forcedRows.has(row.sourceRow)) {
+      let fingerprint = fingerprintFor(row, paymentAccountId)
+      const duplicate = duplicateMatches.get(row.sourceRow)
+      if (duplicate && !forcedRows.has(row.sourceRow) && !additionalRows.has(row.sourceRow)) {
         duplicates++
-        const duplicate = duplicateRecordForRow(d, row, paymentAccountId)
-        if (duplicate) duplicateRows.push(duplicate)
+        duplicateRows.push(duplicate)
         continue
+      }
+      // The legacy unique index remains valid while allowing confirmed/additional occurrences.
+      if (d.prepare('SELECT 1 FROM bank_transactions WHERE fingerprint = ?').get(fingerprint)) {
+        fingerprint = hash(`${fingerprint}|occurrence|${batchId}|${row.sourceRow}`)
       }
       const inserted = insert.run(
         batchId,
@@ -249,7 +298,8 @@ export function commitBankImport(input: {
       imported,
       duplicates,
       errorCount: errors.length,
-      forcedImportSourceRows: Array.from(forcedRows)
+      forcedImportSourceRows: Array.from(forcedRows),
+      additionalImportSourceRows: Array.from(additionalRows)
     })
     return { batchId, imported, importedTransactionIds, duplicates, duplicateRows, errors }
   })
@@ -425,10 +475,11 @@ export function listBankTransactions(input: {
   if (hasOpenRows) materializeDueOccurrences(d)
   const rowsWithMatchScore = rows.map((row) => {
     const transaction = withAiSuggestion(row)
-    if (transaction.status !== 'OPEN') return { ...transaction, matchScore: null }
+    if (transaction.status !== 'OPEN') return { ...transaction, matchScore: null, possibleDuplicateCount: 0 }
     const bestScore = findBankTransactionMatches({ id: Number(row.id), recurringOccurrencesMaterialized: hasOpenRows })
       .reduce((best, match: any) => Math.max(best, Number(match.score || 0)), 0)
-    return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null }
+    const possibleDuplicateCount = findBankTransactionMatches({ id: Number(row.id), linkedOnly: true }).length
+    return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null, possibleDuplicateCount }
   })
   const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>
   const stats = { total: 0, open: 0, linked: 0, checked: 0 }
@@ -642,6 +693,7 @@ export function findBankTransactionMatches(input: {
   manual?: boolean
   forAiReview?: boolean
   recurringOccurrencesMaterialized?: boolean
+  linkedOnly?: boolean
 }) {
   const d = getDb()
   const transaction = getBankTransaction(input.id) as any
@@ -651,10 +703,16 @@ export function findBankTransactionMatches(input: {
   const valueDate = transaction.valueDate || transaction.bookingDate
   const where = [
     `v.reversed_by_id IS NULL`,
-    `NOT EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
+    `${input.linkedOnly ? '' : 'NOT '}EXISTS (SELECT 1 FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ?)`
   ]
   const params: unknown[] = [input.id]
+  if (input.linkedOnly) {
+    where.push(`v.payment_account_id = ?`)
+    params.push(transaction.paymentAccountId)
+  }
   if (manual) {
+    where.push(`v.payment_account_id = ?`)
+    params.push(transaction.paymentAccountId)
     where.push(`${dateDistanceSql} <= 31`)
     params.push(transaction.bookingDate, valueDate)
   } else {
@@ -673,6 +731,7 @@ export function findBankTransactionMatches(input: {
     SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.description, v.note,
       v.gross_amount as grossAmount, v.payment_account_id as paymentAccountId,
       pa.name as paymentAccountName, pa.color as paymentAccountColor,
+      (SELECT other.id FROM bank_transactions other WHERE other.voucher_id = v.id AND other.id <> ? ORDER BY other.id LIMIT 1) as linkedBankTransactionId,
       ro.id as recurringOccurrenceId, rb.id as recurringBookingId,
       rb.name as recurringBookingName
     FROM vouchers v
@@ -683,7 +742,7 @@ export function findBankTransactionMatches(input: {
     ORDER BY ${manual ? '' : 'CASE WHEN v.payment_account_id = ? THEN 0 ELSE 1 END,'}
       ${dateDistanceSql} ASC, v.date DESC, v.id DESC
     LIMIT 100
-  `).all(...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
+  `).all(input.id, ...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
 
   const sourceWords = wordSet([transaction.counterparty, transaction.purpose].filter(Boolean).join(' '))
   const voucherMatches = rows.map((row) => {
@@ -718,7 +777,7 @@ export function findBankTransactionMatches(input: {
     return a.dateDistance - b.dateDistance || b.score - a.score
   })
 
-  if (manual) return voucherMatches
+  if (manual || input.linkedOnly) return voucherMatches
 
   // A close existing voucher is the safest target. In particular, do not offer the next
   // recurring period when the bank transaction most likely belongs to the one just booked.
@@ -810,4 +869,27 @@ export function findBankTransactionMatches(input: {
   return [...recurringMatches, ...voucherMatches]
     .sort((a: any, b: any) => b.score - a.score || a.dateDistance - b.dateDistance)
     .slice(0, 100)
+}
+
+function importDuplicates(d: DB, rows: ParsedBankTransaction[], paymentAccountId: number) {
+  const matches = new Map<number, NonNullable<ReturnType<typeof duplicateRecordForRow>>>()
+  const consumed = new Set<number>()
+  // Reserve exact matches first. Each stored occurrence can cover only one incoming row.
+  for (const allowPotential of [false, true]) {
+    for (const row of rows) {
+      if (row.errors.length || matches.has(row.sourceRow)) continue
+      const match = duplicateRecordForRow(d, row, paymentAccountId, consumed, allowPotential)
+      if (match) matches.set(row.sourceRow, match)
+    }
+  }
+  return matches
+}
+
+export function assertBankBookingCreationReviewed(id: number, acknowledgedVoucherIds: number[] = []) {
+  const unreviewed = findBankTransactionMatches({ id, linkedOnly: true })
+    .filter((match) => !acknowledgedVoucherIds.includes(match.id))
+  if (unreviewed.length) {
+    const match = unreviewed[0]
+    throw new Error(`Mögliche Doppelbuchung: Buchung ${match.voucherNo} ist bereits Bankbeleg #${match.linkedBankTransactionId} zugeordnet. Bitte im Bankimport prüfen und eine zusätzliche Buchung dort ausdrücklich bestätigen.`)
+  }
 }

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
@@ -40,6 +40,7 @@ type BankTransaction = {
   resolvedAt?: string | null
   sourceFileName: string
   matchScore?: number | null
+  possibleDuplicateCount?: number
   aiSuggestion?: BankAiSuggestion | null
 }
 
@@ -117,6 +118,8 @@ type CsvMapping = {
 }
 
 type ImportPreview = {
+  duplicateRows: ImportCommitResult['duplicateRows']
+  warnings: string[]
   format: 'CAMT' | 'CSV'
   headers: string[]
   suggestedMapping: CsvMapping
@@ -151,7 +154,7 @@ type ImportCommitResult = {
     purpose?: string | null
     endToEndId?: string | null
     bankReference?: string | null
-    duplicateBy: 'REFERENCE' | 'FINGERPRINT'
+    duplicateBy: 'REFERENCE' | 'FINGERPRINT' | 'RAW' | 'POTENTIAL'
     duplicateValue: string
     existing: {
       id: number
@@ -172,6 +175,7 @@ type ImportCommitResult = {
 
 type BankTransactionMatch = {
   id: number
+  linkedBankTransactionId?: number | null
   matchKind?: 'VOUCHER' | 'RECURRING'
   voucherNo?: string | null
   date?: string | null
@@ -194,7 +198,7 @@ type BankTransactionMatch = {
 type Props = {
   paymentAccounts: PaymentAccount[]
   notify: (type: 'success' | 'error' | 'info', text: string) => void
-  onCreateBooking: (transaction: BankTransaction) => void
+  onCreateBooking: (transaction: BankTransaction, acknowledgedBankVoucherIds?: number[]) => void
   onOpenVoucher: (voucherId: number, voucherNo?: string | null, date?: string) => void
 }
 
@@ -519,7 +523,9 @@ function MappingSelect({
   )
 }
 
-function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT') {
+function duplicateReasonLabel(reason: 'REFERENCE' | 'FINGERPRINT' | 'RAW' | 'POTENTIAL') {
+  if (reason === 'RAW') return 'Identische Originaldaten'
+  if (reason === 'POTENTIAL') return 'Mögliches Duplikat: gleiches Konto, Datum und Betrag'
   return reason === 'REFERENCE'
     ? 'Bankreferenz / End-to-End-ID'
     : 'Fingerprint aus Konto, Datum, Betrag und Text'
@@ -634,7 +640,7 @@ function ManualAssignmentModal({
         q: query || undefined,
         manual: true
       })
-      setResults(result.rows as BankTransactionMatch[])
+      setResults([...result.rows, ...result.alreadyLinked] as BankTransactionMatch[])
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
     } finally {
@@ -651,7 +657,7 @@ function ManualAssignmentModal({
 
   useEffect(() => {
     setSelectedVoucherId((current) =>
-      current && results.some((row) => row.id === current) ? current : null
+      current && results.some((row) => row.id === current && !row.linkedBankTransactionId) ? current : null
     )
   }, [results])
 
@@ -684,7 +690,8 @@ function ManualAssignmentModal({
               autoFocus
             />
             <span className="helper">
-              Hier siehst du alle Buchungen rund um den Zeitraum. Die Entscheidung triffst du
+              Hier siehst du Buchungen desselben Zahlkontos im Abstand
+              von bis zu 31 Tagen zum Buchungs- oder Wertstellungsdatum. Die Entscheidung triffst du
               manuell.
             </span>
           </div>
@@ -712,11 +719,12 @@ function ManualAssignmentModal({
                     <tr
                       key={match.id}
                       className={selectedVoucherId === match.id ? 'is-selected' : undefined}
-                      onClick={() => setSelectedVoucherId(match.id)}
+                      onClick={() => !match.linkedBankTransactionId && setSelectedVoucherId(match.id)}
                     >
                       <td>
                         <input
                           type="radio"
+                          disabled={!!match.linkedBankTransactionId}
                           name={`manual-assign-${transaction.id}`}
                           checked={selectedVoucherId === match.id}
                           onChange={() => setSelectedVoucherId(match.id)}
@@ -728,6 +736,11 @@ function ManualAssignmentModal({
                         <div className="bank-manual-assign-description">
                           <strong>{match.voucherNo || `#${match.id}`}</strong>
                           <span>{match.description || 'Ohne Beschreibung'}</span>
+                          {match.linkedBankTransactionId && (
+                            <span className="bank-match-warning">
+                              Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet – nicht erneut zuweisbar.
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>{euro.format(Number(match.grossAmount ?? transaction.amount ?? 0))}</td>
@@ -943,6 +956,8 @@ function BankImportModal({
   const [paymentAccountError, setPaymentAccountError] = useState(false)
   const [commitResult, setCommitResult] = useState<ImportCommitResult | null>(null)
   const [selectedDuplicateRows, setSelectedDuplicateRows] = useState<number[]>([])
+  const [additionalImportRows, setAdditionalImportRows] = useState<number[]>([])
+  const previewRequest = useRef(0)
   const [aiAvailable, setAiAvailable] = useState(false)
   const [reviewWithAi, setReviewWithAi] = useState(false)
 
@@ -961,26 +976,32 @@ function BankImportModal({
     }
   }, [])
 
-  const loadPreview = async (nextFile: File, nextBytes: Uint8Array, nextMapping?: CsvMapping) => {
+  const loadPreview = async (nextFile: File, nextBytes: Uint8Array, nextMapping?: CsvMapping, nextAccount = paymentAccountId) => {
+    const request = ++previewRequest.current
     setBusy(true)
+    setAdditionalImportRows([])
     setError('')
     try {
       const result = (await window.api.bankImports.preview({
         fileBytes: nextBytes,
         fileName: nextFile.name,
+        paymentAccountId: nextAccount,
         mapping: nextMapping
       })) as ImportPreview
+      if (request !== previewRequest.current) return
       setPreview(result)
+      setAdditionalImportRows([])
       if (!nextMapping) setMapping(result.suggestedMapping)
       if (result.detectedPaymentAccountId) {
         setPaymentAccountId(result.detectedPaymentAccountId)
         setPaymentAccountError(false)
       }
     } catch (reason: any) {
+      if (request !== previewRequest.current) return
       setError(reason?.message || String(reason))
       setPreview(null)
     } finally {
-      setBusy(false)
+      if (request === previewRequest.current) setBusy(false)
     }
   }
 
@@ -1015,6 +1036,7 @@ function BankImportModal({
         fileBytes,
         fileName: file.name,
         paymentAccountId,
+        additionalImportSourceRows: additionalImportRows,
         mapping: preview?.format === 'CSV' ? mapping : undefined
       })) as ImportCommitResult
       notify(
@@ -1081,8 +1103,13 @@ function BankImportModal({
     }
   }
 
-  const setMap = (key: keyof CsvMapping, value: string | null) =>
-    setMapping((current) => ({ ...current, [key]: value }))
+  const setMap = (key: keyof CsvMapping, value: string | null) => {
+    const nextMapping = { ...mapping, [key]: value }
+    setMapping(nextMapping)
+    if (file && fileBytes) void loadPreview(file, fileBytes, nextMapping)
+  }
+  const previewDuplicates = preview?.duplicateRows ?? []
+  const importCount = (preview?.summary.valid ?? 0) - previewDuplicates.length + additionalImportRows.length
   const activeAccounts = accounts.filter(
     (account) => account.isActive !== 0 && account.kind !== 'CASH'
   )
@@ -1162,6 +1189,7 @@ function BankImportModal({
                 onChange={(event) => {
                   const nextValue = event.target.value ? Number(event.target.value) : null
                   setPaymentAccountId(nextValue)
+                  if (file && fileBytes) void loadPreview(file, fileBytes, mapping, nextValue)
                   if (nextValue) setPaymentAccountError(false)
                 }}
                 aria-invalid={paymentAccountError}
@@ -1282,6 +1310,20 @@ function BankImportModal({
               </section>
             )}
 
+            {preview.warnings?.map((warning) => <p className="bank-import-warning" role="alert" key={warning}><AppIcon icon={IconAlertTriangle} size="action" /> {warning}</p>)}
+            {!paymentAccountId && <p className="helper">Wähle das Zahlkonto, um vorhandene Bankbelege auf Duplikate zu prüfen.</p>}
+            {previewDuplicates.length > 0 && <section className="bank-import-duplicates" aria-label="Duplikate vor dem Import prüfen">
+              <h3><AppIcon icon={IconAlertTriangle} size="action" /> {previewDuplicates.length} vorhandene oder möglicherweise doppelte Umsätze</h3>
+              <p>Diese Zeilen werden zunächst übersprungen. Vergleiche die Daten und wähle nur zusätzliche, tatsächlich erfolgte Zahlungen aus.</p>
+              {previewDuplicates.map((duplicate) => <article className="bank-import-duplicate" key={duplicate.sourceRow}>
+                <strong>Zeile {duplicate.sourceRow} · {duplicateReasonLabel(duplicate.duplicateBy)}</strong>
+                <div className="bank-import-duplicate__comparison">
+                  <div><b>Aus der Importdatei</b><span>{formatDate(duplicate.bookingDate)} · {duplicate.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.amount)}</span><span>{duplicate.counterparty || 'Ohne Gegenpartei'}</span><span>{duplicate.purpose || 'Ohne Verwendungszweck'}</span></div>
+                  <div><b>Bereits vorhanden: Bankbeleg #{duplicate.existing.id}</b><span>{formatDate(duplicate.existing.bookingDate)} · {duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</span><span>{duplicate.existing.counterparty || 'Ohne Gegenpartei'}</span><span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small>{duplicate.existing.paymentAccountName} · {duplicate.existing.sourceFileName}</small></div>
+                </div>
+                <label><input type="checkbox" disabled={busy} checked={additionalImportRows.includes(duplicate.sourceRow)} onChange={(event) => setAdditionalImportRows((current) => event.target.checked ? [...current, duplicate.sourceRow] : current.filter((row) => row !== duplicate.sourceRow))} /> Als zusätzlichen Umsatz importieren – es handelt sich um eine weitere Zahlung.</label>
+              </article>)}
+            </section>}
             <div className="bank-preview-table-wrap">
               <table className="bank-table bank-preview-table">
                 <thead>
@@ -1295,14 +1337,16 @@ function BankImportModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.rows.slice(0, 30).map((row) => (
+                  {preview.rows.map((row) => (
                     <tr key={row.sourceRow} className={row.errors.length ? 'bank-row-error' : ''}>
                       <td>{row.sourceRow}</td>
                       <td>{formatDate(row.bookingDate)}</td>
                       <td>{[row.counterparty, row.purpose].filter(Boolean).join(' - ') || '–'}</td>
                       <td>{row.direction}</td>
                       <td className="number">{euro.format(row.amount)}</td>
-                      <td>{row.errors.join(' ') || 'OK'}</td>
+                      <td>{row.errors.join(' ') || (previewDuplicates.some((duplicate) => duplicate.sourceRow === row.sourceRow)
+                        ? <span className="bank-import-warning"><AppIcon icon={IconAlertTriangle} size="action" /> {additionalImportRows.includes(row.sourceRow) ? 'Zusätzlich importieren' : 'Duplikatprüfung · wird übersprungen'}</span>
+                        : paymentAccountId ? 'Neu' : 'Zahlkonto für Prüfung wählen')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1320,7 +1364,7 @@ function BankImportModal({
             disabled={busy || !preview || preview.summary.valid === 0}
             onClick={() => void commit()}
           >
-            {busy ? 'Importiere …' : `${preview?.summary.valid ?? 0} Beleg(e) importieren`}
+            {busy ? 'Bitte warten …' : importCount === 0 && previewDuplicates.length ? 'Ohne neue Bankbelege abschließen' : `${importCount} Beleg(e) importieren`}
           </button>
         </footer>
       </div>
@@ -1458,6 +1502,9 @@ function BankReviewModal({
   notify: Props['notify']
 }) {
   const [matches, setMatches] = useState<BankTransactionMatch[]>([])
+  const [alreadyLinked, setAlreadyLinked] = useState<BankTransactionMatch[]>([])
+  const [matchesLoaded, setMatchesLoaded] = useState(false)
+  const [duplicateReviewed, setDuplicateReviewed] = useState(false)
   const [loading, setLoading] = useState(transaction.status === 'OPEN')
   const [busy, setBusy] = useState(false)
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
@@ -1468,11 +1515,15 @@ function BankReviewModal({
   const loadMatches = useCallback(async () => {
     if (transaction.status !== 'OPEN') return
     setLoading(true)
+    setMatchesLoaded(false)
+    setDuplicateReviewed(false)
     try {
       const result = await window.api.bankTransactions.matches({
         id: transaction.id
       })
       setMatches(result.rows as BankTransactionMatch[])
+      setAlreadyLinked(result.alreadyLinked as BankTransactionMatch[])
+      setMatchesLoaded(true)
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
     } finally {
@@ -1581,9 +1632,10 @@ function BankReviewModal({
                     <>
                       <button
                         className="btn"
+                        disabled={busy || loading || !matchesLoaded || (alreadyLinked.length > 0 && !duplicateReviewed)}
                         onClick={() => {
                           setActionMenuOpen(false)
-                          onCreateBooking(transaction)
+                          onCreateBooking(transaction, duplicateReviewed ? alreadyLinked.map((match) => match.id) : [])
                           onClose()
                         }}
                       >
@@ -1693,6 +1745,56 @@ function BankReviewModal({
 
         {transaction.status === 'OPEN' ? (
           <div className="bank-review-layout">
+            {!loading && alreadyLinked.length > 0 && (
+              <section className="bank-review-section bank-duplicate-card" aria-label="Mögliche Doppelbuchung">
+                <div className="bank-duplicate-card__heading">
+                  <span className="bank-duplicate-card__icon"><AppIcon icon={IconAlertTriangle} size="action" /></span>
+                  <div>
+                    <h3>Mögliche Doppelbuchung</h3>
+                    <p>Passende Buchungen sind bereits zugeordnet. Ist es derselbe Umsatz, erledige diesen Bankbeleg ohne neue Buchung.</p>
+                  </div>
+                </div>
+                <div className="bank-duplicate-card__matches">
+                  {alreadyLinked.map((match) => (
+                    <div className="bank-duplicate-card__match" key={match.id}>
+                      <div className="bank-duplicate-card__booking">
+                        <strong>{match.description || match.voucherNo}</strong>
+                        <span>{formatDate(match.date)} · {match.voucherNo}</span>
+                        <span className="bank-duplicate-card__link">
+                          <AppIcon icon={IconLink} size="inline" />
+                          Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet
+                        </span>
+                      </div>
+                      <strong className="bank-duplicate-card__amount">{euro.format(Number(match.grossAmount))}</strong>
+                      <button className="btn ghost" onClick={() => {
+                        onOpenVoucher(match.id, match.voucherNo, match.date || undefined)
+                        onClose()
+                      }}><AppIcon icon={IconExternalLink} size="control" /> Buchung öffnen</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="bank-duplicate-card__actions">
+                  <button className="btn bank-duplicate-card__resolve" disabled={busy} onClick={() => {
+                    onCheckWithoutBooking(transaction)
+                    onClose()
+                  }}><AppIcon icon={IconCheck} size="control" /> Ohne neue Buchung erledigen</button>
+                  <span>Die bestehende Buchung bleibt erhalten.</span>
+                </div>
+                <details className="bank-duplicate-card__alternative" onToggle={(event) => {
+                  if (!event.currentTarget.open) setDuplicateReviewed(false)
+                }}>
+                  <summary>Es ist ein zusätzlicher Umsatz</summary>
+                  <label>
+                    <input type="checkbox" checked={duplicateReviewed} onChange={(event) => setDuplicateReviewed(event.target.checked)} />
+                    Ich habe die Zuordnungen geprüft. Für diesen zusätzlichen Umsatz ist eine neue Buchung nötig.
+                  </label>
+                  <button className="btn ghost" disabled={busy || !duplicateReviewed} onClick={() => {
+                    onCreateBooking(transaction, alreadyLinked.map((match) => match.id))
+                    onClose()
+                  }}><AppIcon icon={IconPlus} size="control" /> Zusätzliche Buchung anlegen</button>
+                </details>
+              </section>
+            )}
             <section className="bank-review-section">
               <div className="bank-section-title">
                 <div className="bank-section-title__label">
@@ -1700,6 +1802,7 @@ function BankReviewModal({
                 </div>
                 <div className="bank-match-toolbar">
                   <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>
+                    <AppIcon icon={IconLink} size="control" />
                     Manuell zuweisen
                   </button>
                 </div>
@@ -1722,7 +1825,9 @@ function BankReviewModal({
                     />
                   ))}
                 {!loading && matches.length === 0 && (
-                  <div className="bank-empty-small">Keine kompatible Buchung gefunden.</div>
+                  <div className="bank-empty-small">{alreadyLinked.length
+                    ? 'Keine weitere, noch nicht zugeordnete Buchung gefunden.'
+                    : 'Keine kompatible Buchung gefunden.'}</div>
                 )}
               </div>
             </section>
@@ -2297,6 +2402,21 @@ export default function BankImportView({
                     const match = matchScorePresentation(row.matchScore)
                     return (
                       <div className="bank-assignment-cell">
+                        {row.status === 'OPEN' && Number(row.possibleDuplicateCount) > 0 && (
+                          <button
+                            className="bank-duplicate-indicator"
+                            type="button"
+                            title="Mögliche Doppelbuchung: passende Buchung bereits zugeordnet. Zuordnung prüfen."
+                            aria-label="Mögliche Doppelbuchung – Zuordnung prüfen"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelected(row)
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            <AppIcon icon={IconAlertTriangle} size="action" />
+                          </button>
+                        )}
                         {row.aiSuggestion && (
                           <button
                             className="bank-ai-suggestion-trigger"

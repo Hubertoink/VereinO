@@ -285,7 +285,7 @@ function normalizedHeader(value: string) {
 }
 
 function suggestCsvMapping(headers: string[]): BankCsvMapping {
-  const find = (...patterns: RegExp[]) => headers.find((header) => patterns.some((pattern) => pattern.test(normalizedHeader(header)))) ?? null
+  const find = (...patterns: RegExp[]) => patterns.map((pattern) => headers.find((header) => pattern.test(normalizedHeader(header)))).find(Boolean) ?? null
   return {
     bookingDate: find(/^buchungstag$/, /^buchungsdatum$/, /^datum$/, /booking date/),
     valueDate: find(/^valuta$/, /^wertstellung$/, /value date/),

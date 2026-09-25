@@ -11,7 +11,7 @@ jest.mock('../../electron/main/repositories/recurringOccurrences', () => ({ mate
 jest.mock('../../electron/main/services/audit', () => ({ writeAudit: jest.fn() }))
 
 import { getDb } from '../../electron/main/db/database'
-import { findBankTransactionMatches } from '../../electron/main/repositories/bankTransactions'
+import { assertBankBookingCreationReviewed, findBankTransactionMatches, listBankTransactions } from '../../electron/main/repositories/bankTransactions'
 
 describe('bank transaction matching with real SQLite queries', () => {
   let db: Database.Database
@@ -31,12 +31,14 @@ describe('bank transaction matching with real SQLite queries', () => {
         vat_rate REAL, payment_account_id INTEGER, status TEXT, next_due_date TEXT);
       INSERT INTO payment_accounts VALUES (1, 'Bank', NULL), (2, 'Kasse', NULL);
     `)
-    transaction = { id: 57, bookingDate: '2026-07-13', valueDate: null, direction: 'OUT',
+    transaction = { id: 57, status: 'OPEN', bookingDate: '2026-07-13', valueDate: null, direction: 'OUT',
       amount: 3998.4, paymentAccountId: 1, paymentAccountName: 'Bank', purpose: 'Belegnr 2496676' }
     jest.mocked(getDb).mockReturnValue({
       prepare: (sql: string) => sql.includes('FROM bank_transactions bt')
-        ? { get: () => transaction }
-        : db.prepare(sql)
+        ? { get: () => sql.includes('COUNT(*)') ? { count: 1 } : transaction, all: () => [transaction] }
+        : sql.includes('GROUP BY status')
+          ? { all: () => [{ status: transaction.status, count: 1 }] }
+          : db.prepare(sql)
     } as any)
   })
 
@@ -100,6 +102,60 @@ describe('bank transaction matching with real SQLite queries', () => {
   it('keeps manual matching available for mismatched amounts and directions', () => {
     voucher(1, undefined, 1, 123, 'IN')
     expect(findBankTransactionMatches({ id: 57, manual: true })[0]).toMatchObject({ id: 1, amountMatches: false })
+  })
+
+  it('marks open table rows with the same duplicate evidence as the review modal and clears resolved rows', () => {
+    voucher(54)
+    expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(0)
+    db.exec('INSERT INTO bank_transactions VALUES (99, 54)')
+    expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(1)
+    expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toHaveLength(1)
+    transaction.status = 'CHECKED'
+    expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(0)
+    transaction.status = 'LINKED'
+    expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(0)
+    transaction.status = 'OPEN'
+    db.exec('DELETE FROM bank_transactions WHERE id = 99')
+    expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(0)
+  })
+
+  it('restricts manual search to the exact payment account before limiting candidates', () => {
+    voucher(1)
+    db.exec("INSERT INTO payment_accounts VALUES (3, 'Weitere Bank', NULL)")
+    for (let id = 2; id <= 105; id++) voucher(id, undefined, id % 2 ? 2 : 3)
+    expect(findBankTransactionMatches({ id: 57, manual: true })).toEqual([
+      expect.objectContaining({ id: 1, paymentAccountId: 1 })
+    ])
+  })
+
+  it('finds the reported June income automatically and through manual text search', () => {
+    Object.assign(transaction, { bookingDate: '2026-06-02', direction: 'IN', amount: 75,
+      purpose: 'Jolie Nwayotalu Freizeit St.Goar' })
+    voucher(118, '2026-06-02', 1, 75, 'IN')
+    db.exec("UPDATE vouchers SET description = 'Freizeit St Goar Jolie Nwayotalu' WHERE id = 118")
+    expect(findBankTransactionMatches({ id: 57 })[0]).toMatchObject({ id: 118, score: 100 })
+    expect(findBankTransactionMatches({ id: 57, manual: true, q: 'Freizei' })[0]).toMatchObject({ id: 118 })
+    db.exec('INSERT INTO bank_transactions VALUES (99, 118)')
+    expect(findBankTransactionMatches({ id: 57 })).toEqual([])
+    expect(findBankTransactionMatches({ id: 57, manual: true, q: 'Freizei' })).toEqual([])
+    expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toEqual([
+      expect.objectContaining({ id: 118, linkedBankTransactionId: 99 })
+    ])
+    expect(findBankTransactionMatches({ id: 57, manual: true, q: 'Freizei', linkedOnly: true })).toEqual([
+      expect.objectContaining({ id: 118, linkedBankTransactionId: 99 })
+    ])
+    expect(() => assertBankBookingCreationReviewed(57)).toThrow('Mögliche Doppelbuchung')
+    expect(() => assertBankBookingCreationReviewed(57, [117])).toThrow('Mögliche Doppelbuchung')
+    expect(() => assertBankBookingCreationReviewed(57, [118])).not.toThrow()
+  })
+
+  it('does not warn about linked vouchers from another account, with another amount or reversed', () => {
+    voucher(1, undefined, 2)
+    voucher(2, undefined, 1, 20)
+    voucher(3)
+    db.exec('INSERT INTO bank_transactions VALUES (91, 1), (92, 2), (93, 3); UPDATE vouchers SET reversed_by_id = 99 WHERE id = 3;')
+    expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toEqual([])
+    expect(() => assertBankBookingCreationReviewed(57)).not.toThrow()
   })
 
   it('finds due recurring candidates by value date', () => {

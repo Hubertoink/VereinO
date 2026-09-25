@@ -24,6 +24,30 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Dezente Kostenerstattungsverwaltung bei den Verbindlichkeiten und in den weiteren Buchungsaktionen: Ausgaben mit Kooperationspartner, Fälligkeit und Erstattungszahlungen verknüpfen.
 - Teil- und Sammelerstattungen mit offenen Restbeträgen und direkten Verweisen auf die zugehörigen Buchungen; ohne zusätzliche Finanzbuchungen.
 
+## [4.3.0] - 2026-09-25
+
+### Geändert
+
+- Bankimporte prüfen Duplikate bereits in der Vorschau und erneut beim Speichern. Originaldaten erkennen wiederholte CSV-Umsätze auch bei geänderter Spaltenzuordnung; gleiche Kerndaten mit abweichendem Text werden zur Prüfung vorgelegt und zunächst übersprungen. Echte Mehrfachzahlungen bleiben nach Anzahl erhalten. Die Spaltenerkennung bevorzugt den Verwendungszweck vor dem Buchungstext und warnt bei abweichender Zuordnung.
+- Neue Buchungen erfordern zuerst die bewusste Auswahl der Buchungsart. Das Formular bleibt bis dahin unscharf und gesperrt, während Größe und Position des Dialogs erhalten bleiben. Die Art bleibt danach frei wechselbar. Dies gilt auch für vorbelegte Entwürfe und „Speichern & neu“. Beim Wiederöffnen oder Wechsel der Darstellung bleibt die Auswahl erhalten.
+
+## [4.2.2] - 2026-09-25
+
+### Geändert
+
+- Mögliche Doppelbuchungen erscheinen in einer farblich abgesetzten Kachel mit Icons für Warnung, bestehende Zuordnung und Aktionen.
+- „Ohne neue Buchung erledigen“ ist die hervorgehobene Aktion innerhalb der Kachel. Das Anlegen einer zusätzlichen Buchung liegt unter einer aufklappbaren Option mit ausdrücklicher Bestätigung.
+- Die Bankimport-Tabelle kennzeichnet offene Belege mit möglichen Doppelbuchungen durch ein gelbes Warnsymbol, das direkt die Zuordnungsprüfung öffnet.
+
+## [4.2.1] - 2026-09-25
+
+### Behoben
+
+- Die manuelle Bankzuordnung zeigt nur Buchungen desselben Zahlkontos.
+- Bereits zugeordnete Buchungen bleiben mit Hinweis auf den bestehenden Bankbeleg sichtbar, statt aus der Suche zu verschwinden.
+- Bei möglichen Doppelbuchungen muss eine zusätzliche Buchung ausdrücklich bestätigt werden. Die Prüfung erfolgt auch beim Speichern und bei KI-Vorschlägen.
+- Die Duplikaterkennung beim Bankimport berücksichtigt unterschiedliche Exportfelder und fehlende Referenzen. Mögliche Duplikate werden zur Prüfung zurückgehalten und können bewusst importiert werden.
+
 ## [4.2.0] - 2026-09-24
 
 ### Hinzugefügt

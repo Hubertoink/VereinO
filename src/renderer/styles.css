@@ -4158,6 +4158,102 @@ svg text {
   min-height: 0;
 }
 
+.booking-type-fields {
+  display: contents;
+}
+
+.bank-import-warning { color: var(--warning); }
+.bank-import-duplicates {
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+.bank-import-duplicates h3 { display: flex; gap: 8px; align-items: center; margin-top: 0; color: var(--warning); }
+.bank-import-duplicate { padding: 14px 0; border-top: 1px solid var(--border); }
+.bank-import-duplicate__comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 12px 0; }
+.bank-import-duplicate__comparison > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.bank-import-duplicate label { display: flex; gap: 8px; align-items: baseline; }
+@media (max-width: 640px) { .bank-import-duplicate__comparison { grid-template-columns: minmax(0, 1fr); } }
+
+.compact-booking-flyout.booking-type-flow {
+  height: auto;
+  box-sizing: border-box;
+}
+
+.compact-booking-flyout.booking-type-flow .compact-booking-flyout__form {
+  margin-bottom: 0;
+}
+
+.compact-booking-flyout.booking-type-flow .compact-booking-flyout__footer {
+  margin-top: auto;
+}
+
+.quick-add-modal.booking-editor.booking-type-flow:not(.detached-quick-add-modal) {
+  height: min(90vh, calc(100dvh - 12px));
+}
+
+.compact-booking-flyout.booking-type-flow .compact-booking-flyout__body {
+  scrollbar-gutter: stable;
+}
+
+.compact-booking-flyout.booking-type-pending .compact-booking-flyout__body,
+.quick-add-modal.booking-type-pending > form.quick-add-form {
+  overflow-y: hidden;
+}
+
+.quick-add-form,
+.compact-booking-flyout__form {
+  position: relative;
+}
+
+.booking-type-pending .booking-type-fields > *,
+.booking-type-pending .compact-booking-flyout__footer {
+  filter: blur(5px);
+  opacity: .45;
+  pointer-events: none;
+  user-select: none;
+}
+
+.booking-type-overlay {
+  position: absolute;
+  inset: 74px 0 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--surface) 35%, transparent);
+  cursor: default;
+}
+
+.booking-type-prompt {
+  display: grid;
+  gap: 8px;
+  max-width: 380px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 12%);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.booking-type-prompt strong {
+  font-size: 16px;
+}
+
+.booking-type-prompt span {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.booking-type-pending .compact-booking-kind {
+  position: relative;
+  z-index: 11;
+}
+
 .quick-add-form::-webkit-scrollbar {
   width: 8px;
 }
@@ -17925,6 +18021,185 @@ button.filter-totals-stat {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.bank-review-modal .bank-review-section.bank-duplicate-card {
+  --bank-duplicate-accent: #f5c451;
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--bank-duplicate-accent) 48%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bank-duplicate-accent) 9%, var(--surface));
+}
+
+.bank-duplicate-card__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.bank-duplicate-card__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 9px;
+  border-radius: 10px;
+  color: var(--bank-duplicate-accent);
+  background: color-mix(in srgb, var(--bank-duplicate-accent) 15%, var(--surface));
+}
+
+.bank-duplicate-card__heading h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.bank-duplicate-card__heading p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bank-duplicate-card__matches {
+  display: grid;
+  gap: 8px;
+}
+
+.bank-duplicate-card__match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--bank-duplicate-accent) 20%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.bank-duplicate-card__booking {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bank-duplicate-card__booking > span {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.bank-duplicate-card__link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bank-duplicate-card__amount {
+  font-size: 17px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-duplicate-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.bank-duplicate-card__actions > span {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.bank-duplicate-card .btn,
+.bank-match-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bank-duplicate-card .btn.bank-duplicate-card__resolve {
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid var(--bank-duplicate-accent);
+  background: var(--bank-duplicate-accent);
+  color: #241c09;
+  font-weight: 700;
+}
+
+.bank-duplicate-card .btn.bank-duplicate-card__resolve:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bank-duplicate-accent) 86%, white);
+}
+
+.bank-duplicate-card__alternative {
+  border-top: 1px solid color-mix(in srgb, var(--bank-duplicate-accent) 20%, var(--border));
+  padding-top: 12px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.bank-duplicate-card__alternative summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.bank-duplicate-card__alternative label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0;
+  line-height: 1.5;
+}
+
+.bank-duplicate-card__alternative input {
+  flex-shrink: 0;
+  margin: 2px 0 0;
+}
+
+.bank-duplicate-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, #f5c451 45%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, #f5c451 12%, var(--surface));
+  color: #f5c451;
+  cursor: pointer;
+}
+
+.bank-duplicate-indicator:hover {
+  background: color-mix(in srgb, #f5c451 24%, var(--surface));
+}
+
+.bank-duplicate-indicator:focus-visible,
+.bank-duplicate-card summary:focus-visible,
+.bank-duplicate-card .btn:focus-visible {
+  outline: 2px solid #f5c451;
+  outline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+  .bank-duplicate-card__match {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .bank-duplicate-card__match > .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .bank-duplicate-card__actions > .btn {
+    width: 100%;
+    white-space: normal;
+  }
 }
 
 .bank-section-title > div {

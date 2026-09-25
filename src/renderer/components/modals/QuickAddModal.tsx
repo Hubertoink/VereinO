@@ -178,6 +178,8 @@ export default function QuickAddModal({
     onDeleteExistingFile
 }: QuickAddModalProps) {
     const amountInputRef = React.useRef<HTMLInputElement | null>(null)
+    const hasTypeSelectionStep = React.useRef(qa.bookingTypeSelected !== undefined).current
+    const needsBookingType = qa.bookingTypeSelected === false
     const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
@@ -304,7 +306,7 @@ export default function QuickAddModal({
         grossAmount: grossAmt,
     })
     const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
-    const saveBlocked = hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
+    const saveBlocked = needsBookingType || hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
     const bookingValidationMessage = footerLeft
         ? null
         : hasInvalidAmount
@@ -525,7 +527,7 @@ export default function QuickAddModal({
     }, [rememberCurrentBookingPattern, saveAndClose])
 
     const selectBookingType = React.useCallback((type: QA['type']) => {
-        const nextQa = { ...qa, type } as QA
+        const nextQa = { ...qa, type, bookingTypeSelected: true } as QA
         if (type === 'TRANSFER' && (!(nextQa as any).transferFromAccountId || !(nextQa as any).transferToAccountId)) {
             ;(nextQa as any).transferFromAccountId = defaultCashAccount?.id ?? null
             ;(nextQa as any).transferFromAccountName = defaultCashAccount?.name ?? null
@@ -570,12 +572,14 @@ export default function QuickAddModal({
 
     React.useEffect(() => {
         const timer = window.setTimeout(() => {
-            if ((modalRef.current?.clientWidth || 0) <= 950) {
+            if (needsBookingType) {
+                modalRef.current?.querySelector<HTMLButtonElement>('.booking-kind-switch button')?.focus({ preventScroll: true })
+            } else if ((modalRef.current?.clientWidth || 0) <= 950) {
                 modalRef.current?.querySelector<HTMLButtonElement>('.booking-kind-switch button[aria-pressed="true"]')?.focus({ preventScroll: true })
             } else focusInput(amountInputRef.current)
         }, 0)
         return () => window.clearTimeout(timer)
-    }, [focusInput])
+    }, [focusInput, needsBookingType])
 
     const clampDragOffset = React.useCallback((x: number, y: number) => {
         const modal = modalRef.current
@@ -703,7 +707,7 @@ export default function QuickAddModal({
         >
             <div
                 ref={modalRef}
-                className={`modal booking-modal quick-add-modal booking-editor booking-modal--type-${qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}`}
+                className={`modal booking-modal quick-add-modal booking-editor booking-modal--type-${needsBookingType ? 'pending' : qa.type.toLowerCase()}${windowMode ? ' detached-quick-add-modal' : ''}${hasTypeSelectionStep ? ' booking-type-flow' : ''}${needsBookingType ? ' booking-type-pending' : ''}`}
                 onClick={(e) => e.stopPropagation()}
                 style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
@@ -767,7 +771,8 @@ export default function QuickAddModal({
                 >
                     <BookingKindSwitch
                         className="booking-kind-switch"
-                        value={qa.type}
+                        value={needsBookingType ? '' : qa.type}
+                        autoFocus={needsBookingType}
                         ariaLabel="Buchungsart wählen"
                         options={[
                             { value: 'IN', label: 'Einnahme', icon: <IconArrowDownLeft size={18} /> },
@@ -778,6 +783,7 @@ export default function QuickAddModal({
                         onChange={(value) => selectBookingType(value as QA['type'])}
                     />
 
+                    <div className="booking-type-fields" {...(needsBookingType ? { inert: '' } : {})} aria-hidden={needsBookingType || undefined}>
                     {/* Live Summary */}
                     <div className={`summary-card booking-ai-summary ${aiSuggestions.length ? 'booking-ai-summary--active' : ''}`}>
                         <div className="booking-ai-summary__main">
@@ -1693,6 +1699,13 @@ export default function QuickAddModal({
                             )}
                         </div>
                     </div>
+                    </div>
+                    {needsBookingType && <div className="booking-type-overlay">
+                        <div className="booking-type-prompt" role="status">
+                            <strong>Was möchtest du buchen?</strong>
+                            <span>Wähle oben die Buchungsart, um das Formular freizugeben.</span>
+                        </div>
+                    </div>}
                 </form>
             </div>
         </div>

@@ -65,7 +65,8 @@ export const VoucherCreateInput = z
     earmarks: z.array(VoucherEarmarkAssignment).optional(),
     files: z.array(UploadFileInput).optional(),
     tags: z.array(z.string()).optional(),
-    bankTransactionId: z.number().int().positive().optional()
+    bankTransactionId: z.number().int().positive().optional(),
+    acknowledgedBankVoucherIds: z.array(z.number().int().positive()).optional()
   })
   .refine((v) => v.netAmount != null || v.grossAmount != null, {
     message: 'Either netAmount or grossAmount must be provided'
@@ -1135,18 +1136,9 @@ const BankImportPreviewRow = z.object({
   errors: z.array(z.string())
 })
 
-export const BankImportPreviewOutput = z.object({
-  format: z.enum(['CAMT', 'CSV']),
-  headers: z.array(z.string()),
-  suggestedMapping: BankCsvMappingSchema,
-  accountIbans: z.array(z.string()),
-  detectedPaymentAccountId: z.number().nullable(),
-  rows: z.array(BankImportPreviewRow),
-  summary: z.object({ total: z.number(), valid: z.number(), errors: z.number() })
-})
-
 export const BankImportCommitInput = BankImportInputBase.extend({
-  forceImportSourceRows: z.array(z.number().int().positive()).optional()
+  forceImportSourceRows: z.array(z.number().int().positive()).optional(),
+  additionalImportSourceRows: z.array(z.number().int().positive()).optional()
 }).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 
 const BankImportDuplicateRow = z.object({
@@ -1160,7 +1152,7 @@ const BankImportDuplicateRow = z.object({
   purpose: z.string().nullable(),
   endToEndId: z.string().nullable(),
   bankReference: z.string().nullable(),
-  duplicateBy: z.enum(['REFERENCE', 'FINGERPRINT']),
+  duplicateBy: z.enum(['REFERENCE', 'FINGERPRINT', 'RAW', 'POTENTIAL']),
   duplicateValue: z.string(),
   existing: z.object({
     id: z.number(),
@@ -1175,6 +1167,18 @@ const BankImportDuplicateRow = z.object({
     paymentAccountName: z.string(),
     sourceFileName: z.string()
   })
+})
+
+export const BankImportPreviewOutput = z.object({
+  format: z.enum(['CAMT', 'CSV']),
+  headers: z.array(z.string()),
+  suggestedMapping: BankCsvMappingSchema,
+  accountIbans: z.array(z.string()),
+  detectedPaymentAccountId: z.number().nullable(),
+  rows: z.array(BankImportPreviewRow),
+  duplicateRows: z.array(BankImportDuplicateRow),
+  warnings: z.array(z.string()),
+  summary: z.object({ total: z.number(), valid: z.number(), errors: z.number() })
 })
 
 export const BankImportCommitOutput = z.object({
@@ -1248,7 +1252,10 @@ export const BankImportStatusOutput = z.object({
     })
   )
 })
-export const BankTransactionMatchesOutput = z.object({ rows: z.array(z.record(z.any())) })
+export const BankTransactionMatchesOutput = z.object({
+  rows: z.array(z.record(z.any())),
+  alreadyLinked: z.array(z.record(z.any()))
+})
 
 export type TBankImportPreviewInput = z.infer<typeof BankImportPreviewInput>
 export type TBankImportPreviewOutput = z.infer<typeof BankImportPreviewOutput>
