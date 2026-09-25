@@ -7,6 +7,14 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-09-25
+
+### Geändert
+
+- Mögliche Doppelbuchungen erscheinen in einer farblich abgesetzten Kachel mit Icons für Warnung, bestehende Zuordnung und Aktionen.
+- „Ohne neue Buchung erledigen“ ist die hervorgehobene Aktion innerhalb der Kachel. Das Anlegen einer zusätzlichen Buchung liegt unter einer aufklappbaren Option mit ausdrücklicher Bestätigung.
+- Die Bankimport-Tabelle kennzeichnet offene Belege mit möglichen Doppelbuchungen durch ein gelbes Warnsymbol, das direkt die Zuordnungsprüfung öffnet.
+
 ## [4.2.1] - 2026-09-25
 
 ### Behoben

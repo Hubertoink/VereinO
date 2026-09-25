@@ -453,10 +453,11 @@ export function listBankTransactions(input: {
   if (hasOpenRows) materializeDueOccurrences(d)
   const rowsWithMatchScore = rows.map((row) => {
     const transaction = withAiSuggestion(row)
-    if (transaction.status !== 'OPEN') return { ...transaction, matchScore: null }
+    if (transaction.status !== 'OPEN') return { ...transaction, matchScore: null, possibleDuplicateCount: 0 }
     const bestScore = findBankTransactionMatches({ id: Number(row.id), recurringOccurrencesMaterialized: hasOpenRows })
       .reduce((best, match: any) => Math.max(best, Number(match.score || 0)), 0)
-    return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null }
+    const possibleDuplicateCount = findBankTransactionMatches({ id: Number(row.id), linkedOnly: true }).length
+    return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null, possibleDuplicateCount }
   })
   const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>
   const stats = { total: 0, open: 0, linked: 0, checked: 0 }

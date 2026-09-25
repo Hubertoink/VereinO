@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconChevronLeft, IconChevronRight, IconDotsVertical, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
@@ -39,6 +39,7 @@ type BankTransaction = {
   resolvedAt?: string | null
   sourceFileName: string
   matchScore?: number | null
+  possibleDuplicateCount?: number
   aiSuggestion?: BankAiSuggestion | null
 }
 
@@ -1704,31 +1705,53 @@ function BankReviewModal({
         {transaction.status === 'OPEN' ? (
           <div className="bank-review-layout">
             {!loading && alreadyLinked.length > 0 && (
-              <section className="bank-review-section" aria-label="Bereits zugeordnete Buchungen">
-                <strong>Mögliche Doppelbuchung: passende Buchungen sind bereits zugeordnet</strong>
-                <p>Prüfe die bestehenden Zuordnungen, bevor du eine weitere Buchung anlegst.
-                  Falls dieser Bankbeleg denselben Umsatz erneut enthält, kannst du ihn ohne neue Buchung erledigen.</p>
-                {alreadyLinked.map((match) => (
-                  <div className="bank-match-row" key={match.id}>
-                    <div>
-                      <strong>{match.voucherNo} · {euro.format(Number(match.grossAmount))}</strong>
-                      <span>{formatDate(match.date)} · {match.description}</span>
-                      <span className="bank-match-warning">Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet</span>
-                    </div>
-                    <button className="btn" onClick={() => {
-                      onOpenVoucher(match.id, match.voucherNo, match.date || undefined)
-                      onClose()
-                    }}>Buchung öffnen</button>
+              <section className="bank-review-section bank-duplicate-card" aria-label="Mögliche Doppelbuchung">
+                <div className="bank-duplicate-card__heading">
+                  <span className="bank-duplicate-card__icon"><AppIcon icon={IconAlertTriangle} size="action" /></span>
+                  <div>
+                    <h3>Mögliche Doppelbuchung</h3>
+                    <p>Passende Buchungen sind bereits zugeordnet. Ist es derselbe Umsatz, erledige diesen Bankbeleg ohne neue Buchung.</p>
                   </div>
-                ))}
-                <button className="btn" disabled={busy} onClick={() => {
-                  onCheckWithoutBooking(transaction)
-                  onClose()
-                }}>Ohne neue Buchung erledigen</button>
-                <label className="helper">
-                  <input type="checkbox" checked={duplicateReviewed} onChange={(event) => setDuplicateReviewed(event.target.checked)} />
-                  Ich habe die Zuordnungen geprüft. Dies ist ein zusätzlicher Umsatz, für den eine neue Buchung nötig ist.
-                </label>
+                </div>
+                <div className="bank-duplicate-card__matches">
+                  {alreadyLinked.map((match) => (
+                    <div className="bank-duplicate-card__match" key={match.id}>
+                      <div className="bank-duplicate-card__booking">
+                        <strong>{match.description || match.voucherNo}</strong>
+                        <span>{formatDate(match.date)} · {match.voucherNo}</span>
+                        <span className="bank-duplicate-card__link">
+                          <AppIcon icon={IconLink} size="inline" />
+                          Bereits Bankbeleg #{match.linkedBankTransactionId} zugeordnet
+                        </span>
+                      </div>
+                      <strong className="bank-duplicate-card__amount">{euro.format(Number(match.grossAmount))}</strong>
+                      <button className="btn ghost" onClick={() => {
+                        onOpenVoucher(match.id, match.voucherNo, match.date || undefined)
+                        onClose()
+                      }}><AppIcon icon={IconExternalLink} size="control" /> Buchung öffnen</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="bank-duplicate-card__actions">
+                  <button className="btn bank-duplicate-card__resolve" disabled={busy} onClick={() => {
+                    onCheckWithoutBooking(transaction)
+                    onClose()
+                  }}><AppIcon icon={IconCheck} size="control" /> Ohne neue Buchung erledigen</button>
+                  <span>Die bestehende Buchung bleibt erhalten.</span>
+                </div>
+                <details className="bank-duplicate-card__alternative" onToggle={(event) => {
+                  if (!event.currentTarget.open) setDuplicateReviewed(false)
+                }}>
+                  <summary>Es ist ein zusätzlicher Umsatz</summary>
+                  <label>
+                    <input type="checkbox" checked={duplicateReviewed} onChange={(event) => setDuplicateReviewed(event.target.checked)} />
+                    Ich habe die Zuordnungen geprüft. Für diesen zusätzlichen Umsatz ist eine neue Buchung nötig.
+                  </label>
+                  <button className="btn ghost" disabled={busy || !duplicateReviewed} onClick={() => {
+                    onCreateBooking(transaction, alreadyLinked.map((match) => match.id))
+                    onClose()
+                  }}><AppIcon icon={IconPlus} size="control" /> Zusätzliche Buchung anlegen</button>
+                </details>
               </section>
             )}
             <section className="bank-review-section">
@@ -1738,6 +1761,7 @@ function BankReviewModal({
                 </div>
                 <div className="bank-match-toolbar">
                   <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>
+                    <AppIcon icon={IconLink} size="control" />
                     Manuell zuweisen
                   </button>
                 </div>
@@ -2330,6 +2354,21 @@ export default function BankImportView({
                     const match = matchScorePresentation(row.matchScore)
                     return (
                       <div className="bank-assignment-cell">
+                        {row.status === 'OPEN' && Number(row.possibleDuplicateCount) > 0 && (
+                          <button
+                            className="bank-duplicate-indicator"
+                            type="button"
+                            title="Mögliche Doppelbuchung: passende Buchung bereits zugeordnet. Zuordnung prüfen."
+                            aria-label="Mögliche Doppelbuchung – Zuordnung prüfen"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelected(row)
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            <AppIcon icon={IconAlertTriangle} size="action" />
+                          </button>
+                        )}
                         {row.aiSuggestion && (
                           <button
                             className="bank-ai-suggestion-trigger"
