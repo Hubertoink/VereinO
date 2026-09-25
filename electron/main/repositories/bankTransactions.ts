@@ -9,7 +9,7 @@ import { materializeDueOccurrences } from './recurringOccurrences'
 
 type DB = InstanceType<typeof Database>
 type BankStatus = 'OPEN' | 'LINKED' | 'CHECKED'
-type DuplicateReason = 'REFERENCE' | 'FINGERPRINT' | 'POTENTIAL'
+type DuplicateReason = 'REFERENCE' | 'FINGERPRINT' | 'RAW' | 'POTENTIAL'
 
 function round2(value: number) {
   return Math.round(Number(value) * 100) / 100
@@ -69,7 +69,17 @@ function duplicateValueFor(row: ParsedBankTransaction) {
   ].join(' | ')
 }
 
-function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number) {
+// Compare the complete source row independently of the user's column mapping.
+function rawKey(raw: Record<string, unknown>): string | null {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical)
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)]))
+    return typeof value === 'string' ? value.trim() : value
+  }
+  return raw && Object.keys(raw).length ? JSON.stringify(canonical(raw)) : null
+}
+
+function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
   const fingerprint = fingerprintFor(row, paymentAccountId)
   const candidates = d.prepare(`
     SELECT
@@ -81,6 +91,7 @@ function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAcc
       bt.counterparty,
       bt.counterparty_iban as counterpartyIban,
       bt.fingerprint,
+      bt.raw_json as rawJson,
       bt.purpose,
       bt.end_to_end_id as endToEndId,
       bt.bank_reference as bankReference,
@@ -89,15 +100,15 @@ function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAcc
     FROM bank_transactions bt
     JOIN payment_accounts pa ON pa.id = bt.payment_account_id
     JOIN bank_import_batches bib ON bib.id = bt.batch_id
-    WHERE bt.fingerprint = ? OR (
-      bt.payment_account_id = ? AND bt.booking_date = ? AND bt.direction = ?
+    WHERE bt.payment_account_id = ? AND bt.booking_date = ? AND bt.direction = ?
       AND ROUND(bt.amount, 2) = ROUND(?, 2) AND bt.currency = ?
-    )
     ORDER BY CASE WHEN bt.fingerprint = ? THEN 0 ELSE 1 END, bt.id DESC
-  `).all(fingerprint, paymentAccountId, row.bookingDate, row.direction, row.amount, row.currency, fingerprint) as Record<string, any>[]
-  const contentKey = (value?: string | null) => normalized(value).replace(/[^\p{L}\p{N}]/gu, '')
+  `).all(paymentAccountId, row.bookingDate, row.direction, row.amount, row.currency, fingerprint) as Record<string, any>[]
   for (const existing of candidates) {
-    if (existing.fingerprint === fingerprint) return { existing, duplicateBy: duplicateReasonFor(row) }
+    if (consumed.has(Number(existing.id))) continue
+    const original = rawKey(row.raw)
+    if (original && original === rawKey(jsonValue(existing.rawJson, {}))) return { existing, duplicateBy: 'RAW' as const }
+    if (existing.fingerprint === fingerprint || fingerprintFor(existing as ParsedBankTransaction, paymentAccountId) === fingerprint) return { existing, duplicateBy: duplicateReasonFor(row) }
     // Exports may omit one reference or prefer the bank reference over End-to-End-ID.
     const referenceKeys = ['bankReference', 'endToEndId'] as const
     const knownReferences = referenceKeys.filter((key) => meaningfulReference({ bankReference: row[key] })
@@ -107,24 +118,18 @@ function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAcc
       return { existing, duplicateBy: 'REFERENCE' as const }
     }
     if (knownReferences.length) continue
-    // Missing CSV fields must not defeat the comparison with a richer CAMT export.
-    // Amount/date alone are deliberately insufficient: recurring contributions can coincide.
-    const purpose = contentKey(row.purpose)
-    if (!purpose || purpose !== contentKey(existing.purpose)) continue
-    if (['counterparty', 'counterpartyIban'].some((key) => {
-      const incoming = contentKey(row[key as 'counterparty' | 'counterpartyIban'])
-      const previous = contentKey(existing[key])
-      return incoming && previous && incoming !== previous
-    })) continue
+    // Without a reliable identity, matching core data is only a review candidate.
+    if (!allowPotential) continue
     return { existing, duplicateBy: 'POTENTIAL' as const }
   }
   return null
 }
 
-function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number) {
-  const duplicate = existingTransactionForRow(d, row, paymentAccountId)
+function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
+  const duplicate = existingTransactionForRow(d, row, paymentAccountId, consumed, allowPotential)
   if (!duplicate) return null
   const { existing, duplicateBy } = duplicate
+  consumed.add(Number(existing.id))
   return {
     sourceRow: row.sourceRow,
     bookingDate: row.bookingDate,
@@ -171,13 +176,21 @@ export function previewBankImport(input: {
 }) {
   const parsed = parseBankStatement(input.fileBase64, input.fileName, input.mapping)
   const paymentAccountId = resolvePaymentAccountId(parsed, input.paymentAccountId)
+  const duplicateRows = paymentAccountId ? [...importDuplicates(getDb(), parsed.rows, paymentAccountId).values()] : []
+  const purposeColumn = parsed.headers.find((header) => /verwendungszweck/i.test(header))
+  const selectedPurpose = input.mapping?.purpose === undefined ? parsed.suggestedMapping.purpose : input.mapping.purpose
+  const warnings = purposeColumn && selectedPurpose !== purposeColumn
+    ? [`Die Spalte „${purposeColumn}“ ist vorhanden, wird aber nicht als Verwendungszweck verwendet. Bitte prüfe die Spaltenzuordnung.`]
+    : []
   return {
     format: parsed.format,
     headers: parsed.headers,
     suggestedMapping: parsed.suggestedMapping,
     accountIbans: parsed.accountIbans,
     detectedPaymentAccountId: paymentAccountId,
-    rows: parsed.rows.slice(0, 200).map((row) => ({
+    duplicateRows,
+    warnings,
+    rows: parsed.rows.map((row) => ({
       sourceRow: row.sourceRow,
       bookingDate: row.bookingDate,
       valueDate: row.valueDate ?? null,
@@ -205,6 +218,7 @@ export function commitBankImport(input: {
   paymentAccountId?: number | null
   mapping?: BankCsvMapping
   forceImportSourceRows?: number[]
+  additionalImportSourceRows?: number[]
 }) {
   return withTransaction((d: DB) => {
     const parsed = parseBankStatement(input.fileBase64, input.fileName, input.mapping)
@@ -212,6 +226,9 @@ export function commitBankImport(input: {
     if (!paymentAccountId) throw new Error('Bitte wähle das Zahlkonto für diesen Import.')
     validatePaymentAccount(paymentAccountId, d)
     const forcedRows = new Set((input.forceImportSourceRows || []).map((row) => Number(row)).filter((row) => Number.isFinite(row) && row > 0))
+    const additionalRows = new Set(input.additionalImportSourceRows || [])
+    // Snapshot all matches before inserting: repeated source rows represent separate occurrences.
+    const duplicateMatches = importDuplicates(d, parsed.rows, paymentAccountId)
     const rowsToProcess = forcedRows.size > 0
       ? parsed.rows.filter((row) => forcedRows.has(row.sourceRow))
       : parsed.rows
@@ -239,12 +256,16 @@ export function commitBankImport(input: {
         errors.push({ row: row.sourceRow, message: row.errors.join(' ') })
         continue
       }
-      const fingerprint = fingerprintFor(row, paymentAccountId)
-      const duplicate = duplicateRecordForRow(d, row, paymentAccountId)
-      if (duplicate && !forcedRows.has(row.sourceRow)) {
+      let fingerprint = fingerprintFor(row, paymentAccountId)
+      const duplicate = duplicateMatches.get(row.sourceRow)
+      if (duplicate && !forcedRows.has(row.sourceRow) && !additionalRows.has(row.sourceRow)) {
         duplicates++
         duplicateRows.push(duplicate)
         continue
+      }
+      // The legacy unique index remains valid while allowing confirmed/additional occurrences.
+      if (d.prepare('SELECT 1 FROM bank_transactions WHERE fingerprint = ?').get(fingerprint)) {
+        fingerprint = hash(`${fingerprint}|occurrence|${batchId}|${row.sourceRow}`)
       }
       const inserted = insert.run(
         batchId,
@@ -277,7 +298,8 @@ export function commitBankImport(input: {
       imported,
       duplicates,
       errorCount: errors.length,
-      forcedImportSourceRows: Array.from(forcedRows)
+      forcedImportSourceRows: Array.from(forcedRows),
+      additionalImportSourceRows: Array.from(additionalRows)
     })
     return { batchId, imported, importedTransactionIds, duplicates, duplicateRows, errors }
   })
@@ -847,6 +869,20 @@ export function findBankTransactionMatches(input: {
   return [...recurringMatches, ...voucherMatches]
     .sort((a: any, b: any) => b.score - a.score || a.dateDistance - b.dateDistance)
     .slice(0, 100)
+}
+
+function importDuplicates(d: DB, rows: ParsedBankTransaction[], paymentAccountId: number) {
+  const matches = new Map<number, NonNullable<ReturnType<typeof duplicateRecordForRow>>>()
+  const consumed = new Set<number>()
+  // Reserve exact matches first. Each stored occurrence can cover only one incoming row.
+  for (const allowPotential of [false, true]) {
+    for (const row of rows) {
+      if (row.errors.length || matches.has(row.sourceRow)) continue
+      const match = duplicateRecordForRow(d, row, paymentAccountId, consumed, allowPotential)
+      if (match) matches.set(row.sourceRow, match)
+    }
+  }
+  return matches
 }
 
 export function assertBankBookingCreationReviewed(id: number, acknowledgedVoucherIds: number[] = []) {

@@ -578,6 +578,7 @@ test('presents the optimized booking workflow', async () => {
   const dialog = page.locator('.quick-add-modal')
   await expect(dialog).toBeVisible()
   await expectReducedFloatingRadii(dialog)
+  await dialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   const bookingFieldContrast = await dialog.locator('#quick-add-date').evaluate((field) => ({
     field: getComputedStyle(field).backgroundColor,
     modal: getComputedStyle(field.closest('.modal') as HTMLElement).backgroundColor,
@@ -743,7 +744,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
   const dialog = page.locator('.quick-add-modal')
   await expect(dialog).toBeVisible()
   await expect(page.locator('.compact-booking-flyout')).toHaveCount(0)
-  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
   await chooseBookingEntryPresentation('Kompakt-Flyout')
   await expect.poll(() => page.evaluate(() => localStorage.getItem('ui.bookingEntryPresentation'))).toBe('flyout')
@@ -752,6 +753,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
   await expectReducedFloatingRadii(flyout)
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   const flyoutFieldContrast = await flyout.getByPlaceholder('Was wurde gebucht?').evaluate((field) => ({
     field: getComputedStyle(field).backgroundColor,
     flyout: getComputedStyle(field.closest('.compact-booking-flyout') as HTMLElement).backgroundColor,
@@ -805,6 +807,7 @@ test('parks a compact booking flyout in a tab and restores all entered content',
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
   await expect(flyout.getByRole('button', { name: 'Buchungsreiter wechseln' })).toBeVisible()
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Geparkter Reiter-Test')
   await flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('47.50')
   await page.locator('body').dispatchEvent('mousedown')
@@ -826,6 +829,8 @@ test('parks a compact booking flyout in a tab and restores all entered content',
   const secondDraftTab = allDraftTabs.nth(1)
   await expect(secondDraftTab).toHaveClass(/booking-draft-tab--active/)
   await expect(draftTab).not.toHaveClass(/booking-draft-tab--active/)
+  await expect(flyout.locator('.booking-type-fields')).toHaveAttribute('inert', '')
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('')
   await expect(flyout.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('')
 
@@ -863,6 +868,7 @@ test('closes compact entry without draft tabs and starts a fresh booking from th
 
   await bookingFab.click()
   await expect(flyout).toBeVisible()
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Temporärer Toggle-Test')
 
   await flyout.getByRole('button', { name: 'Buchungsflyout schließen', exact: true }).click()
@@ -871,6 +877,7 @@ test('closes compact entry without draft tabs and starts a fresh booking from th
 
   await bookingFab.click()
   await expect(flyout).toBeVisible()
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await expect(flyout.getByPlaceholder('Was wurde gebucht?')).toHaveValue('')
 })
 
@@ -881,6 +888,7 @@ test('saves a compact booking exactly once and keeps optional fields progressive
 
   const flyout = page.locator('.compact-booking-flyout')
   await expect(flyout).toBeVisible()
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await expect(flyout.getByRole('button', { name: '+ Tag', exact: true })).toBeVisible()
   await expect(flyout.getByRole('button', { name: '+ Kommentar', exact: true })).toBeVisible()
   await expect(flyout.getByRole('button', { name: '+ Anhang', exact: true })).toBeVisible()
@@ -933,6 +941,7 @@ test('parks the compact draft while an existing booking is edited and restores i
 
   await page.locator('.fab-buchung').click()
   const flyout = page.locator('.compact-booking-flyout')
+  await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await flyout.getByPlaceholder('Was wurde gebucht?').fill('Entwurf bleibt im Reiter')
   const draftTab = page.getByLabel('Offene Buchungstabs').locator('.booking-draft-tab').filter({ hasText: 'Entwurf bleibt im Reiter' })
   await expect(draftTab).toHaveClass(/booking-draft-tab--active/)
@@ -980,6 +989,7 @@ test('keeps expanded tags and comments separated in the detached booking window'
   await detachedPage.setViewportSize({ width: 900, height: 720 })
   const detachedDialog = detachedPage.locator('.detached-quick-add-modal')
   await expect(detachedDialog).toBeVisible()
+  await detachedDialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await detachedDialog.locator('.booking-details').nth(0).locator('summary').click()
   await detachedDialog.locator('.booking-details').nth(1).locator('summary').click()
 
@@ -1035,6 +1045,7 @@ test('distributes untouched budget amounts evenly and preserves manual values', 
   await page.locator('.fab-buchung').click()
 
   const dialog = page.locator('.quick-add-modal')
+  await dialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await dialog.locator('input[type="number"]').first().fill('100')
   const addBudget = dialog.getByTitle('Weiteres Budget hinzufügen')
   await addBudget.click()
@@ -1234,6 +1245,7 @@ test('Buchungen Plus shares draft tabs and the expanded editor with detached win
   const plus = page.locator('.bookings-plus')
   await plus.getByRole('button', { name: 'Neue Buchung', exact: true }).click()
   const modal = page.locator('.quick-add-modal')
+  await modal.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await modal.locator('#quick-add-description').fill('Entwurf Plus und Journal')
   await modal.getByRole('spinbutton', { name: 'Brutto-Betrag', exact: true }).fill('47.50')
   await expect(modal.locator('.booking-overview-amount')).toContainText('47,50')

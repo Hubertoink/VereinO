@@ -1,6 +1,16 @@
 import { parseBankStatement, parseCamtStatement } from '../../electron/main/services/bankStatementParser'
 
 describe('bank statement parser', () => {
+  it('prefers the purpose column even when generic booking text occurs first', () => {
+    const csv = 'Buchungstag;Betrag;Buchungstext;Verwendungszweck\n28.01.2026;-8,80;SEPA-UEBERWEISUNG;Porto und Versandkosten'
+    const data = Buffer.from(csv).toString('base64')
+    const parsed = parseBankStatement(data, 'export.csv')
+    expect(parsed.suggestedMapping.purpose).toBe('Verwendungszweck')
+    expect(parsed.rows[0].purpose).toBe('Porto und Versandkosten')
+    const overridden = parseBankStatement(data, 'export.csv', { purpose: 'Buchungstext' })
+    expect(overridden.rows[0].purpose).toBe('SEPA-UEBERWEISUNG')
+    expect(overridden.rows[0].raw).toEqual(parsed.rows[0].raw)
+  })
   it('parses CAMT credit and debit entries with the statement IBAN', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <Document>

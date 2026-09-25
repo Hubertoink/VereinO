@@ -23,6 +23,7 @@ test('customer creation stays above the booking flyout and preserves the booking
     await expect(page.locator('[data-shortcut-nav="Dashboard"]')).toBeVisible()
     await page.keyboard.press('Alt+n')
     const flyout = page.locator('.compact-booking-flyout')
+    await flyout.getByRole('button', { name: 'Einnahme', exact: true }).click()
     await page.setViewportSize({ width: 629, height: 680 })
     await expect(flyout.getByText('Kompakte Erfassung', { exact: true })).toHaveCount(0)
     const heading = await flyout.locator('#compact-booking-title').boundingBox()

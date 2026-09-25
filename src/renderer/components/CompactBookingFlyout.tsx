@@ -169,6 +169,9 @@ export default function CompactBookingFlyout({
   onNewDraft
 }: Props) {
   const amountInputRef = useRef<HTMLInputElement | null>(null)
+  const hasTypeSelectionStep = useRef(qa.bookingTypeSelected !== undefined).current
+  const editorRef = useRef<HTMLElement>(null)
+  const [selectedHeight, setSelectedHeight] = useState<number>()
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const aiAssistRef = useRef<HTMLDivElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
@@ -315,7 +318,8 @@ export default function CompactBookingFlyout({
   const hasInvalidAssignments = hasIncompleteBudgets || hasIncompleteEarmarks
     || hasDuplicateBudgets || hasDuplicateEarmarks
     || hasBudgetOverAllocation || hasEarmarkOverAllocation
-  const saveBlocked = !qa.date || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount
+  const needsBookingType = qa.bookingTypeSelected === false
+  const saveBlocked = needsBookingType || !qa.date || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount
     || hasInvalidAssignments || hasOutOfRange
     || (qa.type === 'INTERNAL' && !internalValidation.hasValidAssignments)
   const missingFields = [
@@ -347,13 +351,16 @@ export default function CompactBookingFlyout({
   })()
 
   useEffect(() => {
-    window.setTimeout(() => amountInputRef.current?.focus(), 0)
-  }, [])
+    if (needsBookingType) return
+    const timer = window.setTimeout(() => amountInputRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
+  }, [needsBookingType])
 
   const patchQa = (patch: Partial<QA>) => setQa({ ...qa, ...patch } as QA)
 
   const selectType = (type: QA['type']) => {
-    const next = { ...qa, type } as QA
+    if (needsBookingType) setSelectedHeight(editorRef.current?.getBoundingClientRect().height)
+    const next = { ...qa, type, bookingTypeSelected: true } as QA
     if (type === 'TRANSFER') {
       next.mode = 'GROSS'
       next.vatRate = 0
@@ -550,7 +557,7 @@ export default function CompactBookingFlyout({
   ]
 
   return (
-    <section className={`compact-booking-flyout compact-booking-flyout--${qa.type.toLowerCase()}`} role="dialog" aria-labelledby="compact-booking-title">
+    <section ref={editorRef} style={{ height: needsBookingType ? undefined : selectedHeight }} className={`compact-booking-flyout compact-booking-flyout--${needsBookingType ? 'pending' : qa.type.toLowerCase()}${hasTypeSelectionStep ? ' booking-type-flow' : ''}${needsBookingType ? ' booking-type-pending' : ''}`} role="dialog" aria-labelledby="compact-booking-title">
       <header className="compact-booking-flyout__header">
         <div>
           <strong id="compact-booking-title" title={title}>{title}</strong>
@@ -576,12 +583,14 @@ export default function CompactBookingFlyout({
         <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
           <BookingKindSwitch
-            value={qa.type}
+            value={needsBookingType ? '' : qa.type}
+            autoFocus={needsBookingType}
             ariaLabel="Buchungsart wählen"
             options={kindOptions}
             onChange={(value) => selectType(value as QA['type'])}
           />
 
+          <div className="booking-type-fields" {...(needsBookingType ? { inert: '' } : {})} aria-hidden={needsBookingType || undefined}>
           <div className="compact-booking-core-grid">
             <label className="compact-booking-field">
               <span>Datum *</span>
@@ -846,9 +855,10 @@ export default function CompactBookingFlyout({
             </div>
           )}
           </BookingOptionalArea>
+          </div>
         </div>
 
-        <footer className="compact-booking-flyout__footer">
+        <footer className="compact-booking-flyout__footer" {...(needsBookingType ? { inert: '' } : {})} aria-hidden={needsBookingType || undefined}>
           <div className="compact-booking-flyout__footer-main">
             {aiSuggestions.length > 0 && (
               <div className="booking-ai-assist compact-booking-ai-assist" ref={aiAssistRef}>
@@ -913,6 +923,12 @@ export default function CompactBookingFlyout({
             <button type="submit" className="btn primary" disabled={saveBlocked}>{saveLabel}</button>
           </div>
         </footer>
+        {needsBookingType && <div className="booking-type-overlay">
+          <div className="booking-type-prompt" role="status">
+            <strong>Was möchtest du buchen?</strong>
+            <span>Wähle oben die Buchungsart, um das Formular freizugeben.</span>
+          </div>
+        </div>}
       </form>
     </section>
   )

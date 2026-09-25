@@ -6,6 +6,7 @@ import type { BookingEntryPresentation } from '../context/UIPreferencesContextCo
 import { encodeFilesForUpload } from '../utils/fileEncoding'
 
 type QA = {
+    bookingTypeSelected?: boolean
     date: string
     type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -147,6 +148,7 @@ export function useQuickAdd(
         return {
             date: '',
             type: habits.type,
+            bookingTypeSelected: false,
             sphere: 'IDEELL',
             mode: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? 'GROSS' : habits.mode,
             grossAmount: undefined,
@@ -163,6 +165,7 @@ export function useQuickAdd(
         const next: QA = {
             date: '',
             type: previous.type,
+            bookingTypeSelected: false,
             sphere: previous.sphere,
             mode,
             vatRate: mode === 'NET' ? Number(previous.vatRate || 0) : 0,
@@ -207,7 +210,7 @@ export function useQuickAdd(
         const draft: QuickAddDraft = {
             id: createDraftId(),
             sequence: nextSequenceRef.current++,
-            qa: initial?.qa ?? makeDefaults(),
+            qa: { ...(initial?.qa ?? makeDefaults()), bookingTypeSelected: initial?.qa?.bookingTypeSelected ?? false },
             files: initial?.files ?? [],
             detached,
             kind: options?.kind ?? 'booking',
@@ -270,9 +273,13 @@ export function useQuickAdd(
     }, [])
 
     const updateDraft = useCallback((draftId: string, patch: { qa?: QA; files?: File[]; detached?: boolean; kind?: 'booking' | 'invoice'; invoiceState?: LocalInvoiceScanDraftState; invoiceGuidance?: InvoiceAiGuidance; invoiceBatchJobId?: number }) => {
-        setDrafts((prev) => prev.map((draft) => (
-            draft.id === draftId ? { ...draft, ...patch } : draft
-        )))
+        setDrafts((prev) => prev.map((draft) => {
+            if (draft.id !== draftId) return draft
+            const qa = patch.qa
+                ? { ...patch.qa, bookingTypeSelected: patch.qa.bookingTypeSelected ?? draft.qa.bookingTypeSelected ?? false }
+                : draft.qa
+            return { ...draft, ...patch, qa }
+        }))
     }, [])
 
     const clearDrafts = useCallback(() => {
@@ -290,7 +297,9 @@ export function useQuickAdd(
     const setQa = useCallback((nextQa: QA) => {
         if (!activeDraftId) return
         setDrafts((prev) => prev.map((draft) => (
-            draft.id === activeDraftId ? { ...draft, qa: nextQa } : draft
+            draft.id === activeDraftId ? { ...draft, qa: {
+                ...nextQa, bookingTypeSelected: nextQa.bookingTypeSelected ?? draft.qa.bookingTypeSelected ?? false
+            } } : draft
         )))
     }, [activeDraftId])
 
@@ -309,6 +318,11 @@ export function useQuickAdd(
 
     async function onQuickSave(mode: QuickAddSaveMode = 'default') {
         if (!activeDraft) return
+
+        if (activeDraft.qa.bookingTypeSelected === false) {
+            notify?.('error', 'Bitte wähle zuerst die Buchungsart aus.')
+            return
+        }
 
         if (!activeDraft.qa.date) {
             notify?.('error', 'Bitte wähle ein Buchungsdatum aus.')

@@ -7,6 +7,13 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-09-25
+
+### Geändert
+
+- Bankimporte prüfen Duplikate bereits in der Vorschau und erneut beim Speichern. Originaldaten erkennen wiederholte CSV-Umsätze auch bei geänderter Spaltenzuordnung; gleiche Kerndaten mit abweichendem Text werden zur Prüfung vorgelegt und zunächst übersprungen. Echte Mehrfachzahlungen bleiben nach Anzahl erhalten. Die Spaltenerkennung bevorzugt den Verwendungszweck vor dem Buchungstext und warnt bei abweichender Zuordnung.
+- Neue Buchungen erfordern zuerst die bewusste Auswahl der Buchungsart. Das Formular bleibt bis dahin unscharf und gesperrt, während Größe und Position des Dialogs erhalten bleiben. Die Art bleibt danach frei wechselbar. Dies gilt auch für vorbelegte Entwürfe und „Speichern & neu“. Beim Wiederöffnen oder Wechsel der Darstellung bleibt die Auswahl erhalten.
+
 ## [4.2.2] - 2026-09-25
 
 ### Geändert
