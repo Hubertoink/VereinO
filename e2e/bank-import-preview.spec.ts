@@ -36,7 +36,7 @@ test.beforeAll(async () => {
         }
       }
       createRoot(document.getElementById('root')).render(<BankImportModal accounts={accounts} onClose={() => {}} onImported={() => {}} notify={() => {}} />)
-    ` }, bundle: true, write: false, platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' },
+    ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'expose-import-dialog', setup(builder) {
       builder.onLoad({ filter: /BankImportView\.tsx$/ }, async ({ path }) => ({ contents: await fs.readFile(path, 'utf8') + '\nexport { BankImportModal }', loader: 'tsx' }))
     } }]
@@ -60,7 +60,8 @@ test('defaults to skipping, shows both records and requires explicit additional 
   const choice = page.getByRole('checkbox', { name: /Als zusätzlichen Umsatz/ })
   await expect(choice).not.toBeChecked()
   await expect(page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' })).toBeEnabled()
-  await expect(page.getByText('Bereits vorhanden: Bankbeleg #12')).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Vergleich möglicher Duplikate' })).toBeVisible()
+  await expect(page.getByText('Bereits vorhanden: Bankbeleg #12', { exact: false })).toBeVisible()
   await page.getByRole('region', { name: 'Duplikate vor dem Import prüfen' }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('duplicate-preview.png'), fullPage: true })
   await choice.check()

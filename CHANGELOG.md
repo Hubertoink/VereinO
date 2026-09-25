@@ -7,6 +7,10 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+
+- Die Duplikatprüfung beim Bankimport zeigt Importdaten und vorhandene Bankbelege in einer kompakten Vergleichstabelle mit Auswahlspalte für zusätzliche Zahlungen.
+
 ## [4.4.0] - 2026-09-25
 
 ### Hinzugefügt

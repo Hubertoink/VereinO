@@ -1315,14 +1315,17 @@ function BankImportModal({
             {previewDuplicates.length > 0 && <section className="bank-import-duplicates" aria-label="Duplikate vor dem Import prüfen">
               <h3><AppIcon icon={IconAlertTriangle} size="action" /> {previewDuplicates.length} vorhandene oder möglicherweise doppelte Umsätze</h3>
               <p>Diese Zeilen werden zunächst übersprungen. Vergleiche die Daten und wähle nur zusätzliche, tatsächlich erfolgte Zahlungen aus.</p>
-              {previewDuplicates.map((duplicate) => <article className="bank-import-duplicate" key={duplicate.sourceRow}>
-                <strong>Zeile {duplicate.sourceRow} · {duplicateReasonLabel(duplicate.duplicateBy)}</strong>
-                <div className="bank-import-duplicate__comparison">
-                  <div><b>Aus der Importdatei</b><span>{formatDate(duplicate.bookingDate)} · {duplicate.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.amount)}</span><span>{duplicate.counterparty || 'Ohne Gegenpartei'}</span><span>{duplicate.purpose || 'Ohne Verwendungszweck'}</span></div>
-                  <div><b>Bereits vorhanden: Bankbeleg #{duplicate.existing.id}</b><span>{formatDate(duplicate.existing.bookingDate)} · {duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</span><span>{duplicate.existing.counterparty || 'Ohne Gegenpartei'}</span><span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small>{duplicate.existing.paymentAccountName} · {duplicate.existing.sourceFileName}</small></div>
-                </div>
-                <label><input type="checkbox" disabled={busy} checked={additionalImportRows.includes(duplicate.sourceRow)} onChange={(event) => setAdditionalImportRows((current) => event.target.checked ? [...current, duplicate.sourceRow] : current.filter((row) => row !== duplicate.sourceRow))} /> Als zusätzlichen Umsatz importieren – es handelt sich um eine weitere Zahlung.</label>
-              </article>)}
+              <div className="bank-duplicate-table-wrap">
+                <table className="bank-table bank-duplicate-table" aria-label="Vergleich möglicher Duplikate">
+                  <thead><tr><th>Zeile / Prüfung</th><th>Aus der Importdatei</th><th>Bereits vorhandener Bankbeleg</th><th>Zusätzlich<br />importieren</th></tr></thead>
+                  <tbody>{previewDuplicates.map((duplicate) => <tr key={duplicate.sourceRow} className={additionalImportRows.includes(duplicate.sourceRow) ? 'is-selected' : ''}>
+                    <td><strong>{duplicate.sourceRow}</strong><small>{duplicateReasonLabel(duplicate.duplicateBy)}</small></td>
+                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.bookingDate)}</span><strong>{duplicate.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.amount)}</strong></div>{duplicate.counterparty && <span className="bank-duplicate-table__party">{duplicate.counterparty}</span>}<span>{duplicate.purpose || 'Ohne Verwendungszweck'}</span></td>
+                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.existing.bookingDate)}</span><strong>{duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</strong></div>{duplicate.existing.counterparty && <span className="bank-duplicate-table__party">{duplicate.existing.counterparty}</span>}<span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small title={duplicate.existing.sourceFileName || ''}>Bereits vorhanden: Bankbeleg #{duplicate.existing.id} · {duplicate.existing.paymentAccountName}<details><summary>Quelldatei</summary>{duplicate.existing.sourceFileName || '–'}</details></small></td>
+                    <td className="bank-duplicate-table__choice"><input type="checkbox" aria-label={`Als zusätzlichen Umsatz importieren: Zeile ${duplicate.sourceRow}`} title="Nur auswählen, wenn es sich um eine weitere, tatsächlich erfolgte Zahlung handelt." disabled={busy} checked={additionalImportRows.includes(duplicate.sourceRow)} onChange={(event) => setAdditionalImportRows((current) => event.target.checked ? [...current, duplicate.sourceRow] : current.filter((row) => row !== duplicate.sourceRow))} /></td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
             </section>}
             <div className="bank-preview-table-wrap">
               <table className="bank-table bank-preview-table">

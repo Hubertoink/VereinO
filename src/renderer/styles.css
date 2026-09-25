@@ -4170,11 +4170,23 @@ svg text {
   background: color-mix(in srgb, var(--warning) 8%, var(--surface));
 }
 .bank-import-duplicates h3 { display: flex; gap: 8px; align-items: center; margin-top: 0; color: var(--warning); }
-.bank-import-duplicate { padding: 14px 0; border-top: 1px solid var(--border); }
-.bank-import-duplicate__comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 12px 0; }
-.bank-import-duplicate__comparison > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
-.bank-import-duplicate label { display: flex; gap: 8px; align-items: baseline; }
-@media (max-width: 640px) { .bank-import-duplicate__comparison { grid-template-columns: minmax(0, 1fr); } }
+.bank-import-duplicates > p { font-size: 12px; margin: 8px 0 12px; }
+.bank-duplicate-table-wrap { max-height: 380px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.bank-table.bank-duplicate-table { width: 100%; min-width: 680px; table-layout: fixed; font-size: 12px; }
+.bank-duplicate-table th { position: sticky; top: 0; z-index: 1; background: var(--surface); font-size: 11px; }
+.bank-duplicate-table th:first-child { width: 125px; }
+.bank-duplicate-table th:last-child { width: 100px; text-align: center; }
+.bank-table.bank-duplicate-table td { padding: 8px 10px; vertical-align: top; overflow-wrap: anywhere; }
+.bank-duplicate-table td > span, .bank-duplicate-table small { display: block; }
+.bank-duplicate-table small { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+.bank-duplicate-table__numbers { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.bank-duplicate-table__numbers strong { white-space: nowrap; }
+.bank-duplicate-table__party { font-weight: 600; margin-bottom: 2px; }
+.bank-duplicate-table__choice { text-align: center; vertical-align: middle !important; }
+.bank-duplicate-table input { accent-color: var(--accent); }
+.bank-duplicate-table tr.is-selected { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.bank-duplicate-table details { margin-top: 3px; }
+.bank-duplicate-table summary { cursor: pointer; }
 
 .compact-booking-flyout.booking-type-flow {
   height: auto;
