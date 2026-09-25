@@ -367,3 +367,11 @@
  .bp-invoice-tools .invoice-split-fab__batch { font-size: 11px; gap: 4px; padding-left: 5px; padding-right: 5px; }
 }
 .bp-reimbursement-indicator { display: inline-flex; align-items: center; color: var(--accent); padding: 3px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* At narrow widths keep account and document indicators alongside the tags. */
+.bp-row-payment--compact { display: none; }
+@media (max-width: 700px) {
+  .bp-row .bp-row-tags { max-height: none; overflow: visible; align-items: center; }
+  .bp-row-payment--compact { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 5px; }
+  .bp-row-payment--compact .bp-payment-badge { padding: 2px 5px; font-size: 10px; }
+}

@@ -14,6 +14,7 @@ test.beforeAll(async () => {
       const accounts = [{ id: 1, name: 'Bank', kind: 'BANK', isActive: 1 }, { id: 2, name: 'Weitere Bank', kind: 'BANK', isActive: 1 }]
       window.commits = []
       window.previews = []
+      window.closeCalls = 0
       window.api = {
         ai: { settings: { get: async () => ({ hasApiKey: false }) } },
         bankImports: {
@@ -24,18 +25,18 @@ test.beforeAll(async () => {
             return { format: 'CSV', headers: ['Buchungstag', 'Betrag', 'Buchungstext', 'Verwendungszweck'],
               suggestedMapping: { bookingDate: 'Buchungstag', amount: 'Betrag', purpose: 'Verwendungszweck' },
               accountIbans: [], detectedPaymentAccountId: input.paymentAccountId || null,
-              rows: [row], summary: { total: 1, valid: 1, errors: 0 },
+              rows: Array.from({ length: window.previewRowCount || 1 }, (_, i) => ({ ...row, sourceRow: i + 2 })), summary: { total: window.previewRowCount || 1, valid: window.previewRowCount || 1, errors: 0 },
               warnings: input.mapping?.purpose === 'Buchungstext' ? ['Die vorhandene Zweckspalte wird nicht verwendet.'] : [],
-              duplicateRows: input.paymentAccountId === 1 ? [{ ...row, duplicateBy: 'POTENTIAL', existing: {
+              duplicateRows: input.paymentAccountId === 1 ? Array.from({ length: window.previewRowCount || 1 }, (_, i) => ({ ...row, sourceRow: i + 2, duplicateBy: 'POTENTIAL', existing: {
                 id: 12, bookingDate: '2026-01-28', direction: 'OUT', amount: 8.8, purpose: 'SEPA-UEBERWEISUNG',
                 paymentAccountName: 'Bank', sourceFileName: 'alter-export.csv'
-              } }] : [] }
+              } })) : [] }
           },
-          commit: async input => { window.commits.push(input); return { imported: input.additionalImportSourceRows?.length || 0,
+          commit: async input => { window.commits.push(input); if (window.commitResult) return window.commitResult; return { imported: input.additionalImportSourceRows?.length || 0,
             duplicates: 0, duplicateRows: [], errors: [], importedTransactionIds: [] } }
         }
       }
-      createRoot(document.getElementById('root')).render(<BankImportModal accounts={accounts} onClose={() => {}} onImported={() => {}} notify={() => {}} />)
+      createRoot(document.getElementById('root')).render(<BankImportModal accounts={accounts} onClose={() => { window.closeCalls++ }} onImported={() => {}} notify={() => {}} />)
     ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'expose-import-dialog', setup(builder) {
       builder.onLoad({ filter: /BankImportView\.tsx$/ }, async ({ path }) => ({ contents: await fs.readFile(path, 'utf8') + '\nexport { BankImportModal }', loader: 'tsx' }))
@@ -61,8 +62,15 @@ test('defaults to skipping, shows both records and requires explicit additional 
   await expect(choice).not.toBeChecked()
   await expect(page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' })).toBeEnabled()
   await expect(page.getByRole('table', { name: 'Vergleich möglicher Duplikate' })).toBeVisible()
-  await expect(page.getByText('Bereits vorhanden: Bankbeleg #12', { exact: false })).toBeVisible()
+  await expect(page.getByText('Bankbeleg #12', { exact: false })).toBeVisible()
   await page.getByRole('region', { name: 'Duplikate vor dem Import prüfen' }).scrollIntoViewIfNeeded()
+  await expect(page.getByText('Quelldatei', { exact: true })).toHaveCount(0)
+  const footer = await page.locator('.bank-import-modal > .bank-modal-footer').boundingBox()
+  const scroll = await page.locator('.bank-import-scroll').boundingBox()
+  expect(scroll!.y + scroll!.height).toBeLessThanOrEqual(footer!.y + 1)
+  expect(footer!.y + footer!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+  const action = page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' })
+  await action.click({ trial: true })
   await page.screenshot({ path: testInfo.outputPath('duplicate-preview.png'), fullPage: true })
   await choice.check()
   await page.getByRole('button', { name: '1 Beleg(e) importieren', exact: true }).click()
@@ -71,8 +79,10 @@ test('defaults to skipping, shows both records and requires explicit additional 
 
 test('rechecks account and mapping changes and resets earlier confirmations', async ({ page }) => {
   const choice = page.getByRole('checkbox', { name: /Als zusätzlichen Umsatz/ })
+  const callsBefore = await page.evaluate(() => (window as any).previews.length)
   await choice.check()
   await page.getByRole('combobox', { name: 'Verwendungszweck', exact: true }).selectOption('Buchungstext')
+  await expect.poll(() => page.evaluate(() => (window as any).previews.length)).toBeGreaterThan(callsBefore)
   await expect(choice).not.toBeChecked()
   await expect(page.getByRole('alert')).toContainText('Zweckspalte')
   await page.getByLabel('Zahlkonto', { exact: false }).selectOption('2')
@@ -82,4 +92,37 @@ test('rechecks account and mapping changes and resets earlier confirmations', as
   await expect(choice).not.toBeChecked()
   await page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' }).click()
   expect(await page.evaluate(() => (window as any).commits[0].additionalImportSourceRows)).toEqual([])
+})
+
+test('reviewed skipped duplicates close directly without a second duplicate dialog', async ({ page }) => {
+  await page.evaluate(() => { (window as any).commitResult = { imported: 0, duplicates: 1, errors: [], importedTransactionIds: [], duplicateRows: [{ sourceRow: 2, duplicateBy: 'POTENTIAL', existing: { id: 12 } }] } })
+  await page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).closeCalls)).toBe(1)
+  await expect(page.getByText('Import geprüft', { exact: true })).toHaveCount(0)
+})
+
+test('new conflicts discovered during commit still receive a review', async ({ page }) => {
+  await page.evaluate(() => { (window as any).commitResult = { imported: 0, duplicates: 1, errors: [], importedTransactionIds: [], duplicateRows: [{ sourceRow: 2, bookingDate: '2026-01-28', direction: 'OUT', amount: 8.8, purpose: 'Porto', duplicateBy: 'POTENTIAL', existing: { id: 99, bookingDate: '2026-01-28', direction: 'OUT', amount: 8.8, purpose: 'Porto' } }] } })
+  await page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' }).click()
+  await expect(page.getByText('Import geprüft', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => (window as any).closeCalls)).toBe(0)
+})
+
+
+test('large duplicate previews keep the lower booking table accessible inside the modal', async ({ page }) => {
+  await page.setViewportSize({ width: 1150, height: 740 })
+  await page.evaluate(() => { (window as any).previewRowCount = 34 })
+  await page.getByRole('combobox', { name: 'Verwendungszweck', exact: true }).selectOption('Buchungstext')
+  await expect(page.locator('.bank-preview-table tbody tr')).toHaveCount(34)
+  await page.locator('.bank-more-options > summary').click()
+  const preview = page.locator('.bank-preview-table-wrap')
+  await preview.scrollIntoViewIfNeeded()
+  const bounds = await preview.boundingBox()
+  const footer = await page.locator('.bank-import-modal > .bank-modal-footer').boundingBox()
+  expect(bounds!.height).toBeGreaterThanOrEqual(160)
+  expect(bounds!.y).toBeGreaterThanOrEqual(0)
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(footer!.y)
+  await preview.evaluate(el => { el.scrollTop = el.scrollHeight })
+  await expect(page.locator('.bank-preview-table tbody tr').last()).toBeInViewport()
+  await page.getByRole('button', { name: 'Ohne neue Bankbelege abschließen' }).click({ trial: true })
 })

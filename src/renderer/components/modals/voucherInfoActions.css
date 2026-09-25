@@ -27,3 +27,14 @@
   width: 100%;
   white-space: nowrap;
 }
+
+.voucher-info-actions__menu > .btn:not(:disabled):hover,
+.voucher-info-actions__menu > .btn:not(:disabled):focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+
+.voucher-info-actions__menu > .btn:not(:disabled):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

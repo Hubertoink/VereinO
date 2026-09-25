@@ -119,6 +119,7 @@ export default function AttachmentsModal({
     const [selectedId, setSelectedId] = useState<number | null>(null)
     const [confirmDelete, setConfirmDelete] = useState<null | { id: number; fileName: string }>(null)
     const [preview, setPreview] = useState<PreviewState>(null)
+    const [pdfZoom, setPdfZoom] = useState(1)
     const [pdfError, setPdfError] = useState<string>('')
     const [pdfMeta, setPdfMeta] = useState<null | { page: number; numPages: number }>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -132,6 +133,22 @@ export default function AttachmentsModal({
     const resizeFrameRef = useRef<number | null>(null)
     const currentPreviewRequestRef = useRef(0)
     const [previewAreaWidth, setPreviewAreaWidth] = useState<number>(0)
+
+    useEffect(() => { setPdfZoom(1) }, [selectedId])
+
+    useEffect(() => {
+        const area = previewAreaRef.current
+        if (!area || preview?.kind !== 'pdf') return
+        const zoomWithWheel = (event: WheelEvent) => {
+            if (!event.ctrlKey || event.deltaY === 0) return
+            event.preventDefault()
+            event.stopPropagation()
+            const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? area.clientHeight : 1)
+            setPdfZoom(current => Math.max(0.25, Math.min(4, current * Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.002))))
+        }
+        area.addEventListener('wheel', zoomWithWheel, { passive: false })
+        return () => area.removeEventListener('wheel', zoomWithWheel)
+    }, [preview])
 
     const revokePreview = (value: PreviewState) => {
         if (value?.kind === 'image' && value.url.startsWith('blob:')) URL.revokeObjectURL(value.url)
@@ -274,7 +291,7 @@ export default function AttachmentsModal({
             const baseViewport = page.getViewport({ scale: 1 })
             const availWidth = Math.max(0, (previewAreaWidth || 0) - 40)
             const fitScale = availWidth > 0 ? Math.min(1, (availWidth / baseViewport.width) * 0.95) : 1
-            const scale = Math.max(0.5, Math.min(1, fitScale))
+            const scale = Math.max(0.5, Math.min(1, fitScale)) * pdfZoom
 
             if (renderTaskRef.current) {
                 try { renderTaskRef.current.cancel() } catch { }
@@ -334,7 +351,7 @@ export default function AttachmentsModal({
                 try { renderTaskRef.current.cancel() } catch { }
             }
         }
-    }, [preview, pdfMeta?.page, previewAreaWidth])
+    }, [preview, pdfMeta?.page, previewAreaWidth, pdfZoom])
 
     const selected = files.find(f => f.id === selectedId) || null
     
@@ -516,6 +533,7 @@ export default function AttachmentsModal({
                                                     >
                                                         <IconChevronLeft />
                                                     </button>
+                                                    <button type="button" className="btn ghost" title="Strg + Mausrad zum Zoomen · Klicken zum Zurücksetzen" aria-label="PDF Zoom zurücksetzen" onClick={() => setPdfZoom(1)}>{Math.round(pdfZoom * 100)} %</button>
                                                     <span className="attachments-modal__pdf-page">Seite {pdfMeta.page} / {pdfMeta.numPages}</span>
                                                     <button
                                                         className="attachments-modal__icon-btn"

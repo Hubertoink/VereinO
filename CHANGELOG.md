@@ -7,9 +7,20 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-09-25
+
 ### Geändert
 
+- Bankbeleg-Details orientieren sich an den Buchungsdetails: hervorgehobener Betrag und Verwendungszweck, kompakte Datums- und Kontofelder mit Icons sowie getrennte Informationsbereiche.
+
+- Bereits in der Importvorschau geprüfte und übersprungene Duplikate öffnen keinen zweiten Ergebnisdialog. Nur neue Konflikte oder Importfehler erfordern eine weitere Prüfung.
+
 - Die Duplikatprüfung beim Bankimport zeigt Importdaten und vorhandene Bankbelege in einer kompakten Vergleichstabelle mit Auswahlspalte für zusätzliche Zahlungen.
+- Importaktionen bleiben außerhalb des scrollenden Inhalts sichtbar. Quelldateien entfallen in Duplikatzeilen; die Spaltenzuordnung zeigt den automatischen Aktualisierungsstatus statt einer manuellen Schaltfläche.
+
+- Buchungen Plus zeigt Zahlweg, Anhang und Kostenerstattung auch in der schmalen Ansicht neben den Tags.
+- PDF-Belege lassen sich mit Strg + Mausrad zoomen; die Zoomanzeige setzt die Ansicht auf 100 % zurück.
+- Störende Trennlinien entfallen; die Importtabelle bleibt auch bei vielen Duplikaten erreichbar. Menüoptionen der Buchungsdetails erhalten einen Hover-Effekt.
 
 ## [4.4.0] - 2026-09-25
 

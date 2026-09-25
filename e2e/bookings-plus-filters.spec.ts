@@ -75,6 +75,7 @@ test('filter refresh keeps rows, totals and panel geometry until results arrive'
 
 test('selected day and month survive leaving Buchungen Plus', async ({ page }) => {
   await page.setContent('<div id="root"></div>')
+  await page.addStyleTag({ content: styles })
   await page.addScriptTag({ content: script })
   await expect(page.locator('.bp-row')).toHaveCount(2)
   await expect(page.locator('.bp-row').filter({ hasText: 'Ausgabe Test' }).getByRole('img', { name: 'Kostenerstattung verknüpft' })).toBeVisible()
@@ -104,4 +105,16 @@ test('edit in flyout mode does not open a detached window', async ({ page }) => 
   await page.getByRole('button', { name: 'Bearbeiten' }).click()
   await expect.poll(() => page.evaluate(() => (window as any).editCalls)).toEqual([1])
   expect(await page.evaluate(() => (window as any).detachedCalls)).toEqual([])
+})
+
+
+test('narrow rows show payment and reimbursement indicators alongside tags', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 800 })
+  await page.setContent('<div id="root"></div>')
+  await page.addStyleTag({ content: styles })
+  await page.addScriptTag({ content: script })
+  const row = page.locator('.bp-row').filter({ hasText: 'Ausgabe Test' })
+  await expect(row.locator('.bp-row-tags .bp-payment-badge')).toBeVisible()
+  await expect(row.getByRole('img', { name: 'Kostenerstattung verknüpft' })).toBeVisible()
+  await expect(row.locator(':scope > .bp-row-payment')).toBeHidden()
 })

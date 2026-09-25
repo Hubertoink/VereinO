@@ -1,3 +1,5 @@
+import { IconArrowDown, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
+import './bankReview.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
@@ -1041,7 +1043,7 @@ function BankImportModal({
       })) as ImportCommitResult
       notify(
         'success',
-        `${result.imported} ${result.imported === 1 ? 'Bankbeleg' : 'Bankbelege'} importiert.`
+        `${result.imported} ${result.imported === 1 ? 'Bankbeleg' : 'Bankbelege'} importiert.${result.duplicates ? ` ${result.duplicates} Duplikat(e) übersprungen.` : ''}`
       )
       if (result.errors.length)
         notify('info', `${result.errors.length} fehlerhafte Zeile(n) wurden nicht übernommen.`)
@@ -1056,8 +1058,14 @@ function BankImportModal({
         }
       }
       onImported()
-      if (result.duplicateRows.length || result.errors.length) {
-        setCommitResult(result)
+      // Only ask again for conflicts that were not already reviewed and skipped.
+      const unexpectedDuplicates = result.duplicateRows.filter(row =>
+        additionalImportRows.includes(row.sourceRow) || !(preview?.duplicateRows || []).some(known =>
+          known.sourceRow === row.sourceRow && known.existing.id === row.existing.id && known.duplicateBy === row.duplicateBy
+        )
+      )
+      if (unexpectedDuplicates.length || result.errors.length) {
+        setCommitResult({ ...result, duplicateRows: unexpectedDuplicates })
         setSelectedDuplicateRows([])
       } else {
         onClose()
@@ -1133,6 +1141,7 @@ function BankImportModal({
           <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
+        <div className="bank-import-scroll">
         <div className="bank-import-drop">
           <strong>{file?.name || 'Kontoauszug auswählen'}</strong>
           <span className="helper">
@@ -1232,13 +1241,7 @@ function BankImportModal({
               <section className="bank-mapping-card">
                 <div className="bank-section-title">
                   <strong>Spaltenzuordnung</strong>
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => file && fileBytes && void loadPreview(file, fileBytes, mapping)}
-                  >
-                    Vorschau aktualisieren
-                  </button>
+                  <span className="helper" role="status">{busy ? 'Vorschau wird aktualisiert …' : 'Vorschau aktualisiert sich automatisch'}</span>
                 </div>
                 <div className="bank-mapping-grid">
                   <MappingSelect
@@ -1321,7 +1324,7 @@ function BankImportModal({
                   <tbody>{previewDuplicates.map((duplicate) => <tr key={duplicate.sourceRow} className={additionalImportRows.includes(duplicate.sourceRow) ? 'is-selected' : ''}>
                     <td><strong>{duplicate.sourceRow}</strong><small>{duplicateReasonLabel(duplicate.duplicateBy)}</small></td>
                     <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.bookingDate)}</span><strong>{duplicate.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.amount)}</strong></div>{duplicate.counterparty && <span className="bank-duplicate-table__party">{duplicate.counterparty}</span>}<span>{duplicate.purpose || 'Ohne Verwendungszweck'}</span></td>
-                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.existing.bookingDate)}</span><strong>{duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</strong></div>{duplicate.existing.counterparty && <span className="bank-duplicate-table__party">{duplicate.existing.counterparty}</span>}<span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small title={duplicate.existing.sourceFileName || ''}>Bereits vorhanden: Bankbeleg #{duplicate.existing.id} · {duplicate.existing.paymentAccountName}<details><summary>Quelldatei</summary>{duplicate.existing.sourceFileName || '–'}</details></small></td>
+                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.existing.bookingDate)}</span><strong>{duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</strong></div>{duplicate.existing.counterparty && <span className="bank-duplicate-table__party">{duplicate.existing.counterparty}</span>}<span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small>Bankbeleg #{duplicate.existing.id} · {duplicate.existing.paymentAccountName}</small></td>
                     <td className="bank-duplicate-table__choice"><input type="checkbox" aria-label={`Als zusätzlichen Umsatz importieren: Zeile ${duplicate.sourceRow}`} title="Nur auswählen, wenn es sich um eine weitere, tatsächlich erfolgte Zahlung handelt." disabled={busy} checked={additionalImportRows.includes(duplicate.sourceRow)} onChange={(event) => setAdditionalImportRows((current) => event.target.checked ? [...current, duplicate.sourceRow] : current.filter((row) => row !== duplicate.sourceRow))} /></td>
                   </tr>)}</tbody>
                 </table>
@@ -1358,6 +1361,7 @@ function BankImportModal({
           </>
         )}
 
+        </div>
         <footer className="bank-modal-footer">
           <button className="btn" onClick={onClose}>
             Abbrechen
@@ -1610,15 +1614,9 @@ function BankReviewModal({
       aria-modal="true"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
-      <div className="modal bank-review-modal">
+      <div className="modal bank-review-modal bank-review-modal--structured">
         <header className="bank-modal-header">
-          <div className="bank-review-heading">
-            <h2>Bankbeleg #{transaction.id}</h2>
-            <p>{transaction.counterparty || 'Ohne Gegenpartei'}</p>
-            <span className={`bank-status bank-review-status-badge bank-status--${transaction.status.toLowerCase()}`}>
-              {statusLabel(transaction.status)}
-            </span>
-          </div>
+          <div className="bank-review-title"><IconFileDescription size={23} aria-hidden="true" /><div><div className="bank-review-title-line"><h2>Bankbeleg #{transaction.id}</h2><span className={`bank-status bank-review-status-badge bank-status--${transaction.status.toLowerCase()}`}>{statusLabel(transaction.status)}</span></div><p>Alle Informationen zu diesem Bankbeleg</p></div></div>
           <div className="bank-header-actions">
             <div className="bank-action-menu" ref={actionMenuRef}>
               <button
@@ -1699,52 +1697,26 @@ function BankReviewModal({
           </div>
         </header>
 
-        <section className="bank-detail-card">
-          <div>
-            <span>Datum</span>
-            <strong>{formatDate(transaction.bookingDate)}</strong>
+        <div className="bank-review-scroll">
+        <section className="bank-review-summary">
+          <div className="bank-review-summary-main">
+            <div className={`bank-review-amount bank-review-amount--${transaction.direction.toLowerCase()}`}>
+              <span className="bank-review-eyebrow">Betrag</span>
+              <strong><span className="bank-review-direction-icon">{transaction.direction === 'IN' ? <IconArrowUp size={22} /> : <IconArrowDown size={22} />}</span>{transaction.direction === 'OUT' ? '−' : '+'}{euro.format(transaction.amount)}</strong>
+              <span className={`badge ${transaction.direction.toLowerCase()}`}>{transaction.direction === 'IN' ? 'Einnahme' : 'Ausgabe'}</span>
+            </div>
+            <div className="bank-review-purpose"><span className="bank-review-eyebrow">Verwendungszweck</span><h3>{transaction.purpose || 'Ohne Verwendungszweck'}</h3><p><IconUser size={15} />{transaction.counterparty || 'Ohne Gegenpartei'}</p></div>
           </div>
-          <div>
-            <span>Wertstellung</span>
-            <strong>{formatDate(transaction.valueDate)}</strong>
-          </div>
-          <div>
-            <span>Typ</span>
-            <strong className={transaction.direction === 'IN' ? 'text-success' : 'text-danger'}>
-              {transaction.direction}
-            </strong>
-          </div>
-          <div>
-            <span>Summe</span>
-            <strong>{euro.format(transaction.amount)}</strong>
-          </div>
-          <div>
-            <span>Zahlkonto</span>
-            <strong style={{ color: transaction.paymentAccountColor || undefined }}>
-              {transaction.paymentAccountName}
-            </strong>
-          </div>
-          <div>
-            <span>IBAN Gegenkonto</span>
-            <strong>{transaction.counterpartyIban || '–'}</strong>
-          </div>
-          <div className="bank-detail-wide">
-            <span>Verwendungszweck</span>
-            <strong>{transaction.purpose || '–'}</strong>
-          </div>
-          <div>
-            <span>End-to-End-ID</span>
-            <strong>{transaction.endToEndId || '–'}</strong>
-          </div>
-          <div>
-            <span>Bankreferenz</span>
-            <strong>{transaction.bankReference || '–'}</strong>
-          </div>
-          <div className="bank-detail-wide">
-            <span>Quelldatei</span>
-            <strong title={transaction.sourceFileName}>{transaction.sourceFileName}</strong>
+          <div className="bank-review-facts">
+            <div><IconCalendar size={21} /><span><small>Datum</small><strong>{formatDate(transaction.bookingDate)}</strong></span></div>
+            <div><IconBuildingBank size={21} /><span><small>Zahlkonto</small><strong style={{ color: transaction.paymentAccountColor || undefined }}>{transaction.paymentAccountName || '–'}</strong></span></div>
+            <div><IconCalendar size={21} /><span><small>Wertstellung</small><strong>{formatDate(transaction.valueDate)}</strong></span></div>
           </div>
         </section>
+        <div className="bank-review-info-grid">
+          <section className="bank-review-info"><h3><IconInfoCircle size={18} />Weitere Informationen</h3><dl><div><dt>IBAN Gegenkonto</dt><dd>{transaction.counterpartyIban || '–'}</dd></div><div><dt>End-to-End-ID</dt><dd>{transaction.endToEndId || '–'}</dd></div></dl></section>
+          <section className="bank-review-info"><h3><IconPaperclip size={18} />Belegdaten</h3><dl><div><dt>Bankreferenz</dt><dd>{transaction.bankReference || '–'}</dd></div><div><dt>Quelldatei</dt><dd>{transaction.sourceFileName || '–'}</dd></div></dl></section>
+        </div>
 
         {transaction.status === 'OPEN' ? (
           <div className="bank-review-layout">
@@ -1801,7 +1773,7 @@ function BankReviewModal({
             <section className="bank-review-section">
               <div className="bank-section-title">
                 <div className="bank-section-title__label">
-                  <strong>Passende Buchungen und Dauerbuchungen</strong>
+                  <IconMessage size={18} /><strong>Passende Buchungen und Dauerbuchungen</strong>
                 </div>
                 <div className="bank-match-toolbar">
                   <button className="btn" type="button" onClick={() => setShowManualAssign(true)}>
@@ -1885,6 +1857,7 @@ function BankReviewModal({
           />
         )}
 
+        </div>
         <footer className="bank-modal-footer">
           <button className="btn" onClick={onClose}>
             Schließen
