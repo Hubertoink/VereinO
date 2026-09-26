@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-09-26
+
+### Geändert
+
+- Aufgeklappte Bankbeleg-Details sind links eingerückt und schließen ohne obere Trennlinie direkt an die zugehörige Tabellenzeile an. Eckige Flächen ohne Akzentlinie verdeutlichen die Zusammengehörigkeit.
+
 ## [4.5.0] - 2026-09-26
 
 ### Hinzugefügt

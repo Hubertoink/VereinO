@@ -2423,13 +2423,13 @@ export default function BankImportView({
                   {euro.format(row.amount)}
                 </td>
               </tr>
-              {expandedId === row.id && <tr id={`bank-inline-${row.id}`} className="bank-inline-detail"><td colSpan={8}>
+              {expandedId === row.id && <tr id={`bank-inline-${row.id}`} className="bank-inline-detail"><td className="bank-inline-indent" aria-hidden="true" /><td colSpan={7}><div className="bank-inline-panel">
                 <div className="bank-inline-heading"><div><strong>Bankbeleg #{row.id}</strong><span>{row.sourceFileName}</span></div><button className="btn primary" onClick={() => setSelected(row)}>{row.status === 'OPEN' ? 'Zuordnung prüfen' : 'Beleg öffnen'}</button></div>
                 <dl className="bank-inline-facts"><div><dt>Verwendungszweck</dt><dd>{row.purpose || '—'}</dd></div><div><dt>Gegenpartei / IBAN</dt><dd>{row.counterparty || '—'}<br />{row.counterpartyIban || 'Keine IBAN hinterlegt'}</dd></div><div><dt>Wertstellung</dt><dd>{formatDate(row.valueDate || row.bookingDate)}</dd></div><div><dt>Referenz</dt><dd>{row.bankReference || row.endToEndId || '—'}</dd></div></dl>
                 <div className="bank-inline-assignment"><strong>Zuordnung</strong>{row.voucherId ? <button className="btn" onClick={() => onOpenVoucher(row.voucherId!, row.voucherNo, row.bookingDate)}>{row.voucherNo || `Buchung #${row.voucherId}`}{row.voucherDescription ? ` · ${row.voucherDescription}` : ''}</button> : <span>{row.status === 'CHECKED' ? row.checkedNote || 'Ohne Buchung geprüft' : 'Noch keiner Buchung zugeordnet'}</span>}</div>
                 {Number(row.possibleDuplicateCount) > 0 && <p className="bank-inline-warning">Mögliche Doppelbuchung: {row.possibleDuplicateCount} bereits zugeordnete Treffer. Bitte Zuordnung prüfen.</p>}
                 {row.aiSuggestion && <div className="bank-inline-ai"><p><strong>KI-Vorschlag</strong> · {row.aiSuggestion.reason}</p><button className="btn" onClick={() => setAiSuggestionTransaction(row)}>Vorschlag prüfen</button></div>}
-              </td></tr>}
+              </div></td></tr>}
               </React.Fragment>
             ))}
             {!loading && rows.length === 0 && (
