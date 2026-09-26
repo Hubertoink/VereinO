@@ -233,7 +233,7 @@ export default function InvoiceFormModal({
                 <div className="card invoice-form-card" style={{ padding: 10 }}>
                   <div className="helper" style={{ marginBottom: 6 }}>Basis</div>
                   <div className="row">
-                    <div className={`field invoice-floating-field booking-compact-control${form.draft.date ? ' invoice-floating-field--filled' : ''}`}>
+                    <div className="field invoice-floating-field booking-compact-control invoice-floating-field--filled">
                       <label htmlFor="invoice-date">Datum <span className="req-asterisk">*</span></label>
                       <span className="booking-date-input-wrap">
                         <input

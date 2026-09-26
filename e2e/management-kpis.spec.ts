@@ -7,6 +7,8 @@ test.beforeAll(async () => {
   css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/finance/managementKpis.css', 'src/renderer/views/invoicesShared/invoiceDetail.css', 'src/renderer/views/reimbursements/reimbursements.css'].map(f => fs.readFile(f, 'utf8')))).join('\n')
   script = (await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
+    import { installSelectKeyboardGuard } from './src/renderer/utils/selectKeyboard'
+    installSelectKeyboardGuard()
     import { createRoot } from 'react-dom/client'
     import MembersView from './src/renderer/views/Mitglieder/MembersView'
     import InvoicesView from './src/renderer/views/InvoicesView'
@@ -108,4 +110,20 @@ test('invoice details prioritize payment figures and disclose named assignments 
   expect(await page.evaluate(() => (window as any).fileOpened)).toBe(true)
   await page.setViewportSize({ width: 500, height: 900 })
   expect(await modal.locator('.invoice-detail-refined').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+})
+
+
+test('invoice filter select opens above its panel and selects without closing the filter', async ({ page }, info) => {
+  await page.evaluate(() => (window as any).mount('invoices'))
+  await page.getByRole('button', { name: 'Filter', exact: true }).click()
+  const select = page.locator('select').filter({ has: page.locator('option[value="IDEELL"]') })
+  await select.click()
+  await expect(page.getByRole('option', { name: 'IDEELL', exact: true })).toBeVisible()
+  await page.screenshot({ path: info.outputPath('invoice-filter-select.png') })
+  await page.getByRole('option', { name: 'IDEELL', exact: true }).click()
+  await expect(select).toHaveValue('IDEELL')
+  await expect(select).toBeVisible()
+  await select.click()
+  await page.keyboard.press('Escape')
+  await expect(select).toBeVisible()
 })

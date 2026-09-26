@@ -64,3 +64,19 @@
 .bank-master-table .bank-table th:nth-child(4), .bank-master-table .bank-table td:nth-child(4) { display: table-cell; }
 
 .bank-master-table .bank-row-expanded > td { border-bottom: 0; }
+
+.bank-ai-review-group { display:contents; }
+.bank-ai-draft-group { display:grid; min-width:0; }
+.bank-ai-draft-group > .bank-ai-reasoning {
+  box-sizing:border-box;
+  justify-self:end;
+  width:min(620px, calc(100% - 48px));
+  margin:0 16px 0 0;
+  padding:14px 16px;
+  border-top:0;
+  border-radius:0 0 12px 12px !important;
+  background:color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+@media(max-width:520px) {
+  .bank-ai-draft-group > .bank-ai-reasoning { width:calc(100% - 24px); margin-right:12px; }
+}

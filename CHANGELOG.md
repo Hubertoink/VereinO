@@ -7,6 +7,18 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.5.2] - 2026-09-26
+
+### Geändert
+
+- Dropdown-Auswahllisten verwenden ein einheitliches, zum jeweiligen VereinO-Theme passendes Design mit dezenten Auswahlflächen und Häkchen.
+- Die KI-Begründung für eine neue Buchung hängt als schmalere Kachel direkt am vorgeschlagenen Buchungsentwurf.
+
+### Behoben
+
+- Die Datumsbeschriftung beim Anlegen einer Verbindlichkeit überlappt auch bei leerem Feld nicht mehr den Datumsplatzhalter.
+- Escape schließt zunächst die geöffnete Auswahlliste, ohne gleichzeitig das übergeordnete Filterfenster zu schließen.
+
 ## [4.5.1] - 2026-09-26
 
 ### Geändert

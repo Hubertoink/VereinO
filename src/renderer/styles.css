@@ -21573,3 +21573,56 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .export-section__body .field { margin-bottom: 0; }
 .export-pdf-hint { margin: 0; }
 .report-export-panel .export-options-flyout__actions { position: sticky; bottom: -16px; background: var(--surface); padding: 12px 0; z-index: 1; }
+/* Theme-aware native selects keep browser keyboard, form and accessibility behavior.
+   Multiple/size listboxes deliberately retain their list presentation. */
+@supports (appearance: base-select) {
+  select:not([multiple]):not([size]),
+  select:not([multiple]):not([size])::picker(select) { appearance: base-select; }
+
+  select:not([multiple]):not([size]) { align-items:center; gap:10px; cursor:pointer; }
+  select:not([multiple]):not([size]):disabled { cursor:default; opacity:.55; }
+  select:not([multiple]):not([size])::picker-icon { color:var(--text-dim); transition:rotate .15s; }
+  select:not([multiple]):not([size]):open::picker-icon { rotate:180deg; }
+  select:not([multiple]):not([size])::picker(select) {
+    box-sizing:border-box;
+    min-width:anchor-size(width);
+    max-width:calc(100vw - 16px);
+    max-height:min(320px, 60vh);
+    margin-block:3px;
+    padding:4px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    background:var(--surface);
+    color:var(--text);
+    box-shadow:0 10px 28px rgb(0 0 0 / .18);
+    font:inherit;
+    overflow:auto;
+    overscroll-behavior:contain;
+  }
+  select:not([multiple]):not([size]) option {
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:32px;
+    padding:7px 9px;
+    border-radius:5px;
+    background:transparent;
+    color:var(--text);
+    font:inherit;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    cursor:pointer;
+  }
+  select:not([multiple]):not([size]) option:is(:hover,:focus-visible,:checked) {
+    background:color-mix(in srgb, var(--text) 8%, var(--surface));
+    outline:none;
+  }
+  select:not([multiple]):not([size]) option::checkmark { order:1; margin-left:auto; color:var(--text-dim); }
+  select:not([multiple]):not([size]) option:disabled { opacity:.45; cursor:default; }
+  select:not([multiple]):not([size]) optgroup { padding:4px; color:var(--text-dim); font-weight:600; }
+}
+.select-dropdown__menu > button:is(:hover,:focus-visible,.is-selected) {
+  background:color-mix(in srgb, var(--text) 8%, var(--surface));
+}
+.select-dropdown__menu > button.is-selected::after { content:'✓'; margin-left:auto; color:var(--text-dim); }

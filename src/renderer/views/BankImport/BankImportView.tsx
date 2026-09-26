@@ -1995,6 +1995,7 @@ function BankAiSuggestionModal({
             ? 'Die KI empfiehlt, diesen Bankbeleg der folgenden bestehenden Buchung zuzuordnen.'
             : newBooking ? 'Die KI schlägt vor, eine neue Buchung zu erstellen. Prüfe und bearbeite den Entwurf; gespeichert wird erst im Buchungsformular.'
             : recurring ? 'Die KI empfiehlt, diesen Bankbeleg mit einer Dauerbuchung zu verbuchen.' : actionLabel}</p>
+          <div className={newBooking ? 'bank-ai-draft-group' : 'bank-ai-review-group'}>
           <div className={`bank-ai-comparison${newBooking ? ' bank-ai-draft-layout' : !existing ? ' bank-ai-comparison--no-arrow' : ''}`}>
             <section className="bank-ai-comparison-card">
               <header><h3>{newBooking ? 'Quelle: importierter Bankbeleg' : 'Bankbeleg'}</h3><p>{transaction.direction === 'OUT' ? 'Ausgang vom Konto' : 'Eingang auf dem Konto'}</p></header>
@@ -2032,6 +2033,7 @@ function BankAiSuggestionModal({
             </div>}
             {!!suggestion.evidence.length && <ul className="bank-ai-evidence">{suggestion.evidence.map((item, index) => <li key={index}>{item}</li>)}</ul>}
           </section>
+          </div>
           {suggestion.warnings.length > 0 && (
             <div className="bank-ai-review-warnings"><strong>Bitte beachten</strong><ul className="bank-ai-suggestion-warnings">
               {suggestion.warnings.map((warning) => <li key={warning}>{warning}</li>)}
