@@ -4,7 +4,6 @@ import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BindingModal from '../../components/modals/BindingModal'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
-import { sortEarmarkEntries } from '../../utils/compactEntrySort'
 
 type Binding = {
   id: number
@@ -32,9 +31,6 @@ type BindingEdit = {
   enforceTimeRange?: number
 }
 
-const COLLAPSED_TABLE_ROWS = 5
-const TABLE_PAGE_SIZE = 10
-
 export default function EarmarksView({
   from,
   to,
@@ -56,13 +52,6 @@ export default function EarmarksView({
   const [archiveConfirm, setArchiveConfirm] = useState<Binding | null>(null)
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
-  const [tableExpanded, setTableExpanded] = useState(false)
-  const [tablePage, setTablePage] = useState(1)
-  const [sortBy, setSortBy] = useState<'name' | 'code'>('name')
-  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('ASC')
-  const [compactCards, setCompactCards] = useState<boolean>(() => {
-    try { return localStorage.getItem('ui.earmarks.compactCards') === 'true' } catch { return false }
-  })
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   const formatRange = (start?: string | null, end?: string | null) => {
@@ -89,10 +78,6 @@ export default function EarmarksView({
 
   const archivedCount = useMemo(() => allBindings.filter((b) => !b.isActive).length, [allBindings])
 
-  useEffect(() => {
-    try { localStorage.setItem('ui.earmarks.compactCards', String(compactCards)) } catch {}
-  }, [compactCards])
-
   const handleSaved = async () => {
     notify('success', 'Zweckbindung gespeichert')
     await loadBindings()
@@ -116,36 +101,7 @@ export default function EarmarksView({
     })
   }, [bindings, q])
 
-  const sortedVisibleBindings = useMemo(
-    () => sortEarmarkEntries(visibleBindings, sortBy, sortDir),
-    [visibleBindings, sortBy, sortDir]
-  )
-
-  const tablePageCount = Math.max(1, Math.ceil(sortedVisibleBindings.length / TABLE_PAGE_SIZE))
-  const tableRows = useMemo(() => {
-    if (!tableExpanded) return sortedVisibleBindings.slice(0, COLLAPSED_TABLE_ROWS)
-    const start = (tablePage - 1) * TABLE_PAGE_SIZE
-    return sortedVisibleBindings.slice(start, start + TABLE_PAGE_SIZE)
-  }, [tableExpanded, tablePage, sortedVisibleBindings])
-
-  const toggleSort = (field: 'name' | 'code') => {
-    setSortBy((currentField) => {
-      const sameField = currentField === field
-      setSortDir((currentDirection) => {
-        if (sameField) return currentDirection === 'ASC' ? 'DESC' : 'ASC'
-        return field === 'name' ? 'ASC' : 'ASC'
-      })
-      return field
-    })
-  }
-
-  useEffect(() => {
-    setTablePage(1)
-  }, [q, showArchived])
-
-  useEffect(() => {
-    if (tablePage > tablePageCount) setTablePage(tablePageCount)
-  }, [tablePage, tablePageCount])
+  const sortedVisibleBindings = visibleBindings
 
   async function doArchive(b: Binding) {
     const nextActive = !b.isActive
@@ -172,6 +128,16 @@ export default function EarmarksView({
       <div className="earmark-management-surface" style={{ padding: 12, marginBottom: 12 }}>
         <div className="management-page-heading">
           <h1>Zweckbindungen</h1>
+        </div>
+
+        <div className="management-search-toolbar">
+          <input
+            className="input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Suche (Code, Name, Zeitraum, Beschreibung)"
+            style={{ flex: '0 1 560px', minWidth: 0, width: '100%' }}
+          />
           <button
             className="btn primary btn-with-icon"
             onClick={() =>
@@ -189,161 +155,8 @@ export default function EarmarksView({
           >
             <AppIcon icon={IconPlus} size="control" />Neu
           </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            className="input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Suche (Code, Name, Zeitraum, Beschreibung)"
-            style={{ flex: 1, minWidth: 260 }}
-          />
-          <div className="btn-group presentation-segmented-control" role="group" aria-label="Darstellung der Zweckbindungskarten">
-            <button
-              type="button"
-              className={`btn-option ${!compactCards ? 'active' : ''}`}
-              aria-pressed={!compactCards}
-              onClick={() => setCompactCards(false)}
-            >
-              Detail
-            </button>
-            <button
-              type="button"
-              className={`btn-option ${compactCards ? 'active' : ''}`}
-              aria-pressed={compactCards}
-              onClick={() => setCompactCards(true)}
-            >
-              Kompakt
-            </button>
-          </div>
           <div className="helper">{sortedVisibleBindings.length} von {bindings.length}</div>
         </div>
-
-        <div className="management-table-scroll" tabIndex={0} role="region" aria-label="Zweckbindungstabelle">
-        <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
-          <thead>
-            <tr>
-              <th align="left" className="sortable" onClick={() => toggleSort('code')} style={{ cursor: 'pointer' }}>
-                Code {sortBy === 'code' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
-              </th>
-              <th align="left" className="sortable" onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
-                Name {sortBy === 'name' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
-              </th>
-              <th align="left">Zeitraum</th>
-              <th align="left">Status</th>
-              <th align="right">Budget</th>
-              <th align="left">Farbe</th>
-              <th align="center">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tableRows.map((b) => (
-              <tr key={b.id} style={!b.isActive ? { opacity: 0.5 } : undefined}>
-                <td>{b.code}</td>
-                <td>{b.name}{!b.isActive ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-dim)' }}>(archiviert)</span> : null}</td>
-                <td>{formatRange(b.startDate, b.endDate)}</td>
-                <td>{b.isActive ? 'aktiv' : 'inaktiv'}</td>
-                <td align="right">{b.budget != null && b.budget > 0 ? eurFmt.format(b.budget) : '—'}</td>
-                <td>
-                  {b.color ? (
-                    <span
-                      title={b.color}
-                      style={{
-                        display: 'inline-block',
-                        width: 16,
-                        height: 16,
-                        borderRadius: 4,
-                        background: b.color,
-                        verticalAlign: 'middle'
-                      }}
-                    />
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                  <button
-                    className="btn"
-                    onClick={() => setArchiveConfirm(b)}
-                    title={b.isActive ? 'Archivieren' : 'Wiederherstellen'}
-                    style={{ marginRight: 6 }}
-                  ><AppIcon icon={b.isActive ? IconChevronsDown : IconChevronsUp} size="inline" /></button>
-                  <button
-                    className="btn btn-edit"
-                    onClick={() =>
-                      setEditBinding({
-                        id: b.id,
-                        code: b.code,
-                        name: b.name,
-                        description: b.description ?? null,
-                        startDate: b.startDate ?? null,
-                        endDate: b.endDate ?? null,
-                        isActive: !!b.isActive,
-                        color: b.color ?? null,
-                        budget: b.budget ?? null,
-                        enforceTimeRange: b.enforceTimeRange ?? 0
-                      })
-                    }
-                  ><AppIcon icon={IconPencil} size="control" /></button>
-                </td>
-              </tr>
-            ))}
-            {sortedVisibleBindings.length === 0 && (
-              <tr>
-                <td colSpan={7} className="helper">
-                  Keine Zweckbindungen gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
-
-        {sortedVisibleBindings.length > COLLAPSED_TABLE_ROWS && (
-          <div className="pagination-bar management-table-bar">
-            <div className="pagination-bar__info">
-              <div className="pagination-bar__stat">
-                <span>Sichtbar:</span>
-                <span className="pagination-bar__stat-value">
-                  {tableExpanded
-                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, sortedVisibleBindings.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, sortedVisibleBindings.length)} von ${sortedVisibleBindings.length}`
-                    : `${Math.min(COLLAPSED_TABLE_ROWS, sortedVisibleBindings.length)} von ${sortedVisibleBindings.length}`}
-                </span>
-              </div>
-              {tableExpanded && (
-                <>
-                  <div className="pagination-bar__divider" />
-                  <div className="pagination-bar__stat">
-                    <span>Seite:</span>
-                    <span className="pagination-bar__stat-value">{tablePage} / {tablePageCount}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="pagination-bar__controls">
-              {tableExpanded && (
-                <>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
-                </>
-              )}
-              <button
-                className="btn"
-                type="button"
-                onClick={() => {
-                  setTableExpanded((expanded) => !expanded)
-                  setTablePage(1)
-                }}
-                aria-expanded={tableExpanded}
-              >
-                {tableExpanded ? 'Einklappen' : 'Alle anzeigen'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {editBinding && (
           <BindingModal value={editBinding} onClose={() => setEditBinding(null)} onSaved={handleSaved} />
@@ -352,11 +165,13 @@ export default function EarmarksView({
 
       {/* Usage Cards */}
       <EarmarkUsageCards
+        onArchive={b => setArchiveConfirm(b as Binding)}
         bindings={sortedVisibleBindings as any}
         from={from}
         to={to}
         sphere={filterSphere}
-        compact={compactCards}
+        compact
+        sortable
         onEdit={(b: any) =>
           setEditBinding({
             id: b.id,

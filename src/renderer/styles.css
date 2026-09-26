@@ -9409,6 +9409,14 @@ body:has(.local-invoice-scan) .app-main {
   border-bottom-color: transparent;
 }
 
+.overlay-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+.overlay-scroll-gutter {
+  scrollbar-gutter: stable !important;
+}
+
 .app-main {
   grid-area: main;
   padding: 16px;
@@ -21542,3 +21550,26 @@ html.receipt-widget-document::before { content: none !important; display: none !
 /* Enlarged PDF pages retain their size and remain scrollable on both axes. */
 .attachments-modal__preview-area:has(.attachments-modal__preview-canvas) { justify-content: flex-start; }
 .attachments-modal__preview-canvas { flex-shrink: 0; margin-inline: auto; }
+
+.management-search-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.management-search-toolbar > .btn,
+.management-search-toolbar > .helper { flex-shrink: 0; }
+
+/* Report exports use the available viewport; sections open only when needed. */
+.report-export-panel > .filter-dropdown__content { max-height: none; }
+.export-section { border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.export-section > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; cursor: pointer; padding: 12px 14px; list-style: none; }
+.export-section > summary::before { content: '›'; font-size: 18px; line-height: 1; }
+.export-section[open] > summary::before { transform: rotate(90deg); }
+.export-section > summary span { margin-left: auto; color: var(--text-dim); font-size: 12px; }
+.export-section > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.export-section__body { padding: 4px 14px 14px; min-width: 0; }
+.export-section__body .field { margin-bottom: 0; }
+.export-pdf-hint { margin: 0; }
+.report-export-panel .export-options-flyout__actions { position: sticky; bottom: -16px; background: var(--surface); padding: 12px 0; z-index: 1; }

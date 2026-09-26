@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../components/finance/ManagementKpis'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconBuildingBank, IconCash, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileImport, IconPaperclip, IconPlus, IconX } from '@tabler/icons-react'
 import { useToast } from '../context/useToast'
@@ -111,6 +112,7 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
 
 export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
   const { notify } = useToast()
+  const [reimbursementToolbar, setReimbursementToolbar] = useState<HTMLDivElement | null>(null)
   const [showReimbursements, setShowReimbursements] = useState(false)
 
   const [q, setQ] = useState('')
@@ -123,7 +125,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
   const [limit, setLimit] = useState(20)
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
-  const [summary, setSummary] = useState<{ count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number } | null>(null)
+  const [summary, setSummary] = useState<{ count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number; remainingIn: number; remainingOut: number; overdueAmount: number; overdueCount: number } | null>(null)
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => { try { return ((localStorage.getItem('invoices.sort') as 'ASC' | 'DESC') || 'ASC') } catch { return 'ASC' } })
   const [sortBy, setSortBy] = useState<'date' | 'due' | 'amount' | 'status'>(() => { try { return ((localStorage.getItem('invoices.sortBy') as 'date' | 'due' | 'amount' | 'status') || 'due') } catch { return 'due' } })
   const [yearsAvail, setYearsAvail] = useState<number[]>([])
@@ -236,7 +238,10 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     }
   }
 
+  const summaryRequest = useRef(0)
   async function loadSummary() {
+    const request = ++summaryRequest.current
+    setSummary(null)
     try {
       const res = await window.api?.invoices?.summary?.({
         status,
@@ -247,9 +252,9 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         dueTo: dueTo || undefined,
         tag: tag || undefined
       })
-      setSummary(res || null)
+      if (request === summaryRequest.current) setSummary(res || null)
     } catch {
-      setSummary(null)
+      if (request === summaryRequest.current) setSummary(null)
     }
   }
 
@@ -470,7 +475,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     const map: Record<string, string> = { OPEN: 'var(--danger)', PARTIAL: '#f9a825', PAID: 'var(--success)' }
     const bg = map[s] || 'var(--muted)'
     const fg = contrastText(bg)
-    return <span className="badge" style={{ background: bg, color: fg }}>{s}</span>
+    return <span className="badge" style={{ background: bg, color: fg }}>{{ OPEN: 'Offen', PARTIAL: 'Teilbezahlt', PAID: 'Bezahlt' }[s]}</span>
   }
 
   const [form, setForm] = useState<InvoiceFormState | null>(null)
@@ -724,7 +729,14 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     <div className="invoices-container">
 
       <div className="invoices-header">
+        <div className="invoices-heading-group">
         <h1>{showReimbursements ? 'Kostenerstattungen' : 'Verbindlichkeiten'}</h1>
+      <div className="reimbursement-view-toggle" role="group" aria-label="Ansicht auswählen">
+        <button className="btn" aria-pressed={!showReimbursements} onClick={() => setShowReimbursements(false)}>Verbindlichkeiten</button>
+        <button className="btn" aria-pressed={showReimbursements} onClick={() => setShowReimbursements(true)}>Kostenerstattungen</button>
+      </div>
+        </div>
+        {showReimbursements && <div className="invoices-filters" ref={setReimbursementToolbar} />}
         {!showReimbursements && <div className="invoices-filters">
           <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)..." value={q} onChange={(e) => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
           <InvoiceFilterDropdown
@@ -764,24 +776,18 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         </div>}
       </div>
 
-      <div className="reimbursement-view-toggle" role="group" aria-label="Ansicht auswählen">
-        <button className="btn" aria-pressed={!showReimbursements} onClick={() => setShowReimbursements(false)}>Verbindlichkeiten</button>
-        <button className="btn" aria-pressed={showReimbursements} onClick={() => setShowReimbursements(true)}>Kostenerstattungen</button>
-      </div>
+
       {!showReimbursements && error && <div className="invoices-text-danger">{error}</div>}
 
-      {showReimbursements ? <ReimbursementsDialog embedded notify={notify} onClose={() => setShowReimbursements(false)} /> : loading ? (
+      {showReimbursements ? <ReimbursementsDialog embedded toolbarTarget={reimbursementToolbar} notify={notify} onClose={() => setShowReimbursements(false)} /> : loading ? (
         <LoadingState message="Lade Verbindlichkeiten..." />
       ) : (
         <>
-          {summary && (
-            <div className="helper invoices-summary">
-              Offen gesamt: <strong>{eurFmt.format(Math.max(0, Math.round((summary.remaining || 0) * 100) / 100))}</strong>
-              <span className="summary-remaining">
-                ({summary.count} gesamt; Forderungen (IN): {eurFmt.format(summary.grossIn || 0)}, Verbindlichkeiten (OUT): {eurFmt.format(summary.grossOut || 0)})
-              </span>
-            </div>
-          )}
+          <ManagementKpis label="Verbindlichkeitenübersicht" items={[
+            { label: 'Offene Verbindlichkeiten', value: summary ? eurFmt.format(summary.remainingOut) : '—', hint: 'Noch zu zahlen · gefilterte Auswahl' },
+            { label: 'Offene Forderungen', value: summary ? eurFmt.format(summary.remainingIn) : '—', hint: 'Noch zu erhalten · gefilterte Auswahl' },
+            { label: 'Überfällig', value: summary ? eurFmt.format(summary.overdueAmount) : '—', hint: summary ? `${summary.overdueCount} ${summary.overdueCount === 1 ? 'überfälliger Eintrag' : 'überfällige Einträge'} · IN und OUT` : 'IN und OUT · gefilterte Auswahl', tone: summary?.overdueAmount ? 'warning' : undefined }
+          ]} />
 
           <div className="invoices-table-scroll-wrapper" role="region" aria-label="Verbindlichkeiten-Tabelle" tabIndex={0}>
           <table cellPadding={6} className="invoices-table invoices-table--wide">
@@ -835,7 +841,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                       <span className={`badge invoices-type-badge ${row.voucherType === 'IN' ? 'invoices-type-badge-in' : ''}`}>{row.voucherType === 'IN' ? '↑ IN' : '↓ OUT'}</span>
                     </td>
                     <td>{fmtDateLocal(row.date)}</td>
-                    <td>{fmtDateLocal(row.dueDate || '')}</td>
+                    <td>{fmtDateLocal(row.dueDate || '')}<InvoiceDueHint date={row.dueDate} remaining={remaining} /></td>
                     <td>
                       {row.invoiceNo || '-'}
                       {fileCount > 0 && <span className="invoices-attachment-icon" title={`${fileCount} Anhang${fileCount > 1 ? 'e' : ''}`}><AppIcon icon={IconPaperclip} size="inline" /></span>}
@@ -854,7 +860,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
                       </td>
                     )}
                     <td align="right">{eurFmt.format(row.grossAmount)}</td>
-                    {colPrefs.showBezahlt && <td align="right">{eurFmt.format(row.paidSum || 0)}</td>}
+                    {colPrefs.showBezahlt && <td align="right"><InvoicePaymentProgress paid={row.paidSum || 0} gross={row.grossAmount} /></td>}
                     {colPrefs.showRest && <td align="right" className={remaining > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(remaining)}</td>}
                     <td>{statusBadge(row.status)}</td>
                     {colPrefs.showAttachments && <td align="center">{fileCount > 0 ? <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon icon={IconPaperclip} size="inline" />{fileCount}</span> : ''}</td>}
@@ -1016,7 +1022,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
       )}
 
       {detailId != null && (
-        <InvoiceDetailModal
+        <InvoiceDetailModal budgets={budgets} earmarks={earmarks}
           detail={detail}
           loading={loadingDetail}
           tags={tags}

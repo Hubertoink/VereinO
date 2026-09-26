@@ -2,6 +2,7 @@ import React from 'react'
 import '../DashboardPlus/dashboardPlus.css'
 import './reports.css'
 import { Sphere, VoucherType, PaymentMethod } from '../../components/reports/types'
+import ReportsAnalytics from '../../components/reports/ReportsAnalytics'
 import ReportsSummary from '../../components/reports/ReportsSummary'
 import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsSphereDonut from '../../components/reports/ReportsSphereDonut'
@@ -239,6 +240,7 @@ export default function ReportsView(props: {
                 </svg>
             }
             title="Exportoptionen"
+            panelClassName="report-export-panel"
             alignRight
             width="min(920px, calc(100vw - 28px))"
             ariaLabel="Exportieren"
@@ -248,7 +250,7 @@ export default function ReportsView(props: {
             open={showExportOptions}
             onOpenChange={setShowExportOptions}
           >
-            <ExportOptionsModal
+            <ExportOptionsModal previewFilters={{ sphere: filterSphere || undefined, type: filterType || undefined, paymentMethod: filterPM || undefined, earmarkId: filterEarmark || undefined, budgetId: filterBudgetId || undefined }}
               {...exportOptions}
               open={showExportOptions}
               onClose={() => setShowExportOptions(false)}
@@ -300,8 +302,9 @@ export default function ReportsView(props: {
       </div>
       <div className="reports-chart-stack">
         <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
-        <ReportsInOutLines activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+        <ReportsInOutLines type={filterType || undefined} activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
+      <ReportsAnalytics refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
     </div>
   )
 }

@@ -2092,6 +2092,7 @@ export default function BankImportView({
   onOpenVoucher
 }: Props) {
   const [rows, setRows] = useState<BankTransaction[]>([])
+  const [expandedId, setExpandedId] = useState<number | null>(null)
   const [stats, setStats] = useState({ total: 0, open: 0, linked: 0, checked: 0 })
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -2110,6 +2111,7 @@ export default function BankImportView({
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const [reviewingWithAi, setReviewingWithAi] = useState(false)
+  useEffect(() => setExpandedId(null), [page, query, status, accountId])
   const aiReviewInFlight = React.useRef(false)
   const limit = 50
 
@@ -2221,7 +2223,7 @@ export default function BankImportView({
       </div>
 
       <div className="bank-overview-row">
-        <div className="bank-status-tabs" role="tablist" aria-label="Bankbelegstatus">
+        <div className="bank-status-tabs" role="group" aria-label="Bankbelegstatus">
         {(
           [
             ['ALL', 'Gesamt', stats.total],
@@ -2233,6 +2235,7 @@ export default function BankImportView({
           <button
             key={key}
             className={status === key ? 'active' : ''}
+            aria-pressed={status === key}
             onClick={() => {
               setStatus(key)
               setPage(1)
@@ -2322,41 +2325,26 @@ export default function BankImportView({
         </div>
       )}
 
-      <div className="bank-table-card">
-        <table className="bank-table">
+      <div className="bank-list-caption"><span>{total} Bankbelege · {status === 'ALL' ? 'Alle Status' : statusLabel(status)}</span><span>Details über + öffnen</span>{(query || accountId) && <button className="btn ghost" onClick={() => { setQuery(''); setAccountId(null); setPage(1) }}>Such- und Kontofilter zurücksetzen</button>}</div>
+      <div className="bank-table-card bank-master-table" role="region" aria-label="Bankbelege" tabIndex={0}>
+        <table className="bank-table" aria-label="Importierte Bankbelege" aria-busy={loading}>
           <thead>
             <tr>
-              <th className="sortable" onClick={() => toggleSort('status')}>
-                Status {renderSort('status')}
-              </th>
-              <th className="sortable" onClick={() => toggleSort('date')}>
-                Datum {renderSort('date')}
-              </th>
-              <th className="sortable" onClick={() => toggleSort('description')}>
-                Beschreibung {renderSort('description')}
-              </th>
+              <th scope="col"><span className="helper">Details</span></th>
+              <th className="sortable" aria-sort={sortBy === 'status' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('status')}> Status {renderSort('status')}</button></th>
+              <th className="sortable" aria-sort={sortBy === 'date' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('date')}> Datum {renderSort('date')}</button></th>
+              <th className="sortable" aria-sort={sortBy === 'description' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('description')}> Beschreibung {renderSort('description')}</button></th>
               <th>Zuordnung</th>
-              <th className="sortable" onClick={() => toggleSort('account')}>
-                Zahlkonto {renderSort('account')}
-              </th>
-              <th className="sortable" onClick={() => toggleSort('type')}>
-                Typ {renderSort('type')}
-              </th>
-              <th className="number sortable" onClick={() => toggleSort('amount')}>
-                Summe {renderSort('amount')}
-              </th>
+              <th className="sortable" aria-sort={sortBy === 'account' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('account')}> Zahlkonto {renderSort('account')}</button></th>
+              <th className="sortable" aria-sort={sortBy === 'type' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('type')}> Typ {renderSort('type')}</button></th>
+              <th className="number sortable" aria-sort={sortBy === 'amount' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('amount')}> Summe {renderSort('amount')}</button></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr
-                key={row.id}
-                tabIndex={0}
-                onClick={() => setSelected(row)}
-                onKeyDown={(event) =>
-                  (event.key === 'Enter' || event.key === ' ') && setSelected(row)
-                }
-              >
+              <React.Fragment key={row.id}>
+              <tr className={expandedId === row.id ? 'bank-row-expanded' : undefined}>
+                <td><button className="btn ghost bank-expand" aria-expanded={expandedId === row.id} aria-controls={`bank-inline-${row.id}`} aria-label={`Bankbeleg ${row.id}: Details ${expandedId === row.id ? 'schließen' : 'anzeigen'}`} onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}>{expandedId === row.id ? '−' : '+'}</button></td>
                 <td>
                   <span
                     className={`bank-status bank-status--${row.status.toLowerCase()}`}
@@ -2369,8 +2357,8 @@ export default function BankImportView({
                 <td>{formatDate(row.bookingDate)}</td>
                 <td>
                   <div className="bank-description-cell">
-                    <strong>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</strong>
-                    {row.counterparty && row.purpose && <span>{row.purpose}</span>}
+                    <button className="bank-description-button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-expanded={expandedId === row.id}>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</button>
+                    {row.counterparty && row.purpose && <span title={row.purpose}>{row.purpose}</span>}
                   </div>
                 </td>
                 <td>
@@ -2427,7 +2415,7 @@ export default function BankImportView({
                 </td>
                 <td>
                   <span className={`badge ${row.direction === 'IN' ? 'in' : 'out'}`}>
-                    {row.direction}
+                    {row.direction === 'IN' ? 'Eingang' : 'Ausgang'}
                   </span>
                 </td>
                 <td className={`number bank-amount bank-amount--${row.direction.toLowerCase()}`}>
@@ -2435,17 +2423,25 @@ export default function BankImportView({
                   {euro.format(row.amount)}
                 </td>
               </tr>
+              {expandedId === row.id && <tr id={`bank-inline-${row.id}`} className="bank-inline-detail"><td colSpan={8}>
+                <div className="bank-inline-heading"><div><strong>Bankbeleg #{row.id}</strong><span>{row.sourceFileName}</span></div><button className="btn primary" onClick={() => setSelected(row)}>{row.status === 'OPEN' ? 'Zuordnung prüfen' : 'Beleg öffnen'}</button></div>
+                <dl className="bank-inline-facts"><div><dt>Verwendungszweck</dt><dd>{row.purpose || '—'}</dd></div><div><dt>Gegenpartei / IBAN</dt><dd>{row.counterparty || '—'}<br />{row.counterpartyIban || 'Keine IBAN hinterlegt'}</dd></div><div><dt>Wertstellung</dt><dd>{formatDate(row.valueDate || row.bookingDate)}</dd></div><div><dt>Referenz</dt><dd>{row.bankReference || row.endToEndId || '—'}</dd></div></dl>
+                <div className="bank-inline-assignment"><strong>Zuordnung</strong>{row.voucherId ? <button className="btn" onClick={() => onOpenVoucher(row.voucherId!, row.voucherNo, row.bookingDate)}>{row.voucherNo || `Buchung #${row.voucherId}`}{row.voucherDescription ? ` · ${row.voucherDescription}` : ''}</button> : <span>{row.status === 'CHECKED' ? row.checkedNote || 'Ohne Buchung geprüft' : 'Noch keiner Buchung zugeordnet'}</span>}</div>
+                {Number(row.possibleDuplicateCount) > 0 && <p className="bank-inline-warning">Mögliche Doppelbuchung: {row.possibleDuplicateCount} bereits zugeordnete Treffer. Bitte Zuordnung prüfen.</p>}
+                {row.aiSuggestion && <div className="bank-inline-ai"><p><strong>KI-Vorschlag</strong> · {row.aiSuggestion.reason}</p><button className="btn" onClick={() => setAiSuggestionTransaction(row)}>Vorschlag prüfen</button></div>}
+              </td></tr>}
+              </React.Fragment>
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="bank-empty">Keine Bankbelege für diesen Filter gefunden.</div>
                 </td>
               </tr>
             )}
             {loading && (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="bank-empty">Bankbelege werden geladen …</div>
                 </td>
               </tr>

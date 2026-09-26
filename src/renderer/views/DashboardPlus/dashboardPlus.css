@@ -133,7 +133,7 @@
 .dp-tooltip b { color: var(--text); font-weight: 500; }
 .dp-tooltip small { display: block; margin-top: 9px; color: var(--text-dim); font-size: 10px; }
 .dp-coverage-select { width: 100%; margin: 12px 0 4px; font-size: 11px; min-height: 32px; padding: 5px 8px; }
-.dp-insights { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; margin-top: 16px; }
+.dp-insights { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; margin-top: 16px; }
 .dp-distribution .dp-card-heading > span { font-size: 11px; color: var(--text-dim); }
 .dp-distribution-bar { display: flex; gap: 2px; height: 12px; border-radius: 8px; overflow: hidden; background: var(--border); margin: 12px 0 22px; }
 .dp-distribution-list { display: grid; gap: 14px; }

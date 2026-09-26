@@ -1,3 +1,4 @@
+import { assignmentMonthly } from './assignmentMonthly'
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { resolvePrimaryClassificationValueId } from './classifications'
@@ -118,30 +119,8 @@ export function deleteBudget(id: number) {
 
 export function budgetUsage(input: { budgetId: number; from?: string; to?: string }) {
     const d = getDb()
-    // Prefer voucher_budgets; include legacy voucher budget columns when no junction row exists.
-    // Der from/to Parameter wird nur für Dashboard-Zeitfilter verwendet.
-    const row = d.prepare(`
-        WITH budget_assignments AS (
-            SELECT vb.voucher_id as voucherId, vb.budget_id as budgetId, vb.amount,
-                   v.type, v.date
-            FROM voucher_budgets vb
-            JOIN vouchers v ON v.id = vb.voucher_id
-            WHERE vb.budget_id = ?
-            UNION ALL
-            SELECT v.id as voucherId, v.budget_id as budgetId,
-                   COALESCE(NULLIF(v.budget_amount, 0), ABS(v.gross_amount), 0) as amount,
-                   v.type, v.date
-            FROM vouchers v
-            WHERE v.budget_id = ?
-              AND NOT EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id)
-        )
-        SELECT
-          IFNULL(SUM(CASE WHEN type='OUT' THEN amount WHEN type='INTERNAL' AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) as spent,
-          IFNULL(SUM(CASE WHEN type='IN' THEN amount WHEN type='INTERNAL' AND amount > 0 THEN amount ELSE 0 END), 0) as inflow,
-          COUNT(1) as count,
-          MAX(date) as lastDate
-        FROM budget_assignments
-    `).get(input.budgetId, input.budgetId) as any
+    const monthly = assignmentMonthly('budget', input.budgetId, input)
+    const row = monthly.reduce((total, month) => ({ spent: total.spent + month.spent, inflow: total.inflow + month.inflow, count: total.count + month.count, lastDate: month.lastDate }), { spent: 0, inflow: 0, count: 0, lastDate: null as string | null })
 
         const plannedRow = d.prepare(`SELECT amount_planned as planned FROM budgets WHERE id=?`).get(input.budgetId) as any
         const planned = Number(plannedRow?.planned ?? 0) || 0
@@ -180,5 +159,5 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
         countInside = Number(insideRow?.c || 0)
         countOutside = Math.max(0, legacyAwareTotalCount - countInside)
     }
-    return { spent, inflow, planned, balance, remaining, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
+    return { monthly, spent: Math.round(spent * 100) / 100, inflow: Math.round(inflow * 100) / 100, planned, balance, remaining, count: row.count || 0, lastDate: row.lastDate || null, countInside, countOutside, startDate, endDate }
 }

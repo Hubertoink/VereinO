@@ -4,6 +4,7 @@ import { IconX } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 
 export interface FilterDropdownProps {
+  panelClassName?: string
   trigger: React.ReactNode
   title: string
   hasActiveFilters?: boolean
@@ -25,6 +26,7 @@ export interface FilterDropdownProps {
 type TooltipPlacement = 'bottom' | 'top'
 
 export default function FilterDropdown({
+  panelClassName,
   trigger,
   title,
   hasActiveFilters = false,
@@ -223,7 +225,7 @@ export default function FilterDropdown({
       {open && createPortal(
         <div
           ref={panelRef}
-          className="filter-dropdown__panel"
+          className={`filter-dropdown__panel ${panelClassName || ''}`}
           style={{
             width: typeof width === 'number' ? `${width}px` : width,
             maxWidth: 'calc(100vw - 24px)',

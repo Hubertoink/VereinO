@@ -4,7 +4,6 @@ import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import BudgetModal from '../../components/modals/BudgetModal'
-import { sortBudgetEntries } from '../../utils/compactEntrySort'
 
 type Budget = {
   id: number
@@ -45,9 +44,6 @@ type BudgetEdit = {
   enforceTimeRange?: number
 }
 
-const COLLAPSED_TABLE_ROWS = 5
-const TABLE_PAGE_SIZE = 10
-
 export default function BudgetsView({
   onGoToBookings,
   notify
@@ -61,13 +57,6 @@ export default function BudgetsView({
   const [archiveConfirm, setArchiveConfirm] = useState<Budget | null>(null)
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
-  const [tableExpanded, setTableExpanded] = useState(false)
-  const [tablePage, setTablePage] = useState(1)
-  const [sortBy, setSortBy] = useState<'year' | 'name'>('year')
-  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
-  const [compactCards, setCompactCards] = useState<boolean>(() => {
-    try { return localStorage.getItem('ui.budgets.compactCards') === 'true' } catch { return false }
-  })
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
   const formatRange = (start?: string | null, end?: string | null) => {
@@ -95,10 +84,6 @@ export default function BudgetsView({
 
   const archivedCount = useMemo(() => allBudgets.filter((b) => b.isArchived).length, [allBudgets])
 
-  useEffect(() => {
-    try { localStorage.setItem('ui.budgets.compactCards', String(compactCards)) } catch {}
-  }, [compactCards])
-
   const handleSaved = async () => {
     notify('success', 'Budget gespeichert')
     await loadBudgets()
@@ -121,36 +106,7 @@ export default function BudgetsView({
     })
   }, [budgets, q])
 
-  const sortedVisibleBudgets = useMemo(
-    () => sortBudgetEntries(visibleBudgets, sortBy, sortDir),
-    [visibleBudgets, sortBy, sortDir]
-  )
-
-  const tablePageCount = Math.max(1, Math.ceil(sortedVisibleBudgets.length / TABLE_PAGE_SIZE))
-  const tableRows = useMemo(() => {
-    if (!tableExpanded) return sortedVisibleBudgets.slice(0, COLLAPSED_TABLE_ROWS)
-    const start = (tablePage - 1) * TABLE_PAGE_SIZE
-    return sortedVisibleBudgets.slice(start, start + TABLE_PAGE_SIZE)
-  }, [tableExpanded, tablePage, sortedVisibleBudgets])
-
-  const toggleSort = (field: 'year' | 'name') => {
-    setSortBy((currentField) => {
-      const sameField = currentField === field
-      setSortDir((currentDirection) => {
-        if (sameField) return currentDirection === 'ASC' ? 'DESC' : 'ASC'
-        return field === 'year' ? 'DESC' : 'ASC'
-      })
-      return field
-    })
-  }
-
-  useEffect(() => {
-    setTablePage(1)
-  }, [q, showArchived])
-
-  useEffect(() => {
-    if (tablePage > tablePageCount) setTablePage(tablePageCount)
-  }, [tablePage, tablePageCount])
+  const sortedVisibleBudgets = visibleBudgets
 
   async function doArchive(b: Budget) {
     const nextArchived = !b.isArchived
@@ -182,6 +138,16 @@ export default function BudgetsView({
       <div className="budget-management-surface" style={{ padding: 12 }}>
         <div className="management-page-heading">
           <h1>Budgets</h1>
+        </div>
+
+        <div className="management-search-toolbar">
+          <input
+            className="input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Suche (Name, Kategorie, Projekt, Jahr, Zeitraum)"
+            style={{ flex: '0 1 560px', minWidth: 0, width: '100%' }}
+          />
           <button
             className="btn primary btn-with-icon"
             onClick={() =>
@@ -200,176 +166,18 @@ export default function BudgetsView({
           >
             <AppIcon icon={IconPlus} size="control" />Neu
           </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            className="input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Suche (Name, Kategorie, Projekt, Jahr, Zeitraum)"
-            style={{ flex: 1, minWidth: 260 }}
-          />
-          <div className="btn-group presentation-segmented-control" role="group" aria-label="Darstellung der Budgetkarten">
-            <button
-              type="button"
-              className={`btn-option ${!compactCards ? 'active' : ''}`}
-              aria-pressed={!compactCards}
-              onClick={() => setCompactCards(false)}
-            >
-              Detail
-            </button>
-            <button
-              type="button"
-              className={`btn-option ${compactCards ? 'active' : ''}`}
-              aria-pressed={compactCards}
-              onClick={() => setCompactCards(true)}
-            >
-              Kompakt
-            </button>
-          </div>
           <div className="helper">{sortedVisibleBudgets.length} von {budgets.length}</div>
         </div>
 
-        {/* Simple table */}
-        <div className="management-table-scroll" tabIndex={0} role="region" aria-label="Budgettabelle">
-        <table cellPadding={6} style={{ marginTop: 8, width: '100%' }}>
-          <thead>
-            <tr>
-              <th align="left" className="sortable" onClick={() => toggleSort('year')} style={{ cursor: 'pointer' }}>
-                Jahr {sortBy === 'year' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
-              </th>
-              <th align="left" className="sortable" onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
-                Name {sortBy === 'name' ? (sortDir === 'ASC' ? '↑' : '↓') : '↕'}
-              </th>
-              <th align="left">Kategorie</th>
-              <th align="left">Projekt</th>
-              <th align="left">Zeitraum</th>
-              <th align="left">Farbe</th>
-              <th align="right">Budget</th>
-              <th align="center">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tableRows.map((b) => (
-              <tr key={b.id} style={b.isArchived ? { opacity: 0.5 } : undefined}>
-                <td>{b.year}</td>
-                <td>{b.name ?? '—'}{b.isArchived ? <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-dim)' }}>(archiviert)</span> : null}</td>
-                <td>{b.categoryName ?? '—'}</td>
-                <td>{b.projectName ?? '—'}</td>
-                <td>{formatRange(b.startDate, b.endDate)}</td>
-                <td>
-                  {b.color ? (
-                    <span
-                      title={b.color}
-                      style={{
-                        display: 'inline-block',
-                        width: 14,
-                        height: 14,
-                        borderRadius: 4,
-                        background: b.color
-                      }}
-                    />
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td align="right">{b.amountPlanned > 0 ? eurFmt.format(b.amountPlanned) : '—'}</td>
-                <td align="center" style={{ whiteSpace: 'nowrap' }}>
-                  <button
-                    className="btn"
-                    onClick={() => setArchiveConfirm(b)}
-                    title={b.isArchived ? 'Wiederherstellen' : 'Archivieren'}
-                    style={{ marginRight: 6 }}
-                  ><AppIcon icon={b.isArchived ? IconChevronsUp : IconChevronsDown} size="inline" /></button>
-                  <button
-                    className="btn btn-edit"
-                    onClick={() =>
-                      setEditBudget({
-                        id: b.id,
-                        year: b.year,
-                        sphere: b.sphere,
-                        primaryClassificationValueId: b.primaryClassificationValueId ?? null,
-                        categoryId: b.categoryId ?? null,
-                        projectId: b.projectId ?? null,
-                        earmarkId: b.earmarkId ?? null,
-                        amountPlanned: b.amountPlanned,
-                        name: b.name ?? null,
-                        categoryName: b.categoryName ?? null,
-                        projectName: b.projectName ?? null,
-                        startDate: b.startDate ?? null,
-                        endDate: b.endDate ?? null,
-                        color: b.color ?? null,
-                        isArchived: b.isArchived ?? 0,
-                        enforceTimeRange: b.enforceTimeRange ?? 0
-                      })
-                    }
-                  ><AppIcon icon={IconPencil} size="control" /></button>
-                </td>
-              </tr>
-            ))}
-            {sortedVisibleBudgets.length === 0 && (
-              <tr>
-                <td colSpan={8} className="helper">
-                  Keine Budgets gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
-
-        {sortedVisibleBudgets.length > COLLAPSED_TABLE_ROWS && (
-          <div className="pagination-bar management-table-bar">
-            <div className="pagination-bar__info">
-              <div className="pagination-bar__stat">
-                <span>Sichtbar:</span>
-                <span className="pagination-bar__stat-value">
-                  {tableExpanded
-                    ? `${Math.min((tablePage - 1) * TABLE_PAGE_SIZE + 1, sortedVisibleBudgets.length)}-${Math.min(tablePage * TABLE_PAGE_SIZE, sortedVisibleBudgets.length)} von ${sortedVisibleBudgets.length}`
-                    : `${Math.min(COLLAPSED_TABLE_ROWS, sortedVisibleBudgets.length)} von ${sortedVisibleBudgets.length}`}
-                </span>
-              </div>
-              {tableExpanded && (
-                <>
-                  <div className="pagination-bar__divider" />
-                  <div className="pagination-bar__stat">
-                    <span>Seite:</span>
-                    <span className="pagination-bar__stat-value">{tablePage} / {tablePageCount}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="pagination-bar__controls">
-              {tableExpanded && (
-                <>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(1)} disabled={tablePage <= 1} title="Erste"><AppIcon icon={IconChevronsLeft} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.max(1, value - 1))} disabled={tablePage <= 1} title="Zurück"><AppIcon icon={IconChevronLeft} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage((value) => Math.min(tablePageCount, value + 1))} disabled={tablePage >= tablePageCount} title="Weiter"><AppIcon icon={IconChevronRight} size="control" /></button>
-                  <button className="btn pagination-bar__btn" onClick={() => setTablePage(tablePageCount)} disabled={tablePage >= tablePageCount} title="Letzte"><AppIcon icon={IconChevronsRight} size="control" /></button>
-                </>
-              )}
-              <button
-                className="btn"
-                type="button"
-                onClick={() => {
-                  setTableExpanded((expanded) => !expanded)
-                  setTablePage(1)
-                }}
-                aria-expanded={tableExpanded}
-              >
-                {tableExpanded ? 'Einklappen' : 'Alle anzeigen'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Budget Tiles */}
       <BudgetTiles
+        onArchive={b => setArchiveConfirm(b as Budget)}
         budgets={sortedVisibleBudgets}
         eurFmt={eurFmt}
-        compact={compactCards}
+        compact
+        sortable
         onEdit={(b) =>
           setEditBudget({
             id: b.id,

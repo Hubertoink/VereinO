@@ -7,6 +7,26 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-09-26
+
+### Hinzugefügt
+
+- Kennzahlentabellen mit Monatsverläufen für Budgets und Zweckbindungen sowie kompakte Übersichten für Bankimport, Mitglieder, Verbindlichkeiten und Kostenerstattungen.
+- Report-Auswertungen mit Monatsvergleich, Jahresübersichten und Kennzahlen; die zusätzlichen Auswertungen werden auch im PDF-Export berücksichtigt.
+
+### Geändert
+
+- Dashboard, Buchungen und Buchungen Plus erhalten übersichtlichere Tabellen und kompakte Detaildarstellungen. Entwurf-Tabs stehen neben der Suche.
+- Budgets und Zweckbindungen verwenden eine gemeinsame Übersicht mit sortierbaren Tabellenköpfen statt doppelter Tabellen.
+- Reports zeigen die Finanzübersicht zuerst und ältere Jahre in einem aufklappbaren Archiv. Das Exportfenster bündelt Optionen in einklappbaren Abschnitten.
+- Verbindlichkeiten und Kostenerstattungen teilen eine kompakte Titelleiste mit Ansichtswechsel, Suche und Aktionen. Verbindlichkeitsdetails zeigen Zahlungen und Anhänge direkt nebeneinander.
+
+### Behoben
+
+- Geöffnete Dialoge sperren das Scrollen im Hintergrund, ohne das Layout durch die ausgeblendete Scrollleiste zu verschieben.
+- Zurück- und Vorwärtsnavigation berücksichtigen die Seitenansicht der App.
+- Entfernte Suchfilter aus verknüpften Buchungen erscheinen nach einem Seitenwechsel in Buchungen Plus nicht erneut.
+
 ## [4.4.1] - 2026-09-25
 
 ### Geändert

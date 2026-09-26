@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 
+function ExportSection({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
+  return <details className="export-section"><summary><strong>{title}</strong>{summary && <span>{summary}</span>}</summary><div className="export-section__body">{children}</div></details>
+}
+
 // Preview row type
 interface PreviewRow {
   id: number
@@ -64,7 +68,8 @@ type FiscalBudgetOption = {
   isArchived?: number | null
 }
 
-export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport, includeInternalVouchers, setIncludeInternalVouchers, flyout = false }: {
+export default function ExportOptionsModal({ open, onClose, fields, setFields, orgName, setOrgName, amountMode, setAmountMode, sortDir, setSortDir, onExport, dateFrom, dateTo, exportType = 'standard', setExportType, fiscalYear, setFiscalYear, includeBindings, setIncludeBindings, includeVoucherList, setIncludeVoucherList, includeBudgets, setIncludeBudgets, includeActivityReport, setIncludeActivityReport, includeInternalVouchers, setIncludeInternalVouchers, flyout = false, previewFilters }: {
+  previewFilters?: { sphere?: string; type?: string; paymentMethod?: string; earmarkId?: number; budgetId?: number }
   open: boolean
   onClose: () => void
   fields: Array<'date' | 'voucherNo' | 'type' | 'sphere' | 'description' | 'status' | 'paymentMethod' | 'netAmount' | 'vatAmount' | 'grossAmount' | 'tags'>
@@ -242,6 +247,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
     async function loadPreview() {
       setPreviewLoading(true)
+      setPreviewData([]); setPreviewTotal(0)
       try {
         // Determine date range based on export type
         let from = dateFrom || ''
@@ -252,6 +258,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
         }
 
         const res = await (window as any).api?.vouchers?.list?.({
+          ...previewFilters,
           from,
           to,
           limit: PREVIEW_LIMIT,
@@ -272,7 +279,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
     loadPreview()
     return () => { cancelled = true }
-  }, [open, dateFrom, dateTo, exportType, fiscalYear, sortDir])
+  }, [open, dateFrom, dateTo, exportType, fiscalYear, sortDir, previewFilters?.sphere, previewFilters?.type, previewFilters?.paymentMethod, previewFilters?.earmarkId, previewFilters?.budgetId])
 
   // Format currency
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
@@ -418,7 +425,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             </div>
 
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <ExportSection title="Zusätzliche Inhalte" summary={'Zweckbindungen, Budgets und Anhänge'}><div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Zusätzliche Optionen</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label className="chip" style={{ cursor: 'pointer', userSelect: 'none' }}>
@@ -558,7 +565,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </div>
                 )}
               </div>
-            </div>
+            </div></ExportSection>
 
           </>
         )}
@@ -595,7 +602,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             </div>
 
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <ExportSection title="Sektionen im Bericht" summary={'Mitglieder, Budgets und weitere Auswertungen'}><div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Sektionen im Bericht</label>
               <div className="helper" style={{ fontSize: 11, marginBottom: 8, opacity: 0.85 }}>
                 Kassenstand, Einnahmen/Ausgaben, Kassenprüfung und Sphären sind immer enthalten. Leere Sektionen werden automatisch ausgeblendet.
@@ -632,7 +639,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </label>
                 )}
               </div>
-            </div>
+            </div></ExportSection>
 
             {trIncludeVoucherList && (
               <div className="field" style={{ gridColumn: '1 / span 2', paddingLeft: 16, borderLeft: '3px solid var(--accent)' }}>
@@ -662,7 +669,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
         {/* Standard export options (only for standard export) */}
         {exportType === 'standard' && (
           <>
-            <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <ExportSection title="Felder" summary={`${fields.length} ausgewählt`}><div className="field" style={{ gridColumn: '1 / span 2' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <label>Felder</label>
                 <button className="btn" onClick={applyJournalColumns} title="Übernimmt die aktuelle Spaltenauswahl aus der Buchungsansicht">
@@ -677,8 +684,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   </label>
                 ))}
               </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            </div></ExportSection>
+            <ExportSection title="Darstellung" summary={`${amountMode === 'OUT_NEGATIVE' ? 'Ausgaben negativ' : 'Beide positiv'} · ${sortDir === 'DESC' ? 'Neueste zuerst' : 'Älteste zuerst'}`}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Betragsdarstellung</label>
                 <div className="btn-group" role="group">
@@ -694,19 +701,21 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </div>
               </div>
             </div>
+            </ExportSection>
           </>
         )}
 
-        <div className={`row${flyout ? ' export-options-flyout__organization' : ''}`}>
-          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+        <div className={flyout ? 'export-options-flyout__organization' : undefined}>
+          <ExportSection title="Organisation" summary={orgName || 'Optional'}><div className="field" style={{ gridColumn: '1 / span 2' }}>
             <label>Organisationsname (optional)</label>
             <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Förderverein Muster e.V." />
-          </div>
+          </div></ExportSection>
         </div>
 
+        {exportType === 'standard' && <p className="helper export-pdf-hint">PDF enthält zusätzlich Kennzahlen, Monatsverläufe und den farbigen Monatsvergleich für den gewählten Zeitraum und die aktiven Filter.</p>}
         {/* Preview Section */}
         {exportType === 'standard' && fields.length > 0 && (
-          <div className="field">
+          <ExportSection title="Vorschau" summary={`${previewTotal} Buchungen · ${Math.min(PREVIEW_LIMIT, previewData.length)} in der Vorschau`}><div className="field">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 Vorschau
@@ -820,7 +829,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </div>
               )}
             </div>
-          </div>
+          </div></ExportSection>
         )}
 
         <div className={flyout ? 'export-options-flyout__actions' : undefined} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>

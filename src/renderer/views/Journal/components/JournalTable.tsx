@@ -1,3 +1,6 @@
+import TableDensityControl from '../../../components/booking/TableDensityControl'
+import BookingRowDetails from '../../../components/booking/BookingRowDetails'
+import { useBookingDensity } from '../../../hooks/useBookingDensity'
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
@@ -435,6 +438,9 @@ export default function JournalTable({
     lockedUntil,
     onRowDoubleClick
 }: JournalTableProps) {
+    const [dense, setDense] = useBookingDensity()
+    const [expandedId, setExpandedId] = useState<number | null>(null)
+    useEffect(() => { if (!rows.some(row => row.id === expandedId)) setExpandedId(null) }, [rows, expandedId])
     const dragIdx = useRef<number | null>(null)
     const [isGeneralProfile, setIsGeneralProfile] = useState(false)
     useEffect(() => {
@@ -1046,25 +1052,31 @@ export default function JournalTable({
     )
     return (
         <>
+            <div className="booking-table-tools"><span className="helper">Details über + · Spalten über den Spaltenkopf anpassen</span><TableDensityControl compact={dense} onChange={setDense} /></div>
             {narrow && <div className="journal-compact-toolbar">
                 <span className="helper">{compact ? 'Kompaktansicht' : 'Alle eingestellten Spalten'}</span>
                 <button type="button" className="btn ghost" aria-pressed={showFullTable} onClick={() => setShowFullTable(value => !value)}>{compact ? 'Alle Spalten' : 'Kompaktansicht'}</button>
             </div>}
             <div className="journal-table-scroll-wrapper" ref={scrollWrapperRef}>
-                <table className={`journal-table resizable-table${compact ? ' journal-table--compact' : ''}`} cellPadding={6} ref={tableRef} style={{ minWidth: compact ? 0 : visibleTableWidth, width: compact ? '100%' : `max(100%, ${visibleTableWidth}px)` }}>
+                <table className={`journal-table resizable-table${compact ? ' journal-table--compact' : ''}${dense ? ' journal-table--dense' : ''}`} cellPadding={6} ref={tableRef} style={{ minWidth: compact ? 0 : visibleTableWidth + 42, width: compact ? '100%' : `max(100%, ${visibleTableWidth + 42}px)` }}>
                     <colgroup>
+                        <col style={{ width: 42 }} />
                         {visibleOrder.map((k) => (
                             <col key={k} style={{ width: compact ? (k === 'description' ? undefined : 118) : getColWidth(k) }} />
                         ))}
                     </colgroup>
                     <thead>
                         <tr>
+                            <th className="booking-expand-cell" scope="col" aria-label="Buchungsdetails" />
                             {visibleOrder.map((k, idx) => {
                                 const isLast = idx === visibleOrder.length - 1
                                 const th = thFor(k)
                                 // Clone the th and add resize handle
                                 return React.cloneElement(th, {
                                     key: k,
+                                    tabIndex: th.props.onClick ? 0 : undefined,
+                                    onKeyDown: th.props.onClick ? (event: React.KeyboardEvent) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); th.props.onClick() } } : undefined,
+                                    'aria-sort': th.props.onClick ? ((k === 'paymentMethod' ? 'payment' : k) === sortBy ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none') : undefined,
                                     className: `${th.props.className || ''} resizable-th`.trim(),
                                     draggable: !compact,
                                     onDragStart: compact ? undefined : th.props.onDragStart,
@@ -1083,9 +1095,10 @@ export default function JournalTable({
                     </thead>
                     <tbody>
                         {rows.map((r) => (
+                            <React.Fragment key={r.id}>
                             <tr
-                                key={r.id}
                                 className={[
+                                    expandedId === r.id ? 'booking-expanded' : '',
                                     highlightId === r.id ? 'row-flash' : '',
                                     r.isAdvancePlaceholder ? 'journal-row-advance-placeholder' : '',
                                     isReversalVoucher(r) ? 'journal-row-storno' : '',
@@ -1093,12 +1106,15 @@ export default function JournalTable({
                                 ].filter(Boolean).join(' ') || undefined}
                                 onDoubleClick={() => onRowDoubleClick?.(r)}
                             >
+                                <td className="booking-expand-cell"><button type="button" className="btn ghost booking-detail-toggle" aria-expanded={expandedId === r.id} aria-controls={`journal-detail-${r.id}`} aria-label={`${r.voucherNo}: Details ${expandedId === r.id ? 'schließen' : 'anzeigen'}`} onDoubleClick={event => event.stopPropagation()} onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>{expandedId === r.id ? '−' : '+'}</button></td>
                                 {visibleOrder.map((k) => tdFor(k, r))}
                             </tr>
+                            {expandedId === r.id && <tr className="booking-inline-row" id={`journal-detail-${r.id}`}><td colSpan={visibleOrder.length + 1}><BookingRowDetails row={r} onOpen={onRowDoubleClick ? () => onRowDoubleClick(r) : undefined} /></td></tr>}
+                            </React.Fragment>
                         ))}
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={visibleOrder.length} className="helper">Keine Buchungen vorhanden.</td>
+                                <td colSpan={visibleOrder.length + 1} className="helper">Keine Buchungen vorhanden.</td>
                             </tr>
                         )}
                     </tbody>

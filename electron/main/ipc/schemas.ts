@@ -503,6 +503,7 @@ export const BindingUsageInput = z.object({
   sphere: Sphere.optional()
 })
 export const BindingUsageOutput = z.object({
+  monthly: z.array(z.object({ month: z.string(), inflow: z.number(), spent: z.number() })).optional(),
   allocated: z.number(),
   released: z.number(),
   balance: z.number(),
@@ -586,6 +587,7 @@ export const BudgetUsageInput = z.object({
   to: z.string().optional()
 })
 export const BudgetUsageOutput = z.object({
+  monthly: z.array(z.object({ month: z.string(), inflow: z.number(), spent: z.number() })).optional(),
   spent: z.number(),
   inflow: z.number(),
   planned: z.number().optional(),
@@ -1386,6 +1388,7 @@ export type TTagDeleteOutput = z.infer<typeof TagDeleteOutput>
 const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
 export const MembersListInput = z
   .object({
+    includeSummary: z.boolean().optional(),
     q: z.string().optional(),
     status: z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT', 'ALL']).optional(),
     limit: z.number().min(1).max(200).default(50).optional(),
@@ -1401,6 +1404,7 @@ export const MembersListInput = z
   .optional()
 const BoardRole = z.enum(['V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])
 export const MembersListOutput = z.object({
+  summary: z.object({ active: z.number(), dueMembers: z.number(), dueAmount: z.number() }).optional(),
   rows: z.array(
     z.object({
       id: z.number(),

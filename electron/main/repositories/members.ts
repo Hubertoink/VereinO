@@ -44,6 +44,7 @@ function setMemberTags(d: DB, memberId: number, tags?: string[]) {
 }
 
 export type MembersListParams = {
+  includeSummary?: boolean
   q?: string
   status?: MemberStatus | 'ALL'
   limit?: number
@@ -55,7 +56,7 @@ export type MembersListParams = {
   boardFilter?: 'ALL'|'ANY'|'NONE'|'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT'
 }
 
-export function listMembers(params: MembersListParams): { rows: MemberRow[]; total: number } {
+export function listMembers(params: MembersListParams): { rows: MemberRow[]; total: number; summary?: { active: number; dueMembers: number; dueAmount: number } } {
   const d = getDb()
   const {
     q,
@@ -116,14 +117,22 @@ export function listMembers(params: MembersListParams): { rows: MemberRow[]; tot
   `
   const mapRows = (rows: any[]): MemberRow[] => rows.map(r => ({ ...r, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] }))
 
-  if (contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
+  if (params.includeSummary || contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
     const candidates = mapRows(d.prepare(selectSql).all(...args) as any[])
     const statuses = getMemberPaymentStatuses(candidates)
     const filtered = candidates.filter((member) => {
       const isDue = (statuses.get(member.id)?.overdue || 0) > 0
-      return contributionFilter === 'DUE' ? isDue : !isDue
+      return contributionFilter === 'DUE' ? isDue : contributionFilter === 'NOT_DUE' ? !isDue : true
     })
-    return { rows: filtered.slice(offset, offset + limit), total: filtered.length }
+    const summary = filtered.reduce((acc, member) => {
+      if (member.status === 'ACTIVE') acc.active++
+      const overdue = Math.max(0, statuses.get(member.id)?.overdue || 0)
+      const amount = Math.max(0, member.contribution_amount || 0)
+      if (amount > 0 && overdue > 0) { acc.dueMembers++; acc.dueAmount += Math.round(amount * 100) * overdue }
+      return acc
+    }, { active: 0, dueMembers: 0, dueAmount: 0 })
+    summary.dueAmount /= 100
+    return { rows: filtered.slice(offset, offset + limit), total: filtered.length, ...(params.includeSummary ? { summary } : {}) }
   }
 
   const total = (d.prepare(`SELECT COUNT(1) as c ${base}`).get(...args) as any)?.c || 0

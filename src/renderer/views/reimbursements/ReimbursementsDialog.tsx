@@ -1,3 +1,4 @@
+import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
 import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil } from '@tabler/icons-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -70,8 +71,8 @@ function VoucherPicker({ role, initialVoucherId, maxCents, busy, submitDisabled 
   </section>
 }
 
-export default function ReimbursementsDialog({ onClose, notify, voucher, initialId, startCreate = false, onNavigate, embedded = false }: {
-  onClose: () => void; notify: Notify; voucher?: Voucher; initialId?: number; startCreate?: boolean; onNavigate?: () => void; embedded?: boolean
+export default function ReimbursementsDialog({ onClose, notify, voucher, initialId, startCreate = false, onNavigate, embedded = false, toolbarTarget }: {
+  onClose: () => void; notify: Notify; voucher?: Voucher; initialId?: number; startCreate?: boolean; onNavigate?: () => void; embedded?: boolean; toolbarTarget?: HTMLElement | null
 }) {
   const [rows, setRows] = useState<Reimbursement[]>([])
   const [detail, setDetail] = useState<ReimbursementDetail | null>(null)
@@ -125,12 +126,19 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
     <label>Notiz / Abrechnungsreferenz<textarea className="input" maxLength={10000} value={note} disabled={busy} onChange={event => setNote(event.target.value)} placeholder="Vereinbarung, Versanddatum oder Referenz der Abrechnung" /></label>
   </div>
   const visible = rows.filter(row => (statusFilter === 'ALL' || row.status === statusFilter) && `${row.title} ${row.partner}`.toLocaleLowerCase().includes(q.toLocaleLowerCase()))
+  const today = new Date().toLocaleDateString('en-CA')
+  const overdue = visible.filter(row => row.remainingCents > 0 && row.dueDate && row.dueDate < today)
+  const toolbar = <div className="reimbursement-overview-toolbar"><input className="input" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} /><select className="input" aria-label="Status filtern" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="ALL">Alle Status</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select><button className="btn primary" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}>+ Erstattung erwarten</button></div>
   const overview = <div className="reimbursement-inline">
-        <div className="reimbursement-overview-toolbar"><input className="input" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} /><select className="input" aria-label="Status filtern" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="ALL">Alle Status</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select><button className="btn primary" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}>+ Erstattung erwarten</button></div>
+        {!(embedded && toolbarTarget) && toolbar}
         {voucher?.type === 'IN' && <p className="helper">Wähle den Vorgang und anschließend „Erstattung zuordnen“. Die aktuelle Einnahme wird vorausgewählt.</p>}
-        <div className="helper invoices-summary">Offen gesamt: <strong>{money(visible.reduce((sum, row) => sum + row.remainingCents, 0))}</strong> ({visible.length} gesamt)</div>
+        <ManagementKpis label="Kostenerstattungsübersicht" loading={loading} items={[
+          { label: 'Offene Erstattungen', value: error ? '—' : money(visible.reduce((sum, row) => sum + Math.max(0, row.remainingCents), 0)), hint: `${visible.length} Vorgänge · gefilterte Auswahl` },
+          { label: 'Bereits erstattet', value: error ? '—' : money(visible.reduce((sum, row) => sum + row.paidCents, 0)), hint: 'Zugeordnete Erstattungszahlungen' },
+          { label: 'Überfällig', value: error ? '—' : money(overdue.reduce((sum, row) => sum + row.remainingCents, 0)), hint: `${overdue.length} ${overdue.length === 1 ? 'überfälliger Vorgang' : 'überfällige Vorgänge'}`, tone: overdue.length ? 'warning' : undefined }
+        ]} />
         {loading ? <p>Lädt …</p> : <div className="invoices-table-scroll-wrapper"><table cellPadding={6} className="invoices-table invoices-table--wide reimbursement-overview-table"><thead><tr><th>Bezeichnung</th><th>Partner</th><th>Fällig</th><th className="money">Erwartet</th><th className="money">Erstattet</th><th className="money">Rest</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
-          {visible.map(row => <tr key={row.id} onClick={() => void open(row.id)}><td><button className="reimbursement-title-button" onClick={event => { event.stopPropagation(); void open(row.id) }}>{row.title}</button></td><td>{row.partner}</td><td className="nowrap">{date(row.dueDate)}</td><td className="money">{money(row.expectedCents)}</td><td className="money">{money(row.paidCents)}</td><td className="money">{money(row.remainingCents)}</td><td><span className={`reimbursement-status reimbursement-status--${row.status.toLowerCase()}`}>{labels[row.status]}</span></td><td><button className="btn" onClick={event => { event.stopPropagation(); void open(row.id) }}>Info</button></td></tr>)}
+          {visible.map(row => <tr key={row.id} onClick={() => void open(row.id)}><td><button className="reimbursement-title-button" onClick={event => { event.stopPropagation(); void open(row.id) }}>{row.title}</button></td><td>{row.partner}</td><td className="nowrap">{date(row.dueDate)}<InvoiceDueHint date={row.dueDate} remaining={row.remainingCents / 100} /></td><td className="money">{money(row.expectedCents)}</td><td className="money"><InvoicePaymentProgress paid={row.paidCents / 100} gross={row.expectedCents / 100} label="erstattet" /></td><td className="money">{money(row.remainingCents)}</td><td><span className={`reimbursement-status reimbursement-status--${row.status.toLowerCase()}`}>{labels[row.status]}</span></td><td><button className="btn" onClick={event => { event.stopPropagation(); void open(row.id) }}>Info</button></td></tr>)}
           {!visible.length && <tr><td colSpan={8} className="helper">Keine Kostenerstattungen gefunden.</td></tr>}
         </tbody></table></div>}
 
@@ -165,5 +173,5 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   const overlay = createPortal(<div className="modal-overlay reimbursement-overlay" role="dialog" aria-modal="true" aria-labelledby="reimbursement-heading" onMouseDown={event => { if (event.target === event.currentTarget && !busy) close() }}>{content}</div>, document.body)
   if (!embedded) return overlay
   const isOpen = !!detail || creating
-  return <><div aria-hidden={isOpen || undefined} ref={node => { if (isOpen) node?.setAttribute('inert', ''); else node?.removeAttribute('inert') }}>{overview}</div>{isOpen && overlay}</>
+  return <>{toolbarTarget && createPortal(toolbar, toolbarTarget)}<div aria-hidden={isOpen || undefined} ref={node => { if (isOpen) node?.setAttribute('inert', ''); else node?.removeAttribute('inert') }}>{overview}</div>{isOpen && overlay}</>
 }

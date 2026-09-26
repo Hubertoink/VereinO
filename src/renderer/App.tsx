@@ -1,3 +1,5 @@
+import { usePageHistory } from './hooks/usePageHistory'
+import { useOverlayScrollLock } from './hooks/useOverlayScrollLock'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ICONS } from './utils/icons'
 import {
@@ -1646,39 +1648,8 @@ function AppInner() {
     setPlusEditQa(null)
     setPlusEditFiles([])
   }), [])
-  const pageHistoryRef = useRef<NavKey[]>([])
-  const pageHistoryIndexRef = useRef(-1)
-  const pageHistoryTargetRef = useRef<NavKey | null>(null)
-
-  useEffect(() => {
-    if (pageHistoryTargetRef.current === activePage) {
-      pageHistoryTargetRef.current = null
-      return
-    }
-    const pages = pageHistoryRef.current
-    const currentIndex = pageHistoryIndexRef.current
-    if (pages[currentIndex] === activePage) return
-    pages.splice(currentIndex + 1)
-    pages.push(activePage)
-    pageHistoryIndexRef.current = pages.length - 1
-  }, [activePage])
-
-  useEffect(() => {
-    const navigateHistory = (direction: -1 | 1) => {
-      const nextIndex = pageHistoryIndexRef.current + direction
-      const nextPage = pageHistoryRef.current[nextIndex]
-      if (!nextPage) return
-      pageHistoryIndexRef.current = nextIndex
-      pageHistoryTargetRef.current = nextPage
-      setActivePage(nextPage)
-    }
-    const offBack = window.api?.window?.onNavigationBackRequested?.(() => navigateHistory(-1))
-    const offForward = window.api?.window?.onNavigationForwardRequested?.(() => navigateHistory(1))
-    return () => {
-      offBack?.()
-      offForward?.()
-    }
-  }, [])
+  usePageHistory(activePage, setActivePage)
+  useOverlayScrollLock()
   useEffect(() => {
     if (!isClassicBookings) {
       setFabNearJournalEnd(false)
@@ -2787,6 +2758,19 @@ function AppInner() {
     budget: filterBudgetId ? String(filterBudgetId) : '',
     earmark: filterEarmark ? String(filterEarmark) : '', tag: filterTag || ''
   }), [q, from, to, filterType, filterSphere, filterPaymentAccountId, filterBudgetId, filterEarmark, filterTag])
+  const updateBookingLinkFilter = useCallback((key: string, value: string) => {
+    switch (key) {
+      case 'q': setQ(value); setFlashId(null); break
+      case 'from': setFrom(value); break
+      case 'to': setTo(value); break
+      case 'type': setFilterType(value as typeof filterType); break
+      case 'sphere': setFilterSphere(value as typeof filterSphere); break
+      case 'account': setFilterPaymentAccountId(value ? Number(value) : null); break
+      case 'budget': setFilterBudgetId(value ? Number(value) : null); break
+      case 'earmark': setFilterEarmark(value ? Number(value) : null); break
+      case 'tag': setFilterTag(value || null); break
+    }
+  }, [])
   const resetBookingLinkFilters = useCallback(() => {
     resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, setFrom, setTo })
     setFilterPrimaryClassificationValueId(null)
@@ -3673,7 +3657,7 @@ function AppInner() {
             />
           )}
           {isPlusBookings && (
-            <BookingsPlusView onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
+            <BookingsPlusView onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
           )}
           {activePage === 'Dauerbuchungen' && (
             <RecurringBookingsView notify={notify} />

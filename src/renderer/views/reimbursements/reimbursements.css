@@ -90,3 +90,6 @@
 .reimbursement-footer { justify-content: flex-end; padding-top: 8px; }
 .reimbursement-voucher-links { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; font-size: 12px; }
 @media(max-width:650px) { .reimbursement-form { grid-template-columns: 1fr; } .reimbursement-list-row { flex-wrap: wrap; } .reimbursement-totals strong { font-size: 16px; } .reimbursement-link { flex-wrap: wrap; } }
+
+.invoices-heading-group { display:flex; align-items:center; flex-wrap:wrap; gap:16px; min-width:0; }
+.invoices-heading-group .reimbursement-view-toggle { margin:0; align-self:auto; flex-wrap:wrap; }

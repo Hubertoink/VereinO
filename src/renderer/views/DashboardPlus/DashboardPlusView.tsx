@@ -1,3 +1,4 @@
+import FinanceKpiTable from '../../components/finance/FinanceKpiTable'
 import StackedMonthlyCard from './StackedMonthlyCard'
 import HoverTooltip from '../../components/common/HoverTooltip'
 import { DashboardRecentActivity } from '../Dashboard/DashboardView'
@@ -122,6 +123,7 @@ export default function DashboardPlusView({ today: initialToday, generalProfile 
           <article className="dp-card dp-open"><div className="dp-card-heading"><h2>Offene Posten</h2><small>Aktuell</small><IconReceipt2 size={20} /></div><strong className="dp-open-value">{money.format(snapshot.invoices.open.remaining)}</strong><p className="dp-card-note">aus {snapshot.invoices.open.count} offenen Rechnungen / Forderungen</p><div className="dp-open-track" aria-hidden="true"><i style={{ flex: snapshot.invoices.open.remaining ? 1 - overdueShare : 0 }} /><i style={{ flex: overdueShare }} /></div><div className="dp-overdue"><span>{snapshot.invoices.overdue.count} überfällig</span><strong>{money.format(snapshot.invoices.overdue.remaining)}</strong></div><p className="dp-card-note">{snapshot.invoices.dueSoon.count} in den nächsten 5 Tagen fällig</p><footer><button onClick={onGoToInvoices}>Offene Posten prüfen <IconArrowUpRight size={16} /></button></footer></article>
         </>}
       </div>
+      <FinanceKpiTable months={months} today={today} />
       <StackedMonthlyCard from={rangeFrom} to={today} months={months.map(row => row.month)} general={generalProfile} revision={revision} />
       <DashboardInsights from={rangeFrom} to={today} revision={revision} onBudgets={onGoToBudgets} onBindings={onGoToBindings} />
       </>}

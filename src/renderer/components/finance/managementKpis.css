@@ -1,0 +1,19 @@
+.management-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:14px 0 18px; }
+.management-kpi { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px 16px; min-width:0; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.management-kpi > span { font-size:12px; color:var(--text-dim); }
+.management-kpi > strong { font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.management-kpi > small { grid-column:1 / -1; font-size:11px; color:var(--text-dim); }
+.management-kpi--warning > strong { color:var(--danger); }
+.management-kpi--success > strong { color:var(--success); }
+.management-status { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:11px; padding:4px 7px; border-radius:6px; background:color-mix(in srgb,var(--status-color,var(--accent)) 12%,var(--surface)); }
+.management-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--status-color,var(--accent)); }
+.management-payment { display:grid; justify-items:end; gap:4px; font-variant-numeric:tabular-nums; }
+.management-payment progress { width:90px; height:4px; border:0; border-radius:4px; overflow:hidden; accent-color:var(--success); }
+.management-payment progress::-webkit-progress-bar { background:var(--border); }
+.management-payment progress::-webkit-progress-value { background:var(--success); }
+.management-payment small,.management-due { font-size:10px; color:var(--text-dim); }
+.management-due { display:block; margin-top:4px; }
+.management-due--late { color:var(--danger); font-weight:600; }
+.management-contribution-interval { display:block; font-size:10px; color:var(--text-dim); margin-top:3px; }
+@media(max-width:1050px) { .management-kpi { grid-template-columns:1fr; } .management-kpi > small { grid-column:auto; } }
+@media(max-width:600px) { .management-kpis { grid-template-columns:1fr; gap:6px; } .management-kpi { grid-template-columns:1fr auto; padding:10px 12px; } .management-kpi > small { grid-column:1 / -1; } }

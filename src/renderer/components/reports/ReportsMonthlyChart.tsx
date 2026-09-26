@@ -71,11 +71,11 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
       (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
-      setInBuckets((inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-      setOutBuckets((outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
+      setInBuckets((props.type && props.type !== 'IN' ? [] : inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
+      setOutBuckets((props.type && props.type !== 'OUT' ? [] : outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
   // Build the X-axis months based on filters
   // - With explicit from/to: show full continuous range (all months)

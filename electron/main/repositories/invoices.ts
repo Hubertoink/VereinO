@@ -413,7 +413,7 @@ export function summarizeInvoices(filters: {
   dueFrom?: string
   dueTo?: string
   tag?: string
-}): { count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number } {
+}): { count: number; gross: number; paid: number; remaining: number; grossIn: number; grossOut: number; remainingIn: number; remainingOut: number; overdueAmount: number; overdueCount: number } {
   const d = getDb()
   const { status, sphere, budgetId, q, dueFrom, dueTo, tag } = filters || {}
   const params: any[] = []
@@ -433,17 +433,22 @@ export function summarizeInvoices(filters: {
   const base = `FROM invoices i ${joinTag} ${whereSql}`
   // Compute gross and paid per invoice, then aggregate with optional status filter
   const rows = d.prepare(`
-    SELECT i.id,
+    SELECT i.id, i.due_date as dueDate,
            i.gross_amount as grossAmount,
            i.voucher_type as voucherType,
            IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum
     ${base}
     GROUP BY i.id
   `).all(...params) as any[]
-  const mapped = rows.map(r => ({ gross: Number(r.grossAmount || 0), paid: Number(r.paidSum || 0), voucherType: r.voucherType }))
+  const mapped = rows.map(r => ({ gross: Number(r.grossAmount || 0), paid: Number(r.paidSum || 0), voucherType: r.voucherType, dueDate: r.dueDate }))
   const withStatus = mapped.map(r => ({ ...r, status: computeStatus(r.gross, r.paid) }))
   const filtered = (status && status !== 'ALL') ? withStatus.filter(r => r.status === status) : withStatus
+  const today = new Date().toLocaleDateString('en-CA')
   const agg = filtered.reduce((acc, r) => {
+    const remaining = clamp2(Math.max(0, r.gross - r.paid))
+    if (r.voucherType === 'IN') acc.remainingIn += remaining
+    else acc.remainingOut += remaining
+    if (remaining > 0 && r.dueDate && r.dueDate < today) { acc.overdueAmount += remaining; acc.overdueCount++ }
     acc.count += 1
     acc.gross += r.gross
     acc.paid += r.paid
@@ -453,9 +458,9 @@ export function summarizeInvoices(filters: {
       acc.grossOut += r.gross
     }
     return acc
-  }, { count: 0, gross: 0, paid: 0, grossIn: 0, grossOut: 0 })
-  const remaining = clamp2(Math.max(0, Math.round((agg.gross - agg.paid) * 100) / 100))
-  return { count: agg.count, gross: clamp2(agg.gross), paid: clamp2(agg.paid), remaining, grossIn: clamp2(agg.grossIn), grossOut: clamp2(agg.grossOut) }
+  }, { count: 0, gross: 0, paid: 0, grossIn: 0, grossOut: 0, remainingIn: 0, remainingOut: 0, overdueAmount: 0, overdueCount: 0 })
+  const remaining = clamp2(agg.remainingIn + agg.remainingOut)
+  return { remainingIn: clamp2(agg.remainingIn), remainingOut: clamp2(agg.remainingOut), overdueAmount: clamp2(agg.overdueAmount), overdueCount: agg.overdueCount, count: agg.count, gross: clamp2(agg.gross), paid: clamp2(agg.paid), remaining, grossIn: clamp2(agg.grossIn), grossOut: clamp2(agg.grossOut) }
 }
 
 export function getInvoiceById(id: number) {

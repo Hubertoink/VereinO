@@ -1,3 +1,4 @@
+import ManagementKpis from '../../components/finance/ManagementKpis'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
@@ -41,6 +42,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
     useEffect(() => { try { localStorage.setItem('members.sort', sort) } catch { } }, [sort])
     const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
     const [total, setTotal] = useState(0)
+    const [memberSummary, setMemberSummary] = useState<{ active: number; dueMembers: number; dueAmount: number } | null>(null)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
     const [busy, setBusy] = useState(false)
@@ -201,6 +203,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
         setBusy(true)
         try {
             const res = await (window as any).api?.members?.list?.({
+                includeSummary: true,
                 q: debouncedQ || undefined,
                 status,
                 contributionFilter,
@@ -214,13 +217,15 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
             if (requestId !== loadRequestIdRef.current) return
             setRows(res?.rows || [])
             setTotal(res?.total || 0)
+            setMemberSummary(res?.summary || null)
         } catch (e: any) {
-            if (requestId === loadRequestIdRef.current) console.error('members.list failed', e)
+            if (requestId === loadRequestIdRef.current) { setMemberSummary(null); console.error('members.list failed', e) }
         } finally {
             if (requestId === loadRequestIdRef.current) setBusy(false)
         }
     }, [boardFilter, contributionFilter, debouncedQ, intervalFilter, limit, offset, sort, sortBy, status])
     useEffect(() => { void load() }, [load])
+    useEffect(() => addDataChangedListener(['members', 'vouchers'], () => { void load() }), [load])
 
     const saveMemberForm = useCallback(async () => {
         if (!form) return
@@ -514,6 +519,11 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     </button>
                 </div>
             </div>
+            <ManagementKpis label="Mitgliederübersicht" loading={busy} items={[
+                { label: 'Aktive Mitglieder', value: memberSummary ? String(memberSummary.active) : '—', hint: 'In der gefilterten Auswahl' },
+                { label: 'Mit fälligen Beiträgen', value: memberSummary ? String(memberSummary.dueMembers) : '—', hint: 'Mitglieder mit offenen Beitragsperioden', tone: memberSummary?.dueMembers ? 'warning' : undefined },
+                { label: 'Fällige Beiträge', value: memberSummary ? eurFmt.format(memberSummary.dueAmount) : '—', hint: 'Offene Perioden × hinterlegter Beitrag', tone: memberSummary?.dueAmount ? 'warning' : undefined }
+            ]} />
             <div className="members-board-card">
                 <div className="members-board-header">
                     <h2 className="members-board-title">Vorstand</h2>
@@ -590,9 +600,9 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                                 <td>{r.phone || '—'}</td>
                                 {colPrefs.showAddress && (<td>{r.address || '—'}</td>)}
                                 {colPrefs.showIBAN && (<td>{r.iban || '—'}</td>)}
-                                {colPrefs.showContribution && (<td align="right">{r.contribution_amount != null ? eurFmt.format(r.contribution_amount) : '—'}</td>)}
+                                {colPrefs.showContribution && (<td align="right">{r.contribution_amount != null ? eurFmt.format(r.contribution_amount) : '—'}<small className="management-contribution-interval">{r.contribution_interval ? ({ MONTHLY: 'pro Monat', QUARTERLY: 'pro Quartal', YEARLY: 'pro Jahr' })[r.contribution_interval] : 'Kein Intervall'}</small></td>)}
                                 <td>{(() => { const s = String(r.status || '').toUpperCase(); const c = (s === 'ACTIVE') ? '#00C853' : (s === 'LEFT') ? 'var(--danger)' : '#FFD600'; return (
-                                    <span title={s} aria-label={`Status: ${s}`} style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c }} />
+                                    <span className="management-status" style={{ '--status-color': c } as React.CSSProperties}>{({ ACTIVE: 'Aktiv', NEW: 'Neu', PAUSED: 'Pausiert', LEFT: 'Ausgetreten' } as Record<string, string>)[s] || s}</span>
                                 ) })()}</td>
                                 {colPrefs.showNotes && (
                                     <td title={r.notes || undefined} style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

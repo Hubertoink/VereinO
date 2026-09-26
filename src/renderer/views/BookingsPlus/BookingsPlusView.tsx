@@ -1,3 +1,4 @@
+import '../../components/booking/bookingTable.css'
 import PartyName from '../../components/common/PartyName'
 import RecentBookingsDropdown from './RecentBookingsDropdown'
 import DateFilterInput from '../../components/common/DateFilterInput'
@@ -19,6 +20,7 @@ type Props = {
     onResetFilters: () => void
     calendarSelection: { month: string; from: string; to: string }
     onCalendarSelectionChange: (selection: { month: string; from: string; to: string }) => void
+    onFilterChange?: (key: keyof Filter, value: string) => void
     externalFilters?: Partial<Filter>
     jumpRevision?: number
     flashId?: number | null
@@ -48,7 +50,17 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ onResetFilters, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+export default function BookingsPlusView({ onResetFilters, onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+    const draftTabsRef = useRef<HTMLDivElement>(null)
+    const activeDraftId = bookingDraftTabs.find(draft => draft.isActive)?.id
+    useEffect(() => {
+        const strip = draftTabsRef.current
+        const active = strip?.querySelector<HTMLElement>('.booking-draft-tab--active')
+        if (!strip || !active) return
+        const container = strip.getBoundingClientRect(), tab = active.getBoundingClientRect()
+        if (tab.right > container.right) strip.scrollLeft += tab.right - container.right
+        else if (tab.left < container.left) strip.scrollLeft -= container.left - tab.left
+    }, [activeDraftId, bookingDraftTabs.length, showBookingDraftTabs])
     const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters, from: calendarSelection.from, to: calendarSelection.to }))
     const q = useDebouncedValue(filters.q.trim(), 250)
     const batchNotify = useCallback((type: 'info' | 'success' | 'error' | 'warn', message: string) => notify(type === 'warn' ? 'info' : type, message), [notify])
@@ -126,7 +138,7 @@ export default function BookingsPlusView({ onResetFilters, calendarSelection, on
         const target = rows.find(row => row.id === flashId)
         if (target) { setSelected(target); setDetailOpen(true) }
     }, [flashId, rows])
-    const update = (key: keyof Filter, value: string) => { setFilters(current => ({ ...current, [key]: value })); setPage(1) }
+    const update = (key: keyof Filter, value: string) => { onFilterChange?.(key, value); setFilters(current => ({ ...current, [key]: value })); setPage(1) }
     const refresh = useCallback(() => { cache.current.clear(); setRevision(value => value + 1) }, [])
     useEffect(() => addDataChangedListener(['vouchers'], refresh), [refresh])
     useEffect(() => window.api.organizations.onSwitched(() => {
@@ -292,7 +304,16 @@ export default function BookingsPlusView({ onResetFilters, calendarSelection, on
             return <span key={`earmark-${item.earmarkId}`} className="bp-assignment-badge" style={color ? { background: color, color: getContrastTextColor(color) } : undefined} title={`Zweckbindung: ${label}${definition?.name ? ` · ${definition.name}` : ''}${item.amount != null ? ` · ${money.format(item.amount)}` : ''}`}><IconTargetArrow size={13} /><span>{label}</span></span>
         })}</span>
     }
-    return <div className="bookings-plus">
+    const activeFilterLabels: Partial<Record<keyof Filter, string>> = {
+        q: filters.q ? `Suche: ${filters.q}` : '',
+        from: filters.from ? `Ab ${fmtDate(filters.from)}` : '', to: filters.to ? `Bis ${fmtDate(filters.to)}` : '',
+        type: kinds[filters.type as keyof typeof kinds], sphere: spheres[filters.sphere as keyof typeof spheres],
+        classification: classifications.find(c => String(c.id) === filters.classification)?.name,
+        account: paymentAccounts.find(a => String(a.id) === filters.account)?.name,
+        budget: budgets.find(b => String(b.id) === filters.budget)?.label,
+        earmark: earmarks.find(e => String(e.id) === filters.earmark)?.name, tag: filters.tag
+    }
+    return <div className="bookings-plus bookings-plus--dense">
         <aside className={`bp-sidebar${filtersOpen ? ' bp-sidebar--open' : ''}`} aria-label="Kalender und Buchungsfilter">
             <button className="btn bp-filter-toggle" onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen} aria-controls="bp-filters"><IconFilter size={18} />Kalender & Filter</button>
             <div id="bp-filters" className="bp-filter-content">
@@ -316,9 +337,9 @@ export default function BookingsPlusView({ onResetFilters, calendarSelection, on
             </div>
         </aside>
         <section className="bp-workspace">
-            <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><label className="bp-search bp-header-search"><IconSearch size={18} /><input type="search" className="input" value={filters.q} onChange={event => update('q', event.target.value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" aria-label="Buchungen suchen" />{filters.q && <button type="button" className="btn ghost" aria-label="Suche leeren" onClick={() => update('q', '')}><IconX size={16} /></button>}</label><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
+            <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><div className="bp-heading-workspace"><label className="bp-search bp-header-search"><IconSearch size={18} /><input type="search" className="input" value={filters.q} onChange={event => update('q', event.target.value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" aria-label="Buchungen suchen" />{filters.q && <button type="button" className="btn ghost" aria-label="Suche leeren" onClick={() => update('q', '')}><IconX size={16} /></button>}</label>{showBookingDraftTabs && bookingDraftTabs.length > 0 && <div ref={draftTabsRef} className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}</div><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
             <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
-            {showBookingDraftTabs && bookingDraftTabs.length > 0 && <div className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}
+            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter"><span>{hasActiveFilters ? 'Aktive Filter:' : 'Gesamter Verlauf · keine Filter'}</span>{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => <button type="button" key={key} aria-label={`${activeFilterLabels[key] || filters[key]}: Filter entfernen`} onClick={() => update(key, '')}>{activeFilterLabels[key] || filters[key]} <span aria-hidden="true">×</span></button>)}</div>
             <div className="bp-main-columns">
                 <section className="bp-panel bp-list" aria-label="Buchungsliste" aria-busy={loading}>
                     {similarTo && <section className="bp-similar"><div className="bp-section-heading"><h3>Ähnliche Buchungen</h3><button className="btn ghost" aria-label="Ähnliche Buchungen schließen" onClick={() => setSimilarTo(null)}><IconX size={16} /></button></div><p className="bp-dim">Bis zu 5 Treffer · gleiche Art · Suche nach „{similarQuery(similarTo)}“ · alle Zeiträume</p>{similarLoading ? <p role="status">Suche läuft …</p> : similarError ? <p role="alert">{similarError}</p> : !similarRows.length ? <p>Keine ähnlichen Buchungen gefunden.</p> : similarRows.map(row => <button className="btn" key={row.id} onClick={() => selectRow(row)}><span>{row.description || row.voucherNo}<small>{prettyDate(row.date)}</small></span><strong>{signedMoney.format(signedAmount(row))}</strong></button>)}</section>}
@@ -327,7 +348,7 @@ export default function BookingsPlusView({ onResetFilters, calendarSelection, on
                     <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
                         <time className="bp-date" dateTime={row.date}><strong>{Number(row.date.slice(8, 10))}</strong><span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('de-DE', { month: 'short' })}</span><small>{row.date.slice(0, 4)}</small></time>
                         <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span><span className="bp-row-payment bp-row-payment--compact">{paymentMeta(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{assignmentBadges(row)}</span></span>
-                        <span className="bp-row-payment">{paymentMeta(row)}</span><strong className={`bp-row-amount ${signedAmount(row) < 0 ? 'bp-negative' : row.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(row))}<IconChevronRight size={14} /></strong>
+                        <span className="bp-row-payment">{paymentMeta(row)}</span><strong className={`bp-row-amount ${signedAmount(row) < 0 ? 'bp-negative' : row.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(row))}</strong>
                     </div>)}</div>}
                     </div>
                     <nav className="bp-pagination" aria-label="Buchungsseiten"><span>Seite {page} / {Math.max(1, Math.ceil(total / limit))} · {total} Einträge</span><div><button className="btn" disabled={loading || page === 1} onClick={() => setPage(1)} aria-label="Erste Seite" title="Zur ersten Seite"><IconChevronsLeft size={17} /></button><button className="btn" disabled={loading || page === 1} onClick={() => setPage(value => value - 1)} aria-label="Vorherige Seite"><IconChevronLeft size={17} /></button><button className="btn" disabled={loading || page * limit >= total} onClick={() => setPage(value => value + 1)} aria-label="Nächste Seite"><IconChevronRight size={17} /></button></div></nav>

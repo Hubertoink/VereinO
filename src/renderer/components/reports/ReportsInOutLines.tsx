@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sphere, PaymentMethod } from './types'
+import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
+export default function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
   const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
@@ -50,11 +50,11 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
       (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, paymentMethod: props.paymentMethod, type: 'OUT', earmarkId: props.earmarkId, budgetId: props.budgetId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
-      setInBuckets((inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-      setOutBuckets((outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
+      setInBuckets((props.type && props.type !== 'IN' ? [] : inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
+      setOutBuckets((props.type && props.type !== 'OUT' ? [] : outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
   const months = Array.from(new Set([...(inBuckets.map(b => b.month)), ...(outBuckets.map(b => b.month))])).sort()
   const maxVal = Math.max(1, ...months.map(m => Math.max(Math.abs(inBuckets.find(b => b.month === m)?.gross || 0), Math.abs(outBuckets.find(b => b.month === m)?.gross || 0))))
   const margin = { top: 22, right: 35, bottom: 48, left: 100 }

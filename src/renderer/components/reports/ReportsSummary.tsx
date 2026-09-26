@@ -1,10 +1,11 @@
+import { buildReportMonths } from '../../../../shared/reportAnalytics'
 import React, { useEffect, useMemo, useState } from 'react'
 import { IconCreditCard, IconReceipt2 } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import { IconBank, IconBudget, IconCash, IconPayPal } from '../../utils/icons'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSummary(props: { refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
+export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<null | {
     totals: { net: number; vat: number; gross: number }
@@ -34,13 +35,13 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
       (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
     ]).then(([inRes, outRes]) => {
       if (cancelled) return
-      const months = new Set<string>()
-      for (const b of (inRes?.buckets || [])) months.add(b.month)
-      for (const b of (outRes?.buckets || [])) months.add(b.month)
-      setMonthsCount(months.size)
+      setMonthsCount(buildReportMonths(
+        props.type && props.type !== 'IN' ? [] : inRes?.buckets || [],
+        props.type && props.type !== 'OUT' ? [] : outRes?.buckets || [], props.from, props.to
+      ).length)
     }).catch(() => setMonthsCount(0))
     return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
   return (
     <div className="report-summary-card">
@@ -53,7 +54,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
       {loading && <div>Lade …</div>}
       {data && (
         <div className="report-summary-content">
-          {(() => {
+          {!props.hideKpis && (() => {
             const inSum = (data.byType.find(t => t.key === 'IN')?.gross || 0)
             const outSum = (data.byType.find(t => t.key === 'OUT')?.gross || 0)
             const net = inSum - outSum
@@ -73,7 +74,7 @@ export default function ReportsSummary(props: { refreshKey?: number; from?: stri
                   <div style={{ color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
                 </div>
                 <div className="dp-card report-summary-kpi">
-                  <div className="helper">Ø Saldo/Monat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
+                  <div className="helper">Ø Saldo/Kalendermonat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
                   <div>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
                 </div>
               </div>

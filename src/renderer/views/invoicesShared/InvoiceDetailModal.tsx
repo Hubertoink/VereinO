@@ -1,6 +1,8 @@
+import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
+import './invoiceDetail.css'
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { IconLock, IconX } from '@tabler/icons-react'
+import { IconLock, IconX, IconPaperclip, IconReceipt2 } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
 import AppIcon from '../../components/common/AppIcon'
 import InvoiceActionMenu from './InvoiceActionMenu'
@@ -10,6 +12,8 @@ type Props = {
   detail: InvoiceDetail | null
   loading: boolean
   tags: InvoiceTagDef[]
+  budgets?: Array<{ id: number; name?: string | null; year?: number }>
+  earmarks?: Array<{ id: number; name?: string | null; code: string }>
   paymentAccounts?: Array<{ id: number; name: string }>
   fmtDateLocal: (value?: string) => string
   eurFmt: Intl.NumberFormat
@@ -61,6 +65,8 @@ export default function InvoiceDetailModal({
   loading,
   tags,
   paymentAccounts = [],
+  budgets = [],
+  earmarks = [],
   fmtDateLocal,
   eurFmt,
   statusBadge,
@@ -71,6 +77,7 @@ export default function InvoiceDetailModal({
   onDetailChange
 }: Props) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<null | { fileId: number; fileName: string }>(null)
+  const remaining = detail ? Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100) : 0
   const canEdit = detail?.status !== 'PAID'
   const paymentAccountName = detail?.paymentAccountName
     ?? (detail?.paymentAccountId ? paymentAccounts.find((account) => account.id === detail.paymentAccountId)?.name : null)
@@ -115,8 +122,8 @@ export default function InvoiceDetailModal({
   }
 
   return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal invoices-detail-grid" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Rechnungsdetails" onClick={onClose}>
+      <div className="modal invoices-detail-grid invoice-detail-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
         <div className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
@@ -136,17 +143,20 @@ export default function InvoiceDetailModal({
                 </div>
                 <div>{statusBadge(detail.status)}</div>
               </div>
+              <ManagementKpis label="Zahlungsübersicht" items={[
+                { label: 'Rechnungsbetrag', value: eurFmt.format(detail.grossAmount), hint: 'Brutto' },
+                { label: 'Bezahlt', value: eurFmt.format(detail.paidSum || 0), hint: `${detail.payments.length} Zahlungen` },
+                { label: 'Offener Rest', value: eurFmt.format(remaining), hint: remaining > 0 ? 'Noch auszugleichen' : 'Vollständig ausgeglichen', tone: remaining > 0 ? 'warning' : 'success' }
+              ]} />
+              <div className="invoice-detail-progress"><InvoicePaymentProgress paid={detail.paidSum || 0} gross={detail.grossAmount} /></div>
               <div className="invoices-detail-info-grid">
                 <div><div className="helper">Datum</div><div>{fmtDateLocal(detail.date)}</div></div>
-                <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '')}</div></div>
+                <div><div className="helper">Fällig</div><div>{fmtDateLocal(detail.dueDate || '') || 'Nicht festgelegt'}<InvoiceDueHint date={detail.dueDate} remaining={remaining} /></div></div>
                 <div><div className="helper">{detail.primaryClassificationName ? 'Kategorie' : 'Sphäre'}</div><div>{detail.primaryClassificationName || detail.sphere}</div></div>
                 <div><div className="helper">Zahlweg</div><div>{paymentRouteLabel}</div></div>
                 <div><div className="helper">Zahlkonto</div><div>{paymentAccountName || (detail.paymentAccountId ? `#${detail.paymentAccountId}` : '-')}</div></div>
-                <div><div className="helper">Betrag</div><div>{eurFmt.format(detail.grossAmount)}</div></div>
-                <div><div className="helper">Bezahlt</div><div>{eurFmt.format(detail.paidSum || 0)}</div></div>
-                <div><div className="helper">Rest</div><div className={Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100) > 0 ? 'invoices-rest-danger' : 'invoices-rest-success'}>{eurFmt.format(Math.max(0, Math.round((detail.grossAmount - (detail.paidSum || 0)) * 100) / 100))}</div></div>
                 <div><div className="helper">Auto-Buchung</div><div>{(detail.autoPost ?? 0) ? 'ja' : 'nein'}</div></div>
-                <div><div className="helper">Buchungstyp</div><div>{detail.voucherType}</div></div>
+                <div><div className="helper">Buchungstyp</div><div>{detail.voucherType === 'IN' ? 'Forderung (Einnahme)' : 'Verbindlichkeit (Ausgabe)'}</div></div>
                 <div>
                   <div className="helper">Verknüpfte Buchung</div>
                   <div>
@@ -163,7 +173,6 @@ export default function InvoiceDetailModal({
                           }
                           onClose()
                         }}
-                        style={{ color: '#fff' }}
                       >
                         {detail.postedVoucherNo ? detail.postedVoucherNo : `#${detail.postedVoucherId}`}
                       </button>
@@ -172,13 +181,13 @@ export default function InvoiceDetailModal({
                 </div>
               </div>
               {((detail.budgets && detail.budgets.length > 0) || (detail.earmarks && detail.earmarks.length > 0)) && (
-                <div className="invoices-detail-split" style={{ marginTop: 10 }}>
+                <section aria-label="Zuordnungen"><div className="invoices-detail-split" style={{ marginTop: 10 }}>
                   <div className="card" style={{ padding: 12 }}>
                     <strong>Budgets</strong>
                     <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
-                      <thead><tr><th align="left">Budget-ID</th><th align="right">Betrag</th></tr></thead>
+                      <thead><tr><th align="left">Budget</th><th align="right">Betrag</th></tr></thead>
                       <tbody>
-                        {(detail.budgets || []).map((item, index) => <tr key={`budget-${index}`}><td>{item.budgetId}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
+                        {(detail.budgets || []).map((item, index) => <tr key={`budget-${index}`}><td>{budgets.find(budget => budget.id === item.budgetId)?.name || `Budget #${item.budgetId}`}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
                         {(detail.budgets || []).length === 0 && <tr><td colSpan={2} className="helper">Keine Budgets.</td></tr>}
                       </tbody>
                     </table>
@@ -189,14 +198,14 @@ export default function InvoiceDetailModal({
                       {(detail.earmarks || []).length > 0 ? <span title="Zweckbindungs-Zuordnungen">{renderLockIcon('currentColor')}</span> : null}
                     </div>
                     <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
-                      <thead><tr><th align="left">Zweckbindung-ID</th><th align="right">Betrag</th></tr></thead>
+                      <thead><tr><th align="left">Zweckbindung</th><th align="right">Betrag</th></tr></thead>
                       <tbody>
-                        {(detail.earmarks || []).map((item, index) => <tr key={`earmark-${index}`}><td>{item.earmarkId}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
+                        {(detail.earmarks || []).map((item, index) => <tr key={`earmark-${index}`}><td>{earmarks.find(earmark => earmark.id === item.earmarkId)?.name || earmarks.find(earmark => earmark.id === item.earmarkId)?.code || `Zweckbindung #${item.earmarkId}`}</td><td align="right">{eurFmt.format(item.amount || 0)}</td></tr>)}
                         {(detail.earmarks || []).length === 0 && <tr><td colSpan={2} className="helper">Keine Zweckbindungen.</td></tr>}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </div></section>
               )}
               {(detail.tags || []).length > 0 && (
                 <div className="invoices-detail-tags">
@@ -213,9 +222,9 @@ export default function InvoiceDetailModal({
                 </div>
               )}
             </div>
-            <div className="invoices-detail-split">
-              <div className="card" style={{ padding: 12 }}>
-                <strong>Zahlungen</strong>
+            <div className="invoice-detail-sections">
+              <section className="card invoice-detail-tile" aria-label="Zahlungen">
+                <h3><AppIcon icon={IconReceipt2} size="control" /> Zahlungen <small>{detail.payments.length}</small></h3>
                 <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
                   <thead><tr><th align="left">Datum</th><th align="right">Betrag</th></tr></thead>
                   <tbody>
@@ -223,39 +232,24 @@ export default function InvoiceDetailModal({
                     {detail.payments.length === 0 && <tr><td colSpan={2} className="helper">Keine Zahlungen.</td></tr>}
                   </tbody>
                 </table>
-              </div>
-              <div className="card" style={{ padding: 12 }}>
-                <strong>Dateien</strong>
-                <table cellPadding={6} className="invoices-table" style={{ marginTop: 6 }}>
-                  <thead><tr><th align="left">Datei</th><th align="right">Größe</th><th align="left">Datum</th><th align="center">Aktion</th></tr></thead>
-                  <tbody>
-                    {(detail.files || []).map((file) => {
-                      const sizeMB = file.size != null ? Number(file.size) / 1024 / 1024 : null
-                      return (
-                        <tr key={file.id}>
-                          <td title={file.fileName}>
-                            <span style={{ display: 'block', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {file.fileName}
-                            </span>
-                          </td>
-                          <td align="right">{sizeMB != null ? `${sizeMB >= 0.01 ? sizeMB.toFixed(2) : sizeMB.toFixed(4)} MB` : '-'}</td>
-                          <td>{file.createdAt || '-'}</td>
-                          <td align="center">
-                            <InvoiceActionMenu
-                              actions={[
-                                { label: 'Öffnen', onClick: () => void openDetailFile(file.id) },
-                                { label: 'Speichern...', onClick: () => void saveDetailFile(file.id) },
-                                { label: 'Entfernen', tone: 'danger', onClick: () => setDeleteConfirm({ fileId: file.id, fileName: file.fileName }) }
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                    {detail.files.length === 0 && <tr><td colSpan={4} className="helper">Keine Dateien.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+              </section>
+              <section className="card invoice-detail-tile" aria-label="Anhänge">
+                <h3><AppIcon icon={IconPaperclip} size="control" /> Anhänge <small>{detail.files.length}</small></h3>
+                <div className="invoice-detail-files">
+                  {detail.files.map(file => <div className="invoice-detail-file" key={file.id}>
+                    <div>
+                      <button className="invoice-detail-file-name" title={file.fileName} onClick={() => void openDetailFile(file.id)}>{file.fileName}</button>
+                      <div className="helper">{file.size != null ? `${(Number(file.size) / 1024).toLocaleString('de-DE', { maximumFractionDigits: 1 })} KB` : '—'} · {file.createdAt ? fmtDateLocal(file.createdAt.slice(0, 10)) : '—'}</div>
+                    </div>
+                    <InvoiceActionMenu actions={[
+                      { label: 'Öffnen', onClick: () => void openDetailFile(file.id) },
+                      { label: 'Speichern...', onClick: () => void saveDetailFile(file.id) },
+                      { label: 'Entfernen', tone: 'danger', onClick: () => setDeleteConfirm({ fileId: file.id, fileName: file.fileName }) }
+                    ]} />
+                  </div>)}
+                  {!detail.files.length && <div className="invoice-detail-empty"><AppIcon icon={IconPaperclip} size="control" /><strong>Keine Anhänge</strong><span className="helper">Zu dieser Verbindlichkeit sind keine Dateien hinterlegt.</span></div>}
+                </div>
+              </section>
             </div>
             <div className="invoices-detail-footer">
               <button className="btn" onClick={onClose}>Schließen</button>

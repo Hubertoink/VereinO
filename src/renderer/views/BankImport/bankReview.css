@@ -37,3 +37,26 @@
   .bank-review-purpose { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
   .bank-review-facts { grid-template-columns: 1fr; }
 }
+.bank-list-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; color: var(--text-dim); font-size: 12px; margin: 4px 0 12px; }
+.bank-master-table { overflow-x: auto; }
+.bank-master-table .bank-table { min-width: 880px; }
+.bank-sort-button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; display: inline-flex; gap: 6px; align-items: center; }
+.bank-expand { min-width: 30px; font-size: 18px; }
+.bank-description-button { border: 0; padding: 0; background: transparent; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bank-master-table .bank-description-cell { max-width: 360px; }
+.bank-master-table .bank-description-cell > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.bank-master-table .bank-row-expanded { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.bank-master-table .bank-inline-detail, .bank-master-table .bank-inline-detail:hover { background: color-mix(in srgb, var(--text) 2%, var(--surface)); cursor: default; }
+.bank-master-table .bank-inline-detail > td { padding: 20px 24px; white-space: normal; }
+.bank-inline-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bank-inline-heading > div { display: grid; gap: 5px; }
+.bank-inline-heading span { color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.bank-inline-facts { display: grid; grid-template-columns: 2fr 1.4fr 1fr 1fr; gap: 24px; margin: 20px 0; }
+.bank-inline-facts dt { color: var(--text-dim); font-size: 11px; margin-bottom: 6px; }
+.bank-inline-facts dd { margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.bank-inline-assignment { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.bank-inline-warning { color: var(--warning); font-size: 13px; }
+.bank-inline-ai { display: flex; align-items: center; gap: 16px; justify-content: space-between; font-size: 13px; }
+.bank-master-table button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.bank-master-table .bank-table th:nth-child(4), .bank-master-table .bank-table td:nth-child(4) { display: table-cell; }

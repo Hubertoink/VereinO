@@ -116,6 +116,10 @@ export const InvoicesSummaryInput = z
   })
   .optional()
 export const InvoicesSummaryOutput = z.object({
+  remainingIn: z.number(),
+  remainingOut: z.number(),
+  overdueAmount: z.number(),
+  overdueCount: z.number(),
   count: z.number(),
   gross: z.number(),
   paid: z.number(),

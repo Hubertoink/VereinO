@@ -1,3 +1,4 @@
+import { buildReportMonths, renderReportAnalytics, reportAnalyticsCss } from '../../../shared/reportAnalytics'
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { getWidgetAutostart, setWidgetAutostart, type createReceiptWidgetController } from '../services/receiptWidget'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataChange'
@@ -1575,48 +1576,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         earmarkId: (parsed.filters as any)?.earmarkId,
         budgetId: (parsed.filters as any)?.budgetId
       })
-      // Build accurate monthly series for IN/OUT/Saldo (ignore type filter to show both lines)
-      const d2 = getDb()
-      const p2: any[] = []
-      const wh2: string[] = []
-      if (parsed.from) {
-        wh2.push('date >= ?')
-        p2.push(parsed.from)
-      }
-      if (parsed.to) {
-        wh2.push('date <= ?')
-        p2.push(parsed.to)
-      }
-      if (parsed.filters?.paymentMethod) {
-        wh2.push('payment_method = ?')
-        p2.push(parsed.filters.paymentMethod)
-      }
-      if (parsed.filters?.sphere) {
-        wh2.push('sphere = ?')
-        p2.push(parsed.filters.sphere)
-      }
-      if ((parsed.filters as any)?.earmarkId != null) {
-        wh2.push('earmark_id = ?')
-        p2.push((parsed.filters as any).earmarkId)
-      }
-      if ((parsed.filters as any)?.budgetId != null) {
-        wh2.push('budget_id = ?')
-        p2.push((parsed.filters as any).budgetId)
-      }
-      const where2 = wh2.length ? ' WHERE ' + wh2.join(' AND ') : ''
-      const detailed = d2
-        .prepare(
-          `
-                SELECT strftime('%Y-%m', date) as month,
-                       IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount ELSE 0 END), 0) as inGross,
-                       IFNULL(SUM(CASE WHEN type='OUT' THEN gross_amount ELSE 0 END), 0) as outGross,
-                       IFNULL(SUM(CASE WHEN type='IN' THEN gross_amount WHEN type='OUT' THEN -gross_amount ELSE 0 END), 0) as saldo
-                FROM vouchers${where2}
-                GROUP BY strftime('%Y-%m', date)
-                ORDER BY month ASC
-            `
-        )
-        .all(...p2) as any[]
+      // Use the same signed monthly series and filters as the report view.
+      const monthlyFilters = { from: parsed.from, to: parsed.to,
+        paymentMethod: parsed.filters?.paymentMethod, sphere: parsed.filters?.sphere,
+        earmarkId: parsed.filters?.earmarkId, budgetId: parsed.filters?.budgetId }
+      const income = parsed.filters?.type && parsed.filters.type !== 'IN' ? [] : monthlyVouchers({ ...monthlyFilters, type: 'IN' })
+      const expense = parsed.filters?.type && parsed.filters.type !== 'OUT' ? [] : monthlyVouchers({ ...monthlyFilters, type: 'OUT' })
+      const reportMonths = buildReportMonths(income, expense, parsed.from, parsed.to)
+      const detailed = reportMonths.map(row => ({ month: row.month, inGross: row.income, outGross: row.expense, saldo: row.net }))
       const orgName =
         (parsed.orgName && parsed.orgName.trim()) ||
         ((getSetting<string>('org.name') || 'VereinO') as string)
@@ -1692,13 +1659,15 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
               gross: p.gross
             }))
 
-      const totalIn = summary.byType.find((t: any) => t.key === 'IN')?.gross ?? 0
-      const totalOut = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross ?? 0)
+      const totalIn = reportMonths.reduce((sum, row) => sum + row.income, 0)
+      const totalOut = reportMonths.reduce((sum, row) => sum + row.expense, 0)
       const saldo = Math.round((totalIn - totalOut) * 100) / 100
 
       const html = `<!doctype html>
 <!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Controlling-Bericht</title>
 <style>
+${reportAnalyticsCss}
+
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; color: #222; }
     h1 { margin: 0 0 4px; }
     .muted { color: #666; font-size: 12px; }
@@ -2021,6 +1990,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
             <span style="display:inline-block; margin-right:12px;"><span style="display:inline-block; width:10px; height:10px; background:#c62828; border-radius:2px; margin-right:4px;"></span>Ausgaben</span>
         </div>
     </div>
+
+    ${renderReportAnalytics(reportMonths, true, { from: parsed.from, to: parsed.to })}
 
     <div class="card table-box" style="margin-top:16px;">
         <div class="title">Belege (Tabelle)</div>
@@ -3055,8 +3026,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   // Members
   ipcMain.handle('members.list', async (_e, payload) => {
     const parsed = MembersListInput.parse(payload) ?? { limit: 50 }
-    const { rows, total } = listMembers(parsed as any)
-    return MembersListOutput.parse({ rows, total })
+    return MembersListOutput.parse(listMembers(parsed as any))
   })
   ipcMain.handle('members.create', async (_e, payload) => {
     const parsed = MemberCreateInput.parse(payload)

@@ -1,3 +1,5 @@
+import AssignmentOverview from '../../components/finance/AssignmentOverview'
+import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
 import { IconPlus, IconPencil, IconTrash, IconRotateClockwise, IconCalendarRepeat, IconLink, IconCheck, IconHistory, IconReceipt2, IconChevronRight } from '@tabler/icons-react'
 import { activityAction, activityFallback, bookingKindLabel, paymentKindLabel, sphereLabel } from './activityPresentation'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -8,8 +10,6 @@ import ReportsCashBars from './charts/ReportsCashBars'
 // EarmarksUsageBars removed to avoid duplicate tile – combined in detail card
 // BudgetDeviationList (older Sphären‑Anteile donut) removed in favor of SphereShareCard
 // WorkQueueCard removed (Offene Aufgaben) per dashboard simplification request
-import EarmarkDetailCard from './EarmarkDetailCard'
-import BudgetDetailCard from './BudgetDetailCard'
 import SphereShareCard from './SphereShareCard'
 // LiquidityForecastArea removed per request
 import type { CommonFilters } from './types'
@@ -469,16 +469,10 @@ export default function DashboardView({
               {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                 <div style={{ display: 'grid', gap: 12 }}>
-                  {activeBudgets.map(b => (
-                    <BudgetDetailCard key={b.id} budgetId={b.id} from={balanceFilters.from} to={balanceFilters.to} />
-                  ))}
-                  {activeBudgets.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Kein aktives Budget.</div></div>}
+                  <AssignmentOverview kind="budget" definitions={activeBudgets.map(b => ({ ...b, name: b.name || `Budget #${b.id}`, plan: b.amountPlanned }))} from={balanceFilters.from} to={balanceFilters.to} compact />
                 </div>
                 <div style={{ display: 'grid', gap: 12 }}>
-                  {activeEarmarks.map(em => (
-                    <EarmarkDetailCard key={em.id} earmarkId={em.id} {...balanceFilters} />
-                  ))}
-                  {activeEarmarks.length === 0 && <div className="card" style={{ padding: 12 }}><div className="helper">Keine aktive Zweckbindung.</div></div>}
+                  <EarmarkUsageCards bindings={activeEarmarks} {...balanceFilters} compact />
                 </div>
               </div>
               <div className="dashboard-chart-secondary-grid">
