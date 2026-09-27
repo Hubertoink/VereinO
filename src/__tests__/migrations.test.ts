@@ -2,11 +2,39 @@ import {
   ensureAdvanceTables,
   ensureAiTables,
   ensureBankImportTables,
+  backfillBankCounterparties,
   ensureOrganizationClassificationTables,
   ensureJournalPerformanceIndexes,
   ensurePartyTables,
   expandVoucherTypeConstraint
 } from '../../electron/main/db/migrations'
+
+const SqliteDatabase: new (path: string) => any = (() => {
+  try { return require('node:sqlite').DatabaseSync }
+  catch { return require('better-sqlite3') }
+})()
+
+describe('backfillBankCounterparties', () => {
+  it('restores only missing CSV counterparty names from saved source rows', () => {
+    const db = new SqliteDatabase(':memory:')
+    try {
+      db.exec(`CREATE TABLE bank_import_batches (id INTEGER PRIMARY KEY, format TEXT);
+        CREATE TABLE bank_transactions (id INTEGER PRIMARY KEY, batch_id INTEGER, counterparty TEXT, raw_json TEXT);
+        INSERT INTO bank_import_batches VALUES (1, 'CSV'), (2, 'CAMT');`)
+      const insert = db.prepare('INSERT INTO bank_transactions VALUES (?, ?, ?, ?)')
+      insert.run(1, 1, null, JSON.stringify({ 'Name Zahlungsbeteiligter': '  Merle  Beckord ' }))
+      insert.run(2, 1, 'Bereits korrigiert', JSON.stringify({ 'Name Zahlungsbeteiligter': 'Anderer Name' }))
+      insert.run(3, 2, null, JSON.stringify({ 'Name Zahlungsbeteiligter': 'CAMT Name' }))
+      insert.run(4, 1, null, '{ungültig')
+      backfillBankCounterparties(db)
+      backfillBankCounterparties(db)
+      expect(db.prepare('SELECT id, counterparty FROM bank_transactions ORDER BY id').all()).toEqual([
+        { id: 1, counterparty: 'Merle Beckord' }, { id: 2, counterparty: 'Bereits korrigiert' },
+        { id: 3, counterparty: null }, { id: 4, counterparty: null }
+      ])
+    } finally { db.close() }
+  })
+})
 
 describe('expandVoucherTypeConstraint', () => {
   it('updates the vouchers table SQL to support INTERNAL voucher types', () => {

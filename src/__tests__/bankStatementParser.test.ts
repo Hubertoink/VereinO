@@ -1,6 +1,13 @@
 import { parseBankStatement, parseCamtStatement } from '../../electron/main/services/bankStatementParser'
 
 describe('bank statement parser', () => {
+  it('maps Name Zahlungsbeteiligter and requires a counterparty column for CSV', () => {
+    const data = Buffer.from('Buchungstag;Betrag;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;Verwendungszweck\n24.09.2026;-75,40;Merle Beckord;DE123;Fahrkarten').toString('base64')
+    const parsed = parseBankStatement(data, 'umsatz.csv')
+    expect(parsed.suggestedMapping).toMatchObject({ counterparty: 'Name Zahlungsbeteiligter', counterpartyIban: 'IBAN Zahlungsbeteiligter' })
+    expect(parsed.rows[0]).toMatchObject({ counterparty: 'Merle Beckord', counterpartyIban: 'DE123', errors: [] })
+    expect(parseBankStatement(data, 'umsatz.csv', { counterparty: null }).rows[0].errors).toContain('Gegenpartei-Spalte nicht zugeordnet.')
+  })
   it('prefers the purpose column even when generic booking text occurs first', () => {
     const csv = 'Buchungstag;Betrag;Buchungstext;Verwendungszweck\n28.01.2026;-8,80;SEPA-UEBERWEISUNG;Porto und Versandkosten'
     const data = Buffer.from(csv).toString('base64')

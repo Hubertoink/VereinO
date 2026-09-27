@@ -206,6 +206,8 @@ test('receipt widget keeps local fields after AI failure and saves a booking wit
   await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
   await intake.getByLabel('Rechnungsnummer').fill('WIDGET-BOOKING')
   await intake.getByRole('button', { name: 'Als Buchung übernehmen', exact: true }).click()
+  await expect(intake.locator('.booking-type-overlay')).toHaveCount(0)
+  await expect(intake.getByRole('button', { name: 'Ausgabe', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await intake.getByRole('button', { name: 'Buchungskonto wählen', exact: true }).click()
   await intake.getByRole('option', { name: 'Widget Testbank', exact: true }).click()
   await expect.poll(() => intake.locator('.booking-validation-badge').allTextContents()).toEqual([])

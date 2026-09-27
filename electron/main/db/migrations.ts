@@ -5,6 +5,34 @@ type DB = InstanceType<typeof Database>
 
 type Mig = { version: number; up: string | ((db: DB) => void) }
 
+export function backfillBankCounterparties(db: DB) {
+  const rows = db.prepare(`
+    SELECT bt.id, bt.raw_json as rawJson
+    FROM bank_transactions bt
+    JOIN bank_import_batches bib ON bib.id = bt.batch_id
+    WHERE bib.format = 'CSV' AND (bt.counterparty IS NULL OR TRIM(bt.counterparty) = '')
+      AND bt.raw_json IS NOT NULL
+  `).all() as Array<{ id: number; rawJson: string }>
+  const update = db.prepare(`
+    UPDATE bank_transactions SET counterparty = ?
+    WHERE id = ? AND (counterparty IS NULL OR TRIM(counterparty) = '')
+  `)
+  for (const row of rows) {
+    try {
+      const raw = JSON.parse(row.rawJson)
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+      const name = Object.entries(raw).find(([header, value]) =>
+        header.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() === 'name zahlungsbeteiligter'
+          && typeof value === 'string'
+      )?.[1]
+      const counterparty = typeof name === 'string' ? name.replace(/\s+/g, ' ').trim() : ''
+      if (counterparty) update.run(counterparty, row.id)
+    } catch {
+      // Older or malformed source rows stay untouched.
+    }
+  }
+}
+
 const MIGRATIONS: Mig[] = [
   {
     version: 1,
@@ -791,6 +819,10 @@ const MIGRATIONS: Mig[] = [
     up: (db: DB) => {
       ensureBankImportTables(db)
     }
+  },
+  {
+    version: 43,
+    up: backfillBankCounterparties
   }
 ]
 
@@ -1408,6 +1440,8 @@ export function ensureBankImportTables(db: DB) {
         ON bank_transactions(payment_account_id, booking_date DESC);
       CREATE INDEX IF NOT EXISTS idx_bank_transactions_batch
         ON bank_transactions(batch_id);
+      CREATE INDEX IF NOT EXISTS idx_bank_import_batches_account_created
+        ON bank_import_batches(payment_account_id, created_at DESC, id DESC);
 
       CREATE TABLE IF NOT EXISTS bank_transaction_ai_suggestions (
         transaction_id INTEGER PRIMARY KEY REFERENCES bank_transactions(id) ON DELETE CASCADE,

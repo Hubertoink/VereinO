@@ -200,6 +200,7 @@ export type AiBankReviewTransaction = {
   amount: number
   currency?: string | null
   counterparty?: string | null
+  counterpartyIban?: string | null
   purpose?: string | null
   endToEndId?: string | null
   bankReference?: string | null
@@ -1693,6 +1694,10 @@ export async function reviewBankImportTransactions(input: {
   }
   const settings = getAiSettings()
   const model = input.model || settings.textModel
+  const bankContext: AiContext = {
+    ...input.context,
+    aiRules: (input.context.aiRules || []).filter((rule) => rule.scope === 'ALL' || rule.scope === 'BOOKINGS')
+  }
   // Prompt-enforced JSON is substantially larger than a connection-test reply.
   // Keep Mittwald reviews small; IPC validates conflicts across the combined result.
   if (settings.provider === 'mittwald' && input.transactions.length > 5) {
@@ -1730,6 +1735,8 @@ export async function reviewBankImportTransactions(input: {
     'Fuer APPLY_RECURRING uebernimm recurringBookingId, recurringBookingName, occurrenceId und scheduledDate exakt aus einem RECURRING-Match. Erfinde keine IDs oder Termine.',
     'LINK_EXISTING nur bei passendem Typ, Betrag und hoher Plausibilitaet.',
     'Die matches enthalten auch schwach bewertete Kandidaten in einem erweiterten Zeitraum. Bewerte Zweck, Gegenpartei, Referenzen, Buchungsdatum und Wertstellung selbst; der lokale score ist keine Wahrscheinlichkeit.',
+    'counterparty ist der Name des Zahlungsbeteiligten aus dem Bankimport. Beruecksichtige ihn als eigenstaendige Information, gerade wenn purpose nur einen kryptischen Zahlungs- oder Terminaltext enthaelt. Leite die Art einer neuen Buchung nicht allein aus diesem Text ab.',
+    'Wende aktive aiRules mit Geltungsbereich ALL oder BOOKINGS auf passende Bankbelege und neue Buchungsvorschlaege an. Pruefe ihre Bedingungen auch gegen counterparty; nutze fuer Zuordnungen nur vorhandene Stammdaten-IDs. Erwaehne eine angewendete Regel kurz in reason oder evidence.',
     'Gleiches Datum und gleicher Betrag sind starke Hinweise, aber bei mehreren plausiblen Buchungen kein eindeutiger Nachweis. Bei uneindeutigen Treffern NEEDS_MANUAL_REVIEW verwenden.',
     'Abweichende Zahlkonten immer in warnings nennen und nur mit klaren weiteren Belegen LINK_EXISTING vorschlagen. Niemals dieselbe vorhandene Buchung mehreren Bankbelegen vorschlagen.',
     'Wenn ein lokaler Treffer passt, ist LINK_EXISTING vorrangig. Erstelle dann keine neue Buchung.',
@@ -1741,7 +1748,7 @@ export async function reviewBankImportTransactions(input: {
     'Halte reason, warnings und evidence kurz. Liefere fuer jeden mitgegebenen Bankbeleg genau einen Vorschlag und keine weiteren Bankbelege.',
     '',
     'VereinO-Kontext:',
-    JSON.stringify(compactContext(input.context)),
+    JSON.stringify(compactContext(bankContext)),
     '',
     'Offene Bankbelege mit lokalen Treffern:',
     JSON.stringify(input.transactions)

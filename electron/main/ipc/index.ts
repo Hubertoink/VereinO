@@ -473,8 +473,14 @@ import { registerBackupAndShellHandlers } from './backupAndShellHandlers'
 import {
   BankImportCommitInput,
   BankImportCommitOutput,
+  BankImportHistoryInput,
+  BankImportHistoryOutput,
   BankImportPreviewInput,
   BankImportPreviewOutput,
+  BankImportRemapPreviewInput,
+  BankImportRemapPreviewOutput,
+  BankImportRemapApplyInput,
+  BankImportRemapApplyOutput,
   BankImportStatusOutput,
   BankTransactionCheckInput,
   BankTransactionIdInput,
@@ -489,6 +495,7 @@ import {
   commitBankImport,
   findBankTransactionMatches,
   getBankImportStatus,
+  listBankImportHistory,
   getBankTransaction,
   linkBankTransaction,
   listBankTransactions,
@@ -497,6 +504,7 @@ import {
   reopenBankTransaction,
   saveBankTransactionAiSuggestions
 } from '../repositories/bankTransactions'
+import { applyBankImportRemap, previewBankImportRemap } from '../repositories/bankImportRemap'
 import {
   createAiJob,
   deleteAiJob,
@@ -1073,6 +1081,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         amount: Number(transaction.amount),
         currency: transaction.currency,
         counterparty: transaction.counterparty,
+        counterpartyIban: transaction.counterpartyIban,
         purpose: transaction.purpose,
         endToEndId: transaction.endToEndId,
         bankReference: transaction.bankReference,
@@ -2586,12 +2595,27 @@ ${reportAnalyticsCss}
     })
     return BankImportCommitOutput.parse(commitBankImport({ ...parsed, fileBase64 } as any))
   })
+  ipcMain.handle('bankImports.remapPreview', async (_e, payload) => {
+    const parsed = BankImportRemapPreviewInput.parse(payload)
+    return BankImportRemapPreviewOutput.parse(previewBankImportRemap(parsed))
+  })
+  ipcMain.handle('bankImports.remapApply', async (_e, payload) => {
+    const parsed = BankImportRemapApplyInput.parse(payload)
+    await requireSafetyBackup(backup.makeBackup, 'preBankImportRemap', 'Bankimport-Zuordnungen aktualisieren')
+    const result = BankImportRemapApplyOutput.parse(applyBankImportRemap(parsed))
+    notifyDataChanged(['bank-imports'])
+    return result
+  })
   ipcMain.handle('bankTransactions.list', async (_e, payload) => {
     const parsed = BankTransactionsListInput.parse(payload ?? {})
     return BankTransactionsListOutput.parse(listBankTransactions(parsed as any))
   })
   ipcMain.handle('bankTransactions.importStatus', async () => {
     return BankImportStatusOutput.parse(getBankImportStatus())
+  })
+  ipcMain.handle('bankTransactions.importHistory', async (_e, payload) => {
+    const parsed = BankImportHistoryInput.parse(payload ?? {})
+    return BankImportHistoryOutput.parse(listBankImportHistory(parsed))
   })
   ipcMain.handle('bankTransactions.get', async (_e, payload) => {
     const parsed = BankTransactionIdInput.parse(payload)

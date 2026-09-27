@@ -95,6 +95,29 @@ it('reviews 34 transactions in seven complete batches and accepts a nullable sum
   expect(result.usage?.totalTokens).toBe(2100)
 })
 
+it('gives bank reviews the payment participant and applicable booking rules', async () => {
+  mockChatCreate.mockResolvedValue(completion(JSON.stringify({
+    summary: 'Manuell prüfen.', warnings: [], suggestions: [{
+      transactionId: 77, action: 'NEEDS_MANUAL_REVIEW', confidence: 0.5,
+      reason: 'Bitte prüfen.', warnings: [], evidence: []
+    }]
+  })))
+  await reviewBankImportTransactions({
+    transactions: [{ id: 77, bookingDate: '2026-09-21', direction: 'OUT', amount: 441.11,
+      counterparty: 'Getränke Fessler', counterpartyIban: 'DE123', purpose: '26N0773 SecureGo plus: GENODE61SPE' }],
+    context: { aiRules: [
+      { id: 1, name: 'Getränke', scope: 'ALL', instruction: 'Getränke Fessler als Getränke und Tickets behandeln.', enabled: 1 },
+      { id: 2, name: 'Rechnungen', scope: 'INVOICES', instruction: 'Nur Rechnungen.', enabled: 1 }
+    ] } as any
+  })
+  const prompt = mockChatCreate.mock.calls[0][0].messages.find((message: any) => message.role === 'user').content[0].text as string
+  const context = JSON.parse(prompt.split('VereinO-Kontext:\n')[1].split('\n\nOffene Bankbelege')[0])
+  const transactions = JSON.parse(prompt.split('Offene Bankbelege mit lokalen Treffern:\n')[1])
+  expect(context.aiRules).toEqual([{ id: 1, name: 'Getränke', scope: 'ALL', instruction: 'Getränke Fessler als Getränke und Tickets behandeln.' }])
+  expect(transactions[0]).toMatchObject({ counterparty: 'Getränke Fessler', counterpartyIban: 'DE123', purpose: '26N0773 SecureGo plus: GENODE61SPE' })
+  expect(prompt).toContain('Pruefe ihre Bedingungen auch gegen counterparty')
+})
+
 it('checks structured JSON during the Mittwald connection test', async () => {
   mockModelsList.mockResolvedValue({ data: [{ id: 'Qwen3.6-35B-A3B-FP8' }] })
   mockChatCreate.mockResolvedValue(completion('{"ok":true}'))

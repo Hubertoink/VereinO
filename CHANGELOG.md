@@ -7,6 +7,26 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.5.5] - 2026-09-27
+
+### Hinzugefügt
+
+- Die Importhistorie zeigt pro Zahlkonto frühere CSV- und CAMT-Importe. Über das Drei-Punkte-Menü lassen sich übernommene Bankbelege anzeigen und CSV-Spaltenzuordnungen nachträglich mit Änderungsvorschau korrigieren.
+- Der Bankimport zeigt nach der Kontowahl den letzten Import mit tatsächlich übernommenen Umsätzen und deren neuesten Buchungstag.
+
+### Geändert
+
+- Bankdaten werden zuerst einem Zahlkonto zugeordnet und anschließend in einer gemeinsamen Vorschau als neu, Duplikat oder fehlerhaft geprüft. Duplikate werden anhand früherer Importe desselben Zahlkontos erkannt und standardmäßig übersprungen.
+- Die Bankimporttabelle zeigt Gegenpartei und Verwendungszweck hierarchisch sowie Datum und Zahlungsrichtung kompakt an. Filter und Importhistorie folgen dem übrigen App-Layout.
+- CSV-Importe erkennen „Name Zahlungsbeteiligter“ als Gegenpartei und verlangen eine zugeordnete Gegenpartei-Spalte. Fehlende Namen älterer CSV-Importe werden aus gespeicherten Ursprungszeilen ergänzt, soweit vorhanden.
+- Die Bank-KI berücksichtigt bei „KI prüfen“ den Zahlungsbeteiligten ausdrücklich und wendet passende aktive Regeln für „Überall“ und „Buchungen & Belege“ an.
+
+### Behoben
+
+- Importieren ist bei null ausgewählten Belegen deaktiviert; abgeschlossene Importe ohne neue Belege zeigen keine Aktion „Belege anzeigen“.
+- KI-Buchungsentwürfe aus Bankbelegen, Belegen und der Stapelanalyse übernehmen die erkannte Buchungsart direkt ins Buchungsformular.
+- Lange Verwendungszwecke verschieben die Bankimporttabelle beim Öffnen der Details nicht mehr.
+
 ## [4.5.2] - 2026-09-26
 
 ### Geändert

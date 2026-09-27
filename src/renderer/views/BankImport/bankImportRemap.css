@@ -1,0 +1,19 @@
+.bank-import-remap-dialog { width: min(820px, calc(100vw - 28px)); max-height: min(760px, calc(100dvh - 28px)); display: flex; flex-direction: column; }
+.bank-import-remap-header, .bank-import-remap-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; }
+.bank-import-remap-header { border-bottom: 1px solid var(--border); }
+.bank-import-remap-header h2 { margin: 0; font-size: 18px; }
+.bank-import-remap-header p { margin: 5px 0 0; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.bank-import-remap-body { min-height: 0; overflow: auto; padding: 16px 20px; }
+.bank-import-remap-body > p { margin: 0 0 14px; font-size: 13px; line-height: 1.5; }
+.bank-import-remap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bank-import-remap-grid .field { min-width: 0; }
+.bank-import-remap-grid .input { width: 100%; min-width: 0; box-sizing: border-box; }
+.bank-import-remap-body .bank-import-remap-summary { margin: 18px 0 8px; }
+.bank-import-remap-preview { display: grid; gap: 8px; }
+.bank-import-remap-row { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 12px; }
+.bank-import-remap-row > strong { display: block; margin-bottom: 7px; }
+.bank-import-remap-row > div { display: grid; grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 3px 0; overflow-wrap: anywhere; }
+.bank-import-remap-row span, .bank-import-remap-row del { color: var(--text-dim); }
+.bank-import-remap-row b { font-weight: 600; }
+.bank-import-remap-footer { justify-content: flex-end; border-top: 1px solid var(--border); }
+@media (max-width: 650px) { .bank-import-remap-grid { grid-template-columns: minmax(0, 1fr); } .bank-import-remap-row > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }

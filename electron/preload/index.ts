@@ -481,11 +481,14 @@ const rendererApi = {
   },
   bankImports: {
     preview: (payload) => invoke('bankImports.preview', payload),
-    commit: (payload) => invoke('bankImports.commit', payload)
+    commit: (payload) => invoke('bankImports.commit', payload),
+    remapPreview: (payload) => invoke('bankImports.remapPreview', payload),
+    remapApply: (payload) => invoke('bankImports.remapApply', payload)
   },
   bankTransactions: {
     list: (payload) => invoke('bankTransactions.list', payload),
     importStatus: () => invoke('bankTransactions.importStatus'),
+    importHistory: (payload) => invoke('bankTransactions.importHistory', payload),
     get: (payload) => invoke('bankTransactions.get', payload),
     matches: (payload) => invoke('bankTransactions.matches', payload),
     link: (payload) => invoke('bankTransactions.link', payload),

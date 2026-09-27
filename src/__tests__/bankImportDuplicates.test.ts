@@ -35,7 +35,7 @@ describe('bank import duplicate detection across exports', () => {
 
   function importRow(overrides: Record<string, unknown> = {}, account = 1, force = false) {
     jest.mocked(parseBankStatement).mockReturnValue({
-      format: 'CSV', rows: [{ sourceRow: 2, bookingDate: '2026-06-02', direction: 'IN', amount: 75,
+      format: 'CSV', headers: ['Name Zahlungsbeteiligter'], suggestedMapping: { counterparty: 'Name Zahlungsbeteiligter' }, rows: [{ sourceRow: 2, bookingDate: '2026-06-02', direction: 'IN', amount: 75,
         currency: 'EUR', purpose: 'Jolie Nwayotalu Freizeit St.Goar', counterparty: 'Jolie Nwayotalu',
         counterpartyIban: 'DE123', bankReference: 'BANK-123', endToEndId: 'E2E-123',
         raw: {}, errors: [], ...overrides }]
@@ -127,7 +127,7 @@ describe('bank import duplicate detection across exports', () => {
     importRow()
     const input = { fileBase64: 'fixture', fileName: 'export.csv', paymentAccountId: 1 }
     const parsed = jest.mocked(parseBankStatement).mock.results.at(-1)!.value
-    jest.mocked(parseBankStatement).mockReturnValue({ ...parsed, headers: ['Buchungstext', 'Verwendungszweck'], suggestedMapping: { purpose: 'Verwendungszweck' }, accountIbans: [],
+    jest.mocked(parseBankStatement).mockReturnValue({ ...parsed, headers: ['Buchungstext', 'Verwendungszweck', 'Name Zahlungsbeteiligter'], suggestedMapping: { purpose: 'Verwendungszweck', counterparty: 'Name Zahlungsbeteiligter' }, accountIbans: [],
       rows: [{ ...parsed.rows[0], purpose: 'GUTSCHRIFT', bankReference: null, endToEndId: null }] })
     const preview = previewBankImport({ ...input, mapping: { purpose: 'Buchungstext' } })
     expect(preview.warnings).toHaveLength(1)
@@ -147,7 +147,7 @@ describe('bank import duplicate detection across exports', () => {
   it.each([true, false])('recognizes a real CSV reimport after changing the purpose mapping (%s)', (genericFirst) => {
     const parser = jest.requireActual<typeof import('../../electron/main/services/bankStatementParser')>('../../electron/main/services/bankStatementParser')
     const input = { fileName: 'export.csv', paymentAccountId: 1,
-      fileBase64: Buffer.from('Buchungstag;Betrag;Buchungstext;Verwendungszweck\n28.01.2026;-8,80;SEPA-UEBERWEISUNG;Porto und Versandkosten').toString('base64') }
+      fileBase64: Buffer.from('Buchungstag;Betrag;Buchungstext;Verwendungszweck;Name Zahlungsbeteiligter\n28.01.2026;-8,80;SEPA-UEBERWEISUNG;Porto und Versandkosten;Jolie Nwayotalu').toString('base64') }
     jest.mocked(parseBankStatement).mockImplementation(parser.parseBankStatement)
     const mapping = { purpose: genericFirst ? 'Buchungstext' : 'Verwendungszweck' }
     expect(commitBankImport({ ...input, mapping }).imported).toBe(1)
@@ -160,9 +160,43 @@ describe('bank import duplicate detection across exports', () => {
     const parser = jest.requireActual<typeof import('../../electron/main/services/bankStatementParser')>('../../electron/main/services/bankStatementParser')
     jest.mocked(parseBankStatement).mockImplementation(parser.parseBankStatement)
     const input = { fileName: 'export.csv', paymentAccountId: 1,
-      fileBase64: Buffer.from('Buchungstag;Betrag;Verwendungszweck\n28.01.2026;-8,80;Porto').toString('base64') }
+      fileBase64: Buffer.from('Buchungstag;Betrag;Verwendungszweck;Name Zahlungsbeteiligter\n28.01.2026;-8,80;Porto;Jolie Nwayotalu').toString('base64') }
     expect(previewBankImport(input).duplicateRows).toHaveLength(0)
     commitBankImport(input)
     expect(commitBankImport(input)).toMatchObject({ imported: 0, duplicates: 1 })
+  })
+
+  it('rejects a CSV import without a mapped counterparty column', () => {
+    const parser = jest.requireActual<typeof import('../../electron/main/services/bankStatementParser')>('../../electron/main/services/bankStatementParser')
+    jest.mocked(parseBankStatement).mockImplementation(parser.parseBankStatement)
+    const input = { fileName: 'ohne-name.csv', paymentAccountId: 1,
+      fileBase64: Buffer.from('Buchungstag;Betrag;Verwendungszweck\n28.01.2026;-8,80;Porto').toString('base64') }
+    expect(previewBankImport(input)).toMatchObject({ summary: { valid: 0, errors: 1 } })
+    expect(() => commitBankImport(input)).toThrow('Gegenpartei')
+    expect(db.prepare('SELECT COUNT(*) AS total FROM bank_import_batches').get()).toEqual({ total: 0 })
+  })
+
+  it('recognizes original CSV data even when date and amount columns change', () => {
+    const parser = jest.requireActual<typeof import('../../electron/main/services/bankStatementParser')>('../../electron/main/services/bankStatementParser')
+    jest.mocked(parseBankStatement).mockImplementation(parser.parseBankStatement)
+    const input = { fileName: 'export.csv', paymentAccountId: 1,
+      fileBase64: Buffer.from('Buchungstag;Wertstellung;Betrag;Saldo;Verwendungszweck;Name Zahlungsbeteiligter\n28.01.2026;29.01.2026;-8,80;1200,00;Porto;Jolie Nwayotalu').toString('base64') }
+    expect(commitBankImport(input).imported).toBe(1)
+    const remapped = { ...input, fileName: 'anderer-name.csv', mapping: { bookingDate: 'Wertstellung', amount: 'Saldo' } }
+    expect(previewBankImport(remapped).duplicateRows).toEqual([expect.objectContaining({ duplicateBy: 'RAW' })])
+    expect(commitBankImport(remapped)).toMatchObject({ imported: 0, duplicates: 1 })
+    expect(commitBankImport({ ...remapped, paymentAccountId: 2 }).imported).toBe(1)
+  })
+
+  it('imports only selected rows and keeps excluded originals available for a later import', () => {
+    const parser = jest.requireActual<typeof import('../../electron/main/services/bankStatementParser')>('../../electron/main/services/bankStatementParser')
+    jest.mocked(parseBankStatement).mockImplementation(parser.parseBankStatement)
+    const input = { fileName: 'export.csv', paymentAccountId: 1,
+      fileBase64: Buffer.from('Buchungstag;Betrag;Verwendungszweck;Name Zahlungsbeteiligter\n28.01.2026;-8,80;Porto;Jolie Nwayotalu\n29.01.2026;75,00;Beitrag;Marc Reiner').toString('base64') }
+    expect(commitBankImport({ ...input, selectedSourceRows: [] }).imported).toBe(0)
+    expect(commitBankImport({ ...input, selectedSourceRows: [3] }).imported).toBe(1)
+    expect(previewBankImport(input).duplicateRows.map(row => row.sourceRow)).toEqual([3])
+    expect(commitBankImport({ ...input, selectedSourceRows: [2] }).imported).toBe(1)
+    expect(commitBankImport(input)).toMatchObject({ imported: 0, duplicates: 2 })
   })
 })

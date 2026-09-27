@@ -79,7 +79,10 @@ function rawKey(raw: Record<string, unknown>): string | null {
   return raw && Object.keys(raw).length ? JSON.stringify(canonical(raw)) : null
 }
 
-function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
+function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean, originals?: Map<string, Record<string, any>[]>) {
+  const original = rawKey(row.raw)
+  const rawMatch = original ? originals?.get(original)?.find((existing) => !consumed.has(Number(existing.id))) : undefined
+  if (rawMatch) return { existing: rawMatch, duplicateBy: 'RAW' as const }
   const fingerprint = fingerprintFor(row, paymentAccountId)
   const candidates = d.prepare(`
     SELECT
@@ -125,8 +128,8 @@ function existingTransactionForRow(d: DB, row: ParsedBankTransaction, paymentAcc
   return null
 }
 
-function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean) {
-  const duplicate = existingTransactionForRow(d, row, paymentAccountId, consumed, allowPotential)
+function duplicateRecordForRow(d: DB, row: ParsedBankTransaction, paymentAccountId: number, consumed: Set<number>, allowPotential: boolean, originals?: Map<string, Record<string, any>[]>) {
+  const duplicate = existingTransactionForRow(d, row, paymentAccountId, consumed, allowPotential, originals)
   if (!duplicate) return null
   const { existing, duplicateBy } = duplicate
   consumed.add(Number(existing.id))
@@ -179,9 +182,13 @@ export function previewBankImport(input: {
   const duplicateRows = paymentAccountId ? [...importDuplicates(getDb(), parsed.rows, paymentAccountId).values()] : []
   const purposeColumn = parsed.headers.find((header) => /verwendungszweck/i.test(header))
   const selectedPurpose = input.mapping?.purpose === undefined ? parsed.suggestedMapping.purpose : input.mapping.purpose
-  const warnings = purposeColumn && selectedPurpose !== purposeColumn
-    ? [`Die Spalte „${purposeColumn}“ ist vorhanden, wird aber nicht als Verwendungszweck verwendet. Bitte prüfe die Spaltenzuordnung.`]
-    : []
+  const selectedCounterparty = input.mapping?.counterparty === undefined ? parsed.suggestedMapping.counterparty : input.mapping.counterparty
+  const warnings = [
+    ...(parsed.format === 'CSV' && !parsed.headers.includes(selectedCounterparty || '')
+      ? ['Ordne die CSV-Spalte für die Gegenpartei zu, bevor du importierst.'] : []),
+    ...(purposeColumn && selectedPurpose !== purposeColumn
+      ? [`Die Spalte „${purposeColumn}“ ist vorhanden, wird aber nicht als Verwendungszweck verwendet. Bitte prüfe die Spaltenzuordnung.`] : [])
+  ]
   return {
     format: parsed.format,
     headers: parsed.headers,
@@ -219,9 +226,14 @@ export function commitBankImport(input: {
   mapping?: BankCsvMapping
   forceImportSourceRows?: number[]
   additionalImportSourceRows?: number[]
+  selectedSourceRows?: number[]
 }) {
   return withTransaction((d: DB) => {
     const parsed = parseBankStatement(input.fileBase64, input.fileName, input.mapping)
+    const counterpartyColumn = input.mapping?.counterparty === undefined ? parsed.suggestedMapping.counterparty : input.mapping.counterparty
+    if (parsed.format === 'CSV' && !parsed.headers.includes(counterpartyColumn || '')) {
+      throw new Error('Bitte ordne vor dem CSV-Import die Spalte „Gegenpartei“ zu.')
+    }
     const paymentAccountId = resolvePaymentAccountId(parsed, input.paymentAccountId, d)
     if (!paymentAccountId) throw new Error('Bitte wähle das Zahlkonto für diesen Import.')
     validatePaymentAccount(paymentAccountId, d)
@@ -229,9 +241,10 @@ export function commitBankImport(input: {
     const additionalRows = new Set(input.additionalImportSourceRows || [])
     // Snapshot all matches before inserting: repeated source rows represent separate occurrences.
     const duplicateMatches = importDuplicates(d, parsed.rows, paymentAccountId)
-    const rowsToProcess = forcedRows.size > 0
+    const selectedRows = input.selectedSourceRows == null ? null : new Set(input.selectedSourceRows)
+    const rowsToProcess = (forcedRows.size > 0
       ? parsed.rows.filter((row) => forcedRows.has(row.sourceRow))
-      : parsed.rows
+      : parsed.rows).filter((row) => !selectedRows || selectedRows.has(row.sourceRow))
 
     const fileHash = hash(input.fileBase64)
     const batchInfo = d.prepare(`
@@ -299,7 +312,8 @@ export function commitBankImport(input: {
       duplicates,
       errorCount: errors.length,
       forcedImportSourceRows: Array.from(forcedRows),
-      additionalImportSourceRows: Array.from(additionalRows)
+      additionalImportSourceRows: Array.from(additionalRows),
+      selectedSourceRows: selectedRows ? Array.from(selectedRows) : null
     })
     return { batchId, imported, importedTransactionIds, duplicates, duplicateRows, errors }
   })
@@ -405,6 +419,7 @@ function withAiSuggestion(row: Record<string, any>) {
 export function listBankTransactions(input: {
   status?: BankStatus | 'ALL'
   paymentAccountId?: number
+  batchId?: number
   from?: string
   to?: string
   q?: string
@@ -415,38 +430,44 @@ export function listBankTransactions(input: {
   ids?: number[]
 }) {
   const d = getDb()
-  const where: string[] = []
-  const params: unknown[] = []
-  if (input.status && input.status !== 'ALL') {
-    where.push('bt.status = ?')
-    params.push(input.status)
-  }
+  const scopeWhere: string[] = []
+  const scopeParams: unknown[] = []
   if (input.paymentAccountId) {
-    where.push('bt.payment_account_id = ?')
-    params.push(input.paymentAccountId)
+    scopeWhere.push('bt.payment_account_id = ?')
+    scopeParams.push(input.paymentAccountId)
+  }
+  if (input.batchId) {
+    scopeWhere.push('bt.batch_id = ?')
+    scopeParams.push(input.batchId)
   }
   if (input.from) {
-    where.push('bt.booking_date >= ?')
-    params.push(input.from)
+    scopeWhere.push('bt.booking_date >= ?')
+    scopeParams.push(input.from)
   }
   if (input.to) {
-    where.push('bt.booking_date <= ?')
-    params.push(input.to)
+    scopeWhere.push('bt.booking_date <= ?')
+    scopeParams.push(input.to)
   }
   const ids = [...new Set((input.ids || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))]
   if (ids.length) {
-    where.push(`bt.id IN (${ids.map(() => '?').join(', ')})`)
-    params.push(...ids)
+    scopeWhere.push(`bt.id IN (${ids.map(() => '?').join(', ')})`)
+    scopeParams.push(...ids)
   }
   if (input.q?.trim()) {
     const like = `%${input.q.trim()}%`
-    where.push(`(
+    scopeWhere.push(`(
       COALESCE(bt.counterparty, '') LIKE ? OR
       COALESCE(bt.purpose, '') LIKE ? OR
       COALESCE(bt.bank_reference, '') LIKE ? OR
       COALESCE(bt.end_to_end_id, '') LIKE ?
     )`)
-    params.push(like, like, like, like)
+    scopeParams.push(like, like, like, like)
+  }
+  const where = [...scopeWhere]
+  const params = [...scopeParams]
+  if (input.status && input.status !== 'ALL') {
+    where.push('bt.status = ?')
+    params.push(input.status)
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const sortDir = input.sortDir === 'ASC' ? 'ASC' : 'DESC'
@@ -481,7 +502,9 @@ export function listBankTransactions(input: {
     const possibleDuplicateCount = findBankTransactionMatches({ id: Number(row.id), linkedOnly: true }).length
     return { ...transaction, matchScore: bestScore >= 15 ? bestScore : null, possibleDuplicateCount }
   })
-  const statsRows = d.prepare('SELECT status, COUNT(*) as count FROM bank_transactions GROUP BY status').all() as Array<{ status: BankStatus; count: number }>
+  const scopeSql = scopeWhere.length ? `WHERE ${scopeWhere.join(' AND ')}` : ''
+  const statsRows = d.prepare(`SELECT bt.status as status, COUNT(*) as count
+    FROM bank_transactions bt ${scopeSql} GROUP BY status`).all(...scopeParams) as Array<{ status: BankStatus; count: number }>
   const stats = { total: 0, open: 0, linked: 0, checked: 0 }
   for (const row of statsRows) {
     stats.total += Number(row.count)
@@ -490,6 +513,37 @@ export function listBankTransactions(input: {
     if (row.status === 'CHECKED') stats.checked = Number(row.count)
   }
   return { rows: rowsWithMatchScore, total, page, limit, stats }
+}
+
+export function listBankImportHistory(input: { paymentAccountId?: number; page?: number; limit?: number } = {}) {
+  const d = getDb()
+  const page = Math.max(1, Number(input.page || 1))
+  const limit = Math.min(50, Math.max(1, Number(input.limit || 10)))
+  const where = input.paymentAccountId ? 'WHERE bib.payment_account_id = ?' : ''
+  const params = input.paymentAccountId ? [input.paymentAccountId] : []
+  const total = Number((d.prepare(`SELECT COUNT(*) as count FROM bank_import_batches bib ${where}`)
+    .get(...params) as { count: number }).count)
+  const rows = d.prepare(`
+    SELECT bib.id, bib.file_name as fileName, bib.format,
+      bib.payment_account_id as paymentAccountId,
+      pa.name as paymentAccountName, pa.color as paymentAccountColor,
+      bib.imported_count as imported, bib.duplicate_count as duplicates,
+      bib.error_count as errors, bib.created_at as importedAt,
+      MIN(bt.booking_date) as periodFrom, MAX(bt.booking_date) as periodTo
+    FROM bank_import_batches bib
+    JOIN payment_accounts pa ON pa.id = bib.payment_account_id
+    LEFT JOIN bank_transactions bt ON bt.batch_id = bib.id
+    ${where}
+    GROUP BY bib.id
+    ORDER BY bib.created_at DESC, bib.id DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, (page - 1) * limit) as Array<{
+    id: number; fileName: string; format: 'CAMT' | 'CSV'; paymentAccountId: number
+    paymentAccountName: string; paymentAccountColor?: string | null
+    imported: number; duplicates: number; errors: number; importedAt: string
+    periodFrom?: string | null; periodTo?: string | null
+  }>
+  return { rows, total, page, limit }
 }
 
 export function getBankImportStatus() {
@@ -543,19 +597,21 @@ export function getBankImportStatus() {
       pa.name,
       pa.color,
       MAX(bt.booking_date) as lastBookingDate,
-      (
-        SELECT MAX(bib.created_at)
-        FROM bank_import_batches bib
-        WHERE bib.payment_account_id = pa.id
-      ) as lastImportAt,
+      last_batch.created_at as lastImportAt,
+      last_batch.imported_count as lastImportImportedCount,
+      last_batch.file_name as lastImportFileName,
       COUNT(bt.id) as total
     FROM payment_accounts pa
     LEFT JOIN bank_transactions bt ON bt.payment_account_id = pa.id
-    WHERE pa.is_active = 1
-      AND pa.kind <> 'CASH'
-    GROUP BY pa.id, pa.name, pa.color
+    LEFT JOIN bank_import_batches last_batch ON last_batch.id = (
+      SELECT bib.id FROM bank_import_batches bib
+      WHERE bib.payment_account_id = pa.id AND bib.imported_count > 0
+      ORDER BY bib.created_at DESC, bib.id DESC LIMIT 1
+    )
+    WHERE pa.kind <> 'CASH'
+    GROUP BY pa.id, pa.name, pa.color, last_batch.created_at, last_batch.imported_count, last_batch.file_name
     ORDER BY pa.sort_order ASC, pa.name COLLATE NOCASE ASC
-  `).all() as Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; lastImportAt?: string | null; total: number }>
+  `).all() as Array<{ id: number; name: string; color?: string | null; lastBookingDate?: string | null; lastImportAt?: string | null; lastImportImportedCount?: number | null; lastImportFileName?: string | null; total: number }>
   return {
     lastBookingDate: latest?.lastBookingDate ?? null,
     lastImportAt: latestBatch?.lastImportAt ?? null,
@@ -874,11 +930,37 @@ export function findBankTransactionMatches(input: {
 function importDuplicates(d: DB, rows: ParsedBankTransaction[], paymentAccountId: number) {
   const matches = new Map<number, NonNullable<ReturnType<typeof duplicateRecordForRow>>>()
   const consumed = new Set<number>()
+  // Compare original source fields before interpreting date/amount mappings. Load once
+  // per import and scope to this account; repeated identical payments stay separate.
+  const originals = new Map<string, Record<string, any>[]>()
+  const incomingKeys = new Set(rows.map((row) => rawKey(row.raw)).filter(Boolean))
+  if (incomingKeys.size) {
+    const stored = d.prepare(`
+      SELECT bt.id, bt.status, bt.booking_date as bookingDate, bt.direction, bt.amount,
+        bt.counterparty, bt.purpose, bt.end_to_end_id as endToEndId,
+        bt.bank_reference as bankReference, bt.raw_json as rawJson,
+        pa.name as paymentAccountName, bib.file_name as sourceFileName
+      FROM bank_transactions bt
+      JOIN payment_accounts pa ON pa.id = bt.payment_account_id
+      JOIN bank_import_batches bib ON bib.id = bt.batch_id
+      WHERE bt.payment_account_id = ? ORDER BY bt.id
+    `).all(paymentAccountId) as Record<string, any>[]
+    for (const existing of stored) {
+      const key = rawKey(jsonValue(existing.rawJson, {}))
+      if (key && incomingKeys.has(key)) originals.set(key, [...(originals.get(key) || []), existing])
+    }
+  }
+  // Reserve original-row matches before weaker reference/fingerprint candidates.
+  for (const row of rows) {
+    if (row.errors.length || !originals.get(rawKey(row.raw) || '')?.some((existing) => !consumed.has(Number(existing.id)))) continue
+    const match = duplicateRecordForRow(d, row, paymentAccountId, consumed, false, originals)
+    if (match) matches.set(row.sourceRow, match)
+  }
   // Reserve exact matches first. Each stored occurrence can cover only one incoming row.
   for (const allowPotential of [false, true]) {
     for (const row of rows) {
       if (row.errors.length || matches.has(row.sourceRow)) continue
-      const match = duplicateRecordForRow(d, row, paymentAccountId, consumed, allowPotential)
+      const match = duplicateRecordForRow(d, row, paymentAccountId, consumed, allowPotential, originals)
       if (match) matches.set(row.sourceRow, match)
     }
   }

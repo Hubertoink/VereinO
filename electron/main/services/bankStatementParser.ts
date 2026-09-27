@@ -284,7 +284,7 @@ function normalizedHeader(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-function suggestCsvMapping(headers: string[]): BankCsvMapping {
+export function suggestCsvMapping(headers: string[]): BankCsvMapping {
   const find = (...patterns: RegExp[]) => patterns.map((pattern) => headers.find((header) => pattern.test(normalizedHeader(header)))).find(Boolean) ?? null
   return {
     bookingDate: find(/^buchungstag$/, /^buchungsdatum$/, /^datum$/, /booking date/),
@@ -293,12 +293,25 @@ function suggestCsvMapping(headers: string[]): BankCsvMapping {
     debit: find(/^soll$/, /^belastung$/, /debit/),
     credit: find(/^haben$/, /^gutschrift$/, /credit/),
     currency: find(/^wahrung$/, /^waehrung$/, /^currency$/),
-    counterparty: find(/auftraggeber/, /begunstigter/, /zahlungspflichtiger/, /empfanger/, /name gegenkonto/, /counterparty/),
-    counterpartyIban: find(/iban gegenkonto/, /gegenkonto iban/, /counterparty iban/),
+    counterparty: find(/^name zahlungsbeteiligter$/, /^zahlungsbeteiligter$/, /auftraggeber/, /begunstigter/, /zahlungspflichtiger/, /empfanger/, /name gegenkonto/, /counterparty/),
+    counterpartyIban: find(/^iban zahlungsbeteiligter$/, /iban gegenkonto/, /gegenkonto iban/, /counterparty iban/),
     purpose: find(/verwendungszweck/, /buchungstext/, /umsatztext/, /purpose/, /description/),
     endToEndId: find(/end to end/, /endtoendid/),
     reference: find(/kundenreferenz/, /bankreferenz/, /mandatsreferenz/, /^referenz$/, /transaction id/),
     accountIban: find(/^iban$/, /konto iban/, /own iban/)
+  }
+}
+
+export type BankCsvMetadataField = 'counterparty' | 'counterpartyIban' | 'purpose' | 'reference' | 'endToEndId'
+
+export function csvMetadataFromRaw(raw: Record<string, unknown>, mapping: Partial<Pick<BankCsvMapping, BankCsvMetadataField>>) {
+  const read = (field?: string | null) => field && typeof raw[field] === 'string' ? raw[field] as string : ''
+  return {
+    counterparty: cleanBankText(read(mapping.counterparty)),
+    counterpartyIban: normalizeIban(read(mapping.counterpartyIban)),
+    purpose: cleanBankText(read(mapping.purpose)),
+    reference: read(mapping.reference).trim(),
+    endToEndId: read(mapping.endToEndId).trim()
   }
 }
 
@@ -308,6 +321,7 @@ function parseCsvStatement(buffer: Buffer, mapping?: BankCsvMapping): ParsedBank
   const headers = (records[0] ?? []).map((header, index) => header || `Spalte ${index + 1}`)
   const suggestedMapping = suggestCsvMapping(headers)
   const selected = { ...suggestedMapping, ...(mapping ?? {}) }
+  const hasCounterpartyColumn = Boolean(selected.counterparty && headers.includes(selected.counterparty))
   const accountIbans = new Set<string>()
   const rows: ParsedBankTransaction[] = []
 
@@ -333,6 +347,7 @@ function parseCsvStatement(buffer: Buffer, mapping?: BankCsvMapping): ParsedBank
     if (!bookingDate) errors.push('Buchungsdatum fehlt oder ist ungültig.')
     if (signedAmount == null || signedAmount === 0) errors.push('Betrag fehlt oder ist 0.')
     if (currency !== 'EUR') errors.push(`Währung ${currency} wird nicht unterstützt.`)
+    if (!hasCounterpartyColumn) errors.push('Gegenpartei-Spalte nicht zugeordnet.')
 
     const raw = Object.fromEntries(headers.map((header, column) => [header, record[column] ?? '']))
     rows.push({

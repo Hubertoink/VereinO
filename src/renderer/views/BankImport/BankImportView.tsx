@@ -1,11 +1,14 @@
 import { IconArrowDown, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
 import './bankReview.css'
+import './bankImportDialog.css'
+import './bankImportPage.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconFilter, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
+import BankImportRemapDialog from './BankImportRemapDialog'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
 type PaymentAccount = {
@@ -100,8 +103,20 @@ type BankImportStatus = {
     color?: string | null
     lastBookingDate?: string | null
     lastImportAt?: string | null
+    lastImportImportedCount?: number | null
+    lastImportFileName?: string | null
     total: number
   }>
+}
+
+type BankImportHistoryEntry = NonNullable<BankImportStatus['recentImports']>[number]
+type ImportOutcome = {
+  batchId: number
+  paymentAccountId: number
+  fileName: string
+  imported: number
+  duplicates: number
+  errors: number
 }
 
 type CsvMapping = {
@@ -242,257 +257,16 @@ function parseLocalDate(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function toISODate(value: Date) {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function addDays(value: Date, days: number) {
-  const next = new Date(value)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function formatMonthRange(from: Date, to: Date) {
-  const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' })
-  const fromMonth = monthFmt.format(from)
-  const toMonth = monthFmt.format(to)
-  return fromMonth === toMonth ? fromMonth : `${fromMonth} bis ${toMonth}`
-}
-
-function getBankImportReminder(status: BankImportStatus | null) {
-  if (!status) return null
-  if (status.total === 0) {
-    return {
-      title: 'Bankdaten importieren',
-      summary: 'Erster Import offen',
-      detail:
-        'Es wurden noch keine Bankbelege importiert. Starte mit dem ersten Kontoauszug deines Zahlkontos.'
-    }
-  }
-  const lastDate = parseLocalDate(status.lastBookingDate)
-  if (!lastDate) return null
-  const today = new Date()
-  const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-  if (lastDate >= previousMonthEnd) return null
-  const from = addDays(lastDate, 1)
-  if (from > previousMonthEnd) return null
-  return {
-    title: 'Neuer Bankimport empfohlen',
-    summary: `${formatMonthRange(from, previousMonthEnd)} fehlt`,
-    detail: `Letzter Import: ${formatDateTime(status.lastImportAt)} · letzter importierter Buchungstag: ${formatDate(toISODate(lastDate))}. Empfohlener Importzeitraum: ${formatDate(toISODate(from))} bis ${formatDate(toISODate(previousMonthEnd))}.`
-  }
-}
-
 function statusLabel(status: BankTransaction['status']) {
   if (status === 'LINKED') return 'Zugeordnet'
   if (status === 'CHECKED') return 'Geprüft'
   return 'Offen'
 }
 
-function BankAccountFilterDropdown({
-  accounts,
-  value,
-  onApply
-}: {
-  accounts: PaymentAccount[]
-  value: number | null
-  onApply: (value: number | null) => void
-}) {
-  const closeRef = React.useRef<(() => void) | null>(null)
-  const [draftValue, setDraftValue] = useState<number | null>(value)
-
-  useEffect(() => {
-    setDraftValue(value)
-  }, [value])
-
-  const apply = () => {
-    onApply(draftValue)
-    closeRef.current?.()
-  }
-
-  const reset = () => {
-    setDraftValue(null)
-    onApply(null)
-  }
-
-  return (
-    <FilterDropdown
-      trigger={<AppIcon icon={IconFilter} size="action" />}
-      title="Zahlkonto filtern"
-      hasActiveFilters={value != null}
-      alignRight
-      width={340}
-      ariaLabel="Nach Zahlkonto filtern"
-      buttonTitle="Nach Zahlkonto filtern"
-      colorVariant="filter"
-      closeRef={closeRef}
-    >
-      <div className="filter-dropdown__field">
-        <label className="filter-dropdown__label">Zahlkonto</label>
-        <div className="bank-account-badge-list" role="listbox" aria-label="Zahlkonto auswählen">
-          <button
-            type="button"
-            className={`bank-account-filter-badge ${draftValue == null ? 'is-selected' : ''}`}
-            onClick={() => setDraftValue(null)}
-            role="option"
-            aria-selected={draftValue == null}
-          >
-            Alle Zahlkonten
-          </button>
-          {accounts.map((account) => (
-            <button
-              key={account.id}
-              type="button"
-              className={`bank-account-filter-badge ${draftValue === account.id ? 'is-selected' : ''}`}
-              style={{ color: account.color || undefined }}
-              onClick={() => setDraftValue(account.id)}
-              role="option"
-              aria-selected={draftValue === account.id}
-            >
-              <span
-                className="bank-account-filter-badge__dot"
-                style={{ background: account.color || 'var(--accent)' }}
-                aria-hidden="true"
-              />
-              {account.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="filter-dropdown__actions">
-        <button className="btn" type="button" onClick={reset}>
-          Zurücksetzen
-        </button>
-        <div className="filter-dropdown__actions-right">
-          <button className="btn primary" type="button" onClick={apply}>
-            Übernehmen
-          </button>
-        </div>
-      </div>
-    </FilterDropdown>
-  )
-}
-
-function BankImportHistoryDropdown({ status }: { status: BankImportStatus | null }) {
-  const recentImports = status?.recentImports || []
-  const periodLabel = (entry: NonNullable<BankImportStatus['recentImports']>[number]) => {
-    if (!entry.periodFrom) return 'Kein neuer Buchungstag'
-    const from = formatDate(entry.periodFrom)
-    const to = formatDate(entry.periodTo || entry.periodFrom)
-    return from === to ? from : `${from} – ${to}`
-  }
-
-  return (
-    <FilterDropdown
-      trigger={<AppIcon icon={IconHistory} size="action" />}
-      title="Importhistorie"
-      alignRight
-      width={390}
-      ariaLabel="Importhistorie anzeigen"
-      buttonTitle="Importhistorie"
-      colorVariant="time"
-    >
-      <div className="bank-history-list">
-        {recentImports.map((entry) => (
-          <div className="bank-history-item" key={entry.id}>
-            <div className="bank-history-item__main">
-              <strong title={entry.fileName}>{entry.fileName}</strong>
-              <span>
-                {formatDateTime(entry.importedAt)} · {periodLabel(entry)}
-              </span>
-            </div>
-            <span className="bank-history-item__account" style={{ color: entry.paymentAccountColor || undefined }}>
-              {entry.paymentAccountName || 'Zahlkonto'}
-            </span>
-            <div className="bank-history-item__stats">
-              <span>{entry.imported} neu</span>
-              {entry.duplicates > 0 && <span>{entry.duplicates} Duplikat(e)</span>}
-              {entry.errors > 0 && <span>{entry.errors} Fehler</span>}
-            </div>
-          </div>
-        ))}
-        {recentImports.length === 0 && status?.lastImportAt && (
-          <div className="bank-history-empty">
-            Dateiname wird bei zukünftigen Importen in dieser Historie angezeigt.
-          </div>
-        )}
-        {recentImports.length === 0 && !status?.lastImportAt && (
-          <div className="bank-history-empty">Noch kein Bankimport vorhanden.</div>
-        )}
-      </div>
-    </FilterDropdown>
-  )
-}
-
 function BankImportActionDropdown({ onOpenImport }: { onOpenImport: (file?: File) => void }) {
-  const closeRef = React.useRef<(() => void) | null>(null)
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
-  const [dragActive, setDragActive] = useState(false)
-  const [error, setError] = useState('')
-
-  const selectFile = (fileList: FileList | null) => {
-    const nextFile = fileList?.[0]
-    if (!nextFile) return
-    if (!/\.(xml|csv)$/i.test(nextFile.name)) {
-      setError('Bitte eine CAMT-XML- oder CSV-Datei auswählen.')
-      return
-    }
-    setError('')
-    closeRef.current?.()
-    onOpenImport(nextFile)
-  }
-
-  return (
-    <FilterDropdown
-      trigger={<AppIcon icon={IconPlus} size="action" />}
-      title="Import"
-      alignRight
-      width={320}
-      ariaLabel="Bankdaten importieren"
-      buttonTitle="Import"
-      colorVariant="action"
-      closeRef={closeRef}
-    >
-      <div className="bank-import-action-dropdown">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xml,.csv,text/csv,application/xml,text/xml"
-          hidden
-          onChange={(event) => selectFile(event.target.files)}
-        />
-        <button
-          className={`bank-import-action-dropzone ${dragActive ? 'is-dragging' : ''}`}
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          onDragEnter={(event) => {
-            event.preventDefault()
-            setDragActive(true)
-          }}
-          onDragOver={(event) => event.preventDefault()}
-          onDragLeave={(event) => {
-            event.preventDefault()
-            if (event.currentTarget === event.target) setDragActive(false)
-          }}
-          onDrop={(event) => {
-            event.preventDefault()
-            setDragActive(false)
-            selectFile(event.dataTransfer.files)
-          }}
-        >
-          <span className="bank-import-action-dropzone__icon" aria-hidden="true"><AppIcon icon={IconFileUpload} size="action" /></span>
-          <strong>Bankdatei hier ablegen</strong>
-          <span>oder Datei auswählen</span>
-          <small>CAMT-XML oder CSV</small>
-          {error && <span className="bank-import-action-dropzone__error">{error}</span>}
-        </button>
-      </div>
-    </FilterDropdown>
-  )
+  return <button className="btn primary btn-with-icon" onClick={() => onOpenImport()}>
+    <AppIcon icon={IconFileUpload} size="action" /> Bankdaten importieren
+  </button>
 }
 
 function MappingSelect({
@@ -937,14 +711,16 @@ function BankImportResultModal({
 function BankImportModal({
   accounts,
   initialFile,
+  initialAccountId,
   onClose,
   onImported,
   notify
 }: {
   accounts: PaymentAccount[]
   initialFile?: File | null
+  initialAccountId?: number | null
   onClose: () => void
-  onImported: () => void
+  onImported: (result: ImportCommitResult, context: { paymentAccountId: number; fileName: string }) => void
   notify: Props['notify']
 }) {
   const paymentAccountRef = React.useRef<HTMLSelectElement | null>(null)
@@ -952,7 +728,7 @@ function BankImportModal({
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [mapping, setMapping] = useState<CsvMapping>({})
-  const [paymentAccountId, setPaymentAccountId] = useState<number | null>(null)
+  const [paymentAccountId, setPaymentAccountId] = useState<number | null>(() => accounts.some(account => account.id === initialAccountId && account.isActive !== 0 && account.kind !== 'CASH') ? initialAccountId! : null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [paymentAccountError, setPaymentAccountError] = useState(false)
@@ -960,8 +736,28 @@ function BankImportModal({
   const [selectedDuplicateRows, setSelectedDuplicateRows] = useState<number[]>([])
   const [additionalImportRows, setAdditionalImportRows] = useState<number[]>([])
   const previewRequest = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const initialFileHandled = useRef(false)
+  const [excludedRows, setExcludedRows] = useState<number[]>([])
+  const [reviewFilter, setReviewFilter] = useState<'ALL' | 'NEW' | 'DUPLICATE' | 'ERROR'>('ALL')
+  const [reviewQuery, setReviewQuery] = useState('')
+  const [reviewPage, setReviewPage] = useState(1)
+  const [importing, setImporting] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const [aiAvailable, setAiAvailable] = useState(false)
   const [reviewWithAi, setReviewWithAi] = useState(false)
+  const [importHistory, setImportHistory] = useState<BankImportStatus | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyFailed, setHistoryFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void window.api.bankTransactions.importStatus()
+      .then(status => { if (active) setImportHistory(status) })
+      .catch(() => { if (active) setHistoryFailed(true) })
+      .finally(() => { if (active) setHistoryLoading(false) })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -979,8 +775,11 @@ function BankImportModal({
   }, [])
 
   const loadPreview = async (nextFile: File, nextBytes: Uint8Array, nextMapping?: CsvMapping, nextAccount = paymentAccountId) => {
+    if (!nextAccount) return
     const request = ++previewRequest.current
     setBusy(true)
+    setExcludedRows([])
+    setReviewPage(1)
     setAdditionalImportRows([])
     setError('')
     try {
@@ -1008,30 +807,60 @@ function BankImportModal({
   }
 
   const chooseFile = async (nextFile?: File) => {
-    if (!nextFile) return
+    if (!nextFile || !paymentAccountId || importing) return
     if (!/\.(xml|csv)$/i.test(nextFile.name)) {
       setError('Bitte wähle eine CAMT-XML- oder CSV-Datei.')
       return
     }
+    const request = ++previewRequest.current
     setFile(nextFile)
-    const nextBytes = new Uint8Array(await nextFile.arrayBuffer())
-    setFileBytes(nextBytes)
-    await loadPreview(nextFile, nextBytes)
+    setFileBytes(null)
+    setPreview(null)
+    setBusy(true)
+    setError('')
+    setReviewFilter('ALL')
+    setReviewQuery('')
+    try {
+      const nextBytes = new Uint8Array(await nextFile.arrayBuffer())
+      if (request !== previewRequest.current) return
+      setFileBytes(nextBytes)
+      await loadPreview(nextFile, nextBytes)
+    } catch (reason: any) {
+      if (request !== previewRequest.current) return
+      setError(reason?.message || String(reason))
+      setBusy(false)
+    }
   }
 
   useEffect(() => {
-    if (!initialFile) return
+    if (!initialFile || !paymentAccountId || initialFileHandled.current) return
+    initialFileHandled.current = true
     void chooseFile(initialFile)
-  }, [initialFile])
+  }, [initialFile, paymentAccountId])
+
+  useEffect(() => () => { previewRequest.current++ }, [])
+
+  const clearFile = () => {
+    previewRequest.current++
+    setFile(null)
+    setFileBytes(null)
+    setPreview(null)
+    setMapping({})
+    setAdditionalImportRows([])
+    setExcludedRows([])
+    setBusy(false)
+    setError('')
+  }
 
   const commit = async () => {
-    if (!file || !fileBytes) return
+    if (!file || !fileBytes || !preview || busy || importing || !importCount) return
     if (!paymentAccountId) {
       setPaymentAccountError(true)
       window.setTimeout(() => paymentAccountRef.current?.focus(), 0)
       return
     }
     setBusy(true)
+    setImporting(true)
     setError('')
     try {
       const result = (await window.api.bankImports.commit({
@@ -1039,6 +868,7 @@ function BankImportModal({
         fileName: file.name,
         paymentAccountId,
         additionalImportSourceRows: additionalImportRows,
+        selectedSourceRows: preview.rows.filter(row => !row.errors.length && !excludedRows.includes(row.sourceRow)).map(row => row.sourceRow),
         mapping: preview?.format === 'CSV' ? mapping : undefined
       })) as ImportCommitResult
       notify(
@@ -1057,14 +887,15 @@ function BankImportModal({
           notify('info', `Import abgeschlossen, KI-Prüfung nicht verfügbar: ${aiReason?.message || String(aiReason)}`)
         }
       }
-      onImported()
+      onImported(result, { paymentAccountId, fileName: file.name })
       // Only ask again for conflicts that were not already reviewed and skipped.
       const unexpectedDuplicates = result.duplicateRows.filter(row =>
         additionalImportRows.includes(row.sourceRow) || !(preview?.duplicateRows || []).some(known =>
           known.sourceRow === row.sourceRow && known.existing.id === row.existing.id && known.duplicateBy === row.duplicateBy
         )
       )
-      if (unexpectedDuplicates.length || result.errors.length) {
+      const unexpectedErrors = result.errors.filter(error => !preview.rows.some(row => row.sourceRow === error.row && row.errors.length))
+      if (unexpectedDuplicates.length || unexpectedErrors.length) {
         setCommitResult({ ...result, duplicateRows: unexpectedDuplicates })
         setSelectedDuplicateRows([])
       } else {
@@ -1074,6 +905,7 @@ function BankImportModal({
       setError(reason?.message || String(reason))
     } finally {
       setBusy(false)
+      setImporting(false)
     }
   }
 
@@ -1103,7 +935,7 @@ function BankImportModal({
           : current
       )
       setSelectedDuplicateRows([])
-      onImported()
+      onImported(result, { paymentAccountId, fileName: file.name })
     } catch (reason: any) {
       setError(reason?.message || String(reason))
     } finally {
@@ -1117,261 +949,188 @@ function BankImportModal({
     if (file && fileBytes) void loadPreview(file, fileBytes, nextMapping)
   }
   const previewDuplicates = preview?.duplicateRows ?? []
-  const importCount = (preview?.summary.valid ?? 0) - previewDuplicates.length + additionalImportRows.length
+  const duplicatesByRow = new Map(previewDuplicates.map(row => [row.sourceRow, row]))
+  const importCount = (preview?.rows || []).filter(row => !row.errors.length && !excludedRows.includes(row.sourceRow)
+    && (!duplicatesByRow.has(row.sourceRow) || additionalImportRows.includes(row.sourceRow))).length
+  const newCount = (preview?.summary.valid || 0) - previewDuplicates.length
+  const filteredRows = (preview?.rows || []).filter(row => {
+    const kind = row.errors.length ? 'ERROR' : duplicatesByRow.has(row.sourceRow) ? 'DUPLICATE' : 'NEW'
+    const haystack = [row.sourceRow, row.bookingDate, formatDate(row.bookingDate), row.counterparty, row.purpose, row.amount, euro.format(row.amount), row.errors.join(' ')].join(' ').toLocaleLowerCase('de-DE')
+    return (reviewFilter === 'ALL' || kind === reviewFilter) && haystack.includes(reviewQuery.toLocaleLowerCase('de-DE').trim())
+  })
+  const reviewPageSize = 10
+  const reviewPages = Math.max(1, Math.ceil(filteredRows.length / reviewPageSize))
+  const currentReviewPage = Math.min(reviewPage, reviewPages)
+  const visibleRows = filteredRows.slice((currentReviewPage - 1) * reviewPageSize, currentReviewPage * reviewPageSize)
   const activeAccounts = accounts.filter(
     (account) => account.isActive !== 0 && account.kind !== 'CASH'
   )
   const paymentAccountsById = new Map(activeAccounts.map((account) => [account.id, account]))
   const selectedPaymentAccountColor =
     paymentAccountsById.get(Number(paymentAccountId || 0))?.color || undefined
+  const accountHistory = importHistory?.accounts.find(account => account.id === paymentAccountId)
 
   return createPortal(
     <div
       className="modal-overlay bank-import-overlay"
       role="dialog"
       aria-modal="true"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      aria-label="Bankdaten importieren"
+      onMouseDown={(event) => !importing && event.target === event.currentTarget && onClose()}
     >
-      <div className="modal bank-import-modal">
+      <div className="modal bank-import-modal bank-import-dialog">
         <header className="bank-modal-header">
           <div>
             <h2>Bankdaten importieren</h2>
             <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
+          <button className="btn ghost" disabled={importing} onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
         </header>
 
         <div className="bank-import-scroll">
-        <div className="bank-import-drop">
-          <strong>{file?.name || 'Kontoauszug auswählen'}</strong>
-          <span className="helper">
-            XML oder CSV, die Originaldatei wird nicht als Anhang gespeichert.
-          </span>
-          <label className="btn">
-            Datei wählen
-            <input
-              type="file"
-              accept=".xml,.csv,text/csv,application/xml,text/xml"
-              hidden
-              onChange={(event) => void chooseFile(event.target.files?.[0])}
-            />
-          </label>
-        </div>
-
-        {error && <div className="inline-error">{error}</div>}
-        {busy && <div className="helper">Datei wird geprüft …</div>}
-
-        {preview && (
-          <>
-            <div className="bank-import-summary">
-              <span>
-                <strong>{preview.format}</strong> erkannt
-              </span>
-              <span>{preview.summary.total} Zeilen</span>
-              <span className="text-success">{preview.summary.valid} gültig</span>
-              <span className={preview.summary.errors ? 'text-danger' : ''}>
-                {preview.summary.errors} fehlerhaft
-              </span>
-            </div>
-
-            <label className="field">
-              <span>
-                Zahlkonto{' '}
-                <span className="req-asterisk" aria-hidden="true">
-                  *
-                </span>
-                {paymentAccountError && (
-                  <span
-                    className="booking-field-error has-tooltip"
-                    data-tooltip="Bitte ein Zahlkonto für den Import auswählen."
-                    tabIndex={0}
-                  >
-                    !
-                  </span>
-                )}
-              </span>
-              <select
-                ref={paymentAccountRef}
-                className={`input ${paymentAccountError ? 'input-error' : ''}`}
-                value={paymentAccountId ?? ''}
-                style={{ color: selectedPaymentAccountColor }}
-                onChange={(event) => {
-                  const nextValue = event.target.value ? Number(event.target.value) : null
-                  setPaymentAccountId(nextValue)
-                  if (file && fileBytes) void loadPreview(file, fileBytes, mapping, nextValue)
-                  if (nextValue) setPaymentAccountError(false)
-                }}
-                aria-invalid={paymentAccountError}
-              >
-                <option value="">Zahlkonto wählen</option>
-                {activeAccounts.map((account) => (
-                  <option
-                    key={account.id}
-                    value={account.id}
-                    style={{ color: account.color || undefined }}
-                  >
-                    {account.name}
-                    {account.iban ? ` · ${account.iban}` : ''}
-                  </option>
-                ))}
-              </select>
-              {paymentAccountError && (
-                <span className="helper text-danger">Bitte wähle ein Zahlkonto aus.</span>
-              )}
-              {preview.accountIbans.length > 0 && (
-                <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>
-              )}
-            </label>
-
-            {aiAvailable && (
-              <label className="bank-import-ai-option">
-                <input
-                  type="checkbox"
-                  checked={reviewWithAi}
-                  onChange={(event) => setReviewWithAi(event.target.checked)}
-                />
-                <span>
-                  <strong>KI-Vorschläge nach dem Import erstellen</strong>
-                  <small>Nur neue, nicht doppelte Bankbelege werden geprüft.</small>
-                </span>
+          <section className="bank-import-account-card">
+            {!preview && <div className="bank-import-step-heading"><AppIcon icon={IconBuildingBank} size="action" /><div><strong>1. Konto auswählen</strong><span>Alle Umsätze werden für dieses Vereinskonto geprüft.</span></div></div>}
+            <div className="bank-import-account-options">
+              <label className="field">
+                <span>Zahlkonto <span className="req-asterisk" aria-hidden="true">*</span></span>
+                <select ref={paymentAccountRef} className="input" value={paymentAccountId ?? ''} disabled={importing}
+                  style={{ color: selectedPaymentAccountColor }} aria-invalid={paymentAccountError}
+                  onChange={event => {
+                    const next = event.target.value ? Number(event.target.value) : null
+                    previewRequest.current++
+                    setPaymentAccountId(next)
+                    setPaymentAccountError(false)
+                    setPreview(null)
+                    setAdditionalImportRows([])
+                    setExcludedRows([])
+                    if (!next) clearFile()
+                    else if (file && fileBytes) void loadPreview(file, fileBytes, mapping, next)
+                    else { setBusy(false); setFile(null) }
+                  }}>
+                  <option value="">Zahlkonto wählen</option>
+                  {activeAccounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.iban ? ` · ${account.iban}` : ''}</option>)}
+                </select>
               </label>
-            )}
-
-            {preview.format === 'CSV' && (
-              <section className="bank-mapping-card">
-                <div className="bank-section-title">
-                  <strong>Spaltenzuordnung</strong>
-                  <span className="helper" role="status">{busy ? 'Vorschau wird aktualisiert …' : 'Vorschau aktualisiert sich automatisch'}</span>
-                </div>
-                <div className="bank-mapping-grid">
-                  <MappingSelect
-                    label="Buchungsdatum *"
-                    value={mapping.bookingDate}
-                    headers={preview.headers}
-                    onChange={(value) => setMap('bookingDate', value)}
-                  />
-                  <MappingSelect
-                    label="Betrag mit Vorzeichen"
-                    value={mapping.amount}
-                    headers={preview.headers}
-                    onChange={(value) => setMap('amount', value)}
-                  />
-                  <MappingSelect
-                    label="Soll / Belastung"
-                    value={mapping.debit}
-                    headers={preview.headers}
-                    onChange={(value) => setMap('debit', value)}
-                  />
-                  <MappingSelect
-                    label="Haben / Gutschrift"
-                    value={mapping.credit}
-                    headers={preview.headers}
-                    onChange={(value) => setMap('credit', value)}
-                  />
-                  <MappingSelect
-                    label="Verwendungszweck"
-                    value={mapping.purpose}
-                    headers={preview.headers}
-                    onChange={(value) => setMap('purpose', value)}
-                  />
-                </div>
-                <details className="bank-more-options">
-                  <summary className="btn btn-with-icon"><AppIcon icon={IconLayoutGrid} size="control" />Weitere Spalten</summary>
-                  <div className="bank-mapping-grid">
-                    <MappingSelect
-                      label="Wertstellung"
-                      value={mapping.valueDate}
-                      headers={preview.headers}
-                      onChange={(value) => setMap('valueDate', value)}
-                    />
-                    <MappingSelect
-                      label="Währung"
-                      value={mapping.currency}
-                      headers={preview.headers}
-                      onChange={(value) => setMap('currency', value)}
-                    />
-                    <MappingSelect
-                      label="Gegenpartei"
-                      value={mapping.counterparty}
-                      headers={preview.headers}
-                      onChange={(value) => setMap('counterparty', value)}
-                    />
-                    <MappingSelect
-                      label="IBAN Gegenkonto"
-                      value={mapping.counterpartyIban}
-                      headers={preview.headers}
-                      onChange={(value) => setMap('counterpartyIban', value)}
-                    />
-                    <MappingSelect
-                      label="Bankreferenz"
-                      value={mapping.reference}
-                      headers={preview.headers}
-                      onChange={(value) => setMap('reference', value)}
-                    />
-                  </div>
-                </details>
-              </section>
-            )}
-
-            {preview.warnings?.map((warning) => <p className="bank-import-warning" role="alert" key={warning}><AppIcon icon={IconAlertTriangle} size="action" /> {warning}</p>)}
-            {!paymentAccountId && <p className="helper">Wähle das Zahlkonto, um vorhandene Bankbelege auf Duplikate zu prüfen.</p>}
-            {previewDuplicates.length > 0 && <section className="bank-import-duplicates" aria-label="Duplikate vor dem Import prüfen">
-              <h3><AppIcon icon={IconAlertTriangle} size="action" /> {previewDuplicates.length} vorhandene oder möglicherweise doppelte Umsätze</h3>
-              <p>Diese Zeilen werden zunächst übersprungen. Vergleiche die Daten und wähle nur zusätzliche, tatsächlich erfolgte Zahlungen aus.</p>
-              <div className="bank-duplicate-table-wrap">
-                <table className="bank-table bank-duplicate-table" aria-label="Vergleich möglicher Duplikate">
-                  <thead><tr><th>Zeile / Prüfung</th><th>Aus der Importdatei</th><th>Bereits vorhandener Bankbeleg</th><th>Zusätzlich<br />importieren</th></tr></thead>
-                  <tbody>{previewDuplicates.map((duplicate) => <tr key={duplicate.sourceRow} className={additionalImportRows.includes(duplicate.sourceRow) ? 'is-selected' : ''}>
-                    <td><strong>{duplicate.sourceRow}</strong><small>{duplicateReasonLabel(duplicate.duplicateBy)}</small></td>
-                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.bookingDate)}</span><strong>{duplicate.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.amount)}</strong></div>{duplicate.counterparty && <span className="bank-duplicate-table__party">{duplicate.counterparty}</span>}<span>{duplicate.purpose || 'Ohne Verwendungszweck'}</span></td>
-                    <td><div className="bank-duplicate-table__numbers"><span>{formatDate(duplicate.existing.bookingDate)}</span><strong>{duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}</strong></div>{duplicate.existing.counterparty && <span className="bank-duplicate-table__party">{duplicate.existing.counterparty}</span>}<span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small>Bankbeleg #{duplicate.existing.id} · {duplicate.existing.paymentAccountName}</small></td>
-                    <td className="bank-duplicate-table__choice"><input type="checkbox" aria-label={`Als zusätzlichen Umsatz importieren: Zeile ${duplicate.sourceRow}`} title="Nur auswählen, wenn es sich um eine weitere, tatsächlich erfolgte Zahlung handelt." disabled={busy} checked={additionalImportRows.includes(duplicate.sourceRow)} onChange={(event) => setAdditionalImportRows((current) => event.target.checked ? [...current, duplicate.sourceRow] : current.filter((row) => row !== duplicate.sourceRow))} /></td>
-                  </tr>)}</tbody>
-                </table>
-              </div>
-            </section>}
-            <div className="bank-preview-table-wrap">
-              <table className="bank-table bank-preview-table">
-                <thead>
-                  <tr>
-                    <th>Zeile</th>
-                    <th>Datum</th>
-                    <th>Gegenpartei / Zweck</th>
-                    <th>Typ</th>
-                    <th className="number">Summe</th>
-                    <th>Prüfung</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((row) => (
-                    <tr key={row.sourceRow} className={row.errors.length ? 'bank-row-error' : ''}>
-                      <td>{row.sourceRow}</td>
-                      <td>{formatDate(row.bookingDate)}</td>
-                      <td>{[row.counterparty, row.purpose].filter(Boolean).join(' - ') || '–'}</td>
-                      <td>{row.direction}</td>
-                      <td className="number">{euro.format(row.amount)}</td>
-                      <td>{row.errors.join(' ') || (previewDuplicates.some((duplicate) => duplicate.sourceRow === row.sourceRow)
-                        ? <span className="bank-import-warning"><AppIcon icon={IconAlertTriangle} size="action" /> {additionalImportRows.includes(row.sourceRow) ? 'Zusätzlich importieren' : 'Duplikatprüfung · wird übersprungen'}</span>
-                        : paymentAccountId ? 'Neu' : 'Zahlkonto für Prüfung wählen')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {paymentAccountId && aiAvailable && <label className="bank-import-ai-option">
+                <input type="checkbox" checked={reviewWithAi} disabled={busy} onChange={event => setReviewWithAi(event.target.checked)} />
+                <span><strong>KI-Vorschläge nach dem Import erstellen</strong><small>Nur die neu übernommenen Bankbelege werden geprüft.</small></span>
+              </label>}
             </div>
-          </>
-        )}
+            {!paymentAccountId && <p className="helper">{activeAccounts.length ? 'Wähle zuerst das Konto. Danach kannst du eine Datei laden und die Umsätze prüfen.' : 'Lege zuerst ein aktives Zahlkonto in den Einstellungen an.'}</p>}
+            {paymentAccountId && <section className="bank-import-account-history" aria-label="Importhistorie des ausgewählten Kontos" aria-live="polite" aria-busy={historyLoading}>
+              <strong className="bank-import-history-heading"><AppIcon icon={IconHistory} size="control" /> Importstand dieses Kontos</strong>
+              {historyLoading ? <p>Importhistorie wird geladen …</p> : historyFailed ? <p>Die Importhistorie konnte nicht geladen werden. Du kannst die Datei trotzdem prüfen.</p> : accountHistory?.lastImportAt ? <>
+                <dl className="bank-import-history-facts">
+                  <div><dt>Letzter Import mit Buchungen</dt><dd>{formatDateTime(accountHistory.lastImportAt)}</dd></div>
+                  <div><dt>Dabei übernommen</dt><dd>{accountHistory.lastImportImportedCount == null ? '–' : `${accountHistory.lastImportImportedCount} Buchungssätze`}</dd></div>
+                  <div><dt>Neuester importierter Umsatz</dt><dd>{accountHistory.lastBookingDate ? formatDate(accountHistory.lastBookingDate) : 'Noch keine Umsätze'}</dd></div>
+                </dl>
+                {accountHistory.lastImportFileName && <p className="bank-import-history-file">Letzte Datei: {accountHistory.lastImportFileName}</p>}
+                {accountHistory.lastBookingDate && <p>Nächsten Auszug ab <strong>{formatDate(accountHistory.lastBookingDate)}</strong> wählen. Überschneidungen werden auf Duplikate geprüft.</p>}
+              </> : <p>Für dieses Konto wurden noch keine Buchungen importiert.</p>}
+            </section>}
+          </section>
 
+          {paymentAccountId && <>
+            <input ref={fileInputRef} type="file" accept=".xml,.csv,text/csv,application/xml,text/xml" hidden disabled={busy}
+              onChange={event => { void chooseFile(event.target.files?.[0]); event.target.value = '' }} />
+            <section className={`bank-import-file-card ${file ? 'has-file' : ''} ${dragActive ? 'is-dragging' : ''}`}
+              aria-label="Bankdatei auswählen"
+              onDragOver={event => { event.preventDefault(); if (!busy) setDragActive(true) }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={event => { event.preventDefault(); setDragActive(false); if (!busy) void chooseFile(event.dataTransfer.files[0]) }}>
+              <AppIcon icon={file ? IconFileDescription : IconFileUpload} size="action" />
+              <div><strong>{file?.name || '2. Kontoauszug auswählen oder hier ablegen'}</strong>
+                <small>{file ? `${preview?.format || 'Bankdatei'} · ${Math.max(1, Math.ceil(file.size / 1024))} KB` : 'CAMT.052/053 oder CSV'}</small></div>
+              {file && <button className="btn ghost" disabled={busy} onClick={clearFile} aria-label="Datei entfernen"><AppIcon icon={IconX} size="control" /></button>}
+              <button className="btn" disabled={busy} onClick={() => fileInputRef.current?.click()}>{file ? 'Andere Datei wählen' : 'Datei wählen'}</button>
+            </section>
+            {busy && <div className="bank-import-loading" role="status">{importing ? 'Bankbelege werden importiert …' : 'Datei und vorhandene Umsätze werden geprüft …'}</div>}
+            {preview && <>
+              <div className={`bank-import-file-status ${preview.summary.errors ? 'has-errors' : ''}`} role="status">
+                <AppIcon icon={preview.summary.errors ? IconAlertTriangle : IconCheck} size="action" />
+                <div><strong>{preview.summary.errors ? 'Datei geprüft – bitte Hinweise beachten' : 'Datei erfolgreich geladen'}</strong>
+                  <small>{preview.format} erkannt · {preview.summary.total} Zeilen · {preview.summary.valid} gültig · {preview.summary.errors} fehlerhaft</small></div>
+              </div>
+              {preview.accountIbans.length > 0 && <span className="helper">IBAN im Auszug: {preview.accountIbans.join(', ')}</span>}
+              {preview.format === 'CSV' && <section className="bank-import-mapping-card">
+                <div className="bank-import-section-heading"><div><strong>Spaltenzuordnung</strong><small>Weise die CSV-Spalten den passenden Feldern zu. Änderungen werden automatisch geprüft.</small></div>
+                  <button className="btn ghost" disabled={busy} onClick={() => { if (file && fileBytes) void loadPreview(file, fileBytes) }}><AppIcon icon={IconSparkles} size="control" /> Automatisch zuordnen</button></div>
+                <fieldset disabled={busy} className="bank-import-mapping-fields">
+                  <div className="bank-import-mapping-grid bank-import-mapping-grid--primary">
+                    <MappingSelect label="Buchungsdatum *" value={mapping.bookingDate} headers={preview.headers} onChange={value => setMap('bookingDate', value)} />
+                    <MappingSelect label="Betrag mit Vorzeichen" value={mapping.amount} headers={preview.headers} onChange={value => setMap('amount', value)} />
+                    <MappingSelect label="Soll / Belastung" value={mapping.debit} headers={preview.headers} onChange={value => setMap('debit', value)} />
+                    <MappingSelect label="Haben / Gutschrift" value={mapping.credit} headers={preview.headers} onChange={value => setMap('credit', value)} />
+                    <MappingSelect label="Gegenpartei *" value={mapping.counterparty} headers={preview.headers} onChange={value => setMap('counterparty', value)} />
+                    <MappingSelect label="Verwendungszweck" value={mapping.purpose} headers={preview.headers} onChange={value => setMap('purpose', value)} />
+                  </div>
+                  <details className="bank-more-options"><summary className="btn btn-with-icon"><AppIcon icon={IconPlus} size="control" />Weitere Spalten</summary>
+                    <div className="bank-import-mapping-grid">
+                      {([['valueDate', 'Wertstellung'], ['currency', 'Währung'], ['counterpartyIban', 'IBAN Gegenkonto'], ['reference', 'Bankreferenz'], ['endToEndId', 'End-to-End-ID'], ['accountIban', 'IBAN Vereinskonto']] as const).map(([key, label]) =>
+                        <MappingSelect key={key} label={label} value={mapping[key]} headers={preview.headers} onChange={value => setMap(key, value)} />)}
+                    </div>
+                  </details>
+                </fieldset>
+              </section>}
+              {preview.warnings?.map(warning => <p className="bank-import-warning" role="alert" key={warning}><AppIcon icon={IconAlertTriangle} size="action" /> {warning}</p>)}
+              <section className="bank-import-review" aria-label="Datenvorschau und Prüfung" aria-busy={busy}>
+                <div className="bank-import-section-heading"><div><strong>3. Datenvorschau und Prüfung</strong><small>Neue Umsätze übernehmen, Duplikate vergleichen und Probleme prüfen.</small></div>
+                  <span className="helper">{importCount} zum Import ausgewählt</span></div>
+                {previewDuplicates.length > 0 && <div className="bank-import-duplicate-banner">
+                  <AppIcon icon={IconAlertTriangle} size="action" /><div><strong>{previewDuplicates.length} Duplikatverdacht / Duplikate erkannt</strong>
+                    <small>Diese Zeilen werden übersprungen. Aktiviere den Import nur bei einer zusätzlichen, tatsächlich erfolgten Zahlung.</small></div>
+                  <button className="btn" onClick={() => { setReviewFilter(reviewFilter === 'DUPLICATE' ? 'ALL' : 'DUPLICATE'); setReviewPage(1) }}>{reviewFilter === 'DUPLICATE' ? 'Alle anzeigen' : 'Nur Duplikate anzeigen'}</button>
+                </div>}
+                <div className="bank-import-review-toolbar">
+                  <div className="bank-import-review-tabs" role="group" aria-label="Vorschau filtern">
+                    {([['ALL', 'Alle Buchungen', preview.summary.total], ['NEW', 'Neu', newCount], ['DUPLICATE', 'Duplikate', previewDuplicates.length], ['ERROR', 'Fehlerhaft', preview.summary.errors]] as const).map(([key, label, count]) =>
+                      <button key={key} className={reviewFilter === key ? 'active' : ''} aria-pressed={reviewFilter === key} onClick={() => { setReviewFilter(key); setReviewPage(1) }}>{label} ({count})</button>)}
+                  </div>
+                  <input className="input" aria-label="Importvorschau durchsuchen" placeholder="Buchungen durchsuchen …" value={reviewQuery} onChange={event => { setReviewQuery(event.target.value); setReviewPage(1) }} />
+                </div>
+                <div className="bank-import-review-table-wrap">
+                  <table className="bank-table bank-import-review-table" aria-label="Umsätze vor dem Import prüfen">
+                    <thead><tr><th>#</th><th>Status</th><th>Datum</th><th>Gegenpartei / Verwendungszweck</th><th className="number">Betrag</th><th>Passender Bankbeleg</th><th>Importieren</th></tr></thead>
+                    <tbody>{visibleRows.map(row => {
+                      const duplicate = duplicatesByRow.get(row.sourceRow)
+                      const invalid = row.errors.length > 0
+                      const selected = !invalid && !excludedRows.includes(row.sourceRow) && (!duplicate || additionalImportRows.includes(row.sourceRow))
+                      const kind = invalid ? 'error' : duplicate ? duplicate.duplicateBy === 'POTENTIAL' ? 'potential' : 'duplicate' : 'new'
+                      const label = invalid ? 'Fehler' : duplicate ? duplicate.duplicateBy === 'POTENTIAL' ? 'Prüfen' : 'Duplikat' : 'Neu'
+                      return <tr key={row.sourceRow} className={`bank-import-review-row--${kind}`}>
+                        <td>{row.sourceRow}</td><td><span className={`bank-import-status bank-import-status--${kind}`} title={duplicate ? duplicateReasonLabel(duplicate.duplicateBy) : row.errors.join(' ')}><AppIcon icon={kind === 'new' ? IconCheck : IconAlertTriangle} size="control" />{label}</span></td>
+                        <td>{formatDate(row.bookingDate)}</td>
+                        <td><div className="bank-import-cell-text">{row.counterparty && <strong>{row.counterparty}</strong>}<span>{row.purpose || (!row.counterparty ? 'Ohne Verwendungszweck' : '')}</span>{invalid && <small className="text-danger">{row.errors.join(' ')}</small>}</div></td>
+                        <td className={`number bank-amount--${row.direction.toLowerCase()}`}>{row.direction === 'OUT' ? '−' : '+'}{row.currency === 'EUR' ? euro.format(row.amount) : `${row.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} ${row.currency}`}</td>
+                        <td>{duplicate ? <details className="bank-import-match"><summary>{formatDate(duplicate.existing.bookingDate)} · {duplicate.existing.direction === 'OUT' ? '−' : '+'}{euro.format(duplicate.existing.amount)}<small>Bankbeleg #{duplicate.existing.id} · Details</small></summary>
+                          <div><span>{duplicate.existing.counterparty}</span><span>{duplicate.existing.purpose || 'Ohne Verwendungszweck'}</span><small>{duplicate.existing.paymentAccountName} · {duplicate.existing.sourceFileName}</small><small>{duplicateReasonLabel(duplicate.duplicateBy)}</small></div></details> : <span className="helper">—</span>}</td>
+                        <td>{invalid ? <span className="helper">Nicht möglich</span> : <label className="bank-import-choice"><input type="checkbox" role="switch" checked={selected} disabled={busy}
+                          aria-label={`${duplicate ? 'Als zusätzlichen Umsatz importieren' : 'Importieren'}: Zeile ${row.sourceRow}`}
+                          onChange={event => {
+                            const checked = event.target.checked
+                            if (duplicate) setAdditionalImportRows(current => checked ? [...current, row.sourceRow] : current.filter(value => value !== row.sourceRow))
+                            else setExcludedRows(current => checked ? current.filter(value => value !== row.sourceRow) : [...current, row.sourceRow])
+                          }} /><span>{selected ? duplicate ? 'Zusätzlich importieren' : 'Importieren' : 'Nicht importieren'}</span></label>}</td>
+                      </tr>
+                    })}{!visibleRows.length && <tr><td colSpan={7}><div className="bank-empty">Keine Buchungen für diesen Filter.</div></td></tr>}</tbody>
+                  </table>
+                </div>
+                <div className="bank-import-review-pagination"><span>{filteredRows.length ? (currentReviewPage - 1) * reviewPageSize + 1 : 0}–{Math.min(currentReviewPage * reviewPageSize, filteredRows.length)} von {filteredRows.length} Buchungen</span><div>
+                  <button className="btn ghost" aria-label="Vorherige Vorschauseite" disabled={currentReviewPage === 1} onClick={() => setReviewPage(currentReviewPage - 1)}><AppIcon icon={IconChevronLeft} size="control" /></button>
+                  <span>Seite {currentReviewPage} / {reviewPages}</span>
+                  <button className="btn ghost" aria-label="Nächste Vorschauseite" disabled={currentReviewPage === reviewPages} onClick={() => setReviewPage(currentReviewPage + 1)}><AppIcon icon={IconChevronRight} size="control" /></button>
+                </div></div>
+              </section>
+            </>}
+          </>}
+          {error && <div className="inline-error" role="alert">{error}</div>}
         </div>
         <footer className="bank-modal-footer">
-          <button className="btn" onClick={onClose}>
-            Abbrechen
-          </button>
-          <button
-            className="btn primary"
-            disabled={busy || !preview || preview.summary.valid === 0}
-            onClick={() => void commit()}
-          >
-            {busy ? 'Bitte warten …' : importCount === 0 && previewDuplicates.length ? 'Ohne neue Bankbelege abschließen' : `${importCount} Beleg(e) importieren`}
+          <span className="helper">{!paymentAccountId ? 'Zuerst ein Zahlkonto auswählen' : preview ? `${importCount} ausgewählt · ${previewDuplicates.length - additionalImportRows.length} Duplikate übersprungen` : 'Kontoauszug als CSV oder CAMT laden'}</span>
+          <button className="btn" disabled={importing} onClick={onClose}>{preview && !importCount ? 'Schließen' : 'Abbrechen'}</button>
+          <button className="btn primary" disabled={busy || !paymentAccountId || !preview || importCount === 0} onClick={() => void commit()}>
+            {importing ? 'Import läuft …' : busy ? 'Wird geprüft …' : `${importCount} Beleg(e) importieren`}
           </button>
         </footer>
       </div>
@@ -1607,6 +1366,13 @@ function BankReviewModal({
     onClose()
   }
 
+  const createBooking = () => {
+    if (transaction.status !== 'OPEN' || busy || loading || !matchesLoaded || (alreadyLinked.length > 0 && !duplicateReviewed)) return
+    setActionMenuOpen(false)
+    onCreateBooking(transaction, duplicateReviewed ? alreadyLinked.map((match) => match.id) : [])
+    onClose()
+  }
+
   return createPortal(
     <div
       className="modal-overlay bank-import-overlay"
@@ -1634,11 +1400,7 @@ function BankReviewModal({
                       <button
                         className="btn"
                         disabled={busy || loading || !matchesLoaded || (alreadyLinked.length > 0 && !duplicateReviewed)}
-                        onClick={() => {
-                          setActionMenuOpen(false)
-                          onCreateBooking(transaction, duplicateReviewed ? alreadyLinked.map((match) => match.id) : [])
-                          onClose()
-                        }}
+                        onClick={createBooking}
                       >
                         Buchung anlegen
                       </button>
@@ -1862,6 +1624,11 @@ function BankReviewModal({
           <button className="btn" onClick={onClose}>
             Schließen
           </button>
+          {transaction.status === 'OPEN' && matchesLoaded && !loading && alreadyLinked.length === 0 && (
+            <button className="btn primary btn-with-icon" disabled={busy} onClick={createBooking}>
+              <AppIcon icon={IconPlus} size="control" /> Buchung anlegen
+            </button>
+          )}
         </footer>
       </div>
     </div>,
@@ -2102,6 +1869,19 @@ export default function BankImportView({
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'ALL' | BankTransaction['status']>('OPEN')
   const [accountId, setAccountId] = useState<number | null>(null)
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [batchFilter, setBatchFilter] = useState<{ id: number; fileName: string } | null>(null)
+  const [importOutcome, setImportOutcome] = useState<ImportOutcome | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyRows, setHistoryRows] = useState<BankImportHistoryEntry[]>([])
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
+  const [remapBatchId, setRemapBatchId] = useState<number | null>(null)
+  const [listRefresh, setListRefresh] = useState(0)
   const [sortBy, setSortBy] = useState<
     'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
   >('date')
@@ -2112,9 +1892,12 @@ export default function BankImportView({
   const [aiSuggestionTransaction, setAiSuggestionTransaction] = useState<BankTransaction | null>(null)
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
+  const [importStatusLoading, setImportStatusLoading] = useState(true)
+  const [importStatusFailed, setImportStatusFailed] = useState(false)
   const [reviewingWithAi, setReviewingWithAi] = useState(false)
-  useEffect(() => setExpandedId(null), [page, query, status, accountId])
+  useEffect(() => setExpandedId(null), [page, query, status, accountId, from, to, batchFilter])
   const aiReviewInFlight = React.useRef(false)
+  const listRequest = React.useRef(0)
   const limit = 50
 
   const toggleSort = (
@@ -2142,37 +1925,48 @@ export default function BankImportView({
   }
 
   const load = useCallback(async () => {
+    const request = ++listRequest.current
     setLoading(true)
     try {
       const result = await window.api.bankTransactions.list({
         status,
         paymentAccountId: accountId || undefined,
+        batchId: batchFilter?.id,
+        from: from || undefined,
+        to: to || undefined,
         q: query || undefined,
         sortBy,
         sortDir,
         page,
         limit
       })
+      if (request !== listRequest.current) return
       setRows(result.rows as BankTransaction[])
       setStats(result.stats)
       setTotal(result.total)
     } catch (reason: any) {
-      notify('error', reason?.message || String(reason))
+      if (request === listRequest.current) notify('error', reason?.message || String(reason))
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
-  }, [accountId, notify, page, query, status, sortBy, sortDir])
+  }, [accountId, batchFilter, from, to, notify, page, query, status, sortBy, sortDir, listRefresh])
 
   const loadImportStatus = useCallback(async () => {
+    setImportStatusLoading(true)
     try {
       const result = await window.api.bankTransactions.importStatus()
       setImportStatus(result as BankImportStatus)
+      setImportStatusFailed(false)
     } catch {
       setImportStatus(null)
+      setImportStatusFailed(true)
+    } finally {
+      setImportStatusLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    listRequest.current++
     const timer = window.setTimeout(() => void load(), 180)
     return () => window.clearTimeout(timer)
   }, [load])
@@ -2182,6 +1976,24 @@ export default function BankImportView({
   }, [loadImportStatus])
 
   useEffect(() => {
+    if (!historyOpen) return
+    let active = true
+    setHistoryLoading(true)
+    setHistoryError(false)
+    void window.api.bankTransactions.importHistory({ paymentAccountId: accountId || undefined, page: historyPage, limit: 10 })
+      .then(result => {
+        if (!active) return
+        setHistoryRows(result.rows)
+        setHistoryTotal(result.total)
+      })
+      .catch(() => {
+        if (active) { setHistoryRows([]); setHistoryError(true) }
+      })
+      .finally(() => { if (active) setHistoryLoading(false) })
+    return () => { active = false }
+  }, [accountId, historyOpen, historyPage, historyRefresh])
+
+  useEffect(() => {
     const refresh = () => {
       void load()
       void loadImportStatus()
@@ -2189,13 +2001,42 @@ export default function BankImportView({
     return addDataChangedListener(['bank-imports', 'vouchers'], refresh)
   }, [load, loadImportStatus])
 
-  const activeAccounts = useMemo(
-    () => paymentAccounts.filter((account) => account.isActive !== 0 && account.kind !== 'CASH'),
+  const bankAccounts = useMemo(
+    () => paymentAccounts.filter((account) => account.kind !== 'CASH'),
     [paymentAccounts]
   )
   const pageCount = Math.max(1, Math.ceil(total / limit))
-  const importReminder = useMemo(() => getBankImportReminder(importStatus), [importStatus])
+  const historyPageCount = Math.max(1, Math.ceil(historyTotal / 10))
+  const selectedAccountHistory = importStatus?.accounts?.find(account => account.id === accountId)
+  const selectedAccount = bankAccounts.find(account => account.id === accountId)
+  const hasPageFilters = Boolean(batchFilter || query || accountId || from || to)
+  const lastBookingDate = parseLocalDate(selectedAccountHistory?.lastBookingDate)
+  const previousMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
+  const olderBankData = selectedAccount?.isActive !== 0 && lastBookingDate != null && lastBookingDate < previousMonthEnd
   const openVisibleIds = rows.filter((row) => row.status === 'OPEN').map((row) => row.id)
+
+  const showImportBatch = (entry: { id: number; fileName: string; paymentAccountId: number }) => {
+    setAccountId(entry.paymentAccountId)
+    setBatchFilter({ id: entry.id, fileName: entry.fileName })
+    setHistoryOpen(false)
+    setHistoryPage(1)
+    setStatus('ALL')
+    setFrom('')
+    setTo('')
+    setQuery('')
+    setPage(1)
+  }
+
+  const clearFilters = () => {
+    setQuery('')
+    setAccountId(null)
+    setFrom('')
+    setTo('')
+    setBatchFilter(null)
+    setStatus('ALL')
+    setHistoryPage(1)
+    setPage(1)
+  }
 
   const reviewVisibleWithAi = async () => {
     if (aiReviewInFlight.current || loading || !openVisibleIds.length) return
@@ -2223,6 +2064,84 @@ export default function BankImportView({
       <div className="bank-page-header">
         <h1>Bankimport</h1>
       </div>
+
+      <div className="bank-import-context-toolbar">
+        <label className="bank-import-context-account">
+          <span>Zahlkonto</span>
+          <select className="input" value={accountId ?? ''} onChange={event => {
+            setAccountId(event.target.value ? Number(event.target.value) : null)
+            setBatchFilter(null)
+            setHistoryPage(1)
+            setPage(1)
+          }}>
+            <option value="">Alle Zahlkonten</option>
+            {bankAccounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.iban ? ` · ${account.iban}` : ''}{account.isActive === 0 ? ' · Inaktiv' : ''}</option>)}
+          </select>
+        </label>
+        <div className="bank-import-date-range" role="group" aria-label="Buchungsdatum filtern">
+          <label><span>Von</span><input className="input" type="date" value={from} max={to || undefined} onChange={event => {
+            const value = event.target.value
+            setFrom(value)
+            if (to && value > to) setTo('')
+            setPage(1)
+          }} /></label>
+          <label><span>Bis</span><input className="input" type="date" value={to} min={from || undefined} onChange={event => {
+            const value = event.target.value
+            setTo(value)
+            if (value && from && value < from) setFrom('')
+            setPage(1)
+          }} /></label>
+        </div>
+        <FilterDropdown
+          trigger={<><AppIcon icon={IconHistory} size="control" /> Importhistorie</>}
+          title="Importhistorie"
+          ariaLabel="Importhistorie"
+          panelClassName="bank-import-history-dropdown"
+          width={560}
+          alignRight
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+        >
+          <div className="bank-import-history-panel">
+            <p className="bank-import-history-context">{selectedAccount ? `Importe für ${selectedAccount.name}` : 'Importe aller Zahlkonten'} · {historyTotal} Vorgänge</p>
+            {historyLoading ? <p role="status">Importhistorie wird geladen …</p> : historyError ? <p role="alert">Die Importhistorie konnte nicht geladen werden. Bitte erneut öffnen.</p> : historyRows.length ? <div className="bank-import-history-entries">
+              {historyRows.map(entry => <div className={`bank-import-history-entry${entry.imported === 0 ? ' bank-import-history-entry--empty' : ''}`} key={entry.id}>
+                <div className="bank-import-history-entry-main"><strong title={entry.fileName}>{entry.fileName}</strong><span>{formatDateTime(entry.importedAt)} · {entry.paymentAccountName || 'Zahlkonto'} · {entry.format}</span></div>
+                <div className="bank-import-history-entry-details"><span>{entry.imported} neu · {entry.duplicates} Duplikate · {entry.errors} Fehler</span><span>{entry.periodFrom ? `Übernommene Buchungstage: ${formatDate(entry.periodFrom)}${entry.periodTo && entry.periodTo !== entry.periodFrom ? ` – ${formatDate(entry.periodTo)}` : ''}` : 'Keine neuen Buchungen'}</span></div>
+                {entry.imported > 0 && <FilterDropdown
+                  trigger={<AppIcon icon={IconDotsVertical} size="action" />}
+                  title={`Aktionen für ${entry.fileName}`}
+                  ariaLabel={`Aktionen für Import ${entry.fileName}`}
+                  panelClassName="bank-import-history-actions-panel"
+                  alignRight width={238}
+                >
+                  <div className="bank-import-history-actions">
+                    <button type="button" onClick={() => showImportBatch({ id: entry.id, fileName: entry.fileName, paymentAccountId: entry.paymentAccountId })}>Belege anzeigen</button>
+                    {entry.format === 'CSV' && <button type="button" onClick={() => { setHistoryOpen(false); setRemapBatchId(entry.id) }}>Zuordnungen aktualisieren</button>}
+                  </div>
+                </FilterDropdown>}
+              </div>)}
+            </div> : <p>Für {selectedAccount?.name || 'die Zahlkonten'} liegt noch kein Import vor.</p>}
+            {historyTotal > 10 && <div className="bank-import-history-pages"><span>Seite {historyPage} / {historyPageCount}</span><button className="btn" type="button" disabled={historyPage <= 1 || historyLoading} onClick={() => setHistoryPage(page => page - 1)} aria-label="Vorherige Historienseite"><AppIcon icon={IconChevronLeft} size="control" /></button><button className="btn" type="button" disabled={historyPage >= historyPageCount || historyLoading} onClick={() => setHistoryPage(page => page + 1)} aria-label="Nächste Historienseite"><AppIcon icon={IconChevronRight} size="control" /></button></div>}
+          </div>
+        </FilterDropdown>
+      </div>
+
+      {accountId && <div className="bank-import-account-overview" role="status">
+        <strong>{selectedAccount?.name || 'Zahlkonto'}</strong>
+        {importStatusLoading ? <span>Importstand wird geladen …</span> : importStatusFailed ? <span>Importstand derzeit nicht verfügbar.</span> : <>
+          <span>{selectedAccountHistory?.lastImportAt ? `Letzter Import mit Buchungen: ${formatDateTime(selectedAccountHistory.lastImportAt)}` : 'Noch keine Buchungen importiert'}</span>
+          <span>Neuester erfasster Umsatz: {formatDate(selectedAccountHistory?.lastBookingDate)}</span>
+          {selectedAccountHistory?.lastImportAt && <span>Dabei übernommen: {selectedAccountHistory.lastImportImportedCount} Buchungssätze</span>}
+          {olderBankData && <small>Prüfe, ob seitdem weitere Kontoauszüge vorliegen. Auch überlappende Auszüge können auf Duplikate geprüft werden.</small>}
+        </>}
+      </div>}
+
+      {importOutcome && <div className="bank-import-outcome" role="status">
+        <div><strong>Import abgeschlossen: {importOutcome.fileName}</strong><span>{importOutcome.imported} übernommen · {importOutcome.duplicates} Duplikate übersprungen · {importOutcome.errors} fehlerhaft</span></div>
+        {importOutcome.imported > 0 && <button className="btn primary" type="button" onClick={() => showImportBatch({ id: importOutcome.batchId, fileName: importOutcome.fileName, paymentAccountId: importOutcome.paymentAccountId })}>{importOutcome.imported === 1 ? 'Diesen Beleg anzeigen' : `Diese ${importOutcome.imported} Belege anzeigen`}</button>}
+        <button className="btn ghost" type="button" aria-label="Importzusammenfassung schließen" onClick={() => setImportOutcome(null)}><AppIcon icon={IconX} size="control" /></button>
+      </div>}
 
       <div className="bank-overview-row">
         <div className="bank-status-tabs" role="group" aria-label="Bankbelegstatus">
@@ -2276,16 +2195,6 @@ export default function BankImportView({
             )}
           </div>
           <div className="journal-filter-toolbar bank-import-filter-toolbar">
-            <BankImportHistoryDropdown status={importStatus} />
-            <BankAccountFilterDropdown
-              accounts={activeAccounts}
-              value={accountId}
-              onApply={(nextAccountId) => {
-                setAccountId(nextAccountId)
-                setPage(1)
-              }}
-            />
-            <div className="filter-divider" />
             <button
               className="btn ghost bank-ai-review-button"
               type="button"
@@ -2308,28 +2217,30 @@ export default function BankImportView({
         </div>
       </div>
 
-      {importReminder && (
-        <div className="helper bank-page-summary">
-          <span
-            className="bank-import-reminder"
-            tabIndex={0}
-            aria-label={`${importReminder.title}: ${importReminder.detail}`}
-          >
-            <span className="bank-import-reminder__icon" aria-hidden="true">
-              !
-            </span>
-            <span className="bank-import-reminder__summary">{importReminder.summary}</span>
-            <span className="bank-import-reminder__popover" role="tooltip">
-              <strong>{importReminder.title}</strong>
-              <span>{importReminder.detail}</span>
-            </span>
-          </span>
-        </div>
-      )}
-
-      <div className="bank-list-caption"><span>{total} Bankbelege · {status === 'ALL' ? 'Alle Status' : statusLabel(status)}</span><span>Details über + öffnen</span>{(query || accountId) && <button className="btn ghost" onClick={() => { setQuery(''); setAccountId(null); setPage(1) }}>Such- und Kontofilter zurücksetzen</button>}</div>
+      <div className="bank-list-caption">
+        <span>{total} Bankbelege · {status === 'ALL' ? 'Alle Status' : statusLabel(status)}</span>
+        <span>Details über + öffnen</span>
+        {hasPageFilters && <div className="bank-import-filter-chips" aria-label="Aktive Bankfilter">
+          {batchFilter && <span className="chip bank-import-filter-chip" title={`Import #${batchFilter.id}: ${batchFilter.fileName}`}><span>Import #{batchFilter.id}: {batchFilter.fileName}</span><button className="chip-x" type="button" aria-label="Importfilter entfernen" onClick={() => { setBatchFilter(null); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
+          {accountId && <span className="chip bank-import-filter-chip"><span>Zahlkonto: {selectedAccount?.name || accountId}</span><button className="chip-x" type="button" aria-label="Zahlkontofilter entfernen" onClick={() => { setAccountId(null); setBatchFilter(null); setHistoryPage(1); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
+          {from && <span className="chip bank-import-filter-chip"><span>Von: {formatDate(from)}</span><button className="chip-x" type="button" aria-label="Von-Filter entfernen" onClick={() => { setFrom(''); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
+          {to && <span className="chip bank-import-filter-chip"><span>Bis: {formatDate(to)}</span><button className="chip-x" type="button" aria-label="Bis-Filter entfernen" onClick={() => { setTo(''); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
+          {query && <span className="chip bank-import-filter-chip"><span>Suche: {query}</span><button className="chip-x" type="button" aria-label="Suchfilter entfernen" onClick={() => { setQuery(''); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
+          <button className="btn ghost bank-import-clear-filters" type="button" title="Alle Filter zurücksetzen" aria-label="Alle Filter zurücksetzen" onClick={clearFilters}><AppIcon icon={IconX} size="control" /></button>
+        </div>}
+      </div>
       <div className="bank-table-card bank-master-table" role="region" aria-label="Bankbelege" tabIndex={0}>
         <table className="bank-table" aria-label="Importierte Bankbelege" aria-busy={loading}>
+          <colgroup>
+            <col className="bank-column-details" />
+            <col className="bank-column-status" />
+            <col className="bank-column-date" />
+            <col />
+            <col className="bank-column-assignment" />
+            <col className="bank-column-account" />
+            <col className="bank-column-type" />
+            <col className="bank-column-amount" />
+          </colgroup>
           <thead>
             <tr>
               <th scope="col"><span className="helper">Details</span></th>
@@ -2356,11 +2267,13 @@ export default function BankImportView({
                     {statusLabel(row.status)}
                   </span>
                 </td>
-                <td>{formatDate(row.bookingDate)}</td>
+                <td><span className="bank-import-row-date"><strong>{Number(row.bookingDate.slice(8, 10)) || '–'}</strong><span>{new Intl.DateTimeFormat('de-DE', { month: 'short' }).format(parseLocalDate(row.bookingDate) || new Date())}<small>{row.bookingDate.slice(0, 4)}</small></span></span></td>
                 <td>
-                  <div className="bank-description-cell">
-                    <button className="bank-description-button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-expanded={expandedId === row.id}>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</button>
-                    {row.counterparty && row.purpose && <span title={row.purpose}>{row.purpose}</span>}
+                  <div className="bank-description-cell bank-import-description-hierarchy">
+                    <span className={`bank-import-direction-symbol bank-import-direction-symbol--${row.direction.toLowerCase()}`} aria-hidden="true"><AppIcon icon={row.direction === 'OUT' ? IconArrowUp : IconArrowDown} size="action" /></span>
+                    <div><button className="bank-description-button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-expanded={expandedId === row.id}>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</button>
+                      {row.counterparty && row.purpose && <span className="bank-import-purpose-subline" title={row.purpose}>{row.purpose}</span>}
+                    </div>
                   </div>
                 </td>
                 <td>
@@ -2478,18 +2391,26 @@ export default function BankImportView({
         <BankImportModal
           accounts={paymentAccounts}
           initialFile={initialImportFile}
+          initialAccountId={accountId}
           notify={notify}
           onClose={() => {
             setShowImport(false)
             setInitialImportFile(null)
           }}
-          onImported={() => {
+          onImported={(result, context) => {
+            setImportOutcome({ batchId: result.batchId, paymentAccountId: context.paymentAccountId, fileName: context.fileName,
+              imported: result.imported, duplicates: result.duplicates, errors: result.errors.length })
+            setAccountId(context.paymentAccountId)
+            setBatchFilter(null)
             setPage(1)
-            void load()
+            setHistoryPage(1)
+            setHistoryRefresh(value => value + 1)
+            setListRefresh(value => value + 1)
             void loadImportStatus()
           }}
         />
       )}
+      {remapBatchId != null && <BankImportRemapDialog batchId={remapBatchId} onClose={() => setRemapBatchId(null)} onApplied={() => { setListRefresh(value => value + 1); setHistoryRefresh(value => value + 1) }} notify={notify} />}
       {selected && (
         <BankReviewModal
           transaction={selected}

@@ -1139,6 +1139,7 @@ const BankImportPreviewRow = z.object({
 })
 
 export const BankImportCommitInput = BankImportInputBase.extend({
+  selectedSourceRows: z.array(z.number().int().positive()).optional(),
   forceImportSourceRows: z.array(z.number().int().positive()).optional(),
   additionalImportSourceRows: z.array(z.number().int().positive()).optional()
 }).refine(hasImportFileData, { message: 'Importdatei fehlt.' })
@@ -1196,6 +1197,7 @@ const BankTransactionStatus = z.enum(['OPEN', 'LINKED', 'CHECKED'])
 export const BankTransactionsListInput = z.object({
   status: z.union([BankTransactionStatus, z.literal('ALL')]).optional(),
   paymentAccountId: z.number().int().positive().optional(),
+  batchId: z.number().int().positive().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   q: z.string().optional(),
@@ -1223,26 +1225,61 @@ export const BankTransactionsListOutput = z.object({
   limit: z.number(),
   stats: z.object({ total: z.number(), open: z.number(), linked: z.number(), checked: z.number() })
 })
+const BankImportHistoryEntry = z.object({
+  id: z.number(),
+  fileName: z.string(),
+  format: z.enum(['CAMT', 'CSV']),
+  paymentAccountId: z.number(),
+  paymentAccountName: z.string().nullable().optional(),
+  paymentAccountColor: z.string().nullable().optional(),
+  imported: z.number(),
+  duplicates: z.number(),
+  errors: z.number(),
+  importedAt: z.string(),
+  periodFrom: z.string().nullable().optional(),
+  periodTo: z.string().nullable().optional()
+})
+
+const BankImportRemapMapping = z.object({
+  counterparty: z.string().nullable().optional(),
+  counterpartyIban: z.string().nullable().optional(),
+  purpose: z.string().nullable().optional(),
+  reference: z.string().nullable().optional(),
+  endToEndId: z.string().nullable().optional()
+})
+const BankImportRemapValues = z.object({
+  counterparty: z.string().nullable(),
+  counterpartyIban: z.string().nullable(),
+  purpose: z.string().nullable(),
+  reference: z.string().nullable(),
+  endToEndId: z.string().nullable()
+})
+export const BankImportRemapPreviewInput = z.object({ batchId: z.number().int().positive(), mapping: BankImportRemapMapping.optional() })
+export const BankImportRemapPreviewOutput = z.object({
+  id: z.number(), fileName: z.string(), format: z.string(), paymentAccountName: z.string(),
+  headers: z.array(z.string()), suggestedMapping: BankImportRemapMapping, mapping: BankImportRemapMapping,
+  totalRows: z.number(), changeCount: z.number(),
+  rows: z.array(z.object({ id: z.number(), bookingDate: z.string(), direction: z.enum(['IN', 'OUT']),
+    amount: z.number(), current: BankImportRemapValues, proposed: BankImportRemapValues, changed: z.boolean() }))
+})
+export const BankImportRemapApplyInput = z.object({ batchId: z.number().int().positive(), mapping: BankImportRemapMapping })
+export const BankImportRemapApplyOutput = z.object({ updated: z.number(), totalRows: z.number() })
+export const BankImportHistoryInput = z.object({
+  paymentAccountId: z.number().int().positive().optional(),
+  page: z.number().int().positive().optional(),
+  limit: z.number().int().positive().max(50).optional()
+})
+export const BankImportHistoryOutput = z.object({
+  rows: z.array(BankImportHistoryEntry),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number()
+})
 export const BankImportStatusOutput = z.object({
   lastBookingDate: z.string().nullable(),
   lastImportAt: z.string().nullable().optional(),
   total: z.number(),
-  recentImports: z.array(
-    z.object({
-      id: z.number(),
-      fileName: z.string(),
-      format: z.enum(['CAMT', 'CSV']),
-      paymentAccountId: z.number(),
-      paymentAccountName: z.string().nullable().optional(),
-      paymentAccountColor: z.string().nullable().optional(),
-      imported: z.number(),
-      duplicates: z.number(),
-      errors: z.number(),
-      importedAt: z.string(),
-      periodFrom: z.string().nullable().optional(),
-      periodTo: z.string().nullable().optional()
-    })
-  ),
+  recentImports: z.array(BankImportHistoryEntry),
   accounts: z.array(
     z.object({
       id: z.number(),
@@ -1250,6 +1287,8 @@ export const BankImportStatusOutput = z.object({
       color: z.string().nullable().optional(),
       lastBookingDate: z.string().nullable().optional(),
       lastImportAt: z.string().nullable().optional(),
+      lastImportImportedCount: z.number().nullable().optional(),
+      lastImportFileName: z.string().nullable().optional(),
       total: z.number()
     })
   )
@@ -1263,7 +1302,13 @@ export type TBankImportPreviewInput = z.infer<typeof BankImportPreviewInput>
 export type TBankImportPreviewOutput = z.infer<typeof BankImportPreviewOutput>
 export type TBankImportCommitInput = z.infer<typeof BankImportCommitInput>
 export type TBankImportCommitOutput = z.infer<typeof BankImportCommitOutput>
+export type TBankImportRemapPreviewInput = z.infer<typeof BankImportRemapPreviewInput>
+export type TBankImportRemapPreviewOutput = z.infer<typeof BankImportRemapPreviewOutput>
+export type TBankImportRemapApplyInput = z.infer<typeof BankImportRemapApplyInput>
+export type TBankImportRemapApplyOutput = z.infer<typeof BankImportRemapApplyOutput>
 export type TBankImportStatusOutput = z.infer<typeof BankImportStatusOutput>
+export type TBankImportHistoryInput = z.infer<typeof BankImportHistoryInput>
+export type TBankImportHistoryOutput = z.infer<typeof BankImportHistoryOutput>
 export type TBankTransactionsListInput = z.infer<typeof BankTransactionsListInput>
 export type TBankTransactionsListOutput = z.infer<typeof BankTransactionsListOutput>
 export type TBankTransactionIdInput = z.infer<typeof BankTransactionIdInput>

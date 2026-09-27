@@ -1,0 +1,113 @@
+.modal.bank-import-dialog { width: min(1180px, 96vw); gap: 16px; max-height: calc(100dvh - 48px); }
+.bank-import-dialog .bank-import-scroll { padding-right: 4px; gap: 12px; }
+.bank-import-dialog .bank-modal-header h2 { margin: 0; }
+.bank-import-dialog .bank-modal-header p { margin: 6px 0 0; }
+.bank-import-account-card,
+.bank-import-file-card,
+.bank-import-mapping-card,
+.bank-import-review { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px; min-width: 0; }
+.bank-import-step-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.bank-import-step-heading > div,
+.bank-import-section-heading > div,
+.bank-import-file-card > div,
+.bank-import-file-status > div,
+.bank-import-duplicate-banner > div { display: grid; gap: 4px; min-width: 0; }
+.bank-import-step-heading span,
+.bank-import-dialog small { color: var(--text-dim); font-size: 12px; line-height: 1.45; }
+.bank-import-account-options { display: flex; gap: 16px; align-items: center; }
+.bank-import-account-options > .field { flex: 1; min-width: 0; margin: 0; }
+.bank-import-account-history { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--text) 4%, var(--surface)); font-size: 12px; }
+.bank-import-history-heading { display: flex; align-items: center; gap: 7px; }
+.bank-import-history-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; margin: 12px 0; }
+.bank-import-history-facts > div { min-width: 0; }
+.bank-import-history-facts dt { color: var(--text-dim); margin-bottom: 4px; }
+.bank-import-history-facts dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.bank-import-account-history p { margin: 8px 0 0; color: var(--text-dim); line-height: 1.5; }
+.bank-import-history-file { overflow-wrap: anywhere; }
+.bank-import-dialog .bank-import-ai-option { flex: 0 1 380px; margin: 0; padding: 10px 12px; font-size: 12px; }
+.bank-import-file-card { display: flex; gap: 12px; align-items: center; border-style: dashed; background: color-mix(in srgb, var(--accent) 3%, var(--surface)); }
+.bank-import-file-card > div { flex: 1; }
+.bank-import-file-card strong { overflow-wrap: anywhere; font-size: 13px; }
+.bank-import-file-card.is-dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.bank-import-file-status { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; background: color-mix(in srgb, var(--success) 9%, var(--surface)); color: var(--success); font-size: 13px; }
+.bank-import-file-status.has-errors { background: color-mix(in srgb, var(--warning) 9%, var(--surface)); color: var(--warning); }
+.bank-import-loading { font-size: 13px; color: var(--text-dim); padding: 8px 0; }
+.bank-import-section-heading { display: flex; gap: 12px; align-items: center; justify-content: space-between; font-size: 13px; }
+.bank-import-section-heading .btn { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; }
+.bank-import-mapping-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.bank-import-mapping-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.bank-import-mapping-grid--primary { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.bank-import-mapping-grid .field { min-width: 0; margin: 0; font-size: 12px; }
+.bank-import-mapping-grid .input { width: 100%; min-width: 0; font-size: 12px; }
+.bank-import-dialog .bank-more-options .btn { font-size: 12px; }
+.bank-import-review { padding: 0; overflow: hidden; }
+.bank-import-review > .bank-import-section-heading { padding: 14px; }
+.bank-import-duplicate-banner { margin: 0 12px 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--danger) 25%, var(--border)); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); border-radius: 8px; color: var(--danger); font-size: 13px; }
+.bank-import-duplicate-banner > div { flex: 1; }
+.bank-import-duplicate-banner .btn { flex-shrink: 0; font-size: 12px; }
+.bank-import-review-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 0 12px 12px; }
+.bank-import-review-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+.bank-import-review-tabs button { border: 1px solid transparent; border-radius: 6px; padding: 8px 10px; font: inherit; font-size: 12px; color: var(--text-dim); background: color-mix(in srgb, var(--text) 4%, var(--surface)); cursor: pointer; }
+.bank-import-review-tabs button.active { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); font-weight: 600; }
+.bank-import-review-toolbar > .input { width: 220px; font-size: 12px; }
+.bank-import-review-table-wrap { overflow: auto; max-height: 360px; border-top: 1px solid var(--border); }
+.bank-import-dialog .bank-import-review-table { table-layout: fixed; width: 100%; min-width: 910px; font-size: 12px; }
+.bank-import-review-table th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+.bank-import-dialog .bank-import-review-table th,
+.bank-import-dialog .bank-import-review-table td { padding: 11px 10px; vertical-align: top; }
+.bank-import-review-table th:nth-child(1) { width: 4%; }
+.bank-import-review-table th:nth-child(2) { width: 10%; }
+.bank-import-review-table th:nth-child(3) { width: 10%; }
+.bank-import-review-table th:nth-child(4) { width: 27%; }
+.bank-import-review-table th:nth-child(5) { width: 11%; }
+.bank-import-review-table th:nth-child(6) { width: 21%; }
+.bank-import-review-table th:nth-child(7) { width: 17%; }
+.bank-import-cell-text { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.bank-import-status { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.bank-import-status--new { color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.bank-import-status--duplicate { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.bank-import-status--error,
+.bank-import-status--potential { color: var(--warning); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+.bank-import-review-row--error { background: color-mix(in srgb, var(--warning) 4%, transparent); }
+.bank-import-match { overflow-wrap: anywhere; }
+.bank-import-match summary { cursor: pointer; }
+.bank-import-match summary small { display: block; margin-top: 4px; font-size: 11px; }
+.bank-import-match > div { display: grid; gap: 6px; padding-top: 8px; }
+.bank-import-choice { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 11px; }
+.bank-import-choice input { appearance: none; flex: 0 0 29px; width: 29px; height: 17px; border-radius: 20px; background: color-mix(in srgb, var(--text-dim) 38%, var(--surface)); border: 1px solid var(--border); position: relative; margin: 0; cursor: pointer; }
+.bank-import-choice input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: white; }
+.bank-import-choice input:checked { background: var(--success); }
+.bank-import-choice input:checked::after { left: 14px; }
+.bank-import-choice input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.bank-import-choice input:disabled { opacity: .5; cursor: wait; }
+.bank-import-review-pagination { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
+.bank-import-review-pagination > div { display: flex; align-items: center; gap: 10px; }
+.bank-import-dialog > .bank-modal-footer { display: flex; align-items: center; }
+.bank-import-dialog > .bank-modal-footer > .helper { margin-right: auto; font-size: 12px; }
+.bank-import-dialog > .bank-modal-footer .btn { box-shadow: none; }
+.bank-import-dialog .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: var(--text-dim); border-color: var(--border); opacity: .6; box-shadow: none; cursor: not-allowed; }
+/* Keep disabled footer actions muted even when global primary hover styles load later. */
+.bank-import-dialog .bank-modal-footer .btn:disabled,
+.bank-import-dialog .bank-modal-footer .btn:disabled:hover {
+  background: color-mix(in srgb, var(--text-dim) 12%, var(--surface));
+  color: var(--text-dim);
+  border-color: var(--border);
+  opacity: .6;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .bank-import-mapping-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bank-import-account-options { flex-wrap: wrap; }
+  .bank-import-dialog .bank-import-ai-option { flex-basis: 100%; }
+}
+@media (max-width: 600px) {
+  .bank-import-history-facts { grid-template-columns: 1fr; }
+  .bank-import-mapping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bank-import-file-card, .bank-import-section-heading, .bank-import-duplicate-banner { flex-wrap: wrap; }
+  .bank-import-file-card > div { flex-basis: 70%; }
+  .bank-import-dialog > .bank-modal-footer > .helper { flex-basis: 100%; }
+}
+@media (max-height: 760px) {
+  .modal.bank-import-dialog { max-height: calc(100dvh - 88px); }
+}

@@ -12,6 +12,7 @@ test.beforeAll(async () => {
       import React from 'react'
       import { createRoot } from 'react-dom/client'
       import { useQuickAdd } from './src/renderer/hooks/useQuickAdd'
+      import { selectAiDraftBookingType } from './src/renderer/utils/aiBookingDraft'
       import QuickAddModal from './src/renderer/components/modals/QuickAddModal'
       import CompactBookingFlyout from './src/renderer/components/CompactBookingFlyout'
       function Harness() {
@@ -26,6 +27,8 @@ test.beforeAll(async () => {
         window.reopenDraft = () => hook.reopenDraft(hook.activeDraftId)
         window.prefill = (selected) => hook.openQuickAdd({ qa: { type: 'OUT', bookingTypeSelected: selected,
           date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'Vorbelegt', paymentAccountId: 1 } })
+        window.aiDraft = (type) => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type,
+          date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'KI-Vorschlag', paymentAccountId: 1 }) })
         React.useEffect(() => { hook.openQuickAdd() }, [])
         const props = { qa: hook.qa, setQa: hook.setQa, onSave: hook.onQuickSave, onClose: hook.parkQuickAdd,
           files: hook.files, setFiles: hook.setFiles, onDropFiles: hook.onDropFiles, openFilePicker: () => {}, fileInputRef,
@@ -133,6 +136,20 @@ test('prefilled drafts require confirmation and retain their values', async ({ p
   await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
   await expect(page.locator('input[type=date]').first()).toHaveValue('2026-09-25')
   await expect(page.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('75')
+})
+
+test('AI drafts open with the suggested income or expense type already selected', async ({ page }) => {
+  for (const presentation of ['flyout', 'modal']) {
+    await page.evaluate(value => (window as any).changePresentation(value), presentation)
+    for (const [type, label] of [['OUT', 'Ausgabe'], ['IN', 'Einnahme']] as const) {
+      await page.evaluate(value => (window as any).aiDraft(value), type)
+      await expect(page.locator('.booking-type-overlay')).toHaveCount(0)
+      await expect(page.locator('.booking-type-fields')).not.toHaveAttribute('inert', '')
+      await expect(page.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.locator('input[type=date]').first()).toHaveValue('2026-09-25')
+      await expect(page.getByRole('spinbutton', { name: 'Brutto-Betrag' })).toHaveValue('75')
+    }
+  }
 })
 
 test('replacing draft data preserves whether the type has been selected', async ({ page }) => {

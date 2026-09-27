@@ -225,6 +225,7 @@ export default function FilterDropdown({
       {open && createPortal(
         <div
           ref={panelRef}
+          onMouseDown={(event) => event.stopPropagation()}
           className={`filter-dropdown__panel ${panelClassName || ''}`}
           style={{
             width: typeof width === 'number' ? `${width}px` : width,

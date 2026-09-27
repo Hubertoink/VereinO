@@ -45,6 +45,7 @@ import {
   normalizeVoucherEarmarkAssignments
 } from './utils/voucherAssignmentFallbacks'
 import { invoiceDraftTabText } from './utils/invoiceDraftLabel'
+import { selectAiDraftBookingType } from './utils/aiBookingDraft'
 import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
@@ -488,6 +489,7 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
       qa: {
         date: result.fields.invoiceDate,
         type: result.bookingMeta.type === 'IN' ? 'IN' : 'OUT',
+        bookingTypeSelected: true,
         sphere: result.bookingMeta.sphere || 'IDEELL',
         primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? undefined,
         mode: 'GROSS',
@@ -2285,7 +2287,10 @@ function AppInner() {
       // Journal besucht hat. Die Auswahlfelder brauchen dann die Stammdaten
       // bereits vor dem ersten Rendern des Buchungsdialogs.
       void Promise.allSettled([loadBindings(), loadBudgets(), loadEarmarks()]).then(() => {
-        openQuickAdd({ qa: detail.qa, files: detail.files || [] })
+        openQuickAdd({
+          qa: selectAiDraftBookingType(detail.qa),
+          files: detail.files || []
+        })
       })
     }
     window.addEventListener('ai:open-booking-draft', handler)
@@ -3810,6 +3815,7 @@ function AppInner() {
                   qa: {
                     date: transaction.bookingDate,
                     type: transaction.direction,
+                    bookingTypeSelected: true,
                     sphere: 'IDEELL',
                     mode: 'GROSS',
                     grossAmount: Number(transaction.amount),
