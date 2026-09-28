@@ -3,7 +3,8 @@ jest.mock('../../electron/main/db/database', () => ({
   withTransaction: (fn: (db: unknown) => unknown) => fn({})
 }))
 
-import { resolvePrimaryClassificationValueId } from '../../electron/main/repositories/classifications'
+import { getDb } from '../../electron/main/db/database'
+import { canChangeOrganizationProfile, resolvePrimaryClassificationValueId } from '../../electron/main/repositories/classifications'
 
 function classificationDb(profile: 'NONPROFIT' | 'GENERAL', value?: { id: number; stableKey: string; isActive: number }) {
   return {
@@ -45,4 +46,18 @@ describe('resolvePrimaryClassificationValueId', () => {
       )
     ).toThrow(/Kategorie/i)
   })
+})
+
+
+describe('canChangeOrganizationProfile', () => {
+  it.each([null, 'vouchers', 'budgets', 'invoices', 'recurring_bookings', 'submissions'])(
+    'allows switching only without financial records (populated table: %s)', (populatedTable) => {
+      ;(getDb as jest.Mock).mockReturnValue({
+        prepare: (sql: string) => ({
+          get: () => ({ hasRows: populatedTable && sql.includes(`FROM ${populatedTable} `) ? 1 : 0 })
+        })
+      })
+      expect(canChangeOrganizationProfile()).toBe(populatedTable === null)
+    }
+  )
 })

@@ -35,6 +35,7 @@ interface OrganizationAppearance {
     backgroundImage: string | null
     backgroundImageVisibility: number | null
     customBackgroundImage: string | null
+    bookingView: 'classic' | 'plus' | null
     glassModals: boolean
 }
 
@@ -195,6 +196,7 @@ export interface SystemApi {
             backgroundImage?: string
             backgroundImageVisibility?: number
             customBackgroundImage?: string | null
+            bookingView?: 'classic' | 'plus'
             glassModals?: boolean
         }) => Promise<{ success: boolean }>
         activeAppearance: () => Promise<OrganizationAppearance>

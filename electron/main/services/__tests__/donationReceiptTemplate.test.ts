@@ -39,3 +39,21 @@ describe('buildDonationReceiptHtml', () => {
     expect(html).not.toContain('weitergeleitet')
   })
 })
+
+it('escapes donor and item content in the shared preview/export template', () => {
+  const html = buildDonationReceiptHtml({
+    receiptType: 'IN_KIND', donorName: '<script>alert("x")</script>',
+    donorAddress: 'Straße & Haus\n12345 Ort', amount: 250,
+    itemDescription: '<Laptop>', itemCondition: 'gebraucht',
+    itemOrigin: 'BETRIEB', valuationMethod: 'Kaufbeleg',
+    donationDate: '2026-09-28', receiptDate: '2026-09-28',
+    purpose: 'Jugendförderung', orgName: 'Verein', orgAddress: 'Ort'
+  })
+  expect(html).not.toContain('<script>')
+  expect(html).toContain('&lt;script&gt;')
+  expect(html).toContain('Straße &amp; Haus<br/>12345 Ort')
+  expect(html).toContain('Bestätigung über Sachzuwendungen')
+  expect(html).toContain('&lt;Laptop&gt;')
+  expect(html).toContain('Betriebsvermögen')
+  expect(html).toContain('Grundlage der Wertermittlung: Kaufbeleg')
+})

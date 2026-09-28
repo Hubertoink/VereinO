@@ -1,3 +1,5 @@
+import { resolveOrganizationBookingView } from './organizationBookingView'
+import { markOrganizationReady } from '../utils/organizationTransition'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { isValidTheme, type ColorTheme } from './uiTheme'
 import { addDataChangedListener } from '../utils/refresh'
@@ -125,6 +127,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   // Load appearance settings from organization on mount
   useEffect(() => {
     const applyAppearance = (appearance: any) => {
+      setBookingViewState(appearance?.bookingView === 'plus' ? 'plus' : 'classic')
       // Apply color theme
       if (isValidTheme(appearance?.colorTheme)) {
         setColorThemeState(appearance.colorTheme)
@@ -166,7 +169,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
           // Get saved appearance for this org
           const appearance = await (window as any).api?.organizations?.activeAppearance?.()
           if (appearance) {
-            applyAppearance(appearance)
+            const bookingView = resolveOrganizationBookingView(orgId, appearance.bookingView, localStorage)
+            if (appearance.bookingView !== bookingView) {
+              await window.api.organizations.setAppearance({ orgId, bookingView })
+            }
+            applyAppearance({ ...appearance, bookingView })
             appearanceInitializedRef.current = true
             return
           }
@@ -206,7 +213,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         appearanceInitializedRef.current = true
       }
     }
-    loadOrgAppearance()
+    void loadOrgAppearance().finally(() => markOrganizationReady('appearance'))
 
     const off = (window as any).api?.organizations?.onSwitched?.(async (org: { id: string }) => {
       try {
@@ -225,7 +232,7 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
 
   // Helper to save appearance to organization
-  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; backgroundImageVisibility?: number; customBackgroundImage?: string | null; glassModals?: boolean }) => {
+  const saveAppearanceToOrg = (updates: { colorTheme?: string; backgroundImage?: string; backgroundImageVisibility?: number; customBackgroundImage?: string | null; glassModals?: boolean; bookingView?: 'classic' | 'plus' }) => {
     if (currentOrgId && appearanceInitializedRef.current) {
       ;(window as any).api?.organizations?.setAppearance?.({ orgId: currentOrgId, ...updates }).catch(() => {})
     }
@@ -323,8 +330,11 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'compact' ? 'compact' : 'normal'
   })
 
-  const [bookingView, setBookingView] = useState<'classic' | 'plus'>(() => localStorage.getItem('ui.bookingView') === 'plus' ? 'plus' : 'classic')
-  useEffect(() => { safeLocalStorageSet('ui.bookingView', bookingView) }, [bookingView])
+  const [bookingView, setBookingViewState] = useState<'classic' | 'plus'>('classic')
+  const setBookingView = (value: 'classic' | 'plus') => {
+    setBookingViewState(value)
+    saveAppearanceToOrg({ bookingView: value })
+  }
 
   const [showBookingDraftTabs, setShowBookingDraftTabs] = useState<boolean>(() => {
     const stored = localStorage.getItem('ui.showBookingDraftTabs')

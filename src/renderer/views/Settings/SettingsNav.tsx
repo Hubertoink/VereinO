@@ -248,9 +248,12 @@ const GROUPS: SettingsGroup[] = [
 ]
 
 export function SettingsNav({ active, onSelect, organizationProfile }: SettingsNavProps) {
-  const groups = React.useMemo(() => organizationProfile === 'NONPROFIT'
-    ? GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => item.key !== 'categories') }))
-    : GROUPS, [organizationProfile])
+  const groups = React.useMemo(() => GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => organizationProfile === 'NONPROFIT'
+      ? item.key !== 'categories'
+      : item.key !== 'donations')
+  })), [organizationProfile])
   const activeGroupKey =
     groups.find((group) => group.items.some((item) => item.key === active))?.key ?? groups[0].key
 

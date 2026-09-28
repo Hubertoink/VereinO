@@ -1,3 +1,4 @@
+import { switchOrganizationWithTransition } from '../../utils/organizationTransition'
 import React, { useEffect, useRef, useState } from 'react'
 import { IconBuilding, IconChevronDown, IconChevronUp, IconPlus } from '@tabler/icons-react'
 import NewOrgModal from '../modals/NewOrgModal'
@@ -76,10 +77,7 @@ export default function OrgSwitcher({ notify }: OrgSwitcherProps) {
     setSwitching(true)
     setIsOpen(false)
     try {
-      await (window as any).api?.organizations?.switch?.({ orgId: org.id })
-      notify?.('info', `Wechsle zu "${org.name}"…`)
-      // Reload the window to reinitialize with new database
-      setTimeout(() => window.location.reload(), 500)
+      await switchOrganizationWithTransition(org)
     } catch (e: any) {
       notify?.('error', e?.message || 'Wechsel fehlgeschlagen')
       setSwitching(false)

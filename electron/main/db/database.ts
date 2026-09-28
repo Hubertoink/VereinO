@@ -54,6 +54,7 @@ type AppConfig = {
         backgroundImageVisibility?: number
         customBackgroundImage?: string
         glassModals?: boolean
+        bookingView?: 'classic' | 'plus'
     }>
 }
 function getConfigPath() {
@@ -404,7 +405,7 @@ export async function deleteOrganization(orgId: string, deleteData: boolean = fa
 /**
  * Get the appearance settings for a specific organization
  */
-export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; backgroundImageVisibility: number | null; customBackgroundImage: string | null; glassModals: boolean } {
+export function getOrganizationAppearance(orgId: string): { colorTheme: string | null; backgroundImage: string | null; backgroundImageVisibility: number | null; customBackgroundImage: string | null; glassModals: boolean; bookingView: 'classic' | 'plus' | null } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const org = orgs.find(o => o.id === orgId)
@@ -413,7 +414,8 @@ export function getOrganizationAppearance(orgId: string): { colorTheme: string |
         backgroundImage: org?.backgroundImage || null,
         backgroundImageVisibility: org?.backgroundImageVisibility ?? null,
         customBackgroundImage: org?.customBackgroundImage || null,
-        glassModals: org?.glassModals ?? false
+        glassModals: org?.glassModals ?? false,
+        bookingView: org?.bookingView ?? null
     }
 }
 
@@ -422,8 +424,11 @@ export function getOrganizationAppearance(orgId: string): { colorTheme: string |
  */
 export function setOrganizationAppearance(
     orgId: string,
-    appearance: { colorTheme?: string; backgroundImage?: string; backgroundImageVisibility?: number; customBackgroundImage?: string | null; glassModals?: boolean }
+    appearance: { colorTheme?: string; backgroundImage?: string; backgroundImageVisibility?: number; customBackgroundImage?: string | null; glassModals?: boolean; bookingView?: 'classic' | 'plus' }
 ): { success: boolean } {
+    if (appearance.bookingView !== undefined && appearance.bookingView !== 'classic' && appearance.bookingView !== 'plus') {
+        throw new Error('Ungültige Buchungsansicht')
+    }
     const cfg = readAppConfig()
     let orgs = cfg.organizations || []
 
@@ -458,7 +463,8 @@ export function setOrganizationAppearance(
                 backgroundImage: appearance.backgroundImage,
                 backgroundImageVisibility: appearance.backgroundImageVisibility,
                 customBackgroundImage: appearance.customBackgroundImage === undefined ? undefined : (appearance.customBackgroundImage ?? undefined),
-                glassModals: appearance.glassModals
+                glassModals: appearance.glassModals,
+                bookingView: appearance.bookingView
             })
         } else {
             throw new Error('Organisation nicht gefunden')
@@ -472,7 +478,8 @@ export function setOrganizationAppearance(
             ...(appearance.backgroundImage !== undefined && { backgroundImage: appearance.backgroundImage }),
             ...(appearance.backgroundImageVisibility !== undefined && { backgroundImageVisibility: appearance.backgroundImageVisibility }),
             ...(appearance.customBackgroundImage !== undefined && { customBackgroundImage: appearance.customBackgroundImage ?? undefined }),
-            ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals })
+            ...(appearance.glassModals !== undefined && { glassModals: appearance.glassModals }),
+            ...(appearance.bookingView !== undefined && { bookingView: appearance.bookingView })
         }
     }
 
@@ -483,14 +490,14 @@ export function setOrganizationAppearance(
 /**
  * Get the appearance settings (theme, background, glass) of the currently active organization
  */
-export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; backgroundImageVisibility: number | null; customBackgroundImage: string | null; glassModals: boolean } {
+export function getActiveOrganizationAppearance(): { colorTheme: string | null; backgroundImage: string | null; backgroundImageVisibility: number | null; customBackgroundImage: string | null; glassModals: boolean; bookingView: 'classic' | 'plus' | null } {
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
     const activeId = cfg.activeOrgId
 
     // If orgs array is empty, return defaults
     if (orgs.length === 0) {
-        return { colorTheme: null, backgroundImage: null, backgroundImageVisibility: null, customBackgroundImage: null, glassModals: false }
+        return { colorTheme: null, backgroundImage: null, backgroundImageVisibility: null, customBackgroundImage: null, glassModals: false, bookingView: null }
     }
 
     // Find active org
@@ -500,6 +507,7 @@ export function getActiveOrganizationAppearance(): { colorTheme: string | null; 
         backgroundImage: activeOrg?.backgroundImage || null,
         backgroundImageVisibility: activeOrg?.backgroundImageVisibility ?? null,
         customBackgroundImage: activeOrg?.customBackgroundImage || null,
-        glassModals: activeOrg?.glassModals ?? false
+        glassModals: activeOrg?.glassModals ?? false,
+        bookingView: activeOrg?.bookingView ?? null
     }
 }

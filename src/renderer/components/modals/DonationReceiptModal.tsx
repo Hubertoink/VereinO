@@ -1,5 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
+import { buildDonationReceiptHtml } from '../../../../shared/donationReceiptTemplate'
+import DonationReceiptPreview from './DonationReceiptPreview'
 
 export interface DonationReceiptDraft {
   id: string
@@ -70,25 +72,25 @@ function createEmptyDraft(defaults: DonationReceiptDefaults): DonationReceiptDra
   }
 }
 
-const RECEIPT_TABS: { key: DonationReceiptDraft['receiptType']; label: string; icon: string; description: string }[] = [
-  { key: 'MONEY', label: 'Geldzuwendung', icon: '💶', description: '§ 10b EStG · Anlage 3' },
-  { key: 'IN_KIND', label: 'Sachzuwendung', icon: '📦', description: '§ 10b EStG · Anlage 3' }
-]
-
 const OFFICIAL_TEMPLATE_URL = 'https://ao.bundesfinanzministerium.de/esth/2019/C-Anhaenge/Anhang-37/I/inhalt.html'
 
 export default function DonationReceiptModal({ notify, defaults, initialDraft, onClose, onSaveDraft }: DonationReceiptModalProps) {
   const [draft, setDraft] = React.useState<DonationReceiptDraft>(() => initialDraft || createEmptyDraft(defaults))
   const [busy, setBusy] = React.useState(false)
+  const [submitted, setSubmitted] = React.useState(false)
+  const formRef = React.useRef<HTMLDivElement>(null)
   const [infoModal, setInfoModal] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape' && !busy) onClose()
+      if (ev.key === 'Escape' && !busy) {
+        if (infoModal) setInfoModal(null)
+        else onClose()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onClose])
+  }, [busy, onClose, infoModal])
 
   function update<K extends keyof DonationReceiptDraft>(key: K, value: DonationReceiptDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }))
@@ -102,26 +104,52 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
     }
   }
 
-  function validate(): string | null {
-    if (!draft.donorName.trim()) return 'Name des Zuwendenden fehlt'
-    if (!draft.donorAddress.trim()) return 'Anschrift des Zuwendenden fehlt'
-    if (!draft.donationDate) return 'Tag der Zuwendung fehlt'
-    if (!draft.purpose.trim()) return 'Begünstigter Zweck fehlt'
-    if (!(Number(draft.amount) > 0)) {
-      return draft.receiptType === 'IN_KIND' ? 'Wert der Sachspende muss größer als 0 sein' : 'Betrag muss größer als 0 sein'
-    }
-    if (draft.receiptType === 'IN_KIND' && !draft.itemDescription.trim()) return 'Bezeichnung der Sachspende fehlt'
-    if (draft.receiptType === 'IN_KIND' && !draft.itemCondition.trim()) return 'Zustand der Sachspende fehlt'
-    if (draft.receiptType === 'IN_KIND' && !draft.valuationMethod.trim()) return 'Grundlage der Wertermittlung fehlt'
-    return null
+  const errors: Partial<Record<keyof DonationReceiptDraft, string>> = {}
+  for (const [key, message] of Object.entries({
+    donorName: 'Bitte den Namen des Zuwendenden eingeben.',
+    donorAddress: 'Bitte die Anschrift des Zuwendenden eingeben.',
+    donationDate: 'Bitte den Tag der Zuwendung angeben.',
+    purpose: 'Bitte den begünstigten Zweck eingeben.',
+    receiptDate: 'Bitte das Ausstellungsdatum angeben.',
+    place: 'Bitte den Ort der Ausstellung eingeben.',
+    signerName: 'Bitte den Unterzeichner eingeben.',
+    ...(draft.receiptType === 'IN_KIND' ? {
+      itemDescription: 'Bitte die Sachzuwendung bezeichnen.',
+      itemCondition: 'Bitte den Zustand angeben.',
+      valuationMethod: 'Bitte die Grundlage der Wertermittlung angeben.'
+    } : {})
+  })) {
+    if (!String(draft[key as keyof DonationReceiptDraft] || '').trim()) errors[key as keyof DonationReceiptDraft] = message
+  }
+  if (!Number.isFinite(draft.amount) || draft.amount <= 0) errors.amount = 'Bitte einen Betrag größer als 0 eingeben.'
+
+  function fieldProps(key: keyof DonationReceiptDraft) {
+    return { id: `donation-${key}`, 'aria-required': true,
+      'aria-invalid': submitted && !!errors[key],
+      'aria-describedby': submitted && errors[key] ? `donation-${key}-error` : undefined }
+  }
+  function fieldError(key: keyof DonationReceiptDraft) {
+    return submitted && errors[key] ? <div className="helper donations-field-error" id={`donation-${key}-error`}>{errors[key]}</div> : null
+  }
+  function validate() {
+    setSubmitted(true)
+    if (!Object.keys(errors).length) return true
+    requestAnimationFrame(() => {
+      const first = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+      first?.focus()
+      first?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+    return false
   }
 
+  const payload = React.useMemo(() => ({
+    ...draft, ...defaults, cashier: draft.signerName.trim(),
+    orgLogoDataUrl: defaults.orgLogoDataUrl || undefined
+  }), [draft, defaults])
+  const previewHtml = React.useMemo(() => buildDonationReceiptHtml(payload), [payload])
+
   async function saveDraft() {
-    const err = validate()
-    if (err) {
-      notify('error', err)
-      return
-    }
+    if (busy || !validate()) return
     setBusy(true)
     try {
       await onSaveDraft({ ...draft, amount: Number(draft.amount) })
@@ -134,24 +162,9 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
   }
 
   async function exportPdf() {
-    const err = validate()
-    if (err) {
-      notify('error', err)
-      return
-    }
+    if (busy || !validate()) return
     setBusy(true)
     try {
-      const payload = {
-        ...draft,
-        amount: Number(draft.amount),
-        orgName: defaults.orgName,
-        orgAddress: defaults.orgAddress,
-        cashier: draft.signerName.trim(),
-        orgLogoDataUrl: defaults.orgLogoDataUrl || undefined,
-        taxOffice: defaults.taxOffice,
-        taxNumber: defaults.taxNumber,
-        exemptionNoticeDate: defaults.exemptionNoticeDate
-      }
       const res = await window.api?.donations?.exportMoneyReceipt(payload)
       if (res?.filePath) {
         notify('success', `PDF erstellt: ${res.filePath}`)
@@ -194,66 +207,66 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
   }
 
   return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="donations-title" onClick={() => { if (!busy) onClose() }}>
       <div className="modal modal-wide donations-modal" onClick={(e) => e.stopPropagation()}>
         <div className="donations-modal-sticky">
           <div className="modal-header">
             <div>
-              <h2>Spendenbescheinigung anlegen</h2>
+              <div className="donations-title-row">
+                <h2 id="donations-title">Spendenbescheinigung anlegen</h2>
+                <div className="donations-type-select">
+                  <select id="donation-receipt-type" aria-label="Art der Zuwendung" className="input" value={draft.receiptType}
+                    disabled={busy} onChange={(event) => update('receiptType', event.target.value as DonationReceiptDraft['receiptType'])}>
+                    <option value="MONEY">Geldzuwendung</option>
+                    <option value="IN_KIND">Sachzuwendung</option>
+                  </select>
+                </div>
+              </div>
               <div className="helper donations-template-helper">Für gemeinnützige Vereine nach Anlage 3 der amtlichen Muster.</div>
             </div>
             <div className="flex gap-8">
-              <button type="button" className="btn ghost donations-template-link" onClick={() => { void openOfficialTemplate() }}>
+              <button type="button" className="btn ghost donations-template-link" title="Offizielle Muster im Browser öffnen" aria-label="Offizielle Muster (externer Link)" onClick={() => { void openOfficialTemplate() }}>
                 Offizielle Muster
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M15 3h6v6M10 14 21 3" />
+                  <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+                </svg>
               </button>
-              <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
+              <button className="btn ghost" onClick={onClose} disabled={busy} aria-label="Schließen">✕</button>
             </div>
           </div>
 
-          <div className="donations-type-tabs" role="tablist">
-            {RECEIPT_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={draft.receiptType === tab.key}
-                className={`donations-type-tab${draft.receiptType === tab.key ? ' active' : ''}`}
-                onClick={() => update('receiptType', tab.key)}
-              >
-                <span className="donations-type-tab-icon">{tab.icon}</span>
-                <span className="donations-type-tab-text">
-                  <span className="donations-type-tab-label">{tab.label}</span>
-                  <span className="donations-type-tab-desc">{tab.description}</span>
-                </span>
-              </button>
-            ))}
-          </div>
         </div>
-
-        <div className="donations-modal-body">
+        <div className="donations-workspace">
+        <div className="donations-modal-body" ref={formRef}>
           <section className="card donations-modal-section">
-            <strong>1) Zuwendender</strong>
+            <h3 className="donations-section-title"><span>1</span>Zuwendender</h3>
             <div className="row">
               <div className="field">
-                <label>Name</label>
-                <input className="input" value={draft.donorName} onChange={(e) => update('donorName', e.target.value)} title="Name des Zuwendenden" placeholder="Vorname Nachname" />
+                <label htmlFor="donation-donorName">Name <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('donorName')} value={draft.donorName} onChange={(e) => update('donorName', e.target.value)} title="Name des Zuwendenden" placeholder="Vorname Nachname" />
+                {fieldError('donorName')}
               </div>
               <div className="field">
-                <label>Anschrift</label>
-                <textarea className="input" rows={2} value={draft.donorAddress} onChange={(e) => update('donorAddress', e.target.value)} title="Anschrift des Zuwendenden" placeholder={'Straße Hausnummer\nPLZ Ort'} />
+                <label htmlFor="donation-donorAddress">Anschrift <span className="donations-required" aria-hidden="true">*</span></label>
+                <textarea className="input" {...fieldProps('donorAddress')} rows={2} value={draft.donorAddress} onChange={(e) => update('donorAddress', e.target.value)} title="Anschrift des Zuwendenden" placeholder={'Straße Hausnummer\nPLZ Ort'} />
+                {fieldError('donorAddress')}
               </div>
             </div>
           </section>
 
           <section className="card donations-modal-section">
-            <strong>2) {isMoney ? 'Geldzuwendung' : 'Sachzuwendung'}</strong>
+            <h3 className="donations-section-title"><span>2</span>{isMoney ? 'Geldzuwendung' : 'Sachzuwendung'}</h3>
             <div className="row">
               <div className="field">
-                <label>{isMoney ? 'Betrag (EUR)' : 'Wert der Sachzuwendung (EUR)'}</label>
-                <input className="input" type="number" min={0} step="0.01" value={String(draft.amount || '')} onChange={(e) => update('amount', Number(e.target.value))} title="Betrag in Euro" placeholder="0,00" />
+                <label htmlFor="donation-amount">{isMoney ? 'Betrag (EUR)' : 'Wert der Sachzuwendung (EUR)'} <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('amount')} type="number" min={0} step="0.01" value={String(draft.amount || '')} onChange={(e) => update('amount', Number(e.target.value))} title="Betrag in Euro" placeholder="0,00" />
+                {fieldError('amount')}
               </div>
               <div className="field">
-                <label>Tag der Zuwendung</label>
-                <input className="input" type="date" value={draft.donationDate} onChange={(e) => update('donationDate', e.target.value)} title="Tag der Zuwendung" />
+                <label htmlFor="donation-donationDate">Tag der Zuwendung <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('donationDate')} type="date" value={draft.donationDate} onChange={(e) => update('donationDate', e.target.value)} title="Tag der Zuwendung" />
+                {fieldError('donationDate')}
               </div>
             </div>
 
@@ -261,12 +274,14 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
               <>
                 <div className="row">
                   <div className="field">
-                    <label>Bezeichnung der Sachzuwendung</label>
-                    <input className="input" value={draft.itemDescription} onChange={(e) => update('itemDescription', e.target.value)} title="Bezeichnung der Sachzuwendung" placeholder="z. B. 1 Laptop, gebraucht" />
+                    <label htmlFor="donation-itemDescription">Bezeichnung der Sachzuwendung <span className="donations-required" aria-hidden="true">*</span></label>
+                    <input className="input" {...fieldProps('itemDescription')} value={draft.itemDescription} onChange={(e) => update('itemDescription', e.target.value)} title="Bezeichnung der Sachzuwendung" placeholder="z. B. 1 Laptop, gebraucht" />
+                {fieldError('itemDescription')}
                   </div>
                   <div className="field">
-                    <label>Zustand</label>
-                    <input className="input" value={draft.itemCondition} onChange={(e) => update('itemCondition', e.target.value)} title="Zustand der Sachzuwendung" placeholder="z. B. gebraucht, funktionsfähig" />
+                    <label htmlFor="donation-itemCondition">Zustand <span className="donations-required" aria-hidden="true">*</span></label>
+                    <input className="input" {...fieldProps('itemCondition')} value={draft.itemCondition} onChange={(e) => update('itemCondition', e.target.value)} title="Zustand der Sachzuwendung" placeholder="z. B. gebraucht, funktionsfähig" />
+                {fieldError('itemCondition')}
                   </div>
                 </div>
                 <div className="row">
@@ -279,8 +294,9 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
                     </select>
                   </div>
                   <div className="field">
-                    <label>Grundlage der Wertermittlung</label>
-                    <input className="input" value={draft.valuationMethod} onChange={(e) => update('valuationMethod', e.target.value)} title="Grundlage der Wertermittlung" placeholder="z. B. Kaufbeleg vom 12.01.2025" />
+                    <label htmlFor="donation-valuationMethod">Grundlage der Wertermittlung <span className="donations-required" aria-hidden="true">*</span></label>
+                    <input className="input" {...fieldProps('valuationMethod')} value={draft.valuationMethod} onChange={(e) => update('valuationMethod', e.target.value)} title="Grundlage der Wertermittlung" placeholder="z. B. Kaufbeleg vom 12.01.2025" />
+                {fieldError('valuationMethod')}
                   </div>
                 </div>
               </>
@@ -288,18 +304,20 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
 
             <div className="row">
               <div className="field">
-                <label>Begünstigter Zweck</label>
-                <input className="input" value={draft.purpose} onChange={(e) => update('purpose', e.target.value)} title="Begünstigter Zweck" placeholder="z. B. Jugendförderung" />
+                <label htmlFor="donation-purpose">Begünstigter Zweck <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('purpose')} value={draft.purpose} onChange={(e) => update('purpose', e.target.value)} title="Begünstigter Zweck" placeholder="z. B. Jugendförderung" />
+                {fieldError('purpose')}
               </div>
               <div className="field">
-                <label>Ausstellungsdatum</label>
-                <input className="input" type="date" value={draft.receiptDate} onChange={(e) => update('receiptDate', e.target.value)} title="Ausstellungsdatum" />
+                <label htmlFor="donation-receiptDate">Ausstellungsdatum <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('receiptDate')} type="date" value={draft.receiptDate} onChange={(e) => update('receiptDate', e.target.value)} title="Ausstellungsdatum" />
+                {fieldError('receiptDate')}
               </div>
             </div>
           </section>
 
           <section className="card donations-modal-section">
-            <strong>3) Verwendung / steuerbegünstigter Zweck</strong>
+            <h3 className="donations-section-title"><span>3</span>Verwendung / steuerbegünstigter Zweck</h3>
             <div className="helper">Die Angaben spiegeln den steuerbegünstigten Zweck und den Nachweis der Gemeinnützigkeit gemäß Anlage 3 wider.</div>
             <div className="donations-checks-grid donations-checks-grid-2col">
               <label className="donations-check donations-check-box">
@@ -360,21 +378,26 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
           </section>
 
           <section className="card donations-modal-section">
-            <strong>4) Ort / Unterschrift</strong>
+            <h3 className="donations-section-title"><span>4</span>Ort / Unterschrift</h3>
             <div className="row">
               <div className="field">
-                <label>Ort</label>
-                <input className="input" value={draft.place} onChange={(e) => update('place', e.target.value)} title="Ort der Ausstellung" placeholder="z. B. München" />
+                <label htmlFor="donation-place">Ort <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('place')} value={draft.place} onChange={(e) => update('place', e.target.value)} title="Ort der Ausstellung" placeholder="z. B. München" />
+                {fieldError('place')}
               </div>
               <div className="field">
-                <label>Unterzeichner (aus Organisation)</label>
-                <input className="input" value={draft.signerName} onChange={(e) => update('signerName', e.target.value)} title="Unterzeichner" placeholder="Kassierer" />
+                <label htmlFor="donation-signerName">Unterzeichner (aus Organisation) <span className="donations-required" aria-hidden="true">*</span></label>
+                <input className="input" {...fieldProps('signerName')} value={draft.signerName} onChange={(e) => update('signerName', e.target.value)} title="Unterzeichner" placeholder="Kassierer" />
+                {fieldError('signerName')}
               </div>
             </div>
           </section>
 
-          <div className="modal-actions-between">
-            <div className="helper">Pflichttexte werden gesetzeskonform fest im PDF eingefügt.</div>
+        </div>
+        <DonationReceiptPreview html={previewHtml} />
+        </div>
+          <div className="modal-actions-between donations-footer">
+            <div className="helper">* Pflichtfelder · Die Vorschau verwendet die PDF-Vorlage.</div>
             <div className="flex gap-8">
               <button className="btn" onClick={saveDraft} disabled={busy}>Entwurf speichern</button>
               <button className="btn primary" onClick={exportPdf} disabled={busy}>
@@ -383,7 +406,6 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
               </button>
             </div>
           </div>
-        </div>
       </div>
     </div>,
     document.body

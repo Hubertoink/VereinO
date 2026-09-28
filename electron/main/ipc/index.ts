@@ -403,6 +403,7 @@ import { listRecentAudit } from '../repositories/audit'
 import {
   createGeneralClassificationValue,
   getOrganizationProfile,
+  canChangeOrganizationProfile,
   getOrganizationProfileDefinition,
   getPrimaryClassificationScheme,
   listPrimaryClassificationValues,
@@ -3945,6 +3946,7 @@ ${reportAnalyticsCss}
   ipcMain.handle('classifications.primary.list', async () => {
     return {
       profile: getOrganizationProfile(),
+      canChangeProfile: canChangeOrganizationProfile(),
       definition: getOrganizationProfileDefinition(),
       scheme: getPrimaryClassificationScheme(),
       values: listPrimaryClassificationValues({ includeInactive: true })
@@ -4113,6 +4115,7 @@ ${reportAnalyticsCss}
         backgroundImageVisibility?: number
         customBackgroundImage?: string | null
         glassModals?: boolean
+        bookingView?: 'classic' | 'plus'
       }
     ) => {
       if (!payload?.orgId) throw new Error('orgId ist erforderlich')
@@ -4121,7 +4124,8 @@ ${reportAnalyticsCss}
         backgroundImage: payload.backgroundImage,
         backgroundImageVisibility: payload.backgroundImageVisibility,
         customBackgroundImage: payload.customBackgroundImage,
-        glassModals: payload.glassModals
+        glassModals: payload.glassModals,
+        bookingView: payload.bookingView
       })
     }
   )

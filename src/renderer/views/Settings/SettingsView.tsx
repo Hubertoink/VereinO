@@ -67,7 +67,8 @@ export function SettingsView(props: SettingsProps) {
   const [orgLogo, setOrgLogo] = useState<string>('')
 
   useEffect(() => {
-    if (props.organizationProfile === 'NONPROFIT' && activeTile === 'categories') {
+    if ((props.organizationProfile === 'NONPROFIT' && activeTile === 'categories')
+      || (props.organizationProfile !== 'NONPROFIT' && activeTile === 'donations')) {
       setActiveTile('org')
     }
   }, [activeTile, props.organizationProfile])
@@ -190,7 +191,7 @@ export function SettingsView(props: SettingsProps) {
 
       {activeTile === 'categories' && <CategoriesPane notify={props.notify} />}
 
-      {activeTile === 'donations' && <DonationsPane notify={props.notify} />}
+      {activeTile === 'donations' && props.organizationProfile === 'NONPROFIT' && <DonationsPane notify={props.notify} />}
 
       {activeTile === 'paymentAccounts' && (
         <PaymentAccountsPane

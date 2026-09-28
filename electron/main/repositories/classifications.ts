@@ -161,6 +161,10 @@ function hasFinancialData(d: DB) {
   })
 }
 
+export function canChangeOrganizationProfile(): boolean {
+  return !hasFinancialData(getDb())
+}
+
 /**
  * A profile is a data-model decision, not a visual preference. It can only be
  * changed while the organisation has no financial records.

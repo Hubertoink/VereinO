@@ -1,3 +1,4 @@
+import { markOrganizationReady } from './utils/organizationTransition'
 import { usePageHistory } from './hooks/usePageHistory'
 import { useOverlayScrollLock } from './hooks/useOverlayScrollLock'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1575,6 +1576,7 @@ function AppInner() {
         // Existing installations remain in the established non-profit mode if
         // the profile table cannot be read during startup recovery.
       })
+      .finally(() => { if (alive) markOrganizationReady('profile') })
     return () => { alive = false }
   }, [])
 
@@ -1751,7 +1753,7 @@ function AppInner() {
       }
     }
 
-    void loadVisibleNavItems()
+    void loadVisibleNavItems().finally(() => { if (alive) markOrganizationReady('navigation') })
     const off = window.api?.organizations?.onSwitched?.(() => {
       void loadVisibleNavItems()
     })
@@ -2979,6 +2981,8 @@ function AppInner() {
         if (mode === 'PROMPT' && due) setAutoBackupPrompt({ intervalDays })
       } catch {
         // Individual views keep their own error handling for essential data.
+      } finally {
+        if (!cancelled) markOrganizationReady('bootstrap')
       }
     }
 

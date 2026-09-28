@@ -1,3 +1,4 @@
+import { switchOrganizationWithTransition } from '../../../utils/organizationTransition'
 import React from 'react'
 import { OrgPaneProps } from '../types'
 import ConfirmSwitchOrgModal from '../../../components/modals/ConfirmSwitchOrgModal'
@@ -5,7 +6,7 @@ import NewOrgModal from '../../../components/modals/NewOrgModal'
 import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
 import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
-import { dispatchDataChanged } from '../../../utils/refresh'
+import { addDataChangedListener, dispatchDataChanged } from '../../../utils/refresh'
 import { IconBuilding, IconLayoutList, IconTags } from '@tabler/icons-react'
 
 interface ActiveOrg {
@@ -48,6 +49,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
   const [categoryBusy, setCategoryBusy] = React.useState(false)
   const [editingCategoryId, setEditingCategoryId] = React.useState<number | null>(null)
   const [editingCategoryName, setEditingCategoryName] = React.useState('')
+  const [canChangeProfile, setCanChangeProfile] = React.useState<boolean | null>(null)
   const [profileChangeBusy, setProfileChangeBusy] = React.useState(false)
 
   async function loadTaxCertificate() {
@@ -75,9 +77,11 @@ export function OrgPane({ notify }: OrgPaneProps) {
     try {
       const res = await (window as any).api?.classifications?.primary?.list?.()
       if (!res) return
+      setCanChangeProfile(res.canChangeProfile === true)
       setProfile(res.profile || null)
       setCategories(res.values || [])
     } catch (e: any) {
+      setCanChangeProfile(null)
       console.error('Error loading classifications:', e)
     }
   }
@@ -107,6 +111,11 @@ export function OrgPane({ notify }: OrgPaneProps) {
     return () => { cancelled = true }
   }, [])
 
+  React.useEffect(() => addDataChangedListener(
+    ['vouchers', 'budgets', 'invoices', 'recurring-bookings', 'submissions', 'settings', 'organizations'],
+    () => { void loadPrimaryClassifications() }
+  ), [])
+
   async function saveOrgName() {
     if (!activeOrg || !activeOrgName.trim()) return
     setSavingOrg(true)
@@ -131,9 +140,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
     if (!showConfirmSwitch || switchingOrg) return
     setSwitchingOrg(true)
     try {
-      await (window as any).api?.organizations?.switch?.({ orgId: showConfirmSwitch.id })
-      notify('info', `Wechsle zu "${showConfirmSwitch.name}"...`)
-      setTimeout(() => window.location.reload(), 500)
+      await switchOrganizationWithTransition(showConfirmSwitch)
     } catch (e: any) {
       notify('error', e?.message || 'Wechsel fehlgeschlagen')
       setSwitchingOrg(false)
@@ -219,7 +226,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
   }
 
   async function changeOrganizationProfile(nextProfile: OrganizationProfile) {
-    if (profileChangeBusy || nextProfile === profile) return
+    if (profileChangeBusy || !canChangeProfile || nextProfile === profile) return
     setProfileChangeBusy(true)
     try {
       await (window as any).api?.classifications?.profile?.update?.({ profile: nextProfile })
@@ -228,6 +235,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
     } catch (e: any) {
       notify('error', e?.message || String(e))
       setProfileChangeBusy(false)
+      await loadPrimaryClassifications()
     }
   }
 
@@ -274,12 +282,20 @@ export function OrgPane({ notify }: OrgPaneProps) {
               ? 'Buchungen werden mit frei angelegten Kategorien gegliedert.'
               : 'Buchungen werden mit den vier steuerlichen Sphären gegliedert.'}
           </div>
-          <div className="helper" style={{ marginTop: 4 }}>Das Profil kann nur geändert werden, solange keine Finanzdaten vorhanden sind.</div>
+          <div id="profile-change-hint" className="helper" style={{ marginTop: 4 }}>
+            {canChangeProfile === false
+              ? 'Ein Profilwechsel ist nicht möglich, da bereits Finanzdaten vorhanden sind.'
+              : canChangeProfile === null
+                ? 'Die Verfügbarkeit des Profilwechsels wird geprüft.'
+                : 'Das Profil kann nur geändert werden, solange keine Finanzdaten vorhanden sind.'}
+          </div>
         </div>
         <button
           className="btn"
           type="button"
-          disabled={profileChangeBusy || !profile}
+          disabled={profileChangeBusy || !profile || !canChangeProfile}
+          style={{ opacity: profileChangeBusy || !profile || !canChangeProfile ? 0.5 : 1, cursor: profileChangeBusy || !profile || !canChangeProfile ? 'not-allowed' : undefined }}
+          aria-describedby="profile-change-hint"
           onClick={() => changeOrganizationProfile(profile === 'GENERAL' ? 'NONPROFIT' : 'GENERAL')}
         >
           {profileChangeBusy ? 'Ändere…' : profile === 'GENERAL' ? 'Zu Verein wechseln' : 'Zu Budgetverwaltung wechseln'}

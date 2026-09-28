@@ -7,6 +7,24 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-09-28
+
+### Hinzugefügt
+
+- Spendenbescheinigungen erhalten eine Live-Vorschau auf Basis der PDF-Vorlage neben dem Formular.
+- Ein dezenter Wechselscreen mit Fade verdeckt den Neuaufbau beim Organisationswechsel und berücksichtigt reduzierte Bewegung.
+
+### Geändert
+
+- Geld- und Sachzuwendungen werden über ein Dropdown im Modalkopf ausgewählt. Pflichtfeldhinweise erscheinen direkt am Eingabefeld; der Link zu den offiziellen Mustern ist als externer Link gekennzeichnet.
+- Spendenbescheinigungen werden nur im Profil „Gemeinnützige Organisation“ angeboten.
+- „Buchungen klassisch“ und „Buchungen Plus“ werden pro Organisation gespeichert, auch im Einrichtungsassistenten. Die bisherige globale Auswahl wird einmalig für die aktuell geöffnete Organisation übernommen.
+
+### Behoben
+
+- Der Profilwechsel ist bei vorhandenen Finanzdaten deaktiviert und erklärt den Grund direkt in den Einstellungen.
+- Sonderzeichen in Spendenbescheinigungen werden für Vorschau und PDF korrekt maskiert.
+
 ## [4.5.5] - 2026-09-27
 
 ### Hinzugefügt

@@ -234,7 +234,7 @@ export default function SetupWizardModal({
             await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
 
             // Persist UI preferences
-            try { localStorage.setItem('ui.bookingView', bookingView) } catch {}
+            setBookingView(bookingView)
             try { localStorage.setItem('ui.navLayout', navLayout) } catch {}
             try { localStorage.setItem('ui.navIconColorMode', navIconColorMode) } catch {}
             try { localStorage.setItem('ui.colorTheme', colorTheme) } catch {}

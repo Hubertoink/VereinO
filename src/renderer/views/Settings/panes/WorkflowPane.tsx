@@ -37,7 +37,7 @@ export function WorkflowPane({
                 <button type="button" className={`btn-option ${bookingView === 'classic' ? 'active' : ''}`} aria-pressed={bookingView === 'classic'} onClick={() => setBookingView('classic')}>Buchungen (klassisch)</button>
                 <button type="button" className={`btn-option ${bookingView === 'plus' ? 'active' : ''}`} aria-pressed={bookingView === 'plus'} onClick={() => setBookingView('plus')}>Buchungen Plus</button>
               </div>
-              <div className="helper">{bookingView === 'plus' ? 'Kalender, Filter und Buchungsdetails nebeneinander.' : 'Kompakte Tabelle mit allen Buchungen.'}</div>
+              <div className="helper">{bookingView === 'plus' ? 'Kalender, Filter und Buchungsdetails nebeneinander.' : 'Kompakte Tabelle mit allen Buchungen.'} Die Auswahl gilt nur für diese Organisation.</div>
             </div>
             <label className="settings-toggle-card" htmlFor="toggle-booking-draft-tabs">
               <span className="settings-toggle-card__copy">

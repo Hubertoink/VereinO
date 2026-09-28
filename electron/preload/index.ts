@@ -532,6 +532,7 @@ const rendererApi = {
       backgroundImageVisibility?: number
       customBackgroundImage?: string | null
       glassModals?: boolean
+      bookingView?: 'classic' | 'plus'
     }) => invoke('organizations.setAppearance', payload),
     activeAppearance: () => invoke('organizations.activeAppearance'),
     onSwitched: (cb: (org: { id: string; name: string; dbRoot: string }) => void) => {
