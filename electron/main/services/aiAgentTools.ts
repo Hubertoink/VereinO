@@ -894,7 +894,8 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
             interval,
             periodKey: args.periodKey || undefined,
             memberId: args.memberId || undefined,
-            includePaid: !!args.includePaid
+            includePaid: !!args.includePaid,
+            dueThroughToday: !args.periodKey
           } as any)
           return result.rows || []
         }).slice(0, limitNumber(args.limit, 120, 300))

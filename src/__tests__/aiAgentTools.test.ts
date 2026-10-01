@@ -156,6 +156,15 @@ jest.mock('../../electron/main/repositories/vouchers', () => ({
 import { createAiAgentTools } from '../../electron/main/services/aiAgentTools'
 
 describe('createAiAgentTools', () => {
+  it('requests all due periods unless a specific period is requested', async () => {
+    const payments = jest.requireMock('../../electron/main/repositories/members_payments')
+    const tool = createAiAgentTools({ context: {} as any }).find(item => item.name === 'payments_due')!
+    await tool.run({ interval: 'MONTHLY', memberId: 7 })
+    expect(payments.listDue).toHaveBeenLastCalledWith(expect.objectContaining({ dueThroughToday: true, memberId: 7 }))
+    await tool.run({ interval: 'MONTHLY', periodKey: '2026-09' })
+    expect(payments.listDue).toHaveBeenLastCalledWith(expect.objectContaining({ dueThroughToday: false, periodKey: '2026-09' }))
+  })
+
   it('prepares a business partner review draft instead of a booking', async () => {
     const tools = createAiAgentTools({ context: {} as any })
     const tool = tools.find((item) => item.name === 'party_change_draft_prepare')

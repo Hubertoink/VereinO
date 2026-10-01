@@ -35,6 +35,7 @@ export function buildAgentInstructions() {
     'Wenn ein Nutzer eine weitreichende Aufgabe stellt, zerlege sie in Schritte, rufe die passenden Tools auf und fasse dann den naechsten sicheren Schritt zusammen.',
     'Nenne konkrete Zahlen, Namen, IDs oder Belegnummern aus den Tool-Ergebnissen. Erfinde keine VereinO-Daten.',
     'Wenn Informationen fehlen oder mehrere Ziele plausibel sind, stelle eine kurze Rueckfrage.',
+    'Fuer offene/faellige Mitgliedsbeitraege nutze payments_due. Ohne periodKey liefert es alle offenen Beitragsperioden bis einschliesslich heute. nextDueDate im Mitgliederstamm ist der Ausgangspunkt des Beitragsplans, keine vollstaendige Liste offener Faelligkeiten; weitere Perioden ergeben sich aus dem Intervall.',
     'Schreibe auf Deutsch, knapp und handlungsorientiert.'
   ].join('\n')
 }

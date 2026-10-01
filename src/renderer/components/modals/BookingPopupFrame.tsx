@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconX } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
@@ -41,6 +41,7 @@ export default function BookingPopupFrame({
   children
 }: BookingPopupFrameProps) {
   const compact = variant === 'compact'
+  const modalRef = useRef<HTMLDivElement>(null)
   const [anchorStyle, setAnchorStyle] = useState<React.CSSProperties | undefined>()
   const modalClassName = compact
     ? `modal compact-booking-flyout compact-booking-popup ${className}`
@@ -56,17 +57,29 @@ export default function BookingPopupFrame({
       : null
     const rect = anchorRect || trigger?.getBoundingClientRect()
     if (!rect || (!rect.width && !rect.height && !rect.right && !rect.bottom)) return
-    const gap = 8
-    const width = Math.min(560, window.innerWidth - 32)
-    const preferredLeft = anchorAlign === 'end' ? rect.right - width : rect.left
-    const left = Math.max(12, Math.min(preferredLeft, window.innerWidth - width - 12))
-    const spaceBelow = window.innerHeight - rect.bottom - gap - 12
-    const spaceAbove = rect.top - gap - 12
-    const opensDown = spaceBelow >= spaceAbove
-    const maxHeight = Math.max(220, Math.min(690, opensDown ? spaceBelow : spaceAbove))
-    setAnchorStyle(opensDown
-      ? { position: 'fixed', left, top: Math.max(12, rect.bottom + gap), maxHeight, margin: 0 }
-      : { position: 'fixed', left, bottom: Math.max(12, window.innerHeight - rect.top + gap), maxHeight, margin: 0 })
+    const updatePosition = () => {
+      const currentRect = anchorRect || trigger?.getBoundingClientRect() || rect
+      const gap = 8
+      // Specialised forms can override the popup width in CSS.
+      const width = modalRef.current?.offsetWidth || Math.min(560, window.innerWidth - 32)
+      const preferredLeft = anchorAlign === 'end' ? currentRect.right - width : currentRect.left
+      const left = Math.max(12, Math.min(preferredLeft, window.innerWidth - width - 12))
+      const spaceBelow = window.innerHeight - currentRect.bottom - gap - 12
+      const spaceAbove = currentRect.top - gap - 12
+      const opensDown = spaceBelow >= spaceAbove
+      const maxHeight = Math.max(220, Math.min(690, opensDown ? spaceBelow : spaceAbove))
+      setAnchorStyle(opensDown
+        ? { position: 'fixed', left, top: Math.max(12, currentRect.bottom + gap), maxHeight, margin: 0 }
+        : { position: 'fixed', left, bottom: Math.max(12, window.innerHeight - currentRect.top + gap), maxHeight, margin: 0 })
+    }
+    updatePosition()
+    const observer = new ResizeObserver(updatePosition)
+    if (modalRef.current) observer.observe(modalRef.current)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updatePosition)
+    }
   }, [anchorAlign, anchorRect, anchorToTrigger, compact])
 
   return createPortal(
@@ -79,7 +92,7 @@ export default function BookingPopupFrame({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className={modalClassName.trim()} style={compact ? anchorStyle : undefined} onClick={(event) => event.stopPropagation()}>
+      <div ref={modalRef} className={modalClassName.trim()} style={compact ? anchorStyle : undefined} onClick={(event) => event.stopPropagation()}>
         {compact ? <>
           <header className="compact-booking-flyout__header">
             <div>

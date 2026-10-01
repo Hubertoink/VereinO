@@ -51,9 +51,9 @@ export function periodRange(periodKey: string, interval: Interval): { start: str
   return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
 }
 
-export function listDue(params: { interval: Interval; periodKey?: string; from?: string; to?: string; q?: string; includePaid?: boolean; memberId?: number }) {
+export function listDue(params: { interval: Interval; periodKey?: string; from?: string; to?: string; q?: string; includePaid?: boolean; memberId?: number; dueThroughToday?: boolean }) {
   const d = getDb()
-  const { interval, periodKey, from, to, q, includePaid, memberId } = params
+  const { interval, periodKey, q, includePaid, memberId } = params
   // Members with contribution configured; status filter: ACTIVE always, PAUSED optional by config, NEW excluded (option C)
   const includePaused = !!getSetting<boolean>('membership.includePaused')
   const statuses = includePaused ? ["'ACTIVE'", "'PAUSED'"] : ["'ACTIVE'"]
@@ -94,6 +94,10 @@ export function listDue(params: { interval: Interval; periodKey?: string; from?:
   const out: any[] = []
   for (const m of members) {
     const intv = (m.interval || interval) as Interval
+    if (intv !== interval) continue
+    const today = new Date().toISOString().slice(0, 10)
+    const from = params.from || (params.dueThroughToday ? (m.nextDue || m.joinDate || `${today.slice(0, 4)}-01-01`) : undefined)
+    const to = params.to || (params.dueThroughToday ? today : undefined)
     if (periodKey) {
       const pk = periodKey
       const paid = d.prepare('SELECT id, voucher_id as voucherId, verified, date_paid as datePaid FROM membership_payments WHERE member_id = ? AND period_key = ?').get(m.id, pk) as any

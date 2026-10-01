@@ -1432,6 +1432,8 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       const result = await window.api.payments.listDue({
         interval,
         memberId: member.id,
+        from: member.next_due_date || member.join_date || `${new Date().getFullYear()}-01-01`,
+        to: new Date().toISOString().slice(0, 10),
         includePaid: false
       })
       rows.push(...(result.rows || []))

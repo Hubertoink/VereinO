@@ -20916,6 +20916,14 @@ textarea {
   gap: 12px !important;
 }
 
+.modal.compact-booking-popup.member-floating-modal {
+  width: min(820px, calc(100vw - 32px));
+}
+
+.member-floating-modal .member-finance-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .member-address-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) 90px minmax(0, 1fr);
@@ -20996,6 +21004,9 @@ textarea {
 }
 
 @media (max-width: 620px) {
+  .member-floating-modal .member-finance-grid {
+    grid-template-columns: 1fr;
+  }
   .member-address-grid,
   .member-finance-grid {
     grid-template-columns: 1fr;

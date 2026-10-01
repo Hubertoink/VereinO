@@ -7,6 +7,13 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.6.1] - 2026-10-01
+
+### Behoben
+
+- Das Mitgliederformular bietet mehr Platz für Datumsfelder und bleibt auch beim Verkleinern des Fensters vollständig sichtbar.
+- Die KI berücksichtigt bei offenen Mitgliedsbeiträgen alle fälligen Perioden bis einschließlich heute statt nur der im Mitgliederstamm hinterlegten Ausgangsperiode.
+
 ## [4.6.0] - 2026-09-28
 
 ### Hinzugefügt
