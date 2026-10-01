@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import { build } from 'esbuild'
 import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 
 let script: string, css: string
 test.beforeAll(async () => {
@@ -45,6 +47,101 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => errors.push(error.message))
   await page.addScriptTag({ content: script })
   expect(errors).toEqual([])
+})
+
+async function checkMemberFinanceHover(page: Page) {
+  await page.getByRole('button', { name: 'Neu', exact: true }).click()
+  const interval = page.locator('#member-contribution-interval')
+  await interval.scrollIntoViewIfNeeded()
+  await page.locator('.member-modal-body').evaluate(el => { el.scrollTop = el.scrollHeight })
+  await page.mouse.move(0, 0)
+  const bounds = () => page.locator('.member-modal-body .card, .member-finance-grid .input').evaluateAll(elements => elements.map(el => {
+    const { x, y, width, height } = el.getBoundingClientRect()
+    return { x, y, width, height }
+  }))
+  await page.waitForTimeout(300)
+  const before = await bounds()
+  const grid = page.locator('.member-modal-body')
+  const screenshotOptions = { mask: [interval.locator('..')], animations: 'disabled' as const }
+  const beforeImage = await grid.screenshot(screenshotOptions)
+  await fs.writeFile(test.info().outputPath('before-hover.png'), beforeImage)
+  await test.info().attach('before-hover', { body: beforeImage, contentType: 'image/png' })
+  for (let i = 0; i < 3; i++) {
+    await interval.hover()
+    expect(await bounds()).toEqual(before)
+    const afterImage = await grid.screenshot(screenshotOptions)
+    await fs.writeFile(test.info().outputPath(`after-hover-${i}.png`), afterImage)
+    await test.info().attach(`after-hover-${i}`, { body: afterImage, contentType: 'image/png' })
+    const changedPixels = await page.evaluate(async ([before, after]) => {
+      const images = await Promise.all([before, after].map(async encoded => {
+        const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
+        const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')!
+        context.drawImage(image, 0, 0)
+        image.close()
+        return context.getImageData(0, 0, canvas.width, canvas.height).data
+      }))
+      let changed = 0
+      for (let pixel = 0; pixel < images[0].length; pixel += 4) {
+        // Ignore tiny antialiasing colour differences; a moved border or text
+        // changes pixel positions and exceeds this per-channel tolerance.
+        if ([0, 1, 2, 3].some(channel => Math.abs(images[0][pixel + channel] - images[1][pixel + channel]) > 3)) changed++
+      }
+      return changed
+    }, [beforeImage.toString('base64'), afterImage.toString('base64')])
+    expect(changedPixels).toBe(0)
+    await page.mouse.move(0, 0)
+    expect(await bounds()).toEqual(before)
+  }
+  await interval.click()
+  await page.getByRole('option', { name: 'Monatlich', exact: true }).click()
+  await expect(interval).toHaveValue('MONTHLY')
+  await interval.click()
+  await expect.poll(() => interval.evaluate(el => el.matches(':open'))).toBe(true)
+  await interval.press('Escape')
+  await expect.poll(() => interval.evaluate(el => el.matches(':open'))).toBe(false)
+  await expect(interval).toBeVisible()
+  await expect(interval).toHaveValue('MONTHLY')
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+}
+
+test('member finance fields stay in place when hovering the interval', async ({ page }) => {
+  await page.setViewportSize({ width: 845, height: 838 })
+  await checkMemberFinanceHover(page)
+})
+
+test('member finance hover and selection remain stable in the installed Electron renderer', async ({}, info) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-member-layout-'))
+  const main = path.join(dir, 'main.cjs')
+  await fs.writeFile(main, `
+    const { app, BrowserWindow } = require('electron')
+    app.whenReady().then(() => {
+      global.window = new BrowserWindow({ width: 960, height: 820 })
+      window.loadURL('data:text/html,<html data-theme="light" data-color-theme="soft-blush"><title>VereinO Layoutprüfung</title><div id="root"></div></html>')
+    })
+    app.on('window-all-closed', () => app.quit())
+  `)
+  const env = { ...process.env }
+  delete env.ELECTRON_RUN_AS_NODE
+  const app = await electron.launch({ args: [main], env })
+  try {
+    const page = await app.firstWindow()
+    await page.addStyleTag({ content: css })
+    await page.addScriptTag({ content: script })
+    for (const zoom of [1, 1.25]) {
+      await app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(value), zoom)
+      await checkMemberFinanceHover(page)
+    }
+    await page.getByRole('button', { name: 'Neu', exact: true }).click()
+    await page.locator('#member-contribution-interval').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: info.outputPath('member-finance-electron.png') })
+  } finally {
+    await app.close()
+    await fs.rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('members show whole-selection KPIs, readable status and contribution interval and refresh after payment', async ({ page }, info) => {

@@ -12781,6 +12781,14 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
   overscroll-behavior: contain;
 }
 
+.compact-booking-popup.member-floating-modal .member-modal-body {
+  /* Keep the scroller on its own compositing layer. At the fractional bottom
+     scroll offset, hover repaints must not resnap the surrounding card borders
+     against the popup's backdrop-filter layer. */
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
 .compact-booking-popup .member-modal-body > .block-grid {
   grid-template-columns: 1fr;
   gap: 8px !important;

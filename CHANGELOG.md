@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.6.2] - 2026-10-01
+
+### Behoben
+
+- Die Kachelrahmen im Mitgliederformular bleiben am unteren Scrollanschlag beim Überfahren der Eingabefelder stabil.
+
 ## [4.6.1] - 2026-10-01
 
 ### Behoben
