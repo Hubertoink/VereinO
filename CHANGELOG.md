@@ -7,6 +7,14 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.6.3] - 2026-10-02
+
+### Behoben
+
+- Der KI-Verlauf bleibt in niedrigen Fenstern vollständig innerhalb der sichtbaren Fläche; alle Aufgaben sind auch in schmalen Fenstern erreichbar.
+- Das Mitgliederformular unterbindet die Rückfederung des Inhalts am unteren Scrollanschlag.
+- Budget- und Zweckbindungsfelder in der KI-Rechnungserfassung haben dieselbe Höhe wie die zugehörigen Betragsfelder.
+
 ## [4.6.2] - 2026-10-01
 
 ### Behoben

@@ -8257,9 +8257,15 @@ body.detached-quick-add-body .local-invoice-scan__header select {
   min-width: 0;
 }
 
+.local-invoice-scan__assignment-row > select,
+.local-invoice-scan__assignment-row .input {
+  height: 34px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+
 .local-invoice-scan__assignment-row .input {
   width: 100%;
-  box-sizing: border-box;
   padding-right: 23px;
 }
 
@@ -12782,6 +12788,9 @@ html[data-booking-handoff='true'] .compact-booking-flyout {
 }
 
 .compact-booking-popup.member-floating-modal .member-modal-body {
+  /* Suppress the boundary bounce as well as scroll chaining: contain still
+     allows the compositor to move the whole content at the bottom edge. */
+  overscroll-behavior: none;
   /* Keep the scroller on its own compositing layer. At the fractional bottom
      scroll offset, hover repaints must not resnap the surrounding card borders
      against the popup's backdrop-filter layer. */

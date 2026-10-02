@@ -12,6 +12,7 @@ test.beforeAll(async () => {
     import { installSelectKeyboardGuard } from './src/renderer/utils/selectKeyboard'
     installSelectKeyboardGuard()
     import { createRoot } from 'react-dom/client'
+    import { useOverlayScrollLock } from './src/renderer/hooks/useOverlayScrollLock'
     import MembersView from './src/renderer/views/Mitglieder/MembersView'
     import InvoicesView from './src/renderer/views/InvoicesView'
     window.requests = []
@@ -28,7 +29,11 @@ test.beforeAll(async () => {
       invoices: { get: async () => ({ id: 1, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bürobedarf Muster', description: 'Material für die Jugendarbeit', invoiceNo: 'R-12', voucherType: 'OUT', grossAmount: 200, paidSum: 50, status: 'PARTIAL', sphere: 'IDEELL', budgets: [{ budgetId: 1, amount: 200 }], earmarks: [], payments: [{ id: 1, date: '2026-09-05', amount: 50 }], files: [{ id: 1, fileName: 'Eine sehr lange Rechnung für Material.pdf', size: 25000, createdAt: '2026-09-01 12:00:00' }], tags: [] }), list: async () => ({ total: 40, rows: [{ id: 1, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bürobedarf Muster', invoiceNo: 'R-12', voucherType: 'OUT', grossAmount: 200, paidSum: 50, status: 'PARTIAL', sphere: 'IDEELL' }, { id: 2, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bezahlte Rechnung', voucherType: 'IN', grossAmount: 100, paidSum: 100, status: 'PAID', sphere: 'IDEELL' }] }), summary: async () => ({ count: 40, gross: 1000, paid: 700, remaining: 300, remainingIn: 110, remainingOut: 190, overdueAmount: 150, overdueCount: 1 }) }
     }
     const root = createRoot(document.getElementById('root'))
-    window.mount = view => root.render(view === 'members' ? <MembersView /> : <InvoicesView />)
+    function App({ view }) {
+      useOverlayScrollLock()
+      return view === 'members' ? <MembersView /> : <InvoicesView />
+    }
+    window.mount = view => root.render(<App view={view} />)
     window.mount('members')
   ` }, bundle: true, jsx: 'automatic', write: false, platform: 'browser', external: ['pdfjs-dist/*'], loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'toast', setup(build) {
     build.onResolve({ filter: /\/(LocalInvoiceScanModal|InvoiceBatchControl|MembersExportModal)$/ }, args => ({ path: args.path, namespace: 'unused-modal' }))
@@ -113,6 +118,36 @@ test('member finance fields stay in place when hovering the interval', async ({ 
   await checkMemberFinanceHover(page)
 })
 
+async function checkMemberScrollBoundary(page: Page) {
+  await page.getByRole('button', { name: 'Neu', exact: true }).click()
+  const body = page.locator('.member-modal-body')
+  await expect(body).toHaveCSS('overscroll-behavior-y', 'none')
+  await page.waitForTimeout(300)
+  await body.evaluate(el => { el.scrollTop = el.scrollHeight - el.clientHeight - 10 })
+  const outer = () => page.locator('.modal-overlay, .member-modal, .compact-booking-popup__content, .member-modal-body').evaluateAll(elements => elements.map(el => {
+    const { x, y, width, height } = el.getBoundingClientRect()
+    return { x, y, width, height, scrollTop: el.classList.contains('member-modal-body') ? undefined : el.scrollTop }
+  }))
+  const before = await outer()
+  await page.locator('#member-bic').hover()
+  await page.mouse.wheel(0, 400)
+  await expect.poll(() => body.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThanOrEqual(1)
+  expect(await outer()).toEqual(before)
+  const bottom = await body.evaluate(el => el.scrollTop)
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.wheel(0, 400)
+    await page.waitForTimeout(100)
+    expect(await outer()).toEqual(before)
+    expect(await body.evaluate(el => el.scrollTop)).toBe(bottom)
+  }
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+}
+
+test('member dialog keeps its outer containers still at the wheel scroll boundary', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 560 })
+  await checkMemberScrollBoundary(page)
+})
+
 test('member finance hover and selection remain stable in the installed Electron renderer', async ({}, info) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-member-layout-'))
   const main = path.join(dir, 'main.cjs')
@@ -134,6 +169,7 @@ test('member finance hover and selection remain stable in the installed Electron
     for (const zoom of [1, 1.25]) {
       await app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(value), zoom)
       await checkMemberFinanceHover(page)
+      await checkMemberScrollBoundary(page)
     }
     await page.getByRole('button', { name: 'Neu', exact: true }).click()
     await page.locator('#member-contribution-interval').scrollIntoViewIfNeeded()

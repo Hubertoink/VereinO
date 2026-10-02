@@ -1235,7 +1235,9 @@ html[data-glass-modals='true'] .ai-message--user {
 }
 
 .ai-history-drawer {
+  box-sizing: border-box;
   width: min(880px, calc(100vw - 48px));
+  height: min(720px, calc(100vh - 148px));
   padding: 18px;
   overflow: hidden;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -1305,6 +1307,7 @@ html[data-glass-modals='true'] .ai-message--user {
 
 .ai-history-column {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   min-height: 0;
@@ -1335,7 +1338,7 @@ html[data-glass-modals='true'] .ai-message--user {
 }
 
 .ai-history-group--all {
-  height: min(560px, calc(100vh - 258px));
+  height: auto;
 }
 
 .ai-history-list {
@@ -3304,8 +3307,24 @@ html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
     width: auto;
   }
 
-  .ai-history-drawer {
+  .ai-assistant-sidebar.ai-history-drawer {
     width: auto;
+    height: auto;
+    overflow-y: auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .ai-history-layout,
+  .ai-history-column {
+    overflow: visible;
+  }
+
+  .ai-history-column {
+    grid-template-rows: auto;
+  }
+
+  .ai-history-group {
+    max-height: 360px;
   }
 
   .ai-history-layout,
@@ -3319,7 +3338,7 @@ html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
     grid-template-rows: none;
   }
 
-.ai-history-group--all {
+  .ai-history-group--all {
     height: auto;
     max-height: 360px;
   }
@@ -3655,7 +3674,6 @@ html[data-glass-modals="true"] .ai-page .card:not(.ai-composer-card--followup) {
 
 .ai-history-drawer {
   max-height: calc(100vh - 148px);
-  overflow: hidden;
 }
 
 /* Keep the AI workspace on the same data-surface and radius hierarchy as the
