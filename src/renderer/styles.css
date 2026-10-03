@@ -15894,13 +15894,20 @@ button.filter-totals-stat {
    ========================== */
 .attachments-modal-overlay {
   z-index: 14000;
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .attachments-modal {
-  width: 90vw;
-  max-width: 900px;
-  height: 80vh;
-  max-height: 700px;
+  width: min(900px, 90vw);
+  min-width: min(640px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  height: min(700px, 80dvh);
+  min-height: min(400px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  box-sizing: border-box;
+  resize: both;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -16033,7 +16040,8 @@ button.filter-totals-stat {
 
 .attachments-modal__content {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 0;
   flex: 1;
   overflow: hidden;
 }
@@ -16042,6 +16050,7 @@ button.filter-totals-stat {
 .attachments-modal__sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   border-right: 1px solid var(--border);
   background: color-mix(in oklab, var(--surface) 50%, var(--bg));
 }
@@ -16152,6 +16161,7 @@ button.filter-totals-stat {
 
 .attachments-modal__toolbar {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
@@ -21052,6 +21062,21 @@ textarea {
 .compact-booking-optional-area .compact-booking-optional-bar {
   margin: 0;
   padding-top: 9px;
+}
+
+/* Keep the divider straight despite the rounded modal surface rules. */
+.compact-booking-popup .compact-booking-optional-bar,
+.compact-booking-flyout .compact-booking-optional-bar {
+  position: relative;
+  border-top: 0;
+}
+
+.compact-booking-popup .compact-booking-optional-bar::before,
+.compact-booking-flyout .compact-booking-optional-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  border-top: 1px solid var(--border);
 }
 
 .compact-booking-popup .booking-description-card .input,

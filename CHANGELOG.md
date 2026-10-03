@@ -7,6 +7,19 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.6.5] - 2026-10-03
+
+### Geändert
+
+- Die Kennzahlen in Mitglieder und Verbindlichkeiten erscheinen kompakter; zusätzliche Hinweise sind beim Überfahren der Kacheln sichtbar.
+- Die Vorschussübersicht und die eingebetteten Belegdetails in Buchungen Plus verwenden ein platzsparenderes Layout.
+- Das Anhangsfenster lässt sich in Breite und Höhe verändern; die Vorschau passt sich an die verfügbare Fläche an.
+
+### Behoben
+
+- Das Anhangsfenster bleibt beim Vergrößern sowie beim Ziehen aus dem Fenster auf den Hintergrund geöffnet.
+- Die Trennlinie zu den optionalen Feldern im Buchungsformular bleibt gerade.
+
 ## [4.6.3] - 2026-10-02
 
 ### Behoben

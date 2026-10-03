@@ -783,7 +783,7 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
         <LoadingState message="Lade Verbindlichkeiten..." />
       ) : (
         <>
-          <ManagementKpis label="Verbindlichkeitenübersicht" items={[
+          <ManagementKpis compact label="Verbindlichkeitenübersicht" items={[
             { label: 'Offene Verbindlichkeiten', value: summary ? eurFmt.format(summary.remainingOut) : '—', hint: 'Noch zu zahlen · gefilterte Auswahl' },
             { label: 'Offene Forderungen', value: summary ? eurFmt.format(summary.remainingIn) : '—', hint: 'Noch zu erhalten · gefilterte Auswahl' },
             { label: 'Überfällig', value: summary ? eurFmt.format(summary.overdueAmount) : '—', hint: summary ? `${summary.overdueCount} ${summary.overdueCount === 1 ? 'überfälliger Eintrag' : 'überfällige Einträge'} · IN und OUT` : 'IN und OUT · gefilterte Auswahl', tone: summary?.overdueAmount ? 'warning' : undefined }

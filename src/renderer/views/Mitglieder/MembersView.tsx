@@ -519,7 +519,7 @@ export default function MembersView({ registerPageShortcuts }: MembersViewProps 
                     </button>
                 </div>
             </div>
-            <ManagementKpis label="Mitgliederübersicht" loading={busy} items={[
+            <ManagementKpis compact label="Mitgliederübersicht" loading={busy} items={[
                 { label: 'Aktive Mitglieder', value: memberSummary ? String(memberSummary.active) : '—', hint: 'In der gefilterten Auswahl' },
                 { label: 'Mit fälligen Beiträgen', value: memberSummary ? String(memberSummary.dueMembers) : '—', hint: 'Mitglieder mit offenen Beitragsperioden', tone: memberSummary?.dueMembers ? 'warning' : undefined },
                 { label: 'Fällige Beiträge', value: memberSummary ? eurFmt.format(memberSummary.dueAmount) : '—', hint: 'Offene Perioden × hinterlegter Beitrag', tone: memberSummary?.dueAmount ? 'warning' : undefined }

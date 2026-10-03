@@ -5,6 +5,12 @@
 .management-kpi > small { grid-column:1 / -1; font-size:11px; color:var(--text-dim); }
 .management-kpi--warning > strong { color:var(--danger); }
 .management-kpi--success > strong { color:var(--success); }
+.management-kpis--compact { gap:8px; }
+.management-kpis--compact .management-kpi { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; box-sizing:border-box; min-height:58px; gap:10px; padding:8px 10px 7px 13px; border:0; border-radius:0; background:var(--surface-alt,var(--surface)); }
+.management-kpis--compact .management-kpi::before { content:''; position:absolute; top:8px; bottom:8px; left:0; width:3px; border-radius:0 4px 4px 0; background:var(--accent); }
+.management-kpis--compact .management-kpi > span { font-size:11px; font-weight:650; line-height:1.2; }
+.management-kpis--compact .management-kpi > strong { align-self:flex-end; margin-top:auto; font-size:18px; line-height:1; }
+.management-kpis--compact .management-kpi > small { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .management-status { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:11px; padding:4px 7px; border-radius:6px; background:color-mix(in srgb,var(--status-color,var(--accent)) 12%,var(--surface)); }
 .management-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--status-color,var(--accent)); }
 .management-payment { display:grid; justify-items:end; gap:4px; font-variant-numeric:tabular-nums; }

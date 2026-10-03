@@ -267,9 +267,11 @@
 .voucher-info-embedded { min-height: 0; display: flex; flex: 1; }
 .voucher-info-embedded .voucher-info-modal { width: 100%; max-width: none; min-height: 0; max-height: none; margin: 0; padding: 0; border: 0; box-shadow: none; display: flex; flex-direction: column; }
 .voucher-info-embedded .voucher-info-modal > header, .voucher-info-embedded .voucher-info-summary, .voucher-info-embedded .voucher-info-modal > .helper { display: none !important; }
-.voucher-info-embedded .voucher-info-modal__content { min-height: 0; overflow-y: auto; }
-.voucher-info-embedded .voucher-info-details-grid { display: block; }
-.voucher-info-embedded .voucher-info-card { padding: 10px; margin-bottom: 12px; }
+.voucher-info-embedded .voucher-info-modal__content { min-height: 0; overflow-y: auto; gap: 10px; }
+.voucher-info-embedded .voucher-info-details-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.voucher-info-embedded .voucher-info-card { padding: 10px; margin: 0; }
+.voucher-info-embedded .voucher-info-section-title { margin: 0 0 8px; padding-bottom: 8px; }
+.voucher-info-embedded .voucher-info-information .voucher-info-section-title { margin: 0; }
 .voucher-info-embedded .voucher-info-detail-row { grid-template-columns: minmax(0, 1fr); gap: 7px; }
 .voucher-info-embedded .voucher-info-assignment-editor { grid-template-columns: minmax(0, 1fr) auto !important; }
 .voucher-info-embedded .voucher-info-assignment-editor > .select-dropdown__trigger { grid-column: 1 / -1; }

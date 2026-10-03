@@ -1,9 +1,9 @@
 import React from 'react'
 import './managementKpis.css'
 
-export default function ManagementKpis({ label, loading, items }: { label: string; loading?: boolean; items: Array<{ label: string; value: string; hint: string; tone?: 'warning' | 'success' }> }) {
-  return <section className="management-kpis" aria-label={label} aria-busy={loading}>
-    {items.map(item => <div className={`management-kpi${item.tone ? ` management-kpi--${item.tone}` : ''}`} key={item.label}>
+export default function ManagementKpis({ label, loading, items, compact = false }: { label: string; loading?: boolean; compact?: boolean; items: Array<{ label: string; value: string; hint: string; tone?: 'warning' | 'success' }> }) {
+  return <section className={`management-kpis${compact ? ' management-kpis--compact' : ''}`} aria-label={label} aria-busy={loading}>
+    {items.map(item => <div className={`management-kpi${item.tone ? ` management-kpi--${item.tone}` : ''}`} key={item.label} title={compact ? item.hint : undefined}>
       <span>{item.label}</span><strong>{loading ? '…' : item.value}</strong><small>{item.hint}</small>
     </div>)}
   </section>

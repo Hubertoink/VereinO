@@ -690,13 +690,7 @@ export default function AdvancesView() {
         <button className="btn primary" type="button" onClick={() => setCreateOpen(true)}>+ Vorschuss</button>
       </header>
 
-      <section className="advances-overview" aria-labelledby="advances-overview-title">
-        <div className="advances-section-header">
-          <div>
-            <h2 id="advances-overview-title">Vorschussübersicht</h2>
-            <p className="helper">Aktueller Stand aller angezeigten Vorschüsse.</p>
-          </div>
-        </div>
+      <section className="advances-overview" aria-label="Vorschussübersicht">
         <div className="advances-summary-grid">
           <div className="advances-summary-card">
             <div className="helper">Offener Betrag</div>

@@ -123,6 +123,7 @@ export default function AttachmentsModal({
     const [pdfError, setPdfError] = useState<string>('')
     const [pdfMeta, setPdfMeta] = useState<null | { page: number; numPages: number }>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
+    const backdropPointerDownRef = useRef(false)
     const pdfCanvasRef = useRef<HTMLCanvasElement | null>(null)
     const previewAreaRef = useRef<HTMLDivElement | null>(null)
     const pdfDocRef = useRef<any>(null)
@@ -250,7 +251,7 @@ export default function AttachmentsModal({
             ro.disconnect()
             if (resizeFrameRef.current != null) cancelAnimationFrame(resizeFrameRef.current)
         }
-    }, [])
+    }, [loading, selectedId])
 
     useEffect(() => {
         let cancelled = false
@@ -429,7 +430,18 @@ export default function AttachmentsModal({
     }
 
     return createPortal(
-        <div className="modal-overlay attachments-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+        <div
+            className="modal-overlay attachments-modal-overlay"
+            onPointerDownCapture={(event) => { backdropPointerDownRef.current = event.target === event.currentTarget }}
+            onPointerCancel={() => { backdropPointerDownRef.current = false }}
+            onClick={(event) => {
+                const startedOnBackdrop = backdropPointerDownRef.current
+                backdropPointerDownRef.current = false
+                if (startedOnBackdrop && event.target === event.currentTarget) onClose()
+            }}
+            role="dialog"
+            aria-modal="true"
+        >
             <div className="modal attachments-modal" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <header className="attachments-modal__header">
