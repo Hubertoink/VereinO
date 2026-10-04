@@ -1,4 +1,5 @@
 import ManagementKpis from '../../components/finance/ManagementKpis'
+import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
@@ -25,15 +26,16 @@ type MemberIntervalFilter = 'ALL' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 type MemberBoardFilter = 'ALL' | 'ANY' | 'NONE' | 'V1' | 'V2' | 'KASSIER' | 'KASSENPR1' | 'KASSENPR2' | 'SCHRIFT'
 
 interface MembersViewProps {
+    initialTask?: DashboardTaskTarget | null
     registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
-export default function MembersView({ registerPageShortcuts }: MembersViewProps = {}) {
+export default function MembersView({ registerPageShortcuts, initialTask }: MembersViewProps = {}) {
     const [q, setQ] = useState('')
     const debouncedQ = useDebouncedValue(q, 250)
     const loadRequestIdRef = useRef(0)
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
-    const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>('ALL')
+    const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>(initialTask?.kind === 'members' ? 'DUE' : 'ALL')
     const [intervalFilter, setIntervalFilter] = useState<MemberIntervalFilter>('ALL')
     const [boardFilter, setBoardFilter] = useState<MemberBoardFilter>('ALL')
     const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })

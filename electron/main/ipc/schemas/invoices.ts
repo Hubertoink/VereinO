@@ -60,6 +60,8 @@ export const InvoicesListInput = z
     offset: z.number().min(0).default(0).optional(),
     sort: z.enum(['ASC', 'DESC']).optional(),
     sortBy: z.enum(['date', 'due', 'amount', 'status']).optional(),
+    unpaidOnly: z.boolean().optional(),
+    voucherType: z.enum(['IN', 'OUT']).optional(),
     status: z.enum(['OPEN', 'PARTIAL', 'PAID', 'ALL']).optional(),
     sphere: Sphere.optional(),
     budgetId: z.number().optional(),
@@ -106,6 +108,8 @@ export const InvoicesListOutput = z.object({
 // Invoices summary (totals)
 export const InvoicesSummaryInput = z
   .object({
+    unpaidOnly: z.boolean().optional(),
+    voucherType: z.enum(['IN', 'OUT']).optional(),
     status: z.enum(['OPEN', 'PARTIAL', 'PAID', 'ALL']).optional(),
     sphere: Sphere.optional(),
     budgetId: z.number().optional(),

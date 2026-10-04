@@ -451,6 +451,7 @@ const rendererApi = {
     version: () => invoke('app.version'),
     bootstrap: () => invoke('app.bootstrap'),
     dashboardSnapshot: (payload) => invoke('app.dashboardSnapshot', payload),
+    dashboardTasks: (payload) => invoke('app.dashboardTasks', payload),
     notifyDataChanged: (scopes) => ipcRenderer.send('app.notifyDataChanged', scopes),
     onDataChanged: (cb: () => void) => {
       const handler = () => cb()

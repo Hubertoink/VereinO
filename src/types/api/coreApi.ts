@@ -2,6 +2,7 @@ import type { DataChangeScope } from '../../../shared/dataChange'
 import type { UploadFilePayload } from '../../../shared/filePayload'
 import type { DashboardSnapshot, DashboardSnapshotInput } from '../../../shared/dashboard'
 import type { WidgetAutostart, WidgetState } from '../../../shared/receiptWidget'
+import type { DashboardTasks } from '../../../shared/dashboardTasks'
 
 export interface QuickAddPayload {
     draftId?: string | null
@@ -51,6 +52,7 @@ export interface CoreApi {
         version: () => Promise<{ version: string; name: string }>
         bootstrap: () => Promise<StartupBootstrapData>
         dashboardSnapshot: (payload: DashboardSnapshotInput) => Promise<DashboardSnapshot>
+        dashboardTasks: (payload: { today: string }) => Promise<DashboardTasks>
         notifyDataChanged: (scopes?: DataChangeScope[]) => void
         onDataChanged: (callback: () => void) => () => void
     }

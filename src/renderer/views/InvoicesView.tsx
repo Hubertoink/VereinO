@@ -14,6 +14,7 @@ import InvoiceDetailModal from './invoicesShared/InvoiceDetailModal'
 import InvoiceFormModal from './invoicesShared/InvoiceFormModal'
 import InvoiceActionMenu from './invoicesShared/InvoiceActionMenu'
 import ReimbursementsDialog from './reimbursements/ReimbursementsDialog'
+import type { DashboardTaskTarget } from '../../../shared/dashboardTasks'
 import LocalInvoiceScanModal, { type LocalInvoiceScanResult } from '../components/modals/LocalInvoiceScanModal'
 import type {
   EditInvoiceFile,
@@ -50,6 +51,7 @@ type PageShortcutAction = {
 }
 
 interface InvoicesViewProps {
+  initialTask?: DashboardTaskTarget | null
   registerPageShortcuts?: (shortcuts: PageShortcutAction[]) => void
 }
 
@@ -110,16 +112,17 @@ function normalizeInvoiceDraft(row?: Partial<InvoiceListRow & InvoiceDetail>): I
   }
 }
 
-export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProps = {}) {
+export default function InvoicesView({ registerPageShortcuts, initialTask }: InvoicesViewProps = {}) {
   const { notify } = useToast()
   const [reimbursementToolbar, setReimbursementToolbar] = useState<HTMLDivElement | null>(null)
-  const [showReimbursements, setShowReimbursements] = useState(false)
+  const [showReimbursements, setShowReimbursements] = useState(initialTask?.kind === 'reimbursements')
+  const [taskFilter, setTaskFilter] = useState<DashboardTaskTarget | null>(initialTask && ['invoices', 'receivables'].includes(initialTask.kind) ? initialTask : null)
 
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<'ALL' | 'OPEN' | 'PARTIAL' | 'PAID'>('ALL')
   const [sphere, setSphere] = useState<'' | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'>('')
   const [dueFrom, setDueFrom] = useState('')
-  const [dueTo, setDueTo] = useState('')
+  const [dueTo, setDueTo] = useState(() => { if (initialTask?.filter !== 'overdue') return ''; const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}` })
   const [budgetId, setBudgetId] = useState<number | ''>('')
   const [tag, setTag] = useState('')
   const [limit, setLimit] = useState(20)
@@ -217,6 +220,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     setError('')
     try {
       const res = await window.api?.invoices?.list?.({
+        unpaidOnly: !!taskFilter,
+        voucherType: taskFilter ? taskFilter.kind === 'receivables' ? 'IN' : 'OUT' : undefined,
         limit,
         offset,
         sort: sortDir,
@@ -244,6 +249,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     setSummary(null)
     try {
       const res = await window.api?.invoices?.summary?.({
+        unpaidOnly: !!taskFilter,
+        voucherType: taskFilter ? taskFilter.kind === 'receivables' ? 'IN' : 'OUT' : undefined,
         status,
         sphere: sphere || undefined,
         budgetId: typeof budgetId === 'number' ? budgetId : undefined,
@@ -258,16 +265,17 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
     }
   }
 
-  useEffect(() => { void load() }, [limit, offset, status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag, sortDir, sortBy])
-  useEffect(() => { void loadSummary() }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag])
+  useEffect(() => { void load() }, [limit, offset, status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag, sortDir, sortBy, taskFilter])
+  useEffect(() => { void loadSummary() }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag, taskFilter])
   useEffect(() => {
     const onChanged = () => { void loadSummary() }
     return addDataChangedListener(['invoices', 'vouchers'], onChanged)
-  }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag])
+  }, [status, sphere, budgetId, qDebounced, dueFrom, dueTo, tag, taskFilter])
   useEffect(() => { try { localStorage.setItem('invoices.sort', sortDir) } catch {} }, [sortDir])
   useEffect(() => { try { localStorage.setItem('invoices.sortBy', sortBy) } catch {} }, [sortBy])
 
   function clearFilters() {
+    setTaskFilter(null)
     setQ('')
     setStatus('ALL')
     setSphere('')
@@ -779,7 +787,8 @@ export default function InvoicesView({ registerPageShortcuts }: InvoicesViewProp
 
       {!showReimbursements && error && <div className="invoices-text-danger">{error}</div>}
 
-      {showReimbursements ? <ReimbursementsDialog embedded toolbarTarget={reimbursementToolbar} notify={notify} onClose={() => setShowReimbursements(false)} /> : loading ? (
+      {taskFilter && !showReimbursements && <p className="helper">Aufgabenfilter: {taskFilter.filter === 'overdue' ? 'überfällige' : 'offene'} {taskFilter.kind === 'receivables' ? 'Forderungen' : 'Verbindlichkeiten'} <button className="btn ghost" onClick={clearFilters}>Filter zurücksetzen</button></p>}
+      {showReimbursements ? <ReimbursementsDialog embedded initialUnpaidOnly={initialTask?.kind === 'reimbursements'} toolbarTarget={reimbursementToolbar} notify={notify} onClose={() => setShowReimbursements(false)} /> : loading ? (
         <LoadingState message="Lade Verbindlichkeiten..." />
       ) : (
         <>

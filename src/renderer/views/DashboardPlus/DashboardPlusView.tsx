@@ -4,11 +4,14 @@ import HoverTooltip from '../../components/common/HoverTooltip'
 import { DashboardRecentActivity } from '../Dashboard/DashboardView'
 import DashboardInsights from './DashboardInsights'
 import DashboardAssistant from './DashboardAssistant'
-import React, { useEffect, useId, useState } from 'react'
+import DashboardTasks from './DashboardTasks'
+import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { IconArrowUpRight, IconArrowDownRight, IconBuildingBank, IconChevronRight, IconReceipt2, IconUsers, IconWallet } from '@tabler/icons-react'
 import type { DashboardSnapshot } from '../../../../shared/dashboard'
 import type { RendererApi } from '../../../types/api'
 import { addDataChangedListener } from '../../utils/refresh'
+import { useScrollToLatest } from '../../hooks/useScrollToLatest'
 import { buildDashboardMonths, dashboardMonths, type MonthRow } from './dashboardPlusModel'
 import './dashboardPlus.css'
 
@@ -18,7 +21,7 @@ const longMonth = (key: string) => new Intl.DateTimeFormat('de-DE', { month: 'lo
 const dateLabel = (date: string) => new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(`${date}T12:00:00`))
 type Accounts = Awaited<ReturnType<RendererApi['paymentAccounts']['list']>>['rows']
 type Data = { snapshot: DashboardSnapshot; months: MonthRow[]; accounts: Accounts; opening: number }
-type Props = { generalProfile?: boolean; today: string; onGoToBookings: () => void; onGoToInvoices: () => void; onGoToMembers: () => void; onGoToBudgets: () => void; onGoToBindings: () => void; onGoToAI: () => void; onGoToVoucher: (args: { voucherId: number; recordDate?: string | null }) => void }
+type Props = { generalProfile?: boolean; today: string; onTaskNavigate: (target: DashboardTaskTarget) => void; drafts?: Array<{ id: string; title: string }>; onOpenDraft?: (id: string) => void; onGoToBookings: () => void; onGoToInvoices: () => void; onGoToMembers: () => void; onGoToBudgets: () => void; onGoToBindings: () => void; onGoToAI: () => void; onGoToVoucher: (args: { voucherId: number; recordDate?: string | null }) => void }
 
 function BalanceLine({ rows }: { rows: MonthRow[] }) {
   const values = rows.map(row => row.balance)
@@ -45,7 +48,7 @@ function ProgressRing({ value, label, caption, gauge = false }: { value: number;
   </div>
 }
 
-export default function DashboardPlusView({ today: initialToday, generalProfile = false, onGoToBookings, onGoToInvoices, onGoToMembers, onGoToBudgets, onGoToBindings, onGoToAI, onGoToVoucher }: Props) {
+export default function DashboardPlusView({ today: initialToday, generalProfile = false, onTaskNavigate, drafts, onOpenDraft, onGoToBookings, onGoToInvoices, onGoToMembers, onGoToBudgets, onGoToBindings, onGoToAI, onGoToVoucher }: Props) {
   const [today, setToday] = useState(initialToday)
   const [coverageMonth, setCoverageMonth] = useState(initialToday.slice(0, 7))
   useEffect(() => {
@@ -84,6 +87,8 @@ export default function DashboardPlusView({ today: initialToday, generalProfile 
     return () => { alive = false }
   }, [today, revision])
   const months = (range === 'all' ? data?.months : data?.months.slice(-range)) || []
+  const monthlyChartRef = useRef<HTMLDivElement>(null)
+  useScrollToLatest(monthlyChartRef, `${tab}:${range}:${months.map(row => row.month).join(',')}`)
   const rangeLabel = range === 'all' ? 'Gesamter Zeitraum' : `${range} Monate`
   const rangeFrom = `${months[0]?.month || today.slice(0, 7)}-01`
   const selected = months.find(row => row.month === selectedMonth) || months[months.length - 1]
@@ -109,11 +114,11 @@ export default function DashboardPlusView({ today: initialToday, generalProfile 
       setTab(next); document.getElementById(`dp-${next}-tab`)?.focus()
     }}>{(['overview', 'activity'] as const).map(value => <button key={value} role="tab" id={`dp-${value}-tab`} tabIndex={tab === value ? 0 : -1} aria-controls="dp-content" aria-selected={tab === value} onClick={() => setTab(value)}>{value === 'overview' ? 'Übersicht' : 'Letzte Aktionen'}</button>)}</div><div className="dp-segments dp-range" aria-label="Dashboard-Zeitraum">{([3, 6, 12, 'all'] as const).map(value => <button key={value} aria-pressed={range === value} onClick={() => selectRange(value)}>{value === 'all' ? 'Gesamt' : `${value}M`}</button>)}</div></div>
     {error ? <div className="dp-state" role="alert"><h2>Dashboard konnte nicht geladen werden</h2><p>Bitte versuche es erneut.</p><button className="btn" onClick={() => setRevision(value => value + 1)}>Erneut versuchen</button></div> : !data || !selected || !current || !snapshot ? <div className="dp-state" role="status">Dashboard wird geladen …</div> : <div id="dp-content" role="tabpanel" aria-labelledby={`dp-${tab}-tab`} aria-busy={loading}>
-      {tab === 'activity' ? <DashboardRecentActivity table onGoToVoucher={onGoToVoucher} /> : <><div className="dp-grid">
+      {tab === 'activity' ? <DashboardRecentActivity table onGoToVoucher={onGoToVoucher} /> : <><DashboardTasks today={today} generalProfile={generalProfile} drafts={drafts} onOpenDraft={onOpenDraft} onNavigate={onTaskNavigate} /><div className="dp-grid">
         {tab === 'overview' && <article className="dp-card dp-balance"><div className="dp-card-heading"><span className="dp-icon"><IconBuildingBank size={21} /></span><h2>{generalProfile ? 'Gebuchte Mittel' : 'Vereinsmittel'}</h2><span className="dp-currency">EUR</span></div><div className="dp-balance-value"><span>Gebuchter Gesamtbestand</span><strong>{money.format(current.balance)}</strong><p>{current.net < 0 ? <IconArrowDownRight size={14} /> : <IconArrowUpRight size={14} />}{money.format(current.net)} <span>im laufenden Monat</span></p></div><BalanceLine rows={months} /><div className="dp-balance-caption">{rangeLabel} · laufender Monat bis heute</div><footer><div className="dp-account-dots">{data.accounts.slice(0, 3).map(account => <i key={account.id} title={account.name} style={{ background: account.color || 'var(--dp-accent)' }} />)}<span>{data.accounts.length} aktive Konten</span></div><button onClick={onGoToBookings}>Buchungen <IconArrowUpRight size={16} /></button></footer></article>}
         <article className="dp-card dp-monthly"><div className="dp-card-heading"><h2>Monatliche Entwicklung</h2><span className="dp-card-period">{rangeLabel}</span></div>
           <div className="dp-chart-summary"><div><strong>{money.format(total)}</strong><span>{heading} · {rangeLabel} bis heute</span></div>{tab === 'overview' && <div className="dp-metric-select">{(['income', 'expense', 'net'] as const).map(value => <button key={value} aria-pressed={metric === value} onClick={() => setMetric(value)}>{value === 'income' ? 'Einnahmen' : value === 'expense' ? 'Ausgaben' : 'Saldo'}</button>)}</div>}</div>
-          <div className="dp-chart" aria-label="Monatswerte"><div className="dp-chart-grid" aria-hidden="true"><span>{money.format(maxBar)}</span><span>{money.format(maxBar / 2)}</span><span>0</span></div><div className="dp-bars" style={{ minWidth: months.length > 12 ? months.length * 46 : undefined }}>{months.map(row => <HoverTooltip key={row.month} className="dp-tooltip" content={<><strong>{longMonth(row.month)}</strong><span>Einnahmen <b>{money.format(row.income)}</b></span><span>Ausgaben <b>{money.format(row.expense)}</b></span><span>Saldo <b>{money.format(row.net)}</b></span>{row.month === today.slice(0, 7) && <small>Laufender Monat bis {dateLabel(today)}</small>}</>}>{({ ref, props }) => <button ref={ref} {...props} className={`dp-month${row.month === today.slice(0, 7) ? ' is-current' : ''}${row.month === selected.month ? ' is-selected' : ''}`} aria-pressed={row.month === selected.month} aria-label={`${longMonth(row.month)}: Einnahmen ${money.format(row.income)}, Ausgaben ${money.format(row.expense)}, Saldo ${money.format(row.net)}`} onClick={() => setSelectedMonth(row.month)}><span className="dp-bar-space">{[metric].map(value => <i key={value} className={`dp-bar dp-bar--${value}${row[value] < 0 ? ' is-negative' : ''}`} style={{ height: `${Math.abs(row[value]) / maxBar * 100}%`, minHeight: row[value] !== 0 ? 3 : 0 }} />)}</span><span className="dp-month-label">{shortMonth(row.month)}{row.month === today.slice(0, 7) ? '*' : ''}</span></button>}</HoverTooltip>)}</div></div>
+          <div ref={monthlyChartRef} className="dp-chart" aria-label="Monatswerte"><div className="dp-chart-grid" aria-hidden="true"><span>{money.format(maxBar)}</span><span>{money.format(maxBar / 2)}</span><span>0</span></div><div className="dp-bars" style={{ minWidth: months.length > 12 ? months.length * 46 : undefined }}>{months.map(row => <HoverTooltip key={row.month} className="dp-tooltip" content={<><strong>{longMonth(row.month)}</strong><span>Einnahmen <b>{money.format(row.income)}</b></span><span>Ausgaben <b>{money.format(row.expense)}</b></span><span>Saldo <b>{money.format(row.net)}</b></span>{row.month === today.slice(0, 7) && <small>Laufender Monat bis {dateLabel(today)}</small>}</>}>{({ ref, props }) => <button ref={ref} {...props} className={`dp-month${row.month === today.slice(0, 7) ? ' is-current' : ''}${row.month === selected.month ? ' is-selected' : ''}`} aria-pressed={row.month === selected.month} aria-label={`${longMonth(row.month)}: Einnahmen ${money.format(row.income)}, Ausgaben ${money.format(row.expense)}, Saldo ${money.format(row.net)}`} onClick={() => setSelectedMonth(row.month)}><span className="dp-bar-space">{[metric].map(value => <i key={value} className={`dp-bar dp-bar--${value}${row[value] < 0 ? ' is-negative' : ''}`} style={{ height: `${Math.abs(row[value]) / maxBar * 100}%`, minHeight: row[value] !== 0 ? 3 : 0 }} />)}</span><span className="dp-month-label">{shortMonth(row.month)}{row.month === today.slice(0, 7) ? '*' : ''}</span></button>}</HoverTooltip>)}</div></div>
           <div className="dp-chart-legend"><span><i />{heading}{metric === 'net' && tab === 'overview' ? ' · Balkenhöhe = absoluter Betrag' : ''}</span><small>* Laufender Monat bis {dateLabel(today)}</small></div>
           <div className="dp-month-caption">{longMonth(selected.month)}{selected.month === today.slice(0, 7) ? ' · bisher' : ''}</div><dl className="dp-month-facts"><div><dt>Einnahmen</dt><dd>{money.format(selected.income)}</dd></div><div><dt>Ausgaben</dt><dd>{money.format(selected.expense)}</dd></div><div><dt>Monatssaldo</dt><dd className={selected.net < 0 ? 'dp-negative' : 'dp-positive'}>{money.format(selected.net)}</dd></div></dl>
         </article>

@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import { build } from 'esbuild'
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 
 let script: string
 let css: string
@@ -46,21 +48,71 @@ test.beforeEach(async ({ page }) => {
   await page.locator('.attachments-modal').evaluate(el => el.getAnimations().forEach(animation => animation.finish()))
 })
 
-test('resizing stays open when release produces a backdrop click', async ({ page }) => {
+async function checkResizeRelease(page: Page) {
   const modal = page.locator('.attachments-modal')
   const before = (await modal.boundingBox())!
-  await page.mouse.move(before.x + before.width - 3, before.y + before.height - 3)
+  await page.getByRole('button', { name: 'Belegfenstergröße ändern' }).hover()
   await page.mouse.down()
   await page.mouse.move(before.x + before.width + 197, before.y + before.height + 117, { steps: 10 })
   await page.mouse.up()
   await expect(modal).toBeVisible()
   expect((await modal.boundingBox())!.width).toBeGreaterThan(before.width + 100)
-  // Chromium can target the backdrop when a native resize ends beyond the
-  // recentered modal. Reproduce that final click even on platforms that omit it.
+  // A trailing click must not close the dialog even if it targets the backdrop.
   await page.locator('.attachments-modal-overlay').dispatchEvent('click')
   await expect(modal).toBeVisible()
+  const enlarged = (await modal.boundingBox())!
+  await page.getByRole('button', { name: 'Belegfenstergröße ändern' }).hover()
+  await page.mouse.down()
+  await page.mouse.move(enlarged.x + enlarged.width - 210, enlarged.y + enlarged.height - 130, { steps: 10 })
+  await page.mouse.up()
+  await expect(modal).toBeVisible()
+  expect((await modal.boundingBox())!.width).toBeLessThan(enlarged.width - 100)
   await page.mouse.click(20, 20)
   await expect(modal).toHaveCount(0)
+}
+
+test('resizing stays open when release produces a backdrop click', async ({ page }) => {
+  await checkResizeRelease(page)
+})
+
+test('resize release stays open in the installed Electron renderer', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'vereino-attachment-resize-'))
+  const main = path.join(dir, 'main.cjs')
+  await writeFile(main, `
+    const { app, BrowserWindow } = require('electron')
+    app.whenReady().then(() => {
+      const window = new BrowserWindow({ width: 1600, height: 1000, show: false })
+      window.loadURL('data:text/html,<html data-theme="light"><div id="root"></div></html>')
+    })
+    app.on('window-all-closed', () => app.quit())
+  `)
+  const env = { ...process.env }
+  delete env.ELECTRON_RUN_AS_NODE
+  const app = await electron.launch({ args: [main], env })
+  try {
+    const page = await app.firstWindow()
+    await page.addStyleTag({ content: css })
+    await page.addScriptTag({ content: script })
+    await expect(page.locator('.attachments-modal__content')).toBeVisible()
+    await page.locator('.attachments-modal').evaluate(el => el.getAnimations().forEach(animation => animation.finish()))
+    await checkResizeRelease(page)
+  } finally {
+    await app.close()
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('resize handle supports the keyboard', async ({ page }) => {
+  const modal = page.locator('.attachments-modal')
+  const before = (await modal.boundingBox())!
+  const handle = page.getByRole('button', { name: 'Belegfenstergröße ändern' })
+  await handle.focus()
+  await handle.press('ArrowRight')
+  await handle.press('ArrowDown')
+  const after = (await modal.boundingBox())!
+  expect(after.width).toBe(before.width + 20)
+  expect(after.height).toBe(before.height + 20)
+  await expect(modal).toBeVisible()
 })
 
 test('pressing inside and releasing outside keeps the modal open', async ({ page }) => {

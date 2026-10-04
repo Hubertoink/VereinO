@@ -5,6 +5,9 @@ import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../../shared/dataCh
 import type { DashboardSnapshotInput } from '../../../shared/dashboard'
 import { ORGANIZATION_PROFILES, type OrganizationProfile } from '../../../shared/classification'
 import { filePayloadToBase64, filePayloadToBuffer } from '../services/filePayload'
+import { memberLetterContributionParagraphs } from '../services/memberLetter'
+import { getDashboardTasks } from '../services/dashboardTasks'
+import { z } from 'zod'
 import {
   clearDashboardSnapshotCache,
   getDashboardSnapshot
@@ -817,6 +820,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   }, ['invoices', 'i.party_id']))
   ipcMain.handle('app.dashboardSnapshot', async (_event, payload: DashboardSnapshotInput) => {
     return getDashboardSnapshot(payload)
+  })
+  ipcMain.handle('app.dashboardTasks', async (_event, payload: { today: string }) => {
+    const today = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(payload?.today)
+    return getDashboardTasks(today)
   })
   ipcMain.handle('updates.getState', async () => getUpdateState())
   ipcMain.handle('updates.check', async () => checkForAppUpdates())
@@ -3481,15 +3488,8 @@ ${reportAnalyticsCss}
         }
         const dateLine = (city ? city + ', ' : '') + datePretty
 
-        // Simple letter body with placeholders (use real umlauts; encoder will convert)
-        const subjectPlaceholder = '<<Betreff eintragen>>'
-        const bodyParas = [
-          `Sehr geehrte/r ${payload.name},`,
-          'wir kontaktieren Sie bezüglich Ihrer Mitgliedsbeiträge.',
-          'Bitte melden Sie sich bei Rückfragen.',
-          'Mit freundlichen Grüßen',
-          'Ihr Verein'
-        ]
+        const contributionParagraphs = memberLetterContributionParagraphs(payload.id)
+        const subject = contributionParagraphs.length ? 'Offene Mitgliedsbeiträge' : '<<Betreff eintragen>>'
 
         // RTF helpers: escape control chars and encode non-ASCII as Unicode escapes
         function rtfUnicodeEncode(s: string): string {
@@ -3549,7 +3549,7 @@ ${reportAnalyticsCss}
             (zipCity ? ' \\line ' + rtfUnicodeEncode(zipCity) : '') +
             ' \\par}\\par',
           // Subject (bold)
-          '{\\pard\\b ' + rtfUnicodeEncode('Betreff: ' + subjectPlaceholder) + ' \\b0 \\par}',
+          '{\\pard\\b ' + rtfUnicodeEncode('Betreff: ' + subject) + ' \\b0 \\par}',
           // City + Pretty Date
           '{\\pard ' + rtfUnicodeEncode(dateLine) + ' \\par}\\par',
           // Salutation and body paragraphs
@@ -3557,6 +3557,7 @@ ${reportAnalyticsCss}
           '{\\pard ' +
             rtfUnicodeEncode('wir wenden uns an Sie bezüglich Ihrer Mitgliedsbeiträge im Verein.') +
             ' \\par}\\par',
+          ...contributionParagraphs.map(text => '{\\pard ' + rtfUnicodeEncode(text) + ' \\par}\\par'),
           '{\\pard ' +
             rtfUnicodeEncode(
               'Falls Sie Fragen oder Unklarheiten haben, melden Sie sich bitte bei uns. Wir stehen Ihnen gerne zur Verfügung.'

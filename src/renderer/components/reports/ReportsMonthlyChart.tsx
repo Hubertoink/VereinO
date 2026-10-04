@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Sphere, VoucherType, PaymentMethod } from './types'
+import { useScrollToLatest } from '../../hooks/useScrollToLatest'
 
 function monthKeys(from?: string, to?: string): string[] {
   // Build inclusive YYYY-MM keys; fallback to current year if props missing
@@ -99,6 +100,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
     }
     return Array.from(allMonths).sort()
   })()
+  useScrollToLatest(containerRef, `${loading}:${props.activateKey}:${months.join(',')}`)
   const inMap = new Map(inBuckets.map(b => [String(b.month), Number(b.gross) || 0]))
   const outMap = new Map(outBuckets.map(b => [String(b.month), Math.abs(Number(b.gross) || 0)]))
   const series = months.map(m => ({

@@ -10,6 +10,7 @@ import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import BankImportRemapDialog from './BankImportRemapDialog'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
+import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 
 type PaymentAccount = {
   id: number
@@ -213,6 +214,7 @@ type BankTransactionMatch = {
 }
 
 type Props = {
+  initialTask?: DashboardTaskTarget | null
   paymentAccounts: PaymentAccount[]
   notify: (type: 'success' | 'error' | 'info', text: string) => void
   onCreateBooking: (transaction: BankTransaction, acknowledgedBankVoucherIds?: number[]) => void
@@ -1855,6 +1857,7 @@ function BankAiSuggestionModal({
 }
 
 export default function BankImportView({
+  initialTask,
   paymentAccounts,
   notify,
   onCreateBooking,
@@ -1868,7 +1871,7 @@ export default function BankImportView({
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'ALL' | BankTransaction['status']>('OPEN')
-  const [accountId, setAccountId] = useState<number | null>(null)
+  const [accountId, setAccountId] = useState<number | null>(initialTask?.kind === 'bank' ? initialTask.accountId ?? null : null)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [batchFilter, setBatchFilter] = useState<{ id: number; fileName: string } | null>(null)
@@ -1886,7 +1889,7 @@ export default function BankImportView({
     'status' | 'date' | 'description' | 'account' | 'type' | 'amount'
   >('date')
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
-  const [showImport, setShowImport] = useState(false)
+  const [showImport, setShowImport] = useState(initialTask?.kind === 'bank' && initialTask.accountId != null && !initialTask.filter)
   const [initialImportFile, setInitialImportFile] = useState<File | null>(null)
   const [selected, setSelected] = useState<BankTransaction | null>(null)
   const [aiSuggestionTransaction, setAiSuggestionTransaction] = useState<BankTransaction | null>(null)

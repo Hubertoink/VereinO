@@ -312,6 +312,8 @@ export function deleteInvoice(id: number) {
 }
 
 export function listInvoicesPaged(filters: {
+  unpaidOnly?: boolean
+  voucherType?: 'IN' | 'OUT'
   limit?: number
   offset?: number
   sort?: 'ASC' | 'DESC'
@@ -331,6 +333,8 @@ export function listInvoicesPaged(filters: {
   const params: any[] = []
   const wh: string[] = []
   let joinTag = ''
+  if (filters.unpaidOnly) wh.push('i.gross_amount > COALESCE((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id=i.id),0) + 0.000001')
+  if (filters.voucherType) { wh.push("COALESCE(i.voucher_type,'OUT') = ?"); params.push(filters.voucherType) }
   if (sphere) { wh.push('i.sphere = ?'); params.push(sphere) }
   if (budgetId) { wh.push('i.budget_id = ?'); params.push(budgetId) }
   if (dueFrom) { wh.push('i.due_date >= ?'); params.push(dueFrom) }
@@ -406,6 +410,8 @@ export function listInvoicesPaged(filters: {
 }
 
 export function summarizeInvoices(filters: {
+  unpaidOnly?: boolean
+  voucherType?: 'IN' | 'OUT'
   status?: InvoiceStatus | 'ALL'
   sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
   budgetId?: number
@@ -419,6 +425,8 @@ export function summarizeInvoices(filters: {
   const params: any[] = []
   const wh: string[] = []
   let joinTag = ''
+  if (filters?.unpaidOnly) wh.push('i.gross_amount > COALESCE((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id=i.id),0) + 0.000001')
+  if (filters?.voucherType) { wh.push("COALESCE(i.voucher_type,'OUT') = ?"); params.push(filters.voucherType) }
   if (sphere) { wh.push('i.sphere = ?'); params.push(sphere) }
   if (budgetId) { wh.push('i.budget_id = ?'); params.push(budgetId) }
   if (dueFrom) { wh.push('i.due_date >= ?'); params.push(dueFrom) }

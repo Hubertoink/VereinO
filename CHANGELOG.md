@@ -5,7 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unreleased]
+## [4.6.6] - 2026-10-04
+
+### Geändert
+
+- Die monatliche Entwicklung im Dashboard und in Reports startet rechts bei den neuesten Monaten, auch nach einem Zeitraumwechsel. Ältere Monate bleiben manuell erreichbar.
+- Das Dashboard bündelt offene Aufgaben mit Dringlichkeit, Beträgen und direkten Verweisen: Bankimport, Mitgliedsbeiträge, Verbindlichkeiten, Forderungen, Abos, Kostenerstattungen, Vorschüsse, Einreichungen, Entwürfe, Belegprüfung, Budgets, Zweckbindungen und Datensicherung. Aufgabendetails und Erinnerungen öffnen als Dropdown an ihrem Auslöser; Bereiche ohne offene Aufgaben stehen kompakt im Status-Dropdown neben den Erinnerungen. Bankimport-Erinnerungen sind pro Konto einstellbar.
+- „Mitglied anschreiben“ nennt die aktuell offenen Beitragszeiträume mit Einzelbeträgen und Gesamtbetrag im erstellten Brief.
+
+### Behoben
+
+- Das Belegfenster lässt sich über einen eigenen Griff zuverlässig vergrößern und verkleinern, auch mit Pfeiltasten. Es bleibt nach dem Ziehen geöffnet.
 
 ## [4.6.5] - 2026-10-03
 

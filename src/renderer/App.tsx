@@ -46,6 +46,7 @@ import {
   normalizeVoucherEarmarkAssignments
 } from './utils/voucherAssignmentFallbacks'
 import { invoiceDraftTabText } from './utils/invoiceDraftLabel'
+import type { DashboardTaskTarget } from '../../shared/dashboardTasks'
 import { selectAiDraftBookingType } from './utils/aiBookingDraft'
 import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
@@ -1653,6 +1654,10 @@ function AppInner() {
     setPlusEditFiles([])
   }), [])
   usePageHistory(activePage, setActivePage)
+  const [dashboardTaskTarget, setDashboardTaskTarget] = useState<DashboardTaskTarget | null>(null)
+  const [dashboardTaskPage, setDashboardTaskPage] = useState<NavKey | null>(null)
+  useEffect(() => { if (activePage !== dashboardTaskPage) { setDashboardTaskTarget(null); setDashboardTaskPage(null) } }, [activePage, dashboardTaskPage])
+  useEffect(() => window.api.organizations.onSwitched(() => { setDashboardTaskTarget(null); setDashboardTaskPage(null) }), [])
   useOverlayScrollLock()
   useEffect(() => {
     if (!isClassicBookings) {
@@ -3597,7 +3602,15 @@ function AppInner() {
               activateKey={reportsActivateKey}
             />
           )}
-          {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} onGoToBookings={() => setActivePage('Buchungen')} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
+          {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} drafts={bookingDraftTabs} onOpenDraft={openBookingDraftTab} onTaskNavigate={target => {
+            const pages: Record<DashboardTaskTarget['kind'], NavKey> = { bank: 'Bankimport', members: 'Mitglieder', invoices: 'Verbindlichkeiten', receivables: 'Verbindlichkeiten', recurring: 'Dauerbuchungen', reimbursements: 'Verbindlichkeiten', advances: 'Vorschuesse', submissions: 'Einreichungen', drafts: 'Buchungen', budgets: 'Budgets', bindings: 'Zweckbindungen', backup: 'Einstellungen', ai: 'KI' }
+            const page = pages[target.kind]
+            if (!visibleNavSet.has(page)) setVisibleNavItems([...visibleNavItems, page])
+            setDashboardTaskTarget(target)
+            setDashboardTaskPage(page)
+            if (target.kind === 'backup') sessionStorage.setItem('settingsActiveTile', 'storage')
+            setActivePage(page)
+          }} onGoToBookings={() => setActivePage('Buchungen')} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
             resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, keepDateRange: true })
             setQ(`#${voucherId}`); setFrom(recordDate?.slice(0, 10) || ''); setTo(recordDate?.slice(0, 10) || ''); setPlusCalendarSelection(current => ({ month: recordDate?.slice(0, 7) || current.month, from: recordDate?.slice(0, 10) || '', to: recordDate?.slice(0, 10) || '' })); setFlashId(voucherId); setPage(1); setActivePage('Buchungen')
             window.setTimeout(() => setFlashId(current => current === voucherId ? null : current), 5000)
@@ -3669,7 +3682,7 @@ function AppInner() {
             <BookingsPlusView onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
           )}
           {activePage === 'Dauerbuchungen' && (
-            <RecurringBookingsView notify={notify} />
+            <RecurringBookingsView notify={notify} initialTask={dashboardTaskTarget} />
           )}
           {/* Old Buchungen block removed - now using JournalView component */}
 
@@ -3801,17 +3814,18 @@ function AppInner() {
           )}
 
           {activePage === 'Mitglieder' && (
-            <MembersView registerPageShortcuts={registerPageShortcuts} />
+            <MembersView registerPageShortcuts={registerPageShortcuts} initialTask={dashboardTaskTarget} />
           )}
 
           {activePage === 'Vorschuesse' && <AdvancesView />}
 
           {activePage === 'Verbindlichkeiten' && (
-            <InvoicesView registerPageShortcuts={registerPageShortcuts} />
+            <InvoicesView registerPageShortcuts={registerPageShortcuts} initialTask={dashboardTaskTarget} />
           )}
 
           {activePage === 'Bankimport' && (
             <BankImportView
+              initialTask={dashboardTaskTarget}
               paymentAccounts={paymentAccounts}
               notify={notify}
               onCreateBooking={(transaction, acknowledgedBankVoucherIds) => {

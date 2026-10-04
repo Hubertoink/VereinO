@@ -71,7 +71,8 @@ function VoucherPicker({ role, initialVoucherId, maxCents, busy, submitDisabled 
   </section>
 }
 
-export default function ReimbursementsDialog({ onClose, notify, voucher, initialId, startCreate = false, onNavigate, embedded = false, toolbarTarget }: {
+export default function ReimbursementsDialog({ onClose, notify, voucher, initialId, startCreate = false, onNavigate, embedded = false, toolbarTarget, initialUnpaidOnly = false }: {
+  initialUnpaidOnly?: boolean
   onClose: () => void; notify: Notify; voucher?: Voucher; initialId?: number; startCreate?: boolean; onNavigate?: () => void; embedded?: boolean; toolbarTarget?: HTMLElement | null
 }) {
   const [rows, setRows] = useState<Reimbursement[]>([])
@@ -83,7 +84,7 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState(initialUnpaidOnly ? 'UNPAID' : 'ALL')
   const [title, setTitle] = useState(voucher?.description || '')
   const [partner, setPartner] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -125,10 +126,10 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
     <label>Fällig am (optional)<input className="input" type="date" value={dueDate} disabled={busy} onChange={event => setDueDate(event.target.value)} /></label>
     <label>Notiz / Abrechnungsreferenz<textarea className="input" maxLength={10000} value={note} disabled={busy} onChange={event => setNote(event.target.value)} placeholder="Vereinbarung, Versanddatum oder Referenz der Abrechnung" /></label>
   </div>
-  const visible = rows.filter(row => (statusFilter === 'ALL' || row.status === statusFilter) && `${row.title} ${row.partner}`.toLocaleLowerCase().includes(q.toLocaleLowerCase()))
+  const visible = rows.filter(row => (statusFilter === 'ALL' || statusFilter === 'UNPAID' && row.remainingCents > 0 || row.status === statusFilter) && `${row.title} ${row.partner}`.toLocaleLowerCase().includes(q.toLocaleLowerCase()))
   const today = new Date().toLocaleDateString('en-CA')
   const overdue = visible.filter(row => row.remainingCents > 0 && row.dueDate && row.dueDate < today)
-  const toolbar = <div className="reimbursement-overview-toolbar"><input className="input" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} /><select className="input" aria-label="Status filtern" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="ALL">Alle Status</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select><button className="btn primary" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}>+ Erstattung erwarten</button></div>
+  const toolbar = <div className="reimbursement-overview-toolbar"><input className="input" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} /><select className="input" aria-label="Status filtern" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="ALL">Alle Status</option><option value="UNPAID">Alle offenen Erstattungen</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select><button className="btn primary" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}>+ Erstattung erwarten</button></div>
   const overview = <div className="reimbursement-inline">
         {!(embedded && toolbarTarget) && toolbar}
         {voucher?.type === 'IN' && <p className="helper">Wähle den Vorgang und anschließend „Erstattung zuordnen“. Die aktuelle Einnahme wird vorausgewählt.</p>}

@@ -24,6 +24,7 @@ import BookingOptionalArea from '../../components/booking/BookingOptionalArea'
 import BookingKindSwitch from '../../components/booking/BookingKindSwitch'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 import { localIsoDate, type RecurringFrequency } from '../../../../shared/recurrence'
+import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 
 type Status = 'ACTIVE' | 'PAUSED' | 'ENDED'
 type Sphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -443,7 +444,8 @@ function RecurringBookingModal({
   </BookingPopupFrame>
 }
 
-export default function RecurringBookingsView({ notify }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void }) {
+export default function RecurringBookingsView({ notify, initialTask }: { notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; initialTask?: DashboardTaskTarget | null }) {
+  const [attentionOnly, setAttentionOnly] = useState(initialTask?.kind === 'recurring')
   const [rows, setRows] = useState<RecurringBooking[]>([])
   const [summary, setSummary] = useState({ due: 0, upcoming: 0, active: 0, paused: 0 })
   const [loading, setLoading] = useState(true)
@@ -576,6 +578,8 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
     }
   }
 
+  const visibleRows = rows.filter(row => !attentionOnly || row.dueCount > 0 || (row.status === 'ACTIVE' && (row.nextDueDate <= localIsoDate(new Date(Date.now() + 7 * 86400000)) || !!row.endDate && row.endDate <= localIsoDate(new Date(Date.now() + 30 * 86400000)))))
+
   return (
     <div className="recurring-bookings-view">
       <div className="recurring-page-header">
@@ -594,6 +598,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
             {q && <button className="btn ghost recurring-search-clear" type="button" onClick={() => setQ('')} aria-label="Suche leeren"><AppIcon icon={IconX} size="control" /></button>}
           </div>
           <RecurringStatusFilterDropdown value={status} onChange={setStatus} />
+          {attentionOnly && <button className="btn" onClick={() => setAttentionOnly(false)}>Aufgabenfilter aufheben</button>}
           <div className="filter-divider" />
           <button className="btn primary btn-with-icon" onClick={(event) => { setEditingAnchor(event.currentTarget.getBoundingClientRect()); setEditing(initialDraft()) }}><AppIcon icon={IconCalendarPlus} size="control" />Dauerbuchung</button>
         </div>
@@ -605,7 +610,7 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
           <table className="recurring-table">
             <thead><tr><th>Bezeichnung</th><th>Rhythmus</th><th>Nächste Fälligkeit</th><th>Betrag</th><th>Konto</th><th>Status</th><th>Aktionen</th></tr></thead>
             <tbody>
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr key={row.id} className={row.dueCount > 0 ? 'recurring-row-due' : undefined}>
                   <td>
                     <strong>{row.name}</strong>
@@ -654,8 +659,8 @@ export default function RecurringBookingsView({ notify }: { notify: (type: 'succ
                   </td>
                 </tr>
               ))}
-              {!loading && rows.length === 0 && <tr><td colSpan={7} className="recurring-empty">Keine Dauerbuchungen gefunden.</td></tr>}
-              {loading && rows.length === 0 && <tr><td colSpan={7} className="recurring-empty">Dauerbuchungen werden geladen…</td></tr>}
+              {!loading && visibleRows.length === 0 && <tr><td colSpan={7} className="recurring-empty">Keine Dauerbuchungen gefunden.</td></tr>}
+              {loading && visibleRows.length === 0 && <tr><td colSpan={7} className="recurring-empty">Dauerbuchungen werden geladen…</td></tr>}
             </tbody>
           </table>
         </div>

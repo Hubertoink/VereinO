@@ -124,6 +124,10 @@ export default function AttachmentsModal({
     const [pdfMeta, setPdfMeta] = useState<null | { page: number; numPages: number }>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const backdropPointerDownRef = useRef(false)
+    const modalRef = useRef<HTMLDivElement | null>(null)
+    const resizeDragRef = useRef<null | { pointerId: number; x: number; y: number; width: number; height: number }>(null)
+    const resizeGestureRef = useRef(false)
+    const [modalSize, setModalSize] = useState<{ width: number; height: number } | null>(null)
     const pdfCanvasRef = useRef<HTMLCanvasElement | null>(null)
     const previewAreaRef = useRef<HTMLDivElement | null>(null)
     const pdfDocRef = useRef<any>(null)
@@ -429,20 +433,32 @@ export default function AttachmentsModal({
         setPdfMeta({ ...pdfMeta, page: Math.min(pdfMeta.numPages, pdfMeta.page + 1) })
     }
 
+    function resizeModal(width: number, height: number) {
+        const maxWidth = window.innerWidth - 32
+        const maxHeight = window.innerHeight - 32
+        setModalSize({
+            width: Math.max(Math.min(640, maxWidth), Math.min(maxWidth, width)),
+            height: Math.max(Math.min(400, maxHeight), Math.min(maxHeight, height))
+        })
+    }
+
     return createPortal(
         <div
             className="modal-overlay attachments-modal-overlay"
-            onPointerDownCapture={(event) => { backdropPointerDownRef.current = event.target === event.currentTarget }}
+            onPointerDownCapture={(event) => {
+                resizeGestureRef.current = false
+                backdropPointerDownRef.current = event.target === event.currentTarget
+            }}
             onPointerCancel={() => { backdropPointerDownRef.current = false }}
             onClick={(event) => {
                 const startedOnBackdrop = backdropPointerDownRef.current
                 backdropPointerDownRef.current = false
-                if (startedOnBackdrop && event.target === event.currentTarget) onClose()
+                if (!resizeGestureRef.current && startedOnBackdrop && event.target === event.currentTarget) onClose()
             }}
             role="dialog"
             aria-modal="true"
         >
-            <div className="modal attachments-modal" onClick={(e) => e.stopPropagation()}>
+            <div ref={modalRef} className="modal attachments-modal" style={modalSize ?? undefined} onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <header className="attachments-modal__header">
                     <div className="attachments-modal__title">
@@ -628,6 +644,45 @@ export default function AttachmentsModal({
                         </div>
                     </div>
                 )}
+
+                <button
+                    type="button"
+                    className="attachments-modal__resize-handle"
+                    aria-label="Belegfenstergröße ändern"
+                    title="Größe ändern: ziehen oder Pfeiltasten verwenden"
+                    onPointerDown={(event) => {
+                        if (event.button !== 0 || !modalRef.current) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        const rect = modalRef.current.getBoundingClientRect()
+                        resizeGestureRef.current = true
+                        resizeDragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, width: rect.width, height: rect.height }
+                        event.currentTarget.setPointerCapture(event.pointerId)
+                    }}
+                    onPointerMove={(event) => {
+                        const drag = resizeDragRef.current
+                        if (!drag || drag.pointerId !== event.pointerId) return
+                        resizeModal(drag.width + event.clientX - drag.x, drag.height + event.clientY - drag.y)
+                    }}
+                    onPointerUp={(event) => {
+                        if (resizeDragRef.current?.pointerId !== event.pointerId) return
+                        event.stopPropagation()
+                        resizeDragRef.current = null
+                        event.currentTarget.releasePointerCapture(event.pointerId)
+                    }}
+                    onLostPointerCapture={() => { resizeDragRef.current = null }}
+                    onClick={(event) => { event.preventDefault(); event.stopPropagation() }}
+                    onKeyDown={(event) => {
+                        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || !modalRef.current) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        const rect = modalRef.current.getBoundingClientRect()
+                        const step = event.shiftKey ? 50 : 20
+                        resizeModal(rect.width + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0), rect.height + (event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0))
+                    }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 13 13 3M7 13l6-6M11 13l2-2" /></svg>
+                </button>
 
                 {/* Delete confirmation modal */}
                 {confirmDelete && (

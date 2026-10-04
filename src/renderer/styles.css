@@ -15907,7 +15907,7 @@ button.filter-totals-stat {
   min-height: min(400px, calc(100dvh - 32px));
   max-height: calc(100dvh - 32px);
   box-sizing: border-box;
-  resize: both;
+  position: relative;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -21062,6 +21062,28 @@ textarea {
 .compact-booking-optional-area .compact-booking-optional-bar {
   margin: 0;
   padding-top: 9px;
+}
+
+.attachments-modal__resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.attachments-modal__resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
 }
 
 /* Keep the divider straight despite the rounded modal surface rules. */
