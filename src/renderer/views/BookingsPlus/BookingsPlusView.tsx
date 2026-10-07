@@ -45,6 +45,8 @@ type Props = {
 }
 type Filter = { q: string; from: string; to: string; type: string; sphere: string; classification: string; account: string; budget: string; earmark: string; tag: string }
 const emptyFilters: Filter = { q: '', from: '', to: '', type: '', sphere: '', classification: '', account: '', budget: '', earmark: '', tag: '' }
+const kindFilterColors: Partial<Record<keyof typeof kinds, string>> = { IN: '#237d49', OUT: '#ad414b' }
+const sphereFilterColors: Record<keyof typeof spheres, string> = { IDEELL: '#7751b8', ZWECK: '#087e8b', VERMOEGEN: '#a86612', WGB: '#a53970' }
 const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', signDisplay: 'exceptZero' })
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -64,7 +66,7 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
     const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters, from: calendarSelection.from, to: calendarSelection.to }))
     const q = useDebouncedValue(filters.q.trim(), 250)
     const batchNotify = useCallback((type: 'info' | 'success' | 'error' | 'warn', message: string) => notify(type === 'warn' ? 'info' : type, message), [notify])
-    const [classifications, setClassifications] = useState<Array<{ id: number; name: string }>>([])
+    const [classifications, setClassifications] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
     useEffect(() => {
         let alive = true
         if (generalProfile) void window.api.classifications.primary.list().then(result => { if (alive) setClassifications(result.values) }).catch(() => { if (alive) notify('error', 'Kategorien konnten nicht geladen werden.') })
@@ -309,14 +311,26 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
         })}</span>
     }
     const activePaymentAccount = paymentAccounts.find(account => String(account.id) === filters.account)
+    const activeClassification = classifications.find(item => String(item.id) === filters.classification)
+    const activeBudget = budgets.find(item => String(item.id) === filters.budget)
+    const activeEarmark = earmarks.find(item => String(item.id) === filters.earmark)
+    const activeFilterColors: Partial<Record<keyof Filter, string | null | undefined>> = {
+        type: kindFilterColors[filters.type as keyof typeof kinds],
+        sphere: sphereFilterColors[filters.sphere as keyof typeof spheres],
+        classification: activeClassification?.color,
+        account: activePaymentAccount?.color,
+        budget: activeBudget?.color,
+        earmark: activeEarmark?.color,
+        tag: resolveTagDisplayColor(filters.tag, tagDefs)
+    }
     const activeFilterLabels: Partial<Record<keyof Filter, string>> = {
         q: filters.q ? `Suche: ${filters.q}` : '',
         from: filters.from ? `Ab ${fmtDate(filters.from)}` : '', to: filters.to ? `Bis ${fmtDate(filters.to)}` : '',
         type: kinds[filters.type as keyof typeof kinds], sphere: spheres[filters.sphere as keyof typeof spheres],
-        classification: classifications.find(c => String(c.id) === filters.classification)?.name,
+        classification: activeClassification?.name,
         account: activePaymentAccount?.name,
-        budget: budgets.find(b => String(b.id) === filters.budget)?.label,
-        earmark: earmarks.find(e => String(e.id) === filters.earmark)?.name, tag: filters.tag
+        budget: activeBudget?.label,
+        earmark: activeEarmark?.name, tag: filters.tag
     }
     return <div className="bookings-plus bookings-plus--dense">
         <aside className={`bp-sidebar${filtersOpen ? ' bp-sidebar--open' : ''}`} aria-label="Kalender und Buchungsfilter">
@@ -329,8 +343,8 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                     <div className="bp-calendar-legend">{calendarState === 'loading' ? 'Buchungstage werden geladen …' : calendarState === 'error' ? <button className="btn ghost" onClick={refresh}>Buchungstage erneut laden</button> : <><span className="bp-receipt-dot" />Tag mit Buchungen · unabhängig von Filtern</>}</div>
                 </section>
                 <section className="bp-panel bp-filters"><div className="bp-section-heading"><h2>Filter</h2>{hasActiveFilters && <button type="button" className="bp-reset-badge" onClick={() => { setFilters(emptyFilters); setPage(1); setSimilarTo(null); onResetFilters() }}>Zurücksetzen</button>}</div>
-                    {chipFilter('type', 'Art', Object.entries(kinds).map(([value, label]) => ({ value, label, color: value === 'IN' ? '#237d49' : value === 'OUT' ? '#ad414b' : undefined })))}
-                    {generalProfile ? chipFilter('classification', 'Kategorie', classifications.map(item => ({ value: String(item.id), label: item.name }))) : chipFilter('sphere', 'Sphäre', Object.entries(spheres).map(([value, label]) => ({ value, label, color: ({ IDEELL: '#7751b8', ZWECK: '#087e8b', VERMOEGEN: '#a86612', WGB: '#a53970' })[value] })))}
+                    {chipFilter('type', 'Art', Object.entries(kinds).map(([value, label]) => ({ value, label, color: kindFilterColors[value as keyof typeof kinds] })))}
+                    {generalProfile ? chipFilter('classification', 'Kategorie', classifications.map(item => ({ value: String(item.id), label: item.name, color: item.color }))) : chipFilter('sphere', 'Sphäre', Object.entries(spheres).map(([value, label]) => ({ value, label, color: sphereFilterColors[value as keyof typeof spheres] })))}
                     {chipFilter('account', 'Zahlweg / Konto', paymentAccounts.map(item => ({ value: String(item.id), label: item.name, color: item.color, icon: paymentFilterIcon(item, filters.account === String(item.id)) })))}
                     {tagDefs.length > 0 && <div>{chipFilter('tag', 'Tags', tagDefs.filter((tag, index) => allTagsOpen || index < 6 || tag.name === filters.tag).map(item => ({ value: item.name, label: item.name, color: resolveTagDisplayColor(item.name, tagDefs) })))}{tagDefs.length > 6 && <button className="btn ghost bp-more-tags" onClick={() => setAllTagsOpen(value => !value)} aria-expanded={allTagsOpen}>{allTagsOpen ? 'Weniger Tags' : `Alle ${tagDefs.length} Tags`}</button>}</div>}
                     <details className="bp-more-filters" open={moreFiltersOpen} onToggle={event => setMoreFiltersOpen(event.currentTarget.open)}><summary>Weitere Filter{(filters.from || filters.to || filters.budget || filters.earmark) && <span className="bp-active-filter-count">{[filters.from || filters.to, filters.budget, filters.earmark].filter(Boolean).length} aktiv</span>}</summary>
@@ -344,12 +358,18 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
         <section className="bp-workspace">
             <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><div className="bp-heading-workspace"><label className="bp-search bp-header-search"><IconSearch size={18} /><input type="search" className="input" value={filters.q} onChange={event => update('q', event.target.value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" aria-label="Buchungen suchen" />{filters.q && <button type="button" className="btn ghost" aria-label="Suche leeren" onClick={() => update('q', '')}><IconX size={16} /></button>}</label>{showBookingDraftTabs && bookingDraftTabs.length > 0 && <div ref={draftTabsRef} className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}</div><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
             <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
-            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter"><span>{hasActiveFilters ? 'Aktive Filter:' : 'Gesamter Verlauf · keine Filter'}</span>{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => <button type="button" key={key} style={key === 'account' && activePaymentAccount?.color ? { background: activePaymentAccount.color, borderColor: activePaymentAccount.color, color: getContrastTextColor(activePaymentAccount.color) } : undefined} aria-label={`${activeFilterLabels[key] || filters[key]}: Filter entfernen`} onClick={() => update(key, '')}>{key === 'account' && activePaymentAccount && paymentFilterIcon(activePaymentAccount, true)}{activeFilterLabels[key] || filters[key]} <span aria-hidden="true">×</span></button>)}</div>
+            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter"><span>{hasActiveFilters ? 'Aktive Filter:' : 'Gesamter Verlauf · keine Filter'}</span>{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
+                const color = activeFilterColors[key]
+                return <button type="button" key={key} style={color ? { background: color, borderColor: color, color: getContrastTextColor(color) } : undefined} aria-label={`${activeFilterLabels[key] || filters[key]}: Filter entfernen`} onClick={() => update(key, '')}>{key === 'account' && activePaymentAccount && paymentFilterIcon(activePaymentAccount, true)}{activeFilterLabels[key] || filters[key]} <span aria-hidden="true">×</span></button>
+            })}</div>
             <div className="bp-main-columns">
                 <section className="bp-panel bp-list" aria-label="Buchungsliste" aria-busy={loading}>
                     {similarTo && <section className="bp-similar"><div className="bp-section-heading"><h3>Ähnliche Buchungen</h3><button className="btn ghost" aria-label="Ähnliche Buchungen schließen" onClick={() => setSimilarTo(null)}><IconX size={16} /></button></div><p className="bp-dim">Bis zu 5 Treffer · gleiche Art · Suche nach „{similarQuery(similarTo)}“ · alle Zeiträume</p>{similarLoading ? <p role="status">Suche läuft …</p> : similarError ? <p role="alert">{similarError}</p> : !similarRows.length ? <p>Keine ähnlichen Buchungen gefunden.</p> : similarRows.map(row => <button className="btn" key={row.id} onClick={() => selectRow(row)}><span>{row.description || row.voucherNo}<small>{prettyDate(row.date)}</small></span><strong>{signedMoney.format(signedAmount(row))}</strong></button>)}</section>}
-                    <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
-                    <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
+                    <div className="bp-list-scroll">
+                    <header className="bp-list-header">
+                        <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
+                        <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
+                    </header>
                     <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
                         <time className="bp-date" dateTime={row.date}><strong>{Number(row.date.slice(8, 10))}</strong><span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('de-DE', { month: 'short' })}</span><small>{row.date.slice(0, 4)}</small></time>
                         <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span><span className="bp-row-payment bp-row-payment--compact">{paymentMeta(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{assignmentBadges(row)}</span></span>
@@ -357,6 +377,7 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                     </div>)}</div>}
                     </div>
                     <nav className="bp-pagination" aria-label="Buchungsseiten"><span>Seite {page} / {Math.max(1, Math.ceil(total / limit))} · {total} Einträge</span><div><button className="btn" disabled={loading || page === 1} onClick={() => setPage(1)} aria-label="Erste Seite" title="Zur ersten Seite"><IconChevronsLeft size={17} /></button><button className="btn" disabled={loading || page === 1} onClick={() => setPage(value => value - 1)} aria-label="Vorherige Seite"><IconChevronLeft size={17} /></button><button className="btn" disabled={loading || page * limit >= total} onClick={() => setPage(value => value + 1)} aria-label="Nächste Seite"><IconChevronRight size={17} /></button></div></nav>
+                    </div>
                 </section>
                 {narrow && detailOpen && <div className="bp-detail-backdrop" onClick={closeDetails} />}
                 <aside ref={inspector} tabIndex={-1} className={`bp-panel bp-inspector${detailOpen ? ' bp-inspector--open' : ''}${metaEditing ? ' bp-inspector--editing' : ''}`} role={narrow && detailOpen ? 'dialog' : undefined} aria-modal={narrow && detailOpen ? true : undefined} aria-label="Ausgewählte Buchung">

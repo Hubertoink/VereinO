@@ -100,6 +100,49 @@ test('filter refresh keeps rows, totals and panel geometry until results arrive'
   await expect(page.locator('.bp-row')).toBeEnabled()
 })
 
+test('compact list chrome stays fixed while bookings scroll behind it', async ({ page }, info) => {
+  for (const theme of ['light', 'dark']) {
+    await page.setViewportSize({ width: theme === 'light' ? 1600 : 1200, height: 700 })
+    await page.setContent(`<style>
+      :root { --surface:${theme === 'light' ? '#fff' : '#202532'};--text:${theme === 'light' ? '#202532' : '#fff'};--text-dim:${theme === 'light' ? '#667085' : '#bac3d2'};--border:#7c9199;--accent:#61959c;--success:#398951;--danger:#dd6154 }
+      body { margin:0;font-family:Arial;background:var(--surface);color:var(--text) }
+      .bookings-plus { height:calc(100dvh - 24px) }
+    </style><div id="root"></div>`)
+    await page.addStyleTag({ content: styles })
+    await page.addScriptTag({ content: script })
+    await expect(page.locator('.bp-row')).toHaveCount(2)
+    await page.evaluate(() => {
+      const rows = Array.from({ length: 20 }, (_, index) => ({ id: index + 1, date: '2026-09-09', voucherNo: `IN-${index + 1}`, type: index % 2 ? 'OUT' : 'IN', sphere: 'IDEELL', grossAmount: 100 + index, description: `Scroll Buchung ${index + 1}`, tags: [] }))
+      ;(window as any).api.vouchers.list = async () => ({ rows, total: rows.length })
+    })
+    await page.getByRole('searchbox', { name: 'Buchungen suchen' }).fill('Scroll')
+    await expect(page.locator('.bp-row')).toHaveCount(20)
+    const scroll = page.locator('.bp-list-scroll')
+    const header = page.locator('.bp-list-header')
+    const footer = page.getByRole('navigation', { name: 'Buchungsseiten' })
+    const headerBefore = (await header.boundingBox())!
+    const footerBefore = (await footer.boundingBox())!
+    expect(headerBefore.height).toBeLessThan(60)
+    expect(footerBefore.height).toBeLessThan(45)
+    expect((await page.locator('.bp-row').first().boundingBox())!.y).toBeGreaterThanOrEqual(headerBefore.y + headerBefore.height)
+    await scroll.evaluate(element => { element.scrollTop = 110 })
+    expect((await header.boundingBox())!.y).toBeCloseTo(headerBefore.y, 0)
+    expect((await footer.boundingBox())!.y).toBeCloseTo(footerBefore.y, 0)
+    const boxes = await page.locator('.bp-row').evaluateAll(elements => elements.map(element => {
+      const rect = element.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom }
+    }))
+    expect(boxes.some(box => box.top < headerBefore.y + headerBefore.height && box.bottom > headerBefore.y)).toBe(true)
+    expect(boxes.some(box => box.top < footerBefore.y + footerBefore.height && box.bottom > footerBefore.y)).toBe(true)
+    await page.screenshot({ path: info.outputPath(`bookings-plus-blur-${theme}.png`) })
+    await page.locator('.bp-row').last().focus()
+    const last = (await page.locator('.bp-row').last().boundingBox())!
+    expect(last.y + last.height).toBeLessThanOrEqual(footerBefore.y)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole(theme === 'light' ? 'complementary' : 'dialog', { name: 'Ausgewählte Buchung' })).toContainText('Scroll Buchung 20')
+  }
+})
+
 test('selected day and month survive leaving Buchungen Plus', async ({ page }) => {
   await page.setContent('<div id="root"></div>')
   await page.addStyleTag({ content: styles })

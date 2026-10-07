@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.7.1] - 2026-10-07
+
+### Geändert
+
+- Die Buchungsliste in Buchungen Plus nutzt kompaktere Kopf- und Fußzeilen. Beim Scrollen laufen die Buchungen hinter den transparenten, weichgezeichneten Bereichen weiter; die erste und letzte Buchung bleiben vollständig erreichbar.
+- Aktive Filter in Buchungen Plus übernehmen die Farben von Art, Sphäre, Kategorie, Tags, Budgets und Zweckbindungen mit passender kontrastreicher Textfarbe.
+
 ## [4.7.0] - 2026-10-07
 
 ### Geändert
