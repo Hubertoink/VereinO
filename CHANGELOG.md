@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.7.0] - 2026-10-07
+
+### Geändert
+
+- In Buchungen Plus stehen Zahlwege und Konten im Filterbereich als farbige Badges mit Symbol zur Auswahl. Der aktive Filter erscheint auch oberhalb der Liste in der hinterlegten Kontofarbe und lässt sich dort direkt entfernen.
+- In der klassischen Buchungsansicht entfallen die Plus-Spalte und die aufklappbaren Detailzeilen. Die vollständigen Buchungsdetails öffnen sich weiterhin per Doppelklick.
+
+### Behoben
+
+- Bearbeitungsreiter werden nach erfolgreichem Speichern oder bestätigtem Verwerfen der Änderungen zuverlässig geschlossen. Gespeicherte Änderungen lösen beim erneuten Öffnen keine veraltete Verwerfen-Abfrage mehr aus; andere geparkte Bearbeitungen bleiben erhalten.
+- Beim Löschen oder Stornieren aus dem Bearbeitungsfenster wird auch der zugehörige Bearbeitungsreiter entfernt.
+
 ## [4.6.6] - 2026-10-04
 
 ### Geändert

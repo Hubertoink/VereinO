@@ -498,18 +498,19 @@ export default function JournalView({
 
     const closeEditModalNow = useCallback(() => {
         setConfirmDiscardEdit(false)
-
-        if (showBookingEditTabs && activeEditTabId) {
-            setActiveEditTabId(null)
-            setEditRowInitialSnapshot(null)
-            setEditRowState(null)
-            return
-        }
-
         setActiveEditTabId(null)
         setEditRowInitialSnapshot(null)
         setEditRowState(null)
-    }, [activeEditTabId, showBookingEditTabs])
+    }, [])
+
+    // Saving or explicitly discarding finishes the edit; closing the window
+    // alone may park it in a tab so the user can continue later.
+    const finishEditModalNow = useCallback(() => {
+        if (activeEditTabId) {
+            setBookingEditTabs((tabs) => tabs.filter((tab) => tab.id !== activeEditTabId))
+        }
+        closeEditModalNow()
+    }, [activeEditTabId, closeEditModalNow])
 
     const requestCloseEditModal = useCallback(() => {
         if (showBookingEditTabs && activeEditTabId) {
@@ -1298,7 +1299,7 @@ export default function JournalView({
                                             <button type="button" className="btn" onClick={() => setConfirmDiscardEdit(false)}>
                                                 Weiter bearbeiten
                                             </button>
-                                            <button type="button" className="btn danger" onClick={closeEditModalNow}>
+                                            <button type="button" className="btn danger" onClick={finishEditModalNow}>
                                                 Änderungen verwerfen
                                             </button>
                                         </div>
@@ -1376,7 +1377,7 @@ export default function JournalView({
                                     const w = (res as any)?.warnings as string[] | undefined
                                     if (w && w.length) { for (const msg of w) notify('info', 'Warnung: ' + msg) }
                                     setFlashId(editRow.id); window.setTimeout(() => setFlashId((cur) => (cur === editRow.id ? null : cur)), 3000)
-                                    closeEditModalNow(); await loadRecent(); bumpDataVersion()
+                                    finishEditModalNow(); await loadRecent(); bumpDataVersion()
                                 } catch (e: any) {
                                     notify('error', friendlyError(e))
                                 }
@@ -2045,8 +2046,8 @@ export default function JournalView({
                                         setDeleteRow(null)
                                         // Close edit modal if deletion was initiated from edit, or if the currently edited row matches the deleted one
                                         try {
-                                            if (deleteRow.fromEdit) closeEditModalNow()
-                                            else if (editRow && editRow.id === deleteRow.id) closeEditModalNow()
+                                            if (deleteRow.fromEdit) finishEditModalNow()
+                                            else if (editRow && editRow.id === deleteRow.id) finishEditModalNow()
                                         } catch {}
                                         await loadRecent()
                                         if (infoVoucher && infoVoucher.id === deleteRow.id) {

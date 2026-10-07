@@ -1,6 +1,6 @@
 appId: org.verein.finanzplaner
 productName: VereinO
-buildVersion: 4.6.6
+buildVersion: 4.7.0
 icon: build/icon.png
 files:
   - dist/**

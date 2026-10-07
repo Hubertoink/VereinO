@@ -8,6 +8,7 @@ export default defineConfig({
     'booking-defaults.spec.ts',
     'party-selector.spec.ts',
     'bookings-plus-filters.spec.ts',
+    'journal-edit-tabs.spec.ts',
     'leader-shortcuts.spec.ts'
   ],
   use: {
