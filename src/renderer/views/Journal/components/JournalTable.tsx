@@ -1,5 +1,3 @@
-import TableDensityControl from '../../../components/booking/TableDensityControl'
-import { useBookingDensity } from '../../../hooks/useBookingDensity'
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
@@ -437,7 +435,6 @@ export default function JournalTable({
     lockedUntil,
     onRowDoubleClick
 }: JournalTableProps) {
-    const [dense, setDense] = useBookingDensity()
     const dragIdx = useRef<number | null>(null)
     const [isGeneralProfile, setIsGeneralProfile] = useState(false)
     useEffect(() => {
@@ -1049,13 +1046,13 @@ export default function JournalTable({
     )
     return (
         <>
-            <div className="booking-table-tools"><span className="helper">Doppelklick für Details · Spalten über den Spaltenkopf anpassen</span><TableDensityControl compact={dense} onChange={setDense} /></div>
+            <div className="booking-table-tools"><span className="helper">Doppelklick für Details · Spalten über den Spaltenkopf anpassen</span></div>
             {narrow && <div className="journal-compact-toolbar">
                 <span className="helper">{compact ? 'Kompaktansicht' : 'Alle eingestellten Spalten'}</span>
                 <button type="button" className="btn ghost" aria-pressed={showFullTable} onClick={() => setShowFullTable(value => !value)}>{compact ? 'Alle Spalten' : 'Kompaktansicht'}</button>
             </div>}
             <div className="journal-table-scroll-wrapper" ref={scrollWrapperRef}>
-                <table className={`journal-table resizable-table${compact ? ' journal-table--compact' : ''}${dense ? ' journal-table--dense' : ''}`} cellPadding={6} ref={tableRef} style={{ minWidth: compact ? 0 : visibleTableWidth, width: compact ? '100%' : `max(100%, ${visibleTableWidth}px)` }}>
+                <table className={`journal-table resizable-table${compact ? ' journal-table--compact' : ''}`} cellPadding={6} ref={tableRef} style={{ minWidth: compact ? 0 : visibleTableWidth, width: compact ? '100%' : `max(100%, ${visibleTableWidth}px)` }}>
                     <colgroup>
                         {visibleOrder.map((k) => (
                             <col key={k} style={{ width: compact ? (k === 'description' ? undefined : 118) : getColWidth(k) }} />

@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.8.1] - 2026-10-08
+
+### Entfernt
+
+- Der wirkungslose Standard/Kompakt-Schalter entfällt in Buchungen (klassisch).
+
+### Behoben
+
+- Die Tabellenkachel in Buchungen (klassisch) schließt sauber am unteren Fensterrand ab und wird nicht mehr abgeschnitten.
+
 ## [4.8.0] - 2026-10-08
 
 ### Behoben

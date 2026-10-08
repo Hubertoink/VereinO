@@ -16803,6 +16803,7 @@ button.filter-totals-stat {
 /* Keep the journal controls visible and scroll only the booking rows. */
 .app-main--journal {
   overflow: hidden;
+  padding-bottom: 0;
 }
 
 .journal-view {
@@ -16826,6 +16827,7 @@ button.filter-totals-stat {
 .journal-table-card {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -21585,6 +21587,7 @@ html.receipt-widget-document::before { content: none !important; display: none !
 
 @media (max-width: 960px) {
   .app-main { padding: 12px; }
+  .app-main--journal { padding-bottom: 0; }
   .compact-booking-flyout-anchor,
   .compact-booking-flyout-anchor--journal-end,
   .advances-purchase-flyout-anchor {
