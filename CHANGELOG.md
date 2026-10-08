@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.7.2] - 2026-10-08
+
+### Geändert
+
+- Im Buchungsdialog startet der Tastaturfokus nach Auswahl der Buchungsart beim Datum, auch nach „Speichern & neu“ und in schmalen Fenstern.
+
+### Behoben
+
+- Die Beschriftung „Datum“ überlappt bei leerem Datumsfeld nicht mehr mit dem Formatplatzhalter.
+
 ## [4.7.1] - 2026-10-07
 
 ### Geändert

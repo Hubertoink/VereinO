@@ -177,7 +177,6 @@ export default function QuickAddModal({
     onDownloadExistingFile,
     onDeleteExistingFile
 }: QuickAddModalProps) {
-    const amountInputRef = React.useRef<HTMLInputElement | null>(null)
     const hasTypeSelectionStep = React.useRef(qa.bookingTypeSelected !== undefined).current
     const needsBookingType = qa.bookingTypeSelected === false
     const dateInputRef = React.useRef<HTMLInputElement | null>(null)
@@ -564,22 +563,16 @@ export default function QuickAddModal({
         return null
     }, [eurFmt, grossAmt])
 
-    const focusInput = React.useCallback((input: HTMLInputElement | null) => {
-        if (!input) return
-        input.focus()
-        input.select()
-    }, [])
-
     React.useEffect(() => {
         const timer = window.setTimeout(() => {
             if (needsBookingType) {
                 modalRef.current?.querySelector<HTMLButtonElement>('.booking-kind-switch button')?.focus({ preventScroll: true })
-            } else if ((modalRef.current?.clientWidth || 0) <= 950) {
-                modalRef.current?.querySelector<HTMLButtonElement>('.booking-kind-switch button[aria-pressed="true"]')?.focus({ preventScroll: true })
-            } else focusInput(amountInputRef.current)
+            } else {
+                dateInputRef.current?.focus({ preventScroll: true })
+            }
         }, 0)
         return () => window.clearTimeout(timer)
-    }, [focusInput, needsBookingType])
+    }, [needsBookingType])
 
     const clampDragOffset = React.useCallback((x: number, y: number) => {
         const modal = modalRef.current
@@ -1003,7 +996,8 @@ export default function QuickAddModal({
                         <div className="form-card">
                             <h3 className="booking-editor-section-title"><IconCalendar size={18} />Grunddaten<span>Datum, Bereich und Konto auswählen</span></h3>
                             <div className="row booking-basis-fields">
-                                <div className={`field booking-floating-field${qa.date ? ' booking-floating-field--filled' : ''}`}>
+                                {/* Native date inputs show their format hint even when empty. Keep the label above it. */}
+                                <div className="field booking-floating-field booking-floating-field--filled">
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <span className="booking-date-input-wrap">
                                         <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
@@ -1168,7 +1162,7 @@ export default function QuickAddModal({
                                     <div className="field field-full-width finance-amount-highlight">
                                         <span className={`adorn-wrap booking-floating-control${(qa as any).grossAmount !== null && (qa as any).grossAmount !== undefined && (qa as any).grossAmount !== '' ? ' booking-floating-control--filled' : ''}`}>
                                             <label htmlFor="quick-add-transfer-amount">Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                            <input id="quick-add-transfer-amount" ref={amountInputRef} className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
+                                            <input id="quick-add-transfer-amount" className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
                                                 onFocus={(e) => e.currentTarget.select()}
                                                 onClick={(e) => e.currentTarget.select()}
                                                 onChange={(e) => {
@@ -1217,7 +1211,7 @@ export default function QuickAddModal({
                                                 </span>
                                                 <span className={`adorn-wrap flex-1 booking-floating-control${((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== null && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== undefined && ((qa as any).mode === 'GROSS' ? (qa as any).grossAmount : qa.netAmount) !== '' ? ' booking-floating-control--filled' : ''}`}>
                                                     <label htmlFor="quick-add-amount">{(qa as any).mode === 'GROSS' ? 'Brutto' : 'Netto'} <span className="req-asterisk" aria-hidden="true">*</span></label>
-                                                    <input id="quick-add-amount" ref={amountInputRef} className={`input amount-input ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount ?? ''}
+                                                    <input id="quick-add-amount" className={`input amount-input ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).mode === 'GROSS' ? (qa as any).grossAmount ?? '' : qa.netAmount ?? ''}
                                                         onFocus={(e) => e.currentTarget.select()}
                                                         onClick={(e) => e.currentTarget.select()}
                                                         onChange={(e) => {
