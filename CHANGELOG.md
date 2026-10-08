@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.8.0] - 2026-10-08
+
+### Behoben
+
+- Ein zum großen Dialog erweitertes Buchungs-Flyout bleibt bei „Speichern & neu“ als Dialog geöffnet.
+- Nach erfolgreichem Speichern öffnet sich die nächste Buchung auch dann, wenn die interne Benachrichtigung anderer Fenster verzögert ist oder fehlschlägt.
+
 ## [4.7.2] - 2026-10-08
 
 ### Geändert

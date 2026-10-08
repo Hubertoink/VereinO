@@ -35,6 +35,7 @@ import { getNavIcon } from './utils/navIcons'
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
+import { notifyBookingSaved } from './utils/notifyBookingSaved'
 import {
   base64ToFile,
   encodeFileForUpload,
@@ -710,7 +711,7 @@ function DetachedQuickAddWindow() {
           notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
           const warnings = res?.warnings
           if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
-          await window.api?.quickAdd?.notifySaved?.({
+          notifyBookingSaved({
             ...res,
             draftId: detachedDraftIdRef.current,
             agentDraftId: payload?.agentDraftId
@@ -2203,7 +2204,7 @@ function AppInner() {
             for (const msg of w) notify('info', 'Warnung: ' + msg)
           }
           if (p?.bankTransactionId) dispatchDataChanged(['bank-imports'])
-          await window.api?.quickAdd?.notifySaved?.({
+          notifyBookingSaved({
             ...res,
             agentDraftId: p?.agentDraftId
           })
@@ -2225,7 +2226,7 @@ function AppInner() {
 
   useEffect(() => {
     setForceFullBookingDialog(false)
-  }, [activeDraftId, bookingEntryPresentation])
+  }, [bookingEntryPresentation])
 
   useEffect(() => {
     if (!quickAdd) {
