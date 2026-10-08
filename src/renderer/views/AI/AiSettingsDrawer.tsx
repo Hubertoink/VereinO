@@ -1,4 +1,6 @@
 import { forwardRef } from 'react'
+import { IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import { AI_TASK_PROFILE_OPTIONS } from '../../../../shared/aiModelProfiles'
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
 
@@ -43,7 +45,7 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
   return <section ref={ref} className="card ai-settings-card ai-settings-drawer">
     <div className="ai-section-head">
       <strong>Einstellungen</strong>
-      <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
+      <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen" aria-label="Schließen"><AppIcon icon={IconX} size="action" /></button>
     </div>
     <div className="ai-form-grid">
       <label className="field ai-field-wide">

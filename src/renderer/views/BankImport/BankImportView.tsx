@@ -986,7 +986,7 @@ function BankImportModal({
             <h2>Bankdaten importieren</h2>
             <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
           </div>
-          <button className="btn ghost" disabled={importing} onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
+          <button className="btn dialog-close-btn" type="button" disabled={importing} onClick={onClose} title="Schließen" aria-label="Schließen"><AppIcon icon={IconX} size="action" /></button>
         </header>
 
         <div className="bank-import-scroll">

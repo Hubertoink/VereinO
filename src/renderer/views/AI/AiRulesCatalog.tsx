@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import type { TAiKnowledgeRulesListOutput } from '../../../../electron/main/ipc/schemas'
 import { IconTrash } from '../../utils/icons'
 
@@ -145,8 +147,8 @@ export function AiRulesCatalog({ notify, onClose }: Props) {
           <strong>✦ KI-Regelkatalog</strong>
           <span>Gilt organisationsweit für alle passenden KI-Analysen und Agentenaktionen.</span>
         </div>
-        <button className="btn ghost ai-rules-close" type="button" onClick={onClose} aria-label="Schließen">
-          ×
+        <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen" aria-label="Schließen">
+          <AppIcon icon={IconX} size="action" />
         </button>
       </header>
 

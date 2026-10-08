@@ -1,11 +1,14 @@
 .quick-add-modal.booking-editor { width: min(1180px, calc(100vw - 24px)); max-width: 1180px; padding: 0; container-type: inline-size; }
 .quick-add-modal.booking-editor.detached-quick-add-modal { width: 100%; max-width: none; }
-.booking-editor .modal-header-flex { display: flex; justify-content: space-between; gap: 16px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 16px 20px; margin: 0; background: var(--surface); flex-shrink: 0; }
-.booking-editor-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.quick-add-modal.booking-editor > .modal-header-flex { display: flex; align-items: stretch; justify-content: space-between; gap: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; margin: 0; background: var(--surface); flex-shrink: 0; }
+.booking-editor-title { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px 20px; }
 .booking-editor-title h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
 .booking-editor-title p { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
 .booking-editor-title-icon, .booking-overview-type-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; color: var(--booking-header-tone); background: color-mix(in srgb, var(--booking-header-tone) 17%, var(--surface)); }
-.quick-add-modal.booking-editor > form.quick-add-form { display: grid; grid-template-columns: minmax(0, 1fr) 270px; grid-template-areas: "kind overview" "primary overview" "description overview" "assignments overview" "secondary overview" "footer footer"; gap: 0 22px; padding: 14px 20px 0; align-content: start; }
+.quick-add-modal.booking-editor > form.quick-add-form { display: grid; grid-template-columns: minmax(0, 1fr) 270px; grid-template-areas: "kind overview" "primary overview" "description overview" "assignments overview" "secondary overview" "footer footer"; gap: 0 22px; margin: 0; padding: 14px 20px 0; align-content: start; }
+/* Only the detached window fills spare height. Grow the last content track so
+   the sticky footer meets the bottom without stretching the actual fields. */
+.quick-add-modal.booking-editor.detached-quick-add-modal > form.quick-add-form { grid-template-rows: repeat(4, max-content) minmax(max-content, 1fr) max-content; }
 .booking-editor .booking-kind-switch { grid-area: kind; width: 100%; max-width: none; margin: 0 0 6px; border: 1px solid var(--border); border-radius: 7px; -webkit-app-region: no-drag; }
 .booking-editor .booking-kind-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; font-size: 12px; }
 .booking-editor .booking-primary-grid { grid-area: primary; display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; }
@@ -40,17 +43,26 @@
 .booking-overview-tip svg { color: var(--accent); flex-shrink: 0; }
 .booking-overview-tip p { font-size: 10px; line-height: 1.5; color: var(--text-dim); margin: 0; }
 .booking-editor .booking-ai-assist { margin-top: 12px; }
-.quick-add-modal.booking-editor .modal-footer-actions { grid-area: footer; position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border); }
+.quick-add-modal.booking-editor .modal-footer-actions { grid-area: footer; position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border); border-radius: 0; }
+.quick-add-modal.booking-editor .booking-modal-save-actions .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: color-mix(in srgb, var(--text-dim) 65%, var(--surface)); border-color: var(--border); box-shadow: none; transform: none; cursor: not-allowed; opacity: 1; }
+.quick-add-modal.booking-editor .booking-modal-header-actions { align-self: flex-start; gap: 0; }
+.quick-add-modal.booking-editor .booking-modal-header-actions .window-controls { display: flex; gap: 0; margin: 0; }
+.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-icon-btn, .window-controls__btn) { width: 48px; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text-dim); box-shadow: none; transform: none; transition: background 140ms ease, color 140ms ease; }
+.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-icon-btn, .window-controls__btn):hover { background: color-mix(in srgb, var(--text) 9%, var(--surface)); color: var(--text); }
+.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-close-btn, .window-controls__btn--close) { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger-strong, var(--danger)); }
+.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-close-btn, .window-controls__btn--close):hover { background: #c42b36; color: #fff; }
+.quick-add-modal.booking-editor .booking-modal-header-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .booking-editor .booking-validation-badge { border-radius: 6px; padding: 8px 10px; font-size: 11px; }
 .booking-editor .quick-add-dropzone { min-height: 80px; }
 @container (max-width: 950px) {
  .quick-add-modal.booking-editor > form.quick-add-form { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kind" "overview" "primary" "description" "assignments" "secondary" "footer"; }
+ .quick-add-modal.booking-editor.detached-quick-add-modal > form.quick-add-form { grid-template-rows: repeat(5, max-content) minmax(max-content, 1fr) max-content; }
  .quick-add-modal.booking-editor .summary-card.booking-ai-summary { border-left: 0; border-top: 1px solid var(--border); padding: 16px 0; }
  .booking-editor .booking-overview-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
  .quick-add-modal.booking-editor .booking-secondary-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 }
 @container (max-width: 580px) {
- .booking-editor .modal-header-flex { padding: 12px; }
+ .booking-editor-title { padding: 12px; }
  .booking-editor-title p { display: none; }
  .quick-add-modal.booking-editor > form.quick-add-form { padding: 12px 12px 0; }
  .booking-editor .booking-kind-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }

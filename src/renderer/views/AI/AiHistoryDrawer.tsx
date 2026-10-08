@@ -1,4 +1,6 @@
 import { forwardRef } from 'react'
+import { IconX } from '@tabler/icons-react'
+import AppIcon from '../../components/common/AppIcon'
 import type { TAiJobsListOutput } from '../../../../electron/main/ipc/schemas'
 import { bookingProgress } from './aiBooking'
 import { statusLabel, typeLabel } from './aiText'
@@ -67,7 +69,7 @@ export const AiHistoryDrawer = forwardRef<HTMLElement, Props>(function AiHistory
   return <section ref={ref} className="card ai-assistant-sidebar ai-history-drawer" role="dialog" aria-label="KI-Verlauf">
     <div className="ai-history-drawer-head">
       <div><strong>Verlauf</strong><span>Schneller zurück in Reviews, gebuchte Vorschläge und alte Agent-Läufe.</span></div>
-      <button className="btn ghost ai-history-close" type="button" onClick={onClose} aria-label="Schließen">×</button>
+      <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen" aria-label="Schließen"><AppIcon icon={IconX} size="action" /></button>
     </div>
     <div className="ai-history-stats">
       <span><strong>{openBookingJobs.length}</strong> offen</span>

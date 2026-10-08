@@ -82,7 +82,7 @@
 .bank-import-choice input:disabled { opacity: .5; cursor: wait; }
 .bank-import-review-pagination { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
 .bank-import-review-pagination > div { display: flex; align-items: center; gap: 10px; }
-.bank-import-dialog > .bank-modal-footer { display: flex; align-items: center; }
+.modal.bank-import-dialog > .bank-modal-footer { display: flex; align-items: center; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
 .bank-import-dialog > .bank-modal-footer > .helper { margin-right: auto; font-size: 12px; }
 .bank-import-dialog > .bank-modal-footer .btn { box-shadow: none; }
 .bank-import-dialog .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: var(--text-dim); border-color: var(--border); opacity: .6; box-shadow: none; cursor: not-allowed; }

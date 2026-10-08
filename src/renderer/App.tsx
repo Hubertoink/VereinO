@@ -24,6 +24,7 @@ import { UIPreferencesProvider } from './context/UIPreferences'
 import { useUIPreferences } from './context/useUIPreferences'
 import { TopNav } from './components/layout/TopNav'
 import { SideNav } from './components/layout/SideNav'
+import WindowControls from './components/layout/WindowControls'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
 import CompactBookingFlyout from './components/CompactBookingFlyout'
@@ -174,19 +175,6 @@ const goToShortcutKeys = {
   Reports: 'r',
   Einstellungen: 'e'
 } satisfies Record<NavKey, string>
-
-function MaximizeWindowIcon({ isMaximized }: { isMaximized: boolean }) {
-  return isMaximized ? (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="4" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="4" y="9" width="11" height="11" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  ) : (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="6" y="6" width="12" height="12" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  )
-}
 
 type SetOptionalNumber = (value: number | null) => void
 type SetOptionalText = (value: string | null) => void
@@ -3359,22 +3347,6 @@ function AppInner() {
   // (earmarks loaded above)
 
   const isTopNav = effectiveNavLayout === 'top'
-  const [isWindowMaximized, setIsWindowMaximized] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    const windowApi = window.api?.window
-    const unsubscribe = windowApi?.onMaximizeChanged?.(setIsWindowMaximized)
-
-    void windowApi?.isMaximized?.().then((isMaximized) => {
-      if (mounted) setIsWindowMaximized(isMaximized)
-    }).catch(() => {})
-
-    return () => {
-      mounted = false
-      unsubscribe?.()
-    }
-  }, [])
 
   return (
     <div className={`app-root-grid ${isTopNav ? 'app-root-grid--top' : 'app-root-grid--side'}`}>
@@ -3413,34 +3385,7 @@ function AppInner() {
         {isTopNav && <div className="app-header__drag-spacer" aria-hidden="true" />}
         {/* Window controls */}
         <div className="app-header__controls no-drag" data-shortcut-ignore style={{ WebkitAppRegion: 'no-drag' } as any}>
-          <button
-            className="btn ghost icon-btn"
-            title="Minimieren"
-            aria-label="Minimieren"
-            onClick={() => window.api?.window?.minimize?.()}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <rect x="5" y="11" width="14" height="2" rx="1" />
-            </svg>
-          </button>
-          <button
-            className="btn ghost icon-btn"
-            title={isWindowMaximized ? 'Wiederherstellen' : 'Maximieren'}
-            aria-label={isWindowMaximized ? 'Wiederherstellen' : 'Maximieren'}
-            onClick={() => window.api?.window?.toggleMaximize?.()}
-          >
-            <MaximizeWindowIcon isMaximized={isWindowMaximized} />
-          </button>
-          <button
-            className="btn danger icon-btn"
-            title="Schließen"
-            aria-label="Schließen"
-            onClick={() => window.api?.window?.close?.()}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </button>
+          <WindowControls />
         </div>
       </header>
       {!isTopNav && (

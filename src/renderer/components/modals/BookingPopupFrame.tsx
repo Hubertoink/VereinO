@@ -101,7 +101,7 @@ export default function BookingPopupFrame({
             </div>
             {headerAccessory}
             <div className="compact-booking-flyout__header-actions">
-              <button className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--close" type="button" onClick={onClose} title="Schließen (Esc)" aria-label="Schließen">
+              <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen (Esc)" aria-label="Schließen">
                 <AppIcon icon={IconX} size="control" />
               </button>
             </div>

@@ -5,6 +5,23 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.8.2] - 2026-10-08
+
+### Geändert
+
+- Die Fensteraktionen für Minimieren, Maximieren und Schließen sind in der App und im separaten Buchungsfenster vereinheitlicht, mit bündiger Position am oberen rechten Rand und besser lesbaren Symbolen.
+- Bankimport, KI-Dialoge und kompakte Buchungsdialoge verwenden einheitliche Schließen-Buttons mit Hover- und Tastaturfokus-Effekt.
+
+### Behoben
+
+- Der Buchungsdialog passt seine Höhe dem Inhalt an. Im separaten Fenster bleibt die Speichern-Leiste am unteren Rand, auch bei wenig Inhalt.
+- Speichern ist bei unvollständigen Angaben deutlich ausgegraut; ein fehlendes Buchungsdatum sperrt auch die weiteren Speicheraktionen.
+- Die Fußzeile beim Bankimport hat wieder ausreichend Innenabstand für Hinweise und Aktionen.
+
+### Entfernt
+
+- Der zusätzliche Abbrechen-Button unten im Buchungsdialog entfällt. Schließen bleibt über das X und die Escape-Taste möglich.
+
 ## [4.8.1] - 2026-10-08
 
 ### Entfernt

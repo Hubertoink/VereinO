@@ -160,3 +160,59 @@ test('replacing draft data preserves whether the type has been selected', async 
   await page.evaluate(() => (window as any).replaceDraft())
   await expect(page.locator('input[type=date]').first()).toBeVisible()
 })
+
+for (const presentation of ['modal', 'detached']) {
+  test(`${presentation}: footer and window actions stay at the frame edges across sizes`, async ({ page }, testInfo) => {
+    await page.evaluate(value => (window as any).changePresentation(value), presentation)
+    await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+    const editor = page.locator('.quick-add-modal')
+    const footer = editor.locator('.modal-footer-actions')
+    for (const size of [{ width: 1440, height: 1200 }, { width: 1280, height: 720 }, { width: 600, height: 800 }]) {
+      await page.setViewportSize(size)
+      for (const expanded of [false, true]) {
+        if (expanded) await editor.locator('details').filter({ hasText: 'Kommentar' }).locator('summary').click()
+        const bounds = (await editor.boundingBox())!
+        const footerBounds = (await footer.boundingBox())!
+        expect(Math.abs(bounds.y + bounds.height - footerBounds.y - footerBounds.height)).toBeLessThanOrEqual(2)
+        expect(footerBounds.y).toBeGreaterThan(bounds.y)
+        const close = (await editor.getByRole('button', { name: 'Schließen', exact: true }).boundingBox())!
+        expect(Math.abs(close.x + close.width - bounds.x - bounds.width)).toBeLessThanOrEqual(2)
+        expect(Math.abs(close.y - bounds.y)).toBeLessThanOrEqual(2)
+        if (presentation === 'detached') expect(Math.abs(bounds.height - size.height)).toBeLessThanOrEqual(2)
+        else if (size.height === 1200) expect(bounds.height).toBeLessThan(size.height * .85)
+        await editor.locator('form').evaluate(form => { form.scrollTop = form.scrollHeight })
+        await expect(editor.locator('.quick-add-dropzone')).toBeInViewport()
+        const scrolledFooter = (await footer.boundingBox())!
+        expect(Math.abs(bounds.y + bounds.height - scrolledFooter.y - scrolledFooter.height)).toBeLessThanOrEqual(2)
+        await editor.locator('form').evaluate(form => { form.scrollTop = 0 })
+        if (expanded) await editor.locator('details').filter({ hasText: 'Kommentar' }).locator('summary').click()
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1200 })
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
+      await page.screenshot({ path: testInfo.outputPath(`${presentation}-${theme}.png`), animations: 'disabled' })
+    }
+  })
+
+  test(`${presentation}: save is disabled until date and amount are complete`, async ({ page }) => {
+    await page.evaluate(value => (window as any).changePresentation(value), presentation)
+    await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+    const save = page.getByRole('button', { name: 'Speichern', exact: true })
+    const menu = page.getByRole('button', { name: 'Weitere Speicheraktionen' })
+    await expect(page.getByRole('button', { name: 'Abbrechen', exact: true })).toHaveCount(0)
+    await page.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('25')
+    await expect(save).toBeDisabled()
+    await expect(menu).toBeDisabled()
+    const disabledBackground = await save.evaluate(button => getComputedStyle(button).backgroundColor)
+    await page.locator('#quick-add-date').fill('2026-10-08')
+    await expect(save).toBeEnabled()
+    await expect(menu).toBeEnabled()
+    expect(await save.evaluate(button => getComputedStyle(button).backgroundColor)).not.toBe(disabledBackground)
+    await page.locator('#quick-add-amount').fill('0')
+    await expect(save).toBeDisabled()
+    await page.locator('#quick-add-amount').fill('25')
+    await page.locator('#quick-add-date').fill('')
+    await expect(save).toBeDisabled()
+  })
+}

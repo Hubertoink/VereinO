@@ -305,9 +305,12 @@ export default function QuickAddModal({
         grossAmount: grossAmt,
     })
     const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
-    const saveBlocked = needsBookingType || hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
+    const hasMissingDate = !qa.date
+    const saveBlocked = needsBookingType || hasMissingDate || hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
     const bookingValidationMessage = footerLeft
         ? null
+        : hasMissingDate
+            ? 'Bitte ein Buchungsdatum auswählen.'
         : hasInvalidAmount
             ? 'Bitte einen Betrag größer als 0 € eingeben.'
             : hasMissingAccount
@@ -511,19 +514,22 @@ export default function QuickAddModal({
     }, [activeSuggestion, budgetsList, defaultBankAccount, defaultCashAccount, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
 
     const handleSave = React.useCallback(() => {
+        if (saveBlocked) return
         rememberCurrentBookingPattern()
         onSave()
-    }, [onSave, rememberCurrentBookingPattern])
+    }, [onSave, rememberCurrentBookingPattern, saveBlocked])
 
     const handleSaveAndNew = React.useCallback(() => {
+        if (saveBlocked) return
         rememberCurrentBookingPattern()
         saveAndNew()
-    }, [rememberCurrentBookingPattern, saveAndNew])
+    }, [rememberCurrentBookingPattern, saveAndNew, saveBlocked])
 
     const handleSaveAndClose = React.useCallback(() => {
+        if (saveBlocked) return
         rememberCurrentBookingPattern()
         saveAndClose()
-    }, [rememberCurrentBookingPattern, saveAndClose])
+    }, [rememberCurrentBookingPattern, saveAndClose, saveBlocked])
 
     const selectBookingType = React.useCallback((type: QA['type']) => {
         const nextQa = { ...qa, type, bookingTypeSelected: true } as QA
@@ -716,7 +722,7 @@ export default function QuickAddModal({
                     <div className="booking-modal-header-actions">
                         {onDetach && (
                             <button className="btn ghost booking-modal-icon-btn" type="button" onClick={onDetach} title="In eigenes Fenster abdocken" aria-label="In eigenes Fenster abdocken">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M15 3h6v6" />
                                     <path d="M10 14 21 3" />
                                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -729,8 +735,8 @@ export default function QuickAddModal({
                             </div>
                         ) : (
                             <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" onClick={closeModal} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} title="Schließen (ESC)" aria-label="Schließen">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                                    <path d="M6 6l12 12M18 6 6 18" />
                                 </svg>
                             </button>
                         )}
@@ -1648,7 +1654,6 @@ export default function QuickAddModal({
                         <div className="booking-modal-save-actions" onBlur={(e) => {
                             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSaveMenuOpen(false)
                         }}>
-                            <button type="button" className="btn ghost" onClick={closeModal}>Abbrechen</button>
                             {showSaveMenu ? (
                                 <div className="booking-split-save">
                                     <button
@@ -1671,7 +1676,7 @@ export default function QuickAddModal({
                                             <path d="M7 10l5 5 5-5H7z" />
                                         </svg>
                                     </button>
-                                    {saveMenuOpen && (
+                                    {saveMenuOpen && !saveBlocked && (
                                         <div className="booking-split-save__menu" role="menu">
                                             <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); handleSaveAndClose() }}>
                                                 Speichern & schließen

@@ -4201,10 +4201,6 @@ svg text {
   margin-top: auto;
 }
 
-.quick-add-modal.booking-editor.booking-type-flow:not(.detached-quick-add-modal) {
-  height: min(90vh, calc(100dvh - 12px));
-}
-
 .compact-booking-flyout.booking-type-flow .compact-booking-flyout__body {
   scrollbar-gutter: stable;
 }
@@ -8857,16 +8853,76 @@ body:has(.local-invoice-scan) .app-main {
 /* Window controls in titlebar */
 .window-controls {
   display: inline-flex;
-  gap: 4px;
+  gap: 0;
   justify-self: end;
 }
-.window-controls__btn {
-  width: 28px;
-  height: 28px;
+.window-controls .window-controls__btn {
+  width: 48px;
+  height: 44px;
   padding: 0;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  box-shadow: none;
+  transform: none;
+  transition: background 140ms ease, color 140ms ease;
+}
+.window-controls .window-controls__btn:hover {
+  background: color-mix(in srgb, var(--text) 9%, var(--surface));
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
+}
+.window-controls .window-controls__btn--close {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger-strong, var(--danger));
+}
+.window-controls .window-controls__btn--close:hover {
+  background: #c42b36;
+  color: #fff;
+}
+.window-controls .window-controls__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+/* Shared close action for compact booking popups and other app dialogs. */
+.btn.dialog-close-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface));
+  box-shadow: none;
+  -webkit-app-region: no-drag;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.btn.dialog-close-btn:hover:not(:disabled),
+.btn.dialog-close-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--danger) 72%, var(--border));
+  background: color-mix(in oklab, var(--danger) 18%, var(--surface));
+  color: var(--danger);
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--danger) 22%, transparent);
+}
+.btn.dialog-close-btn:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+.btn.dialog-close-btn:active:not(:disabled) {
+  transform: none;
+}
+.btn.dialog-close-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
 }
 
 /* Electron-specific note: app-region is applied inline to avoid CSS linter false positives */
@@ -8972,7 +9028,7 @@ body:has(.local-invoice-scan) .app-main {
   display: grid;
   align-items: center;
   gap: 12px;
-  padding: 4px 8px;
+  padding: 0 0 0 8px;
   border-bottom: 1px solid var(--border);
   overflow: visible;
   -webkit-backdrop-filter: none;
@@ -8981,11 +9037,11 @@ body:has(.local-invoice-scan) .app-main {
   -webkit-app-region: drag;
 }
 .app-header-top {
-  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-columns: minmax(0, 1fr) 144px;
   position: relative;
 }
 .app-header-left {
-  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-columns: minmax(0, 1fr) 144px;
 }
 .app-header > * {
   min-width: 0;
@@ -9034,7 +9090,8 @@ body:has(.local-invoice-scan) .app-main {
 }
 .app-header__controls {
   display: inline-flex;
-  gap: 4px;
+  align-self: start;
+  gap: 0;
   justify-self: end;
 }
 .app-header__drag-spacer {
