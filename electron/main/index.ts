@@ -327,7 +327,7 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
             "default-src 'self';",
             "base-uri 'self';",
             "object-src 'none';",
-            "img-src 'self' data:;",
+            "img-src 'self' data: blob:;",
             "frame-src 'self' blob:;",
             "child-src 'self' blob:;",
             "font-src 'self' data:;",

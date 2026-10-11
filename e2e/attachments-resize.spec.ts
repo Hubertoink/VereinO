@@ -17,7 +17,10 @@ test.beforeAll(async () => {
         import AttachmentsModal from './src/renderer/components/modals/AttachmentsModal'
         window.api = {
           vouchers: { list: async () => ({ rows: [{ id: 1, type: 'OUT', sphere: 'IDEELL', grossAmount: 118.75, paymentMethod: 'BANK' }] }) },
-          attachments: { list: async () => ({ files: [] }) }
+          attachments: {
+            list: async () => ({ files: window.attachmentFixture ? [{ id: 1, fileName: 'grivox-logo_groß.png', mimeType: 'image/png' }] : [] }),
+            read: async () => ({ mimeType: 'image/png', dataBase64: window.attachmentFixture })
+          }
         }
         function App() {
           const [open, setOpen] = useState(true)
@@ -98,6 +101,50 @@ test('resize release stays open in the installed Electron renderer', async () =>
     await checkResizeRelease(page)
   } finally {
     await app.close()
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('image attachment blob previews load with the production CSP over file URLs', async () => {
+  // Read the application's actual policy so this catches production-only regressions.
+  const source = await readFile('electron/main/index.ts', 'utf8')
+  const policyBlock = source.match(/const prodCsp = \[([\s\S]*?)\]\.join\(' '\)/)
+  expect(policyBlock).not.toBeNull()
+  const csp = [...policyBlock![1].matchAll(/"([^"]*)"/g)].map(match => match[1]).join(' ')
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'vereino-attachment-image-'))
+  const main = path.join(dir, 'main.cjs')
+  await writeFile(path.join(dir, 'policy.json'), JSON.stringify(csp))
+  await writeFile(path.join(dir, 'styles.css'), css)
+  await writeFile(path.join(dir, 'renderer.js'), `
+    window.attachmentFixture = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1cAAAAASUVORK5CYII=';
+    ${script}
+  `)
+  await writeFile(path.join(dir, 'index.html'), '<html data-theme="light"><head><link rel="stylesheet" href="./styles.css"></head><body><div id="root"></div><script src="./renderer.js"></script></body></html>')
+  await writeFile(main, `
+    const { app, BrowserWindow, session } = require('electron')
+    const path = require('node:path')
+    const csp = require('./policy.json')
+    app.whenReady().then(() => {
+      session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+        callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } })
+      })
+      const window = new BrowserWindow({ width: 1600, height: 1000, show: false,
+        webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } })
+      window.loadFile(path.join(__dirname, 'index.html'))
+    })
+    app.on('window-all-closed', () => app.quit())
+  `)
+  const env = { ...process.env }
+  delete env.ELECTRON_RUN_AS_NODE
+  let app: Awaited<ReturnType<typeof electron.launch>> | undefined
+  try {
+    app = await electron.launch({ args: [main], env })
+    const page = await app.firstWindow()
+    const image = page.locator('.attachments-modal__preview-img')
+    await expect(image).toHaveAttribute('src', /^blob:/)
+    await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true)
+  } finally {
+    if (app) await app.close()
     await rm(dir, { recursive: true, force: true })
   }
 })
