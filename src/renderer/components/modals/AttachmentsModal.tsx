@@ -1,70 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconX as IconClose, IconExternalLink, IconDownload, IconPlus, IconChevronLeft, IconChevronRight, IconTrash, IconFile, IconPhoto as IconImage, IconReceipt2, IconCalendar, IconWallet, IconCategory, IconTag, IconArrowDown, IconArrowUp, IconArrowsExchange, IconPaperclip } from '@tabler/icons-react'
 import { useToast } from '../../context/useToast'
 import { addDataChangedListener, notifyDataChanged } from '../../utils/refresh'
 import { base64ToUint8Array, encodeFileForUpload } from '../../utils/fileEncoding'
 import type { RendererApi } from '../../../types/api'
 
 type BookingDetails = Awaited<ReturnType<RendererApi['vouchers']['list']>>['rows'][number]
-const amountFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+const amountFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', signDisplay: 'exceptZero' })
 const bookingTypeLabels = { IN: 'Einnahme', OUT: 'Ausgabe', TRANSFER: 'Transfer', INTERNAL: 'Interne Umbuchung' }
+const dateFormat = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const sphereLabels = { IDEELL: 'Ideell', ZWECK: 'Zweckbetrieb', VERMOEGEN: 'Vermögensverwaltung', WGB: 'Wirtschaftlicher Geschäftsbetrieb' }
 
 // Vite will copy the worker file and return a URL string
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-
-// Icon components for toolbar
-const IconClose = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-)
-const IconExternalLink = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-        <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-)
-const IconDownload = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-)
-const IconPlus = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-)
-const IconChevronLeft = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="15 18 9 12 15 6" />
-    </svg>
-)
-const IconChevronRight = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="9 18 15 12 9 6" />
-    </svg>
-)
-const IconTrash = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
-)
-const IconFile = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-    </svg>
-)
-const IconImage = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-    </svg>
-)
 
 type PreviewState =
     | null
@@ -457,87 +406,79 @@ export default function AttachmentsModal({
             }}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="attachments-modal-title"
         >
             <div ref={modalRef} className="modal attachments-modal" style={modalSize ?? undefined} onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
                 <header className="attachments-modal__header">
                     <div className="attachments-modal__title">
-                        <h2>Belege zu <button
-                            type="button"
-                            className="attachments-modal__voucher-link"
-                            title="Zur Buchung"
-                            onClick={() => {
-                                onClose()
-                                window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
-                                    detail: { voucherId: voucher.voucherId, voucherNo: voucher.voucherNo, date: voucher.date }
-                                }))
-                            }}
-                        >#{voucher.voucherNo}</button></h2>
-                        <span className="attachments-modal__subtitle">{voucher.date} · {voucher.description || '—'}</span>
-                        {booking && booking.id === voucher.voucherId ? (
-                            <dl className="attachments-modal__booking" aria-label="Buchungsinformationen">
-                                <div>
-                                    <dt>Brutto</dt>
-                                    <dd className={`attachments-modal__amount attachments-modal__amount--${booking.type.toLowerCase()}`}>{amountFormat.format(booking.grossAmount)}</dd>
-                                </div>
-                                <div><dt>Art</dt><dd>{bookingTypeLabels[booking.type]}</dd></div>
-                                <div><dt>Zahlweg</dt><dd>{paymentLabel}</dd></div>
-                                <div><dt>Bereich</dt><dd>{booking.primaryClassificationName || sphereLabels[booking.sphere]}</dd></div>
-                            </dl>
-                        ) : (
-                            <span className="attachments-modal__subtitle" role="status">{bookingError ? 'Buchungsinformationen konnten nicht geladen werden.' : 'Lade Buchungsinformationen…'}</span>
-                        )}
+                        <h2 id="attachments-modal-title"><IconPaperclip size={18} aria-hidden="true" />Belege</h2>
+                        <button type="button" className="attachments-modal__voucher-link" title="Zur Buchung" onClick={() => {
+                            onClose()
+                            window.dispatchEvent(new CustomEvent('apply-voucher-jump', {
+                                detail: { voucherId: voucher.voucherId, voucherNo: voucher.voucherNo, date: voucher.date }
+                            }))
+                        }}><IconReceipt2 size={14} aria-hidden="true" /><span>Buchung #{voucher.voucherNo}</span><IconChevronRight size={14} aria-hidden="true" /></button>
                     </div>
-                    <button className="attachments-modal__close" onClick={onClose} aria-label="Schließen">
-                        <IconClose />
-                    </button>
+                    <button className="attachments-modal__close" onClick={onClose} aria-label="Schließen"><IconClose size={20} /></button>
                 </header>
+                <section className="attachments-modal__context" aria-label="Buchungsinformationen">
+                    <div className="attachments-modal__summary">
+                        <span className={`attachments-modal__direction attachments-modal__amount--${booking?.type.toLowerCase() || 'neutral'}`} aria-hidden="true">{booking?.type === 'IN' ? <IconArrowDown size={17} /> : booking?.type === 'OUT' ? <IconArrowUp size={17} /> : <IconArrowsExchange size={17} />}</span>
+                        <div>
+                            {booking ? <strong className={`attachments-modal__amount attachments-modal__amount--${booking.type.toLowerCase()}`}>{amountFormat.format(booking.type === 'OUT' ? -booking.grossAmount : booking.grossAmount)}</strong> : <span className="attachments-modal__subtitle" role="status">{bookingError ? 'Buchungsinformationen konnten nicht geladen werden.' : 'Lade Buchungsinformationen…'}</span>}
+                            <p title={booking?.description || voucher.description || 'Ohne Beschreibung'}>{booking?.description || voucher.description || 'Ohne Beschreibung'}</p>
+                        </div>
+                    </div>
+                    <dl className="attachments-modal__booking">
+                        <div><dt><IconCalendar size={14} />Datum</dt><dd>{dateFormat.format(new Date(`${voucher.date.slice(0, 10)}T12:00:00`))}</dd></div>
+                        {booking && <>
+                            <div><dt><IconTag size={14} />Art</dt><dd>{bookingTypeLabels[booking.type]}</dd></div>
+                            <div><dt><IconWallet size={14} />Konto</dt><dd>{paymentLabel}</dd></div>
+                            <div><dt><IconCategory size={14} />{booking.primaryClassificationName ? 'Kategorie' : 'Sphäre'}</dt><dd>{booking.primaryClassificationName || sphereLabels[booking.sphere]}</dd></div>
+                        </>}
+                    </dl>
+                </section>
+                <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" aria-label="Belege auswählen" onChange={(event) => handleAddFiles(event.target.files)} />
 
-                {error && <div className="attachments-modal__error">{error}</div>}
+                {error && <div className="attachments-modal__error" role="alert">{error}</div>}
                 
                 {loading ? (
-                    <div className="attachments-modal__loading">Lade Belege…</div>
+                    <div className="attachments-modal__loading" role="status">Lade Belege…</div>
                 ) : (
-                    <div className="attachments-modal__content">
+                    <div className={`attachments-modal__content${files.length === 0 ? ' attachments-modal__content--empty' : ''}`}>
+                        {files.length === 0 ? <div className="attachments-modal__empty">
+                            <span className="attachments-modal__empty-icon"><IconReceipt2 size={30} stroke={1.5} aria-hidden="true" /></span>
+                            <h3>Noch keine Belege</h3>
+                            <p>Füge eine Rechnung oder Quittung zu dieser Buchung hinzu.</p>
+                            <button className="btn primary attachments-modal__add" onClick={() => fileInputRef.current?.click()}><IconPlus size={17} />Beleg hinzufügen</button>
+                            <small>PDF, JPG, PNG oder Word · mehrere Dateien möglich</small>
+                        </div> : <>
+
                         {/* File list sidebar */}
-                        <aside className="attachments-modal__sidebar">
+                        <aside className="attachments-modal__sidebar" aria-label="Belegliste">
                             <div className="attachments-modal__sidebar-header">
-                                <span className="attachments-modal__file-count">{files.length} Datei{files.length !== 1 ? 'en' : ''}</span>
+                                <span className="attachments-modal__file-count">Belege <span>{files.length}</span></span>
                                 <button 
                                     className="attachments-modal__icon-btn" 
                                     onClick={() => fileInputRef.current?.click?.()} 
-                                    title="Datei(en) hinzufügen"
+                                    title="Beleg hinzufügen" aria-label="Beleg hinzufügen"
                                 >
-                                    <IconPlus />
+                                    <IconPlus size={17} aria-hidden="true" />
                                 </button>
                             </div>
-                            <input 
-                                ref={fileInputRef} 
-                                type="file" 
-                                multiple 
-                                hidden 
-                                accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" 
-                                onChange={(e) => handleAddFiles(e.target.files)} 
-                            />
                             <div className="attachments-modal__file-list">
-                                {files.length === 0 && (
-                                    <div className="attachments-modal__empty">
-                                        <span>Keine Dateien</span>
-                                        <button className="btn btn-sm" onClick={() => fileInputRef.current?.click?.()}>
-                                            Datei hinzufügen
-                                        </button>
-                                    </div>
-                                )}
                                 {files.map(f => (
                                     <button 
                                         key={f.id} 
                                         className={`attachments-modal__file-item ${selectedId === f.id ? 'active' : ''}`}
+                                        aria-pressed={selectedId === f.id}
+                                        title={f.fileName}
                                         onClick={() => setSelectedId(f.id)}
                                     >
                                         <span className="attachments-modal__file-icon">
-                                            {isImageFile(f) ? <IconImage /> : <IconFile />}
+                                            {isImageFile(f) ? <IconImage size={17} aria-hidden="true" /> : <IconFile size={17} aria-hidden="true" />}
                                         </span>
-                                        <span className="attachments-modal__file-name">{f.fileName}</span>
+                                        <span className="attachments-modal__file-label"><span className="attachments-modal__file-name">{f.fileName}</span><small>{isImageFile(f) ? 'Bild' : /\.pdf$/i.test(f.fileName) ? 'PDF-Dokument' : /\.docx?$/i.test(f.fileName) ? 'Word-Dokument' : 'Datei'}</small></span>
                                     </button>
                                 ))}
                             </div>
@@ -550,26 +491,26 @@ export default function AttachmentsModal({
                                     {/* Toolbar for selected file */}
                                     <div className="attachments-modal__toolbar">
                                         <div className="attachments-modal__toolbar-left">
-                                            <span className="attachments-modal__toolbar-name">{selected.fileName}</span>
+                                            <span className="attachments-modal__toolbar-name" title={selected.fileName}><span>Vorschau</span><strong>{selected.fileName}</strong></span>
                                             {preview?.kind === 'pdf' && pdfMeta && (
                                                 <div className="attachments-modal__pdf-controls" aria-label="PDF Seitensteuerung">
                                                     <button
                                                         className="attachments-modal__icon-btn"
                                                         onClick={goPrevPdfPage}
-                                                        title="Vorherige Seite"
+                                                        title="Vorherige Seite" aria-label="Vorherige Seite"
                                                         disabled={pdfMeta.page <= 1}
                                                     >
-                                                        <IconChevronLeft />
+                                                        <IconChevronLeft size={17} aria-hidden="true" />
                                                     </button>
                                                     <button type="button" className="btn ghost" title="Strg + Mausrad zum Zoomen · Klicken zum Zurücksetzen" aria-label="PDF Zoom zurücksetzen" onClick={() => setPdfZoom(1)}>{Math.round(pdfZoom * 100)} %</button>
                                                     <span className="attachments-modal__pdf-page">Seite {pdfMeta.page} / {pdfMeta.numPages}</span>
                                                     <button
                                                         className="attachments-modal__icon-btn"
                                                         onClick={goNextPdfPage}
-                                                        title="Nächste Seite"
+                                                        title="Nächste Seite" aria-label="Nächste Seite"
                                                         disabled={pdfMeta.page >= pdfMeta.numPages}
                                                     >
-                                                        <IconChevronRight />
+                                                        <IconChevronRight size={17} aria-hidden="true" />
                                                     </button>
                                                 </div>
                                             )}
@@ -578,23 +519,23 @@ export default function AttachmentsModal({
                                             <button 
                                                 className="attachments-modal__icon-btn" 
                                                 onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}
-                                                title="Extern öffnen"
+                                                title="Extern öffnen" aria-label="Extern öffnen"
                                             >
-                                                <IconExternalLink />
+                                                <IconExternalLink size={17} aria-hidden="true" />
                                             </button>
                                             <button 
                                                 className="attachments-modal__icon-btn" 
                                                 onClick={handleDownload}
-                                                title="Herunterladen"
+                                                title="Herunterladen" aria-label="Herunterladen"
                                             >
-                                                <IconDownload />
+                                                <IconDownload size={17} aria-hidden="true" />
                                             </button>
                                             <button 
                                                 className="attachments-modal__icon-btn attachments-modal__icon-btn--danger" 
                                                 onClick={() => setConfirmDelete({ id: selected.id, fileName: selected.fileName })}
-                                                title="Löschen"
+                                                title="Löschen" aria-label="Löschen"
                                             >
-                                                <IconTrash />
+                                                <IconTrash size={17} aria-hidden="true" />
                                             </button>
                                         </div>
                                     </div>
@@ -605,7 +546,7 @@ export default function AttachmentsModal({
                                         ) : preview?.kind === 'pdf' ? (
                                             pdfError ? (
                                                 <div className="attachments-modal__no-preview">
-                                                    <IconFile />
+                                                    <IconFile size={17} aria-hidden="true" />
                                                     <span>{pdfError}</span>
                                                     <div className="attachments-modal__no-preview-actions">
                                                         <button className="btn btn-sm" onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}>
@@ -621,7 +562,7 @@ export default function AttachmentsModal({
                                             )
                                         ) : (
                                             <div className="attachments-modal__no-preview">
-                                                <IconFile />
+                                                <IconFile size={17} aria-hidden="true" />
                                                 <span>Keine Vorschau verfügbar</span>
                                                 <div className="attachments-modal__no-preview-actions">
                                                     <button className="btn btn-sm" onClick={() => (window as any).api?.attachments.open?.({ fileId: selected.id })}>
@@ -637,11 +578,12 @@ export default function AttachmentsModal({
                                 </>
                             ) : (
                                 <div className="attachments-modal__no-selection">
-                                    <IconFile />
-                                    <span>Wähle eine Datei aus der Liste</span>
+                                    <IconFile size={32} />
+                                    <span>Wähle einen Beleg aus der Liste.</span>
                                 </div>
                             )}
                         </div>
+                        </>}
                     </div>
                 )}
 

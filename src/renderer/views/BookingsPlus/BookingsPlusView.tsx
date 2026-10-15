@@ -2,11 +2,12 @@ import '../../components/booking/bookingTable.css'
 import PartyName from '../../components/common/PartyName'
 import RecentBookingsDropdown from './RecentBookingsDropdown'
 import DateFilterInput from '../../components/common/DateFilterInput'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconChevronLeft, IconChevronsLeft, IconCopy, IconWallet, IconTargetArrow, IconChevronRight, IconFilter, IconPaperclip, IconPencil, IconPlus, IconReceipt2, IconSearch, IconTrash, IconX } from '@tabler/icons-react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { IconCalendar, IconTag, IconCategory, IconDots, IconArrowDown, IconArrowUp, IconArrowsExchange, IconChevronLeft, IconChevronsLeft, IconCopy, IconWallet, IconTargetArrow, IconChevronRight, IconFilter, IconPaperclip, IconPencil, IconPlus, IconReceipt2, IconSearch, IconTrash, IconX } from '@tabler/icons-react'
 import type { RendererApi } from '../../../types/api'
 import AttachmentsModal from '../../components/modals/AttachmentsModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
+import BookingDetailPopover from '../../components/booking/BookingDetailPopover'
 import InvoiceBatchControl from '../../components/InvoiceBatchControl'
 import ReceiptThumbnail, { type ReceiptPreviewCache } from '../../components/ReceiptThumbnail'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
@@ -100,7 +101,6 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
     const [error, setError] = useState('')
     const [revision, setRevision] = useState(0)
     const [detailOpen, setDetailOpen] = useState(false)
-    const [filtersOpen, setFiltersOpen] = useState(false)
     const [metaEditing, setMetaEditing] = useState(false)
     const metaEditingRef = useRef(false)
     metaEditingRef.current = metaEditing
@@ -205,10 +205,39 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
         }).catch(() => { if (alive) setSimilarError('Ähnliche Buchungen konnten nicht geladen werden.') }).finally(() => { if (alive) setSimilarLoading(false) })
         return () => { alive = false }
     }, [similarTo, revision])
-    const closeDetails = useCallback(() => { setDetailOpen(false); setMetaEditing(false); lastRowButton.current?.focus() }, [])
+    const closeDetails = useCallback(() => { setDetailOpen(false); setMetaEditing(false); lastRowButton.current?.focus({ preventScroll: true }) }, [])
+    useLayoutEffect(() => {
+        const panel = inspector.current
+        if (!narrow || !detailOpen || !panel) return
+        // Keep the compact panel beside the selected row, including after scrolling,
+        // resizing or switching to the metadata editor.
+        const anchor = panel.parentElement?.querySelector<HTMLElement>(`.bp-row[data-voucher-id="${selected?.id}"]`) || lastRowButton.current
+        const position = () => {
+            const margin = window.innerWidth <= 1100 ? 8 : 16
+            const height = panel.getBoundingClientRect().height
+            const row = anchor?.isConnected ? anchor.getBoundingClientRect() : null
+            const preferredTop = row
+                ? (row.top + row.bottom) / 2 > window.innerHeight / 2 ? row.bottom - height : row.top
+                : margin
+            const top = Math.max(margin, Math.min(preferredTop, window.innerHeight - height - margin))
+            panel.style.top = `${Math.round(top)}px`
+        }
+        position()
+        const observer = new ResizeObserver(position)
+        observer.observe(panel)
+        if (anchor) observer.observe(anchor)
+        window.addEventListener('resize', position)
+        window.addEventListener('scroll', position, true)
+        return () => {
+            observer.disconnect()
+            window.removeEventListener('resize', position)
+            window.removeEventListener('scroll', position, true)
+            panel.style.removeProperty('top')
+        }
+    }, [narrow, detailOpen, selected?.id, metaEditing])
     useEffect(() => {
         if (!narrow || !detailOpen || attachments || infoOpen || confirm) return
-        inspector.current?.focus()
+        inspector.current?.focus({ preventScroll: true })
         const handle = (event: KeyboardEvent) => {
             if (event.key === 'Escape') { event.preventDefault(); closeDetails() }
             if (event.key === 'Tab') {
@@ -222,7 +251,7 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
         window.addEventListener('keydown', handle)
         return () => window.removeEventListener('keydown', handle)
     }, [narrow, detailOpen, attachments, infoOpen, confirm, closeDetails])
-    const selectRow = (row: BookingPlusRow, button?: HTMLElement, openInfo = false) => { if (metaEditing) { notify('info', 'Bitte die Bearbeitung zuerst speichern oder abbrechen.'); return }; setSelected(row); setDetailOpen(true); if (openInfo) setInfoOpen(true); setSimilarTo(null); if (button) lastRowButton.current = button }
+    const selectRow = (row: BookingPlusRow, button?: HTMLElement, openInfo = false) => { if (metaEditing) { notify('info', 'Bitte die Bearbeitung zuerst speichern oder abbrechen.'); return }; setSelected(row); setDetailOpen(true); if (openInfo) setInfoOpen(true); setSimilarTo(null); lastRowButton.current = button || null }
     const changeMonth = (offset: number) => {
         const date = new Date(`${month}-01T12:00:00`); date.setMonth(date.getMonth() + offset)
         setMonth(isoDate(date).slice(0, 7))
@@ -310,6 +339,19 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
             return <span key={`earmark-${item.earmarkId}`} className="bp-assignment-badge" style={color ? { background: color, color: getContrastTextColor(color) } : undefined} title={`Zweckbindung: ${label}${definition?.name ? ` · ${definition.name}` : ''}${item.amount != null ? ` · ${money.format(item.amount)}` : ''}`}><IconTargetArrow size={13} /><span>{label}</span></span>
         })}</span>
     }
+    const detailSummary = selected && <>
+        <div className="bp-detail-summary">
+            <span className={`bp-detail-direction bp-kind-icon--${selected.type.toLowerCase()}`} aria-hidden="true">{selected.type === 'IN' ? <IconArrowDown size={23} /> : selected.type === 'OUT' ? <IconArrowUp size={23} /> : <IconArrowsExchange size={23} />}</span>
+            <div><strong className={`bp-detail-amount ${signedAmount(selected) < 0 ? 'bp-negative' : selected.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(selected))}</strong><h2>{selected.description || 'Ohne Beschreibung'}</h2>{selected.counterparty && <p className="bp-dim"><PartyName name={selected.counterparty} /></p>}</div>
+        </div>
+        <dl className="bp-detail-facts">
+            <div><dt><IconCalendar size={15} />Datum</dt><dd>{prettyDate(selected.date)}</dd></div>
+            <div><dt><IconReceipt2 size={15} />Belegnummer</dt><dd className="bp-detail-voucher"><span>{selected.voucherNo}</span><button type="button" className="btn ghost" aria-label="Belegnummer kopieren" title="Belegnummer kopieren" onClick={() => { navigator.clipboard.writeText(selected.voucherNo).then(() => notify('success', 'Belegnummer kopiert')).catch(() => notify('error', 'Kopieren fehlgeschlagen')) }}><IconCopy size={14} /></button></dd></div>
+            <div><dt><IconTag size={15} />Art</dt><dd><span className={`bp-type-badge bp-kind-icon--${selected.type.toLowerCase()}`}>{kinds[selected.type]}</span></dd></div>
+            <div><dt><IconWallet size={15} />Konto</dt><dd>{paymentLabel(selected)}</dd></div>
+            <div><dt><IconCategory size={15} />{generalProfile ? 'Kategorie' : 'Sphäre'}</dt><dd>{classificationLabel(selected)}</dd></div>
+        </dl>
+    </>
     const activePaymentAccount = paymentAccounts.find(account => String(account.id) === filters.account)
     const activeClassification = classifications.find(item => String(item.id) === filters.classification)
     const activeBudget = budgets.find(item => String(item.id) === filters.budget)
@@ -332,17 +374,26 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
         budget: activeBudget?.label,
         earmark: activeEarmark?.name, tag: filters.tag
     }
-    return <div className="bookings-plus bookings-plus--dense">
-        <aside className={`bp-sidebar${filtersOpen ? ' bp-sidebar--open' : ''}`} aria-label="Kalender und Buchungsfilter">
-            <button className="btn bp-filter-toggle" onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen} aria-controls="bp-filters"><IconFilter size={18} />Kalender & Filter</button>
-            <div id="bp-filters" className="bp-filter-content">
-                <section className="bp-panel bp-calendar" aria-label="Kalender">
+    const monthLabel = new Date(`${month}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+    const activeFilterCount = [filters.type, generalProfile ? filters.classification : filters.sphere, filters.account, filters.tag, filters.budget, filters.earmark, filters.from || filters.to].filter(Boolean).length
+    const navigateMonth = (offset: number) => {
+        const date = new Date(`${month}-01T12:00:00`)
+        date.setMonth(date.getMonth() + offset)
+        const next = isoDate(date).slice(0, 7)
+        setMonth(next)
+        setFilters(current => ({ ...current, ...monthRange(next) }))
+        setPage(1)
+    }
+    const calendarContent = (
+                <section className="bp-calendar" aria-label="Kalender">
                     <div className="bp-calendar-heading"><button className="btn ghost" aria-label="Vorheriger Monat" onClick={() => changeMonth(-1)}><IconChevronLeft size={16} /></button><button className={`bp-month-select${monthSelected ? ' is-active' : ''}`} aria-pressed={monthSelected} title="Monat filtern / Monatsfilter aufheben" onClick={selectMonth}>{new Date(`${month}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</button><button className="btn ghost" aria-label="Nächster Monat" onClick={() => changeMonth(1)}><IconChevronRight size={16} /></button></div>
                     <div className="bp-days">{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(day => <span className="bp-weekday" key={day}>{day}</span>)}{calendarDays(month).map((day, index) => day ? <button key={day} className={`${filters.from === day && filters.to === day ? 'is-selected' : ''} ${day === isoDate(new Date()) ? 'is-today' : ''}`} aria-label={`${prettyDate(day)}${receiptDays.has(day) ? ' · Buchungen vorhanden' : ''}`} title={receiptDays.has(day) ? 'An diesem Tag gibt es Buchungen' : undefined} aria-pressed={filters.from === day && filters.to === day} onClick={() => { if (filters.from === day && filters.to === day) clearDates(); else { setFilters(current => ({ ...current, from: day, to: day })); setPage(1) } }}>{Number(day.slice(-2))}{receiptDays.has(day) && <span className="bp-receipt-dot" aria-hidden="true" />}</button> : <span key={`empty-${index}`} />)}</div>
                     <button className={`btn ghost bp-all-dates${allDates ? ' is-active' : ''}`} aria-pressed={allDates} onClick={clearDates}>Gesamter Verlauf</button>
                     <div className="bp-calendar-legend">{calendarState === 'loading' ? 'Buchungstage werden geladen …' : calendarState === 'error' ? <button className="btn ghost" onClick={refresh}>Buchungstage erneut laden</button> : <><span className="bp-receipt-dot" />Tag mit Buchungen · unabhängig von Filtern</>}</div>
                 </section>
-                <section className="bp-panel bp-filters"><div className="bp-section-heading"><h2>Filter</h2>{hasActiveFilters && <button type="button" className="bp-reset-badge" onClick={() => { setFilters(emptyFilters); setPage(1); setSimilarTo(null); onResetFilters() }}>Zurücksetzen</button>}</div>
+    )
+    const filterContent = (
+                <section className="bp-filters"><div className="bp-section-heading"><h2>Filter</h2>{hasActiveFilters && <button type="button" className="bp-reset-badge" onClick={() => { setFilters(emptyFilters); setPage(1); setSimilarTo(null); onResetFilters() }}>Zurücksetzen</button>}</div>
                     {chipFilter('type', 'Art', Object.entries(kinds).map(([value, label]) => ({ value, label, color: kindFilterColors[value as keyof typeof kinds] })))}
                     {generalProfile ? chipFilter('classification', 'Kategorie', classifications.map(item => ({ value: String(item.id), label: item.name, color: item.color }))) : chipFilter('sphere', 'Sphäre', Object.entries(spheres).map(([value, label]) => ({ value, label, color: sphereFilterColors[value as keyof typeof spheres] })))}
                     {chipFilter('account', 'Zahlweg / Konto', paymentAccounts.map(item => ({ value: String(item.id), label: item.name, color: item.color, icon: paymentFilterIcon(item, filters.account === String(item.id)) })))}
@@ -353,12 +404,23 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                         {selectFilter('earmark', 'Zweckbindung', earmarks.map(item => ({ value: String(item.id), label: `${item.code} · ${item.name}` })))}
                     </details>
                 </section>
-            </div>
-        </aside>
+    )
+    return <div className="bookings-plus bookings-plus--dense">
         <section className="bp-workspace">
             <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><div className="bp-heading-workspace"><label className="bp-search bp-header-search"><IconSearch size={18} /><input type="search" className="input" value={filters.q} onChange={event => update('q', event.target.value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" aria-label="Buchungen suchen" />{filters.q && <button type="button" className="btn ghost" aria-label="Suche leeren" onClick={() => update('q', '')}><IconX size={16} /></button>}</label>{showBookingDraftTabs && bookingDraftTabs.length > 0 && <div ref={draftTabsRef} className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}</div><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
-            <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
-            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter"><span>{hasActiveFilters ? 'Aktive Filter:' : 'Gesamter Verlauf · keine Filter'}</span>{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
+            <div className="bp-toolbar">
+                <div className="bp-browse-tools">
+                    <div className="bp-month-navigation" role="group" aria-label="Monatsnavigation">
+                        <button type="button" className="btn ghost" aria-label="Vorheriger Monat" onClick={() => navigateMonth(-1)}><IconChevronLeft size={16} /></button>
+                        <BookingDetailPopover label="Kalender öffnen" trigger={<><IconCalendar size={16} /><span>{monthLabel}</span></>} triggerClassName="bp-month-trigger" panelClassName="bp-calendar-popover">{calendarContent}</BookingDetailPopover>
+                        <button type="button" className="btn ghost" aria-label="Nächster Monat" onClick={() => navigateMonth(1)}><IconChevronRight size={16} /></button>
+                    </div>
+                    <BookingDetailPopover label="Buchungsfilter" trigger={<><IconFilter size={16} /><span>Filter</span>{activeFilterCount > 0 && <span className="bp-filter-count">{activeFilterCount}</span>}</>} triggerClassName="bp-filter-trigger" panelClassName="bp-filters-popover">{filterContent}</BookingDetailPopover>
+                    {allDates && <span className="bp-period-hint">Gesamter Verlauf</span>}
+                </div>
+                <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
+            </div>
+            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter">{hasActiveFilters && <span>Aktive Filter:</span>}{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
                 const color = activeFilterColors[key]
                 return <button type="button" key={key} style={color ? { background: color, borderColor: color, color: getContrastTextColor(color) } : undefined} aria-label={`${activeFilterLabels[key] || filters[key]}: Filter entfernen`} onClick={() => update(key, '')}>{key === 'account' && activePaymentAccount && paymentFilterIcon(activePaymentAccount, true)}{activeFilterLabels[key] || filters[key]} <span aria-hidden="true">×</span></button>
             })}</div>
@@ -370,7 +432,7 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                         <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
                         <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
                     </header>
-                    <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
+                    <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} data-voucher-id={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
                         <time className="bp-date" dateTime={row.date}><strong>{Number(row.date.slice(8, 10))}</strong><span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('de-DE', { month: 'short' })}</span><small>{row.date.slice(0, 4)}</small></time>
                         <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span><span className="bp-row-payment bp-row-payment--compact">{paymentMeta(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{assignmentBadges(row)}</span></span>
                         <span className="bp-row-payment">{paymentMeta(row)}</span><strong className={`bp-row-amount ${signedAmount(row) < 0 ? 'bp-negative' : row.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(row))}</strong>
@@ -382,19 +444,24 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                 {narrow && detailOpen && <div className="bp-detail-backdrop" onClick={closeDetails} />}
                 <aside ref={inspector} tabIndex={-1} className={`bp-panel bp-inspector${detailOpen ? ' bp-inspector--open' : ''}${metaEditing ? ' bp-inspector--editing' : ''}`} role={narrow && detailOpen ? 'dialog' : undefined} aria-modal={narrow && detailOpen ? true : undefined} aria-label="Ausgewählte Buchung">
                     <div className="bp-section-heading"><strong>Buchungsdetails</strong><button className="btn ghost bp-detail-close" aria-label="Details schließen" onClick={closeDetails}><IconX size={19} /></button></div>
-                    {selected && <div className="bp-voucher-number"><div><span>Belegnummer</span><strong>{selected.voucherNo}</strong></div><button type="button" className="btn ghost" aria-label="Belegnummer kopieren" title="Belegnummer kopieren" onClick={() => { navigator.clipboard.writeText(selected.voucherNo).then(() => notify('success', 'Belegnummer kopiert')).catch(() => notify('error', 'Kopieren fehlgeschlagen')) }}><IconCopy size={18} /></button></div>}
-                    {selected && metaEditing ? <VoucherInfoModal key={selected.id} embedded initialEditing voucher={selected} onClose={() => setMetaEditing(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onOpenAttachments={() => setAttachments(selected)} /> : selected ? <>
+                    {selected && metaEditing ? <VoucherInfoModal key={selected.id} embedded initialEditing embeddedSummary={detailSummary} voucher={selected} onClose={() => setMetaEditing(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onOpenAttachments={() => setAttachments(selected)} /> : selected ? <>
                         <div className="bp-inspector-scroll">
+                            {detailSummary}
+                            <div className="bp-detail-tag-row"><span><IconTag size={15} />Tags</span><div className="bp-row-tags">{selected.tags?.length ? selected.tags.map(name => {
+                                const color = resolveTagDisplayColor(name, tagDefs)
+                                return <span key={name} className="bp-tag" style={color ? { background: color, color: getContrastTextColor(color) } : undefined}>{name}</span>
+                            }) : <span className="bp-dim">Keine Tags</span>}</div></div>
+                            <h3>Zuordnungen</h3><div className="bp-assignment"><span>Budget</span><div>{selected.budgets?.length ? selected.budgets.map(item => <span key={item.budgetId}>{item.label || budgets.find(budget => budget.id === item.budgetId)?.label || `#${item.budgetId}`} <small>{money.format(item.amount)}</small></span>) : selected.budgetLabel || budgets.find(item => item.id === selected.budgetId)?.label || (selected.budgetId ? `#${selected.budgetId}` : '—')}</div><span>Zweckbindung</span><div>{selected.earmarksAssigned?.length ? selected.earmarksAssigned.map(item => <span key={item.earmarkId}>{item.code || item.name || earmarks.find(earmark => earmark.id === item.earmarkId)?.code || `#${item.earmarkId}`} <small>{money.format(item.amount)}</small></span>) : selected.earmarkCode || earmarks.find(item => item.id === selected.earmarkId)?.code || (selected.earmarkId ? `#${selected.earmarkId}` : '—')}</div></div>
+                            <h3>Notiz</h3><div className={`bp-note${selected.note ? '' : ' bp-dim'}`}>{selected.note || 'Keine Notiz hinterlegt.'}</div>
+                            <h3>Beleg</h3>
                             {(selected.fileCount || 0) > 0 && <button className="bp-preview-button" onClick={() => setAttachments(selected)} aria-label="Belege anzeigen"><ReceiptThumbnail key={selected.id} voucherId={selected.id} cache={cache.current} revision={revision} /></button>}
-                            <h2>{selected.description || 'Ohne Beschreibung'}</h2>{selected.counterparty && <p className="bp-dim"><PartyName name={selected.counterparty} /></p>}<strong className={`bp-detail-amount ${signedAmount(selected) < 0 ? 'bp-negative' : selected.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(selected))}</strong>
-                            <dl className="bp-detail-facts"><div><dt>Datum</dt><dd>{prettyDate(selected.date)}</dd></div><div><dt>Zahlweg</dt><dd>{paymentBadge(selected)}</dd></div><div><dt>{generalProfile ? 'Kategorie' : 'Sphäre'}</dt><dd>{classificationLabel(selected)}</dd></div><div><dt>Art</dt><dd><span className={`bp-type-badge bp-kind-icon--${selected.type.toLowerCase()}`}>{selected.type === 'IN' ? <IconArrowDown size={15} /> : selected.type === 'OUT' ? <IconArrowUp size={15} /> : <IconArrowsExchange size={15} />}{kinds[selected.type]}</span></dd></div></dl>
-                            <h3>Tags</h3><div className="bp-row-tags">{selected.tags?.length ? tags(selected.tags) : <span className="bp-dim">Keine Tags</span>}</div>
-                            <h3>Zuordnungen</h3><div className="bp-assignment"><span>Budget</span><strong>{assignmentBadges(selected, true) || '—'}</strong><span>Zweckbindung</span><strong>{selected.earmarksAssigned?.map(item => item.code || item.name).join(', ') || selected.earmarkCode || '—'}</strong></div>
-                            <h3>Beleg / Notiz</h3><div className="bp-note">{selected.note || 'Keine Notiz hinterlegt.'}</div><button className="btn bp-attachment" onClick={() => setAttachments(selected)}><IconPaperclip size={16} />{selected.fileCount ? `${selected.fileCount} Beleg${selected.fileCount === 1 ? '' : 'e'} anzeigen / ergänzen` : 'Beleg hinzufügen'}</button>
+                            <button className="btn bp-attachment" onClick={() => setAttachments(selected)}><IconPaperclip size={20} /><span>{selected.fileCount ? `${selected.fileCount} Beleg${selected.fileCount === 1 ? '' : 'e'} anzeigen / ergänzen` : 'Beleg hinzufügen'}</span></button>
                             {blocked && <p className="bp-dim">{blocked}</p>}
 
                         </div>
-                        <footer className="bp-detail-actions"><div><button className="btn bp-edit-booking" disabled={!!editBlocked || busy} onClick={() => { void edit() }}><IconPencil size={16} />Bearbeiten</button><button className="btn" onClick={() => setInfoOpen(true)} title="Vollständige Buchungsinfo" aria-label="Vollständige Buchungsinfo"><IconReceipt2 size={18} /></button><button className="btn danger" disabled={!!blocked || busy} onClick={() => setConfirm(selected)} title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'} aria-label={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}><IconTrash size={17} /></button></div><button className="btn ghost" disabled={!similarQuery(selected)} onClick={() => { setSimilarTo(current => current?.id === selected.id ? null : selected); if (narrow) closeDetails() }} aria-expanded={!!similarTo}><IconSearch size={16} />Ähnliche Buchungen</button></footer>
+                        <footer className="bp-detail-actions"><div><button className="btn bp-edit-booking" disabled={!!editBlocked || busy} onClick={() => { void edit() }}><IconPencil size={16} />Bearbeiten</button><BookingDetailPopover key={selected.id} label="Weitere Aktionen" trigger={<IconDots size={18} />}>
+                            {close => <div className="bp-more-actions"><button className="btn ghost" onClick={() => { close(); setInfoOpen(true) }}><IconReceipt2 size={16} />Vollständige Buchungsinfo</button><button className="btn ghost" disabled={!similarQuery(selected)} onClick={() => { close(); setSimilarTo(current => current?.id === selected.id ? null : selected); if (narrow) closeDetails() }} aria-expanded={!!similarTo}><IconSearch size={16} />Ähnliche Buchungen</button></div>}
+                        </BookingDetailPopover><button className="btn danger" disabled={!!blocked || busy} onClick={() => setConfirm(selected)} title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'} aria-label={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}><IconTrash size={17} /></button></div></footer>
                     </> : <p className="bp-empty">Wähle eine Buchung aus der Liste.</p>}
                 </aside>
             </div>

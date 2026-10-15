@@ -8,6 +8,8 @@ import { createPortal } from 'react-dom'
 import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconDotsVertical, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
 import SelectDropdown from '../common/SelectDropdown'
 import TagsEditor from '../TagsEditor'
+import BookingDetailPopover from '../booking/BookingDetailPopover'
+import BookingAssignmentEditor from '../booking/BookingAssignmentEditor'
 import ReceiptThumbnail, { type ReceiptPreviewCache } from '../ReceiptThumbnail'
 import AppIcon from '../common/AppIcon'
 import { IconBank, IconCash } from '../../utils/icons'
@@ -78,6 +80,7 @@ interface VoucherInfoModalProps {
   suspended?: boolean
   embedded?: boolean
   initialEditing?: boolean
+  embeddedSummary?: React.ReactNode
 }
 
 const IconEdit = ({ size = 28 }: { size?: number }) => (
@@ -96,7 +99,7 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
   </svg>
 )
 
-export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false }: VoucherInfoModalProps) {
+export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, notify, earmarks = [], budgets = [], tagDefs = [], allowVoucherDeletion = false, onReverse, onOpenAttachments, onSaveMeta, windowMode = false, suspended = false, embedded = false, initialEditing = false, embeddedSummary }: VoucherInfoModalProps) {
   const [reimbursementDialog, setReimbursementDialog] = useState<{ id?: number; create?: boolean } | null>(null)
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([])
   useEffect(() => {
@@ -351,6 +354,27 @@ Status: ${statusLabel}`
       notify('error', 'Kopieren fehlgeschlagen', 2000)
     })
   }
+
+  if (embedded) return <div className="bp-meta-editor" aria-label="Buchungsdetails bearbeiten">
+    <div className="bp-inspector-scroll">
+      {embeddedSummary}
+      <div className="bp-detail-tag-row"><span><IconTag size={15} />Tags</span><div className="bp-row-tags">{metaTags.length ? metaTags.map(name => {
+        const color = resolveTagDisplayColor(name, tagDefs)
+        return <span key={name} className="bp-tag" style={{ background: color || undefined, color: color ? getContrastTextColor(color) : undefined }}>{name}</span>
+      }) : <span className="bp-dim">Keine Tags</span>}<BookingDetailPopover label="Tags bearbeiten" trigger="+" disabled={savingMeta}><TagsEditor value={metaTags} onChange={setMetaTags} tagDefs={tagDefs} disabled={savingMeta} /></BookingDetailPopover></div></div>
+      <h3>Zuordnungen</h3>
+      <BookingAssignmentEditor label="Budget" value={metaBudgets.map(item => ({ id: item.budgetId, amount: item.amount }))} options={[...availableBudgets.map(item => ({ id: item.id, label: item.label })), ...budgetAssignments.filter(item => !availableBudgets.some(option => option.id === item.budgetId)).map(item => ({ id: item.budgetId, label: item.label || `#${item.budgetId}`, unavailable: true }))]} onChange={value => setMetaBudgets(value.map(item => ({ budgetId: item.id, amount: item.amount })))} gross={grossLimit} internal={voucher.type === 'INTERNAL'} disabled={savingMeta} money={eurFmt} />
+      <BookingAssignmentEditor label="Zweckbindung" value={metaEarmarks.map(item => ({ id: item.earmarkId, amount: item.amount }))} options={[...availableEarmarks.map(item => ({ id: item.id, label: `${item.code} · ${item.name}` })), ...earmarkAssignments.filter(item => !availableEarmarks.some(option => option.id === item.earmarkId)).map(item => ({ id: item.earmarkId, label: item.code || `#${item.earmarkId}`, unavailable: true }))]} onChange={value => setMetaEarmarks(value.map(item => ({ earmarkId: item.id, amount: item.amount })))} gross={grossLimit} internal={voucher.type === 'INTERNAL'} disabled={savingMeta} money={eurFmt} />
+      <h3><label htmlFor="bp-meta-note">Notiz</label></h3>
+      <textarea id="bp-meta-note" className="input bp-note-input" rows={3} placeholder="Keine Notiz hinterlegt." value={metaNote} disabled={savingMeta} onChange={event => setMetaNote(event.target.value)} />
+      <h3>Beleg</h3>
+      <button className="btn bp-attachment" onClick={onOpenAttachments} disabled={savingMeta || !onOpenAttachments}><IconPaperclip size={18} />{voucher.fileCount ? `${voucher.fileCount} Beleg${voucher.fileCount === 1 ? '' : 'e'} anzeigen / ergänzen` : 'Beleg hinzufügen'}</button>
+      {metaError && <p className="voucher-info-meta-error" role="alert">{metaError}</p>}
+      {budgetExceedsGross && <p className="voucher-info-meta-error" role="alert">Budget-Summe übersteigt den Buchungsbetrag.</p>}
+      {earmarkExceedsGross && <p className="voucher-info-meta-error" role="alert">Zweckbindungs-Summe übersteigt den Buchungsbetrag.</p>}
+    </div>
+    <footer className="bp-detail-actions"><div><button className="btn" disabled={savingMeta} onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={!canSaveMeta || budgetExceedsGross || earmarkExceedsGross} onClick={() => { void saveMeta() }}>{savingMeta ? 'Speichert …' : 'Speichern'}</button></div></footer>
+  </div>
 
   const content = (
     <div

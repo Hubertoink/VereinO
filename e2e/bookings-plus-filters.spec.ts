@@ -16,7 +16,9 @@ test('compact rows and removable filter chips retain the detail inspector', asyn
   await expect(page.locator('.booking-open-details')).toHaveCount(0)
   await page.locator('.bp-row').filter({ hasText: 'Einnahme Test' }).click()
   await expect(page.getByRole('complementary', { name: 'Ausgewählte Buchung' })).toContainText('Einnahme Test')
+  await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
   await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Einnahme: Filter entfernen' })).toBeVisible()
   await page.evaluate(() => (window as any).pendingFilters.splice(0).forEach((resolve: () => void) => resolve()))
   await expect(page.locator('.bp-row')).toHaveCount(1)
@@ -85,7 +87,9 @@ test('filter refresh keeps rows, totals and panel geometry until results arrive'
   const panel = page.locator('.bp-list')
   const before = await panel.boundingBox()
   const sum = await page.locator('.bp-totals').innerText()
+  await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
   await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+  await page.keyboard.press('Escape')
   await expect(panel).toHaveAttribute('aria-busy', 'true')
   await expect(page.locator('.bp-row')).toHaveCount(2)
   await expect(page.locator('.bp-row').first()).toBeDisabled()
@@ -101,12 +105,18 @@ test('filter refresh keeps rows, totals and panel geometry until results arrive'
 })
 
 test('compact list chrome stays fixed while bookings scroll behind it', async ({ page }, info) => {
-  for (const theme of ['light', 'dark']) {
-    await page.setViewportSize({ width: theme === 'light' ? 1600 : 1200, height: 700 })
+  for (const { theme, width, height } of [
+    { theme: 'light', width: 1600, height: 700 },
+    { theme: 'dark', width: 1200, height: 700 },
+    { theme: 'dark', width: 1080, height: 1920 },
+    { theme: 'light', width: 640, height: 560 },
+    { theme: 'dark', width: 480, height: 560 }
+  ]) {
+    await page.setViewportSize({ width, height })
     await page.setContent(`<style>
       :root { --surface:${theme === 'light' ? '#fff' : '#202532'};--text:${theme === 'light' ? '#202532' : '#fff'};--text-dim:${theme === 'light' ? '#667085' : '#bac3d2'};--border:#7c9199;--accent:#61959c;--success:#398951;--danger:#dd6154 }
       body { margin:0;font-family:Arial;background:var(--surface);color:var(--text) }
-      .bookings-plus { height:calc(100dvh - 24px) }
+      #root { display:grid; grid-template-rows:auto minmax(0,1fr); height:100dvh }
     </style><div id="root"></div>`)
     await page.addStyleTag({ content: styles })
     await page.addScriptTag({ content: script })
@@ -126,6 +136,8 @@ test('compact list chrome stays fixed while bookings scroll behind it', async ({
     expect(footerBefore.height).toBeLessThan(45)
     expect((await page.locator('.bp-row').first().boundingBox())!.y).toBeGreaterThanOrEqual(headerBefore.y + headerBefore.height)
     await scroll.evaluate(element => { element.scrollTop = 110 })
+    expect(await scroll.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(height)
     expect((await header.boundingBox())!.y).toBeCloseTo(headerBefore.y, 0)
     expect((await footer.boundingBox())!.y).toBeCloseTo(footerBefore.y, 0)
     const boxes = await page.locator('.bp-row').evaluateAll(elements => elements.map(element => {
@@ -133,13 +145,13 @@ test('compact list chrome stays fixed while bookings scroll behind it', async ({
       return { top: rect.top, bottom: rect.bottom }
     }))
     expect(boxes.some(box => box.top < headerBefore.y + headerBefore.height && box.bottom > headerBefore.y)).toBe(true)
-    expect(boxes.some(box => box.top < footerBefore.y + footerBefore.height && box.bottom > footerBefore.y)).toBe(true)
-    await page.screenshot({ path: info.outputPath(`bookings-plus-blur-${theme}.png`) })
+    expect(footerBefore.y + footerBefore.height).toBeLessThanOrEqual(height)
+    await page.screenshot({ path: info.outputPath(`bookings-plus-blur-${theme}-${width}.png`) })
     await page.locator('.bp-row').last().focus()
     const last = (await page.locator('.bp-row').last().boundingBox())!
     expect(last.y + last.height).toBeLessThanOrEqual(footerBefore.y)
     await page.keyboard.press('Enter')
-    await expect(page.getByRole(theme === 'light' ? 'complementary' : 'dialog', { name: 'Ausgewählte Buchung' })).toContainText('Scroll Buchung 20')
+    await expect(page.getByRole(width > 1250 ? 'complementary' : 'dialog', { name: 'Ausgewählte Buchung' })).toContainText('Scroll Buchung 20')
   }
 })
 
@@ -150,21 +162,25 @@ test('selected day and month survive leaving Buchungen Plus', async ({ page }) =
   await expect(page.locator('.bp-row')).toHaveCount(2)
   await expect(page.locator('.bp-row').filter({ hasText: 'Ausgabe Test' }).getByRole('img', { name: 'Kostenerstattung verknüpft' })).toBeVisible()
   await expect(page.locator('.bp-row').filter({ hasText: 'Einnahme Test' }).getByRole('img', { name: 'Kostenerstattung verknüpft' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
   await page.getByRole('button', { name: /09\. Sept\. 2026/ }).click()
   await expect(page.locator('.bp-row')).toHaveCount(1)
   await page.locator('#navigate').click()
   await page.locator('#navigate').click()
+  await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
   await expect(page.getByRole('button', { name: /09\. Sept\. 2026/ })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.bp-row')).toHaveCount(1)
   await page.getByRole('button', { name: /September 2026/i }).click()
   await expect(page.locator('.bp-row')).toHaveCount(2)
   await page.locator('#navigate').click()
   await page.locator('#navigate').click()
+  await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
   await expect(page.getByRole('button', { name: /September 2026/i })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.bp-row')).toHaveCount(2)
   await page.getByRole('button', { name: 'Gesamter Verlauf' }).click()
   await page.locator('#navigate').click()
   await page.locator('#navigate').click()
+  await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Gesamter Verlauf' })).toHaveAttribute('aria-pressed', 'true')
 })
 
@@ -235,4 +251,24 @@ test('cleared linked-booking search stays cleared after navigation and new jumps
   await page.evaluate(() => (window as any).jumpTo('IN-1'))
   await expect(page.getByRole('searchbox', { name: 'Buchungen suchen' })).toHaveValue('IN-1')
   await expect(page.locator('.bp-row')).toHaveCount(1)
+})
+
+
+test('month arrows apply the month and calendar restores the full history', async ({ page }) => {
+  await page.setContent('<div id="root"></div>')
+  await page.addStyleTag({ content: styles })
+  await page.addScriptTag({ content: script })
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Vorheriger Monat', exact: true }).click()
+  await expect(page.locator('.bp-row')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Kalender öffnen', exact: true })).toContainText('August 2026')
+  await expect(page.getByRole('button', { name: 'Buchungsfilter', exact: true }).locator('.bp-filter-count')).toHaveText('1')
+  await page.getByRole('button', { name: 'Nächster Monat', exact: true }).click()
+  await expect(page.locator('.bp-row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'September 2026', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Gesamter Verlauf', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.bp-filter-count')).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Buchungsliste' })).toBeVisible()
 })

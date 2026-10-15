@@ -15,16 +15,22 @@ test.beforeAll(async () => {
         import React, { useState } from 'react'
         import { createRoot } from 'react-dom/client'
         import AttachmentsModal from './src/renderer/components/modals/AttachmentsModal'
+        let uploaded = []
+        window.attachmentActions = []
         window.api = {
-          vouchers: { list: async () => ({ rows: [{ id: 1, type: 'OUT', sphere: 'IDEELL', grossAmount: 118.75, paymentMethod: 'BANK' }] }) },
+          vouchers: { list: async () => ({ rows: [{ id: 1, type: 'OUT', sphere: 'IDEELL', grossAmount: 118.75, paymentMethod: 'BANK', paymentAccountName: 'Vereinskonto' }] }) },
           attachments: {
-            list: async () => ({ files: window.attachmentFixture ? [{ id: 1, fileName: 'grivox-logo_groß.png', mimeType: 'image/png' }] : [] }),
-            read: async () => ({ mimeType: 'image/png', dataBase64: window.attachmentFixture })
+            list: async () => ({ files: window.attachmentFixture ? [{ id: 1, fileName: 'grivox-logo_groß.png', mimeType: 'image/png' }] : uploaded }),
+            read: async ({ fileId }) => window.attachmentFixture ? ({ mimeType: 'image/png', dataBase64: window.attachmentFixture }) : uploaded.find(file => file.id === fileId),
+            add: async file => { uploaded.push({ ...file, id: uploaded.length + 1, mimeType: file.mimeType }) },
+            delete: async ({ fileId }) => { uploaded = uploaded.filter(file => file.id !== fileId) },
+            saveAs: async ({ fileId }) => { window.attachmentActions.push(['save', fileId]); return {} },
+            open: async ({ fileId }) => { window.attachmentActions.push(['open', fileId]) }
           }
         }
         function App() {
           const [open, setOpen] = useState(true)
-          return open && <AttachmentsModal voucher={{ voucherId: 1, voucherNo: 'OUT-1', date: '2026-10-03', description: 'Resize prüfen' }} onClose={() => setOpen(false)} />
+          return open && <AttachmentsModal voucher={{ voucherId: 1, voucherNo: 'OUT-1', date: '2026-10-03', description: 'Material für das Vereinsfest' }} onClose={() => setOpen(false)} />
         }
         createRoot(document.getElementById('root')).render(<App />)
       `
@@ -176,3 +182,43 @@ test('Escape still closes the modal', async ({ page }) => {
   await page.keyboard.press('Escape')
   await expect(page.locator('.attachments-modal')).toHaveCount(0)
 })
+
+
+for (const theme of ['light', 'dark']) {
+  test(`${theme}: empty state and file actions remain usable at narrow widths`, async ({ page }, info) => {
+    await page.evaluate(theme => document.documentElement.setAttribute('data-theme', theme), theme)
+    const modal = page.getByRole('dialog', { name: 'Belege', exact: true })
+    await expect(modal.getByRole('heading', { name: 'Noch keine Belege' })).toBeVisible()
+    await expect(modal.getByRole('button', { name: 'Beleg hinzufügen', exact: true })).toHaveCount(1)
+    await expect(modal.locator('.attachments-modal__sidebar')).toHaveCount(0)
+    await modal.screenshot({ path: info.outputPath(`empty-${theme}.png`) })
+    await page.setViewportSize({ width: 390, height: 640 })
+    await expect(modal.getByRole('button', { name: 'Beleg hinzufügen', exact: true })).toBeInViewport()
+    await modal.screenshot({ path: info.outputPath(`empty-narrow-${theme}.png`) })
+    const chooser = page.waitForEvent('filechooser')
+    await modal.getByRole('button', { name: 'Beleg hinzufügen', exact: true }).click()
+    await (await chooser).setFiles([
+      { name: 'Quittung Vereinsfest.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1cAAAAASUVORK5CYII=', 'base64') },
+      { name: 'Ergänzende Angaben zum Beleg.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('test document') }
+    ])
+    await expect(modal.locator('.attachments-modal__file-item')).toHaveCount(2)
+    await expect(modal.getByRole('img', { name: 'Quittung Vereinsfest.png' })).toBeVisible()
+    await modal.getByRole('button', { name: 'Ergänzende Angaben zum Beleg.docx Word-Dokument', exact: true }).click()
+    await expect(modal).toContainText('Keine Vorschau verfügbar')
+    await modal.screenshot({ path: info.outputPath(`files-narrow-${theme}.png`) })
+    expect(await modal.locator('.attachments-modal').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    const actions = modal.locator('.attachments-modal__toolbar-actions')
+    await actions.getByRole('button', { name: 'Herunterladen', exact: true }).click()
+    await actions.getByRole('button', { name: 'Extern öffnen', exact: true }).click()
+    expect(await page.evaluate(() => (window as any).attachmentActions)).toEqual([['save', 2], ['open', 2]])
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await modal.screenshot({ path: info.outputPath(`files-${theme}.png`) })
+    await actions.getByRole('button', { name: 'Löschen', exact: true }).click()
+    await modal.locator('.modal-grid').getByRole('button', { name: 'Löschen', exact: true }).click()
+    await expect(modal.locator('.attachments-modal__file-item')).toHaveCount(1)
+    await expect(modal.getByRole('img', { name: 'Quittung Vereinsfest.png' })).toBeVisible()
+    await actions.getByRole('button', { name: 'Löschen', exact: true }).click()
+    await modal.locator('.modal-grid').getByRole('button', { name: 'Löschen', exact: true }).click()
+    await expect(modal.getByRole('heading', { name: 'Noch keine Belege' })).toBeVisible()
+  })
+}

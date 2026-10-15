@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.9.0] - 2026-10-15
+
+### Geändert
+
+- Buchungen Plus zeigt Buchungsdetails mit klarer Hierarchie, Symbolen und farbigen Tags. Budgets, Zweckbindungen und Tags lassen sich beim Bearbeiten über kompakte Auswahlfenster zuordnen.
+- Kalender und Filter öffnen bei Bedarf über die kompakte Werkzeugleiste. Die Buchungsliste erhält dadurch mehr Platz.
+- Die Belegansicht bietet einen kompakten Kopfbereich, eine übersichtliche Dateiliste und eine größere Vorschau mit klar beschrifteten Aktionen.
+- In schmalen Fenstern öffnen Buchungsdetails als kompaktes Panel rechts auf Höhe der ausgewählten Buchung. Die Aktionen stehen direkt unter dem Inhalt.
+
+### Behoben
+
+- Auch im Hochformat und in schmalen Fenstern scrollt nur die Buchungsliste; Suche, Filter, Tabellenkopf und Seitennavigation bleiben stehen.
+- Beim Wechsel zwischen Ansicht und Bearbeitung bleiben die Abstände unter Tags und Zuordnungen stabil.
+
 ## [4.8.3] - 2026-10-11
 
 ### Behoben

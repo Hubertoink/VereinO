@@ -301,7 +301,10 @@ test('open filters remain inside the window when a tile shrinks', async () => {
 
 test('new dashboard, reports and bookings plus remain usable in half-screen tiles', async () => {
   test.setTimeout(120_000)
-  await page.evaluate(() => localStorage.setItem('ui.bookingView', 'plus'))
+  await page.evaluate(async () => {
+    const { organization } = await window.api.organizations.active()
+    await window.api.organizations.setAppearance({ orgId: organization!.id, bookingView: 'plus' })
+  })
   await page.reload()
   const nav = page.locator('.side-nav, .top-nav')
   for (const width of [960, 800, 640, 480]) {
@@ -329,11 +332,24 @@ test('new dashboard, reports and bookings plus remain usable in half-screen tile
     await nav.getByRole('button', { name: 'Buchungen', exact: true }).click()
     await expect(page.locator('.bp-row').first()).toBeVisible()
     await expectFits('.app-main, .bookings-plus, .bp-heading, .bp-list, .bp-row')
-    const filters = page.locator('.bp-filter-toggle')
-    await filters.click()
+    const listScroll = page.locator('.bp-list-scroll')
+    const headingBefore = await page.locator('.bp-heading').boundingBox()
+    await listScroll.evaluate(element => { element.scrollTop = 200 })
+    expect(await listScroll.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    expect(await page.locator('.app-main').evaluate(element => ({
+      scrollTop: element.scrollTop,
+      overflow: element.scrollHeight - element.clientHeight
+    }))).toEqual({ scrollTop: 0, overflow: 0 })
+    expect(await page.locator('.bp-heading').boundingBox()).toEqual(headingBefore)
+    await expect(page.getByRole('navigation', { name: 'Buchungsseiten' })).toBeInViewport()
+    await listScroll.evaluate(element => { element.scrollTop = 0 })
+    await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
     await expect(page.locator('.bp-calendar')).toBeVisible()
-    await expectFits('.bp-sidebar, .bp-filters')
-    await filters.click()
+    await expectFits('.bp-calendar-popover')
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
+    await expectFits('.bp-filters-popover')
+    await page.keyboard.press('Escape')
     await page.locator('.bp-header-search input').fill('Material für das Vereinsfest')
     await expect(page.locator('.bp-row')).toHaveCount(1)
     await screenshot(`bookings-plus-${width}`)
@@ -348,7 +364,7 @@ test('new dashboard, reports and bookings plus remain usable in half-screen tile
     await expect(page.locator('.bp-row').nth(1)).toBeVisible()
   }
   await page.setViewportSize({ width: 1440, height: 900 })
-  await expect(page.locator('.bp-filter-toggle')).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Buchungsfilter', exact: true })).toBeVisible()
   await expect(page.locator('.bp-inspector')).toBeVisible()
-  expect(await page.evaluate(() => localStorage.getItem('ui.bookingView'))).toBe('plus')
+  expect(await page.evaluate(async () => (await window.api.organizations.activeAppearance())?.bookingView)).toBe('plus')
 })
