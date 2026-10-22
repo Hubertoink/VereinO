@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.9.1] - 2026-10-22
+
+### Geändert
+
+- Die Saldo-Karte im Report zeigt die Teilbeträge je Zahlweg dezent unter dem Gesamtsaldo, passend zum gewählten Zeitraum und den aktiven Filtern.
+
+### Behoben
+
+- Einnahmen und Ausgaben sind in den Report-Diagrammen und Legenden im Monochrome-Theme durch Grün und Rot klar unterscheidbar.
+
 ## [4.9.0] - 2026-10-15
 
 ### Geändert

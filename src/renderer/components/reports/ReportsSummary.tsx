@@ -18,12 +18,33 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
     byType: Array<{ key: VoucherType; net: number; vat: number; gross: number }>
   }>(null)
   const [monthsCount, setMonthsCount] = useState<number>(0)
+  const [paymentBalances, setPaymentBalances] = useState<Array<{ key: string; label: string; gross: number }>>([])
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    ;(window as any).api?.reports.summary?.({ from: props.from, to: props.to, sphere: props.sphere, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
-      .then((res: any) => { if (!cancelled) setData(res) })
+    const filters = { from: props.from, to: props.to, sphere: props.sphere, type: props.type, paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId }
+    const summary = (type: VoucherType | undefined) => (window as any).api?.reports.summary?.({ ...filters, type })
+    const totalRequest = summary(props.type)
+    Promise.all([
+      totalRequest,
+      props.type === 'IN' ? totalRequest : !props.type ? summary('IN') : null,
+      props.type === 'OUT' ? totalRequest : !props.type ? summary('OUT') : null
+    ]).then(([res, income, expenses]) => {
+      if (cancelled) return
+      const balances = new Map<string, { key: string; label: string; gross: number }>()
+      for (const [result, sign] of [[income, 1], [expenses, -1]] as const) {
+        const rows = result?.byPaymentAccount?.length ? result.byPaymentAccount : result?.byPaymentMethod || []
+        for (const row of rows) {
+          const key = row.accountId != null ? `account:${row.accountId}` : `legacy:${row.key}`
+          const existing = balances.get(key) || { key, label: row.key === 'BAR' ? 'Bar' : row.key === 'BANK' ? 'Bank' : row.key || 'Ohne Konto', gross: 0 }
+          existing.gross += sign * row.gross
+          balances.set(key, existing)
+        }
+      }
+      setPaymentBalances(Array.from(balances.values()))
+      setData(res)
+    }).catch(() => { if (!cancelled) { setData(null); setPaymentBalances([]) } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
@@ -72,6 +93,16 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
                 <div className="dp-card dp-balance report-summary-kpi report-summary-kpi--balance">
                   <div className="helper">Saldo</div>
                   <div style={{ color: (net >= 0 ? 'var(--success)' : 'var(--danger)') }}>{eurFmt.format(net)}</div>
+                  {paymentBalances.length > 0 && (
+                    <dl className="report-balance-details" aria-label="Saldo nach Zahlweg">
+                      {paymentBalances.map(row => (
+                        <div key={row.key}>
+                          <dt>{row.label}</dt>
+                          <dd>{eurFmt.format(row.gross)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </div>
                 <div className="dp-card report-summary-kpi">
                   <div className="helper">Ø Saldo/Kalendermonat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>

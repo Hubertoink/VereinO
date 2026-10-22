@@ -7,8 +7,13 @@
 .reports-plus .report-summary-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .reports-plus .report-summary-kpi { min-height: 160px; gap: 26px; justify-content: space-between; }
 .reports-plus .report-summary-kpi > .helper { font-size: 11px; }
-.reports-plus .report-summary-kpi > div:last-child { font-size: clamp(23px, 2.2vw, 34px); font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.reports-plus .report-summary-kpi > div:nth-child(2) { font-size: clamp(23px, 2.2vw, 34px); font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .reports-plus .report-summary-kpi--balance { grid-column: auto; }
+.reports-plus .report-summary-kpi--balance { gap: 12px; }
+.report-balance-details { margin: 0; padding-top: 10px; border-top: 1px solid var(--border); display: grid; gap: 6px; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+.report-balance-details > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.report-balance-details dt { min-width: 0; overflow-wrap: anywhere; }
+.report-balance-details dd { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 500; }
 .reports-plus .report-summary-breakdowns { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .reports-plus .dp-card { padding: 24px; }
 .reports-plus .report-summary-section-title { margin-bottom: 20px; }
@@ -28,6 +33,7 @@
 .reports-plus .donut-chart-wrapper { flex: 1; gap: 24px; align-items: center; }
 .reports-plus .report-chart-card { margin-top: 0; }
 .reports-plus .report-chart-card { --dp-accent: var(--accent); --dp-amber: var(--warning); --dp-mint: var(--success); }
+:root[data-color-theme='monochrome-harmony'] .reports-plus .report-chart-card { --dp-accent: var(--success); --dp-amber: var(--danger); }
 .reports-plus .report-chart-card .legend { color: var(--text-dim); }
 .reports-plus .legend-swatch-in { background: var(--dp-accent); }
 .reports-plus .legend-swatch-out { background: var(--dp-amber); }
