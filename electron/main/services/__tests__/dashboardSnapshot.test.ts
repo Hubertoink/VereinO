@@ -14,9 +14,6 @@ const mockPrepare = jest.fn((sql: string) => {
   if (sql.includes('FROM bank_transactions')) {
     return { get: jest.fn(() => ({ count: 2 })) }
   }
-  if (sql.includes('FROM submissions')) {
-    return { get: jest.fn(() => ({ count: 1 })) }
-  }
   if (sql.includes('FROM settings')) {
     return { all: jest.fn(() => [{ key: 'org.cashier', valueJson: '"Merle"' }]) }
   }

@@ -1,5 +1,9 @@
 # VereinO Submission Web
 
+> Historischer Portal-Prototyp: Die Desktop-Funktion „Einreichungen“ wurde entfernt.
+> Aktuelle VereinO-Versionen können die hier erzeugten Einreichungen nicht mehr importieren.
+> Dieser Quellstand ist kein Bestandteil des aktuellen Desktop-Workflows.
+
 Mobile-first Web-App zum Einreichen von Buchungen für VereinO.
 
 ## Features

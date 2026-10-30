@@ -230,8 +230,59 @@ test('starts the real Electron app with its preload bridge', async () => {
   expect(bridgeResult.ping).toBe('pong')
   expect(bridgeResult.appInfo.name).toBeTruthy()
   expect(bridgeResult.appInfo.version).toMatch(/^\d+\.\d+\.\d+/)
-  expect(bridgeResult.bootstrap.counts.pendingSubmissions).toBeGreaterThanOrEqual(0)
+  expect(bridgeResult.bootstrap.counts).not.toHaveProperty('pendingSubmissions')
   expect(Array.isArray(bridgeResult.bootstrap.paymentAccounts)).toBe(true)
+
+  // An upgraded installation may still remember the removed page.
+  await page.evaluate(() => localStorage.setItem('activePage', 'Einreichungen'))
+  await page.reload()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('activePage'))).toBe('Buchungen')
+  await expect(page.locator('.app-main')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Einreichungen', exact: true })).toHaveCount(0)
+})
+
+test('starts a fresh AI conversation after restarting the app', async () => {
+  await page.evaluate(async () => {
+    const { value } = await window.api.settings.get<string[]>({ key: 'ui.visibleNavItems' })
+    await window.api.settings.set({ key: 'ui.visibleNavItems', value: [...(value || []), 'Dashboard', 'KI'] })
+  })
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'KI', exact: true })).toBeVisible()
+  const marker = 'Unterhaltung aus der vorherigen Sitzung'
+  const key = await page.evaluate(async (body) => {
+    const { organization } = await window.api.organizations.active()
+    if (!organization) throw new Error('Active organization missing')
+    const storageKey = `vereino.ai.chat.v2.${encodeURIComponent(organization.id)}`
+    const snapshot = JSON.stringify({ messages: [{ id: 'previous-chat', role: 'user', body }] })
+    // Seed both the current session and the persistent format used by older versions.
+    sessionStorage.setItem(storageKey, snapshot)
+    localStorage.setItem(storageKey, snapshot)
+    return storageKey
+  }, marker)
+  await page.getByRole('button', { name: 'KI', exact: true }).click()
+  await expect(page.locator('.ai-message-list')).toContainText(marker)
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('button', { name: 'KI', exact: true }).click()
+  await expect(page.locator('.ai-message-list')).toContainText(marker)
+
+  await electronApp.close()
+  const launchEnv = { ...process.env }
+  delete launchEnv.ELECTRON_RUN_AS_NODE
+  electronApp = await electron.launch({
+    args: [path.resolve('dist-electron/main/index.cjs'), `--user-data-dir=${userDataDir}`],
+    env: {
+      ...launchEnv,
+      ELECTRON_RENDERER_URL: pathToFileURL(path.resolve('dist/index.html')).toString(),
+      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+    }
+  })
+  page = await waitForVereinOWindow(electronApp)
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'KI', exact: true }).click()
+  await expect(page.locator('.ai-prompt-examples')).toBeVisible()
+  await expect(page.locator('.ai-message')).toHaveCount(0)
+  // Persisted legacy messages must not be restored on the new app launch.
+  expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toContain(marker)
 })
 
 test('adjusts and persists background image visibility', async () => {
@@ -405,9 +456,8 @@ test('loads split application pages on demand', async () => {
   await expect(advanceRows.first()).toHaveAttribute('aria-pressed', 'false')
   await page.screenshot({ path: 'test-results/phase4-advances-light.png', fullPage: true })
 
-  await page.getByRole('button', { name: 'Einreichungen', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Einreichungen', exact: true })).toBeVisible()
-  await expectReadablePageCanvas()
+  await expect(page.getByRole('button', { name: 'Einreichungen', exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => 'submissions' in window.api)).toBe(false)
 
   await page.getByRole('button', { name: 'Belege', exact: true }).click()
   await expect(page.locator('.receipts-container').getByRole('heading', { name: 'Belege', exact: true })).toBeVisible()

@@ -72,7 +72,6 @@ const DashboardPlusView = lazy(() => import('./views/DashboardPlus/DashboardPlus
 const InvoicesView = lazy(() => import('./views/InvoicesView'))
 const MembersView = lazy(() => import('./views/Mitglieder/MembersView'))
 const ReceiptsView = lazy(() => import('./views/ReceiptsView'))
-const SubmissionsView = lazy(() => import('./views/Submissions/SubmissionsView'))
 const AdvancesView = lazy(() => import('./views/Advances/AdvancesView'))
 const BudgetsView = lazy(() => import('./views/Budgets/BudgetsView'))
 const EarmarksView = lazy(() => import('./views/Earmarks/EarmarksView'))
@@ -169,7 +168,6 @@ const goToShortcutKeys = {
   Vorschuesse: 'o',
   Budgets: 'p',
   Zweckbindungen: 'z',
-  Einreichungen: 'i',
   KI: 'a',
   Belege: 'l',
   Reports: 'r',
@@ -1552,8 +1550,6 @@ function AppInner() {
   // Effective layout: user preference wins when wide enough, side-nav forced when narrow
   const effectiveNavLayout = narrowOverride && navLayout === 'top' ? 'left' : navLayout
 
-  // Pending submissions count for nav badge
-  const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(0)
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>('NONPROFIT')
 
   useEffect(() => {
@@ -1592,7 +1588,7 @@ function AppInner() {
   useEffect(() => {
     const onDataChanged = () => bumpDataVersion()
     return addDataChangedListener(
-      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'recurring-bookings'],
+      ['vouchers', 'members', 'invoices', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'recurring-bookings'],
       onDataChanged
     )
   }, [bumpDataVersion])
@@ -1619,7 +1615,7 @@ function AppInner() {
   const [activePage, setActivePage] = useState<NavKey>(() => {
     try {
       const saved = localStorage.getItem('activePage') as NavKey
-      return saved === 'DashboardPlus' ? 'Dashboard' : saved === 'BuchungenPlus' ? 'Buchungen' : saved || 'Buchungen'
+      return saved === 'DashboardPlus' ? 'Dashboard' : saved === 'BuchungenPlus' ? 'Buchungen' : navItems.some(item => item.key === saved) ? saved : 'Buchungen'
     } catch {
       return 'Buchungen'
     }
@@ -2959,7 +2955,6 @@ function AppInner() {
       try {
         const data = await window.api.app.bootstrap()
         if (cancelled) return
-        setPendingSubmissionsCount(data.counts.pendingSubmissions)
         setOpenBankImportsCount(data.counts.openBankImports)
         setDueMembershipFeesCount(data.counts.dueMembershipFees)
         setOpenInvoicesCount(data.counts.openInvoices)
@@ -2991,7 +2986,7 @@ function AppInner() {
     const taskId = scheduleInitialLoad()
     const onChanged = () => void loadBootstrap()
     const removeDataChangedListener = addDataChangedListener(
-      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'settings', 'recurring-bookings'],
+      ['vouchers', 'members', 'invoices', 'bank-imports', 'budgets', 'earmarks', 'tags', 'organizations', 'settings', 'recurring-bookings'],
       onChanged
     )
     return () => {
@@ -3371,7 +3366,6 @@ function AppInner() {
               activePage={activePage}
               onNavigate={setActivePage}
               navIconColorMode={navIconColorMode}
-              pendingSubmissionsCount={pendingSubmissionsCount}
               openBankImportsCount={openBankImportsCount}
               openInvoicesCount={openInvoicesCount}
               dueMembershipFeesCount={dueMembershipFeesCount}
@@ -3395,7 +3389,6 @@ function AppInner() {
             onNavigate={setActivePage}
             navIconColorMode={navIconColorMode}
             collapsed={true}
-            pendingSubmissionsCount={pendingSubmissionsCount}
             openBankImportsCount={openBankImportsCount}
             openInvoicesCount={openInvoicesCount}
             dueMembershipFeesCount={dueMembershipFeesCount}
@@ -3549,7 +3542,7 @@ function AppInner() {
             />
           )}
           {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} drafts={bookingDraftTabs} onOpenDraft={openBookingDraftTab} onTaskNavigate={target => {
-            const pages: Record<DashboardTaskTarget['kind'], NavKey> = { bank: 'Bankimport', members: 'Mitglieder', invoices: 'Verbindlichkeiten', receivables: 'Verbindlichkeiten', recurring: 'Dauerbuchungen', reimbursements: 'Verbindlichkeiten', advances: 'Vorschuesse', submissions: 'Einreichungen', drafts: 'Buchungen', budgets: 'Budgets', bindings: 'Zweckbindungen', backup: 'Einstellungen', ai: 'KI' }
+            const pages: Record<DashboardTaskTarget['kind'], NavKey> = { bank: 'Bankimport', members: 'Mitglieder', invoices: 'Verbindlichkeiten', receivables: 'Verbindlichkeiten', recurring: 'Dauerbuchungen', reimbursements: 'Verbindlichkeiten', advances: 'Vorschuesse', drafts: 'Buchungen', budgets: 'Budgets', bindings: 'Zweckbindungen', backup: 'Einstellungen', ai: 'KI' }
             const page = pages[target.kind]
             if (!visibleNavSet.has(page)) setVisibleNavItems([...visibleNavItems, page])
             setDashboardTaskTarget(target)
@@ -3821,18 +3814,6 @@ function AppInner() {
             </div>
           )}
 
-          {activePage === 'Einreichungen' && (
-            <SubmissionsView
-              notify={notify}
-              bumpDataVersion={bumpDataVersion}
-              eurFmt={eurFmt}
-              fmtDate={fmtDate}
-              earmarks={earmarks}
-              budgetsForEdit={budgetsForEdit}
-              tagDefs={tagDefs}
-              paymentAccounts={paymentAccounts}
-            />
-          )}
         </Suspense>
       </main>
 

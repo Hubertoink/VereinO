@@ -7,7 +7,6 @@ interface TopNavProps {
   activePage: NavKey
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'
-  pendingSubmissionsCount?: number
   openBankImportsCount?: number
   openInvoicesCount?: number
   dueMembershipFeesCount?: number
@@ -17,7 +16,7 @@ interface TopNavProps {
   aiBusy?: boolean
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmissionsCount = 0, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
   return (
     <nav aria-label="Hauptmenü (oben)" className="top-nav">
       {items.map((item, idx) => {
@@ -28,7 +27,6 @@ export function TopNav({ activePage, onNavigate, navIconColorMode, pendingSubmis
         
         // Determine badge count based on nav item
         let badgeCount = 0
-        if (item.key === 'Einreichungen') badgeCount = pendingSubmissionsCount
         if (item.key === 'Bankimport') badgeCount = openBankImportsCount
         if (item.key === 'Verbindlichkeiten') badgeCount = openInvoicesCount
         if (item.key === 'Mitglieder') badgeCount = dueMembershipFeesCount

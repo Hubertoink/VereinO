@@ -154,6 +154,7 @@ export function listPrimaryClassificationValues(options: { includeInactive?: boo
 }
 
 function hasFinancialData(d: DB) {
+  // Retain historical submissions when checking whether a profile change is safe.
   const tables = ['vouchers', 'budgets', 'invoices', 'recurring_bookings', 'submissions']
   return tables.some((table) => {
     const row = d.prepare(`SELECT EXISTS(SELECT 1 FROM ${table} LIMIT 1) as hasRows`).get() as { hasRows?: number }

@@ -22,7 +22,6 @@ export interface QuickAddPayload {
 
 export interface StartupBootstrapData {
     counts: {
-        pendingSubmissions: number
         openBankImports: number
         dueMembershipFees: number
         openInvoices: number

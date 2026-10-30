@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { IconArrowUpRight, IconBuildingBank, IconUsers, IconReceipt2, IconRepeat, IconCheck, IconChevronDown, IconSettings, IconAlertTriangle, IconClock, IconWallet, IconFileDescription, IconShieldCheck, IconTarget, IconInbox } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBuildingBank, IconUsers, IconReceipt2, IconRepeat, IconCheck, IconChevronDown, IconSettings, IconAlertTriangle, IconClock, IconWallet, IconFileDescription, IconShieldCheck, IconTarget } from '@tabler/icons-react'
 import type { DashboardTasks as TaskData, DashboardTaskGroup, DashboardTaskKind, DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 
 const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const mainKinds: DashboardTaskKind[] = ['bank', 'members', 'invoices', 'recurring']
-const icons = { bank: IconBuildingBank, members: IconUsers, invoices: IconReceipt2, receivables: IconReceipt2, recurring: IconRepeat, reimbursements: IconWallet, advances: IconWallet, submissions: IconInbox, drafts: IconFileDescription, budgets: IconTarget, bindings: IconTarget, backup: IconShieldCheck, ai: IconFileDescription }
+const icons = { bank: IconBuildingBank, members: IconUsers, invoices: IconReceipt2, receivables: IconReceipt2, recurring: IconRepeat, reimbursements: IconWallet, advances: IconWallet, drafts: IconFileDescription, budgets: IconTarget, bindings: IconTarget, backup: IconShieldCheck, ai: IconFileDescription }
 const labels = { urgent: 'Jetzt erledigen', soon: 'Demnächst prüfen', open: 'Offen', clear: 'Alles erledigt' }
 const rank = { urgent: 0, soon: 1, open: 2, clear: 3 }
 type Draft = { id: string; title: string }
@@ -23,7 +23,7 @@ export default function DashboardTasks({ today, generalProfile, drafts = [], onO
   const [actionError, setActionError] = useState('')
   const organizationRevision = useRef(0)
   useEffect(() => () => { organizationRevision.current++ }, [])
-  useEffect(() => addDataChangedListener(['vouchers', 'members', 'invoices', 'reimbursements', 'submissions', 'bank-imports', 'recurring-bookings', 'budgets', 'earmarks', 'settings', 'organizations'], () => setRevision(value => value + 1)), [])
+  useEffect(() => addDataChangedListener(['vouchers', 'members', 'invoices', 'reimbursements', 'bank-imports', 'recurring-bookings', 'budgets', 'earmarks', 'settings', 'organizations'], () => setRevision(value => value + 1)), [])
   useEffect(() => {
     let alive = true
     setData(null); setError(''); setActionError('')

@@ -13,7 +13,6 @@
 - [Features](#-features)
 - [Installation](#-installation)
 - [Verwendung](#-verwendung)
-- [Online-Plattform](#-online-plattform--submission-portal)
 - [Technologie-Stack](#-technologie-stack)
 - [Lizenz](#-lizenz)
 
@@ -160,47 +159,6 @@ Vorbereitete Installationsdateien können (falls verfügbar) direkt von der [Rel
 
 ---
 
-## 🌐 Online-Plattform – Submission Portal
-
-Für Vereinsmitglieder, die Ausgaben einreichen möchten, steht ein **Submission Portal** zur Verfügung:
-
-### 🔗 [https://vereino.kassiero.de](https://vereino.kassiero.de)
-
-Das Portal ermöglicht einen einfachen Workflow für die Belegeinreichung:
-
-#### Für Mitglieder (Einreicher)
-- **Buchungen anlegen**: Ausgaben mit allen relevanten Daten erfassen
-- **Belege hochladen**: Digitale Kopien von Quittungen und Rechnungen anhängen
-- **Als JSON exportieren**: Eingereichte Buchungen als JSON-Datei herunterladen
-- **An Kassierer senden**: JSON-Export per E-Mail oder Dateifreigabe übermitteln
-
-#### Für Kassierer (in der VereinO Desktop-App)
-- **JSON importieren**: Eingereichte Buchungen in der App prüfen
-- **Validieren**: Belege und Beträge kontrollieren
-- **Übernehmen**: Geprüfte Buchungen in die offizielle Buchhaltung aufnehmen
-
-### Workflow
-
-```
-┌─────────────────┐    JSON-Export    ┌──────────────────┐
-│  Mitglied       │ ───────────────► │  Kassierer       │
-│  (Portal)       │                   │  (Desktop-App)   │
-├─────────────────┤                   ├──────────────────┤
-│ • Buchung       │                   │ • Import prüfen  │
-│   anlegen       │                   │ • Validieren     │
-│ • Beleg         │                   │ • In Journal     │
-│   hochladen     │                   │   übernehmen     │
-│ • JSON Export   │                   │                  │
-└─────────────────┘                   └──────────────────┘
-```
-
-Diese Trennung ermöglicht:
-- **Dezentrale Erfassung**: Mitglieder können von überall Ausgaben einreichen
-- **Zentrale Kontrolle**: Der Kassierer behält die volle Kontrolle über die Buchhaltung
-- **Offline-Fähigkeit**: Die Hauptbuchhaltung bleibt offline und sicher
-
----
-
 ## 🛠️ Technologie-Stack
 
 ### Desktop-App (Frontend)
@@ -210,7 +168,7 @@ Diese Trennung ermöglicht:
 - **Vite** – Build-Tool & Dev-Server
 - **SQLite (better-sqlite3)** – Lokale Datenbank
 
-### Backend (Submission Portal)
+### Separater Backend-Prototyp
 - **Fastify** – Web-Framework
 - **PostgreSQL** – Relationale Datenbank
 - **Zod** – Schema-Validierung
@@ -242,7 +200,7 @@ VereinO/
 │   │   ├── hooks/      # Custom React Hooks
 │   │   └── context/    # React Context Provider
 │   └── App.tsx         # Root-Komponente
-├── backend/            # Submission Portal API (Fastify)
+├── backend/            # Backend-Prototyp (Fastify)
 ├── shared/             # Gemeinsame Typen
 └── docs/               # Dokumentation
 ```
@@ -270,7 +228,6 @@ Beiträge sind willkommen! So kannst du helfen:
 ## 📞 Kontakt & Support
 
 - **GitHub Issues**: [https://github.com/Hubertoink/VereinO/issues](https://github.com/Hubertoink/VereinO/issues)
-- **Submission Portal**: [https://vereino.kassiero.de](https://vereino.kassiero.de)
 
 ---
 

@@ -1,14 +1,7 @@
-name: Deploy Submission Web App
+name: Build historical Submission Web App (manual)
 
 on:
-  push:
-    branches:
-      - feature/submissions
-      - main
-      - MultipleOrga
-    paths:
-      - 'submission-web/**'
-      - '.github/workflows/deploy-submission-web.yml'
+  # The desktop submission workflow has been retired. Keep builds opt-in.
   workflow_dispatch:
 
 env:

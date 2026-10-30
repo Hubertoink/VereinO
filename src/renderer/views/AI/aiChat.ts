@@ -1,5 +1,8 @@
 const AI_CHAT_STORAGE_KEY = 'vereino.ai.chat.v2'
 
+// Keep each organization's conversation for this window session only.
+// A fresh app start must not restore the previous chat or agent session.
+
 export type AiMessage = {
   id: string
   role: 'user' | 'assistant'
@@ -29,7 +32,7 @@ function storageKey(organizationId: string) {
 export function readAiChatSnapshot<T extends object>(organizationId?: string | null): Partial<T> {
   if (typeof window === 'undefined' || !organizationId) return {}
   try {
-    const raw = window.localStorage.getItem(storageKey(organizationId))
+    const raw = window.sessionStorage.getItem(storageKey(organizationId))
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
@@ -43,16 +46,16 @@ export function writeAiChatSnapshot<T extends { messages?: AiMessage[] }>(
   if (typeof window === 'undefined' || !organizationId) return
   try {
     const messages = (snapshot.messages || []).map(({ displayBody, isStreaming, ...message }) => message)
-    window.localStorage.setItem(storageKey(organizationId), JSON.stringify({ ...snapshot, messages }))
+    window.sessionStorage.setItem(storageKey(organizationId), JSON.stringify({ ...snapshot, messages }))
   } catch {
-    // Der Chat bleibt auch ohne verfügbaren Local Storage nutzbar.
+    // Der Chat bleibt auch ohne verfügbaren Sitzungsspeicher nutzbar.
   }
 }
 
 export function clearAiChatSnapshot(organizationId?: string | null) {
   if (typeof window === 'undefined' || !organizationId) return
   try {
-    window.localStorage.removeItem(storageKey(organizationId))
+    window.sessionStorage.removeItem(storageKey(organizationId))
   } catch {
     // Das Leeren ist eine Komfortfunktion und darf den Chat nicht blockieren.
   }

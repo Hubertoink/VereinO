@@ -5,6 +5,17 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.9.2] - 2026-10-30
+
+### Behoben
+
+- Die Dauerbuchungstabelle nutzt schmale Fenster besser aus: flexible Spalten und umbrechende Aktionen vermeiden unnötiges horizontales Scrollen.
+- Der KI-Agent beginnt bei jedem App-Start mit einem leeren Chat. Innerhalb der laufenden Sitzung bleibt die Unterhaltung beim Seitenwechsel erhalten.
+
+### Entfernt
+
+- Einreichungen aus Navigation, Dashboards, Tastenkürzeln und Desktop-Schnittstellen entfernt. Vorhandene Einreichungen bleiben als historische Daten in der lokalen Datenbank erhalten; bereits übernommene Buchungen bleiben unverändert.
+
 ## [4.9.1] - 2026-10-22
 
 ### Geändert

@@ -1,10 +1,10 @@
-export type NavKey = 'Dashboard' | 'DashboardPlus' | 'Buchungen' | 'BuchungenPlus' | 'Dauerbuchungen' | 'Bankimport' | 'Verbindlichkeiten' | 'Mitglieder' | 'Vorschuesse' | 'Budgets' | 'Zweckbindungen' | 'Einreichungen' | 'KI' | 'Belege' | 'Reports' | 'Einstellungen'
+export type NavKey = 'Dashboard' | 'DashboardPlus' | 'Buchungen' | 'BuchungenPlus' | 'Dauerbuchungen' | 'Bankimport' | 'Verbindlichkeiten' | 'Mitglieder' | 'Vorschuesse' | 'Budgets' | 'Zweckbindungen' | 'KI' | 'Belege' | 'Reports' | 'Einstellungen'
 
 /**
  * Navigation groups for visual separation:
  * - overview: Dashboard (Startseite)
  * - transactions: Buchungen, Verbindlichkeiten (Kernbereiche Geldfluss)
- * - organization: Mitglieder, Budgets, Zweckbindungen, Einreichungen (Vereinsstruktur)
+ * - organization: Mitglieder, Budgets, Zweckbindungen (Vereinsstruktur)
  * - documents: Belege, Reports (Dokumente & Auswertungen)
  * - system: Einstellungen (Konfiguration)
  */
@@ -31,7 +31,6 @@ export const navItems: NavItem[] = [
   { key: 'Vorschuesse', label: 'Vorschüsse', group: 'organization' },
   { key: 'Budgets', label: 'Budgets', group: 'organization' },
   { key: 'Zweckbindungen', label: 'Zweckbindungen', group: 'organization' },
-  { key: 'Einreichungen', label: 'Einreichungen', group: 'organization' },
   // Dokumente & Auswertungen
   { key: 'KI', label: 'KI', group: 'documents' },
   { key: 'Belege', label: 'Belege', group: 'documents' },

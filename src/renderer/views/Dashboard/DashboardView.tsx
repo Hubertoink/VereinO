@@ -110,14 +110,12 @@ export default function DashboardView({
   onGoToInvoices,
   onGoToBankImport,
   onGoToMembers,
-  onGoToSubmissions,
   onGoToVoucher
 }: {
   today: string
   onGoToInvoices: () => void
   onGoToBankImport?: () => void
   onGoToMembers?: () => void
-  onGoToSubmissions?: () => void
   onGoToVoucher?: (args: GoToVoucherArgs) => void
 }) {
   const [quote, setQuote] = useState<{ text: string; author?: string; source?: string } | null>(null)
@@ -164,7 +162,6 @@ export default function DashboardView({
   const [bankOpenCount, setBankOpenCount] = useState(0)
   const [bankImportReminder, setBankImportReminder] = useState<{ summary: string; detail: string } | null>(null)
   const [dueMembershipFees, setDueMembershipFees] = useState<{ dueMembers: number; duePeriods: number }>({ dueMembers: 0, duePeriods: 0 })
-  const [pendingSubmissions, setPendingSubmissions] = useState(0)
 
   // Member statistics
   const [memberStats, setMemberStats] = useState<{ total: number; active: number; new: number; paused: number; left: number }>({ total: 0, active: 0, new: 0, paused: 0, left: 0 })
@@ -204,18 +201,8 @@ export default function DashboardView({
         onClick: onGoToInvoices
       })
     }
-    if (pendingSubmissions > 0) {
-      items.push({
-        key: 'submissions',
-        label: 'Einreichungen',
-        value: String(pendingSubmissions),
-        detail: 'wartet auf Prüfung',
-        tone: 'info',
-        onClick: onGoToSubmissions
-      })
-    }
     return items
-  }, [bankImportReminder, bankOpenCount, dueMembershipFees, eur, invDueSoonCount, invDueSoonRemaining, invOverdueCount, invOverdueRemaining, onGoToBankImport, onGoToInvoices, onGoToMembers, onGoToSubmissions, pendingSubmissions])
+  }, [bankImportReminder, bankOpenCount, dueMembershipFees, eur, invDueSoonCount, invDueSoonRemaining, invOverdueCount, invOverdueRemaining, onGoToBankImport, onGoToInvoices, onGoToMembers])
 
   // Active Zweckbindungen (earmarks) & Budgets for dashboard cards (max 2 each, exclude ended)
   const [activeEarmarks, setActiveEarmarks] = useState<Array<{ id: number; code: string; name: string; endDate?: string | null; color?: string | null }>>([])
@@ -251,7 +238,6 @@ export default function DashboardView({
         setBankOpenCount(snapshot.tasks.bankOpenCount)
         setBankImportReminder(buildBankImportReminder(snapshot.tasks.bankImportStatus, today))
         setDueMembershipFees(snapshot.tasks.dueMembershipFees)
-        setPendingSubmissions(snapshot.tasks.pendingSubmissions)
         setActiveBudgets(snapshot.activeBudgets)
         setActiveEarmarks(snapshot.activeEarmarks)
       } catch {
@@ -260,7 +246,7 @@ export default function DashboardView({
     }
     void load()
     const removeDataChangedListener = addDataChangedListener(
-      ['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks', 'settings', 'organizations'],
+      ['vouchers', 'members', 'invoices', 'bank-imports', 'budgets', 'earmarks', 'settings', 'organizations'],
       () => { void load() }
     )
     return () => { cancelled = true; removeDataChangedListener() }
@@ -556,7 +542,7 @@ export function DashboardRecentActivity({
     }
     load()
     const onChanged = () => load()
-    const removeDataChangedListener = addDataChangedListener(['vouchers', 'members', 'invoices', 'submissions', 'bank-imports', 'budgets', 'earmarks'], onChanged)
+    const removeDataChangedListener = addDataChangedListener(['vouchers', 'members', 'invoices', 'bank-imports', 'budgets', 'earmarks'], onChanged)
     return () => { alive = false; removeDataChangedListener() }
   }, [])
   

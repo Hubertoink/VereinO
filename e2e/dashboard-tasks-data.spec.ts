@@ -58,7 +58,7 @@ test('dashboard tasks use actual SQLite balances, import coverage and recurring 
     expect(group('recurring').items.find(item => item.title === 'Variabel')?.amount).toBeUndefined()
     expect(group('reimbursements').items[0].amount).toBe(60)
     expect(group('advances').count).toBe(1)
-    expect(group('submissions').count).toBe(1)
+    expect(group('submissions')).toBeUndefined()
     expect(group('ai').count).toBe(1)
     expect(group('budgets').items[0].amount).toBe(50)
     expect(group('bindings').items[0].amount).toBe(80)

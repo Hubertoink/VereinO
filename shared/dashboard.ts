@@ -40,7 +40,6 @@ export type DashboardSnapshot = {
       total: number
     }
     dueMembershipFees: { dueMembers: number; duePeriods: number }
-    pendingSubmissions: number
   }
   activeBudgets: Array<{
     id: number

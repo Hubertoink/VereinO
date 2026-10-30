@@ -8,7 +8,7 @@ Diese Checkliste ist für einen vollständigen Funktionstest nach größeren Än
 - [ ] Vor dem Test ein manuelles Backup erstellen und dessen Speicherort notieren.
 - [ ] Ausgangswerte notieren: Anzahl Buchungen, Mitglieder, offene Verbindlichkeiten und Kontostände.
 - [ ] Mindestens zwei Organisationen anlegen, um die Datentrennung zu prüfen.
-- [ ] Testdateien bereithalten: PDF, JPG/PNG, XLSX/CSV beziehungsweise Importvorlage und Einreichungs-JSON.
+- [ ] Testdateien bereithalten: PDF, JPG/PNG, XLSX/CSV beziehungsweise Importvorlage.
 - [ ] Für Zeitraumtests ein offenes und ein abgeschlossenes Geschäftsjahr verwenden.
 - [ ] Nach jedem größeren Abschnitt die App schließen, neu starten und die Persistenz prüfen.
 
@@ -27,7 +27,7 @@ Empfohlene Teststammdaten:
 Diese Punkte zuerst prüfen. Bei einem Fehler den ausführlichen Test abbrechen.
 
 - [ ] App startet ohne Fehlermeldung und zeigt die zuletzt aktive Organisation.
-- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Dauerbuchungen, Bankimport, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, Einreichungen, KI, Belege, Reports und Einstellungen.
+- [ ] Alle Hauptseiten lassen sich öffnen: Dashboard, Buchungen, Dauerbuchungen, Bankimport, Verbindlichkeiten, Mitglieder, Vorschüsse, Budgets, Zweckbindungen, KI, Belege, Reports und Einstellungen.
 - [ ] Eine Einnahme kann angelegt, gespeichert und im Journal wiedergefunden werden.
 - [ ] Eine Ausgabe kann angelegt, bearbeitet und gespeichert werden.
 - [ ] Eine Buchung mit Datei kann geöffnet werden; der Anhang bleibt nach Neustart vorhanden.
@@ -253,18 +253,12 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Umlaute, Anschrift und Mitgliedsnummer erscheinen korrekt in Export/Brief.
 - [ ] Mitglied mit verknüpften Beiträgen kann nicht inkonsistent gelöscht werden.
 
-## 17. Einreichungen
+## 17. Upgrade ohne Einreichungen
 
-- [ ] Gültige Einreichungs-JSON importieren.
-- [ ] Einzelobjekt und Liste importieren.
-- [ ] Ungültiges JSON und fehlende Pflichtfelder werden verständlich gemeldet.
-- [ ] Anhänge lassen sich ansehen und entfernen.
-- [ ] Einreichung genehmigen, ablehnen und löschen.
-- [ ] Genehmigte Einreichung in Buchung umwandeln.
-- [ ] Betrag, Beschreibung, Kategorie, Budget, Zweckbindung, Tags und Anhänge werden übernommen.
-- [ ] Umgewandelte Einreichung zeigt Verknüpfung zur Buchung.
-- [ ] Katalog für das Webformular exportieren und Inhalt stichprobenartig prüfen.
-- [ ] Statusfilter und Zähler aktualisieren sich.
+- [ ] Einreichungen erscheinen weder in Navigation, Tastenkürzeln noch Dashboard-Aufgaben.
+- [ ] Ein gespeicherter Startseitenwert „Einreichungen“ führt nach dem Neustart zu Buchungen.
+- [ ] Alte Datenbanken und Backups lassen sich weiterhin öffnen; bestehende Buchungen und historische Einreichungsdaten bleiben erhalten.
+- [ ] Die Desktop-API bietet keine Einreichungs-Importe, Freigaben oder Konvertierungen mehr an.
 
 ## 18. Dashboard
 
@@ -272,7 +266,7 @@ Dieser Abschnitt ist nach dem Repository-Refactor besonders wichtig.
 - [ ] Bank-/Kassen- und einzelne Kontostände stimmen.
 - [ ] Monats-/Tagesdiagramme zeigen den gewählten Zeitraum.
 - [ ] Budgetabweichungen und Zweckbindungsnutzung stimmen.
-- [ ] Arbeitsliste zeigt offene Verbindlichkeiten, Einreichungen und weitere Aufgaben.
+- [ ] Arbeitsliste zeigt offene Verbindlichkeiten und weitere Aufgaben.
 - [ ] Klicks auf Karten/Diagramme navigieren zur richtigen gefilterten Ansicht.
 - [ ] Leere Datenbank erzeugt sinnvolle Null-/Leerzustände.
 - [ ] Änderungen aktualisieren das Dashboard ohne vollständigen Neustart.

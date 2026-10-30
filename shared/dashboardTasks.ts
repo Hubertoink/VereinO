@@ -1,4 +1,4 @@
-export type DashboardTaskKind = 'bank' | 'members' | 'invoices' | 'receivables' | 'recurring' | 'reimbursements' | 'advances' | 'submissions' | 'drafts' | 'budgets' | 'bindings' | 'backup' | 'ai'
+export type DashboardTaskKind = 'bank' | 'members' | 'invoices' | 'receivables' | 'recurring' | 'reimbursements' | 'advances' | 'drafts' | 'budgets' | 'bindings' | 'backup' | 'ai'
 export type DashboardTaskLevel = 'urgent' | 'soon' | 'open' | 'clear'
 export type DashboardTaskTarget = { kind: DashboardTaskKind; accountId?: number; filter?: 'overdue' | 'open' | 'upcoming'; id?: number }
 export type DashboardTaskItem = {

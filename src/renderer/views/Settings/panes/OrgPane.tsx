@@ -112,7 +112,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
   }, [])
 
   React.useEffect(() => addDataChangedListener(
-    ['vouchers', 'budgets', 'invoices', 'recurring-bookings', 'submissions', 'settings', 'organizations'],
+    ['vouchers', 'budgets', 'invoices', 'recurring-bookings', 'settings', 'organizations'],
     () => { void loadPrimaryClassifications() }
   ), [])
 

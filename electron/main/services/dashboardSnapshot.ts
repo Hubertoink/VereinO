@@ -14,7 +14,6 @@ const DASHBOARD_SCOPES = new Set<DataChangeScope>([
   'vouchers',
   'members',
   'invoices',
-  'submissions',
   'bank-imports',
   'budgets',
   'earmarks',
@@ -139,14 +138,12 @@ function taskStats() {
       (SELECT COUNT(*) FROM bank_transactions WHERE status = 'OPEN') AS bankOpenCount,
       (SELECT MAX(booking_date) FROM bank_transactions) AS lastBookingDate,
       (SELECT COUNT(*) FROM bank_transactions) AS bankTotal,
-      (SELECT MAX(created_at) FROM bank_import_batches) AS lastImportAt,
-      (SELECT COUNT(*) FROM submissions WHERE status = 'pending') AS pendingSubmissions
+      (SELECT MAX(created_at) FROM bank_import_batches) AS lastImportAt
   `).get() as {
     bankOpenCount?: number
     lastBookingDate?: string | null
     bankTotal?: number
     lastImportAt?: string | null
-    pendingSubmissions?: number
   }
   return {
     bankOpenCount: Number(row?.bankOpenCount || 0),
@@ -155,8 +152,7 @@ function taskStats() {
       lastImportAt: row?.lastImportAt ?? null,
       total: Number(row?.bankTotal || 0)
     },
-    dueMembershipFees: dueSummary(),
-    pendingSubmissions: Number(row?.pendingSubmissions || 0)
+    dueMembershipFees: dueSummary()
   }
 }
 

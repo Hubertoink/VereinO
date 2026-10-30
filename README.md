@@ -2,7 +2,7 @@
 
 Offline-first Desktop-App für moderne Vereinsbuchhaltung.
 
-VereinO richtet sich an gemeinnützige Vereine, die Buchungen, Belege, Mitglieder, Budgets, Zweckbindungen, Rechnungen und Berichte lokal verwalten möchten. Die Hauptbuchhaltung bleibt auf dem eigenen Gerät; für Belegeinreichungen gibt es optional ein separates Submission Portal.
+VereinO richtet sich an gemeinnützige Vereine, die Buchungen, Belege, Mitglieder, Budgets, Zweckbindungen, Rechnungen und Berichte lokal verwalten möchten. Die Buchhaltung bleibt auf dem eigenen Gerät.
 
 ## Download
 
@@ -34,7 +34,6 @@ macOS-Hinweis: Ohne Apple Developer ID ist die App nicht signiert/notarisiert. B
 - Dashboard und Reports mit Monatsverlauf, Einnahmen/Ausgaben, Sphärenauswertung und Tätigkeitsbericht
 - Spendenbescheinigungen, Kassenprüfung, Jahresabschluss- und Exportfunktionen
 - Optionaler KI-Agent für prüfbare Vorschläge, Rechnungsanalyse und lokale Buchhaltungsunterstützung
-- Submission Portal unter [vereino.kassiero.de](https://vereino.kassiero.de) für dezentrale Belegeinreichungen
 
 ## Erste Schritte
 
@@ -46,19 +45,8 @@ macOS-Hinweis: Ohne Apple Developer ID ist die App nicht signiert/notarisiert. B
 
 Backups und Datenumzug findest du in der App unter Einstellungen -> Daten.
 
-## Submission Portal
-
-Das optionale Submission Portal ist für Mitglieder gedacht, die Ausgaben oder Belege einreichen möchten:
-
-[https://vereino.kassiero.de](https://vereino.kassiero.de)
-
-Typischer Ablauf:
-
-1. Kassierer exportiert Budgets, Zweckbindungen und Tags als Katalogdatei.
-2. Mitglied erfasst Ausgaben und lädt Belege hoch.
-3. Portal exportiert die Einreichung als JSON.
-4. Kassierer importiert und prüft die Einreichung in VereinO.
-5. Geprüfte Buchungen werden ins offizielle Journal übernommen.
+Ein Vorschlag für einen verschlüsselten geräteübergreifenden Abgleich liegt im
+[Sync-Konzept](docs/Sync-Konzept.md). Synchronisierung ist noch nicht implementiert.
 
 ## Entwicklung
 
@@ -112,7 +100,6 @@ Der GitHub-Workflow erstellt anschließend die Release-Artefakte für Windows, L
 - SQLite mit `better-sqlite3`
 - Electron Builder und Electron Updater
 - Jest, Playwright, ESLint und Prettier
-- Fastify/PostgreSQL im separaten Submission-Portal-Kontext
 
 ## Lizenz
 
@@ -121,4 +108,3 @@ MIT License. Details stehen in [LICENSE](LICENSE), sofern die Lizenzdatei im Che
 ## Support
 
 - Issues: [https://github.com/Hubertoink/VereinO/issues](https://github.com/Hubertoink/VereinO/issues)
-- Submission Portal: [https://vereino.kassiero.de](https://vereino.kassiero.de)

@@ -504,19 +504,6 @@ const rendererApi = {
     openExternal: (url: string) =>
       invokeRaw<RendererResultAt<'shell.openExternal'>>('shell.openExternal', { url })
   },
-  submissions: {
-    list: (payload) => invoke('submissions.list', payload),
-    get: (payload) => invoke('submissions.get', payload),
-    import: (payload) => invoke('submissions.import', payload),
-    importFromFile: () => invoke('submissions.importFromFile'),
-    exportCatalog: () => invoke('submissions.exportCatalog'),
-    approve: (payload) => invoke('submissions.approve', payload),
-    reject: (payload) => invoke('submissions.reject', payload),
-    delete: (payload) => invoke('submissions.delete', payload),
-    convert: (payload) => invoke('submissions.convert', payload),
-    summary: () => invoke('submissions.summary'),
-    readAttachment: (payload) => invoke('submissions.readAttachment', payload)
-  },
   organizations: {
     list: () => invoke('organizations.list'),
     active: () => invoke('organizations.active'),
