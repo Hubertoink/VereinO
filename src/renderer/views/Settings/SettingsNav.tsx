@@ -219,7 +219,7 @@ const GROUPS: SettingsGroup[] = [
     label: 'Daten',
     items: [
       { key: 'storage', label: 'Speicher & Backup', shortLabel: 'Speicher' },
-      { key: 'docling', label: 'Docling', shortLabel: 'Docling' },
+      { key: 'docling', label: 'Texterkennung', shortLabel: 'OCR' },
       { key: 'import', label: 'Import', shortLabel: 'Import' },
       { key: 'updates', label: 'Updates', shortLabel: 'Updates' },
     ],

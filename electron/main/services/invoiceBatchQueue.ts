@@ -34,6 +34,7 @@ type InvoiceBatchGuidance = {
   defaults?: {
     type?: 'IN' | 'OUT'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
   }
@@ -104,6 +105,7 @@ function applyGuidanceDefaults(result: any, guidance?: InvoiceBatchGuidance) {
   if (!defaults) return result
   if (defaults.type) result.type = defaults.type
   if (defaults.sphere) result.sphere = defaults.sphere
+  if (defaults.primaryClassificationValueId !== undefined) result.primaryClassificationValueId = defaults.primaryClassificationValueId
   if (defaults.paymentMethod) result.paymentMethod = defaults.paymentMethod
   if (defaults.paymentAccountId !== undefined) result.paymentAccountId = defaults.paymentAccountId
   const label = [
@@ -408,7 +410,6 @@ export async function processInvoiceBatchQueue() {
           }
           analyzed.result.warnings = [...new Set([...groupingWarnings, ...analyzed.result.warnings])]
         }
-        applyGuidanceDefaults(analyzed.result, source.guidance)
         saveAiJobResult(job.id, 'BOOKING_CANDIDATE', analyzed.result)
         setAiJobStatus(job.id, 'NEEDS_REVIEW', { model: analyzed.model, usage: analyzed.usage })
       } catch (error: any) {

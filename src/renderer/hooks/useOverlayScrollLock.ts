@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react'
 
 // Legacy modals and portalled flyouts share this guard, including nested dialogs.
-const overlaySelector = '.modal-overlay, [role="dialog"], .flyout-popover, .invoice-batch-flyout, .bank-action-menu__popover'
+const overlaySelector = '.modal-overlay, [role="dialog"], .flyout-popover, .invoice-batch-flyout, .bank-action-menu__popover, .invoice-analysis-popover'
 const lockClass = 'overlay-scroll-locked'
 const gutterClass = 'overlay-scroll-gutter'
 

@@ -1,3 +1,4 @@
+import { getSetting } from './settings'
 import { getActiveOrganization } from '../db/database'
 import { listBindings } from '../repositories/bindings'
 import { listBudgets } from '../repositories/budgets'
@@ -117,7 +118,7 @@ export function buildAiInvoiceContext(): AiContext {
   const aiRules = listAiKnowledgeRules({ enabledOnly: true, scope: 'INVOICES' })
 
   return {
-    organization: { profile, primaryClassificationLabel: definition.primaryLabel },
+    organization: { name: getSetting<string>('org.name') || getActiveOrganization()?.name || null, profile, primaryClassificationLabel: definition.primaryLabel },
     aiRules,
     primaryClassifications,
     generatedAt: new Date().toISOString().slice(0, 10),

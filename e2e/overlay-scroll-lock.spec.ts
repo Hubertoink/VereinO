@@ -13,16 +13,17 @@ test.beforeAll(async () => {
     import React, { useState } from 'react'
     import { createRoot } from 'react-dom/client'
     import { useOverlayScrollLock } from './src/renderer/hooks/useOverlayScrollLock'
+    import InvoiceAnalysisInfo from './src/renderer/components/modals/InvoiceAnalysisInfo'
     import FilterDropdown from './src/renderer/components/dropdowns/FilterDropdown'
     function App() {
       useOverlayScrollLock()
       const [modal, setModal] = useState(false), [nested, setNested] = useState(false)
       return <><div id="background"><button onClick={() => setModal(true)}>Modal öffnen</button><FilterDropdown trigger="Import" title="Import"><div id="flyout-content" style={{ height: 1300 }}>Import-Inhalt</div></FilterDropdown><div style={{ height: 1800 }}>Hintergrund</div></div>
-      {modal && <div className="modal-overlay"><div id="modal-scroll"><button onClick={() => setModal(false)}>Modal schließen</button><button onClick={() => setNested(true)}>Verschachtelt öffnen</button><div style={{ height: 1500 }}>Modal-Inhalt</div></div></div>}
+      {modal && <div className="modal-overlay"><div id="modal-scroll"><InvoiceAnalysisInfo message="KI-Auswertung übernommen" warning={true} warnings={Array.from({ length: 30 }, (_, index) => 'Prüfhinweis ' + (index + 1))} /><button onClick={() => setModal(false)}>Modal schließen</button><button onClick={() => setNested(true)}>Verschachtelt öffnen</button><div style={{ height: 1500 }}>Modal-Inhalt</div></div></div>}
       {nested && <div className="modal-overlay nested"><div id="nested-scroll"><button onClick={() => setNested(false)}>Verschachtelt schließen</button><div style={{ height: 800 }}>Innerer Inhalt</div></div></div>}</>
     }
     createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>)
-  ` }, bundle: true, write: false, platform: 'browser', define: { 'process.env.NODE_ENV': '"development"' } })).outputFiles[0].text
+  ` }, bundle: true, jsx: 'automatic', write: false, platform: 'browser', define: { 'process.env.NODE_ENV': '"development"' } })).outputFiles[0].text
 })
 
 test.beforeEach(async ({ page }) => {
@@ -32,6 +33,7 @@ test.beforeEach(async ({ page }) => {
     .modal-overlay { position:fixed; inset:0; z-index:100; background:#0002; display:grid; place-items:center; }
     #modal-scroll { width:400px; height:300px; overflow:auto; background:white; }
     .nested { z-index:200; }
+    .invoice-analysis-popover { position:fixed; z-index:30000; width:300px; max-height:220px; overflow:auto; background:white; overscroll-behavior:contain; }
     #nested-scroll { width:240px; height:200px; overflow:auto; background:white; }
     .filter-dropdown__panel { display:flex; flex-direction:column; background:white; }
     .filter-dropdown__content { max-height:300px; overflow:auto; }
@@ -129,4 +131,26 @@ test('viewport scrollbar space is preserved without double compensation on the b
   await page.getByRole('button', { name: 'Modal schließen' }).click()
   await expect(page.locator('html')).not.toHaveClass(/overlay-scroll-gutter/)
   expect(await button.boundingBox()).toEqual(before)
+})
+
+
+test('invoice analysis supports mouse wheel scrolling and restores the parent after closing', async ({ page }) => {
+  await page.getByRole('button', { name: 'Modal öffnen' }).click()
+  await page.getByRole('button', { name: 'Auswertung mit Prüfhinweisen anzeigen' }).click()
+  const panel = page.locator('.invoice-analysis-popover')
+  const parent = page.locator('#modal-scroll')
+  await expect(parent).toHaveClass(/overlay-scroll-locked/)
+  await panel.hover()
+  await page.mouse.wheel(0, 180)
+  await expect.poll(() => panel.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+  expect(await parent.evaluate(el => el.scrollTop)).toBe(0)
+  await panel.evaluate(el => { el.scrollTop = el.scrollHeight })
+  await page.mouse.wheel(0, 300)
+  expect(await parent.evaluate(el => el.scrollTop)).toBe(0)
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+  await expect(parent).not.toHaveClass(/overlay-scroll-locked/)
+  await parent.hover()
+  await page.mouse.wheel(0, 180)
+  await expect.poll(() => parent.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
 })

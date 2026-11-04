@@ -21,6 +21,7 @@ import {
 } from '../ipc/schemas'
 import { getSetting, setSetting } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
+import { normalizeCreditAmounts, normalizeInvoiceDirection, validateInvoiceExtraction } from './invoiceValidation'
 import { isPdfInputFile } from './aiDocumentRouting'
 import { validateBankReviewResult } from './aiBankReviewValidation'
 import {
@@ -676,7 +677,7 @@ function invoiceAssignments(value: unknown) {
 }
 
 function normalizeInvoiceExtraction(value: unknown) {
-  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const raw = normalizeCreditAmounts(normalizeInvoiceDirection(value && typeof value === 'object' ? value as Record<string, unknown> : {}))
   const type = raw.type === 'IN' ? 'IN' : 'OUT'
   const sphere = ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'].includes(String(raw.sphere))
     ? raw.sphere
@@ -710,6 +711,7 @@ function normalizeInvoiceExtraction(value: unknown) {
       ? primaryClassificationValueId
       : null,
     paymentMethod,
+    paymentAccountEvidence: textOrNull(raw.paymentAccountEvidence),
     paymentAccountId:
       paymentAccountId != null && Number.isInteger(paymentAccountId) && paymentAccountId > 0
         ? paymentAccountId
@@ -1342,6 +1344,7 @@ export async function analyzeInvoiceDocument(input: {
     defaults?: {
       type?: 'IN' | 'OUT'
       sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+      primaryClassificationValueId?: number | null
       paymentMethod?: 'BAR' | 'BANK'
       paymentAccountId?: number | null
     }
@@ -1401,10 +1404,15 @@ export async function analyzeInvoiceDocument(input: {
   const prompt = [
     'Analysiere genau diese eine Rechnung fuer einen deutschen Verein.',
     'Liefere ausschliesslich die strukturierten Rechnungs- und Buchungsfelder.',
+    'Bestimme organizationRole aus Sicht der Organisation im Stammdatenkontext: ISSUER nur wenn sie selbst die Rechnung ausgestellt hat, RECIPIENT wenn sie Rechnungsempfänger ist, sonst UNKNOWN. organizationRoleEvidence enthält die konkrete Textstelle mit Name und Rolle; ohne Beleg bleibt die Rolle UNKNOWN. Normale Lieferantenrechnungen sind OUT (Ausgabe). IN nur bei belegter eigener Rechnungsstellung. Bei fehlendem Organisationsnamen oder unklarer Perspektive normale Rechnungen als OUT vorbelegen und warnen.',
+    'supplier und partyId bezeichnen den externen Geschäftspartner: bei Eingangsrechnungen den Lieferanten, bei Ausgangsrechnungen den Kunden. Leistungsbeschreibungen wie Material oder Veranstaltungsbedarf sind keine Firmennamen; wenn kein Name erkennbar ist, supplier und partyId null lassen.',
     'Erfinde keine Werte: Nutze null, leere Arrays und Warnungen, wenn etwas nicht sicher erkennbar ist.',
+    'Schreibe jeden Prüfhinweis als eigenen Eintrag in warnings, in verständlichem Deutsch mit einem konkreten Prüfauftrag. Keine technischen Feldnamen wie partyId, supplier oder null und keine internen IDs. Nenne vorhandene Einträge beim Namen. Beispiel: Geschäftspartner Musterbedarf GmbH wurde nicht in deinen Stammdaten gefunden; bitte Zuordnung prüfen.',
     'Bewahre Rechnungsnummer und IBAN exakt; Datumswerte muessen YYYY-MM-DD sein.',
-    'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt Einnahme oder Ausgabe.',
+    'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt die Zahlungsrichtung aus Sicht der Organisation.',
+    'Kennzeichne Gutschriften und Stornobelege mit documentType CREDIT_NOTE, normale Rechnungen mit INVOICE, unklare Belege mit UNKNOWN. Eine Lieferantengutschrift bedeutet normalerweise IN, eine an Kunden ausgestellte Gutschrift OUT. Eine Gutschrift im Sinne einer Abrechnung durch den Leistungsempfänger ist nicht automatisch eine Erstattung. Prüfe die Perspektive und warne bei unklarer Zahlungsrichtung oder Verrechnung.',
     'Nutze Kategorie-, Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
+    'paymentAccountId ist das eigene Zahlungskonto der Organisation, nicht das Bankkonto des Lieferanten. Wähle es nur bei eindeutiger Belegevidenz und dokumentiere diese in paymentAccountEvidence. Zahlungsziel, Überweisungshinweis oder Lieferanten-IBAN beweisen kein eigenes Zahlungskonto. Auch ein einziges vorhandenes Bankkonto ist kein Beweis. Bei Unklarheit paymentAccountId und paymentAccountEvidence null lassen und zur manuellen Kontowahl auffordern. Eine ausdrücklich bestätigte Barzahlung darf nur bei genau einer passenden aktiven Kasse zugeordnet werden; bei mehreren Kassen muss der konkrete Kassenname belegt sein.',
     'Wenn organization.profile GENERAL ist, setze primaryClassificationValueId zwingend auf eine passende Kategorie aus primaryClassifications. sphere bleibt dann technisch IDEELL.',
     'Setze partyId nur bei einem eindeutig passenden vorhandenen Geschäftspartner (Name, rechtlicher Name, E-Mail, IBAN-Endziffern oder USt-IdNr.). Erfinde niemals einen Partner oder eine ID; bei keinem sicheren Treffer ist partyId null.',
     'Schlage nur passende vorhandene Tags vor. Vermische keine Daten aus anderen Rechnungen.',
@@ -1456,7 +1464,18 @@ export async function analyzeInvoiceDocument(input: {
       ]
     } as any)
   let response = await analyzeWithModel(model)
-  let result = parseInvoiceExtraction(response)
+  const validatedResult = (response: unknown) => {
+    const parsed = parseInvoiceExtraction(response)
+    const defaults = input.guidance?.defaults
+    if (defaults) {
+      for (const [key, value] of Object.entries(defaults)) {
+        if (value !== undefined) Object.assign(parsed, { [key]: value })
+      }
+      parsed.warnings.push('Nutzer-Buchungsvorgaben übernommen; bitte mit dem Beleg abgleichen.')
+    }
+    return validateInvoiceExtraction(parsed, context, defaults?.paymentAccountId)
+  }
+  let result = validatedResult(response)
   let usage = normalizeUsage(response, model)
 
   // The fast profile is deliberately inexpensive for clean, routine documents.
@@ -1470,7 +1489,7 @@ export async function analyzeInvoiceDocument(input: {
     )
     if (escalationModel !== model) {
       response = await analyzeWithModel(escalationModel)
-      result = parseInvoiceExtraction(response)
+      result = validatedResult(response)
       usage = mergeAiUsage(usage, normalizeUsage(response, escalationModel))
       model = escalationModel
     }

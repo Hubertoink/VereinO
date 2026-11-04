@@ -51,6 +51,13 @@ export default function InvoiceBatchControl({
   const [dragging, setDragging] = useState(false)
   const [singleDragging, setSingleDragging] = useState(false)
   const [singleError, setSingleError] = useState('')
+  const [classification, setClassification] = useState<{ profile: string; values: Array<{ id: number; name: string; isActive?: boolean }> } | null>(null)
+  useEffect(() => {
+    let active = true
+    void window.api.classifications.primary.list().then((result) => { if (active) setClassification(result) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+  const isGeneral = classification?.profile === 'GENERAL'
   const [guidanceInstructions, setGuidanceInstructions] = useState('')
   const [guidanceDefaults, setGuidanceDefaults] = useState<NonNullable<InvoiceAiGuidance['defaults']>>({})
 
@@ -163,17 +170,17 @@ export default function InvoiceBatchControl({
   const readyCount = rows.filter((item) => item.status === 'NEEDS_REVIEW').length
   const duplicateCount = rows.filter((item) => item.isDuplicate).length
   const busyCount = rows.filter((item) => !item.isDuplicate && ['DRAFT', 'QUEUED', 'PROCESSING'].includes(item.status)).length
-  const bankAccounts = paymentAccounts.filter((account) => account.isActive !== 0 && (!account.kind || account.kind === 'BANK'))
+  const activeAccounts = paymentAccounts.filter((account) => account.isActive !== 0)
   const guidanceSummary = [
     guidanceDefaults.type === 'OUT' ? 'Ausgabe' : guidanceDefaults.type === 'IN' ? 'Einnahme' : '',
-    SPHERE_OPTIONS.find(([value]) => value === guidanceDefaults.sphere)?.[1] || '',
+    (isGeneral ? classification?.values.find((value) => value.id === guidanceDefaults.primaryClassificationValueId)?.name : SPHERE_OPTIONS.find(([value]) => value === guidanceDefaults.sphere)?.[1]) || '',
     guidanceDefaults.paymentAccountId
-      ? paymentAccounts.find((account) => account.id === guidanceDefaults.paymentAccountId)?.name || 'Bankkonto'
+      ? paymentAccounts.find((account) => account.id === guidanceDefaults.paymentAccountId)?.name || 'Zahlungskonto'
       : guidanceDefaults.paymentMethod === 'BANK' ? 'Bank' : guidanceDefaults.paymentMethod === 'BAR' ? 'Kasse' : ''
   ].filter(Boolean).join(' · ')
   const guidanceFields = (
     <details className="invoice-ai-guidance">
-      <summary><span><strong>KI-Vorgaben</strong><small>Hinweis, Sphäre und Buchungskonto</small></span><em>Optional</em></summary>
+      <summary><span><strong>KI-Vorgaben</strong><small>Hinweis, {isGeneral ? 'Kategorie' : 'Sphäre'} und Zahlungskonto</small></span><em>Optional</em></summary>
       <div className="invoice-ai-guidance__body">
       <p>Die Vorgaben werden getrennt vom Belegtext an die KI übergeben und bleiben danach prüfbar.</p>
       <label>
@@ -182,9 +189,9 @@ export default function InvoiceBatchControl({
       </label>
       <div className="invoice-ai-guidance__defaults">
         <label><span>Art</span><SelectDropdown value={guidanceDefaults.type || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, type: (value || undefined) as 'IN' | 'OUT' | undefined }))} ariaLabel="Buchungsart vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, { value: 'OUT', label: 'Ausgabe' }, { value: 'IN', label: 'Einnahme' }]} /></label>
-        <label><span>Sphäre</span><SelectDropdown value={guidanceDefaults.sphere || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, sphere: (value || undefined) as NonNullable<InvoiceAiGuidance['defaults']>['sphere'] }))} ariaLabel="Sphäre vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, ...SPHERE_OPTIONS.map(([value, label]) => ({ value, label }))]} /></label>
-        <label><span>Zahlweg</span><SelectDropdown value={guidanceDefaults.paymentMethod || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, paymentMethod: (value || undefined) as 'BAR' | 'BANK' | undefined, paymentAccountId: value === 'BANK' ? current.paymentAccountId : undefined }))} ariaLabel="Zahlweg vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, { value: 'BANK', label: 'Bank' }, { value: 'BAR', label: 'Kasse' }]} /></label>
-        {guidanceDefaults.paymentMethod === 'BANK' && bankAccounts.length > 0 && <label><span>Bankkonto</span><SelectDropdown value={String(guidanceDefaults.paymentAccountId || '')} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, paymentAccountId: value ? Number(value) : undefined }))} ariaLabel="Bankkonto vorgeben" placeholder="Beliebiges Bankkonto" options={[{ value: '', label: 'Beliebiges Bankkonto' }, ...bankAccounts.map((account) => ({ value: String(account.id), label: account.name }))]} /></label>}
+        {classification && (isGeneral ? <label><span>Kategorie</span><SelectDropdown value={String(guidanceDefaults.primaryClassificationValueId || '')} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, sphere: 'IDEELL', primaryClassificationValueId: value ? Number(value) : undefined }))} ariaLabel="Kategorie vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, ...classification.values.filter((value) => value.isActive !== false).map((value) => ({ value: String(value.id), label: value.name }))]} /></label> : <label><span>Sphäre</span><SelectDropdown value={guidanceDefaults.sphere || ''} onChange={(value) => setGuidanceDefaults((current) => ({ ...current, sphere: (value || undefined) as NonNullable<InvoiceAiGuidance['defaults']>['sphere'] }))} ariaLabel="Sphäre vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, ...SPHERE_OPTIONS.map(([value, label]) => ({ value, label }))]} /></label>)}
+        <label><span>Zahlungskonto</span><SelectDropdown value={String(guidanceDefaults.paymentAccountId || '')} onChange={(value) => { const account = activeAccounts.find((item) => item.id === Number(value)); setGuidanceDefaults((current) => ({ ...current, paymentAccountId: account?.id, paymentMethod: account ? account.kind === 'CASH' ? 'BAR' : 'BANK' : undefined })) }} ariaLabel="Zahlungskonto vorgeben" placeholder="Automatisch" options={[{ value: '', label: 'Automatisch' }, ...activeAccounts.map((account) => ({ value: String(account.id), label: account.name }))]} /></label>
+
       </div>
       {guidanceSummary && <small className="invoice-ai-guidance__summary">Vorgabe: {guidanceSummary}</small>}
       </div>

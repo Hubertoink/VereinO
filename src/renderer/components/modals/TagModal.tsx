@@ -1,3 +1,4 @@
+import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -92,6 +93,7 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
                                     }}
                                 />
                             ))}
+              <RandomColorButton color={v.color} onChange={(color) => { setV({ ...v, color }); setDraftColor(color) }} />
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                             <button 

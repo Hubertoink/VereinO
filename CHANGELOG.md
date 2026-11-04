@@ -5,6 +5,31 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.10.0] - 2026-11-04
+
+### Hinzugefügt
+
+- Die Rechnungserfassung zeigt Einnahme/Ausgabe und das eigene Zahlungskonto direkt an. Ohne Kontowahl ist keine Übernahme möglich; manuelle Kontowahlen bleiben bei erneutem KI-Auslesen erhalten.
+- Rechnungsdateien lassen sich direkt in der Vorschau umbenennen. Die Dateiendung bleibt erhalten.
+- Farbpaletten für Tags, Kategorien, Budgets, Zweckbindungen und Zahlungskonten bieten eine Zufallsfarbe per Shuffle-Button.
+
+### Geändert
+
+- KI-Prüfhinweise stehen als verständliche Liste in einem scrollbaren Info-Fenster, getrennt von Status und Laufzeit.
+- Die Rechnungsnummer wird bei der Übernahme in Klammern an die Beschreibung angehängt, statt automatisch in den Kommentar geschrieben zu werden.
+- KI-Vorgaben verwenden aktive Zahlungskonten und bei allgemeinen Organisationen Kategorien statt Vereinssphären.
+
+### Behoben
+
+- Widersprüche zwischen Netto, Umsatzsteuer und Brutto werden geprüft und direkt an den Betragsfeldern rot markiert.
+- Unbekannte oder inaktive Stammdatenzuordnungen werden verworfen. Ein von der KI vorgeschlagenes Zahlungskonto braucht Belegevidenz oder eine ausdrückliche Nutzervorgabe.
+- Rechnungssteller und Empfänger werden anhand der eigenen Organisation unterschieden; unklare normale Rechnungen werden mit Warnung als Ausgabe vorbelegt. Gutschriften behalten ihre Beträge und werden ausdrücklich zur Prüfung markiert.
+- Die Kategorie wird nach dem KI-Auslesen korrekt in den Entwurf übernommen. Das Scrollrad funktioniert auch im Auswertungsfenster.
+
+### Entfernt
+
+- Die optionale Docling-Verarbeitung entfällt. Die integrierte lokale Texterkennung mit Tesseract bleibt verfügbar.
+
 ## [4.9.2] - 2026-10-30
 
 ### Behoben

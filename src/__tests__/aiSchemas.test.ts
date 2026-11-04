@@ -3,6 +3,7 @@ import {
   AiBookingAnalysisResult,
   AiBookingAnalysisResultStructured,
   AiInvoiceExtractInput,
+  AiInvoiceBookingDefaults,
   AiInvoiceExtractionResult,
   AiSettingsGetOutput,
   AiSettingsSetInput,
@@ -273,5 +274,17 @@ describe('AiBankImportReviewResult', () => {
         ]
       })
     ).toThrow()
+  })
+})
+
+
+describe('invoice booking guidance', () => {
+  it('preserves a general organization category and its cash account through IPC validation', () => {
+    const defaults = { sphere: 'IDEELL', primaryClassificationValueId: 12, paymentAccountId: 7, paymentMethod: 'BAR' }
+    expect(AiInvoiceBookingDefaults.parse(defaults)).toEqual(defaults)
+  })
+
+  it('rejects invalid category identifiers', () => {
+    expect(AiInvoiceBookingDefaults.safeParse({ primaryClassificationValueId: -1 }).success).toBe(false)
   })
 })

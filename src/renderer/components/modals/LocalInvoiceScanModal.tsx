@@ -1,3 +1,7 @@
+import InvoiceFileName from './InvoiceFileName'
+import InvoiceAnalysisInfo from './InvoiceAnalysisInfo'
+import BookingKindSwitch from '../booking/BookingKindSwitch'
+import { invoiceAmountMismatch } from '../../../../shared/invoiceAmounts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronLeft, IconChevronRight, IconFilePlus, IconPlus, IconSparkles, IconTargetArrow, IconX } from '@tabler/icons-react'
@@ -63,7 +67,8 @@ function bookingMetaFromGuidance(guidance?: InvoiceAiGuidance): BookingMeta {
   return {
     type: defaults?.type || 'OUT',
     sphere: defaults?.sphere || 'IDEELL',
-    paymentMethod: defaults?.paymentMethod || 'BANK',
+    primaryClassificationValueId: defaults?.primaryClassificationValueId ?? null,
+    paymentMethod: defaults?.paymentMethod,
     paymentAccountId: defaults?.paymentAccountId ?? null
   }
 }
@@ -88,6 +93,7 @@ export type LocalInvoiceScanDraftState = {
   note: string
   bookingMeta: BookingMeta
   visibleSections: OptionalSection[]
+  analysisDetails?: { summary: string; timings: string; warnings: string[] }
 }
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024
@@ -132,19 +138,23 @@ function Field({
   value,
   onChange,
   type = 'text',
-  placeholder
+  placeholder,
+  error
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   type?: 'text' | 'date'
   placeholder?: string
+  error?: string
 }) {
   return (
     <label className="local-invoice-scan__field">
       <span>{label}</span>
       <input
-        className="input"
+        className={`input${error ? ' local-invoice-scan__input-error' : ''}`}
+        aria-invalid={Boolean(error)}
+        title={error}
         type={type}
         value={value}
         placeholder={placeholder}
@@ -282,6 +292,22 @@ export default function LocalInvoiceScanModal({
   const [imageUrl, setImageUrl] = useState('')
   const [analysisState, setAnalysisState] = useState<AnalysisState>('idle')
   const [analysisMessage, setAnalysisMessage] = useState('')
+  const [analysisDetails, setAnalysisDetails] = useState<LocalInvoiceScanDraftState['analysisDetails']>()
+  const [hasAnalysisWarnings, setHasAnalysisWarnings] = useState(false)
+  const manualTypeRef = useRef(false)
+  const manualAccountRef = useRef(false)
+  const [paymentAccounts, setPaymentAccounts] = useState<Array<{ id: number; name: string; kind: string }>>([])
+  const [accountsReady, setAccountsReady] = useState(false)
+  const [accountError, setAccountError] = useState('')
+  useEffect(() => {
+    let active = true
+    void window.api.paymentAccounts.list({ activeOnly: true }).then((result) => {
+      if (!active) return
+      setPaymentAccounts(result.rows.filter((account) => account.isActive !== 0))
+      setAccountsReady(true)
+    }).catch(() => { if (active) setAccountError('Zahlungskonten konnten nicht geladen werden. Bitte den Dialog erneut öffnen.') })
+    return () => { active = false }
+  }, [])
   const [duplicate, setDuplicate] = useState<InvoiceDuplicate | null>(null)
   const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false)
   const [rawText, setRawText] = useState('')
@@ -341,6 +367,10 @@ export default function LocalInvoiceScanModal({
 
   const clampPdfZoom = (value: number) => Math.min(MAX_PDF_ZOOM, Math.max(MIN_PDF_ZOOM, value))
 
+  const amountValue = (value: string) => value.trim() ? Number(value.replace(',', '.')) : null
+  const amountMismatch = invoiceAmountMismatch(amountValue(fields.grossAmount), amountValue(fields.netAmount), amountValue(fields.taxAmount))
+  const amountError = amountMismatch ? 'Netto + Umsatzsteuer stimmen nicht mit Brutto überein. Bitte die drei Beträge am Original prüfen.' : undefined
+
   const grossAmount = useMemo(
     () => Number(fields.grossAmount.replace(',', '.')) || 0,
     [fields.grossAmount]
@@ -357,11 +387,11 @@ export default function LocalInvoiceScanModal({
     const defaults = aiGuidance?.defaults
     const values = [
       defaults?.type === 'OUT' ? 'Ausgabe' : defaults?.type === 'IN' ? 'Einnahme' : '',
-      defaults?.sphere === 'IDEELL' ? 'Ideeller Bereich' : defaults?.sphere === 'ZWECK' ? 'Zweckbetrieb' : defaults?.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : defaults?.sphere === 'WGB' ? 'Wirtschaftlicher Geschäftsbetrieb' : '',
+      isGeneralProfile ? categories.find((category) => category.id === defaults?.primaryClassificationValueId)?.name || '' : defaults?.sphere === 'IDEELL' ? 'Ideeller Bereich' : defaults?.sphere === 'ZWECK' ? 'Zweckbetrieb' : defaults?.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : defaults?.sphere === 'WGB' ? 'Wirtschaftlicher Geschäftsbetrieb' : '',
       defaults?.paymentMethod === 'BANK' ? 'Bank' : defaults?.paymentMethod === 'BAR' ? 'Kasse' : ''
     ].filter(Boolean)
     return values.join(' · ') || (aiGuidance?.instructions?.trim() ? 'Hinweis für die KI' : '')
-  }, [aiGuidance])
+  }, [aiGuidance, isGeneralProfile, categories])
   const activeAiGuidance = useMemo<InvoiceAiGuidance | undefined>(() => {
     if (!aiAvailable) return undefined
     const instructions = aiInstructions.trim()
@@ -531,6 +561,11 @@ export default function LocalInvoiceScanModal({
     setDuplicateCheckInProgress(false)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
+    setHasAnalysisWarnings(false)
+    setAnalysisDetails(undefined)
+    manualTypeRef.current = false
+    manualAccountRef.current = false
+    setAccountError('')
     setPartyId(null)
     setPdfPage(1)
     setPdfPages(0)
@@ -576,6 +611,11 @@ export default function LocalInvoiceScanModal({
     onFileChangeRef.current?.(nextFile)
     setRawText('')
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
+    setHasAnalysisWarnings(false)
+    setAnalysisDetails(undefined)
+    manualTypeRef.current = false
+    manualAccountRef.current = false
+    setAccountError('')
     setPartyId(null)
     setBookingMeta(bookingMetaFromGuidance(aiGuidance))
     setPdfZoom(1)
@@ -583,6 +623,7 @@ export default function LocalInvoiceScanModal({
     setPdfPages(0)
     setOcrWordsByPage({})
     setPickerText('')
+    setAnalysisDetails(undefined)
     setAnalysisState('analyzing')
     setAnalysisMessage('Dokument wird gelesen …')
     setDuplicate(null)
@@ -604,6 +645,8 @@ export default function LocalInvoiceScanModal({
     })
     if (restored) {
       setFields(restored.fields)
+      setHasAnalysisWarnings(Boolean(restored.analysisDetails?.warnings.length || restored.note))
+      setAnalysisDetails(restored.analysisDetails || (restored.note ? { summary: 'Gespeicherte Auswertung', timings: '', warnings: restored.note.split('\n').filter(Boolean) } : undefined))
       setPartyId(restored.partyId ?? null)
       setBudgets(restored.budgets)
       setEarmarkAssignments(restored.earmarksAssigned)
@@ -613,52 +656,14 @@ export default function LocalInvoiceScanModal({
       setVisibleSections(new Set(restored.visibleSections))
     }
 
-    // Der Docling-Fallback darf die konkrete Fehlerursache der integrierten OCR nicht verdecken.
+    // Konkrete OCR-Fehler für die manuelle Prüfung erhalten.
     let localOcrFailure = ''
     const ocrFailureHint = () => localOcrFailure ? ` Lokale OCR-Fehler: ${localOcrFailure}` : ''
-
-    const applyDocling = async (fallbackText = '') => {
-      try {
-        if (restored) return false
-        if (mimeType === 'image/webp') return false
-        const status = await window.api.docling.status()
-        if (!status.enabled) return false
-        setAnalysisState('analyzing')
-        setAnalysisMessage('Docling analysiert Text, OCR und Dokumentlayout lokal …')
-        const result = await window.api.docling.extract({
-          fileName: nextFile.name,
-          mimeType,
-          dataBytes: new Uint8Array(await nextFile.arrayBuffer())
-        })
-        if (requestRef.current !== requestId) return true
-        const doclingText = result.text.trim()
-        const text = doclingText.length >= 20 ? doclingText : fallbackText
-        setRawText(text)
-        if (!restored && text.length >= 20) setFields(extractLocalInvoiceFields(text))
-        setAnalysisState(text.length >= 20 ? 'text-found' : 'ocr-needed')
-        setAnalysisMessage(
-          text.length >= 20
-            ? `Mit Docling ${result.version ? `v${result.version} ` : ''}lokal erkannt und vorbefüllt.`
-            : `Docling konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
-        )
-        return true
-      } catch (error: any) {
-        if (requestRef.current !== requestId) return true
-        if (!fallbackText) {
-          setAnalysisState('error')
-          setAnalysisMessage(`Docling-Analyse fehlgeschlagen: ${error?.message || String(error)}${ocrFailureHint()}`)
-          return true
-        }
-        setAnalysisMessage(
-          `Textschicht erkannt; Docling konnte nicht ergänzt werden: ${error?.message || String(error)}`
-        )
-        return false
-      }
-    }
 
     const applyLocalOcr = async (pdfDocument?: any) => {
       try {
         if (restored) return null
+        setAnalysisDetails(undefined)
         setAnalysisState('analyzing')
         setAnalysisMessage('Lokale OCR liest den Scan …')
         const images: Array<{ dataBytes: Uint8Array }> = []
@@ -730,18 +735,15 @@ export default function LocalInvoiceScanModal({
       if (ocr?.text.length && ocr.text.length >= 20) {
         setRawText(ocr.text)
         setFields(extractLocalInvoiceFields(ocr.text))
-        if (await applyDocling(ocr.text)) return
+
         setAnalysisState('text-found')
         setAnalysisMessage(`Lokal per OCR erkannt und vorbefüllt · ${ocr.confidence}% Zuversicht.`)
         return
       }
-      const handledByDocling = await applyDocling()
-      if (!handledByDocling) {
-        setAnalysisState('ocr-needed')
-        setAnalysisMessage(
-          `Bildvorschau bereit. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
-        )
-      }
+      setAnalysisState('ocr-needed')
+      setAnalysisMessage(
+        `Bildvorschau bereit. Die lokale OCR konnte keinen ausreichend verwertbaren Text erkennen.${ocrFailureHint()}`
+      )
       return
     }
 
@@ -774,14 +776,14 @@ export default function LocalInvoiceScanModal({
         if (ocr?.text.length && ocr.text.length >= 20) {
           setRawText(ocr.text)
           setFields(extractLocalInvoiceFields(ocr.text))
-          if (await applyDocling(ocr.text)) return
+
           setAnalysisState('text-found')
           setAnalysisMessage(
             `Lokal per OCR aus ${ocr.pages.length} ${ocr.pages.length === 1 ? 'Seite' : 'Seiten'} erkannt und vorbefüllt · ${ocr.confidence}% Zuversicht.`
           )
           return
         }
-        if (await applyDocling(text)) return
+
       }
       if (text.length >= 20) {
         if (!restored) setFields(extractLocalInvoiceFields(text))
@@ -832,9 +834,11 @@ export default function LocalInvoiceScanModal({
       tags,
       note,
       bookingMeta,
+      analysisDetails,
       visibleSections: Array.from(visibleSections)
     })
   }, [
+    analysisDetails,
     bookingMeta,
     budgets,
     draftReady,
@@ -903,6 +907,7 @@ export default function LocalInvoiceScanModal({
       return
     }
     setAiBusy(true)
+    setAnalysisDetails(undefined)
     setAnalysisState('analyzing')
     setAnalysisMessage(`${aiProvider} liest die Rechnung aus …`)
     try {
@@ -918,16 +923,14 @@ export default function LocalInvoiceScanModal({
       const result = analyzed.result
       if (!manuallyEditedRef.current.has('supplier')) setPartyId(result.partyId ?? null)
       setFields((current) => mergeInvoiceFields(current, result, manuallyEditedRef.current))
-      setBookingMeta({
-        type: activeAiGuidance?.defaults?.type || result.type,
-        sphere: activeAiGuidance?.defaults?.sphere || result.sphere,
-        paymentMethod: activeAiGuidance?.defaults?.paymentMethod || (
-          result.paymentMethod === 'BAR' || result.paymentMethod === 'BANK'
-            ? result.paymentMethod
-            : 'BANK'
-        ),
-        paymentAccountId: activeAiGuidance?.defaults?.paymentAccountId ?? result.paymentAccountId
-      })
+      setHasAnalysisWarnings(result.warnings.length > 0)
+      setBookingMeta((current) => ({
+        type: manualTypeRef.current ? current.type : result.type,
+        sphere: isGeneralProfile ? 'IDEELL' : result.sphere,
+        primaryClassificationValueId: result.primaryClassificationValueId,
+        paymentMethod: manualAccountRef.current ? current.paymentMethod : result.paymentMethod || undefined,
+        paymentAccountId: manualAccountRef.current ? current.paymentAccountId : result.paymentAccountId
+      }))
       if (result.budgets.length) {
         setBudgets(
           result.budgets.map((assignment) => ({
@@ -950,7 +953,6 @@ export default function LocalInvoiceScanModal({
         setTags(result.tags)
         setVisibleSections((current) => new Set([...current, 'tags']))
       }
-      const warning = result.warnings[0] ? ` ${result.warnings[0]}` : ''
       const timings = analyzed.timings
       const timingDetails = [
         `Gesamt ${formatAnalysisDuration(timings.totalMs)}`,
@@ -961,7 +963,8 @@ export default function LocalInvoiceScanModal({
         .filter(Boolean)
         .join(' · ')
       setAnalysisState('text-found')
-      setAnalysisMessage(`KI-Auswertung übernommen (${timingDetails}).${warning}`)
+      setAnalysisDetails({ summary: 'KI-Auswertung übernommen', timings: timingDetails, warnings: result.warnings })
+      setAnalysisMessage('KI-Auswertung übernommen')
     } catch (error: any) {
       setAnalysisState('error')
       setAnalysisMessage(`KI-Auswertung fehlgeschlagen: ${error?.message || String(error)}`)
@@ -972,6 +975,12 @@ export default function LocalInvoiceScanModal({
 
   const createInvoice = async () => {
     if (!file || duplicateCheckInProgress || isTransferring) return
+    const account = paymentAccounts.find((item) => item.id === bookingMeta.paymentAccountId)
+    if (!accountsReady || !account) {
+      setAccountError('Bitte ein aktives Zahlungskonto auswählen. Ohne Konto kann der Beleg nicht übernommen werden.')
+      document.getElementById('invoice-payment-account')?.focus()
+      return
+    }
     setIsTransferring(true)
     document.documentElement.dataset.bookingHandoff = 'true'
     try {
@@ -986,7 +995,7 @@ export default function LocalInvoiceScanModal({
         earmarksAssigned: earmarkAssignments.filter((assignment) => assignment.earmarkId > 0),
         tags,
         note,
-        bookingMeta
+        bookingMeta: { ...bookingMeta, paymentAccountId: account.id, paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK' }
       })
       if (!created) {
         delete document.documentElement.dataset.bookingHandoff
@@ -1108,7 +1117,7 @@ export default function LocalInvoiceScanModal({
             <section className="local-invoice-scan__preview-panel" aria-label="Dokumentvorschau">
               <div className="local-invoice-scan__panel-heading">
                 <div className="local-invoice-scan__file-info">
-                  <strong title={file.name}>{file.name}</strong>
+                  <InvoiceFileName file={file} onRename={setFile} disabled={isTransferring} />
                   <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <div className="local-invoice-scan__preview-actions">
@@ -1263,13 +1272,38 @@ export default function LocalInvoiceScanModal({
                   <strong>Erkannte Daten</strong>
                   <div className="helper">Werte können direkt angepasst werden.</div>
                 </div>
+                {analysisMessage && analysisState !== 'analyzing' && analysisState !== 'idle' && (
+                  <InvoiceAnalysisInfo message={analysisDetails?.summary || analysisMessage} timings={analysisDetails?.timings} warnings={analysisDetails?.warnings} warning={hasAnalysisWarnings || amountMismatch || analysisState === 'error' || analysisState === 'ocr-needed'} />
+                )}
               </div>
 
               <div className="local-invoice-scan__result-body">
-                <div className={`local-invoice-scan__status is-${analysisState}`} role="status">
+                <BookingKindSwitch
+                  ariaLabel="Buchungsart wählen"
+                  value={bookingMeta.type === 'IN' ? 'IN' : 'OUT'}
+                  options={[{ value: 'IN', label: 'Einnahme' }, { value: 'OUT', label: 'Ausgabe' }]}
+                  onChange={(value) => { manualTypeRef.current = true; setBookingMeta((current) => ({ ...current, type: value === 'IN' ? 'IN' : 'OUT' })) }}
+                />
+                <label className="local-invoice-scan__field local-invoice-scan__payment-account">
+                  <span>Zahlungskonto *</span>
+                  <select id="invoice-payment-account" className={`input${accountError ? ' local-invoice-scan__input-error' : ''}`}
+                    value={paymentAccounts.some((account) => account.id === bookingMeta.paymentAccountId) ? String(bookingMeta.paymentAccountId) : ''}
+                    aria-invalid={Boolean(accountError)} aria-describedby="invoice-payment-account-hint" disabled={!accountsReady}
+                    onChange={(event) => {
+                      const account = paymentAccounts.find((item) => item.id === Number(event.target.value))
+                      manualAccountRef.current = true
+                      setAccountError('')
+                      setBookingMeta((current) => ({ ...current, paymentAccountId: account?.id ?? null, paymentMethod: account ? account.kind === 'CASH' ? 'BAR' : 'BANK' : undefined }))
+                    }}>
+                    <option value="">{accountsReady ? 'Bitte Zahlungskonto auswählen' : 'Zahlungskonten werden geladen …'}</option>
+                    {paymentAccounts.map((account) => <option key={account.id} value={String(account.id)}>{account.name}</option>)}
+                  </select>
+                  <small id="invoice-payment-account-hint">{accountError || (accountsReady && !paymentAccounts.length ? 'Noch keine aktiven Zahlungskonten vorhanden. Bitte in den Einstellungen ein Konto anlegen.' : 'Eigenes Konto der Organisation, über das die Zahlung erfolgt.')}</small>
+                </label>
+                {(analysisState === 'analyzing' || analysisState === 'error') && <div className={`local-invoice-scan__status is-${analysisState}`} role="status">
                   <span className="local-invoice-scan__status-dot" aria-hidden="true" />
                   <span>{analysisMessage}</span>
-                </div>
+                </div>}
                 {duplicate && (
                   <div className="local-invoice-scan__duplicate-warning" role="alert">
                     <div>
@@ -1279,15 +1313,16 @@ export default function LocalInvoiceScanModal({
                   </div>
                 )}
 
+                {amountError && <div className="local-invoice-scan__amount-warning" role="alert">{amountError}</div>}
                 <div className="local-invoice-scan__fields">
                   <div className="local-invoice-scan__field">
-                    <span>Lieferant / Rechnungsteller</span>
+                    <span>{bookingMeta.type === 'IN' ? 'Geschäftspartner / Kunde' : 'Lieferant / Rechnungssteller'}</span>
                     <PartySelector
                       valueId={partyId}
                       valueName={fields.supplier}
-                      role="SUPPLIER"
+                      role={bookingMeta.type === 'IN' ? 'CUSTOMER' : 'SUPPLIER'}
                       inputId="local-invoice-party"
-                      ariaLabel="Lieferant / Rechnungsteller"
+                      ariaLabel={bookingMeta.type === 'IN' ? 'Geschäftspartner / Kunde' : 'Lieferant / Rechnungssteller'}
                       placeholder="Wählen, eingeben oder neu anlegen"
                       onChange={(selection) => {
                         manuallyEditedRef.current.add('supplier')
@@ -1316,18 +1351,21 @@ export default function LocalInvoiceScanModal({
                   />
                   <Field
                     label="Brutto (€)"
+                    error={amountError}
                     value={fields.grossAmount}
                     onChange={(value) => updateField('grossAmount', value)}
                     placeholder="0,00"
                   />
                   <Field
                     label="Netto (€)"
+                    error={amountError}
                     value={fields.netAmount}
                     onChange={(value) => updateField('netAmount', value)}
                     placeholder="0,00"
                   />
                   <Field
                     label="Umsatzsteuer (€)"
+                    error={amountError}
                     value={fields.taxAmount}
                     onChange={(value) => updateField('taxAmount', value)}
                     placeholder="0,00"

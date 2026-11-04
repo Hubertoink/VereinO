@@ -1,3 +1,4 @@
+import { invoiceDescription } from './utils/invoiceDescription'
 import { markOrganizationReady } from './utils/organizationTransition'
 import { usePageHistory } from './hooks/usePageHistory'
 import { useOverlayScrollLock } from './hooks/useOverlayScrollLock'
@@ -467,7 +468,6 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
   if (missing.length) return { missing }
 
   const invoiceDetails = [
-    result.fields.invoiceNumber.trim() && `Rechnung: ${result.fields.invoiceNumber.trim()}`,
     result.note.trim(),
     result.fields.netAmount && `Netto: ${result.fields.netAmount} €`,
     result.fields.taxAmount && `Umsatzsteuer: ${result.fields.taxAmount} €`,
@@ -484,7 +484,7 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
         mode: 'GROSS',
         grossAmount,
         vatRate: 0,
-        description: result.fields.description.trim() || result.fields.supplier.trim(),
+        description: invoiceDescription(result.fields.description.trim() || result.fields.supplier.trim(), result.fields.invoiceNumber),
         counterparty: result.fields.supplier.trim() || null,
         partyId: result.partyId,
         note: invoiceDetails,
@@ -1154,7 +1154,7 @@ function DetachedQuickAddWindow() {
             await window.api.invoices.create({
               date: result.fields.invoiceDate, dueDate: result.fields.dueDate || null,
               invoiceNo: result.fields.invoiceNumber.trim(), party: result.fields.supplier.trim(), partyId: result.partyId,
-              description: result.fields.description.trim() || null, note: converted.initial.qa.note || null,
+              description: converted.initial.qa.description || null, note: converted.initial.qa.note || null,
               grossAmount: converted.initial.qa.grossAmount!,
               paymentMethod: result.bookingMeta.paymentMethod || null, paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
               sphere: result.bookingMeta.sphere || 'IDEELL', primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? null,

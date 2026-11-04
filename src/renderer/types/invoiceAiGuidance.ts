@@ -3,6 +3,7 @@ export type InvoiceAiGuidance = {
   defaults?: {
     type?: 'IN' | 'OUT'
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number | null
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
   }

@@ -1,3 +1,4 @@
+import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useRef, useState } from 'react'
 import { IconTrash, IconX } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
@@ -166,6 +167,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
                   <span aria-hidden="true" />
                 </button>
               ))}
+              <RandomColorButton color={v.color} onChange={(color) => { setV({ ...v, color }); setDraftColor(color) }} size={28} />
               <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ '--swatch-color': v.color || 'var(--muted)', '--swatch-text': v.color ? contrastText(v.color) : 'var(--text)' } as React.CSSProperties}>
                 Eigene…
               </button>

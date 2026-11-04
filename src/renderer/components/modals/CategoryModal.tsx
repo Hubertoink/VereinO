@@ -1,3 +1,4 @@
+import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getContrastTextColor } from '../../utils/tagColors'
@@ -59,7 +60,7 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
           <div className="field"><label>Zeichen</label><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}><button type="button" onClick={() => setDraft({ ...draft, icon: null })} style={{ minWidth: 76, height: 32, padding: '0 9px', borderRadius: 8, border: !draft.icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: !draft.icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', color: 'var(--text)', cursor: 'pointer' }}>Kein Zeichen</button>{ICONS.map((icon) => <button key={icon} type="button" onClick={() => setDraft({ ...draft, icon })} style={{ width: 32, height: 32, borderRadius: 8, border: draft.icon === icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: draft.icon === icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', cursor: 'pointer' }}>{icon}</button>)}</div></div>
           <div className="field">
             <label>Farbe</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>{PALETTE.map((color) => <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} title={color} style={{ width: 32, height: 32, borderRadius: 8, border: draft.color === color ? '3px solid var(--text)' : '2px solid transparent', background: color, cursor: 'pointer', transform: draft.color === color ? 'scale(1.1)' : undefined }} />)}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>{PALETTE.map((color) => <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} title={color} style={{ width: 32, height: 32, borderRadius: 8, border: draft.color === color ? '3px solid var(--text)' : '2px solid transparent', background: color, cursor: 'pointer', transform: draft.color === color ? 'scale(1.1)' : undefined }} />)}<RandomColorButton color={draft.color} onChange={(color) => { setDraft({ ...draft, color }); setDraftColor(color) }} /></div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button type="button" className="btn" onClick={() => setShowColorPicker(true)} style={{ flex: 1 }}>🎨 Eigene Farbe…</button><button type="button" className="btn" onClick={() => setDraft({ ...draft, color: null })} style={{ flex: 1 }}>Keine Farbe</button></div>
           </div>
         </div>

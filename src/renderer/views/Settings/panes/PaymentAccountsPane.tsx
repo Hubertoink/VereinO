@@ -1,3 +1,4 @@
+import RandomColorButton from '../../../components/common/RandomColorButton'
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { IconPencil } from '@tabler/icons-react'
@@ -218,6 +219,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
                         <span aria-hidden="true" />
                       </button>
                     ))}
+              <RandomColorButton color={draft.color} onChange={(color) => { setDraft({ ...draft, color }); setDraftColor(color) }} size={28} />
                     <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ background: draft.color || 'var(--muted)', color: draft.color ? contrastText(draft.color) : 'var(--text)' }}>
                       Eigene…
                     </button>

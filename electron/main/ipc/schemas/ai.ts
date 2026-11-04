@@ -122,6 +122,7 @@ export const AiInvoiceExtractionResult = z.object({
   sphere: Sphere,
   primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   paymentMethod: PaymentMethod.nullable(),
+  paymentAccountEvidence: z.string().nullable().optional(),
   paymentAccountId: z.number().int().positive().nullable(),
   budgets: z.array(AiBookingAssignment),
   earmarks: z.array(AiBookingAssignment),
@@ -131,7 +132,11 @@ export const AiInvoiceExtractionResult = z.object({
   evidence: z.array(z.string())
 })
 
-export const AiInvoiceExtractionResultStructured = AiInvoiceExtractionResult
+export const AiInvoiceExtractionResultStructured = AiInvoiceExtractionResult.extend({
+  documentType: z.enum(['INVOICE', 'CREDIT_NOTE', 'UNKNOWN']),
+  organizationRole: z.enum(['ISSUER', 'RECIPIENT', 'UNKNOWN']),
+  organizationRoleEvidence: z.string().nullable()
+})
 
 export const AiTextDraftResultStructured = z.object({
   title: z.string(),
@@ -389,6 +394,7 @@ export const LocalOcrExtractOutput = z.object({
   confidence: z.number().int().min(0).max(100)
 })
 export const AiInvoiceBookingDefaults = z.object({
+  primaryClassificationValueId: z.number().int().positive().nullable().optional(),
   type: z.enum(['IN', 'OUT']).optional(),
   sphere: Sphere.optional(),
   paymentMethod: PaymentMethod.optional(),
