@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
 import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil } from '@tabler/icons-react'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -146,7 +147,7 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   </div>
   if (creating && voucher?.type === 'OUT') return <ReimbursementCreateForm voucherId={voucher.id} description={voucher.description} busy={busy} error={error} onClose={close} onSave={input => void mutate(() => window.api.reimbursements.create(input), 'Kostenerstattung angelegt.')} />
   const content = <div className={embedded && !detail && !creating ? 'reimbursement-inline' : 'modal reimbursement-modal'}>
-      {(!embedded || detail || creating) && <header className="reimbursement-header"><div><h2 id="reimbursement-heading">{creating ? 'Erstattung erwarten' : detail ? 'Kostenerstattung' : 'Kostenerstattungen'}</h2>{detail && <p className="reimbursement-detail-title">{detail.title}</p>}</div><button className="btn ghost" disabled={busy} onClick={close} aria-label="Schließen">×</button></header>}
+      {(!embedded || detail || creating) && <ModalHeader className="reimbursement-header"><div><h2 id="reimbursement-heading">{creating ? 'Erstattung erwarten' : detail ? 'Kostenerstattung' : 'Kostenerstattungen'}</h2>{detail && <p className="reimbursement-detail-title">{detail.title}</p>}</div><ModalCloseButton disabled={busy} onClick={close} aria-label="Schließen" /></ModalHeader>}
       {error && <p className="reimbursement-error" role="alert">{error}</p>}
       {creating ? <>
         {form}

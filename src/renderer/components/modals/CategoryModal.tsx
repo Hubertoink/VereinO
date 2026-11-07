@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -45,10 +46,10 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={onClose}>
       <div className="modal" style={{ maxWidth: 500 }} onMouseDown={(event) => event.stopPropagation()}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <ModalHeader >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>🏷️</span><h2 style={{ margin: 0 }}>{draft.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'}</h2></div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ padding: '4px 8px', fontSize: 18 }}>✕</button>
-        </header>
+          <ModalCloseButton onClick={onClose} aria-label="Schließen" />
+        </ModalHeader>
 
         <div className="card" style={{ padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, background: draft.color ? `${draft.color}20` : 'var(--muted)' }}>
           <div style={{ width: 40, height: 40, borderRadius: 8, background: previewColor, display: 'grid', placeItems: 'center', color: draft.color ? getContrastTextColor(draft.color) : 'var(--text)', fontSize: 20 }}>{draft.icon || '🏷️'}</div>
@@ -67,7 +68,12 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={!draft.name.trim() || busy} onClick={() => void save()}>{busy ? 'Speichert…' : 'Speichern'}</button></footer>
       </div>
       {showColorPicker && <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={() => setShowColorPicker(false)}><div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onMouseDown={(event) => event.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3><button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button></div>
+        <ModalHeader
+          title="Eigene Farbe wählen"
+          onClose={() => setShowColorPicker(false)}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
         <div className="row"><div className="field"><label>Picker</label><input type="color" value={draftColor} onChange={(event) => { setDraftColor(event.target.value); setColorError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} /></div><div className="field"><label>HEX</label><input className="input" value={draftColor} onChange={(event) => { setDraftColor(event.target.value); setColorError('') }} placeholder="#00C853" />{colorError && <div className="helper" style={{ color: 'var(--danger)' }}>{colorError}</div>}</div></div>
         <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} /><div className="helper">Kontrast: <span style={{ background: draftColor, color: getContrastTextColor(draftColor), padding: '2px 6px', borderRadius: 6 }}>{getContrastTextColor(draftColor)}</span></div></div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}><button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button><button className="btn primary" onClick={() => { const color = draftColor.trim(); if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setColorError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return } setDraft({ ...draft, color }); setShowColorPicker(false) }}>Übernehmen</button></div>

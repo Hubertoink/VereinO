@@ -1,75 +1,65 @@
-import React, { useEffect } from 'react'
+import React, { forwardRef, useEffect, useRef } from 'react'
 import { IconX } from '@tabler/icons-react'
-import AppIcon from './common/AppIcon'
+import './modalHeader.css'
 
-interface ModalHeaderProps {
-  title: string
-  onClose: () => void
-  subtitle?: string
-  closeButtonClassName?: string
+type CloseButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'style'>
+
+/** One close action for every app dialog; native window controls stay separate. */
+export const ModalCloseButton = forwardRef<HTMLButtonElement, CloseButtonProps>(function ModalCloseButton(
+  { type = 'button', title = 'Schließen (Esc)', 'aria-label': label = 'Schließen', ...props }, ref
+) {
+  return <button {...props} ref={ref} type={type} className="modal-close-button" title={title} aria-label={label}>
+    <IconX size={16} stroke={1.8} aria-hidden="true" />
+  </button>
+})
+
+type ModalHeaderProps = Omit<React.HTMLAttributes<HTMLElement>, 'title'> & {
+  title?: React.ReactNode
+  headerTitle?: string
+  titleId?: string
+  subtitle?: React.ReactNode
+  icon?: React.ReactNode
+  actions?: React.ReactNode
+  onClose?: () => void
+  closeDisabled?: boolean
+  closeLabel?: string
+  closeOnEscape?: boolean
 }
 
-/**
- * ModalHeader - Einheitlicher Modal-Header
- * 
- * Standardisierter Header für alle Modals mit:
- * - Titel links (mit optionalem Untertitel)
- * - X-Button rechts
- * - ESC-Taste-Support
- * - Konsistente Abstände und Styling
- */
-export default function ModalHeader({ title, onClose, subtitle, closeButtonClassName }: ModalHeaderProps) {
+/** Shared sticky title bar. Custom children support existing menus and window controls. */
+export default function ModalHeader({
+  title, titleId, headerTitle, subtitle, icon, actions, onClose, closeDisabled, closeLabel,
+  closeOnEscape = true, children, className = '', ...props
+}: ModalHeaderProps) {
+  const ref = useRef<HTMLElement>(null)
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
+    if (!onClose || !closeOnEscape || closeDisabled) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const overlays = Array.from(document.querySelectorAll<HTMLElement>('.modal-overlay, [role="dialog"]'))
+        .filter(element => element.getClientRects().length > 0)
+      const topmost = overlays[overlays.length - 1]
+      if (topmost && !topmost.contains(ref.current)) return
+      event.preventDefault()
+      onClose()
     }
-
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+  }, [onClose, closeOnEscape, closeDisabled])
 
-  return (
-    <div 
-      style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'flex-start',
-        marginBottom: subtitle ? 8 : 16,
-        paddingBottom: 12,
-        borderBottom: '1px solid var(--border)'
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>
-          {title}
-        </h2>
-        {subtitle && (
-          <div style={{ 
-            fontSize: 13, 
-            color: 'var(--text-dim)', 
-            marginTop: 4 
-          }}>
-            {subtitle}
-          </div>
-        )}
+  return <header {...props} title={headerTitle} ref={ref} className={`modal-header-bar ${className}`.trim()}>
+    {children || <>
+      <div className="modal-header-bar__heading">
+        {icon && <span className="modal-header-bar__icon">{icon}</span>}
+        <div className="modal-header-bar__titles">
+          <h2 id={titleId}>{title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
       </div>
-
-      <button 
-        className={`btn ghost${closeButtonClassName ? ` ${closeButtonClassName}` : ''}`}
-        onClick={onClose} 
-        title="Schließen (ESC)"
-        style={{
-          padding: 4,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginLeft: 16
-        }}
-      >
-        <AppIcon icon={IconX} size="action" />
-      </button>
-    </div>
-  )
+      <div className="modal-header-bar__actions">
+        {actions}
+        {onClose && <ModalCloseButton onClick={onClose} disabled={closeDisabled} aria-label={closeLabel || 'Schließen'} />}
+      </div>
+    </>}
+  </header>
 }

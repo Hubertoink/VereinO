@@ -1,5 +1,6 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
-import { IconArchive, IconChevronLeft, IconChevronRight, IconChevronsDown, IconChevronsLeft, IconChevronsRight, IconChevronsUp, IconPencil, IconPlus, IconX } from '@tabler/icons-react'
+import { IconArchive, IconChevronsDown, IconChevronsUp, IconPlus } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BudgetTiles from '../../components/tiles/BudgetTiles'
@@ -210,10 +211,12 @@ export default function BudgetsView({
       {archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>{archiveConfirm.isArchived ? 'Budget wiederherstellen?' : 'Budget archivieren?'}</h3>
-              <button className="btn ghost" onClick={() => setArchiveConfirm(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              title={<>{archiveConfirm.isArchived ? 'Budget wiederherstellen?' : 'Budget archivieren?'}</>}
+              onClose={() => setArchiveConfirm(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <p style={{ margin: '0 0 16px' }}>
               {archiveConfirm.isArchived
                 ? <>Möchtest du <strong>{archiveConfirm.name || `#${archiveConfirm.id}`}</strong> wieder aktivieren?</>

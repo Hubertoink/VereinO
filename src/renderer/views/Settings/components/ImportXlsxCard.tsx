@@ -1,3 +1,4 @@
+import ModalHeader from '../../../components/ModalHeader'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { dispatchDataChanged } from '../../../utils/refresh'
@@ -501,10 +502,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       {showErrorsModal && result && createPortal(
         <div className="modal-overlay" onClick={() => setShowErrorsModal(false)} role="dialog" aria-modal="true" style={{ zIndex: 10000 }}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h2 style={{ margin: 0 }}>Import abgeschlossen</h2>
-              <button className="btn danger" onClick={() => setShowErrorsModal(false)}>Schließen</button>
-            </header>
+            <ModalHeader
+              title="Import abgeschlossen"
+              onClose={() => setShowErrorsModal(false)}
+              closeOnEscape={false}
+            />
             <div className="helper">Importiert: {result.imported} | Übersprungen: {result.skipped} | Fehler: {result.errors?.length || 0}</div>
             {(result.newTags?.length || 0) > 0 && <div style={{ marginTop: 8 }}><strong>Neu angelegte Tags</strong><div className="helper">{result.newTags?.join(', ')}</div></div>}
             {(result.errors?.length || 0) > 0 && <ul style={{ marginTop: 12, maxHeight: 280, overflowY: 'auto' }}>{result.errors.slice(0, 50).map((e, idx) => <li key={idx}>Zeile {e.row}: {e.message}</li>)}</ul>}

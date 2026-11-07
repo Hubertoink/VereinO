@@ -1,9 +1,12 @@
+import { openReportBookings } from './utils/reportNavigation'
+import ModalHeader from './components/ModalHeader'
+import { resolveBankDraftParty } from './utils/bankDraftParty'
 import { invoiceDescription } from './utils/invoiceDescription'
 import { markOrganizationReady } from './utils/organizationTransition'
 import { usePageHistory } from './hooks/usePageHistory'
 import { useOverlayScrollLock } from './hooks/useOverlayScrollLock'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ICONS } from './utils/icons'
+
 import {
   getDefaultJournalCols,
   getDefaultJournalOrder
@@ -33,7 +36,7 @@ import QuickAddModal from './components/modals/QuickAddModal'
 import { getInternalAssignmentValidationState } from './components/modals/voucherMetaValidation'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
-import { getNavIcon } from './utils/navIcons'
+
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
 import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
@@ -487,6 +490,7 @@ function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
         description: invoiceDescription(result.fields.description.trim() || result.fields.supplier.trim(), result.fields.invoiceNumber),
         counterparty: result.fields.supplier.trim() || null,
         partyId: result.partyId,
+        partyCreationSource: result.partyCreationSource,
         note: invoiceDetails,
         paymentMethod: result.bookingMeta.paymentMethod || 'BANK',
         paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
@@ -512,6 +516,7 @@ function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
   const tags = Array.isArray(result?.tags) ? result.tags.map(String) : []
   return {
     partyId: typeof result?.partyId === 'number' ? result.partyId : null,
+    partyCreationSource: { name: result?.supplier || '', iban: result?.counterpartyIban },
     fields: {
       supplier: result?.supplier || '',
       invoiceNumber: result?.invoiceNumber || '',
@@ -1419,20 +1424,12 @@ function DetachedQuickAddWindow() {
               onClick={(e) => e.stopPropagation()}
               style={{ maxWidth: 520, display: 'grid', gap: 12 }}
             >
-              <header
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <h2 style={{ margin: 0 }}>
-                  {allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}
-                </h2>
-                <button
-                  className="btn ghost"
-                  onClick={() => setConfirmDeleteEdit(false)}
-                  aria-label="Schließen"
-                >
-                  ✕
-                </button>
-              </header>
+              <ModalHeader
+                title={<>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</>}
+                onClose={() => setConfirmDeleteEdit(false)}
+                closeLabel="Schließen"
+                closeOnEscape={false}
+              />
               <p style={{ margin: 0 }}>
                 {allowVoucherDeletion
                   ? 'Möchtest du diese Buchung wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'
@@ -2065,6 +2062,8 @@ function AppInner() {
         const voucherId = detail.voucherId ? Number(detail.voucherId) : null
         const voucherNo = typeof detail.voucherNo === 'string' ? detail.voucherNo.trim() : ''
         const voucherDate = typeof detail.date === 'string' ? detail.date : ''
+        const reportFrom = typeof detail.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(detail.from) ? detail.from : ''
+        const reportTo = typeof detail.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(detail.to) ? detail.to : ''
 
         setFilterSphere(null)
         setFilterType(null)
@@ -2073,11 +2072,17 @@ function AppInner() {
         setFilterEarmark(null)
         setFilterBudgetId(null)
         setFilterTag(null)
+        setFilterPrimaryClassificationValueId(null)
+        setFlashId(null)
 
         if (voucherDate) {
           setFrom(voucherDate)
           setTo(voucherDate)
           setPlusCalendarSelection(current => ({ ...current, month: voucherDate.slice(0, 7), from: voucherDate, to: voucherDate }))
+        } else if (reportFrom && reportTo) {
+          setFrom(reportFrom); setTo(reportTo)
+          setFilterType(detail.type === 'IN' || detail.type === 'OUT' ? detail.type : null)
+          setPlusCalendarSelection({ month: reportTo.slice(0, 7), from: reportFrom, to: reportTo })
         } else {
           setFrom('')
           setTo('')
@@ -2239,6 +2244,7 @@ function AppInner() {
       if (!(target instanceof Element)) return
       if (target.closest([
         '.compact-booking-flyout-anchor',
+        '.bank-draft-source',
         '.fab-buchung',
         '.select-dropdown__menu--portal',
         '.party-selector__menu--portal',
@@ -2278,9 +2284,15 @@ function AppInner() {
       // KI-Entwürfe können geöffnet werden, ohne dass die Person zuvor das
       // Journal besucht hat. Die Auswahlfelder brauchen dann die Stammdaten
       // bereits vor dem ersten Rendern des Buchungsdialogs.
-      void Promise.allSettled([loadBindings(), loadBudgets(), loadEarmarks()]).then(() => {
+      void Promise.allSettled([loadBindings(), loadBudgets(), loadEarmarks()]).then(async () => {
+        const bankParty = detail.qa.bankReviewSource
+          ? await resolveBankDraftParty({
+            counterparty: detail.qa.bankReviewSource.counterparty || detail.qa.counterparty,
+            counterpartyIban: detail.qa.bankReviewSource.counterpartyIban
+          }, input => window.api.parties.list(input))
+          : null
         openQuickAdd({
-          qa: selectAiDraftBookingType(detail.qa),
+          qa: selectAiDraftBookingType({ ...detail.qa, ...bankParty }),
           files: detail.files || []
         })
       })
@@ -2288,6 +2300,15 @@ function AppInner() {
     window.addEventListener('ai:open-booking-draft', handler)
     return () => window.removeEventListener('ai:open-booking-draft', handler)
   }, [openQuickAdd])
+
+  useEffect(() => {
+    const openAgent = () => {
+      if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI'])
+      setActivePage('KI')
+    }
+    window.addEventListener('ai:continue-agent', openAgent)
+    return () => window.removeEventListener('ai:continue-agent', openAgent)
+  }, [visibleNavSet, visibleNavItems, setVisibleNavItems])
 
   const detachQuickAdd = useCallback(async () => {
     if (!activeDraftId) return
@@ -3549,7 +3570,10 @@ function AppInner() {
             setDashboardTaskPage(page)
             if (target.kind === 'backup') sessionStorage.setItem('settingsActiveTile', 'storage')
             setActivePage(page)
-          }} onGoToBookings={() => setActivePage('Buchungen')} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
+          }} onGoToBookings={source => {
+            if (source) openReportBookings(source)
+            else setActivePage('Buchungen')
+          }} onGoToInvoices={() => setActivePage('Verbindlichkeiten')} onGoToMembers={() => setActivePage('Mitglieder')} onGoToBudgets={() => setActivePage('Budgets')} onGoToBindings={() => setActivePage('Zweckbindungen')} onGoToAI={() => { if (!visibleNavSet.has('KI')) setVisibleNavItems([...visibleNavItems, 'KI']); setActivePage('KI') }} onGoToVoucher={({ voucherId, recordDate }) => {
             resetVoucherFilters({ setFilterEarmark, setFilterBudgetId, setFilterTag, setFilterType, setFilterPM, setFilterPaymentAccountId, setFilterSphere, setQ, keepDateRange: true })
             setQ(`#${voucherId}`); setFrom(recordDate?.slice(0, 10) || ''); setTo(recordDate?.slice(0, 10) || ''); setPlusCalendarSelection(current => ({ month: recordDate?.slice(0, 7) || current.month, from: recordDate?.slice(0, 10) || '', to: recordDate?.slice(0, 10) || '' })); setFlashId(voucherId); setPage(1); setActivePage('Buchungen')
             window.setTimeout(() => setFlashId(current => current === voucherId ? null : current), 5000)
@@ -3787,6 +3811,8 @@ function AppInner() {
                     paymentMethod: 'BANK',
                     paymentAccountId: transaction.paymentAccountId,
                     paymentAccountName: transaction.paymentAccountName,
+                    counterparty: transaction.counterparty || '',
+                    partyCreationSource: { name: transaction.counterparty || '', iban: transaction.counterpartyIban },
                     bankTransactionId: transaction.id,
                     acknowledgedBankVoucherIds
                   }
@@ -3987,16 +4013,13 @@ function AppInner() {
       {showOpenBookingTabsClosePrompt && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal booking-close-guard-modal" onClick={(e) => e.stopPropagation()}>
-            <header className="booking-close-guard-modal__header">
-              <h2>Offene Buchungstabs</h2>
-              <button
-                className="btn ghost"
-                onClick={cancelCloseWithOpenDrafts}
-                aria-label="Schließen"
-              >
-                ✕
-              </button>
-            </header>
+            <ModalHeader
+              className="booking-close-guard-modal__header"
+              title="Offene Buchungstabs"
+              onClose={cancelCloseWithOpenDrafts}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <p className="booking-close-guard-modal__text">
               Es sind noch {bookingDraftTabs.length} offene Buchungstabs vorhanden. Sollen diese
               verworfen und VereinO geschlossen werden?

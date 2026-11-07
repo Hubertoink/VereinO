@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { OrganizationProfile } from '../../../../shared/classification'
@@ -58,10 +59,14 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
         aria-modal="true"
         aria-labelledby="new-org-title"
       >
-        <header className="flex justify-between items-center mb-12">
-          <h2 id="new-org-title" style={{ margin: 0 }}>Neue Organisation anlegen</h2>
-          <button className="btn icon-btn" onClick={onClose} aria-label="Schließen">✕</button>
-        </header>
+        <ModalHeader
+          className="flex justify-between items-center mb-12"
+          title="Neue Organisation anlegen"
+          titleId="new-org-title"
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <div className="helper" style={{ marginBottom: 16 }}>
           Jede Organisation hat eine eigene Datenbank mit separaten Buchungen, Mitgliedern und Einstellungen.

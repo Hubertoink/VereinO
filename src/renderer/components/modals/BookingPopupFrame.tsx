@@ -1,7 +1,8 @@
+import ModalHeader from '../ModalHeader'
 import React, { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconX } from '@tabler/icons-react'
-import AppIcon from '../common/AppIcon'
+
+
 
 type BookingPopupFrameProps = {
   title: React.ReactNode
@@ -93,35 +94,19 @@ export default function BookingPopupFrame({
       }}
     >
       <div ref={modalRef} className={modalClassName.trim()} style={compact ? anchorStyle : undefined} onClick={(event) => event.stopPropagation()}>
-        {compact ? <>
-          <header className="compact-booking-flyout__header">
-            <div>
-              <strong id={titleId}>{title}</strong>
-              {subtitle && <small>{subtitle}</small>}
-            </div>
-            {headerAccessory}
-            <div className="compact-booking-flyout__header-actions">
-              <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen (Esc)" aria-label="Schließen">
-                <AppIcon icon={IconX} size="control" />
-              </button>
-            </div>
-          </header>
-          <div className="compact-booking-popup__content">
-            {kindSwitch && <div className="compact-booking-popup__kind">{kindSwitch}</div>}
-            {children}
-          </div>
-        </> : <>
-          <header className="modal-header-flex">
-            <h2 id={titleId}>{title}</h2>
-            {headerAccessory}
-            <div className="booking-modal-header-actions">
-              <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" onClick={onClose} title="Schließen (Esc)" aria-label="Schließen">
-                <AppIcon icon={IconX} size="action" />
-              </button>
-            </div>
-          </header>
+        <ModalHeader
+          className={compact ? 'compact-booking-flyout__header' : 'modal-header-flex'}
+          title={title}
+          titleId={titleId}
+          subtitle={subtitle}
+          actions={headerAccessory}
+          onClose={onClose}
+          closeOnEscape={false}
+        />
+        {compact ? <div className="compact-booking-popup__content">
+          {kindSwitch && <div className="compact-booking-popup__kind">{kindSwitch}</div>}
           {children}
-        </>}
+        </div> : children}
       </div>
     </div>,
     document.body

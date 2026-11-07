@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useEffect, useState } from 'react'
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -30,10 +31,11 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Filter wählen</h2>
-          <button className="btn danger" onClick={onClose}>Schließen</button>
-        </header>
+        <ModalHeader
+          title="Filter wählen"
+          onClose={onClose}
+          closeOnEscape={false}
+        />
         <div className="row">
           {isGeneral ? <div className="field">
             <label>Kategorie</label>

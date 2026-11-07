@@ -1,3 +1,6 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
+import { useBankDraftSourceHighlight } from '../../hooks/useBankDraftSourceHighlight'
+import BankDraftSourcePanel from '../booking/BankDraftSourcePanel'
 import React from 'react'
 import { IconPlus, IconCalendar, IconWallet, IconCurrencyEuro, IconUser, IconTags, IconPaperclip, IconNotes, IconLink, IconReceipt2, IconArrowDownLeft, IconArrowUpRight, IconArrowsExchange, IconUsers, IconBulb, IconLayoutGrid, IconUpload } from '@tabler/icons-react'
 import './quickAddLayout.css'
@@ -695,6 +698,8 @@ export default function QuickAddModal({
         lastGrossAmtRef.current = grossAmt
     }, [grossAmt, budgetsList, earmarksList, qa, setQa])
 
+    const bankSource = useBankDraftSourceHighlight(Boolean(qa.bankReviewSource))
+
     return (
         <div
             className={`modal-overlay quick-add-modal-overlay${windowMode ? ' detached-quick-add-overlay' : ''}`}
@@ -710,9 +715,9 @@ export default function QuickAddModal({
                 onClick={(e) => e.stopPropagation()}
                 style={windowMode ? undefined : { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
             >
-                <header
+                <ModalHeader
                     className={`modal-header-flex${canDrag ? ' booking-modal-drag-handle' : ''}${windowMode ? ' detached-booking-titlebar' : ''}`}
-                    title={canDrag || windowMode ? 'Zum Verschieben ziehen' : undefined}
+                    headerTitle={canDrag || windowMode ? 'Zum Verschieben ziehen' : undefined}
                     onPointerDown={startDrag}
                     onPointerMove={moveDrag}
                     onPointerUp={endDrag}
@@ -734,14 +739,10 @@ export default function QuickAddModal({
                                 <WindowControls onClose={closeModal} />
                             </div>
                         ) : (
-                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" onClick={closeModal} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} title="Schließen (ESC)" aria-label="Schließen">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                                    <path d="M6 6l12 12M18 6 6 18" />
-                                </svg>
-                            </button>
+                            <ModalCloseButton type="button" onClick={closeModal} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} title="Schließen (ESC)" aria-label="Schließen" />
                         )}
                     </div>
-                </header>
+                </ModalHeader>
 
                 {/* Unsaved changes confirmation */}
                 {confirmingClose && (
@@ -764,6 +765,7 @@ export default function QuickAddModal({
                     </div>
                 )}
                 
+                <BankDraftSourcePanel source={qa.bankReviewSource} anchorRef={modalRef} active={bankSource.active} />
                 <form
                     className="quick-add-form"
                     onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) handleSave(); }}
@@ -1003,7 +1005,7 @@ export default function QuickAddModal({
                             <h3 className="booking-editor-section-title"><IconCalendar size={18} />Grunddaten<span>Datum, Bereich und Konto auswählen</span></h3>
                             <div className="row booking-basis-fields">
                                 {/* Native date inputs show their format hint even when empty. Keep the label above it. */}
-                                <div className="field booking-floating-field booking-floating-field--filled">
+                                <div className="field booking-floating-field booking-floating-field--filled" {...bankSource.fieldProps('date')}>
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <span className="booking-date-input-wrap">
                                         <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
@@ -1135,7 +1137,7 @@ export default function QuickAddModal({
                                         <div className="badge pm-account-badge pm-internal">intern</div>
                                     </div>
                                 ) : (
-                                    <div className="field booking-floating-field booking-floating-field--filled">
+                                    <div className="field booking-floating-field booking-floating-field--filled" {...bankSource.fieldProps('account')}>
                                         <label htmlFor="quick-add-account">Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                         <SelectDropdown
                                             id="quick-add-account"
@@ -1165,7 +1167,7 @@ export default function QuickAddModal({
                             <h3 className="booking-editor-section-title"><IconCurrencyEuro size={18} />Betrag & Geschäftspartner</h3>
                             <div className="row">
                                 {qa.type === 'TRANSFER' ? (
-                                    <div className="field field-full-width finance-amount-highlight">
+                                    <div className="field field-full-width finance-amount-highlight" {...bankSource.fieldProps('amount')}>
                                         <span className={`adorn-wrap booking-floating-control${(qa as any).grossAmount !== null && (qa as any).grossAmount !== undefined && (qa as any).grossAmount !== '' ? ' booking-floating-control--filled' : ''}`}>
                                             <label htmlFor="quick-add-transfer-amount">Betrag (Transfer) <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <input id="quick-add-transfer-amount" className={`input input-transfer ${hasInvalidAmount ? 'input-error' : ''}`} type="number" step="0.01" value={(qa as any).grossAmount ?? ''}
@@ -1182,7 +1184,7 @@ export default function QuickAddModal({
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="field finance-amount-highlight">
+                                        <div className="field finance-amount-highlight" {...bankSource.fieldProps('amount')}>
                                             <div className="flex-gap-8">
                                                 <span className="booking-select-shell">
                                                     <SelectDropdown
@@ -1251,10 +1253,11 @@ export default function QuickAddModal({
                                 )}
                             </div>
                             {(qa.type === 'IN' || qa.type === 'OUT') && (
-                                <div className="field field-full-width booking-floating-field booking-floating-field--filled booking-finance-party">
+                                <div className="field field-full-width booking-floating-field booking-floating-field--filled booking-finance-party" {...bankSource.fieldProps('party')}>
                                     <label htmlFor="quick-add-party">{qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</label>
                                     <PartySelector
                                         valueId={qa.partyId}
+                                        creationSource={qa.partyCreationSource || (qa.bankReviewSource ? { name: qa.bankReviewSource.counterparty || '', iban: qa.bankReviewSource.counterpartyIban } : undefined)}
                                         valueName={qa.counterparty || ''}
                                         role={qa.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
                                         inputId="quick-add-party"
@@ -1273,7 +1276,7 @@ export default function QuickAddModal({
                     </div>
 
                     <div className="form-card booking-description-card"><h3 className="booking-editor-section-title"><IconNotes size={18} />Beschreibung</h3>
-                        <div className="field field-full-width booking-floating-field booking-floating-field--filled">
+                        <div className="field field-full-width booking-floating-field booking-floating-field--filled" {...bankSource.fieldProps('description')}>
                             <label htmlFor="quick-add-description">Beschreibung</label>
                             <SuggestionInput
                                 id="quick-add-description"

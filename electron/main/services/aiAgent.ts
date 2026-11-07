@@ -1,4 +1,6 @@
 import type { AiAgentDraft } from './aiAgentTools'
+import type { ReportAnswer } from '../../../shared/aiReporting'
+import { AiReportAnswerSchema } from '../ipc/schemas/aiReporting'
 import {
   compactContext,
   createClient,
@@ -51,6 +53,7 @@ export type AiAgentRunResult = {
   toolCalls: AiAgentToolTrace[]
   trace: AiAgentTraceEvent[]
   drafts: AiAgentDraft[]
+  reports?: ReportAnswer[]
   usage: AiUsage
 }
 
@@ -304,8 +307,10 @@ export async function runAiAgent(input: {
 
     let usage = emptyUsage(model)
     const drafts: AiAgentDraft[] = []
+    const reports: ReportAnswer[] = []
     const toolCalls: AiAgentToolTrace[] = []
     const completedWriteTools = new Map<string, any>()
+    const completedReadTools = new Map<string, any>()
     const trace: AiAgentTraceEvent[] = [
       {
         id: `memory-${Date.now()}`,
@@ -373,15 +378,17 @@ export async function runAiAgent(input: {
 
         const isReadOnly = !!tool.annotations?.readOnlyHint
         const executionKey = `${tool.name}:${stableToolArguments(args)}`
-        const completed = !isReadOnly ? completedWriteTools.get(executionKey) : null
+        const completed = isReadOnly ? completedReadTools.get(executionKey) : completedWriteTools.get(executionKey)
         if (completed) {
           const result = {
             ...completed,
             draft: undefined,
             drafts: undefined,
+            report: undefined,
+            usage: undefined,
             data: {
               ...(completed.data && typeof completed.data === 'object' ? completed.data : {}),
-              message: 'Dieser identische schreibende Schritt wurde bereits ausgeführt und nicht erneut wiederholt.'
+              message: 'Dieser identische Schritt wurde bereits ausgeführt. Verwende das vorhandene Ergebnis und antworte dem Nutzer.'
             }
           }
           outputs.push({
@@ -393,13 +400,13 @@ export async function runAiAgent(input: {
             name: tool.name,
             args,
             ok: true,
-            summary: 'Identischer schreibender Tool-Aufruf übersprungen.'
+            summary: 'Identischer Tool-Aufruf übersprungen.'
           })
           trace.push({
             id: `tool-result-${step}-${toolCalls.length}-${Date.now()}`,
             kind: 'tool_result',
             title: tool.name,
-            detail: 'Identischer schreibender Schritt wurde nicht wiederholt.',
+            detail: 'Identischer Schritt wurde nicht wiederholt.',
             ok: true,
             payload: { result, skippedDuplicate: true }
           })
@@ -425,6 +432,13 @@ export async function runAiAgent(input: {
         try {
           const { agentResult: result, mcpResult } = await mcpHost.callTool(tool.name, args)
           if (!isReadOnly && result.ok) completedWriteTools.set(executionKey, result)
+          if (isReadOnly && result.ok) completedReadTools.set(executionKey, result)
+          // A write invalidates earlier reads; identical reads are cached only within a stable step sequence.
+          if (!isReadOnly && result.ok) completedReadTools.clear()
+          if (result.report && result.ok) {
+            reports.push(AiReportAnswerSchema.parse(result.report))
+            if (result.usage) usage = mergeUsage(usage, result.usage)
+          }
           const nextDrafts = collectDrafts(result).map(applyAutoApproval)
           drafts.push(...nextDrafts)
           for (const draft of nextDrafts) {
@@ -442,7 +456,10 @@ export async function runAiAgent(input: {
           outputs.push({
             type: 'function_call_output',
             call_id: call.call_id,
-            output: JSON.stringify(result)
+            output: JSON.stringify(result.report ? { ok: result.ok, report: {
+              title: result.report.title, summary: result.report.summary, notes: result.report.notes,
+              scope: result.report.datasets.finance.scope
+            }, message: 'Die vollständigen Kennzahlen, Diagramme und Quellen werden dem Nutzer bereits angezeigt. Keine erneute Abfrage nötig.' } : result)
           })
           toolCalls.push({
             name: tool.name,
@@ -521,11 +538,18 @@ export async function runAiAgent(input: {
       usage = mergeUsage(usage, normalizeUsage(response, model))
     }
 
-    if (!extractOutputText(response) && !responseFunctionCalls(response).length) {
+    // A tool call at the step limit has not been executed. Always ask for a final
+    // answer without tools instead of silently replacing results with a success placeholder.
+    if ((!reports.length && !extractOutputText(response)) || responseFunctionCalls(response).length > 0) {
       try {
         const finalPrompt = 'Formuliere jetzt eine knappe, konkrete Antwort für den Nutzer auf Basis der bereits vorliegenden Tool-Ergebnisse. Rufe keine weiteren Tools auf.'
+        const unfinishedCalls: Array<{ type: 'function_call_output'; call_id: string; output: string }> = responseFunctionCalls(response).map((call: { call_id: string }) => ({
+          type: 'function_call_output' as const, call_id: call.call_id,
+          output: JSON.stringify({ ok: false, error: 'Schrittlimit erreicht. Dieser Aufruf wurde nicht ausgeführt. Nutze die bereits vorliegenden Ergebnisse und benenne verbleibende Lücken.' })
+        }))
         if (usesMittwaldChatCompletions) {
           mittwaldMessages.push(response.mittwaldMessage)
+          mittwaldMessages.push(...unfinishedCalls.map(call => ({ role: 'tool', tool_call_id: call.call_id, content: call.output })))
           mittwaldMessages.push({ role: 'user', content: finalPrompt })
           response = await createMittwaldAgentResponse({
             client,
@@ -540,7 +564,7 @@ export async function runAiAgent(input: {
             ...baseRequest,
             tool_choice: 'none',
             previous_response_id: response.id,
-            input: [{ role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
+            input: [...unfinishedCalls, { role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
           } as any)
         }
         usage = mergeUsage(usage, normalizeUsage(response, model))
@@ -549,10 +573,10 @@ export async function runAiAgent(input: {
       }
     }
 
-    const answer = extractOutputText(response) || (drafts.length
+    const answer = extractOutputText(response) || (reports.length ? reports.map(report => report.summary).join('\n\n') : drafts.length
       ? 'Ich habe den passenden Review vorbereitet. Bitte prüfe die Vorschau und bestätige sie bei Bedarf.'
       : toolCalls.length
-        ? 'Ich habe die VereinO-Daten geprüft. Die ausgeführten Schritte sind im Agentenverlauf dokumentiert.'
+        ? 'Die Datenabfragen sind abgeschlossen, aber die KI konnte keine abschließende Auswertung formulieren. Bitte grenze die Frage ein oder versuche es erneut; die einzelnen Ergebnisse stehen im Agentenverlauf.'
         : 'Ich konnte für diese Anfrage noch keine passenden VereinO-Daten ermitteln.')
     trace.push({
       id: `message-${Date.now()}`,
@@ -567,7 +591,8 @@ export async function runAiAgent(input: {
       content: answer,
       payload: {
         toolCalls: toolCalls.map((call) => ({ name: call.name, ok: call.ok })),
-        drafts: drafts.map((draft) => ({ kind: draft.kind, title: draft.title }))
+        drafts: drafts.map((draft) => ({ kind: draft.kind, title: draft.title })),
+        reports: reports.map(report => ({ title: report.title, summary: report.summary, scope: report.datasets.finance.scope }))
       }
     })
 
@@ -579,6 +604,7 @@ export async function runAiAgent(input: {
       toolCalls,
       trace,
       drafts,
+      reports,
       usage
     }
   } finally {

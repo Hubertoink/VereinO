@@ -45,7 +45,8 @@ function decodeHocrText(value: string) {
 function wordsFromHocr(hocr: string | null | undefined): OcrWord[] {
   if (!hocr) return []
   const words: OcrWord[] = []
-  const spans = /<span\b([^>]*)>([\s\S]*?)<\/span>/gi
+  // Match word spans directly so enclosing line spans cannot consume their first word.
+  const spans = /<span\b([^>]*\bclass=['"][^'"]*\bocrx_word\b[^'"]*['"][^>]*)>([\s\S]*?)<\/span>/gi
   for (const match of hocr.matchAll(spans)) {
     const attributes = match[1] || ''
     if (!/\bocrx_word\b/i.test(attributes)) continue

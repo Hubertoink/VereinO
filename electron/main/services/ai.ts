@@ -1,4 +1,5 @@
 import { safeStorage, session } from 'electron'
+import { visibleAiText } from '../../../shared/aiVisibleText'
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
@@ -8,6 +9,7 @@ import {
   AiBookingAnalysisResult,
   AiBookingAnalysisResultStructured,
   AiInvoiceExtractionResult,
+  AiInvoiceFieldSource,
   AiInvoiceExtractionResultStructured,
   AiActionPlan,
   AiActionPlanStructured,
@@ -601,14 +603,15 @@ export async function createAiResponse(request: any): Promise<any> {
 }
 
 export function extractOutputText(response: any) {
-  if (typeof response?.output_text === 'string') return response.output_text
+  if (typeof response?.output_text === 'string') return visibleAiText(response.output_text)
   const parts: string[] = []
   for (const item of response?.output || []) {
+    if (item?.type !== 'message') continue
     for (const content of item?.content || []) {
-      if (typeof content?.text === 'string') parts.push(content.text)
+      if (content?.type === 'output_text' && typeof content?.text === 'string') parts.push(content.text)
     }
   }
-  return parts.join('\n').trim()
+  return visibleAiText(parts.join('\n'))
 }
 
 async function extractMittwaldDocumentText(file: AiInputFile) {
@@ -694,6 +697,10 @@ function normalizeInvoiceExtraction(value: unknown) {
   const partyId = nullableNumber(raw.partyId)
   const vatRate = nullableNumber(raw.vatRate)
   return {
+    fieldSources: (Array.isArray(raw.fieldSources) ? raw.fieldSources : []).flatMap((source: unknown) => {
+      const parsed = AiInvoiceFieldSource.safeParse(source)
+      return parsed.success ? [parsed.data] : []
+    }),
     supplier: textOrNull(raw.supplier),
     partyId: partyId != null && Number.isInteger(partyId) && partyId > 0 ? partyId : null,
     invoiceNumber: textOrNull(raw.invoiceNumber),
@@ -704,6 +711,7 @@ function normalizeInvoiceExtraction(value: unknown) {
     taxAmount: nonNegativeNumber(raw.taxAmount),
     vatRate: vatRate != null && vatRate >= 0 && vatRate <= 100 ? vatRate : null,
     iban: textOrNull(raw.iban),
+    counterpartyIban: textOrNull(raw.counterpartyIban),
     description: textOrNull(raw.description),
     type,
     sphere,
@@ -1142,6 +1150,7 @@ export async function analyzeBookingDocuments(input: {
     'Wenn eine Quelle genau einen einzelnen Beleg oder Kassenbon enthaelt, erzeuge dafuer genau einen Kandidaten.',
     'Wenn eine Excel-/CSV-/Tabellendatei mehrere Buchungszeilen enthaelt, erstelle pro erkannter Buchungszeile einen eigenen Kandidaten.',
     'Erzeuge keine finale Buchung. Liefere nur Kandidaten, Warnungen und Evidenz.',
+    'counterparty ist der externe Geschäftspartner. counterpartyIban ist ausschließlich dessen vollständig und eindeutig in der Quelle angegebene IBAN. Keine eigene IBAN der Organisation, keine Kontonummer aus Stammdaten und keine unklare oder unvollständige IBAN übernehmen; dann counterpartyIban null setzen. Bei mehreren Konten nur ein eindeutig zugehöriges Konto übernehmen, sonst null.',
     'Nutze Kategorie-, Budget-, Zweckbindungs- und Konto-IDs nur aus dem bereitgestellten Kontext.',
     'Bei Organisationen mit profile GENERAL ist primaryClassificationValueId verpflichtend: wähle ausschließlich eine passende Kategorie aus primaryClassifications. sphere bleibt aus technischen Gründen IDEELL.',
     'Bei Tags: Nutze vorhandene VereinO-Tags, wenn sie passen. Wenn eine Datei eine Tag-/Kategorie-Spalte mit einem noch nicht vorhandenen Tag enthaelt, uebernimm den Tag-Namen trotzdem als vorgeschlagenen Tag und ergaenze eine Warnung, dass der Tag vor dem Buchen angelegt werden muss.',
@@ -1409,6 +1418,8 @@ export async function analyzeInvoiceDocument(input: {
     'Erfinde keine Werte: Nutze null, leere Arrays und Warnungen, wenn etwas nicht sicher erkennbar ist.',
     'Schreibe jeden Prüfhinweis als eigenen Eintrag in warnings, in verständlichem Deutsch mit einem konkreten Prüfauftrag. Keine technischen Feldnamen wie partyId, supplier oder null und keine internen IDs. Nenne vorhandene Einträge beim Namen. Beispiel: Geschäftspartner Musterbedarf GmbH wurde nicht in deinen Stammdaten gefunden; bitte Zuordnung prüfen.',
     'Bewahre Rechnungsnummer und IBAN exakt; Datumswerte muessen YYYY-MM-DD sein.',
+    'counterpartyIban bezeichnet ausschließlich die im Beleg eindeutig dem externen Geschäftspartner supplier zugeordnete vollständige IBAN. Nicht die eigene IBAN der Organisation übernehmen, insbesondere bei selbst ausgestellten Rechnungen. Bei unklarer Zugehörigkeit, mehreren gleichwertigen Konten oder fehlender IBAN counterpartyIban null lassen.',
+    'Gib in fieldSources für jedes direkt vom Beleg gelesene Feld die tatsächliche Originaltextstelle (text) und die Seitennummer ab 1 (page) an. Zitiere wortgetreu mit ursprünglichem Vorzeichen, Währung und Datumsformat, z.B. −119 € für grossAmount 119. Nutze bei mehrfach vorkommenden Werten genügend benachbarten Text für eine eindeutige Zuordnung. Keine Quelle für berechnete, vermutete oder aus Nutzervorgaben übernommene Werte erfinden; dafür keinen Eintrag ausgeben.',
     'grossAmount, netAmount und taxAmount sind positive Euro-Betraege. type zeigt die Zahlungsrichtung aus Sicht der Organisation.',
     'Kennzeichne Gutschriften und Stornobelege mit documentType CREDIT_NOTE, normale Rechnungen mit INVOICE, unklare Belege mit UNKNOWN. Eine Lieferantengutschrift bedeutet normalerweise IN, eine an Kunden ausgestellte Gutschrift OUT. Eine Gutschrift im Sinne einer Abrechnung durch den Leistungsempfänger ist nicht automatisch eine Erstattung. Prüfe die Perspektive und warne bei unklarer Zahlungsrichtung oder Verrechnung.',
     'Nutze Kategorie-, Konto-, Budget-, Zweckbindungs- und Geschäftspartner-IDs nur aus dem folgenden Stammdatenkontext.',
@@ -1762,6 +1773,7 @@ export async function reviewBankImportTransactions(input: {
     'CREATE_BOOKING erzeugt nur einen Vorschlag, keine finale Buchung.',
     'CREATE_BOOKING wird spaeter mit dem Bankbeleg verknuepft; die Beschreibung soll den Zahler/Zweck nachvollziehbar enthalten, aber keine IBAN-Fuelltexte.',
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
+    'Übernimm counterparty und counterpartyIban für neue Buchungsvorschläge aus dem jeweiligen Bankbeleg. counterpartyIban ist das Gegenkonto, niemals das eigene Zahlungskonto. Fehlt sie, setze null.',
     'Wenn Budget-/Zweckbindungs-IDs unsicher sind, lasse diese Listen leer und schreibe eine Warnung.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
     'Halte reason, warnings und evidence kurz. Liefere fuer jeden mitgegebenen Bankbeleg genau einen Vorschlag und keine weiteren Bankbelege.',

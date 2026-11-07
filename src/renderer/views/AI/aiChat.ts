@@ -1,3 +1,5 @@
+import type { ReportAnswer } from '../../../../shared/aiReporting'
+
 const AI_CHAT_STORAGE_KEY = 'vereino.ai.chat.v2'
 
 // Keep each organization's conversation for this window session only.
@@ -14,6 +16,8 @@ export type AiMessage = {
   jobId?: number
   reviewable?: boolean
   filePath?: string
+  reports?: ReportAnswer[]
+  reportQuestion?: string
   bookingDraft?: {
     agentDraftId?: string
     title?: string

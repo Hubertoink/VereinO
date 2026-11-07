@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DatePickerButton from '../common/DatePickerButton'
@@ -199,17 +200,12 @@ export default function CashCheckModal(props: {
   return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <h3 style={{ margin: 0 }}>Neue Kassenprüfung</h3>
-          <button
-            className="btn ghost"
-            onClick={onClose}
-            aria-label="Schließen"
-            style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}
-          >
-            ✕
-          </button>
-        </div>
+        <ModalHeader
+          title="Neue Kassenprüfung"
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <div className="helper">
           Soll wird aus BAR-Buchungen über den gesamten Zeitraum bis Stichtag

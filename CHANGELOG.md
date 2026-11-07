@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.11.0] - 2026-11-07
+
+### Hinzugefügt
+
+- KI-Antworten zeigen Kennzahlen und interaktive Finanzdiagramme mit direkten Links zu den zugrunde liegenden Buchungen. Rückfragen behalten den Auswertungszeitraum bei.
+- Erkannte Rechnungsfelder lassen sich ihren markierten Fundstellen im Bild oder PDF zuordnen.
+- Buchungsentwürfe aus KI-Bankimporten zeigen die Originaldaten zum Vergleichen und heben passende Quellfelder hervor.
+
+### Geändert
+
+- Dashboard und KI-Chat verwenden denselben Agenten und Werkzeugkatalog für freie Fragen, Auswertungen und prüfbare Vorschläge. Aktive KI-Regeln werden auch an die grafische Auswertung weitergegeben.
+- Modale verwenden gemeinsame, kompakte Kopfleisten und einheitliche Schließen-Schaltflächen. Die Kopfleiste bleibt beim Scrollen erreichbar.
+- Geschäftspartner und zugehörige IBAN werden aus den Quelldaten in die zentrale Partneranlage übernommen.
+
+### Behoben
+
+- KI-Buchungsentwürfe können die erforderliche Kategorie und den ursprünglichen Bankbeleg korrekt übernehmen; fehlende Kategorie-Argumente werden nicht als fehlerhafte Vereinseinstellungen ausgegeben.
+- Unvollständige Agent-Antworten nach Werkzeugaufrufen werden abschließend ausgewertet. Interne Denkblöcke werden ausgeblendet und identische Berichtszusammenfassungen nicht doppelt angezeigt.
+- Der zusätzliche leere Scrollbereich im Dashboard wurde entfernt. Das Eingabefeld für KI-Hinweise verwendet normale Schriftstärke.
+
 ## [4.10.0] - 2026-11-04
 
 ### Hinzugefügt

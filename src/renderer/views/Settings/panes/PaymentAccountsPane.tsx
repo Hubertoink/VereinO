@@ -1,3 +1,4 @@
+import ModalHeader from '../../../components/ModalHeader'
 import RandomColorButton from '../../../components/common/RandomColorButton'
 import React from 'react'
 import { createPortal } from 'react-dom'
@@ -179,10 +180,13 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
       {draft && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDraft}>
           <div className="modal payment-account-modal" onClick={(e) => e.stopPropagation()}>
-            <header className="payment-account-modal__header">
-              <h2>{draft.id ? 'Konto bearbeiten' : 'Konto anlegen'}</h2>
-              <button className="btn ghost" onClick={closeDraft} aria-label="Schließen">✕</button>
-            </header>
+            <ModalHeader
+              className="payment-account-modal__header"
+              title={<>{draft.id ? 'Konto bearbeiten' : 'Konto anlegen'}</>}
+              onClose={closeDraft}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="payment-account-modal__body">
               <div className="row">
                 <div className="field">
@@ -239,10 +243,13 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
       {showColorPicker && draft && createPortal(
         <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
           <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="color-picker-header">
-              <h3 className="m-0">Eigene Farbe wählen</h3>
-              <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
-            </div>
+            <ModalHeader
+              className="color-picker-header"
+              title="Eigene Farbe wählen"
+              onClose={() => setShowColorPicker(false)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="row">
               <div className="field">
                 <label htmlFor="payment-account-color-native">Picker</label>
@@ -275,10 +282,12 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Konto löschen</h2>
-              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen">✕</button>
-            </header>
+            <ModalHeader
+              title="Konto löschen"
+              onClose={() => setDeleteConfirm(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="helper">Möchtest du das Konto <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>

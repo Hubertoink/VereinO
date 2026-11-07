@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
 import { IconTrash } from '../../utils/icons'
 import HoverTooltip from '../../components/common/HoverTooltip'
@@ -322,7 +323,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
   return (
     <div className={flyout ? undefined : 'modal-overlay'} onClick={flyout ? undefined : onClose} role={flyout ? undefined : 'dialog'} aria-modal={flyout ? undefined : true}>
       <div className={flyout ? 'activity-report-flyout' : 'modal activity-report-modal'} onClick={(event) => event.stopPropagation()}>
-        <header className="activity-report-modal__header">
+        <ModalHeader className="activity-report-modal__header">
           <div>
             {!flyout && <h2 style={{ margin: 0 }}>Tätigkeitsbericht</h2>}
             <p className="helper" style={{ marginTop: 4 }}>
@@ -337,9 +338,9 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
                 Zur Übersicht
               </button>
             )}
-            {!flyout && <button className="btn ghost" onClick={onClose} aria-label="Schließen" type="button">×</button>}
+            {!flyout && <ModalCloseButton onClick={onClose} aria-label="Schließen" type="button" />}
           </div>
-        </header>
+        </ModalHeader>
 
         <div className="activity-report-modal__body">
           {error && <div className="helper" style={{ color: 'var(--danger)' }}>{error}</div>}
@@ -528,10 +529,12 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Tätigkeitsbericht löschen</h3>
-              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen" type="button">✕</button>
-            </div>
+            <ModalHeader
+              title="Tätigkeitsbericht löschen"
+              onClose={() => setDeleteConfirm(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div>
               Möchtest du den Tätigkeitsbericht für <strong>{deleteConfirm.fiscalYear}</strong> wirklich löschen?
             </div>

@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { TaxExemptionCertificate } from '../../../../shared/types'
@@ -211,15 +212,14 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
     <div className="modal-overlay taxex-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal taxex-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <header className="taxex-header">
-          <div>
-            <h2 className="taxex-title">📄 Steuerbefreiungsbescheid</h2>
-            <div className="helper">Gemeinnützigkeitsbescheid für Spendenbescheinigungen</div>
-          </div>
-          <button className="btn ghost taxex-close-btn" onClick={onClose} aria-label="Schließen">
-            ✕
-          </button>
-        </header>
+        <ModalHeader
+          className="taxex-header"
+          title="📄 Steuerbefreiungsbescheid"
+          subtitle="Gemeinnützigkeitsbescheid für Spendenbescheinigungen"
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         {loading && (<div className="taxex-loading"><div>Lade...</div></div>)}
         {error && <div className="taxex-error">{error}</div>}

@@ -2,8 +2,8 @@ import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../co
 import './invoiceDetail.css'
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { IconLock, IconX, IconPaperclip, IconReceipt2 } from '@tabler/icons-react'
-import ModalHeader from '../../components/ModalHeader'
+import { IconLock, IconPaperclip, IconReceipt2 } from '@tabler/icons-react'
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import AppIcon from '../../components/common/AppIcon'
 import InvoiceActionMenu from './InvoiceActionMenu'
 import type { InvoiceDetail, InvoiceStatus, InvoiceTagDef } from './types'
@@ -124,13 +124,13 @@ export default function InvoiceDetailModal({
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Rechnungsdetails" onClick={onClose}>
       <div className="modal invoices-detail-grid invoice-detail-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
-        <div className="invoices-detail-header">
+        <ModalHeader className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
             {detail && canEdit && <InvoiceActionMenu actions={[{ label: 'Bearbeiten', onClick: () => onEdit(detail) }]} />}
-            <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
+            <ModalCloseButton onClick={onClose} aria-label="Schließen" />
           </div>
-        </div>
+        </ModalHeader>
         {loading && <div className="helper">Lade Details...</div>}
         {!loading && detail && (
           <div className="invoices-detail-grid">

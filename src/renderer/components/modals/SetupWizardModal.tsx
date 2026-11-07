@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 ﻿
 import React, { useEffect, useMemo, useState } from 'react'
 import './setupBookingView.css'
@@ -294,15 +295,7 @@ export default function SetupWizardModal({
     const LAST_STEP = setupSteps.length - 1
 
     function Header() {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <h2 style={{ margin: 0 }}>Erste Schritte</h2>
-                    <div className="helper">{setupSteps[step]}</div>
-                </div>
-                {/* Später oben rechts entfernt – nur noch unten in der Button-Leiste */}
-            </div>
-        )
+        return <ModalHeader title="Erste Schritte" subtitle={setupSteps[step]} />
     }
 
     function MiniNavPreview() {

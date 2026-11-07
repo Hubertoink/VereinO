@@ -58,8 +58,7 @@ test.beforeAll(async () => {
   // needs the fully initialized renderer and its IPC-backed database.
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
   const later = page.getByRole('button', { name: 'Später', exact: true })
-  await later.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
-  if (await later.isVisible()) await later.click()
+  await page.addLocatorHandler(later, () => later.click())
 })
 
 test.afterAll(async () => {
@@ -99,6 +98,7 @@ async function createInvoicePdf() {
 }
 
 test('receipt widget drops a PDF, preserves fields across modes and saves an open invoice', async () => {
+  await page.evaluate(() => window.api.paymentAccounts.upsert({ name: 'Beleg Testbank', kind: 'BANK' }))
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Belegwidget öffnen', exact: true })).toHaveCount(0)
   await page.locator('.settings-subnav').getByTitle('Arbeitsweise', { exact: true }).click()
@@ -134,6 +134,7 @@ test('receipt widget drops a PDF, preserves fields across modes and saves an ope
   }, pdf)
   const intake = await intakePromise
   await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
+  await intake.locator('#invoice-payment-account').selectOption({ label: 'Beleg Testbank' })
   await intake.getByLabel('Rechnungsnummer').fill('WIDGET-001')
   await intake.getByRole('button', { name: 'Rechnungserfassung schließen' }).click()
   await expect(intake.getByRole('alertdialog')).toContainText('Beige_und_Braun_Elegant_Einfach_Cafe_Rechnung_A4_Dokument_mit_besonders_langem_Dateinamen_2026.pdf')
@@ -205,18 +206,17 @@ test('receipt widget keeps local fields after AI failure and saves a booking wit
   await expect(intake.getByRole('status')).toContainText('KI nicht erreichbar')
   await expect(intake.getByLabel('Brutto (€)')).toHaveValue('618.80')
   await intake.getByLabel('Rechnungsnummer').fill('WIDGET-BOOKING')
+  await intake.locator('#invoice-payment-account').selectOption({ label: 'Widget Testbank' })
   await intake.getByRole('button', { name: 'Als Buchung übernehmen', exact: true }).click()
   await expect(intake.locator('.booking-type-overlay')).toHaveCount(0)
   await expect(intake.getByRole('button', { name: 'Ausgabe', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await intake.getByRole('button', { name: 'Buchungskonto wählen', exact: true }).click()
-  await intake.getByRole('option', { name: 'Widget Testbank', exact: true }).click()
   await expect.poll(() => intake.locator('.booking-validation-badge').allTextContents()).toEqual([])
   const closed = intake.waitForEvent('close')
   await intake.getByRole('button', { name: 'Speichern', exact: true }).click()
   await closed
   const saved = await page.evaluate(async () => {
     const result = await window.api.vouchers.list({ limit: 100 })
-    return result.rows.find(row => row.note?.includes('WIDGET-BOOKING'))
+    return result.rows.find(row => row.description?.includes('WIDGET-BOOKING'))
   })
   expect(saved?.grossAmount).toBe(618.8)
   expect(saved?.fileCount).toBe(1)
@@ -227,14 +227,12 @@ test('receipt widget keeps local fields after AI failure and saves a booking wit
 
 test('opens the local invoice modal and extracts a PDF text layer', async () => {
   await page.setViewportSize({ width: 1280, height: 820 })
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  await laterButton.waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined)
-  if (await laterButton.isVisible()) await laterButton.click()
   await page.evaluate(() => window.api.ai.settings.set({ apiKey: 'sk-test-local-invoice-ui' }))
+  await page.evaluate(() => window.api.paymentAccounts.upsert({ name: 'Rechnung Testbank', kind: 'BANK' }))
 
   await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Rechnung lokal erfassen' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Verbindlichkeiten', exact: true }).click()
+  await page.getByLabel('Verbindlichkeiten', { exact: true }).click()
   const scanButton = page.getByRole('button', { name: 'Rechnung erfassen', exact: true })
   await expect(scanButton).toBeVisible()
   await expect(scanButton).toHaveClass(/invoices-scan-button/)
@@ -253,11 +251,8 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
     buffer: await createInvoicePdf()
   })
 
-  await expect(dialog.getByRole('status')).toContainText('Text erkannt', {
-    timeout: 15_000
-  })
-  await expect(dialog.getByLabel('Lieferant / Rechnungsteller')).toHaveValue(
-    'Auto Teile Europa GmbH'
+  await expect(dialog.getByLabel('Lieferant / Rechnungssteller')).toHaveValue(
+    'Auto Teile Europa GmbH', { timeout: 15_000 }
   )
   await expect(dialog.getByLabel('Rechnungsnummer')).toHaveValue('DE-001')
   await expect(dialog.getByLabel('Rechnungsdatum')).toHaveValue('2024-01-01')
@@ -266,6 +261,7 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
   await expect(dialog.getByLabel('Netto (€)')).toHaveValue('520.00')
   await expect(dialog.getByLabel('Umsatzsteuer (€)')).toHaveValue('98.80')
   await expect(dialog.getByLabel('IBAN')).toHaveValue('DE89370400440532013000')
+  await dialog.locator('#invoice-payment-account').selectOption({ label: 'Rechnung Testbank' })
   await expect(dialog.getByRole('button', { name: 'Mit KI auslesen' })).toBeVisible()
   await dialog.locator('.local-invoice-scan__ai-guidance summary').click()
   const guidanceLayout = await dialog.evaluate((element) => {
@@ -343,4 +339,94 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
   expect(savedInvoice?.grossAmount).toBe(618.8)
   expect(savedInvoice?.note).toContain('Geprüft durch Kasse')
   expect(savedInvoice?.files[0]?.fileName).toBe('rechnung-test.pdf')
+})
+
+
+test('links AI source rectangles to fields and removes evidence after manual edits', async () => {
+  await page.setViewportSize({ width: 1280, height: 820 })
+  await page.evaluate(() => window.api.ai.settings.set({ apiKey: 'sk-test-local-invoice-ui' }))
+  await electronApp.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('ai.invoice.extract')
+    ipcMain.handle('ai.invoice.extract', (_event, payload) => ({
+      result: {
+        supplier: 'Auto Teile Europa GmbH', partyId: null, invoiceNumber: 'DE-001',
+        counterpartyIban: 'DE89370400440532013000',
+        invoiceDate: '2024-01-01', dueDate: '2024-01-15', grossAmount: payload.file.mimeType === 'image/png' ? 119 : 618.8,
+        netAmount: 520, taxAmount: 98.8, vatRate: 19, iban: null, description: null,
+        type: 'OUT', sphere: 'IDEELL', primaryClassificationValueId: null,
+        paymentMethod: null, paymentAccountId: null, budgets: [], earmarks: [], tags: [],
+        confidence: 1, warnings: [], evidence: [],
+        fieldSources: [{ field: 'grossAmount', page: 1, text: payload.file.mimeType === 'image/png' ? '−119 €' : '618,80 EUR' }]
+      },
+      timings: { totalMs: 10, analysisMs: 10, ocrMs: null, doclingMs: null }
+    }))
+  })
+  await page.getByLabel('Verbindlichkeiten', { exact: true }).click()
+  await page.getByRole('button', { name: 'Rechnung erfassen', exact: true }).click()
+  const dialog = page.locator('.local-invoice-scan')
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'sources.pdf', mimeType: 'application/pdf', buffer: await createInvoicePdf()
+  })
+  await expect(dialog.getByLabel('Brutto (€)')).toHaveValue('618.80', { timeout: 15_000 })
+  await dialog.getByRole('button', { name: 'Mit KI auslesen', exact: true }).click()
+  const source = dialog.getByRole('button', { name: 'Brutto: 618,80 EUR', exact: true })
+  await expect(source).toBeVisible()
+  await dialog.locator('.party-selector__add').click()
+  const partyEditor = page.getByRole('dialog', { name: 'Geschäftspartner anlegen' })
+  await expect(partyEditor.getByLabel('IBAN', { exact: true })).toHaveValue('DE89370400440532013000')
+  await expect(partyEditor.getByLabel('IBAN', { exact: true })).toBeVisible()
+  await partyEditor.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await source.click()
+  await expect(dialog.getByLabel('Brutto (€)')).toBeFocused()
+  await expect(source).toHaveClass(/is-active/)
+  const geometry = await source.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const preview = element.closest('.local-invoice-scan__pdf-page')!.getBoundingClientRect()
+    return { x: (box.x - preview.x) / preview.width, y: (box.y - preview.y) / preview.height }
+  })
+  expect(geometry.x).toBeGreaterThan(54 / 595)
+  expect(geometry.x).toBeLessThan(0.6)
+  expect(geometry.y).toBeGreaterThan(0.3)
+  expect(geometry.y).toBeLessThan(0.4)
+  await page.screenshot({ path: 'test-results/invoice-source-rectangles.png', animations: 'disabled' })
+  await dialog.getByRole('button', { name: 'Fundstellen ausblenden' }).click()
+  await expect(source).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Fundstellen anzeigen' }).click()
+  await expect(source).toBeVisible()
+  await dialog.getByRole('button', { name: 'PDF vergrößern' }).click()
+  await expect(dialog.locator('.local-invoice-scan__zoom-label')).toHaveText('115%')
+  await expect(source).toBeVisible()
+  await dialog.getByLabel('Brutto (€)').fill('619.00')
+  await expect(source).toHaveCount(0)
+
+  await electronApp.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('ocr.extract')
+    ipcMain.handle('ocr.extract', () => ({
+      text: 'Gutschrift Musterbedarf Brutto −119 €', confidence: 100,
+      pages: [{ text: 'Gutschrift Musterbedarf Brutto −119 €', confidence: 100,
+        words: [{ text: '−119 €', x: 100, y: 200, width: 120, height: 30 }] }]
+    }))
+  })
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 800; canvas.height = 1000
+    const context = canvas.getContext('2d')!
+    context.fillStyle = 'white'; context.fillRect(0, 0, 800, 1000)
+    context.fillStyle = 'black'; context.font = '30px sans-serif'; context.fillText('−119 €', 100, 225)
+    return canvas.toDataURL('image/png').split(',')[1]
+  })
+  await dialog.locator('input[type="file"]').setInputFiles({ name: 'credit.png', mimeType: 'image/png', buffer: Buffer.from(image, 'base64') })
+  await expect(dialog.getByRole('img', { name: 'Rechnung', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Mit KI auslesen', exact: true })).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Mit KI auslesen', exact: true }).click()
+  const imageSource = dialog.getByRole('button', { name: 'Brutto: −119 €', exact: true })
+  await expect(imageSource).toBeVisible()
+  await expect(dialog.getByLabel('Brutto (€)')).toHaveValue('119.00')
+  const imageGeometry = await imageSource.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const img = element.closest('.local-invoice-scan__source-image')!.querySelector('img')!.getBoundingClientRect()
+    return { x: (box.x - img.x) / img.width, y: (box.y - img.y) / img.height }
+  })
+  expect(imageGeometry.x).toBeCloseTo(100 / 800, 2)
+  expect(imageGeometry.y).toBeCloseTo(200 / 1000, 2)
 })

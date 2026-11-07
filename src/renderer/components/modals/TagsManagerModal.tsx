@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagModal, { TagValue } from './TagModal'
@@ -19,14 +20,14 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <ModalHeader >
                     <h2 style={{ margin: 0 }}>Tags verwalten</h2>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
                         <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
-                        <button className="btn danger" onClick={onClose}>Schließen</button>
+                        <ModalCloseButton onClick={onClose} />
                     </div>
-                </header>
+                </ModalHeader>
                 {busy && <div className="helper">Lade …</div>}
                 <table cellPadding={6} style={{ marginTop: 4, width: '100%' }}>
                     <thead>
@@ -65,10 +66,11 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
                 {deleteConfirm && (
                     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
                         <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h2 style={{ margin: 0 }}>Tag löschen</h2>
-                                <button className="btn ghost" onClick={() => setDeleteConfirm(null)}>✕</button>
-                            </div>
+                            <ModalHeader
+                              title="Tag löschen"
+                              onClose={() => setDeleteConfirm(null)}
+                              closeOnEscape={false}
+                            />
                             <div>Den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
                             <div className="helper">Hinweis: Der Tag wird aus allen Buchungen entfernt.</div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

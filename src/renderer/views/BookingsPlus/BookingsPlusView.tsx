@@ -1,3 +1,4 @@
+import ModalHeader from '../../components/ModalHeader'
 import '../../components/booking/bookingTable.css'
 import PartyName from '../../components/common/PartyName'
 import RecentBookingsDropdown from './RecentBookingsDropdown'
@@ -443,7 +444,13 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                 </section>
                 {narrow && detailOpen && <div className="bp-detail-backdrop" onClick={closeDetails} />}
                 <aside ref={inspector} tabIndex={-1} className={`bp-panel bp-inspector${detailOpen ? ' bp-inspector--open' : ''}${metaEditing ? ' bp-inspector--editing' : ''}`} role={narrow && detailOpen ? 'dialog' : undefined} aria-modal={narrow && detailOpen ? true : undefined} aria-label="Ausgewählte Buchung">
-                    <div className="bp-section-heading"><strong>Buchungsdetails</strong><button className="btn ghost bp-detail-close" aria-label="Details schließen" onClick={closeDetails}><IconX size={19} /></button></div>
+                    <ModalHeader
+                      className="bp-section-heading"
+                      title="Buchungsdetails"
+                      onClose={closeDetails}
+                      closeLabel="Details schließen"
+                      closeOnEscape={false}
+                    />
                     {selected && metaEditing ? <VoucherInfoModal key={selected.id} embedded initialEditing embeddedSummary={detailSummary} voucher={selected} onClose={() => setMetaEditing(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onOpenAttachments={() => setAttachments(selected)} /> : selected ? <>
                         <div className="bp-inspector-scroll">
                             {detailSummary}

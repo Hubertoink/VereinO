@@ -1,5 +1,6 @@
+import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
-import { IconPencil, IconTag, IconX } from '@tabler/icons-react'
+import { IconPencil, IconTag } from '@tabler/icons-react'
 import { TagsPaneProps } from '../types'
 import TagModal, { TagValue } from '../../../components/modals/TagModal'
 import AppIcon from '../../../components/common/AppIcon'
@@ -165,12 +166,12 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Tag löschen</h2>
-              <button className="btn ghost" onClick={() => setDeleteConfirm(null)} aria-label="Schließen">
-                <AppIcon icon={IconX} size="control" />
-              </button>
-            </header>
+            <ModalHeader
+              title="Tag löschen"
+              onClose={() => setDeleteConfirm(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="helper">
               Möchtest du den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?
             </div>

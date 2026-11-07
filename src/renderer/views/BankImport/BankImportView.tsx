@@ -1,10 +1,12 @@
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
+import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
 import { IconArrowDown, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
 import './bankReview.css'
 import './bankImportDialog.css'
 import './bankImportPage.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconHistory, IconLayoutGrid, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconHistory, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
@@ -66,6 +68,7 @@ type BankAiSuggestion = {
     type: 'IN' | 'OUT'
     sphere: string
     primaryClassificationValueId?: number | null
+    counterparty?: string | null
     description: string
     grossAmount: number
     vatRate?: number | null
@@ -447,16 +450,14 @@ function ManualAssignmentModal({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className="modal bank-manual-assign-modal">
-        <header className="bank-modal-header">
-          <div>
-            <h2>Manuelle Zuweisung</h2>
-            <p>
-              {transaction.counterparty || 'Ohne Gegenpartei'} · {formatDate(transaction.bookingDate)} · {euro.format(transaction.amount)} ·{' '}
-              {transaction.direction}
-            </p>
-          </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-        </header>
+        <ModalHeader
+          className="bank-modal-header"
+          title="Manuelle Zuweisung"
+          subtitle={<>{transaction.counterparty || 'Ohne Gegenpartei'}· {formatDate(transaction.bookingDate)}· {euro.format(transaction.amount)}·{' '}{transaction.direction}</>}
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <section className="bank-review-section">
           <div className="bank-manual-assign-toolbar">
@@ -597,16 +598,15 @@ function BankImportResultModal({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className="modal bank-import-result-modal">
-        <header className="bank-modal-header">
-          <div>
-            <h2>Import geprüft</h2>
-            <p>
-              {result.imported} importiert, {result.duplicates} als Duplikat erkannt,{' '}
-              {result.errors.length} fehlerhaft.
-            </p>
-          </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-        </header>
+        <ModalHeader
+          className="bank-modal-header"
+          title="Import geprüft"
+          subtitle={<>{result.imported}importiert, {result.duplicates}als Duplikat erkannt,{' '}{result.errors.length}fehlerhaft.
+            </>}
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         {result.duplicateRows.length > 0 && (
           <section className="bank-review-section">
@@ -981,13 +981,15 @@ function BankImportModal({
       onMouseDown={(event) => !importing && event.target === event.currentTarget && onClose()}
     >
       <div className="modal bank-import-modal bank-import-dialog">
-        <header className="bank-modal-header">
-          <div>
-            <h2>Bankdaten importieren</h2>
-            <p>CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen.</p>
-          </div>
-          <button className="btn dialog-close-btn" type="button" disabled={importing} onClick={onClose} title="Schließen" aria-label="Schließen"><AppIcon icon={IconX} size="action" /></button>
-        </header>
+        <ModalHeader
+          className="bank-modal-header"
+          title="Bankdaten importieren"
+          subtitle="CAMT.052/053 oder CSV prüfen und als offene Bankbelege übernehmen."
+          onClose={onClose}
+          closeDisabled={importing}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <div className="bank-import-scroll">
           <section className="bank-import-account-card">
@@ -1201,13 +1203,15 @@ function BankCheckModal({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className="modal bank-check-modal">
-        <header className="bank-modal-header">
-          <div>
-            <h2 id="bank-check-modal-title">Ohne Buchung erledigen</h2>
-            <p>Bankbeleg #{transaction.id}</p>
-          </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-        </header>
+        <ModalHeader
+          className="bank-modal-header"
+          title="Ohne Buchung erledigen"
+          titleId="bank-check-modal-title"
+          subtitle={<>Bankbeleg #{transaction.id}</>}
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <section className="bank-check-modal__content">
           <p>
@@ -1383,7 +1387,7 @@ function BankReviewModal({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
       <div className="modal bank-review-modal bank-review-modal--structured">
-        <header className="bank-modal-header">
+        <ModalHeader className="bank-modal-header">
           <div className="bank-review-title"><IconFileDescription size={23} aria-hidden="true" /><div><div className="bank-review-title-line"><h2>Bankbeleg #{transaction.id}</h2><span className={`bank-status bank-review-status-badge bank-status--${transaction.status.toLowerCase()}`}>{statusLabel(transaction.status)}</span></div><p>Alle Informationen zu diesem Bankbeleg</p></div></div>
           <div className="bank-header-actions">
             <div className="bank-action-menu" ref={actionMenuRef}>
@@ -1449,17 +1453,9 @@ function BankReviewModal({
                 </div>
               )}
             </div>
-            <button
-              className="btn ghost booking-modal-icon-btn booking-modal-close-btn"
-              type="button"
-              onClick={onClose}
-              title="Schließen (ESC)"
-              aria-label="Schließen"
-            >
-              <AppIcon icon={IconX} size="action" />
-            </button>
+            <ModalCloseButton type="button" onClick={onClose} title="Schließen (ESC)" aria-label="Schließen" />
           </div>
-        </header>
+        </ModalHeader>
 
         <div className="bank-review-scroll">
         <section className="bank-review-summary">
@@ -1712,6 +1708,7 @@ function BankAiSuggestionModal({
             mode: 'GROSS',
             grossAmount: candidate.grossAmount,
             vatRate: candidate.vatRate ?? 0,
+            counterparty: transaction.counterparty?.trim() || candidate.counterparty?.trim() || '',
             description: candidate.description,
             note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason].filter(Boolean).join('\n'),
             paymentMethod: candidate.paymentMethod || 'BANK',
@@ -1720,6 +1717,7 @@ function BankAiSuggestionModal({
             budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
             earmarksAssigned: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
             tags: candidate.tags || [],
+            bankReviewSource: bankDraftSourceFromTransaction(transaction, transaction.id),
             bankTransactionId: transaction.id
           }
         }
@@ -1741,7 +1739,7 @@ function BankAiSuggestionModal({
   return createPortal(
     <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" aria-labelledby="bank-ai-review-title" onMouseDown={(event) => !busy && event.target === event.currentTarget && onClose()}>
       <div className={`modal bank-ai-suggestion-modal${newBooking ? ' bank-ai-draft-modal' : ''}`}>
-        <header className="bank-modal-header bank-ai-review-header">
+        <ModalHeader className="bank-modal-header bank-ai-review-header">
           <div>
             <h2 id="bank-ai-review-title">{newBooking ? 'Neue Buchung aus Bankbeleg' : existing || recurring ? 'KI-Zuordnungsempfehlung' : 'KI-Prüfung'}</h2>
             <p>Bankbeleg #{transaction.id} · {formatDate(transaction.bookingDate)}</p>
@@ -1750,9 +1748,10 @@ function BankAiSuggestionModal({
             <strong>{newBooking ? 'Entwurf · noch nicht gebucht' : strongMatch ? 'Hohe Übereinstimmung' : actionLabel}</strong>
             <span>{newBooking ? 'KI-Vorschlag zur Erfassung' : `KI-Einschätzung: ${confidence} %`}</span>
           </div>
-          <button className="btn ghost" type="button" disabled={busy} onClick={onClose} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-        </header>
+          <ModalCloseButton type="button" disabled={busy} onClick={onClose} aria-label="Schließen" />
+        </ModalHeader>
 
+        <div className="bank-ai-review-body">
         <section className="bank-ai-suggestion-card">
           {refreshing && (
             <div className="bank-ai-refresh-state" role="status">
@@ -1850,6 +1849,7 @@ function BankAiSuggestionModal({
             }}>Bankbeleg manuell prüfen</button>
           )}
         </footer>
+        </div>
       </div>
     </div>,
     document.body

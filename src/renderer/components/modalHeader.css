@@ -1,0 +1,73 @@
+/* Same title bar in compact and full dialogs. In flex dialogs it stays outside
+   the scrolling body; in legacy scrolling dialogs it sticks to the top. */
+.modal-header-bar.modal-header-bar.modal-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 !important;
+  background: var(--surface);
+  color: var(--text);
+}
+.modal-header-bar > :first-child { min-width: 0; }
+/* Older dialogs scroll inside a padded container. Cover that top inset so
+   scrolled content cannot peek out above the sticky title bar. */
+.modal > .modal-header-bar::before {
+  content: '';
+  position: absolute;
+  inset: -32px 0 100%;
+  background: var(--surface);
+  pointer-events: none;
+}
+.modal-header-bar__heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.modal-header-bar__titles { min-width: 0; }
+.modal-header-bar__icon { display: grid; place-items: center; color: var(--accent); flex-shrink: 0; }
+.modal-header-bar__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.modal-header-bar.modal-header-bar :is(h2, h3) { margin: 0; font-size: 15px; line-height: 1.35; font-weight: 650; overflow-wrap: anywhere; }
+.modal-header-bar.modal-header-bar :is(p, .helper) { margin: 3px 0 0; font-size: 11px; line-height: 1.4; color: var(--text-dim); }
+.modal-header-bar__titles > p { overflow-wrap: anywhere; }
+button.modal-close-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface));
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+button.modal-close-button:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--danger) 72%, var(--border));
+  background: color-mix(in oklab, var(--danger) 18%, var(--surface));
+}
+button.modal-close-button:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
+button.modal-close-button:disabled { opacity: .5; cursor: not-allowed; }
+button.modal-close-button svg { width: 16px; height: 16px; pointer-events: none; }
+
+.modal-header-bar .booking-editor-title { padding: 0; }
+.modal-header-bar .booking-editor-title-icon { width: 32px; height: 32px; }
+.modal-header-bar .booking-modal-header-actions { align-self: center; align-items: center; gap: 8px; }
+.modal-header-bar .booking-modal-header-actions .booking-modal-icon-btn { width: 34px; height: 32px; border-radius: 6px; }
+
+/* Detached windows keep native controls at the outer frame edge. */
+.modal-header-bar.modal-header-bar.detached-booking-titlebar { padding: 0; align-items: stretch; }
+.modal-header-bar.detached-booking-titlebar .booking-editor-title { padding: 12px 14px; }
+.modal-header-bar.detached-booking-titlebar .booking-modal-header-actions { align-self: flex-start; gap: 0; }

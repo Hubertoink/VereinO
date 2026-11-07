@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React, { useState, useEffect, useMemo } from 'react'
 
 function ExportSection({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
@@ -343,7 +344,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
 
   const content = (
       <div className={flyout ? 'export-options-flyout' : 'modal'} onClick={(e) => e.stopPropagation()} style={flyout ? undefined : { maxWidth: 900, width: '95vw' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 12 }}>
+        <ModalHeader >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               {!flyout && <h2 style={{ margin: 0 }}>Export Optionen</h2>}
@@ -396,15 +397,8 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
               </div>
             )}
           </div>
-          {!flyout && <button
-            className="btn ghost"
-            onClick={onClose}
-            aria-label="Schließen"
-            style={{ width: 32, height: 32, padding: 0, display: 'grid', placeItems: 'center', fontSize: 18 }}
-          >
-            ×
-          </button>}
-        </header>
+          {!flyout && <ModalCloseButton onClick={onClose} aria-label="Schließen" />}
+        </ModalHeader>
 
         {/* Fiscal Year Selection (only for fiscal export) */}
         {exportType === 'fiscal' && setFiscalYear && (

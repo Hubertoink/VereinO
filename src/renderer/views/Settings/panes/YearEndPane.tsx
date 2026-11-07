@@ -1,3 +1,4 @@
+import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
 import { YearEndPaneProps } from '../types'
 import { dispatchDataChanged } from '../../../utils/refresh'
@@ -181,10 +182,12 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
       {confirmAction && (
         <div className="modal-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>{confirmAction.type === 'close' ? 'Jahr abschließen' : 'Periode wieder öffnen'}</h3>
-              <button className="btn ghost" onClick={() => setConfirmAction(null)} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>✕</button>
-            </div>
+            <ModalHeader
+              title={<>{confirmAction.type === 'close' ? 'Jahr abschließen' : 'Periode wieder öffnen'}</>}
+              onClose={() => setConfirmAction(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             {confirmAction.type === 'close' ? (
               <div>Jahr <strong>{year}</strong> abschließen? Buchungen bis <strong>{year}-12-31</strong> sind danach gesperrt.</div>
             ) : (

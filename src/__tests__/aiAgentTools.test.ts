@@ -1,6 +1,10 @@
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn()
 }))
+jest.mock('../../electron/main/services/aiReporting', () => ({
+  getDefaultReportScope: () => ({ from: '2026-01-01', to: '2026-11-07' }),
+  generateReportAnswer: jest.fn(async () => ({ report: { title: 'Testbericht' }, usage: {} }))
+}))
 jest.mock('../../electron/main/db/database', () => ({ getDb: jest.fn(), withTransaction: jest.fn() }))
 
 jest.mock('../../electron/main/repositories/bankTransactions', () => ({
@@ -25,6 +29,8 @@ jest.mock('../../electron/main/repositories/bankTransactions', () => ({
     counterparty: 'Marc Reiner',
     purpose: id === 23 ? 'Zirkus Trolori 7-9' : 'Einkaufen für Förderverein',
     bankReference: `REF-${id}`,
+    paymentAccountId: 1,
+    counterpartyIban: 'DE12500105170648489890',
     paymentAccountName: 'Bank'
   }))
 }))
@@ -154,6 +160,54 @@ jest.mock('../../electron/main/repositories/vouchers', () => ({
 }))
 
 import { createAiAgentTools } from '../../electron/main/services/aiAgentTools'
+
+test('the report tool passes the same organization rules to its narrative model', async () => {
+  const aiRules = [{ id: 7, name: 'Vorstand', scope: 'ALL', instruction: 'Verwende einfache Sprache.' }] as const
+  const tool = createAiAgentTools({ context: { aiRules: [...aiRules] } }).find(item => item.name === 'reports_answer')!
+  await tool.run({ question: 'Unsere Finanzlage?', from: null, to: null })
+  expect(jest.requireMock('../../electron/main/services/aiReporting').generateReportAnswer).toHaveBeenCalledWith(
+    { question: 'Unsere Finanzlage?', from: '2026-01-01', to: '2026-11-07' }, aiRules
+  )
+})
+
+describe('booking draft tool contract', () => {
+  const context = { organization: { profile: 'GENERAL' }, primaryClassifications: [{ id: 5, name: 'Material', isActive: true }, { id: 6, name: 'Alt', isActive: false }] } as any
+  const args = { date: '2026-07-07', type: 'OUT', description: 'Einkauf', grossAmount: 111, primaryClassificationValueId: 5, bankTransactionId: 23 }
+
+  it('exposes the required category to the model and carries bank source/link/IBAN into the real draft', async () => {
+    const tool = createAiAgentTools({ context }).find(item => item.name === 'booking_draft_prepare')!
+    expect(tool.parameters.properties).toMatchObject({ primaryClassificationValueId: expect.any(Object), bankTransactionId: expect.any(Object) })
+    const result = await tool.run(args)
+    expect(result.ok).toBe(true)
+    expect(result.draft).toMatchObject({ kind: 'booking', payload: { qa: {
+      primaryClassificationValueId: 5, bankTransactionId: 23, paymentAccountId: 1, paymentMethod: 'BANK',
+      bankReviewSource: { transactionId: 23, amount: 111, counterparty: 'Marc Reiner', counterpartyIban: 'DE12500105170648489890' },
+      partyCreationSource: { name: 'Marc Reiner', iban: 'DE12500105170648489890' }
+    } } })
+  })
+
+  it('returns available categories for correcting arguments instead of diagnosing broken settings', async () => {
+    const tools = createAiAgentTools({ context })
+    const tool = tools.find(item => item.name === 'booking_draft_prepare')!
+    for (const id of [null, 6, 99]) {
+      const result = await tool.run({ ...args, primaryClassificationValueId: id })
+      expect(result.ok).toBe(false)
+      expect(result.warning).toContain('"id":5,"name":"Material"')
+      expect(result.warning).not.toContain('"name":"Alt"')
+    }
+    const data = await tools.find(item => item.name === 'master_data_list')!.run({})
+    expect(data.data).toMatchObject({ primaryClassifications: [{ id: 5, name: 'Material' }] })
+  })
+
+  it('does not prepare a bank-linked draft with a conflicting amount, direction, account or closed bank source', async () => {
+    const tool = createAiAgentTools({ context }).find(item => item.name === 'booking_draft_prepare')!
+    for (const patch of [{ grossAmount: 112 }, { type: 'IN' }, { paymentAccountId: 99 }]) {
+      expect((await tool.run({ ...args, ...patch })).ok).toBe(false)
+    }
+    jest.requireMock('../../electron/main/repositories/bankTransactions').getBankTransaction.mockReturnValueOnce({ id: 23, status: 'LINKED' })
+    expect((await tool.run(args)).ok).toBe(false)
+  })
+})
 
 describe('createAiAgentTools', () => {
   it('requests all due periods unless a specific period is requested', async () => {
@@ -371,4 +425,15 @@ describe('createAiAgentTools', () => {
     expect(result.ok).toBe(false)
     expect(result.warning).toContain('reiner Bankbeleg-Verknüpfung')
   })
+})
+
+
+test('free booking drafts carry counterparty source data into central partner creation', async () => {
+  const tool = createAiAgentTools({ context: {} as any }).find(item => item.name === 'booking_draft_prepare')!
+  const result = await tool.run({ date: '2026-08-17', type: 'OUT', description: 'Werkzeug', grossAmount: 119,
+    counterparty: 'OBI GmbH', counterpartyIban: 'DE12500105170648489890' })
+  expect(result.ok).toBe(true)
+  expect(result.draft?.payload).toMatchObject({ qa: {
+    counterparty: 'OBI GmbH', partyCreationSource: { name: 'OBI GmbH', iban: 'DE12500105170648489890' }
+  } })
 })

@@ -1,3 +1,6 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
+import type { PartyCreationSource } from '../../utils/partyCreationSource'
+import { locateInvoiceSource, type InvoiceSource, type SourcePage } from '../../utils/invoiceSources'
 import InvoiceFileName from './InvoiceFileName'
 import InvoiceAnalysisInfo from './InvoiceAnalysisInfo'
 import BookingKindSwitch from '../booking/BookingKindSwitch'
@@ -77,6 +80,7 @@ export type LocalInvoiceScanResult = {
   file: File
   fields: LocalInvoiceFields
   partyId: number | null
+  partyCreationSource?: PartyCreationSource
   budgets: BudgetAssignment[]
   earmarksAssigned: EarmarkAssignment[]
   tags: string[]
@@ -85,8 +89,11 @@ export type LocalInvoiceScanResult = {
 }
 
 export type LocalInvoiceScanDraftState = {
+  fieldSources?: InvoiceSource[]
+  sourcePages?: Record<number, SourcePage>
   fields: LocalInvoiceFields
   partyId: number | null
+  partyCreationSource?: PartyCreationSource
   budgets: BudgetAssignment[]
   earmarksAssigned: EarmarkAssignment[]
   tags: string[]
@@ -139,7 +146,9 @@ function Field({
   onChange,
   type = 'text',
   placeholder,
-  error
+  error,
+  sourceField,
+  onSourceFocus
 }: {
   label: string
   value: string
@@ -147,9 +156,11 @@ function Field({
   type?: 'text' | 'date'
   placeholder?: string
   error?: string
+  sourceField?: LocalInvoicePickerField
+  onSourceFocus?: (field: LocalInvoicePickerField) => void
 }) {
   return (
-    <label className="local-invoice-scan__field">
+    <label className="local-invoice-scan__field" data-source-field={sourceField} onFocus={() => sourceField && onSourceFocus?.(sourceField)}>
       <span>{label}</span>
       <input
         className={`input${error ? ' local-invoice-scan__input-error' : ''}`}
@@ -312,11 +323,16 @@ export default function LocalInvoiceScanModal({
   const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false)
   const [rawText, setRawText] = useState('')
   const [fields, setFields] = useState<LocalInvoiceFields>(EMPTY_LOCAL_INVOICE_FIELDS)
+  const [partyCreationSource, setPartyCreationSource] = useState<PartyCreationSource>()
   const [partyId, setPartyId] = useState<number | null>(initialState?.partyId ?? null)
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfPages, setPdfPages] = useState(0)
   const [pdfZoom, setPdfZoom] = useState(1)
   const [pdfPageSize, setPdfPageSize] = useState({ width: 595, height: 842 })
+  const [fieldSources, setFieldSources] = useState<InvoiceSource[]>([])
+  const [sourcePages, setSourcePages] = useState<Record<number, SourcePage>>({})
+  const [activeSource, setActiveSource] = useState<LocalInvoicePickerField | null>(null)
+  const [showSources, setShowSources] = useState(true)
   const [ocrWordsByPage, setOcrWordsByPage] = useState<Record<number, OcrWord[]>>({})
   const [dragActive, setDragActive] = useState(false)
   const [pickerEnabled, setPickerEnabled] = useState(false)
@@ -500,6 +516,22 @@ export default function LocalInvoiceScanModal({
         })
         textLayerTaskRef.current = layer
         await Promise.all([task.promise, layer.render()])
+        if (cancelled) return
+        // Browser ranges use the actual PDF font metrics, including rotation and zoom.
+        const bounds = textLayer.getBoundingClientRect()
+        const words: OcrWord[] = []
+        for (const span of textLayer.querySelectorAll('span')) {
+          const node = span.firstChild
+          if (!node || node.nodeType !== Node.TEXT_NODE) continue
+          for (const match of (node.textContent || '').matchAll(/\S+/g)) {
+            const range = document.createRange()
+            range.setStart(node, match.index!)
+            range.setEnd(node, match.index! + match[0].length)
+            const rect = range.getBoundingClientRect()
+            words.push({ text: match[0], x: rect.x - bounds.x, y: rect.y - bounds.y, width: rect.width, height: rect.height })
+          }
+        }
+        if (words.length) setSourcePages((current) => ({ ...current, [pdfPage]: { width: bounds.width, height: bounds.height, words } }))
       } catch (error: any) {
         if (!cancelled && error?.name !== 'RenderingCancelledException') {
           setAnalysisState('error')
@@ -522,6 +554,7 @@ export default function LocalInvoiceScanModal({
     manuallyEditedRef.current.add(key)
     if (key === 'supplier') setPartyId(null)
     setFields((current) => ({ ...current, [key]: value }))
+    setFieldSources((current) => current.filter((source) => source.field !== key))
   }
 
   const ensurePdfJs = async () => {
@@ -567,10 +600,14 @@ export default function LocalInvoiceScanModal({
     manualAccountRef.current = false
     setAccountError('')
     setPartyId(null)
+    setPartyCreationSource(undefined)
     setPdfPage(1)
     setPdfPages(0)
     setPdfPageSize({ width: 595, height: 842 })
     setOcrWordsByPage({})
+    setFieldSources([])
+    setSourcePages({})
+    setActiveSource(null)
     setPickerText('')
     setPickerEnabled(false)
     setVisibleSections(new Set())
@@ -617,11 +654,15 @@ export default function LocalInvoiceScanModal({
     manualAccountRef.current = false
     setAccountError('')
     setPartyId(null)
+    setPartyCreationSource(undefined)
     setBookingMeta(bookingMetaFromGuidance(aiGuidance))
     setPdfZoom(1)
     setPdfPage(1)
     setPdfPages(0)
     setOcrWordsByPage({})
+    setFieldSources([])
+    setSourcePages({})
+    setActiveSource(null)
     setPickerText('')
     setAnalysisDetails(undefined)
     setAnalysisState('analyzing')
@@ -645,9 +686,12 @@ export default function LocalInvoiceScanModal({
     })
     if (restored) {
       setFields(restored.fields)
+      setFieldSources(restored.fieldSources || [])
+      setSourcePages(restored.sourcePages || {})
       setHasAnalysisWarnings(Boolean(restored.analysisDetails?.warnings.length || restored.note))
       setAnalysisDetails(restored.analysisDetails || (restored.note ? { summary: 'Gespeicherte Auswertung', timings: '', warnings: restored.note.split('\n').filter(Boolean) } : undefined))
       setPartyId(restored.partyId ?? null)
+      setPartyCreationSource(restored.partyCreationSource)
       setBudgets(restored.budgets)
       setEarmarkAssignments(restored.earmarksAssigned)
       setTags(restored.tags)
@@ -667,6 +711,7 @@ export default function LocalInvoiceScanModal({
         setAnalysisState('analyzing')
         setAnalysisMessage('Lokale OCR liest den Scan …')
         const images: Array<{ dataBytes: Uint8Array }> = []
+        const sizes: Array<{ width: number; height: number }> = []
 
         if (pdfDocument) {
           const pagesToRead = Math.min(pdfDocument.numPages || 1, MAX_LOCAL_OCR_PAGES)
@@ -676,6 +721,7 @@ export default function LocalInvoiceScanModal({
             const canvas = document.createElement('canvas')
             canvas.width = Math.ceil(viewport.width)
             canvas.height = Math.ceil(viewport.height)
+            sizes.push({ width: canvas.width, height: canvas.height })
             const context = canvas.getContext('2d')
             if (!context) throw new Error('OCR-Seite konnte nicht gerendert werden.')
             await page.render({ canvasContext: context, viewport }).promise
@@ -694,6 +740,11 @@ export default function LocalInvoiceScanModal({
 
         const result = await window.api.ocr.extract({ images })
         if (requestRef.current !== requestId) return null
+        setSourcePages((current) => ({ ...current, ...Object.fromEntries(result.pages.map((page, index) => [index + 1, {
+          width: sizes[index]?.width || current[index + 1]?.width || 0,
+          height: sizes[index]?.height || current[index + 1]?.height || 0,
+          words: page.words
+        }])) }))
         if (pdfDocument) {
           setOcrWordsByPage(
             Object.fromEntries(
@@ -760,14 +811,31 @@ export default function LocalInvoiceScanModal({
       setPdfPages(document.numPages || 1)
 
       const pageTexts: string[] = []
+      const locatedPages: Record<number, SourcePage> = {}
       const pagesToRead = Math.min(document.numPages || 1, MAX_TEXT_PAGES)
       for (let pageNumber = 1; pageNumber <= pagesToRead; pageNumber += 1) {
         const page = await document.getPage(pageNumber)
         const content = await page.getTextContent()
         pageTexts.push(joinPdfTextItems(content.items))
+        const viewport = page.getViewport({ scale: 1 })
+        locatedPages[pageNumber] = {
+          width: viewport.width, height: viewport.height,
+          words: content.items.filter((item: any) => typeof item.str === 'string' && item.str.trim()).map((item: any) => {
+            const transform = pdfjs.Util.transform(viewport.transform, item.transform)
+            const height = Math.hypot(transform[2], transform[3])
+            const style = content.styles[item.fontName]
+            const ascent = style?.ascent ?? (style?.descent != null ? 1 + style.descent : 0.8)
+            const angle = Math.atan2(transform[1], transform[0])
+            const width = item.width
+            const corners = [[0, -height * ascent], [width, -height * ascent], [0, height * (1 - ascent)], [width, height * (1 - ascent)]].map(([x, y]) => [transform[4] + x * Math.cos(angle) - y * Math.sin(angle), transform[5] + x * Math.sin(angle) + y * Math.cos(angle)])
+            const xs = corners.map(([x]) => x), ys = corners.map(([, y]) => y)
+            return { text: item.str, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+          })
+        }
       }
       if (requestRef.current !== requestId) return
 
+      setSourcePages((current) => ({ ...current, ...Object.fromEntries(Object.entries(locatedPages).filter(([, page]) => page.words.length)) }))
       const text = pageTexts.join('\n\n').trim()
       setRawText(text)
       if (restored) setFields(restored.fields)
@@ -829,15 +897,20 @@ export default function LocalInvoiceScanModal({
       file,
       fields,
       partyId,
+      partyCreationSource,
       budgets,
       earmarksAssigned: earmarkAssignments,
       tags,
       note,
       bookingMeta,
       analysisDetails,
+      fieldSources,
+      sourcePages,
       visibleSections: Array.from(visibleSections)
     })
   }, [
+    fieldSources,
+    sourcePages,
     analysisDetails,
     bookingMeta,
     budgets,
@@ -847,6 +920,7 @@ export default function LocalInvoiceScanModal({
     file,
     note,
     partyId,
+    partyCreationSource,
     tags,
     visibleSections
   ])
@@ -898,6 +972,41 @@ export default function LocalInvoiceScanModal({
     window.getSelection()?.removeAllRanges()
   }
 
+  const focusSource = (field: LocalInvoicePickerField) => {
+    setActiveSource(field)
+    const source = fieldSources.find((item) => item.field === field && locateInvoiceSource(item, sourcePages[item.page]).length)
+    if (source) {
+      setShowSources(true)
+      if (previewKind === 'pdf') setPdfPage(source.page)
+    }
+  }
+
+  useEffect(() => {
+    if (activeSource && showSources) {
+      document.querySelector('.local-invoice-scan__source-box.is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [activeSource, showSources, pdfPage, sourcePages])
+
+  const renderSources = (page: number) => showSources && !pickerEnabled && (
+    <div className="local-invoice-scan__sources" aria-label="KI-Fundstellen">
+      {fieldSources.filter((source) => source.page === page).flatMap((source, index) => {
+        const label = PICKER_FIELDS.find((field) => field.value === source.field)?.label || source.field
+        return locateInvoiceSource(source, sourcePages[page]).map((box, boxIndex) => (
+          <button key={`${index}-${boxIndex}`} type="button"
+            className={`local-invoice-scan__source-box${activeSource === source.field ? ' is-active' : ''}`}
+            style={{ left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%` }}
+            title={`${label}: ${source.text}`} aria-label={`${label}: ${source.text}`}
+            onClick={() => {
+              focusSource(source.field)
+              const input = source.field === 'supplier' ? document.getElementById('local-invoice-party') : document.querySelector<HTMLInputElement>(`[data-source-field="${source.field}"] input`)
+              input?.focus()
+            }}
+          ><span>{label}</span></button>
+        ))
+      })}
+    </div>
+  )
+
   const analyzeWithAi = async () => {
     if (!file || aiBusy) return
     const mimeType = inferMimeType(file)
@@ -906,6 +1015,7 @@ export default function LocalInvoiceScanModal({
       notify('error', 'Die KI-Analyse unterstützt Rechnungen bis 10 MB.')
       return
     }
+    const aiRequestId = requestRef.current
     setAiBusy(true)
     setAnalysisDetails(undefined)
     setAnalysisState('analyzing')
@@ -920,7 +1030,10 @@ export default function LocalInvoiceScanModal({
         localDocumentText: rawText.slice(0, 250_000),
         guidance: activeAiGuidance
       })
+      if (requestRef.current !== aiRequestId) return
       const result = analyzed.result
+      setPartyCreationSource({ name: result.supplier || '', iban: result.counterpartyIban })
+      setFieldSources((result.fieldSources || []).filter((source) => !manuallyEditedRef.current.has(source.field)))
       if (!manuallyEditedRef.current.has('supplier')) setPartyId(result.partyId ?? null)
       setFields((current) => mergeInvoiceFields(current, result, manuallyEditedRef.current))
       setHasAnalysisWarnings(result.warnings.length > 0)
@@ -991,6 +1104,7 @@ export default function LocalInvoiceScanModal({
         file,
         fields,
         partyId,
+        partyCreationSource,
         budgets: budgets.filter((assignment) => assignment.budgetId > 0),
         earmarksAssigned: earmarkAssignments.filter((assignment) => assignment.earmarkId > 0),
         tags,
@@ -1035,7 +1149,7 @@ export default function LocalInvoiceScanModal({
         onClick={(event) => event.stopPropagation()}
         style={flyoutStyle}
       >
-        <header className="local-invoice-scan__header">
+        <ModalHeader className="local-invoice-scan__header">
           <div className="local-invoice-scan__title-row">
             <span className="local-invoice-scan__title-icon">
               <FileTextPlusIcon />
@@ -1055,17 +1169,9 @@ export default function LocalInvoiceScanModal({
                 {aiBusy ? 'KI liest …' : 'Mit KI auslesen'}
               </button>
             )}
-            <button
-              ref={closeButtonRef}
-              type="button"
-              className="btn ghost local-invoice-scan__close"
-              onClick={onClose}
-              aria-label="Rechnungserfassung schließen"
-            >
-              <AppIcon icon={IconX} size="action" />
-            </button>
+            <ModalCloseButton ref={closeButtonRef} type="button" onClick={onClose} aria-label="Rechnungserfassung schließen" />
           </div>
-        </header>
+        </ModalHeader>
 
         {intakeHeader}
         {!file && aiGuidancePanel}
@@ -1121,6 +1227,7 @@ export default function LocalInvoiceScanModal({
                   <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <div className="local-invoice-scan__preview-actions">
+                  {fieldSources.length > 0 && <button type="button" className="btn btn-sm" aria-pressed={showSources} onClick={() => setShowSources((value) => !value)}>Fundstellen {showSources ? 'ausblenden' : 'anzeigen'}</button>}
                   {previewKind === 'pdf' && (
                     <>
                       <button
@@ -1179,6 +1286,7 @@ export default function LocalInvoiceScanModal({
                     }
                   >
                     <canvas ref={canvasRef} />
+                    {renderSources(pdfPage)}
                     <div
                       ref={textLayerRef}
                       className={`local-invoice-scan__text-layer${pickerEnabled ? ' is-picker-active' : ''}`}
@@ -1201,7 +1309,13 @@ export default function LocalInvoiceScanModal({
                     </div>
                   </div>
                 )}
-                {previewKind === 'image' && imageUrl && <img src={imageUrl} alt="Rechnung" />}
+                {previewKind === 'image' && imageUrl && <div className="local-invoice-scan__source-image" style={{ '--source-ratio': (sourcePages[1]?.width || 1) / (sourcePages[1]?.height || 1) } as CSSProperties}>
+                  <img src={imageUrl} alt="Rechnung" onLoad={(event) => {
+                    const { naturalWidth: width, naturalHeight: height } = event.currentTarget
+                    setSourcePages((current) => ({ ...current, 1: { width, height, words: current[1]?.words || [] } }))
+                  }} />
+                  {renderSources(1)}
+                </div>}
                 {previewKind === 'none' && analysisState === 'analyzing' && (
                   <div className="local-invoice-scan__loading">Dokument wird vorbereitet …</div>
                 )}
@@ -1320,12 +1434,14 @@ export default function LocalInvoiceScanModal({
                     <PartySelector
                       valueId={partyId}
                       valueName={fields.supplier}
+                      creationSource={partyCreationSource}
                       role={bookingMeta.type === 'IN' ? 'CUSTOMER' : 'SUPPLIER'}
                       inputId="local-invoice-party"
                       ariaLabel={bookingMeta.type === 'IN' ? 'Geschäftspartner / Kunde' : 'Lieferant / Rechnungssteller'}
                       placeholder="Wählen, eingeben oder neu anlegen"
                       onChange={(selection) => {
                         manuallyEditedRef.current.add('supplier')
+                        setFieldSources((current) => current.filter((source) => source.field !== 'supplier'))
                         setPartyId(selection.partyId)
                         setFields((current) => ({ ...current, supplier: selection.name }))
                       }}
@@ -1333,6 +1449,8 @@ export default function LocalInvoiceScanModal({
                   </div>
                   <Field
                     label="Rechnungsnummer"
+                    sourceField="invoiceNumber"
+                    onSourceFocus={focusSource}
                     value={fields.invoiceNumber}
                     onChange={(value) => updateField('invoiceNumber', value)}
                     placeholder="Noch nicht erkannt"
@@ -1340,18 +1458,24 @@ export default function LocalInvoiceScanModal({
                   <Field
                     label="Rechnungsdatum"
                     type="date"
+                    sourceField="invoiceDate"
+                    onSourceFocus={focusSource}
                     value={fields.invoiceDate}
                     onChange={(value) => updateField('invoiceDate', value)}
                   />
                   <Field
                     label="Fällig am"
                     type="date"
+                    sourceField="dueDate"
+                    onSourceFocus={focusSource}
                     value={fields.dueDate}
                     onChange={(value) => updateField('dueDate', value)}
                   />
                   <Field
                     label="Brutto (€)"
                     error={amountError}
+                    sourceField="grossAmount"
+                    onSourceFocus={focusSource}
                     value={fields.grossAmount}
                     onChange={(value) => updateField('grossAmount', value)}
                     placeholder="0,00"
@@ -1359,6 +1483,8 @@ export default function LocalInvoiceScanModal({
                   <Field
                     label="Netto (€)"
                     error={amountError}
+                    sourceField="netAmount"
+                    onSourceFocus={focusSource}
                     value={fields.netAmount}
                     onChange={(value) => updateField('netAmount', value)}
                     placeholder="0,00"
@@ -1366,12 +1492,16 @@ export default function LocalInvoiceScanModal({
                   <Field
                     label="Umsatzsteuer (€)"
                     error={amountError}
+                    sourceField="taxAmount"
+                    onSourceFocus={focusSource}
                     value={fields.taxAmount}
                     onChange={(value) => updateField('taxAmount', value)}
                     placeholder="0,00"
                   />
                   <Field
                     label="IBAN"
+                    sourceField="iban"
+                    onSourceFocus={focusSource}
                     value={fields.iban}
                     onChange={(value) => updateField('iban', value)}
                     placeholder="Noch nicht erkannt"
@@ -1390,7 +1520,9 @@ export default function LocalInvoiceScanModal({
                   <div className="local-invoice-scan__field-span">
                     <Field
                       label="Beschreibung"
-                      value={fields.description}
+                      sourceField="description"
+                    onSourceFocus={focusSource}
+                    value={fields.description}
                       onChange={(value) => updateField('description', value)}
                       placeholder="Buchungstext"
                     />

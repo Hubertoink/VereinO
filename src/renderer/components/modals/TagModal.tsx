@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,13 +30,13 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
     return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <ModalHeader >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 20 }}>🏷️</span>
                         <h2 style={{ margin: 0 }}>{v.id ? 'Tag bearbeiten' : 'Neuer Tag'}</h2>
                     </div>
-                    <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ padding: '4px 8px', fontSize: 18 }}>✕</button>
-                </header>
+                    <ModalCloseButton onClick={onClose} aria-label="Schließen" />
+                </ModalHeader>
                 
                 {/* Preview */}
                 <div className="card" style={{ padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, background: v.color ? `${v.color}20` : 'var(--muted)' }}>
@@ -144,10 +145,12 @@ export default function TagModal({ value, onClose, onSaved, notify }: { value: T
             {showColorPicker && (
                 <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, display: 'grid', gap: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Eigene Farbe wählen</h3>
-                            <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen">✕</button>
-                        </div>
+                        <ModalHeader
+                          title="Eigene Farbe wählen"
+                          onClose={() => setShowColorPicker(false)}
+                          closeLabel="Schließen"
+                          closeOnEscape={false}
+                        />
                         <div className="row">
                             <div className="field">
                                 <label>Picker</label>

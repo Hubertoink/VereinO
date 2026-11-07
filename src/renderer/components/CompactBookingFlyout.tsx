@@ -1,3 +1,6 @@
+import ModalHeader, { ModalCloseButton } from './ModalHeader'
+import { useBankDraftSourceHighlight } from '../hooks/useBankDraftSourceHighlight'
+import BankDraftSourcePanel from './booking/BankDraftSourcePanel'
 import './compactBookingFlyout.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { QA } from '../hooks/useQuickAdd'
@@ -556,9 +559,11 @@ export default function CompactBookingFlyout({
     { key: 'attachments', label: 'Anhang', count: files.length }
   ]
 
+  const bankSource = useBankDraftSourceHighlight(Boolean(qa.bankReviewSource))
+
   return (
     <section ref={editorRef} style={{ height: needsBookingType ? undefined : selectedHeight }} className={`compact-booking-flyout compact-booking-flyout--${needsBookingType ? 'pending' : qa.type.toLowerCase()}${hasTypeSelectionStep ? ' booking-type-flow' : ''}${needsBookingType ? ' booking-type-pending' : ''}`} role="dialog" aria-labelledby="compact-booking-title">
-      <header className="compact-booking-flyout__header">
+      <ModalHeader className="compact-booking-flyout__header">
         <div>
           <strong id="compact-booking-title" title={title}>{title}</strong>
         </div>
@@ -575,10 +580,11 @@ export default function CompactBookingFlyout({
         )}
         <div className="compact-booking-flyout__header-actions">
           {showExpand && <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--expand" onClick={onExpand} title="Vollständigen Dialog öffnen" aria-label="Vollständigen Buchungsdialog öffnen">↗</button>}
-          <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--close" onClick={onClose} aria-label={draftTabsEnabled ? 'Buchungsflyout parken' : 'Buchungsflyout schließen'}>✕</button>
+          <ModalCloseButton type="button" onClick={onClose} aria-label={draftTabsEnabled ? 'Buchungsflyout parken' : 'Buchungsflyout schließen'} />
         </div>
-      </header>
+      </ModalHeader>
 
+      <BankDraftSourcePanel source={qa.bankReviewSource} anchorRef={editorRef} active={bankSource.active} />
       <form className="compact-booking-flyout__form" onSubmit={(event) => { event.preventDefault(); save() }}>
         <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
@@ -592,7 +598,7 @@ export default function CompactBookingFlyout({
 
           <div className="booking-type-fields" {...(needsBookingType ? { inert: '' } : {})} aria-hidden={needsBookingType || undefined}>
           <div className="compact-booking-core-grid">
-            <label className="compact-booking-field">
+            <label className="compact-booking-field" {...bankSource.fieldProps('date')}>
               <span>Datum *</span>
               <span className="booking-date-input-wrap">
                 <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
@@ -679,7 +685,7 @@ export default function CompactBookingFlyout({
                 </label>
               </>
             ) : qa.type !== 'INTERNAL' ? (
-              <label className="compact-booking-field">
+              <label className="compact-booking-field" {...bankSource.fieldProps('account')}>
                 <span>Konto *</span>
                 <SelectDropdown placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
                   const id = value ? Number(value) : null
@@ -691,7 +697,7 @@ export default function CompactBookingFlyout({
               <div className="compact-booking-field compact-booking-field--readonly"><span>Zahlweg</span><strong>Intern</strong></div>
             )}
 
-            <label className="compact-booking-field compact-booking-field--amount">
+            <label className="compact-booking-field compact-booking-field--amount" {...bankSource.fieldProps('amount')}>
               <span>Betrag *</span>
               <span className={`compact-booking-amount-control${qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && qa.mode === 'NET' ? ' compact-booking-amount-control--with-vat' : ''}`}>
                 {qa.type !== 'TRANSFER' && qa.type !== 'INTERNAL' && (
@@ -724,7 +730,7 @@ export default function CompactBookingFlyout({
             </label>
           </div>
 
-          <label className="compact-booking-field compact-booking-field--description">
+          <label className="compact-booking-field compact-booking-field--description" {...bankSource.fieldProps('description')}>
             <span>Beschreibung</span>
             <SuggestionInput value={qa.description} suggestions={descSuggest} onChange={(value) => patchQa({ description: value })} placeholder="Was wurde gebucht?" />
           </label>
@@ -739,13 +745,14 @@ export default function CompactBookingFlyout({
           )}
 
           {visibleSections.has('party') && (qa.type === 'IN' || qa.type === 'OUT') && (
-            <div className="compact-booking-optional-section compact-booking-party-section" aria-label="Geschäftspartner">
+            <div className="compact-booking-optional-section compact-booking-party-section" aria-label="Geschäftspartner" {...bankSource.fieldProps('party')}>
               <div className="compact-booking-section-title">
                 <strong>{qa.type === 'OUT' ? 'Lieferant / Zahlungsempfänger' : 'Kunde / Zahlungspflichtiger'}</strong>
                 <button type="button" onClick={() => removeSection('party')} aria-label="Geschäftspartner entfernen">×</button>
               </div>
               <PartySelector
                 valueId={qa.partyId}
+                creationSource={qa.partyCreationSource || (qa.bankReviewSource ? { name: qa.bankReviewSource.counterparty || '', iban: qa.bankReviewSource.counterpartyIban } : undefined)}
                 valueName={qa.counterparty || ''}
                 role={qa.type === 'OUT' ? 'SUPPLIER' : 'CUSTOMER'}
                 inputId="compact-booking-party"

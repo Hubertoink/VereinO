@@ -1,46 +1,295 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { IconArrowUp, IconSparkles, IconMessagePlus } from '@tabler/icons-react'
+import type { ReportBookingSource, ReportScope } from '../../../../shared/aiReporting'
+import type { TAiAgentRunOutput } from '../../../../electron/main/ipc/schemas'
+import ReportAnswerCard from '../../components/ai/ReportAnswerCard'
 import { addDataChangedListener } from '../../utils/refresh'
-type Answer = { question: string; title: string; body: string; notes: string[] }
-export default function DashboardAssistant({ context, onSetup }: { context: string; onSetup: () => void }) {
+import { AiMarkdown } from '../AI/AiMarkdown'
+import { openAgentReview } from '../../utils/aiAgentHandoff'
+import { reportSupplement } from '../../../../shared/aiVisibleText'
+
+type Answer = {
+  question: string
+  result: TAiAgentRunOutput
+  organizationId: string
+  revision: number
+}
+export default function DashboardAssistant({
+  from,
+  to,
+  onSetup,
+  onSource
+}: ReportScope & {
+  onSetup: () => void
+  onSource: (source: ReportBookingSource) => void
+}) {
   const [ready, setReady] = useState<boolean | null>(null)
+  const [scope, setScope] = useState({ from, to })
   const [question, setQuestion] = useState('')
   const [answers, setAnswers] = useState<Answer[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [revision, setRevision] = useState(0)
   const generation = useRef(0)
+  const session = useRef<string>()
   const sending = useRef(false)
+  const validRange = Boolean(scope.from && scope.to && scope.from <= scope.to)
+  useEffect(() => setScope({ from, to }), [from, to])
   useEffect(() => {
     let alive = true
-    const load = () => { window.api.ai.settings.get().then(settings => { if (alive) setReady(settings.hasApiKey) }).catch(() => { if (alive) setReady(false) }) }
+    const load = () => {
+      window.api.ai.settings
+        .get()
+        .then((settings) => {
+          if (alive) setReady(settings.hasApiKey)
+        })
+        .catch(() => {
+          if (alive) setReady(false)
+        })
+    }
     load()
     const off = addDataChangedListener(['settings'], load)
-    const reset = window.api.organizations.onSwitched(() => { generation.current++; sending.current = false; setBusy(false); setAnswers([]); setQuestion(''); setError(''); load() })
-    return () => { alive = false; generation.current++; off(); reset?.() }
+    const changed = addDataChangedListener(['vouchers', 'invoices', 'members'], () =>
+      setRevision((value) => value + 1)
+    )
+    const reset = window.api.organizations.onSwitched(() => {
+      generation.current++
+      session.current = undefined
+      sending.current = false
+      setBusy(false)
+      setAnswers([])
+      setQuestion('')
+      setError('')
+      load()
+    })
+    return () => {
+      alive = false
+      generation.current++
+      off()
+      changed()
+      reset?.()
+    }
   }, [])
   const newChat = () => {
     generation.current++
+    session.current = undefined
     sending.current = false
-    setBusy(false); setAnswers([]); setQuestion(''); setError('')
+    setBusy(false)
+    setAnswers([])
+    setQuestion('')
+    setError('')
+    setScope({ from, to })
   }
-  const ask = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!question.trim() || !ready || sending.current) return
-    sending.current = true; setBusy(true); setError('')
+  const askQuestion = async (prompt: string, selectedScope = scope) => {
+    if (
+      !prompt.trim() ||
+      !ready ||
+      sending.current ||
+      !selectedScope.from ||
+      !selectedScope.to ||
+      selectedScope.from > selectedScope.to
+    )
+      return
+    sending.current = true
+    setBusy(true)
+    setError('')
+    setScope(selectedScope)
     const ticket = generation.current
-    const sent = question.trim()
+    const sent = prompt.trim()
     try {
-      const result = await window.api.ai.text.generate({ type: 'REPORT_TEXT', tone: 'präzise, verständlich, sachlich', audience: 'Kassier und Vorstand', prompt: `Beantworte eine Reporting-/Controlling-Frage zu den Vereinsfinanzen. Nutze für Zeitraumfragen die folgenden Dashboarddaten; unterscheide gebuchte Werte, offene Posten und Stichtagswerte. Erfinde keine Zahlen. Wenn Daten fehlen, benenne das.
-Dashboarddaten: ${context}
-Bisherige Rückfragen: ${JSON.stringify(answers.slice(-3))}
-Frage: ${sent}` })
-      if (generation.current === ticket) { setAnswers(previous => [...previous, { question: sent, ...result }]); setQuestion('') }
-    } catch (reason) { if (generation.current === ticket) setError(reason instanceof Error ? reason.message : 'Die KI konnte nicht antworten. Bitte erneut versuchen.') }
-    finally { if (generation.current === ticket) { sending.current = false; setBusy(false) } }
+      const active = await window.api.organizations.active()
+      if (generation.current !== ticket) return
+      if (!active.organization) throw new Error('Bitte einen Verein auswählen.')
+      const result = await window.api.ai.agent.run({
+        sessionId: session.current,
+        prompt: sent,
+        uiContext: { activeArea: 'Dashboard', reportingScope: selectedScope }
+      })
+      if (generation.current === ticket) {
+        session.current = result.sessionId
+        setAnswers((previous) => [
+          ...previous,
+          { question: sent, result, organizationId: active.organization!.id, revision }
+        ])
+        setQuestion('')
+      }
+    } catch (reason) {
+      if (generation.current === ticket) {
+        setQuestion(sent)
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : 'Die KI konnte nicht antworten. Bitte erneut versuchen.'
+        )
+      }
+    } finally {
+      if (generation.current === ticket) {
+        sending.current = false
+        setBusy(false)
+      }
+    }
   }
-  return <section className="dp-assistant" aria-label="Dashboard KI"><div className="dp-assistant-toolbar">{(answers.length > 0 || question || error || busy) && <button type="button" className="btn ghost" onClick={newChat}><IconMessagePlus size={17} />Neuer Chat</button>}</div><div className="dp-assistant-intro"><IconSparkles size={23} /><h2>Deine Zahlen. Deine Fragen.</h2><p>Reporting und Controlling direkt aus deinem Dashboard.</p></div>
-    {ready === false ? <div className="dp-assistant-setup"><p>Hinterlege deinen KI-Zugang, um Fragen zu deinen Vereinsdaten zu stellen.</p><button className="btn" onClick={onSetup}>KI einrichten</button></div> : <><form onSubmit={ask}><input aria-label="Frage zu Reporting oder Controlling" placeholder="Wie stehen wir finanziell da?" value={question} onChange={event => setQuestion(event.target.value)} disabled={busy || ready === null} maxLength={4000} /><button type="submit" aria-label="Frage senden" disabled={!question.trim() || busy || !ready}><IconArrowUp size={20} /></button></form><div className="dp-assistant-suggestions">{['Wie hat sich unser Saldo entwickelt?', 'Welche Ausgaben fallen besonders auf?', 'Fasse die Finanzlage für den Vorstand zusammen.'].map(text => <button key={text} disabled={busy} onClick={() => setQuestion(text)}>{text}</button>)}</div></>}
-    {busy && <p role="status">Die KI wertet deine Frage aus …</p>}{error && <p className="dp-ai-error" role="alert">{error}</p>}
-    {answers.length > 0 && <div className="dp-ai-answers" aria-live="polite">{answers.map((answer, index) => <article key={index}><p>{answer.question}</p><h3>{answer.title}</h3><div>{answer.body}</div>{answer.notes.length > 0 && <ul>{answer.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>}</article>)}</div>}
-  </section>
+  return (
+    <section className="dp-assistant" aria-label="Dashboard KI">
+      <div className="dp-assistant-toolbar">
+        {(answers.length > 0 || question || error || busy) && (
+          <button type="button" className="btn ghost" onClick={newChat}>
+            <IconMessagePlus size={17} />
+            Neuer Chat
+          </button>
+        )}
+      </div>
+      <div className="dp-assistant-intro">
+        <IconSparkles size={23} />
+        <h2>Deine Zahlen. Deine Fragen.</h2>
+        <p>Reporting und Controlling direkt aus deinem Dashboard.</p>
+      </div>
+      {ready === false ? (
+        <div className="dp-assistant-setup">
+          <p>Hinterlege deinen KI-Zugang, um Fragen zu deinen Vereinsdaten zu stellen.</p>
+          <button className="btn" onClick={onSetup}>
+            KI einrichten
+          </button>
+        </div>
+      ) : (
+        <>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void askQuestion(question)
+            }}
+          >
+            <input
+              aria-label="Frage zu Reporting oder Controlling"
+              placeholder="Wie stehen wir finanziell da?"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              disabled={busy || ready === null}
+              maxLength={4000}
+            />
+            <button
+              type="submit"
+              aria-label="Frage senden"
+              disabled={!question.trim() || busy || !ready || !validRange}
+            >
+              <IconArrowUp size={20} />
+            </button>
+          </form>
+          <div className="dp-assistant-period" role="group" aria-label="Zeitraum der KI-Auswertung">
+            <span>Auswertungszeitraum</span>
+            <label>
+              Von
+              <input
+                type="date"
+                aria-label="Auswertung von"
+                value={scope.from}
+                max={scope.to || undefined}
+                disabled={busy}
+                onChange={(event) =>
+                  setScope((current) => ({ ...current, from: event.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Bis
+              <input
+                type="date"
+                aria-label="Auswertung bis"
+                value={scope.to}
+                min={scope.from || undefined}
+                disabled={busy}
+                onChange={(event) =>
+                  setScope((current) => ({ ...current, to: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+          {!validRange && (
+            <p className="dp-ai-error" role="alert">
+              Bitte einen gültigen Zeitraum auswählen.
+            </p>
+          )}
+          <div className="dp-assistant-suggestions">
+            {[
+              'Wie hat sich unser Saldo entwickelt?',
+              'Wie stehen Einnahmen und Ausgaben zueinander?',
+              'Fasse die Finanzlage für den Vorstand zusammen.'
+            ].map((text) => (
+              <button
+                key={text}
+                disabled={busy || !ready || !validRange}
+                onClick={() => void askQuestion(text)}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {busy && <p role="status">Die KI prüft deine Frage und ruft passende Daten ab …</p>}
+      {error && (
+        <p className="dp-ai-error" role="alert">
+          {error}
+        </p>
+      )}
+      {answers.length > 0 && (
+        <div className="dp-ai-answers">
+          {answers.map((answer, index) => (
+            <div key={index}>
+              {answer.revision !== revision && (
+                <p className="dp-ai-stale">
+                  Die Daten wurden inzwischen geändert. Diese Antwort zeigt den Stand der damaligen
+                  Abfrage; Quellenlinks öffnen die aktuellen Buchungen.
+                </p>
+              )}
+              {answer.result.reports?.map((report, reportIndex) => (
+                <ReportAnswerCard
+                  key={reportIndex}
+                  answer={report}
+                  question={answer.question}
+                  onSource={onSource}
+                  busy={busy}
+                  onFollowUp={(prompt, selectedScope) => void askQuestion(prompt, selectedScope)}
+                />
+              ))}
+              {reportSupplement(answer.result.answer, answer.result.reports) && (
+                <article className={answer.result.reports?.length ? 'ai-report-addendum' : 'ai-report-answer'}>
+                  {!answer.result.reports?.length && <header className="ai-report-heading">
+                    <p className="ai-report-question">{answer.question}</p>
+                    <h3>{answer.result.title || 'VereinO KI'}</h3>
+                  </header>}
+                  <AiMarkdown
+                    text={reportSupplement(answer.result.answer, answer.result.reports)}
+                    onOpenVoucher={(mention) =>
+                      window.dispatchEvent(
+                        new CustomEvent('apply-voucher-jump', {
+                          detail: { ...mention, voucherId: mention.id }
+                        })
+                      )
+                    }
+                  />
+                </article>
+              )}
+              {!!answer.result.drafts.length && (
+                <div className="ai-report-answer">
+                  <strong>Vorschläge zur Prüfung</strong>
+                  <ul>
+                    {answer.result.drafts.map((draft, index) => (
+                      <li key={index}>{draft.title}</li>
+                    ))}
+                  </ul>
+                  <button className="btn" type="button" onClick={() => openAgentReview(answer)}>
+                    Vorschläge im KI-Bereich prüfen
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <span className="sr-only" aria-live="polite">
+        {!busy && answers.length ? 'Die Auswertung ist bereit.' : ''}
+      </span>
+    </section>
+  )
 }

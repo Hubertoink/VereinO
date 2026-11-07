@@ -1,3 +1,4 @@
+import ModalHeader from './ModalHeader'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
 import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
@@ -310,13 +311,13 @@ export default function InvoiceBatchControl({
 
       {singleOpen && (
         <section className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
-          <header>
-            <div>
-              <strong>Rechnung erfassen</strong>
-              <small>Eine Rechnung zur Erkennung auswählen</small>
-            </div>
-            <button className="btn ghost" onClick={() => setSingleOpen(false)} aria-label="Upload-Flyout schließen">✕</button>
-          </header>
+          <ModalHeader
+            title="Rechnung erfassen"
+            subtitle="Eine Rechnung zur Erkennung auswählen"
+            onClose={() => setSingleOpen(false)}
+            closeLabel="Upload-Flyout schließen"
+            closeOnEscape={false}
+          />
           {guidanceFields}
           <button
             type="button"
@@ -362,10 +363,13 @@ export default function InvoiceBatchControl({
 
       {open && (
         <section className="invoice-batch-flyout" aria-label="KI-Rechnungsentwürfe">
-          <header>
-            <div><strong>KI-Rechnungsentwürfe</strong><small>{readyCount ? `${readyCount} bereit` : duplicateCount ? `${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'}` : busyCount ? `${busyCount} in Vorbereitung` : 'Keine offenen Entwürfe'}</small></div>
-            <button className="btn ghost" onClick={() => setOpen(false)} aria-label="Flyout schließen">✕</button>
-          </header>
+          <ModalHeader
+            title="KI-Rechnungsentwürfe"
+            subtitle={<>{readyCount ? `${readyCount} bereit` : duplicateCount ? `${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'}` : busyCount ? `${busyCount} in Vorbereitung` : 'Keine offenen Entwürfe'}</>}
+            onClose={() => setOpen(false)}
+            closeLabel="Flyout schließen"
+            closeOnEscape={false}
+          />
           {!queue?.aiAvailable && !queue?.doclingAvailable && (
             <p className="invoice-batch-flyout__notice">Für die Hintergrundanalyse muss ein KI-API-Key oder die lokale Docling-Verarbeitung aktiv sein.</p>
           )}

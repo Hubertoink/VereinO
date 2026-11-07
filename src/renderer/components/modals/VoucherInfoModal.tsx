@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import PartyName from '../common/PartyName'
 import ReimbursementsDialog from '../../views/reimbursements/ReimbursementsDialog'
 import type { Reimbursement } from '../../../../shared/reimbursements'
@@ -431,11 +432,9 @@ Status: ${statusLabel}`
         } as React.CSSProperties}
       >
         {/* Header */}
-        <header
+        <ModalHeader
           className={windowMode ? 'modal-header-flex detached-booking-titlebar' : undefined}
-          style={windowMode
-            ? ({ pointerEvents: 'auto', padding: '8px 16px 0' } as React.CSSProperties)
-            : { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
+          style={windowMode ? { pointerEvents: 'auto' } : undefined}
         >
           <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <h2 id="voucher-info-heading" className="voucher-info-title">
@@ -526,11 +525,9 @@ Status: ${statusLabel}`
                 </div>
               )}
             </div>
-            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={onClose} aria-label="Schließen" title="Schließen (ESC)" style={{ fontSize: windowMode ? undefined : 20 }}>
-              ✕
-            </button>
+            <ModalCloseButton onClick={onClose} aria-label="Schließen" title="Schließen (ESC)" />
           </div>
-        </header>
+        </ModalHeader>
 
         {/* Content */}
         <div className="voucher-info-modal__content" style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto', padding: windowMode ? '12px 16px 0' : undefined } as React.CSSProperties}>

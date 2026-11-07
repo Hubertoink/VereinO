@@ -1,5 +1,6 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
-import { IconArchive, IconChevronLeft, IconChevronRight, IconChevronsDown, IconChevronsLeft, IconChevronsRight, IconChevronsUp, IconPencil, IconPlus, IconX } from '@tabler/icons-react'
+import { IconArchive, IconChevronsDown, IconChevronsUp, IconPlus } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
 import BindingModal from '../../components/modals/BindingModal'
@@ -193,10 +194,12 @@ export default function EarmarksView({
       {archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>{archiveConfirm.isActive ? 'Zweckbindung archivieren?' : 'Zweckbindung wiederherstellen?'}</h3>
-              <button className="btn ghost" onClick={() => setArchiveConfirm(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              title={<>{archiveConfirm.isActive ? 'Zweckbindung archivieren?' : 'Zweckbindung wiederherstellen?'}</>}
+              onClose={() => setArchiveConfirm(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <p style={{ margin: '0 0 16px' }}>
               {archiveConfirm.isActive
                 ? <>Möchtest du <strong>{archiveConfirm.code} – {archiveConfirm.name}</strong> ins Archiv verschieben? Archivierte Zweckbindungen werden standardmäßig ausgeblendet.</>

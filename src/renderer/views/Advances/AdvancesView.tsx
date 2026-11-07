@@ -1,3 +1,4 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../context/useToast'
 import CompactBookingFlyout from '../../components/CompactBookingFlyout'
@@ -105,16 +106,6 @@ type PaymentAccount = {
 function paymentMethodForAccountKind(kind?: PaymentAccount['kind'] | null): 'BAR' | 'BANK' | undefined {
   if (!kind) return undefined
   return kind === 'CASH' ? 'BAR' : 'BANK'
-}
-
-function AdvanceModalCloseButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" type="button" aria-label="Schließen" title="Schließen (ESC)" disabled={disabled} onClick={onClick}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-      </svg>
-    </button>
-  )
 }
 
 function buildAdvancePurchaseQa(accounts: PaymentAccount[]): QA {
@@ -837,10 +828,7 @@ export default function AdvancesView() {
       {settleOpen && detail && (
         <div className="modal-overlay" onClick={() => setSettleOpen(false)} role="dialog" aria-modal="true">
           <div className="modal standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-            <div className="advances-modal-header">
-              <h2 style={{ margin: 0 }}>Vorschuss auflösen</h2>
-              <AdvanceModalCloseButton onClick={() => setSettleOpen(false)} />
-            </div>
+            <ModalHeader title="Vorschuss auflösen" onClose={() => setSettleOpen(false)} closeOnEscape={false} />
             <div className="helper">Offener Betrag: {eurFmt.format(detail.status === 'OPEN' ? detail.openAmount : 0)}</div>
             <div className="row">
               <div className="field standard-floating-field standard-floating-field--filled">
@@ -887,10 +875,7 @@ export default function AdvancesView() {
       {resolveConfirmOpen && detail && (
         <div className="modal-overlay" onClick={() => resolveBusy ? undefined : setResolveConfirmOpen(false)} role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <div className="advances-modal-header">
-              <h2 style={{ margin: 0 }}>Vorschuss jetzt auflösen?</h2>
-              <AdvanceModalCloseButton disabled={resolveBusy} onClick={() => setResolveConfirmOpen(false)} />
-            </div>
+            <ModalHeader title="Vorschuss jetzt auflösen?" closeDisabled={resolveBusy} onClose={() => setResolveConfirmOpen(false)} closeOnEscape={false} />
             <div className="helper" style={{ marginBottom: 8 }}>Empfänger: {detail.memberName || detail.recipientName}</div>
             <div style={{ display: 'grid', gap: 6 }}>
               <div>- Alle Buchungen werden als Belege gebucht</div>
@@ -912,18 +897,13 @@ export default function AdvancesView() {
           aria-modal="true"
         >
           <div className="modal" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Vorschuss löschen</h2>
-              <button
-                className="btn ghost"
-                type="button"
-                aria-label="Schließen"
-                disabled={deleteAdvanceBusy}
-                onClick={() => setDeleteAdvanceConfirmOpen(false)}
-              >
-                ×
-              </button>
-            </header>
+            <ModalHeader
+              title="Vorschuss löschen"
+              onClose={() => setDeleteAdvanceConfirmOpen(false)}
+              closeDisabled={deleteAdvanceBusy}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="helper">
               Möchtest du den Vorschuss für <strong>{detail.memberName || detail.recipientName}</strong> wirklich löschen?
               <div className="helper" style={{ marginTop: 6 }}>
@@ -946,18 +926,13 @@ export default function AdvancesView() {
           aria-modal="true"
         >
           <div className="modal" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Buchung entfernen</h2>
-              <button
-                className="btn ghost"
-                type="button"
-                aria-label="Schließen"
-                disabled={deletePurchaseBusy}
-                onClick={() => setDeletePurchaseConfirm(null)}
-              >
-                ×
-              </button>
-            </header>
+            <ModalHeader
+              title="Buchung entfernen"
+              onClose={() => setDeletePurchaseConfirm(null)}
+              closeDisabled={deletePurchaseBusy}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="helper">
               Möchtest du diese Buchung wirklich entfernen?
               <div className="helper" style={{ marginTop: 6 }}>

@@ -7,11 +7,16 @@ let css: string
 
 test.beforeAll(async () => {
   css = await fs.readFile('src/renderer/styles.css', 'utf8') + '\n' + await fs.readFile('src/renderer/components/modals/quickAddLayout.css', 'utf8')
+  css += '\n' + await fs.readFile('src/renderer/components/booking/bankDraftSource.css', 'utf8') + '\n' + await fs.readFile('src/renderer/components/compactBookingFlyout.css', 'utf8')
+  css += '\n' + await fs.readFile('src/renderer/components/common/party.css', 'utf8')
+  css += '\n' + await fs.readFile('src/renderer/components/modalHeader.css', 'utf8')
   const result = await build({
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'
       import { createRoot } from 'react-dom/client'
       import { useQuickAdd } from './src/renderer/hooks/useQuickAdd'
+      import { resolveBankDraftParty } from './src/renderer/utils/bankDraftParty'
+      import { bankDraftSourceFromTransaction } from './src/renderer/types/bankDraftSource'
       import { selectAiDraftBookingType } from './src/renderer/utils/aiBookingDraft'
       import QuickAddModal from './src/renderer/components/modals/QuickAddModal'
       import CompactBookingFlyout from './src/renderer/components/CompactBookingFlyout'
@@ -20,6 +25,7 @@ test.beforeAll(async () => {
         const [presentation, setPresentation] = React.useState('flyout')
         const fileInputRef = React.useRef(null)
         window.changePresentation = setPresentation
+        window.currentQa = hook.qa
         window.newDraft = () => hook.openQuickAdd()
         window.parkDraft = hook.parkQuickAdd
         window.replaceDraft = () => hook.updateDraft(hook.activeDraftId, { qa: { type: 'OUT',
@@ -27,6 +33,16 @@ test.beforeAll(async () => {
         window.reopenDraft = () => hook.reopenDraft(hook.activeDraftId)
         window.prefill = (selected) => hook.openQuickAdd({ qa: { type: 'OUT', bookingTypeSelected: selected,
           date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'Vorbelegt', paymentAccountId: 1 } })
+        window.aiBankDraft = async () => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type: 'OUT',
+          date: '2026-08-17', grossAmount: 118.75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL',
+          description: 'Farbe und Werkzeug Renovierung Gruppenraum · OBI GmbH', paymentAccountId: 1,
+          ...await resolveBankDraftParty({ counterparty: 'OBI GmbH' }, async () => ({ rows: [{ id: 7, name: 'OBI GmbH', isActive: 1 }] })),
+          bankTransactionId: 77, bankReviewSource: bankDraftSourceFromTransaction({ id: 77, bookingDate: '2026-08-17',
+            valueDate: '2026-08-18', direction: 'OUT', amount: 118.75, currency: 'EUR', counterparty: 'OBI GmbH', counterpartyIban: 'DE12 5001 0517 0648 4898 90',
+            purpose: 'Farbe und Werkzeug Renovierung Gruppenraum', paymentAccountName: 'Bank', bankReference: 'BREF-JH-0011', sourceFileName: 'umsatz.csv' }) }) })
+        window.aiPartyDraft = () => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type: 'OUT',
+          date: '2026-08-17', grossAmount: 118.75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'Werkzeug',
+          paymentAccountId: 1, counterparty: 'OBI GmbH', partyCreationSource: { name: 'OBI GmbH', iban: 'DE12 5001 0517 0648 4898 90' } }) })
         window.aiDraft = (type) => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type,
           date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'KI-Vorschlag', paymentAccountId: 1 }) })
         React.useEffect(() => { hook.openQuickAdd() }, [])
@@ -50,6 +66,7 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async ({ page }) => {
+  page.on('pageerror', error => console.error(error.message))
   await page.route('http://booking.test/**', route => route.fulfill({ contentType: 'text/html', body: '<html data-theme="dark"><div id="root"></div></html>' }))
   await page.goto('http://booking.test/')
   await page.addStyleTag({ content: css })
@@ -176,8 +193,16 @@ for (const presentation of ['modal', 'detached']) {
         expect(Math.abs(bounds.y + bounds.height - footerBounds.y - footerBounds.height)).toBeLessThanOrEqual(2)
         expect(footerBounds.y).toBeGreaterThan(bounds.y)
         const close = (await editor.getByRole('button', { name: 'Schließen', exact: true }).boundingBox())!
-        expect(Math.abs(close.x + close.width - bounds.x - bounds.width)).toBeLessThanOrEqual(2)
-        expect(Math.abs(close.y - bounds.y)).toBeLessThanOrEqual(2)
+        if (presentation === 'detached') {
+          expect(Math.abs(close.x + close.width - bounds.x - bounds.width)).toBeLessThanOrEqual(2)
+          expect(Math.abs(close.y - bounds.y)).toBeLessThanOrEqual(2)
+        } else {
+          expect(bounds.x + bounds.width - close.x - close.width).toBeCloseTo(15, 0)
+          expect(close.width).toBe(34)
+          expect(close.height).toBe(32)
+          const header = (await editor.locator('.modal-header-bar').boundingBox())!
+          expect(Math.abs(close.y + close.height / 2 - header.y - header.height / 2)).toBeLessThanOrEqual(2)
+        }
         if (presentation === 'detached') expect(Math.abs(bounds.height - size.height)).toBeLessThanOrEqual(2)
         else if (size.height === 1200) expect(bounds.height).toBeLessThan(size.height * .85)
         await editor.locator('form').evaluate(form => { form.scrollTop = form.scrollHeight })
@@ -216,3 +241,91 @@ for (const presentation of ['modal', 'detached']) {
     await expect(save).toBeDisabled()
   })
 }
+
+
+test('AI bank draft keeps original data beside the editor and highlights matching source fields', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 850 })
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; (window as any).aiBankDraft() })
+  const panel = page.locator('.bank-draft-source')
+  await expect(panel).toHaveClass(/--docked/)
+  await expect(panel).toContainText('OBI GmbH')
+  await expect(page.getByRole('combobox', { name: 'Lieferant oder Zahlungsempfänger' })).toHaveValue('OBI GmbH')
+  await page.locator('[data-bank-review-field=party]').hover()
+  await expect(panel.locator('[data-bank-source=party]')).toHaveClass(/is-highlighted/)
+  await expect(panel).toContainText('BREF-JH-0011')
+  const bounds = await panel.boundingBox()
+  const editor = await page.locator('.compact-booking-flyout').boundingBox()
+  expect(bounds!.x).toBeGreaterThanOrEqual(0)
+  expect(bounds!.x + bounds!.width).toBeLessThan(editor!.x)
+  expect(Math.abs(bounds!.y - editor!.y)).toBeLessThan(2)
+  await page.locator('[data-bank-review-field=date]').hover()
+  await expect(panel.locator('[data-bank-source=date]')).toHaveClass(/is-highlighted/)
+  await expect(panel.locator('[data-bank-source=valueDate]')).toHaveClass(/is-highlighted/)
+  await page.getByLabel('Datum der Buchung').fill('2026-08-19')
+  await expect(panel.locator('[data-bank-source=date]')).toContainText('17.08.2026')
+  await page.locator('[data-bank-review-field=description]').hover()
+  await expect(panel.locator('[data-bank-source=purpose]')).toHaveClass(/is-highlighted/)
+  await expect(panel.locator('[data-bank-source=party]')).toHaveClass(/is-highlighted/)
+  await page.mouse.move(0, 0)
+  await page.getByRole('spinbutton', { name: 'Brutto-Betrag', exact: true }).focus()
+  await expect(panel.locator('[data-bank-source=amount]')).toHaveClass(/is-highlighted/)
+  await page.getByRole('spinbutton', { name: 'Brutto-Betrag', exact: true }).fill('120')
+  await expect(panel.locator('[data-bank-source=amount]')).toContainText('118,75')
+  await page.screenshot({ path: testInfo.outputPath('bank-source-docked.png') })
+  await page.evaluate(() => (window as any).parkDraft())
+  await expect(panel).toHaveCount(0)
+  await page.evaluate(() => (window as any).reopenDraft())
+  await expect(panel).toContainText('118,75')
+  await page.setViewportSize({ width: 650, height: 850 })
+  await expect(panel).toHaveClass(/--inline/)
+  await expect(panel.locator('summary')).toBeVisible()
+  expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('bank-source-narrow.png') })
+  await page.setViewportSize({ width: 1280, height: 850 })
+  await page.getByRole('button', { name: 'Vollständigen Buchungsdialog öffnen' }).click()
+  await expect(panel).toBeVisible()
+  await page.getByLabel('Datum der Buchung').focus()
+  await page.mouse.move(0, 0)
+  await expect(panel.locator('[data-bank-source=date]')).toHaveClass(/is-highlighted/)
+  await page.screenshot({ path: testInfo.outputPath('bank-source-full.png') })
+  await page.evaluate(() => (window as any).newDraft())
+  await expect(panel).toHaveCount(0)
+})
+
+
+for (const source of ['bank', 'booking']) {
+  for (const presentation of ['flyout', 'modal']) {
+    test(`${source} ${presentation}: partner creation prefills and saves the source IBAN centrally`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 })
+      await page.evaluate(async ({ source, presentation }) => {
+        const win = window as any
+        win.api = { parties: {
+          list: async () => ({ rows: [] }),
+          upsert: async (input: any) => { win.savedParty = input; return { id: 42 } },
+          get: async () => ({ ...win.savedParty, id: 42 })
+        } }
+        if (source === 'bank') await win.aiBankDraft()
+        else win.aiPartyDraft()
+        win.changePresentation(presentation)
+      }, { source, presentation })
+      await page.locator('[data-bank-review-field=party] .party-selector__add, .booking-finance-party .party-selector__add, .compact-booking-party-section .party-selector__add').click()
+      const editor = page.getByRole('dialog', { name: 'Geschäftspartner anlegen' })
+      await expect(editor.getByLabel('IBAN', { exact: true })).toBeVisible()
+      await expect(editor.getByLabel('IBAN', { exact: true })).toHaveValue('DE12500105170648489890')
+      await expect(editor.getByLabel('Name *', { exact: true })).toHaveValue('OBI GmbH')
+      await editor.getByRole('button', { name: 'Speichern', exact: true }).click()
+      await expect(editor).toHaveCount(0)
+      expect(await page.evaluate(() => (window as any).savedParty.iban)).toBe('DE12500105170648489890')
+      expect(await page.evaluate(() => (window as any).currentQa.partyId)).toBe(42)
+    })
+  }
+}
+
+test('changing the counterparty does not copy the original IBAN into another partner', async ({ page }) => {
+  await page.evaluate(() => (window as any).aiPartyDraft())
+  await page.getByRole('combobox', { name: 'Lieferant oder Zahlungsempfänger' }).fill('Anderer Lieferant')
+  await page.locator('.compact-booking-party-section .party-selector__add').click()
+  const editor = page.getByRole('dialog', { name: 'Geschäftspartner anlegen' })
+  await editor.getByText('Zahlung & Steuer', { exact: true }).click()
+  await expect(editor.getByLabel('IBAN', { exact: true })).toHaveValue('')
+})

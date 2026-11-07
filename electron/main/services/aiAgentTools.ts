@@ -1,4 +1,5 @@
 import { createReimbursementTools } from './aiReimbursementTools'
+import { bankDraftSourceFromTransaction } from '../../../shared/bankDraftSource'
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs/promises'
@@ -18,6 +19,8 @@ import { listDueRecurringOccurrences, listRecurringBookings, recurringBookingsSu
 import { listTags } from '../repositories/tags'
 import { cashBalance, listVouchersAdvanced, listVouchersAdvancedPaged, monthlyVouchers, summarizeVouchers } from '../repositories/vouchers'
 import type { AiContext } from './ai'
+import type { AiUsage } from './ai'
+import type { ReportAnswer } from '../../../shared/aiReporting'
 
 export type AiAgentDraft = {
   kind: 'reimbursementAction' | 'booking' | 'recurringBooking' | 'partyChange' | 'voucherUpdate' | 'voucherReverse' | 'voucherRebook' | 'memberCreate' | 'memberUpdate' | 'contributionPaymentLink' | 'tagChange' | 'budgetChange' | 'earmarkChange' | 'bankLink' | 'invoiceAction' | 'reportExport'
@@ -36,6 +39,8 @@ export type AiAgentToolResult = {
   draft?: AiAgentDraft
   drafts?: AiAgentDraft[]
   warning?: string
+  report?: ReportAnswer
+  usage?: AiUsage
 }
 
 export type AiAgentTool = {
@@ -622,7 +627,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
   const requireValidCategory = (id?: number | null) => {
     if (!isGeneralOrganization) return null
     if (id != null && activeCategoryIds.has(Number(id))) return null
-    return 'Für diese allgemeine Organisation muss eine aktive Kategorie über primaryClassificationValueId gewählt werden.'
+    return `Bitte primaryClassificationValueId mit der ID einer aktiven Kategorie übergeben. Verfügbare Kategorien: ${JSON.stringify((input.context.primaryClassifications || []).filter(value => activeCategoryIds.has(Number(value.id))).map(({ id, name }) => ({ id, name })))}. Eine fehlende oder ungültige ID ist kein Nachweis einer fehlerhaften Organisationseinstellung.`
   }
   return [
     ...createReimbursementTools(),
@@ -649,6 +654,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           ok: true,
           data: {
             paymentAccounts: listPaymentAccounts({ activeOnly: true } as any),
+            primaryClassifications: (input.context.primaryClassifications || []).filter(value => activeCategoryIds.has(Number(value.id))),
             parties: listParties({ activeOnly: true, limit: 200 } as any),
             tags: listTags({ includeUsage: true } as any),
             budgets: listBudgets({ includeArchived: !!args.includeArchived } as any),
@@ -1637,6 +1643,23 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
       }
     },
     {
+      name: 'reports_answer',
+      description: 'Beantwortet frei formulierte Finanz-, Saldo- und Entwicklungsfragen mit berechneten Kennzahlen, interaktivem Diagramm und Quellenlinks. Die fertige Antwort wird direkt angezeigt. Verwende den gewünschten Zeitraum, sonst reportingScope aus dem UI-Kontext bzw. den letzten Report. Ohne Zeitraum from/to null lassen; dann gilt der gesamte Datenzeitraum. Für Konten-/Kategoriedetails ergänzende Werkzeuge verwenden. Nicht für Datei-Exporte.',
+      readOnly: true,
+      parameters: toolParameters({
+        question: { type: 'string', description: 'Die vollständige aktuelle Frage des Nutzers.' },
+        from: { type: ['string', 'null'], description: 'Beginn YYYY-MM-DD, sonst null.' },
+        to: { type: ['string', 'null'], description: 'Ende YYYY-MM-DD, sonst null.' }
+      }, ['question', 'from', 'to']),
+      run: async rawArgs => {
+        const args = parseArgs(z.object({ question: z.string().min(1).max(4000), from: z.string().nullable().optional(), to: z.string().nullable().optional() }), rawArgs)
+        const { generateReportAnswer, getDefaultReportScope } = await import('./aiReporting')
+        const scope = getDefaultReportScope()
+          const result = await generateReportAnswer({ question: args.question, from: args.from || scope.from, to: args.to || scope.to }, input.context.aiRules)
+        return { ok: true, ...result }
+      }
+    },
+    {
       name: 'reports_summary',
       description: 'Berechnet Finanzsummen, Monatswerte und Kontostände für einen Zeitraum.',
       readOnly: true,
@@ -2607,13 +2630,17 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'booking_draft_prepare',
-      description: 'Bereitet einen neuen, freien Buchungsentwurf für das Buchungsmodal vor. Dieses Tool speichert keine Buchung. Nicht verwenden, wenn eine bestehende falsche Buchung storniert/korrigiert und neu angelegt werden soll; dafür immer voucher_rebook_draft_prepare nutzen.',
+      description: 'Öffnet einen prüfbaren Buchungsentwurf. Speichert keine Buchung; für das Vorbereiten ist keine zusätzliche Zustimmung nötig. Bei Bankimporten bankTransactionId mitgeben: Originaldaten und Verknüpfung werden übernommen. Für GENERAL-Organisationen primaryClassificationValueId aus den aktiven Kategorien übergeben. Für Storno mit Ersatzbuchung voucher_rebook_draft_prepare nutzen.',
       readOnly: false,
       parameters: toolParameters({
         date: { type: 'string' },
         type: { type: 'string', enum: ['IN', 'OUT'] },
         sphere: { type: 'string', enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] },
         description: { type: 'string' },
+        counterparty: { type: ['string', 'null'], description: 'Name des externen Geschäftspartners aus Quelle oder Nutzerangabe.' },
+        counterpartyIban: { type: ['string', 'null'], description: 'Nur die vollständige, eindeutig diesem externen Geschäftspartner zugeordnete IBAN aus Quelle oder Nutzerangabe. Niemals das eigene Zahlungskonto; bei Unklarheit null.' },
+        primaryClassificationValueId: { ...nullableNumber, description: 'Aktive Kategorie-ID aus primaryClassifications; bei GENERAL verpflichtend. Keine Budget-ID.' },
+        bankTransactionId: { ...nullableNumber, description: 'ID des importierten Bankbelegs, aus dem dieser Entwurf entsteht; sonst null.' },
         grossAmount: { type: 'number' },
         vatRate: { type: 'number' },
         paymentMethod: { type: ['string', 'null'], enum: ['BAR', 'BANK', null] },
@@ -2628,6 +2655,9 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           sphere: z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB']).nullable().optional(),
           primaryClassificationValueId: z.number().int().positive().nullable().optional(),
           description: z.string(),
+          counterparty: z.string().nullable().optional(),
+          counterpartyIban: z.string().nullable().optional(),
+          bankTransactionId: z.number().int().positive().nullable().optional(),
           grossAmount: z.number().positive(),
           vatRate: z.number().min(0).max(100).optional(),
           paymentMethod: z.enum(['BAR', 'BANK']).nullable().optional(),
@@ -2637,22 +2667,37 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         }), rawArgs)
         const categoryWarning = requireValidCategory(args.primaryClassificationValueId)
         if (categoryWarning) return { ok: false, warning: categoryWarning }
-        const account = args.paymentAccountId
-          ? listPaymentAccounts({ activeOnly: true } as any).find((item: any) => Number(item.id) === Number(args.paymentAccountId))
+        const bank = args.bankTransactionId ? getBankTransaction(args.bankTransactionId) : null
+        if (bank && bank.status !== 'OPEN') return { ok: false, warning: 'Dieser Bankbeleg ist nicht mehr offen. Bitte die bestehende Zuordnung prüfen.' }
+        if (bank && (bank.direction !== args.type || Math.round(Number(bank.amount) * 100) !== Math.round(args.grossAmount * 100))) {
+          return { ok: false, warning: 'Betrag oder Richtung weicht vom Bankbeleg ab. Bitte die Originalwerte verwenden.' }
+        }
+        if (bank && args.paymentAccountId != null && Number(bank.paymentAccountId) !== args.paymentAccountId) {
+          return { ok: false, warning: 'Das Zahlungskonto weicht vom importierten Bankbeleg ab. Bitte dessen Zahlungskonto verwenden.' }
+        }
+        const source = bank ? bankDraftSourceFromTransaction(bank, args.bankTransactionId!) : undefined
+        if (bank && !source) return { ok: false, warning: 'Die Quelldaten dieses Bankbelegs sind unvollständig.' }
+        const paymentAccountId = bank?.paymentAccountId ?? args.paymentAccountId ?? null
+        const account = paymentAccountId
+          ? listPaymentAccounts({ activeOnly: true } as any).find((item: any) => Number(item.id) === Number(paymentAccountId))
           : null
         const draft = {
-          date: args.date,
+          date: source?.bookingDate ?? args.date,
           type: args.type,
-          sphere: args.sphere || 'IDEELL',
+          sphere: isGeneralOrganization ? 'IDEELL' : args.sphere || 'IDEELL',
           primaryClassificationValueId: args.primaryClassificationValueId ?? null,
           mode: 'GROSS',
           grossAmount: args.grossAmount,
           vatRate: args.vatRate ?? 0,
           description: args.description,
+          counterparty: source?.counterparty || args.counterparty || '',
+          partyCreationSource: { name: source?.counterparty || args.counterparty || '', iban: source ? source.counterpartyIban : args.counterpartyIban },
+          bankTransactionId: args.bankTransactionId ?? undefined,
+          bankReviewSource: source,
           note: args.note || 'Aus VereinO KI-Agent vorbereitet.',
-          paymentMethod: args.paymentMethod ?? (account?.kind === 'CASH' ? 'BAR' : account ? 'BANK' : null),
-          paymentAccountId: args.paymentAccountId ?? null,
-          paymentAccountName: account?.name ?? null,
+          paymentMethod: bank ? 'BANK' : args.paymentMethod ?? (account?.kind === 'CASH' ? 'BAR' : account ? 'BANK' : null),
+          paymentAccountId,
+          paymentAccountName: source?.paymentAccountName ?? account?.name ?? null,
           tags: args.tags || []
         }
         return {

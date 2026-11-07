@@ -1,3 +1,4 @@
+import ModalHeader from './components/ModalHeader'
 import React from 'react'
 
 type Props = (
@@ -10,10 +11,12 @@ export default function DbMigrateModal(props: Props) {
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => busy ? undefined : props.onCancel()}>
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 560 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0 }}>Datenbank-Speicherort</h2>
-                    <button className="btn ghost" onClick={() => props.onCancel()} disabled={!!busy}>✕</button>
-                </div>
+                <ModalHeader
+                  title="Datenbank-Speicherort"
+                  onClose={() => props.onCancel()}
+                  closeDisabled={!!busy}
+                  closeOnEscape={false}
+                />
                 {props.mode === 'useOrMigrate' ? (
                     <>
                         <div>Im gewählten Ordner wurde eine vorhandene Datenbank gefunden:</div>

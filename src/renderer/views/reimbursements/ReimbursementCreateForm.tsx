@@ -1,3 +1,4 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReimbursementMetadata, ReimbursementVoucher } from '../../../../shared/reimbursements'
@@ -42,7 +43,15 @@ export default function ReimbursementCreateForm({ voucherId, description, busy, 
   }
   return createPortal(<div className="modal-overlay reimbursement-overlay" role="dialog" aria-modal="true" aria-labelledby="reimbursement-create-heading" onMouseDown={event => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <form className="modal reimbursement-create" onSubmit={submit}>
-      <header className="reimbursement-create-header"><h2 id="reimbursement-create-heading">Erstattung erwarten</h2><button type="button" className="btn ghost" disabled={busy} onClick={onClose} aria-label="Schließen">×</button></header>
+      <ModalHeader
+        className="reimbursement-create-header"
+        title="Erstattung erwarten"
+        titleId="reimbursement-create-heading"
+        onClose={onClose}
+        closeDisabled={busy}
+        closeLabel="Schließen"
+        closeOnEscape={false}
+      />
       <div className="reimbursement-create-body">
         <section className="reimbursement-source" aria-label="Zugehörige Ausgabe">
           <span className="reimbursement-field-label">Zugehörige Ausgabe</span>

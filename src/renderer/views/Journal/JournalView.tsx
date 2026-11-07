@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconExternalLink, IconGripVertical, IconLayoutGrid, IconPaperclip, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
 import FilterTotals from './components/FilterTotals'
@@ -1273,7 +1274,7 @@ export default function JournalView({
                 {editRow && (
                     <div className="modal-overlay journal-edit-modal-overlay">
                         <div className="modal booking-modal journal-edit-modal" onClick={(e) => e.stopPropagation()}>
-                            <header className="journal-edit-modal__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <ModalHeader className="journal-edit-modal__header" >
                                 <h2 style={{ margin: 0 }}>
                                     {(() => {
                                         const desc = (editRow.description || '').trim()
@@ -1283,9 +1284,9 @@ export default function JournalView({
                                 </h2>
                                 <div className="booking-modal-header-actions">
                                     <button className="btn ghost" type="button" onClick={() => { void openDetachedEdit(editRow, true) }} title="In eigenes Fenster abdocken"><AppIcon icon={IconExternalLink} size="action" /></button>
-                                    <button className="btn ghost" onClick={requestCloseEditModal} title="Schließen (ESC)"><AppIcon icon={IconX} size="action" /></button>
+                                    <ModalCloseButton onClick={requestCloseEditModal} title="Schließen (ESC)" />
                                 </div>
-                            </header>
+                            </ModalHeader>
 
                             {confirmDiscardEdit && (
                                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
@@ -1957,18 +1958,12 @@ export default function JournalView({
                                 {confirmDeleteAttachment && (
                                     <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
                                         <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <h3 style={{ margin: 0 }}>Anhang löschen</h3>
-                                                <button
-                                                    type="button"
-                                                    className="btn ghost"
-                                                    onClick={() => setConfirmDeleteAttachment(null)}
-                                                    aria-label="Schließen"
-                                                    style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}
-                                                >
-                                                    <AppIcon icon={IconX} size="control" />
-                                                </button>
-                                            </div>
+                                            <ModalHeader
+                                              title="Anhang löschen"
+                                              onClose={() => setConfirmDeleteAttachment(null)}
+                                              closeLabel="Schließen"
+                                              closeOnEscape={false}
+                                            />
                                             <div>
                                                 Möchtest du den Anhang
                                                 {` `}
@@ -2026,10 +2021,11 @@ export default function JournalView({
                 {deleteRow && (
                     <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0, zIndex: 16000 }}>
                         <div className="modal" onClick={(e) => e.stopPropagation()}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <h2 style={{ margin: 0 }}>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</h2>
-                                <button className="btn danger" onClick={() => setDeleteRow(null)}>Schließen</button>
-                            </header>
+                            <ModalHeader
+                              title={<>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</>}
+                              onClose={() => setDeleteRow(null)}
+                              closeOnEscape={false}
+                            />
                             <p>
                                 Möchtest du die Buchung <strong>{deleteRow.voucherNo ? `#${deleteRow.voucherNo}` : ''}{deleteRow.description ? ` ${deleteRow.voucherNo ? '– ' : ''}${deleteRow.description}` : ''}</strong>{' '}
                                 {allowVoucherDeletion

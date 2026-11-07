@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useMemo } from 'react'
 import changelogRaw from '../../../../CHANGELOG.md?raw'
 
@@ -63,12 +64,13 @@ export function ChangelogModal({ onClose, appVersion }: ChangelogModalProps): Re
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="modal-header">
-          <h2>
-            📋 Changelog {appVersion && <span className="changelog-version-badge">v{appVersion}</span>}
-          </h2>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">✕</button>
-        </div>
+        <ModalHeader
+          className="modal-header"
+          title={<>📋 Changelog {appVersion && <span className="changelog-version-badge">v{appVersion}</span>}</>}
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         {/* Content */}
         <div className="changelog-content">

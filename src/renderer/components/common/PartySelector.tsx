@@ -1,10 +1,12 @@
+import ModalHeader from '../ModalHeader'
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { IconX } from '@tabler/icons-react'
+
 import type { TParty, TPartyRole, TPartyUpsertInput } from '../../../../electron/main/ipc/schemas'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
-import AppIcon from './AppIcon'
+
 import './party.css'
+import { partyCreationIban, type PartyCreationSource } from '../../utils/partyCreationSource'
 import { PARTY_ROLE_LABELS } from './partyLabels'
 
 export type PartySelection = { partyId: number | null; name: string }
@@ -91,15 +93,14 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save() }
     }}>
       <form className="modal party-editor-modal" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void save() }}>
-        <header className="party-editor-modal__header">
-          <div>
-            <h2>{initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'}</h2>
-            <div className="helper">Name und Rolle genügen. Weitere Angaben sind optional.</div>
-          </div>
-          <button type="button" className="btn ghost party-editor-modal__close" onClick={onClose} aria-label="Schließen">
-            <AppIcon icon={IconX} size="control" />
-          </button>
-        </header>
+        <ModalHeader
+          className="party-editor-modal__header"
+          title={<>{initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'}</>}
+          subtitle="Name und Rolle genügen. Weitere Angaben sind optional."
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
         <div className="party-editor-modal__body">
           <section className="party-editor-section" aria-labelledby="party-editor-master-data">
             <h3 id="party-editor-master-data">Stammdaten</h3>
@@ -124,7 +125,7 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
             </div>
           </details>
 
-          <details className="party-editor-section party-editor-extra">
+          <details className="party-editor-section party-editor-extra" open={Boolean(initial?.iban)}>
             <summary>Zahlung & Steuer</summary>
             <div className="party-editor-grid">
               <label className={floatingClass(draft.iban)}><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
@@ -152,6 +153,7 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
 }
 
 type PartySelectorProps = {
+  creationSource?: PartyCreationSource
   valueId?: number | null
   valueName: string
   role?: 'SUPPLIER' | 'CUSTOMER'
@@ -171,7 +173,7 @@ type PartyMenuPosition = {
   maxHeight: number
 }
 
-export default function PartySelector({ valueId, valueName, role, inputId, ariaLabel, placeholder, invalid, menuPlacement = 'auto', onChange }: PartySelectorProps) {
+export default function PartySelector({ valueId, valueName, creationSource, role, inputId, ariaLabel, placeholder, invalid, menuPlacement = 'auto', onChange }: PartySelectorProps) {
   const [parties, setParties] = React.useState<TParty[]>([])
   const [open, setOpen] = React.useState(false)
   const [activeIndex, setActiveIndex] = React.useState(-1)
@@ -344,7 +346,7 @@ export default function PartySelector({ valueId, valueName, role, inputId, ariaL
         <button type="button" className="btn party-selector__add" onClick={createParty} title="Geschäftspartner anlegen">+</button>
       </div>
       {menu}
-      {creating && <PartyEditorModal initial={{ name: valueName.trim(), role: 'BOTH' }} onClose={returnToInput} onSaved={(party) => { returnToInput(); void load(); onChange({ partyId: party.id, name: party.name }) }} />}
+      {creating && <PartyEditorModal initial={{ name: valueName.trim(), role: 'BOTH', iban: partyCreationIban(valueName, creationSource) }} onClose={returnToInput} onSaved={(party) => { returnToInput(); void load(); onChange({ partyId: party.id, name: party.name }) }} />}
     </div>
   )
 }

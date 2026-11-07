@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { buildDonationReceiptHtml } from '../../../../shared/donationReceiptTemplate'
@@ -210,7 +211,7 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="donations-title" onClick={() => { if (!busy) onClose() }}>
       <div className="modal modal-wide donations-modal" onClick={(e) => e.stopPropagation()}>
         <div className="donations-modal-sticky">
-          <div className="modal-header">
+          <ModalHeader className="modal-header">
             <div>
               <div className="donations-title-row">
                 <h2 id="donations-title">Spendenbescheinigung anlegen</h2>
@@ -232,9 +233,9 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
                   <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
                 </svg>
               </button>
-              <button className="btn ghost" onClick={onClose} disabled={busy} aria-label="Schließen">✕</button>
+              <ModalCloseButton onClick={onClose} disabled={busy} aria-label="Schließen" />
             </div>
-          </div>
+          </ModalHeader>
 
         </div>
         <div className="donations-workspace">
@@ -362,10 +363,13 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
             {infoModal && verwendungInfos[infoModal] && createPortal(
               <div className="modal-overlay" onClick={() => setInfoModal(null)}>
                 <div className="modal donations-info-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-                  <div className="modal-header">
-                    <h3>{verwendungInfos[infoModal].title}</h3>
-                    <button className="btn ghost" onClick={() => setInfoModal(null)} aria-label="Schließen">✕</button>
-                  </div>
+                  <ModalHeader
+                    className="modal-header"
+                    title={<>{verwendungInfos[infoModal].title}</>}
+                    onClose={() => setInfoModal(null)}
+                    closeLabel="Schließen"
+                    closeOnEscape={false}
+                  />
                   <p className="donations-info-modal-text">{verwendungInfos[infoModal].text}</p>
                   <div className="modal-actions">
                     <button className="btn primary" onClick={() => setInfoModal(null)}>Verstanden</button>

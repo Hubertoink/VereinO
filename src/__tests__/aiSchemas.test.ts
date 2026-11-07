@@ -81,6 +81,7 @@ describe('AiBookingAnalysisResult', () => {
           paymentMethod: 'BANK',
           paymentAccountId: null,
           counterparty: 'Muster GmbH',
+          counterpartyIban: null,
           budgets: [{ id: 1, amount: 42.5 }],
           earmarks: [],
           tags: ['Projekt'],

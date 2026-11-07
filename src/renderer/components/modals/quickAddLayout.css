@@ -1,6 +1,5 @@
 .quick-add-modal.booking-editor { width: min(1180px, calc(100vw - 24px)); max-width: 1180px; padding: 0; container-type: inline-size; }
 .quick-add-modal.booking-editor.detached-quick-add-modal { width: 100%; max-width: none; }
-.quick-add-modal.booking-editor > .modal-header-flex { display: flex; align-items: stretch; justify-content: space-between; gap: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; margin: 0; background: var(--surface); flex-shrink: 0; }
 .booking-editor-title { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px 20px; }
 .booking-editor-title h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
 .booking-editor-title p { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
@@ -45,12 +44,11 @@
 .booking-editor .booking-ai-assist { margin-top: 12px; }
 .quick-add-modal.booking-editor .modal-footer-actions { grid-area: footer; position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border); border-radius: 0; }
 .quick-add-modal.booking-editor .booking-modal-save-actions .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: color-mix(in srgb, var(--text-dim) 65%, var(--surface)); border-color: var(--border); box-shadow: none; transform: none; cursor: not-allowed; opacity: 1; }
-.quick-add-modal.booking-editor .booking-modal-header-actions { align-self: flex-start; gap: 0; }
 .quick-add-modal.booking-editor .booking-modal-header-actions .window-controls { display: flex; gap: 0; margin: 0; }
 .quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-icon-btn, .window-controls__btn) { width: 48px; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text-dim); box-shadow: none; transform: none; transition: background 140ms ease, color 140ms ease; }
 .quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-icon-btn, .window-controls__btn):hover { background: color-mix(in srgb, var(--text) 9%, var(--surface)); color: var(--text); }
-.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-close-btn, .window-controls__btn--close) { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger-strong, var(--danger)); }
-.quick-add-modal.booking-editor .booking-modal-header-actions :is(.booking-modal-close-btn, .window-controls__btn--close):hover { background: #c42b36; color: #fff; }
+.quick-add-modal.booking-editor .booking-modal-header-actions .window-controls__btn--close { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger-strong, var(--danger)); }
+.quick-add-modal.booking-editor .booking-modal-header-actions .window-controls__btn--close:hover { background: #c42b36; color: #fff; }
 .quick-add-modal.booking-editor .booking-modal-header-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .booking-editor .booking-validation-badge { border-radius: 6px; padding: 8px 10px; font-size: 11px; }
 .booking-editor .quick-add-dropzone { min-height: 80px; }

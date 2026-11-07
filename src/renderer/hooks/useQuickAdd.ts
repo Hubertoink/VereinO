@@ -4,6 +4,8 @@ import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoi
 import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
 import type { BookingEntryPresentation } from '../context/UIPreferencesContextCore'
 import { encodeFilesForUpload } from '../utils/fileEncoding'
+import type { BankDraftSource } from '../types/bankDraftSource'
+import type { PartyCreationSource } from '../utils/partyCreationSource'
 
 type QA = {
     bookingTypeSelected?: boolean
@@ -17,6 +19,7 @@ type QA = {
     description: string
     note?: string | null
     counterparty?: string | null
+    partyCreationSource?: PartyCreationSource
     partyId?: number | null
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
@@ -34,6 +37,7 @@ type QA = {
     earmarksAssigned?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
     bankTransactionId?: number
+    bankReviewSource?: BankDraftSource
     acknowledgedBankVoucherIds?: number[]
 }
 

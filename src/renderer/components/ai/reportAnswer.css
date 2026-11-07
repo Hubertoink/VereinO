@@ -1,0 +1,405 @@
+.ai-report-answer {
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+}
+.ai-report-addendum {
+  padding: 12px 20px;
+  color: var(--text);
+  text-align: left;
+}
+.ai-report-heading {
+  margin-bottom: 20px;
+}
+.ai-report-answer .ai-report-question {
+  margin: 0 0 15px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.ai-report-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.ai-report-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.dp-ai-answers .ai-report-answer h3,
+.ai-message .ai-report-answer h3 {
+  margin: 9px 0;
+  font-size: 21px;
+  letter-spacing: -0.4px;
+}
+.ai-report-answer .ai-report-summary {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 78ch;
+}
+.ai-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 23px;
+}
+.ai-report-metric {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--text));
+}
+.ai-report-metric dt {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.ai-report-metric dd {
+  margin: 10px 0;
+  font-size: clamp(19px, 2.5vw, 27px);
+  font-weight: 650;
+  letter-spacing: -0.7px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ai-report-metric--income dt svg {
+  color: var(--success);
+}
+.ai-report-metric--expense dt svg {
+  color: var(--accent);
+}
+.ai-report-metric--change {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+.ai-report-metric--change.is-negative dd {
+  color: var(--danger);
+}
+.ai-report-answer button {
+  font: inherit;
+  cursor: pointer;
+}
+.ai-report-metric button,
+.ai-report-insight button,
+.ai-report-source-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 0;
+  padding: 3px 0;
+  color: var(--text);
+  font-size: 11px;
+}
+.ai-report-metric small {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.ai-report-answer .ai-report-source-button {
+  font-size: 11px;
+}
+.ai-report-chart {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 17px 16px 0;
+}
+.ai-report-chart-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ai-report-chart h4 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+.ai-report-chart-heading span {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.ai-report-switch {
+  display: flex;
+  gap: 3px;
+  border-radius: 8px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+.ai-report-switch button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.ai-report-switch button[aria-pressed='true'] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px #0001;
+}
+.ai-report-chart-scroll {
+  overflow-x: auto;
+  margin-top: 18px;
+  scrollbar-width: thin;
+}
+.ai-report-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.ai-report-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.ai-report-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--success);
+}
+.ai-report-legend span + span i {
+  background: var(--accent);
+}
+.ai-report-plot {
+  position: relative;
+  min-width: 100%;
+}
+.ai-report-plot svg {
+  display: block;
+  width: 100%;
+}
+.ai-report-axis {
+  fill: var(--text-dim);
+  font-size: 10px;
+}
+.ai-report-gridline {
+  stroke: var(--border);
+  stroke-dasharray: 3 5;
+}
+.ai-report-zero {
+  stroke: var(--border);
+}
+.ai-report-selected-month {
+  fill: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.ai-report-month-targets {
+  position: absolute;
+  display: flex;
+  top: 8px;
+  bottom: 0;
+}
+.ai-report-month-targets button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+}
+.ai-report-month-targets button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ai-report-month-detail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.ai-report-month-detail > div {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+.ai-report-month-detail > div span {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.ai-report-month-detail dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  flex: 1;
+}
+.ai-report-month-detail dt {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.ai-report-month-detail dd {
+  font-size: 12px;
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ai-report-insight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  margin: 14px 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.ai-report-insight > svg {
+  color: var(--accent);
+}
+.ai-report-insight p {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  margin: 0;
+  font-size: 11px;
+}
+.ai-report-insight strong {
+  color: var(--text);
+}
+.ai-report-sources {
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.ai-report-sources summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.ai-report-sources p,
+.ai-report-sources li {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.ai-report-balances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.ai-report-balances dd {
+  margin: 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.ai-report-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 12px;
+  max-height: 320px;
+}
+.ai-report-table-scroll table {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+.ai-report-table-scroll caption {
+  text-align: left;
+  padding: 8px 0;
+}
+.ai-report-table-scroll :is(th, td) {
+  padding: 9px 8px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.ai-report-table-scroll th:first-child {
+  text-align: left;
+}
+.ai-report-table-scroll button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-decoration: underline;
+}
+.ai-report-followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.ai-report-followups button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  text-align: left;
+  font-size: 11px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text);
+  background: var(--surface);
+}
+.ai-report-answer button:hover {
+  color: var(--accent);
+}
+.ai-report-answer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ai-report-answer .ai-report-notice {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.ai-message.ai-message--report {
+  width: 100%;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+.ai-message--report > .ai-report-answer {
+  padding: 14px 8px 4px;
+}
+.ai-message--report .ai-report-answer p {
+  white-space: normal;
+}
+@media (max-width: 650px) {
+  .ai-report-metrics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .ai-report-metric {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 5px 10px;
+    padding: 12px;
+  }
+  .ai-report-metric dd {
+    margin: 0;
+    font-size: 20px;
+  }
+  .ai-report-metric button,
+  .ai-report-metric small {
+    grid-column: 1 / -1;
+  }
+  .dp-ai-answers .ai-report-answer h3,
+  .ai-message .ai-report-answer h3 {
+    font-size: 19px;
+  }
+  .ai-report-chart {
+    padding: 12px 10px 0;
+  }
+  .ai-report-month-detail > div {
+    width: 100%;
+  }
+  .ai-report-month-detail dl {
+    flex-basis: 100%;
+  }
+}

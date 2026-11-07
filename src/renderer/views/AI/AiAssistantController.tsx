@@ -1,3 +1,6 @@
+import { resolveBankDraftParty } from '../../utils/bankDraftParty'
+import { takeAgentReview } from '../../utils/aiAgentHandoff'
+import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
 import { AgentReimbursementCard } from './AgentReimbursementCard'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import './AIView.css'
@@ -650,6 +653,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     resetAgentSession,
     restoreAgentSession,
     shouldUseAgentRuntime,
+    acceptAgentResult,
     runAgentRuntime
   } = useAiAgentWorkflow({
     initialSessionId: initialChat.agentSessionId || null,
@@ -661,7 +665,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     pushMessage,
     prepareAgentDraft,
     onTrace: updateAgentTrace,
-    getUiContext: () => agentUiContext
+    getUiContext: () => ({ ...agentUiContext,
+      reportingScope: [...messages].reverse().find(message => message.reports?.length)?.reports?.[0]?.datasets.finance.scope
+    })
   })
 
   const loadPaymentAccounts = useCallback(async () => {
@@ -1038,6 +1044,20 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     clearAiChatSnapshot(activeOrganizationId)
   }
 
+  useEffect(() => {
+    if (!chatSnapshotReady || !activeOrganizationId) return
+    const consume = () => {
+      const handoff = takeAgentReview(activeOrganizationId)
+      if (!handoff) return
+      startNewChat()
+      pushMessage({ role: 'user', body: handoff.question })
+      acceptAgentResult(handoff.result, handoff.question)
+    }
+    consume()
+    window.addEventListener('ai:continue-agent', consume)
+    return () => window.removeEventListener('ai:continue-agent', consume)
+  }, [chatSnapshotReady, activeOrganizationId, acceptAgentResult, pushMessage, startNewChat])
+
   const updateBankSuggestion = (transactionId: number, patch: Partial<AiBankReviewSuggestion>) => {
     setBankReview((current) =>
       current
@@ -1093,6 +1113,8 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             grossAmount: reviewCandidate.grossAmount,
             vatRate: reviewCandidate.vatRate ?? 0,
             description: reviewCandidate.description,
+            counterparty: reviewCandidate.counterparty || '',
+            partyCreationSource: { name: reviewCandidate.counterparty || '', iban: reviewCandidate.counterpartyIban },
             note: ['Aus KI-Buchungsvorschlag vorbereitet.', ...(reviewCandidate.warnings || [])]
               .filter(Boolean)
               .join('\n'),
@@ -3369,7 +3391,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     setBusy(true)
     try {
       const transaction = suggestion.transaction || {}
+      const bankParty = await resolveBankDraftParty({ counterparty: transaction.counterparty || candidate.counterparty, counterpartyIban: transaction.counterpartyIban }, input => window.api.parties.list(input))
       const res = await window.api.vouchers.create({
+        ...bankParty,
         date: candidate.date,
         type: candidate.type,
         sphere: candidate.sphere,
@@ -3427,6 +3451,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             mode: 'GROSS',
             grossAmount: candidate.grossAmount,
             vatRate: candidate.vatRate ?? 0,
+            counterparty: transaction.counterparty?.trim() || candidate.counterparty?.trim() || '',
             description: candidate.description,
             note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason]
               .filter(Boolean)
@@ -3446,6 +3471,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
               amount: earmark.amount
             })),
             tags: candidate.tags || [],
+            bankReviewSource: bankDraftSourceFromTransaction(transaction, suggestion.transactionId),
             bankTransactionId: suggestion.transactionId
           }
         }
@@ -4205,9 +4231,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     return false
   }
 
-  const submitPrompt = async () => {
+  const submitPrompt = async (providedPrompt?: string) => {
     if (busy) return
-    const userPrompt = prompt.trim()
+    const userPrompt = (providedPrompt ?? prompt).trim()
     if (!userPrompt && !files.length) {
       notify('info', 'Bitte gib einen Auftrag ein oder hänge eine Datei an.')
       return
@@ -4957,6 +4983,12 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             onOpenBookingDraftFromJob={(id) => void openBookingDraftFromJobId(id)}
             onOpenMessageDraft={openMessageBookingDraft}
             onShowFile={(path) => void window.api.shell.showItemInFolder(path)}
+            busy={busy}
+            onReportFollowUp={(question, scope) => {
+              const text = `${question} Zeitraum: ${scope.from} bis ${scope.to}.`
+              if (files.length) { setPrompt(text); promptInputRef.current?.focus() }
+              else void submitPrompt(text)
+            }}
           />
 
           <AgentReviewQueue items={agentReviewQueueItems} onOpen={openAgentReviewQueueItem} />

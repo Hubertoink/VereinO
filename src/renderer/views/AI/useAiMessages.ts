@@ -57,7 +57,7 @@ export function useAiMessages(initialMessages: AiMessage[] = []) {
 
   const pushMessage = (message: Omit<AiMessage, 'id' | 'displayBody' | 'isStreaming'>) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const hasAssistantBody = message.role === 'assistant' && Boolean(message.body)
+    const hasAssistantBody = message.role === 'assistant' && Boolean(message.body) && !message.reports?.length
     setMessages((current) => [
       ...current,
       {

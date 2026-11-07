@@ -1,3 +1,4 @@
+import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
 import { StoragePaneProps } from '../types'
 import DbMigrateModal from '../../../DbMigrateModal'
@@ -394,10 +395,12 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {importPick && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyImport && setImportPick(null)}>
           <div className="modal modal-wide modal-grid" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Import vergleichen</h2>
-              <button className="btn ghost" onClick={() => setImportPick(null)}>✕</button>
-            </div>
+            <ModalHeader
+              className="modal-header"
+              title="Import vergleichen"
+              onClose={() => setImportPick(null)}
+              closeOnEscape={false}
+            />
             <div className="helper helper-danger">
               Die aktuelle Datenbank wird beim Import überschrieben. Prüfe die Tabellenstände, bevor du fortfährst.
             </div>
@@ -477,12 +480,12 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {showDeleteAll && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal modal-grid">
-            <div className="modal-header">
-              <h2>Alle Buchungen löschen</h2>
-              <button className="btn ghost" onClick={() => setShowDeleteAll(false)}>
-                ✕
-              </button>
-            </div>
+            <ModalHeader
+              className="modal-header"
+              title="Alle Buchungen löschen"
+              onClose={() => setShowDeleteAll(false)}
+              closeOnEscape={false}
+            />
             <div className="helper">
               Dieser Vorgang löscht ALLE Buchungen und zugehörige Anhänge dauerhaft. Dies kann nicht rückgängig gemacht werden.
             </div>
@@ -525,12 +528,12 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {showDeleteOrg && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal modal-grid">
-            <div className="modal-header">
-              <h2>Organisation löschen</h2>
-              <button className="btn ghost" onClick={() => setShowDeleteOrg(false)}>
-                ✕
-              </button>
-            </div>
+            <ModalHeader
+              className="modal-header"
+              title="Organisation löschen"
+              onClose={() => setShowDeleteOrg(false)}
+              closeOnEscape={false}
+            />
             <div className="helper">
               Diese Aktion löscht die aktuell aktive Organisation{activeOrg?.name ? ` "${activeOrg.name}"` : ''} inklusive aller Daten.
             </div>
@@ -605,12 +608,13 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {compareModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busy && setCompareModal(null)}>
           <div className="modal modal-wider modal-grid-14" onClick={e => e.stopPropagation()}>
-            <header className="modal-header">
-              <h2>
-                {compareModal.mode === 'folder' ? 'Datenbanken vergleichen' : 'Standard-Datenbank Vergleich'}
-              </h2>
-              <button className="btn ghost" onClick={() => setCompareModal(null)} aria-label="Schließen">✕</button>
-            </header>
+            <ModalHeader
+              className="modal-header"
+              title={<>{compareModal.mode === 'folder' ? 'Datenbanken vergleichen' : 'Standard-Datenbank Vergleich'}</>}
+              onClose={() => setCompareModal(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="helper helper-mt-neg">
               {compareModal.mode === 'folder' ? (
                 compareModal.hasTargetDb ? 'Im gewählten Ordner wurde eine bestehende Datenbank gefunden. Vergleiche die Tabellenstände und wähle eine Aktion.' : 'Der gewählte Ordner enthält keine Datenbank. Du kannst deine aktuelle Datenbank dorthin migrieren.'

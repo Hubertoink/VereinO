@@ -1,7 +1,7 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconX } from '@tabler/icons-react'
-import AppIcon from '../../components/common/AppIcon'
+
 import type { TBankImportRemapPreviewOutput } from '../../../../electron/main/ipc/schemas'
 import './bankImportRemap.css'
 
@@ -60,7 +60,15 @@ export default function BankImportRemapDialog({ batchId, onClose, onApplied, not
 
   return createPortal(<div className="modal-overlay bank-import-remap-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saving) onClose() }}>
     <div className="modal bank-import-remap-dialog" role="dialog" aria-modal="true" aria-label="Spaltenzuordnungen aktualisieren">
-      <header className="bank-import-remap-header"><div><h2>Spaltenzuordnungen aktualisieren</h2><p>{preview?.fileName || 'CSV-Import'} · {preview?.paymentAccountName || 'Zahlkonto'}</p></div><button className="btn ghost" aria-label="Schließen" disabled={saving} onClick={onClose}><AppIcon icon={IconX} size="control" /></button></header>
+      <ModalHeader
+        className="bank-import-remap-header"
+        title="Spaltenzuordnungen aktualisieren"
+        subtitle={<>{preview?.fileName || 'CSV-Import'}· {preview?.paymentAccountName || 'Zahlkonto'}</>}
+        onClose={onClose}
+        closeDisabled={saving}
+        closeLabel="Schließen"
+        closeOnEscape={false}
+      />
       <div className="bank-import-remap-body">
         <p>Wähle die Spalten, deren Angaben bei den vorhandenen Bankbelegen korrigiert werden sollen. Datum, Betrag und Buchungszuordnungen bleiben erhalten.</p>
         {preview && <div className="bank-import-remap-grid">{fields.map(field => <label className="field" key={field.key}><span>{field.label}</span><select className="input" value={mapping?.[field.key] || ''} disabled={saving} onChange={event => setMapping(current => ({ ...current, [field.key]: event.target.value || null }))}><option value="">Nicht aktualisieren</option>{preview.headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>)}</div>}

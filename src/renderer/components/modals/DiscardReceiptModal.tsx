@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { IconFileDescription } from '@tabler/icons-react'
@@ -49,10 +50,10 @@ export default function DiscardReceiptModal({
         aria-describedby="receipt-discard-description"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="receipt-discard-modal__header">
+        <ModalHeader className="receipt-discard-modal__header">
           <IconFileDescription size={26} aria-hidden="true" />
           <h2 id="receipt-discard-title">Belegerfassung schließen?</h2>
-        </header>
+        </ModalHeader>
         <p id="receipt-discard-description">
           {fileName ? (
             <>

@@ -1,6 +1,7 @@
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import React, { useCallback, useEffect, useState } from 'react'
-import { IconX } from '@tabler/icons-react'
-import AppIcon from '../../components/common/AppIcon'
+
+
 import type { TAiKnowledgeRulesListOutput } from '../../../../electron/main/ipc/schemas'
 import { IconTrash } from '../../utils/icons'
 
@@ -142,15 +143,14 @@ export function AiRulesCatalog({ notify, onClose }: Props) {
 
   return (
     <section className="card ai-rules-drawer" role="dialog" aria-label="KI-Regelkatalog">
-      <header className="ai-rules-head">
-        <div>
-          <strong>✦ KI-Regelkatalog</strong>
-          <span>Gilt organisationsweit für alle passenden KI-Analysen und Agentenaktionen.</span>
-        </div>
-        <button className="btn dialog-close-btn" type="button" onClick={onClose} title="Schließen" aria-label="Schließen">
-          <AppIcon icon={IconX} size="action" />
-        </button>
-      </header>
+      <ModalHeader
+        className="ai-rules-head"
+        title="✦ KI-Regelkatalog"
+        subtitle="Gilt organisationsweit für alle passenden KI-Analysen und Agentenaktionen."
+        onClose={onClose}
+        closeLabel="Schließen"
+        closeOnEscape={false}
+      />
 
       <div className="ai-rules-toolbar">
         <span>{rules.filter((rule) => rule.enabled !== 0).length} aktiv · {rules.length} gesamt</span>
@@ -163,9 +163,7 @@ export function AiRulesCatalog({ notify, onClose }: Props) {
         <section className="ai-rule-editor" aria-label={form.id ? 'KI-Regel bearbeiten' : 'Neue KI-Regel'}>
           <div className="ai-section-head">
             <strong>{form.id ? 'Regel bearbeiten' : 'Neue Regel'}</strong>
-            <button className="btn ghost" type="button" onClick={() => setShowEditor(false)} aria-label="Editor schließen">
-              ×
-            </button>
+            <ModalCloseButton onClick={() => setShowEditor(false)} aria-label="Editor schließen" />
           </div>
           <div className="ai-rule-form-grid">
             <label className="field">

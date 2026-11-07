@@ -1,11 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiAgentRunOutput } from '../../../../electron/main/ipc/schemas'
+import type { ReportAnswer } from '../../../../shared/aiReporting'
 
 type AgentMessage = {
   role: 'assistant'
   title?: string
   body: string
   meta?: string
+  reports?: ReportAnswer[]
+  reportQuestion?: string
   bookingDraft?: {
     agentDraftId?: string
     title?: string
@@ -103,9 +106,11 @@ function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {
 
 export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
   const [agentSessionId, setAgentSessionId] = useState<string | null>(input.initialSessionId || null)
+  const generation = useRef(0)
+  useEffect(() => () => { generation.current++ }, [])
 
-  const resetAgentSession = useCallback(() => setAgentSessionId(null), [])
-  const restoreAgentSession = useCallback((sessionId?: string | null) => setAgentSessionId(sessionId || null), [])
+  const resetAgentSession = useCallback(() => { generation.current++; setAgentSessionId(null) }, [])
+  const restoreAgentSession = useCallback((sessionId?: string | null) => { generation.current++; setAgentSessionId(sessionId || null) }, [])
 
   const shouldUseAgentRuntime = (userPrompt: string) => {
     if (input.filesLength) return false
@@ -156,7 +161,28 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
     }
   }
 
+  const acceptAgentResult = (result: TAiAgentRunOutput, userPrompt: string) => {
+    setAgentSessionId(result.sessionId)
+    input.onTrace(result.trace || [])
+    const drafts = mergeAgentDrafts(result.drafts)
+    if (!drafts.length || result.reports?.length) {
+      input.pushMessage({
+        role: 'assistant',
+        title: result.title || 'VereinO Agent',
+        body: result.answer,
+        reports: result.reports,
+        reportQuestion: userPrompt,
+        meta: [
+          result.toolCalls.length ? `${result.toolCalls.length} Tool-Aufruf(e)` : 'Agent',
+          input.formatUsage(result.usage)
+        ].filter(Boolean).join(' · ')
+      })
+    }
+    openAgentDrafts(drafts, userPrompt)
+  }
+
   const runAgentRuntime = async (userPrompt: string) => {
+    const ticket = generation.current
     const result = await window.api.ai.agent.run({
       sessionId: agentSessionId || undefined,
       prompt: userPrompt,
@@ -167,21 +193,8 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
         ...(input.getUiContext ? input.getUiContext() : {})
       }
     })
-    setAgentSessionId(result.sessionId)
-    input.onTrace(result.trace || [])
-    const drafts = mergeAgentDrafts(result.drafts)
-    if (!drafts.length) {
-      input.pushMessage({
-        role: 'assistant',
-        title: result.title || 'VereinO Agent',
-        body: result.answer,
-        meta: [
-          result.toolCalls.length ? `${result.toolCalls.length} Tool-Aufruf(e)` : 'Agent',
-          input.formatUsage(result.usage)
-        ].filter(Boolean).join(' · ')
-      })
-    }
-    openAgentDrafts(drafts, userPrompt)
+    if (ticket !== generation.current) return true
+    acceptAgentResult(result, userPrompt)
     return true
   }
 
@@ -190,6 +203,7 @@ export function useAiAgentWorkflow(input: UseAiAgentWorkflowInput) {
     resetAgentSession,
     restoreAgentSession,
     shouldUseAgentRuntime,
+    acceptAgentResult,
     runAgentRuntime
   }
 }

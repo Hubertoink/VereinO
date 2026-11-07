@@ -1,6 +1,7 @@
+import ModalHeader from '../ModalHeader'
 import RandomColorButton from '../common/RandomColorButton'
 import React, { useEffect, useRef, useState } from 'react'
-import { IconTrash, IconX } from '@tabler/icons-react'
+import { IconTrash } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'
 import BookingPopupFrame from './BookingPopupFrame'
@@ -207,10 +208,13 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
       {askDelete && v.id && (
         <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
           <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="delete-modal-header">
-              <h3 className="m-0">Budget löschen</h3>
-              <button className="btn ghost" onClick={() => setAskDelete(false)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              className="delete-modal-header"
+              title="Budget löschen"
+              onClose={() => setAskDelete(false)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div>Möchtest du das Budget <strong>{(v.name || '').trim() || ('#' + v.id)}</strong> wirklich löschen?</div>
             <div className="helper">Dieser Vorgang kann nicht rückgängig gemacht werden.</div>
             <div className="delete-modal-actions">
@@ -223,10 +227,13 @@ export default function BudgetModal({ value, onClose, onSaved }: { value: Budget
       {showColorPicker && (
         <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
           <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="color-picker-header">
-              <h3 className="m-0">Eigene Farbe wählen</h3>
-              <button className="btn ghost" onClick={() => setShowColorPicker(false)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              className="color-picker-header"
+              title="Eigene Farbe wählen"
+              onClose={() => setShowColorPicker(false)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="row">
               <div className="field">
                 <label htmlFor="budget-color-picker-native">Picker</label>

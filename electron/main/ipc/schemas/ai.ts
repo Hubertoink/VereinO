@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AiReportAnswerSchema } from './aiReporting'
 import { FileDataFields, hasFileData, PaymentMethod, Sphere, VoucherType } from './primitives'
 
 // AI jobs and OpenAI-backed helpers
@@ -57,6 +58,7 @@ export const AiBookingCandidate = z.object({
   paymentMethod: PaymentMethod.nullable().optional(),
   paymentAccountId: z.number().int().positive().nullable().optional(),
   counterparty: z.string().nullable().optional(),
+  counterpartyIban: z.string().nullable().optional(),
   budgets: z.array(AiBookingAssignment).default([]),
   earmarks: z.array(AiBookingAssignment).default([]),
   tags: z.array(z.string()).default([]),
@@ -90,6 +92,7 @@ export const AiBookingCandidateStructured = z.object({
   paymentMethod: PaymentMethod.nullable(),
   paymentAccountId: z.number().int().positive().nullable(),
   counterparty: z.string().nullable(),
+  counterpartyIban: z.string().nullable(),
   budgets: z.array(AiBookingAssignment),
   earmarks: z.array(AiBookingAssignment),
   tags: z.array(z.string()),
@@ -105,7 +108,14 @@ export const AiBookingAnalysisResultStructured = z.object({
   warnings: z.array(z.string())
 })
 
+export const AiInvoiceFieldSource = z.object({
+  field: z.enum(['supplier', 'invoiceNumber', 'invoiceDate', 'dueDate', 'grossAmount', 'netAmount', 'taxAmount', 'iban', 'description']),
+  page: z.number().int().min(1),
+  text: z.string()
+})
+
 export const AiInvoiceExtractionResult = z.object({
+  fieldSources: z.array(AiInvoiceFieldSource).optional(),
   supplier: z.string().nullable(),
   // A matching entry from the central business-partner registry, never a new suggestion.
   partyId: z.number().int().positive().nullable().optional(),
@@ -117,6 +127,7 @@ export const AiInvoiceExtractionResult = z.object({
   taxAmount: z.number().nonnegative().nullable(),
   vatRate: z.number().min(0).max(100).nullable(),
   iban: z.string().nullable(),
+  counterpartyIban: z.string().nullable().optional(),
   description: z.string().nullable(),
   type: z.enum(['IN', 'OUT']),
   sphere: Sphere,
@@ -133,6 +144,8 @@ export const AiInvoiceExtractionResult = z.object({
 })
 
 export const AiInvoiceExtractionResultStructured = AiInvoiceExtractionResult.extend({
+  counterpartyIban: z.string().nullable(),
+  fieldSources: z.array(AiInvoiceFieldSource),
   documentType: z.enum(['INVOICE', 'CREDIT_NOTE', 'UNKNOWN']),
   organizationRole: z.enum(['ISSUER', 'RECIPIENT', 'UNKNOWN']),
   organizationRoleEvidence: z.string().nullable()
@@ -571,6 +584,7 @@ export const AiAgentRunOutput = z.object({
   toolCalls: z.array(AiAgentToolCall).default([]),
   trace: z.array(AiAgentTraceEvent).default([]),
   drafts: z.array(AiAgentDraft).default([]),
+  reports: z.array(AiReportAnswerSchema).optional(),
   usage: AiUsageSchema
 })
 

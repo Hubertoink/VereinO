@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React from 'react'
 
 export type UpdateModalState = {
@@ -25,10 +26,13 @@ export default function UpdateAvailableModal({ state, onClose, onDownload, onIns
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="modal update-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Update verfügbar</h2>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen">×</button>
-        </div>
+        <ModalHeader
+          className="modal-header"
+          title="Update verfügbar"
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <div className="card update-modal__summary">
           <div>

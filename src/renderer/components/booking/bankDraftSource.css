@@ -1,0 +1,33 @@
+.bank-draft-source {
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  pointer-events: auto;
+  overflow: auto;
+  -webkit-app-region: no-drag;
+}
+.bank-draft-source--docked { position: fixed; width: 324px; z-index: 5002; box-shadow: 0 12px 40px rgb(0 0 0 / 22%); }
+.bank-draft-source--inline { flex: 0 0 auto; margin: 10px 14px; max-height: 210px; }
+.bank-draft-source summary { position: sticky; top: 0; z-index: 1; padding: 12px 14px; cursor: pointer; background: var(--surface); border-bottom: 1px solid var(--border); }
+.bank-draft-source summary strong { font-size: 12px; }
+.bank-draft-source summary span { display: block; margin-top: 2px; color: var(--text-dim); font-size: 11px; }
+.bank-draft-source__body { padding: 0 12px 12px; }
+.bank-draft-source__body > p { padding: 5px; margin: 8px 0; color: var(--text-dim); }
+.bank-draft-source dl { margin: 0; }
+.bank-draft-source dl > div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 8px; padding: 8px 5px; border-bottom: 1px solid var(--border); border-radius: 4px; }
+.bank-draft-source dt { color: var(--text-dim); font-size: 11px; }
+.bank-draft-source dd { margin: 0; overflow-wrap: anywhere; }
+.bank-draft-source__amount { display: flex; justify-content: space-between; gap: 8px; padding: 10px 6px; margin-top: 10px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border-radius: 4px; }
+.bank-draft-source__amount strong { font-size: 15px; }
+.bank-draft-source__filename { overflow-wrap: anywhere; font-size: 10px; }
+.bank-draft-source small { display: block; margin-top: 10px; font-size: 10px; color: var(--text-dim); }
+.bank-draft-source .is-highlighted { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 4px; }
+[data-bank-review-active='true'] { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 4px; }
+@media (min-width: 900px) {
+  .quick-add-modal .bank-draft-source--inline dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; }
+}

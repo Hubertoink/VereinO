@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, memo, useCallback } from 'react'
+import ModalHeader from '../../../components/ModalHeader'
 import { createPortal } from 'react-dom'
 import { dispatchDataChanged } from '../../../utils/refresh'
 import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconCreditCard, IconDeviceMobile, IconHome, IconNotes, IconPencil, IconPlayerSkipForward, IconUser } from '@tabler/icons-react'
@@ -709,21 +710,11 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
             style={{ zIndex: 10000 }}
           >
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
-              <header
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 8
-                }}
-              >
-                <h2 style={{ margin: 0 }}>
-                  Import abgeschlossen — einige Zeilen konnten nicht übernommen werden
-                </h2>
-                <button className="btn danger" onClick={() => setShowErrorsModal(false)}>
-                  Schließen
-                </button>
-              </header>
+              <ModalHeader
+                title="Import abgeschlossen — einige Zeilen konnten nicht übernommen werden"
+                onClose={() => setShowErrorsModal(false)}
+                closeOnEscape={false}
+              />
               <div className="helper">
                 Importiert: {result.imported} | Aktualisiert: {result.updated} | Übersprungen: {result.skipped} | Fehler:{' '}
                 {result.errors?.length || 0}

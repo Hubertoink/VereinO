@@ -57,7 +57,7 @@ it('does not demand a document source in the bank review output schema', () => {
       recurringBookingId: null, recurringBookingName: null, occurrenceId: null, scheduledDate: null,
       warnings: [], evidence: [],
       bookingCandidate: { ...booking, vatRate: 0, paymentMethod: null, paymentAccountId: null,
-        counterparty: null, budgets: [], earmarks: [], tags: [], confidence: 0.8, warnings: [], evidence: [] }
+        counterparty: null, counterpartyIban: null, budgets: [], earmarks: [], tags: [], confidence: 0.8, warnings: [], evidence: [] }
     }], summary: null, warnings: []
   }).success).toBe(true)
 })

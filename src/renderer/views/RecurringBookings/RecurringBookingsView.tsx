@@ -1,3 +1,4 @@
+import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -671,10 +672,15 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
       {pendingAction && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">
           <div className="modal recurring-confirm-modal">
-            <div className="recurring-modal-header">
-              <div><h2 id="recurring-confirm-title">{pendingAction.kind === 'skip' ? 'Fälligkeit überspringen?' : pendingAction.kind === 'pause' ? 'Dauerbuchung pausieren?' : 'Dauerbuchung beenden?'}</h2><div className="helper">{pendingAction.row.name}</div></div>
-              <button className="btn ghost" onClick={() => setPendingAction(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              className="recurring-modal-header"
+              title={<>{pendingAction.kind === 'skip' ? 'Fälligkeit überspringen?' : pendingAction.kind === 'pause' ? 'Dauerbuchung pausieren?' : 'Dauerbuchung beenden?'}</>}
+              titleId="recurring-confirm-title"
+              subtitle={<>{pendingAction.row.name}</>}
+              onClose={() => setPendingAction(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <p className="recurring-confirm-message">{pendingAction.kind === 'skip' ? 'Die nächste fällige Buchung wird übersprungen. Die Dauerbuchung bleibt danach aktiv.' : pendingAction.kind === 'pause' ? 'Es werden keine weiteren Fälligkeiten erzeugt, bis du die Dauerbuchung wieder aktivierst.' : 'Offene Fälligkeiten werden verworfen. Die Dauerbuchung kann anschließend nicht mehr fortgesetzt werden.'}</p>
             <div className="modal-footer"><div className="helper">Diese Aktion kann später nicht automatisch rückgängig gemacht werden.</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setPendingAction(null)} disabled={confirmBusy}>Abbrechen</button><button className={pendingAction.kind === 'end' ? 'btn danger' : 'btn primary'} onClick={() => void confirmPendingAction()} disabled={confirmBusy}>{confirmBusy ? 'Wird ausgeführt…' : pendingAction.kind === 'skip' ? 'Überspringen' : pendingAction.kind === 'pause' ? 'Pausieren' : 'Beenden'}</button></div></div>
           </div>
@@ -684,10 +690,15 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
       {booking && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-book-title">
           <div className="modal recurring-book-modal">
-            <div className="recurring-modal-header">
-              <div><h2 id="recurring-book-title">Dauerbuchung buchen</h2><div className="helper">{booking.name} · fällig am {fmtDate(booking.earliestDueDate)}</div></div>
-              <button className="btn ghost" onClick={() => setBooking(null)} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-            </div>
+            <ModalHeader
+              className="recurring-modal-header"
+              title="Dauerbuchung buchen"
+              titleId="recurring-book-title"
+              subtitle={<>{booking.name}· fällig am {fmtDate(booking.earliestDueDate)}</>}
+              onClose={() => setBooking(null)}
+              closeLabel="Schließen"
+              closeOnEscape={false}
+            />
             <div className="recurring-book-summary">
               <label className="field"><span>Buchungsdatum</span><span className="booking-date-input-wrap"><input ref={bookingDateInputRef} className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /><DatePickerButton inputRef={bookingDateInputRef} ariaLabel="Kalender zur Auswahl des Buchungsdatums öffnen" /></span></label>
               <label className="field"><span>{booking.amountMode === 'NET' ? 'Nettobetrag' : 'Bruttobetrag'} (€)</span><input className="input" type="number" min="0.01" step="0.01" value={bookingAmount} onChange={(event) => setBookingAmount(Number(event.target.value || 0))} /></label>

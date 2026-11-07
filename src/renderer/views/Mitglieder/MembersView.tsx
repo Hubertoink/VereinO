@@ -3,8 +3,8 @@ import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
-import ModalHeader from '../../components/ModalHeader'
-import LoadingState from '../../components/LoadingState'
+import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
+
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import MembersExportModal from '../../components/modals/MembersExportModal'
@@ -922,15 +922,15 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                     }}
                 >
                     <div className="modal invite-recipient-modal" onClick={(e) => e.stopPropagation()}>
-                        <header className="invite-modal-header">
-                            <div>
-                                <h3 id="invite-recipient-modal-title">Empfänger im Batch</h3>
-                                <div className="helper">{inviteCurrentBatch.length} E-Mail-Adresse{inviteCurrentBatch.length === 1 ? '' : 'n'}</div>
-                            </div>
-                            <button className="btn ghost booking-modal-icon-btn booking-modal-close-btn" onClick={() => setShowInviteRecipients(false)} aria-label="Schließen">
-                                <AppIcon icon={IconX} size="action" />
-                            </button>
-                        </header>
+                        <ModalHeader
+                          className="invite-modal-header"
+                          title="Empfänger im Batch"
+                          titleId="invite-recipient-modal-title"
+                          subtitle={<>{inviteCurrentBatch.length}E-Mail-Adresse{inviteCurrentBatch.length === 1 ? '' : 'n'}</>}
+                          onClose={() => setShowInviteRecipients(false)}
+                          closeLabel="Schließen"
+                          closeOnEscape={false}
+                        />
                         <div className="invite-recipient-modal__content">
                             <table className="invite-recipient-table">
                                 <thead>
@@ -974,10 +974,12 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                 createPortal(
                     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setMissingRequired([])}>
                         <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
-                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0 }}>Pflichtfelder fehlen</h3>
-                                <button className="btn" onClick={() => setMissingRequired([])} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-                            </header>
+                            <ModalHeader
+                              title="Pflichtfelder fehlen"
+                              onClose={() => setMissingRequired([])}
+                              closeLabel="Schließen"
+                              closeOnEscape={false}
+                            />
                             <div className="card" style={{ padding: 10 }}>
                                 <div>Bitte ergänze die folgenden Felder:</div>
                                 <ul className="helper" style={{ marginTop: 6 }}>
@@ -995,10 +997,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             {deleteConfirm && (
                 <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
                     <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
-                        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0 }}>Mitglied löschen</h3>
-                            <button className="btn" onClick={() => setDeleteConfirm(null)}><AppIcon icon={IconX} size="control" /></button>
-                        </header>
+                        <ModalHeader title="Mitglied löschen" onClose={() => setDeleteConfirm(null)} closeOnEscape={false} />
                         <div className="card" style={{ padding: 10 }}>
                             <div style={{ marginBottom: 6 }}>Soll das folgende Mitglied wirklich gelöscht werden?</div>
                             <div className="helper" style={{ fontWeight: 600 }}>{deleteConfirm.label}</div>
@@ -1397,13 +1396,13 @@ function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; na
                         {/* Quick Action Panel - shows when a period is selected from timeline */}
                         {selectedPeriod && selectedPeriodInfo && (
                             <div className="fee-quick-action">
-                                <div className="fee-quick-action__header">
+                                <ModalHeader className="fee-quick-action__header">
                                     <span className="fee-quick-action__title" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                                         <AppIcon icon={selectedPeriodInfo.isPaid ? IconCalendarCheck : IconCalendarDue} size="inline" />
                                         {selectedPeriodInfo.isPaid ? 'Bezahlte Periode' : 'Fällige Periode'}: {selectedPeriod}
                                     </span>
-                                    <button className="btn ghost" onClick={() => { setSelectedPeriod(null); setSelectedPeriodInfo(null) }} aria-label="Schließen"><AppIcon icon={IconX} size="control" /></button>
-                                </div>
+                                    <ModalCloseButton onClick={() => { setSelectedPeriod(null); setSelectedPeriodInfo(null) }} aria-label="Schließen" />
+                                </ModalHeader>
                                 {selectedPeriodInfo.isPaid && selectedPeriodInfo.paymentInfo ? (
                                     <div className="fee-quick-action__info">
                                         <div className="fee-quick-action__row">

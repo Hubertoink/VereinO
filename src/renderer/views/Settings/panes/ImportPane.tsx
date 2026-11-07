@@ -1,3 +1,4 @@
+import ModalHeader, { ModalCloseButton } from '../../../components/ModalHeader'
 import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
@@ -128,13 +129,13 @@ export function ImportPane({ notify }: ImportPaneProps) {
       {showLog && createPortal(
         <div className="modal-overlay" onClick={() => setShowLog(false)} role="dialog" aria-modal="true">
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10, width: 'min(900px, 96vw)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <ModalHeader >
               <h2 style={{ margin: 0 }}>Import-Log</h2>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn" onClick={loadLog} disabled={busy}>Aktualisieren</button>
-                <button className="btn danger" onClick={() => setShowLog(false)}>Schließen</button>
+                <ModalCloseButton onClick={() => setShowLog(false)} />
               </div>
-            </div>
+            </ModalHeader>
             {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
             {busy && <div className="helper">Lade …</div>}
             {!busy && (

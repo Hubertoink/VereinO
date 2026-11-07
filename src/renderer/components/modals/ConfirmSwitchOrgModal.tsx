@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React from 'react'
 import { createPortal } from 'react-dom'
 
@@ -30,10 +31,14 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
         aria-modal="true"
         aria-labelledby="confirm-switch-title"
       >
-        <header className="flex justify-between items-center mb-12">
-          <h2 id="confirm-switch-title" style={{ margin: 0 }}>Organisation wechseln?</h2>
-          <button className="btn icon-btn" onClick={onCancel} aria-label="Schließen">✕</button>
-        </header>
+        <ModalHeader
+          className="flex justify-between items-center mb-12"
+          title="Organisation wechseln?"
+          titleId="confirm-switch-title"
+          onClose={onCancel}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <p style={{ marginBottom: 16 }}>
           Möchtest du jetzt zu <strong>"{orgName}"</strong> wechseln?

@@ -1,6 +1,7 @@
+import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconX as IconClose, IconExternalLink, IconDownload, IconPlus, IconChevronLeft, IconChevronRight, IconTrash, IconFile, IconPhoto as IconImage, IconReceipt2, IconCalendar, IconWallet, IconCategory, IconTag, IconArrowDown, IconArrowUp, IconArrowsExchange, IconPaperclip } from '@tabler/icons-react'
+import { IconExternalLink, IconDownload, IconPlus, IconChevronLeft, IconChevronRight, IconTrash, IconFile, IconPhoto as IconImage, IconReceipt2, IconCalendar, IconWallet, IconCategory, IconTag, IconArrowDown, IconArrowUp, IconArrowsExchange, IconPaperclip } from '@tabler/icons-react'
 import { useToast } from '../../context/useToast'
 import { addDataChangedListener, notifyDataChanged } from '../../utils/refresh'
 import { base64ToUint8Array, encodeFileForUpload } from '../../utils/fileEncoding'
@@ -409,7 +410,7 @@ export default function AttachmentsModal({
             aria-labelledby="attachments-modal-title"
         >
             <div ref={modalRef} className="modal attachments-modal" style={modalSize ?? undefined} onClick={(e) => e.stopPropagation()}>
-                <header className="attachments-modal__header">
+                <ModalHeader className="attachments-modal__header">
                     <div className="attachments-modal__title">
                         <h2 id="attachments-modal-title"><IconPaperclip size={18} aria-hidden="true" />Belege</h2>
                         <button type="button" className="attachments-modal__voucher-link" title="Zur Buchung" onClick={() => {
@@ -419,8 +420,8 @@ export default function AttachmentsModal({
                             }))
                         }}><IconReceipt2 size={14} aria-hidden="true" /><span>Buchung #{voucher.voucherNo}</span><IconChevronRight size={14} aria-hidden="true" /></button>
                     </div>
-                    <button className="attachments-modal__close" onClick={onClose} aria-label="Schließen"><IconClose size={20} /></button>
-                </header>
+                    <ModalCloseButton onClick={onClose} aria-label="Schließen" />
+                </ModalHeader>
                 <section className="attachments-modal__context" aria-label="Buchungsinformationen">
                     <div className="attachments-modal__summary">
                         <span className={`attachments-modal__direction attachments-modal__amount--${booking?.type.toLowerCase() || 'neutral'}`} aria-hidden="true">{booking?.type === 'IN' ? <IconArrowDown size={17} /> : booking?.type === 'OUT' ? <IconArrowUp size={17} /> : <IconArrowsExchange size={17} />}</span>
@@ -630,10 +631,13 @@ export default function AttachmentsModal({
                 {confirmDelete && (
                     <div className="modal-overlay" onClick={() => setConfirmDelete(null)} role="dialog" aria-modal="true">
                         <div className="modal modal-grid" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
-                            <div className="modal-header">
-                                <h3 style={{ margin: 0 }}>Datei löschen</h3>
-                                <button className="btn ghost" onClick={() => setConfirmDelete(null)} aria-label="Schließen">✕</button>
-                            </div>
+                            <ModalHeader
+                              className="modal-header"
+                              title="Datei löschen"
+                              onClose={() => setConfirmDelete(null)}
+                              closeLabel="Schließen"
+                              closeOnEscape={false}
+                            />
                             <p>
                                 Möchtest du <strong>{confirmDelete.fileName}</strong> wirklich löschen?
                             </p>

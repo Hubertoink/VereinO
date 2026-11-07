@@ -1,3 +1,4 @@
+import ModalHeader from '../ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -28,12 +29,12 @@ export default function CashCheckAuditorsModal(props: {
   return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <h3 style={{ margin: 0 }}>Kassenprüfer eintragen</h3>
-          <button className="btn ghost" onClick={onClose} aria-label="Schließen" style={{ width: 28, height: 28, display: 'grid', placeItems: 'center', borderRadius: 8 }}>
-            ✕
-          </button>
-        </div>
+        <ModalHeader
+          title="Kassenprüfer eintragen"
+          onClose={onClose}
+          closeLabel="Schließen"
+          closeOnEscape={false}
+        />
 
         <div className="helper">
           Für den PDF-Kassenprüferbericht wird mindestens ein Kassenprüfer benötigt. Wenn ihr sie noch nicht bei den Mitgliedern gepflegt habt, tragt sie hier ein.
