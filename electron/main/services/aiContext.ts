@@ -109,7 +109,7 @@ function compactPartyForAi(party: any) {
 export function buildAiInvoiceContext(): AiContext {
   const profile = getOrganizationProfile()
   const definition = getOrganizationProfileDefinition()
-  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, color: value.color, icon: value.icon, isActive: value.isActive }))
+  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, stableKey: value.stableKey, color: value.color, icon: value.icon, isActive: value.isActive }))
   const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
   const budgets = listBudgets({ includeArchived: true } as any) || []
   const earmarks = listBindings({ activeOnly: true } as any) || []
@@ -166,7 +166,7 @@ export function buildAiContext(): AiContext {
   const currentYear = Number(today.slice(0, 4))
   const profile = getOrganizationProfile()
   const definition = getOrganizationProfileDefinition()
-  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, color: value.color, icon: value.icon, isActive: value.isActive }))
+  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, stableKey: value.stableKey, color: value.color, icon: value.icon, isActive: value.isActive }))
   const organization = (() => {
     try {
       const active = getActiveOrganization() as any

@@ -1,3 +1,4 @@
+import { currentAiBookingComment } from './aiBookingPolicy'
 import { createReimbursementTools } from './aiReimbursementTools'
 import { bankDraftSourceFromTransaction } from '../../../shared/bankDraftSource'
 import { z } from 'zod'
@@ -643,7 +644,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'master_data_list',
-      description: 'Listet aktive Zahlungskonten, Geschäftspartner, Tags, Budgets/Kategorien, Zweckbindungen und Dauerbuchungen für genaue ID-Zuordnungen.',
+      description: 'Listet aktive Zahlungskonten, Geschäftspartner, Tags, Budgets, Zweckbindungen und Dauerbuchungen für genaue ID-Zuordnungen.',
       readOnly: true,
       parameters: toolParameters({
         includeArchived: { type: 'boolean', description: 'Archivierte Budgets und inaktive Zweckbindungen einbeziehen.' }
@@ -1436,7 +1437,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
     },
     {
       name: 'budget_change_draft_prepare',
-      description: 'Bereitet einen Review-Entwurf vor, um Budgets/Kategorien anzulegen, zu ändern, zu archivieren oder zu löschen. Speichert nichts direkt.',
+      description: 'Bereitet einen Review-Entwurf vor, um Budgets anzulegen, zu ändern, zu archivieren oder zu löschen. Speichert nichts direkt.',
       readOnly: false,
       parameters: toolParameters({
         changes: {
@@ -2546,10 +2547,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           paymentAccountId,
           paymentAccountName: account?.name ?? original.paymentAccountName ?? null,
           tags: replacementTags,
-          note: [
-            `Ersatzbuchung nach Storno von ${original.voucherNo || `#${original.id}`}.`,
-            args.reason || null
-          ].filter(Boolean).join('\n'),
+          note: original.note || '',
           bankTransactionId: args.bankTransactionId ?? null,
           budgets: original.budgetId ? [{ budgetId: Number(original.budgetId), amount: Math.abs(Number(original.budgetAmount || original.grossAmount || 0)) }] : [],
           earmarks: original.earmarkId ? [{ earmarkId: Number(original.earmarkId), amount: Math.abs(Number(original.earmarkAmount || original.grossAmount || 0)) }] : []
@@ -2694,7 +2692,7 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           partyCreationSource: { name: source?.counterparty || args.counterparty || '', iban: source ? source.counterpartyIban : args.counterpartyIban },
           bankTransactionId: args.bankTransactionId ?? undefined,
           bankReviewSource: source,
-          note: args.note || 'Aus VereinO KI-Agent vorbereitet.',
+          note: currentAiBookingComment(args.note),
           paymentMethod: bank ? 'BANK' : args.paymentMethod ?? (account?.kind === 'CASH' ? 'BAR' : account ? 'BANK' : null),
           paymentAccountId,
           paymentAccountName: source?.paymentAccountName ?? account?.name ?? null,

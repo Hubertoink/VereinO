@@ -72,6 +72,7 @@ describe('AiBookingAnalysisResult', () => {
     const parsed = AiBookingAnalysisResultStructured.parse({
       candidates: [
         {
+          note: null,
           date: '2026-07-04',
           type: 'OUT',
           sphere: 'IDEELL',

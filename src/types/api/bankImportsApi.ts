@@ -1,3 +1,4 @@
+import type { BankAiBatchApplyInput, BankAiBatchResult, BankAiBatchRow } from '../../../shared/bankAiBatch'
 import type {
   TBankImportCommitInput,
   TBankImportCommitOutput,
@@ -28,6 +29,9 @@ export interface BankImportsApi {
     remapApply: (payload: TBankImportRemapApplyInput) => Promise<TBankImportRemapApplyOutput>
   }
   bankTransactions: {
+    previewAiBatch: (payload: { ids: number[] }) => Promise<BankAiBatchRow[]>
+    applyAiBatch: (payload: BankAiBatchApplyInput) => Promise<BankAiBatchResult>
+    validateAiBatchDraft: (payload: BankAiBatchApplyInput) => Promise<{ blockers: string[] }>
     list: (payload?: TBankTransactionsListInput) => Promise<TBankTransactionsListOutput>
     importStatus: () => Promise<TBankImportStatusOutput>
     importHistory: (payload?: TBankImportHistoryInput) => Promise<TBankImportHistoryOutput>

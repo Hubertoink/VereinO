@@ -4,7 +4,7 @@ type AttachmentPreview = { key: string; name: string; url: string | null; badge:
 type MentionOption = {
   id: string
   label: string
-  scope: 'Bereich' | 'Tag' | 'Kategorie' | 'Zweckbindung' | 'Zahlungskonto' | 'Sphäre'
+  scope: 'Bereich' | 'Tag' | 'Budget' | 'Kategorie' | 'Zweckbindung' | 'Zahlungskonto' | 'Sphäre'
   insert: string
   description: string
   plannerHint: string

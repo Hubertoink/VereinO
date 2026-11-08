@@ -44,6 +44,7 @@ test('dashboard report sources open filtered bookings and the app has one vertic
     await page.getByLabel('Auswertung von').fill('2026-08-01')
     await page.getByLabel('Auswertung bis').fill('2026-08-31')
     await page.getByRole('button', { name: 'Wie hat sich unser Saldo entwickelt?', exact: true }).click()
+    await page.getByRole('button', { name: 'Frage senden' }).click()
     await expect(page.getByRole('heading', { name: 'Saldo im August' })).toBeVisible()
     await page.getByRole('button', { name: 'Ausgaben ansehen', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Buchungen Plus', exact: true })).toBeVisible()

@@ -16,8 +16,9 @@ jest.mock('electron', () => ({
 }))
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(), setSetting: jest.fn() }))
 
-import { getSetting } from '../../electron/main/services/settings'
-import { createAiResponse, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
+import { getSetting, setSetting } from '../../electron/main/services/settings'
+import { createAiResponse, getAiSettings, setAiSettings, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
+import { AI_BOOKING_COMMENTS_SETTING } from '../../shared/aiBookingPolicy'
 
 const structuredRequest = {
   model: 'Qwen3.6-35B-A3B-FP8', input: 'Prüfe die Belege.',
@@ -141,4 +142,70 @@ it('completes the bank review when one provider suggestion contains a null requi
   })
   expect(result.result.suggestions[0]).toMatchObject({ action: 'LINK_EXISTING', voucherId: 42 })
   expect(result.result.suggestions[1]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: expect.stringContaining('reason') })
+})
+
+it.each([false, true])('passes comment rules into bank analysis and gates note output with opt-in %s', async enabled => {
+  const original = jest.mocked(getSetting).getMockImplementation()!
+  jest.mocked(getSetting).mockImplementation(((key: string) => key === AI_BOOKING_COMMENTS_SETTING ? enabled : original(key)) as any)
+  mockChatCreate.mockResolvedValue(completion(JSON.stringify({ suggestions: [{
+    transactionId: 77, action: 'CREATE_BOOKING', reason: 'Keine vorhandene Buchung.', warnings: ['Kein Budget zugeordnet.'],
+    bookingCandidate: { date: '2026-08-13', type: 'OUT', sphere: 'IDEELL', description: 'Software', grossAmount: 29.99,
+      note: 'Referenz BREF-123', warnings: ['Kein Budget zugeordnet.'] }
+  }] })))
+  const result = await reviewBankImportTransactions({
+    transactions: [{ id: 77, bookingDate: '2026-08-13', direction: 'OUT', amount: 29.99 }],
+    context: { aiRules: [{ id: 1, name: 'Kommentare', scope: 'BOOKINGS', instruction: 'Im Kommentar nur die Bankreferenz nennen.', enabled: 1 }] }
+  })
+  const suggestion = result.result.suggestions[0]
+  expect(suggestion.bookingCandidate?.note).toBe(enabled ? 'Referenz BREF-123' : '')
+  expect(suggestion.warnings).toEqual([])
+  expect(suggestion.bookingCandidate?.warnings).toEqual([])
+  const prompt = mockChatCreate.mock.calls[0][0].messages.find((message: any) => message.role === 'user').content[0].text as string
+  expect(prompt).toContain('Im Kommentar nur die Bankreferenz nennen.')
+  expect(prompt).toContain(enabled ? 'KI-Kommentare sind aktiviert' : 'KI-Kommentare sind deaktiviert')
+  expect(prompt).toContain('Kategorie/Sphäre und Budget sind getrennte Konzepte')
+})
+
+it('defaults comments on and preserves explicit preferences across provider updates', () => {
+  const settings = new Map<string, unknown>()
+  jest.mocked(getSetting).mockImplementation(((key: string) => settings.get(key)) as any)
+  jest.mocked(setSetting).mockImplementation((key, value) => { settings.set(key, value) })
+  expect(getAiSettings().bookingCommentsEnabled).toBe(true)
+  expect(setAiSettings({ bookingCommentsEnabled: true }).bookingCommentsEnabled).toBe(true)
+  expect(setAiSettings({ provider: 'mittwald' }).bookingCommentsEnabled).toBe(true)
+  expect(setAiSettings({ bookingCommentsEnabled: false }).bookingCommentsEnabled).toBe(false)
+  expect(setAiSettings({ provider: 'openai' }).bookingCommentsEnabled).toBe(false)
+})
+
+it('reports only real completed analysis batches, keeping a failed batch unfinished', async () => {
+  const progress = jest.fn()
+  mockChatCreate.mockImplementation(async request => {
+    const prompt = request.messages.find((message: any) => message.role === 'user').content[0].text
+    const transactions = JSON.parse(prompt.split('Offene Bankbelege mit lokalen Treffern:\n')[1])
+    if (transactions[0].id === 6) throw new Error('Provider offline')
+    expect(progress).toHaveBeenLastCalledWith({ activeIds: [1, 2, 3, 4, 5], completedIds: [] })
+    return completion(JSON.stringify({ suggestions: transactions.map((t: any) => ({ transactionId: t.id, action: 'NEEDS_MANUAL_REVIEW', reason: 'Bitte prüfen.' })) }))
+  })
+  await expect(reviewBankImportTransactions({ context: {}, onProgress: progress,
+    transactions: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, bookingDate: '2026-08-13', direction: 'OUT', amount: 10 }))
+  })).rejects.toThrow('Provider offline')
+  expect(progress.mock.calls.map(([value]) => value)).toEqual([
+    { activeIds: [1, 2, 3, 4, 5], completedIds: [] },
+    { activeIds: [], completedIds: [1, 2, 3, 4, 5] },
+    { activeIds: [6, 7], completedIds: [1, 2, 3, 4, 5] }
+  ])
+})
+
+it.each(['GENERAL', 'NONPROFIT'] as const)('passes profile-specific classification and language instructions for %s', async profile => {
+  mockChatCreate.mockResolvedValue(completion(JSON.stringify({ suggestions: [{ transactionId: 77, action: 'NEEDS_MANUAL_REVIEW', reason: 'Bitte prüfen.' }] })))
+  await reviewBankImportTransactions({ context: { organization: { profile }, primaryClassifications: [{ id: 6, name: 'Sonstiges', stableKey: 'OTHER' }] },
+    transactions: [{ id: 77, bookingDate: '2026-08-13', direction: 'IN', amount: 350, counterparty: 'Stadt Höchstädt', purpose: 'Zuschuss Jugendarbeit' }] })
+  const prompt = mockChatCreate.mock.calls[0][0].messages.find((message: any) => message.role === 'user').content[0].text
+  if (profile === 'GENERAL') {
+    expect(prompt).toContain('Es gibt fachlich keine steuerlichen Sphären')
+    expect(prompt).toContain('nicht in reason, evidence, warnings, note')
+    expect(prompt).toContain('keine Gemeinnützigkeit')
+    expect(prompt).not.toContain('Profil NONPROFIT und verwendet steuerliche Sphären')
+  } else expect(prompt).toContain('Profil NONPROFIT und verwendet steuerliche Sphären')
+  expect(prompt).toContain('"stableKey":"OTHER"')
 })

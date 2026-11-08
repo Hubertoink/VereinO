@@ -26,9 +26,9 @@ export function buildAiMentionOptions({ tags, budgets, bindings, accounts }: Ref
         id: `budget-${budget.id}`,
         label,
         insert: `Budget:${label}`,
-        scope: 'Kategorie' as const,
-        description: budget.archived ? 'Archiviertes Budget/Kategorie' : 'Budget/Kategorie',
-        plannerHint: `Budget/Kategorie "${label}" gezielt verwenden.`
+        scope: 'Budget' as const,
+        description: (budget.isArchived || budget.archived) ? 'Archiviertes Budget' : 'Budget',
+        plannerHint: `Budget "${label}" gezielt verwenden.`
       }
     }),
     ...bindings.slice(0, 80).map((binding) => ({

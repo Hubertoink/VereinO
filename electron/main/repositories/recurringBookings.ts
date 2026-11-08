@@ -56,6 +56,16 @@ function parseAssignments(value: unknown, kind: 'budgetId' | 'earmarkId', fallba
   return fallbackId ? [{ [kind]: Number(fallbackId), amount: Number(fallbackAmount || 0) }] : []
 }
 
+/** Uses the same legacy full-amount fallback as booking a bank occurrence. */
+export function getRecurringBankAssignments(id: number, amount: number) {
+  const row = getDb().prepare(`SELECT budget_assignments_json, earmark_assignments_json, budget_id, earmark_id FROM recurring_bookings WHERE id=?`).get(id) as any
+  if (!row) throw new Error('Dauerbuchung nicht gefunden.')
+  return {
+    budgets: parseAssignments(row.budget_assignments_json, 'budgetId', row.budget_id, amount) as Array<{ budgetId: number; amount: number }>,
+    earmarks: parseAssignments(row.earmark_assignments_json, 'earmarkId', row.earmark_id, amount) as Array<{ earmarkId: number; amount: number }>
+  }
+}
+
 function mapRow(row: any) {
   return {
     id: Number(row.id),

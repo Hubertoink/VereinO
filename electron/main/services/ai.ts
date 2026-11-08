@@ -1,3 +1,5 @@
+import { AI_BOOKING_COMMENTS_SETTING, aiClassificationInstruction, aiBookingComment, aiBookingCommentInstruction, filterOptionalAssignmentWarnings } from '../../../shared/aiBookingPolicy'
+import type { BankAiAnalysisProgress } from '../../../shared/bankAiReviewProgress'
 import { safeStorage, session } from 'electron'
 import { visibleAiText } from '../../../shared/aiVisibleText'
 import OpenAI from 'openai'
@@ -105,6 +107,7 @@ type AiStoredSecret = {
 }
 
 export type AiSettings = {
+  bookingCommentsEnabled: boolean
   hasApiKey: boolean
   model: string
   textModel: string
@@ -137,7 +140,7 @@ export type AiContext = {
     instruction: string
     enabled?: number | boolean
   }>
-  primaryClassifications?: Array<{ id: number; name: string; color?: string | null; icon?: string | null; isActive?: number | boolean }>
+  primaryClassifications?: Array<{ id: number; name: string; stableKey?: string; color?: string | null; icon?: string | null; isActive?: number | boolean }>
   paymentAccounts?: Array<{
     id: number
     name: string
@@ -326,6 +329,7 @@ export function getAiSettings(): AiSettings {
   const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
   const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
+    bookingCommentsEnabled: getSetting(AI_BOOKING_COMMENTS_SETTING) !== false,
     hasApiKey: !!apiKey.trim(),
     model,
     textModel,
@@ -341,6 +345,7 @@ export function getAiSettings(): AiSettings {
 }
 
 export function setAiSettings(input: {
+  bookingCommentsEnabled?: boolean
   apiKey?: string
   model?: string
   textModel?: string
@@ -395,9 +400,11 @@ export function setAiSettings(input: {
   if (input.proxyBypassRules !== undefined) {
     setSetting(PROXY_BYPASS_SETTING, input.proxyBypassRules.trim())
   }
+  if (input.bookingCommentsEnabled !== undefined) setSetting(AI_BOOKING_COMMENTS_SETTING, input.bookingCommentsEnabled)
   const next = getAiSettings()
   return {
     ok: true,
+    bookingCommentsEnabled: next.bookingCommentsEnabled,
     hasApiKey: next.hasApiKey,
     model: next.model,
     textModel: next.textModel,
@@ -811,7 +818,7 @@ export function compactContext(context: AiContext) {
       .map((rule) => ({ id: rule.id, name: rule.name, scope: rule.scope, instruction: rule.instruction })),
     primaryClassifications: (context.primaryClassifications || [])
       .filter((classification) => classification.isActive !== 0 && classification.isActive !== false)
-      .map((classification) => ({ id: classification.id, name: classification.name, color: classification.color, icon: classification.icon })),
+      .map((classification) => ({ id: classification.id, name: classification.name, stableKey: classification.stableKey, color: classification.color, icon: classification.icon })),
     generatedAt: context.generatedAt,
     paymentAccounts: (context.paymentAccounts || [])
       .filter((account) => account.isActive !== 0)
@@ -1141,7 +1148,9 @@ export async function analyzeBookingDocuments(input: {
     .map((item, idx) => `${idx + 1}. ${item.source.label}`)
     .join('\n')
   const prompt = [
-    'Du bist ein vorsichtiger Buchungsassistent fuer einen deutschen Verein.',
+    'Du bist ein vorsichtiger Buchungsassistent für die im Kontext beschriebene Organisation.',
+    aiClassificationInstruction(input.context.organization?.profile),
+    aiBookingCommentInstruction(settings.bookingCommentsEnabled),
     'Extrahiere aus den angehaengten Belegen, Rechnungen oder Tabellen Buchungsvorschlaege fuer VereinO.',
     'Jede angehaengte Quelle ist eine eigenstaendige Quelleinheit. Mehrseitige PDFs wurden vorab seitenweise getrennt.',
     'Vermische niemals Inhalte aus verschiedenen Quelleinheiten in einem Kandidaten.',
@@ -1185,9 +1194,13 @@ export async function analyzeBookingDocuments(input: {
   } as any)
   return {
     model,
-    result: AiBookingAnalysisResult.parse(
-      parseStructured(response, AiBookingAnalysisResultStructured)
-    ),
+    result: (() => {
+      const result = AiBookingAnalysisResult.parse(parseStructured(response, AiBookingAnalysisResultStructured))
+      return { ...result, warnings: filterOptionalAssignmentWarnings(result.warnings), candidates: result.candidates.map(candidate => ({ ...candidate,
+        note: aiBookingComment(settings.bookingCommentsEnabled, candidate.note),
+        warnings: filterOptionalAssignmentWarnings(candidate.warnings)
+      })) }
+    })(),
     usage: normalizeUsage(response, model)
   } as any
 }
@@ -1379,7 +1392,7 @@ export async function analyzeInvoiceDocument(input: {
     aiRules: (input.context.aiRules || [])
       .filter((rule) => rule.enabled !== 0 && rule.enabled !== false)
       .map((rule) => ({ id: rule.id, name: rule.name, instruction: rule.instruction })),
-    primaryClassifications: (input.context.primaryClassifications || []).filter((classification) => classification.isActive !== 0 && classification.isActive !== false).map((classification) => ({ id: classification.id, name: classification.name, color: classification.color, icon: classification.icon })),
+    primaryClassifications: (input.context.primaryClassifications || []).filter((classification) => classification.isActive !== 0 && classification.isActive !== false).map((classification) => ({ id: classification.id, name: classification.name, stableKey: classification.stableKey, color: classification.color, icon: classification.icon })),
     generatedAt: input.context.generatedAt,
     paymentAccounts: (input.context.paymentAccounts || [])
       .filter((account) => account.isActive !== 0)
@@ -1411,7 +1424,8 @@ export async function analyzeInvoiceDocument(input: {
       .slice(0, 500)
   }
   const prompt = [
-    'Analysiere genau diese eine Rechnung fuer einen deutschen Verein.',
+    'Analysiere genau diese eine Rechnung für die im Kontext beschriebene Organisation.',
+    aiClassificationInstruction(input.context.organization?.profile),
     'Liefere ausschliesslich die strukturierten Rechnungs- und Buchungsfelder.',
     'Bestimme organizationRole aus Sicht der Organisation im Stammdatenkontext: ISSUER nur wenn sie selbst die Rechnung ausgestellt hat, RECIPIENT wenn sie Rechnungsempfänger ist, sonst UNKNOWN. organizationRoleEvidence enthält die konkrete Textstelle mit Name und Rolle; ohne Beleg bleibt die Rolle UNKNOWN. Normale Lieferantenrechnungen sind OUT (Ausgabe). IN nur bei belegter eigener Rechnungsstellung. Bei fehlendem Organisationsnamen oder unklarer Perspektive normale Rechnungen als OUT vorbelegen und warnen.',
     'supplier und partyId bezeichnen den externen Geschäftspartner: bei Eingangsrechnungen den Lieferanten, bei Ausgangsrechnungen den Kunden. Leistungsbeschreibungen wie Material oder Veranstaltungsbedarf sind keine Firmennamen; wenn kein Name erkennbar ist, supplier und partyId null lassen.',
@@ -1714,6 +1728,7 @@ export async function reviewBankImportTransactions(input: {
   transactions: AiBankReviewTransaction[]
   context: AiContext
   model?: string | null
+  onProgress?: (progress: BankAiAnalysisProgress) => void
 }): Promise<{ model: string; result: TAiBankImportReviewResult; usage: AiUsage | null }> {
   if (!input.transactions.length) {
     return {
@@ -1730,19 +1745,23 @@ export async function reviewBankImportTransactions(input: {
   }
   // Prompt-enforced JSON is substantially larger than a connection-test reply.
   // Keep Mittwald reviews small; IPC validates conflicts across the combined result.
-  if (settings.provider === 'mittwald' && input.transactions.length > 5) {
+  if ((settings.provider === 'mittwald' || input.onProgress) && input.transactions.length > 5) {
     const suggestions: TAiBankImportReviewResult['suggestions'] = []
     const warnings: string[] = []
     let usage: AiUsage | null = null
     for (let offset = 0; offset < input.transactions.length; offset += 5) {
+      const batch = input.transactions.slice(offset, offset + 5)
+      input.onProgress?.({ activeIds: batch.map(t => t.id), completedIds: input.transactions.slice(0, offset).map(t => t.id) })
       const reviewed = await reviewBankImportTransactions({
         ...input,
         model,
-        transactions: input.transactions.slice(offset, offset + 5)
+        transactions: batch,
+        onProgress: undefined
       })
       suggestions.push(...reviewed.result.suggestions)
       warnings.push(...reviewed.result.warnings)
       if (reviewed.usage) usage = usage ? mergeAiUsage(usage, reviewed.usage) : reviewed.usage
+      input.onProgress?.({ activeIds: [], completedIds: input.transactions.slice(0, offset + batch.length).map(t => t.id) })
     }
     return {
       model,
@@ -1750,8 +1769,11 @@ export async function reviewBankImportTransactions(input: {
       usage
     }
   }
+  input.onProgress?.({ activeIds: input.transactions.map(t => t.id), completedIds: [] })
   const prompt = [
-    'Du bist ein vorsichtiger Bankimport-Assistent fuer einen deutschen Verein.',
+    'Du bist ein vorsichtiger Bankimport-Assistent für die im Kontext beschriebene Organisation.',
+    aiClassificationInstruction(input.context.organization?.profile),
+    aiBookingCommentInstruction(settings.bookingCommentsEnabled),
     'Denke wie ein Kassier: Jeder offene Bankbeleg soll entweder mit einer vorhandenen Buchung verknuepft, als neue Buchung vorbereitet, als nicht buchungsrelevant markiert oder bewusst manuell geklaert werden. Lass Bankbelege nicht unverbunden, wenn du eine Buchung daraus erzeugst.',
     'Pruefe offene Bankbelege und entscheide pro Beleg genau eine Aktion:',
     '- LINK_EXISTING: wenn eine vorhandene Buchung sehr wahrscheinlich passt.',
@@ -1774,7 +1796,7 @@ export async function reviewBankImportTransactions(input: {
     'CREATE_BOOKING wird spaeter mit dem Bankbeleg verknuepft; die Beschreibung soll den Zahler/Zweck nachvollziehbar enthalten, aber keine IBAN-Fuelltexte.',
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
     'Übernimm counterparty und counterpartyIban für neue Buchungsvorschläge aus dem jeweiligen Bankbeleg. counterpartyIban ist das Gegenkonto, niemals das eigene Zahlungskonto. Fehlt sie, setze null.',
-    'Wenn Budget-/Zweckbindungs-IDs unsicher sind, lasse diese Listen leer und schreibe eine Warnung.',
+    'Wenn keine passende optionale Budget-/Zweckbindungszuordnung erkennbar ist, lasse die Listen ohne Warnung leer. Beachte ausdrücklich verlangte Zuordnungen aus aiRules.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
     'Halte reason, warnings und evidence kurz. Liefere fuer jeden mitgegebenen Bankbeleg genau einen Vorschlag und keine weiteren Bankbelege.',
     '',
@@ -1801,9 +1823,16 @@ export async function reviewBankImportTransactions(input: {
     ]
   } as any)
 
-  return {
-    model,
-    result: validateBankReviewResult(response.output_parsed ?? JSON.parse(extractOutputText(response)), input.transactions.map((transaction) => transaction.id)),
-    usage: normalizeUsage(response, model)
-  } as any
+  const result = (() => {
+      const result = validateBankReviewResult(response.output_parsed ?? JSON.parse(extractOutputText(response)), input.transactions.map((transaction) => transaction.id))
+      return { ...result, warnings: filterOptionalAssignmentWarnings(result.warnings), suggestions: result.suggestions.map(suggestion => ({ ...suggestion,
+        warnings: filterOptionalAssignmentWarnings(suggestion.warnings),
+        bookingCandidate: suggestion.bookingCandidate ? { ...suggestion.bookingCandidate,
+          note: aiBookingComment(settings.bookingCommentsEnabled, suggestion.bookingCandidate.note),
+          warnings: filterOptionalAssignmentWarnings(suggestion.bookingCandidate.warnings)
+        } : suggestion.bookingCandidate
+      })) }
+    })()
+  input.onProgress?.({ activeIds: [], completedIds: input.transactions.map(t => t.id) })
+  return { model, result, usage: normalizeUsage(response, model) }
 }

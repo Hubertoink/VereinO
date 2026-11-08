@@ -1,3 +1,4 @@
+import { aiBookingCommentsEnabled } from './aiBookingPolicy'
 import { randomBytes, randomUUID } from 'node:crypto'
 import http, {
   type IncomingMessage,
@@ -243,7 +244,7 @@ function createVereinoMcpServer(input: {
   const server = new McpServer(
     { name: 'vereino-agent-mcp', version: '1.0.0' },
     {
-      instructions: buildAgentInstructions(),
+      instructions: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile),
       capabilities: { logging: {} }
     }
   )
@@ -310,7 +311,7 @@ function createVereinoMcpServer(input: {
           role: 'user',
           content: {
             type: 'text',
-            text: buildAgentInstructions()
+            text: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile)
           }
         }
       ]
@@ -392,7 +393,7 @@ export class VereinoMcpHost {
       .filter(Boolean)
       .join('\n')
       .trim()
-    return text || buildAgentInstructions()
+    return text || buildAgentInstructions(aiBookingCommentsEnabled())
   }
 
   // fallow-ignore-next-line unused-class-member -- public MCP host API used by aiAgent.ts and MCP tests

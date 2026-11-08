@@ -92,6 +92,14 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
         <span>Beleganalyse: {AI_TASK_PROFILE_OPTIONS.invoice.find((option) => option.value === settings.invoiceProfile)?.description}</span>
         <span>Text &amp; KI-Agent: {AI_TASK_PROFILE_OPTIONS.text.find((option) => option.value === settings.textProfile)?.description}</span>
       </p>}
+      <div className="ai-settings-divider ai-field-wide"><strong>Buchungsentwürfe</strong></div>
+      <label className="ai-field-wide" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <input type="checkbox" checked={settings.bookingCommentsEnabled === true} disabled={busy}
+          onChange={event => update('bookingCommentsEnabled', event.target.checked)} />
+        <span>KI-Kommentare in Buchungsentwürfe übernehmen
+          <small className="helper" style={{ display: 'block', marginTop: 5 }}>Standardmäßig an. Die KI darf hilfreiche Kommentare vorschlagen. Über den KI-Regelkatalog kannst du deren Inhalt steuern oder die Übernahme hier ausschalten. Gilt für neue KI-Entwürfe, auch beim Bankimport.</small>
+        </span>
+      </label>
       <div className="ai-settings-divider ai-field-wide"><strong>Netzwerk &amp; Proxy</strong><span>Gilt nur für KI-Anfragen.</span></div>
       <label className="field">
         <span>Verbindungsmodus</span>

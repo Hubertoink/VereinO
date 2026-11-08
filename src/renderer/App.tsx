@@ -1,3 +1,4 @@
+import { currentAiDraftComment } from './utils/aiBookingDraft'
 import { openReportBookings } from './utils/reportNavigation'
 import ModalHeader from './components/ModalHeader'
 import { resolveBankDraftParty } from './utils/bankDraftParty'
@@ -27,7 +28,7 @@ import { useToast } from './context/useToast'
 import { UIPreferencesProvider } from './context/UIPreferences'
 import { useUIPreferences } from './context/useUIPreferences'
 import { TopNav } from './components/layout/TopNav'
-import { SideNav } from './components/layout/SideNav'
+import { AppSidebar } from './components/layout/AppSidebar'
 import WindowControls from './components/layout/WindowControls'
 import OrgSwitcher from './components/common/OrgSwitcher'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
@@ -35,7 +36,7 @@ import CompactBookingFlyout from './components/CompactBookingFlyout'
 import QuickAddModal from './components/modals/QuickAddModal'
 import { getInternalAssignmentValidationState } from './components/modals/voucherMetaValidation'
 import type { NavKey } from './utils/navItems'
-import { navItems } from './utils/navItems'
+import { getProfileNavigationItems, navItems } from './utils/navItems'
 
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
@@ -1761,13 +1762,7 @@ function AppInner() {
     [normalizeVisibleNavItems]
   )
   const visibleNavSet = useMemo(() => new Set(visibleNavItems), [visibleNavItems])
-  const profileAllowedNavSet = useMemo(() => {
-    if (organizationProfile !== 'GENERAL') return new Set(navItems.map((item) => item.key))
-    return new Set<NavKey>([
-      'Dashboard', 'DashboardPlus', 'Buchungen', 'BuchungenPlus', 'Dauerbuchungen', 'Bankimport', 'Verbindlichkeiten',
-      'Vorschuesse', 'Budgets', 'KI', 'Belege', 'Reports', 'Einstellungen'
-    ])
-  }, [organizationProfile])
+  const profileAllowedNavSet = useMemo(() => new Set(getProfileNavigationItems(organizationProfile).map(item => item.key)), [organizationProfile])
   const visibleNavigationItems = useMemo(
     () => navItems.filter((item) => visibleNavSet.has(item.key) && profileAllowedNavSet.has(item.key)),
     [profileAllowedNavSet, visibleNavSet]
@@ -2292,7 +2287,7 @@ function AppInner() {
           }, input => window.api.parties.list(input))
           : null
         openQuickAdd({
-          qa: selectAiDraftBookingType({ ...detail.qa, ...bankParty }),
+          qa: selectAiDraftBookingType({ ...detail.qa, ...bankParty, note: await currentAiDraftComment(detail.qa.note) }),
           files: detail.files || []
         })
       })
@@ -2795,6 +2790,21 @@ function AppInner() {
     setFlashId(null)
     setPage(1)
   }, [])
+  const openSidebarAccount = (id: number) => {
+    resetBookingLinkFilters()
+    setFilterPaymentAccountId(id)
+    setPlusCalendarSelection({ month: currentLocalMonth(), from: '', to: '' })
+    setBookingJumpRevision(value => value + 1)
+    setActivePage('Buchungen')
+  }
+  const openSidebarAssignment = (kind: 'budget' | 'earmark', id: number) => {
+    resetBookingLinkFilters()
+    if (kind === 'budget') setFilterBudgetId(id)
+    else setFilterEarmark(id)
+    setPlusCalendarSelection({ month: currentLocalMonth(), from: '', to: '' })
+    setBookingJumpRevision(value => value + 1)
+    setActivePage('Buchungen')
+  }
   const openPlusEdit = useCallback(async (row: { id: number }) => {
     try {
       const result = await window.api.vouchers.list({ limit: 1, voucherIds: [row.id] })
@@ -3404,12 +3414,20 @@ function AppInner() {
         </div>
       </header>
       {!isTopNav && (
-        <aside className="app-sidebar">
-          <SideNav
+          <AppSidebar
             activePage={activePage}
             onNavigate={setActivePage}
             navIconColorMode={navIconColorMode}
-            collapsed={true}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            selectedAccountId={filterPaymentAccountId}
+            onSelectAccount={openSidebarAccount}
+            onSelectAssignment={openSidebarAssignment}
+            onSelectBankAccount={accountId => {
+              setDashboardTaskTarget({ kind: 'bank', accountId, filter: 'open' })
+              setDashboardTaskPage('Bankimport')
+              setActivePage('Bankimport')
+            }}
             openBankImportsCount={openBankImportsCount}
             openInvoicesCount={openInvoicesCount}
             dueMembershipFeesCount={dueMembershipFeesCount}
@@ -3418,7 +3436,6 @@ function AppInner() {
             items={visibleNavigationItems}
             aiBusy={aiBusy}
           />
-        </aside>
       )}
 
       {/* Main content */}

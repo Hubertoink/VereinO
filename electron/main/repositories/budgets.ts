@@ -1,7 +1,7 @@
 import { assignmentMonthly } from './assignmentMonthly'
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
-import { resolvePrimaryClassificationValueId } from './classifications'
+import { getOrganizationProfile, resolvePrimaryClassificationValueId } from './classifications'
 
 type DB = InstanceType<typeof Database>
 
@@ -28,7 +28,10 @@ export function upsertBudget(input: Partial<{ id: number }> &
         enforceTimeRange?: boolean
     }) {
     return withTransaction((d: DB) => {
-        const primaryClassificationValueId = resolvePrimaryClassificationValueId(d, {
+        // Budgets group bookings; a GENERAL budget does not need its own booking category.
+        // Explicit legacy assignments remain validated, while vouchers keep their required category.
+        const primaryClassificationValueId = getOrganizationProfile() === 'GENERAL' && input.primaryClassificationValueId == null
+            ? null : resolvePrimaryClassificationValueId(d, {
             legacySphere: input.sphere,
             primaryClassificationValueId: input.primaryClassificationValueId
         })

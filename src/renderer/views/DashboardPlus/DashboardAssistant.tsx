@@ -33,6 +33,14 @@ export default function DashboardAssistant({
   const generation = useRef(0)
   const session = useRef<string>()
   const sending = useRef(false)
+  const questionInput = useRef<HTMLInputElement>(null)
+  const prepareQuestion = (text: string, selectedScope?: ReportScope) => {
+    setQuestion(text)
+    setError('')
+    if (selectedScope) setScope(selectedScope)
+    questionInput.current?.focus()
+    questionInput.current?.scrollIntoView({ block: 'nearest' })
+  }
   const validRange = Boolean(scope.from && scope.to && scope.from <= scope.to)
   useEffect(() => setScope({ from, to }), [from, to])
   useEffect(() => {
@@ -131,19 +139,80 @@ export default function DashboardAssistant({
   }
   return (
     <section className="dp-assistant" aria-label="Dashboard KI">
-      <div className="dp-assistant-toolbar">
-        {(answers.length > 0 || question || error || busy) && (
-          <button type="button" className="btn ghost" onClick={newChat}>
-            <IconMessagePlus size={17} />
-            Neuer Chat
-          </button>
-        )}
-      </div>
       <div className="dp-assistant-intro">
-        <IconSparkles size={23} />
-        <h2>Deine Zahlen. Deine Fragen.</h2>
+        <IconSparkles size={23} className={busy ? 'dp-assistant-icon--busy' : undefined} aria-hidden="true" />
+        <div className="dp-assistant-heading">
+          <h2>Deine Zahlen. Deine Fragen.</h2>
+          {(answers.length > 0 || question || error || busy) && (
+            <button type="button" className="btn ghost dp-assistant-new-chat" onClick={newChat} aria-label="Neuer Chat" title="Neuer Chat">
+              <IconMessagePlus size={17} aria-hidden="true" />
+              <span>Neuer Chat</span>
+            </button>
+          )}
+        </div>
         <p>Reporting und Controlling direkt aus deinem Dashboard.</p>
       </div>
+      {error && (
+        <p className="dp-ai-error" role="alert">
+          {error}
+        </p>
+      )}
+      {answers.length > 0 && (
+        <div className="dp-ai-answers">
+          {answers.map((answer, index) => (
+            <div key={index}>
+              {answer.revision !== revision && (
+                <p className="dp-ai-stale">
+                  Die Daten wurden inzwischen geändert. Diese Antwort zeigt den Stand der damaligen
+                  Abfrage; Quellenlinks öffnen die aktuellen Buchungen.
+                </p>
+              )}
+              {answer.result.reports?.map((report, reportIndex) => (
+                <ReportAnswerCard
+                  key={reportIndex}
+                  answer={report}
+                  question={answer.question}
+                  onSource={onSource}
+                  busy={busy}
+                  onFollowUp={prepareQuestion}
+                />
+              ))}
+              {reportSupplement(answer.result.answer, answer.result.reports) && (
+                <article className={answer.result.reports?.length ? 'ai-report-addendum' : 'ai-report-answer'}>
+                  {!answer.result.reports?.length && <header className="ai-report-heading">
+                    <p className="ai-report-question">{answer.question}</p>
+                    <h3>{answer.result.title || 'VereinO KI'}</h3>
+                  </header>}
+                  <AiMarkdown
+                    text={reportSupplement(answer.result.answer, answer.result.reports)}
+                    onOpenVoucher={(mention) =>
+                      window.dispatchEvent(
+                        new CustomEvent('apply-voucher-jump', {
+                          detail: { ...mention, voucherId: mention.id }
+                        })
+                      )
+                    }
+                  />
+                </article>
+              )}
+              {!!answer.result.drafts.length && (
+                <div className="ai-report-answer">
+                  <strong>Vorschläge zur Prüfung</strong>
+                  <ul>
+                    {answer.result.drafts.map((draft, index) => (
+                      <li key={index}>{draft.title}</li>
+                    ))}
+                  </ul>
+                  <button className="btn" type="button" onClick={() => openAgentReview(answer)}>
+                    Vorschläge im KI-Bereich prüfen
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {busy && <div className="dp-assistant-pending" aria-label="Gesendete Frage">{question}</div>}
       {ready === false ? (
         <div className="dp-assistant-setup">
           <p>Hinterlege deinen KI-Zugang, um Fragen zu deinen Vereinsdaten zu stellen.</p>
@@ -160,6 +229,7 @@ export default function DashboardAssistant({
             }}
           >
             <input
+              ref={questionInput}
               aria-label="Frage zu Reporting oder Controlling"
               placeholder="Wie stehen wir finanziell da?"
               value={question}
@@ -217,8 +287,9 @@ export default function DashboardAssistant({
             ].map((text) => (
               <button
                 key={text}
-                disabled={busy || !ready || !validRange}
-                onClick={() => void askQuestion(text)}
+                type="button"
+                disabled={busy || !ready}
+                onClick={() => prepareQuestion(text)}
               >
                 {text}
               </button>
@@ -226,69 +297,8 @@ export default function DashboardAssistant({
           </div>
         </>
       )}
-      {busy && <p role="status">Die KI prüft deine Frage und ruft passende Daten ab …</p>}
-      {error && (
-        <p className="dp-ai-error" role="alert">
-          {error}
-        </p>
-      )}
-      {answers.length > 0 && (
-        <div className="dp-ai-answers">
-          {answers.map((answer, index) => (
-            <div key={index}>
-              {answer.revision !== revision && (
-                <p className="dp-ai-stale">
-                  Die Daten wurden inzwischen geändert. Diese Antwort zeigt den Stand der damaligen
-                  Abfrage; Quellenlinks öffnen die aktuellen Buchungen.
-                </p>
-              )}
-              {answer.result.reports?.map((report, reportIndex) => (
-                <ReportAnswerCard
-                  key={reportIndex}
-                  answer={report}
-                  question={answer.question}
-                  onSource={onSource}
-                  busy={busy}
-                  onFollowUp={(prompt, selectedScope) => void askQuestion(prompt, selectedScope)}
-                />
-              ))}
-              {reportSupplement(answer.result.answer, answer.result.reports) && (
-                <article className={answer.result.reports?.length ? 'ai-report-addendum' : 'ai-report-answer'}>
-                  {!answer.result.reports?.length && <header className="ai-report-heading">
-                    <p className="ai-report-question">{answer.question}</p>
-                    <h3>{answer.result.title || 'VereinO KI'}</h3>
-                  </header>}
-                  <AiMarkdown
-                    text={reportSupplement(answer.result.answer, answer.result.reports)}
-                    onOpenVoucher={(mention) =>
-                      window.dispatchEvent(
-                        new CustomEvent('apply-voucher-jump', {
-                          detail: { ...mention, voucherId: mention.id }
-                        })
-                      )
-                    }
-                  />
-                </article>
-              )}
-              {!!answer.result.drafts.length && (
-                <div className="ai-report-answer">
-                  <strong>Vorschläge zur Prüfung</strong>
-                  <ul>
-                    {answer.result.drafts.map((draft, index) => (
-                      <li key={index}>{draft.title}</li>
-                    ))}
-                  </ul>
-                  <button className="btn" type="button" onClick={() => openAgentReview(answer)}>
-                    Vorschläge im KI-Bereich prüfen
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
       <span className="sr-only" aria-live="polite">
-        {!busy && answers.length ? 'Die Auswertung ist bereit.' : ''}
+        {busy ? 'Die KI bearbeitet deine Frage.' : answers.length ? 'Die Auswertung ist bereit.' : ''}
       </span>
     </section>
   )

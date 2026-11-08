@@ -4,6 +4,7 @@ export type ToastType = 'info' | 'success' | 'warn' | 'error'
 
 interface ToastContextValue {
   notify: (type: ToastType, text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
+  setProgressToast: (id: string, text: string | null) => void
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null)

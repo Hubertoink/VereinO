@@ -11,7 +11,7 @@ describe('AI reference mentions', () => {
     expect(mentions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ insert: 'Tag:Spende', scope: 'Tag' }),
-        expect.objectContaining({ insert: 'Budget:Jugend', scope: 'Kategorie' }),
+        expect.objectContaining({ insert: 'Budget:Jugend', scope: 'Budget' }),
         expect.objectContaining({ insert: 'Zweck:ZWB', scope: 'Zweckbindung' }),
         expect.objectContaining({ insert: 'Konto:Kasse', scope: 'Zahlungskonto' })
       ])

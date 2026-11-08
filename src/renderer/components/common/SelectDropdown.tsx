@@ -10,6 +10,7 @@ export type SelectDropdownOption = {
 }
 
 type MenuPosition = {
+  zIndex: number
   left: number
   width: number
   top?: number
@@ -44,8 +45,16 @@ function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement |
     const gap = 0
     const below = window.innerHeight - rect.bottom
     const above = rect.top
+    // Portal menus live outside the dialog's stacking context. Keep them above
+    // their own trigger's ancestors, including detached booking/detail dialogs.
+    let zIndex = 6100
+    for (let parent: HTMLElement | null = anchor; parent; parent = parent.parentElement) {
+      const layer = Number(window.getComputedStyle(parent).zIndex)
+      if (Number.isFinite(layer)) zIndex = Math.max(zIndex, layer + 1)
+    }
     const placeAbove = menuPlacement === 'top' || (menuPlacement !== 'bottom' && below < 230 && above > below)
     setPosition({
+      zIndex,
       left: rect.left,
       width: rect.width,
       ...(placeAbove ? { bottom: window.innerHeight - rect.top - 1 } : { top: rect.bottom - 1 }),

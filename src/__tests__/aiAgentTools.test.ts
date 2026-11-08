@@ -6,6 +6,7 @@ jest.mock('../../electron/main/services/aiReporting', () => ({
   generateReportAnswer: jest.fn(async () => ({ report: { title: 'Testbericht' }, usage: {} }))
 }))
 jest.mock('../../electron/main/db/database', () => ({ getDb: jest.fn(), withTransaction: jest.fn() }))
+jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn() }))
 
 jest.mock('../../electron/main/repositories/bankTransactions', () => ({
   listBankTransactions: jest.fn(),
@@ -184,6 +185,16 @@ describe('booking draft tool contract', () => {
       bankReviewSource: { transactionId: 23, amount: 111, counterparty: 'Marc Reiner', counterpartyIban: 'DE12500105170648489890' },
       partyCreationSource: { name: 'Marc Reiner', iban: 'DE12500105170648489890' }
     } } })
+  })
+
+  it('only includes model-generated comments after explicit opt-in', async () => {
+    const getSetting = jest.requireMock('../../electron/main/services/settings').getSetting as jest.Mock
+    const tool = createAiAgentTools({ context }).find(item => item.name === 'booking_draft_prepare')!
+    getSetting.mockReturnValue(undefined)
+    expect((await tool.run({ ...args, note: 'Referenz BREF-123' })).draft?.payload).toMatchObject({ qa: { note: '' } })
+    getSetting.mockReturnValue(true)
+    expect((await tool.run({ ...args, note: 'Referenz BREF-123' })).draft?.payload).toMatchObject({ qa: { note: 'Referenz BREF-123' } })
+    getSetting.mockReturnValue(undefined)
   })
 
   it('returns available categories for correcting arguments instead of diagnosing broken settings', async () => {

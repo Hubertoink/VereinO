@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.12.0] - 2026-11-08
+
+### Hinzugefügt
+
+- KI-Vorschläge für Bankimporte lassen sich gesammelt prüfen, bearbeiten und ausgewählt übernehmen. Erneute Prüfungen bereits analysierter Belege werden bestätigt; laufende Prüfungen zeigen ihren Fortschritt und verhindern parallele Starts.
+- Die ausklappbare Seitenleiste zeigt Zahlungskonten mit Beständen, aktuelle Budgets und Zweckbindungen mit Restbeträgen, Zeiträumen und verbindlichen Sperren sowie den letzten Bankimport je Konto mit Fälligkeitsstatus.
+- Die Versionsnummer in der Seitenleiste öffnet den Changelog.
+
+### Geändert
+
+- KI-Kommentare in Buchungsentwürfen sind standardmäßig aktiviert und können in den KI-Einstellungen ausgeschaltet werden. KI-Regeln steuern ihren Inhalt; technische Begründungen bleiben getrennt.
+- Fragevorschläge und Rückfragen zu KI-Reports füllen zunächst das Eingabefeld. Frage und Zeitraum können vor dem Absenden angepasst werden. Die Eingabe steht unter dem Gesprächsverlauf; das KI-Icon zeigt laufende Anfragen an.
+- Die Seitenleiste öffnet sich sanft, zeigt den Scrollbalken nur beim Darüberfahren und hält Einstellungen sowie Versionsinfo erreichbar. „Neuer Chat“ erscheint ohne zusätzliche Zeile neben der Überschrift.
+
+### Behoben
+
+- Optionale Budgets und Zweckbindungen werden nicht mit erforderlichen Kategorien verwechselt. KI-Vorgaben berücksichtigen die Organisationsform und verwenden bei allgemeinen Organisationen keine gemeinnützigen Sphären.
+- Zweckbindungen sind auch in allgemeinen Organisationen als Modul sichtbar; Budgets benötigen dort keine Kategorie.
+- Budget- und Zweckbindungs-Auswahllisten erscheinen korrekt über den Buchungsdetails. Änderungen an Zeitraum-Sperren und Stammdaten aktualisieren die Seitenleiste unmittelbar.
+
 ## [4.11.0] - 2026-11-07
 
 ### Hinzugefügt

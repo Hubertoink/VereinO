@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
+import type { BankAiReviewProgress } from '../../shared/bankAiReviewProgress'
 import type { QuickAddPayload, RendererApi, UpdateState } from '../../src/types/api'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../shared/dataChange'
 import type { OrganizationProfile } from '../../shared/classification'
@@ -216,6 +217,11 @@ const rendererApi = {
       }
     },
     bankImports: {
+      onReviewProgress: (callback: (progress: BankAiReviewProgress) => void) => {
+        const handler = (_event: IpcRendererEvent, progress: BankAiReviewProgress) => callback(progress)
+        ipcRenderer.on('ai.bankImports.reviewProgress', handler)
+        return () => ipcRenderer.removeListener('ai.bankImports.reviewProgress', handler)
+      },
       reviewOpen: (payload) => cleanInvoke('ai.bankImports.reviewOpen', payload)
     }
   },
@@ -487,6 +493,9 @@ const rendererApi = {
     remapApply: (payload) => invoke('bankImports.remapApply', payload)
   },
   bankTransactions: {
+    previewAiBatch: (payload) => invoke('bankTransactions.previewAiBatch', payload),
+    applyAiBatch: (payload) => invoke('bankTransactions.applyAiBatch', payload),
+    validateAiBatchDraft: (payload) => invoke('bankTransactions.validateAiBatchDraft', payload),
     list: (payload) => invoke('bankTransactions.list', payload),
     importStatus: () => invoke('bankTransactions.importStatus'),
     importHistory: (payload) => invoke('bankTransactions.importHistory', payload),

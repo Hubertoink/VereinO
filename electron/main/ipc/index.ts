@@ -1,3 +1,5 @@
+import { withBankAiReviewLock } from '../services/bankAiReviewLock'
+import type { BankAiReviewProgress } from '../../../shared/bankAiReviewProgress'
 import { buildReportMonths, renderReportAnalytics, reportAnalyticsCss } from '../../../shared/reportAnalytics'
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { getWidgetAutostart, setWidgetAutostart, type createReceiptWidgetController } from '../services/receiptWidget'
@@ -8,6 +10,8 @@ import { filePayloadToBase64, filePayloadToBuffer } from '../services/filePayloa
 import { memberLetterContributionParagraphs } from '../services/memberLetter'
 import { getDashboardTasks } from '../services/dashboardTasks'
 import { z } from 'zod'
+import { currentAiBookingComment } from '../services/aiBookingPolicy'
+import { applyBankAiBatchRow, BankAiBatchApplySchema, BankAiBatchPreviewInput, previewBankAiBatch, validateBankAiBatchDraft } from '../services/bankAiBatch'
 import {
   clearDashboardSnapshotCache,
   getDashboardSnapshot
@@ -1034,7 +1038,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const { configureAiMcpEndpoint } = await loadAiMcpService()
     return AiMcpConfigureOutput.parse(await configureAiMcpEndpoint(parsed))
   })
-  ipcMain.handle('ai.bankImports.reviewOpen', async (_e, payload) => {
+  ipcMain.handle('ai.bankImports.reviewOpen', async (event, payload) => {
     const parsed = AiBankImportReviewInput.parse(payload)
     const transactionIds = parsed?.transactionIds
     const limit = transactionIds?.length || Math.max(1, Math.min(50, Number(parsed?.limit || 20)))
@@ -1055,137 +1059,152 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         warnings: []
       })
     }
-    const transactions = openRows.map((transaction) => {
-      // Give the AI a wider candidate window, including weak local scores.
-      // Type, amount, reversal and existing-link exclusions still apply.
-      const matches = findBankTransactionMatches({ id: transaction.id, forAiReview: true })
-        .slice(0, 20)
-      return {
-        id: transaction.id,
-        bookingDate: transaction.bookingDate,
-        valueDate: transaction.valueDate,
-        direction: transaction.direction,
-        amount: Number(transaction.amount),
-        currency: transaction.currency,
-        counterparty: transaction.counterparty,
-        counterpartyIban: transaction.counterpartyIban,
-        purpose: transaction.purpose,
-        endToEndId: transaction.endToEndId,
-        bankReference: transaction.bankReference,
-        paymentAccountId: transaction.paymentAccountId,
-        paymentAccountName: transaction.paymentAccountName,
-        alreadyLinked: findBankTransactionMatches({ id: transaction.id, linkedOnly: true }),
-        matches
+    return withBankAiReviewLock(getDb(), openRows.map(row => Number(row.id)), async () => {
+      const ids = openRows.map(row => Number(row.id))
+      const progress = (phase: BankAiReviewProgress['phase'], activeIds: number[] = [], completedIds: number[] = []) => {
+        if (parsed?.requestId && !event.sender.isDestroyed()) {
+          try {
+            event.sender.send('ai.bankImports.reviewProgress', { requestId: parsed.requestId, phase, transactionIds: ids, activeIds, completedIds } satisfies BankAiReviewProgress)
+          } catch { /* The renderer may have closed; progress delivery must not fail the review. */ }
+        }
       }
-    })
-    const [{ reviewBankImportTransactions }, { buildAiContext }] = await Promise.all([
-      loadAiService(),
-      loadAiContextService()
-    ])
-    const reviewed = await reviewBankImportTransactions({
-      transactions,
-      context: buildAiContext()
-    })
-    const transactionById = new Map(openRows.map((row) => [Number(row.id), row]))
-    const matchesByTransactionId = new Map(
-      transactions.map((row) => [Number(row.id), row.matches || []])
-    )
-    const voucherSuggestionCounts = new Map<number, number>()
-    for (const suggestion of reviewed.result.suggestions) {
-      if (suggestion.action === 'LINK_EXISTING' && suggestion.voucherId) {
-        voucherSuggestionCounts.set(suggestion.voucherId, (voucherSuggestionCounts.get(suggestion.voucherId) || 0) + 1)
-      }
-    }
-    const suggestions = reviewed.result.suggestions
-      .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
-      .map((suggestion) => {
-        const transaction = transactionById.get(Number(suggestion.transactionId))
-        const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
-        const alreadyLinked = transactions.find((row) => row.id === Number(suggestion.transactionId))?.alreadyLinked || []
-        if (alreadyLinked.length && (suggestion.action === 'CREATE_BOOKING' || suggestion.action === 'APPLY_RECURRING')) {
-          return {
-            ...suggestion,
-            action: 'NEEDS_MANUAL_REVIEW' as const,
-            bookingCandidate: null,
-            reason: `Mögliche Doppelbuchung: ${alreadyLinked.map((match) => `${match.voucherNo} (Bankbeleg #${match.linkedBankTransactionId})`).join(', ')} bereits zugeordnet. Bitte bestehende Zuordnungen im Bankimport prüfen.`,
-            transaction
-          }
+      progress('preparing')
+      const transactions = openRows.map((transaction) => {
+        // Give the AI a wider candidate window, including weak local scores.
+        // Type, amount, reversal and existing-link exclusions still apply.
+        const matches = findBankTransactionMatches({ id: transaction.id, forAiReview: true })
+          .slice(0, 20)
+        return {
+          id: transaction.id,
+          bookingDate: transaction.bookingDate,
+          valueDate: transaction.valueDate,
+          direction: transaction.direction,
+          amount: Number(transaction.amount),
+          currency: transaction.currency,
+          counterparty: transaction.counterparty,
+          counterpartyIban: transaction.counterpartyIban,
+          purpose: transaction.purpose,
+          endToEndId: transaction.endToEndId,
+          bankReference: transaction.bankReference,
+          paymentAccountId: transaction.paymentAccountId,
+          paymentAccountName: transaction.paymentAccountName,
+          alreadyLinked: findBankTransactionMatches({ id: transaction.id, linkedOnly: true }),
+          matches
         }
-        if (suggestion.action === 'LINK_EXISTING') {
-          const match = matches.find(
-            (item: any) => item.matchKind === 'VOUCHER' && Number(item.id) === Number(suggestion.voucherId)
-          )
-          if (!match || (voucherSuggestionCounts.get(Number(suggestion.voucherId)) || 0) > 1) {
-            return {
-              ...suggestion,
-              action: 'NEEDS_MANUAL_REVIEW' as const,
-              voucherId: null,
-              voucherNo: null,
-              reason: `${suggestion.reason} Die vorgeschlagene Buchung ist nicht eindeutig zuordenbar. Bitte manuell prüfen.`,
-              transaction
-            }
-          }
-          return {
-            ...suggestion,
-            voucherNo: match.voucherNo || null,
-            matchedVoucher: {
-              grossAmount: Number(match.grossAmount),
-              date: match.date,
-              description: match.description || null
-            },
-            warnings: [...suggestion.warnings, ...(match.paymentAccountWarning ? [match.paymentAccountWarning] : [])],
-            transaction
-          }
-        }
-        if (suggestion.action === 'APPLY_RECURRING') {
-          const match = matches.find((item: any) =>
-            item.matchKind === 'RECURRING' &&
-            Number(item.recurringBookingId) === Number(suggestion.recurringBookingId) &&
-            (suggestion.occurrenceId
-              ? Number(item.occurrenceId) === Number(suggestion.occurrenceId)
-              : item.scheduledDate === suggestion.scheduledDate)
-          ) as any
-          if (!match) {
-            return {
-              ...suggestion,
-              action: 'NEEDS_MANUAL_REVIEW' as const,
-              recurringBookingId: null,
-              recurringBookingName: null,
-              occurrenceId: null,
-              scheduledDate: null,
-              reason: `${suggestion.reason} Dauerbuchungs-Treffer konnte nicht sicher validiert werden.`,
-              transaction
-            }
-          }
-          return {
-            ...suggestion,
-            recurringBookingId: Number(match.recurringBookingId),
-            recurringBookingName: match.recurringBookingName || null,
-            occurrenceId: match.occurrenceId == null ? null : Number(match.occurrenceId),
-            scheduledDate: match.scheduledDate || match.date,
-            transaction
-          }
-        }
-        return { ...suggestion, transaction }
       })
-    const seen = new Set(suggestions.map((suggestion) => Number(suggestion.transactionId)))
-    for (const transaction of openRows) {
-      if (!seen.has(Number(transaction.id))) {
-        suggestions.push({
-          transactionId: Number(transaction.id),
-          action: 'NEEDS_MANUAL_REVIEW',
-          confidence: 0.2,
-          reason: 'Die KI hat fuer diesen Bankbeleg keinen belastbaren Vorschlag geliefert.',
-          warnings: ['Manuelle Pruefung empfohlen.'],
-          evidence: [],
-          transaction
-        })
+      const [{ reviewBankImportTransactions }, { buildAiContext }] = await Promise.all([
+        loadAiService(),
+        loadAiContextService()
+      ])
+      const reviewed = await reviewBankImportTransactions({
+        transactions,
+        context: buildAiContext(),
+        onProgress: parsed?.requestId ? update => progress('analyzing', update.activeIds, update.completedIds) : undefined
+      })
+      progress('validating', [], ids)
+      const transactionById = new Map(openRows.map((row) => [Number(row.id), row]))
+      const matchesByTransactionId = new Map(
+        transactions.map((row) => [Number(row.id), row.matches || []])
+      )
+      const voucherSuggestionCounts = new Map<number, number>()
+      for (const suggestion of reviewed.result.suggestions) {
+        if (suggestion.action === 'LINK_EXISTING' && suggestion.voucherId) {
+          voucherSuggestionCounts.set(suggestion.voucherId, (voucherSuggestionCounts.get(suggestion.voucherId) || 0) + 1)
+        }
       }
-    }
-    saveBankTransactionAiSuggestions(suggestions)
-    return AiBankImportReviewOutput.parse({
-      ...reviewed.result,
-      suggestions
+      const suggestions = reviewed.result.suggestions
+        .filter((suggestion) => transactionById.has(Number(suggestion.transactionId)))
+        .map((suggestion) => {
+          const transaction = transactionById.get(Number(suggestion.transactionId))
+          const matches = matchesByTransactionId.get(Number(suggestion.transactionId)) || []
+          const alreadyLinked = transactions.find((row) => row.id === Number(suggestion.transactionId))?.alreadyLinked || []
+          if (alreadyLinked.length && (suggestion.action === 'CREATE_BOOKING' || suggestion.action === 'APPLY_RECURRING')) {
+            return {
+              ...suggestion,
+              action: 'NEEDS_MANUAL_REVIEW' as const,
+              bookingCandidate: null,
+              reason: `Mögliche Doppelbuchung: ${alreadyLinked.map((match) => `${match.voucherNo} (Bankbeleg #${match.linkedBankTransactionId})`).join(', ')} bereits zugeordnet. Bitte bestehende Zuordnungen im Bankimport prüfen.`,
+              transaction
+            }
+          }
+          if (suggestion.action === 'LINK_EXISTING') {
+            const match = matches.find(
+              (item: any) => item.matchKind === 'VOUCHER' && Number(item.id) === Number(suggestion.voucherId)
+            )
+            if (!match || (voucherSuggestionCounts.get(Number(suggestion.voucherId)) || 0) > 1) {
+              return {
+                ...suggestion,
+                action: 'NEEDS_MANUAL_REVIEW' as const,
+                voucherId: null,
+                voucherNo: null,
+                reason: `${suggestion.reason} Die vorgeschlagene Buchung ist nicht eindeutig zuordenbar. Bitte manuell prüfen.`,
+                transaction
+              }
+            }
+            return {
+              ...suggestion,
+              voucherNo: match.voucherNo || null,
+              matchedVoucher: {
+                grossAmount: Number(match.grossAmount),
+                date: match.date,
+                description: match.description || null
+              },
+              warnings: [...suggestion.warnings, ...(match.paymentAccountWarning ? [match.paymentAccountWarning] : [])],
+              transaction
+            }
+          }
+          if (suggestion.action === 'APPLY_RECURRING') {
+            const match = matches.find((item: any) =>
+              item.matchKind === 'RECURRING' &&
+              Number(item.recurringBookingId) === Number(suggestion.recurringBookingId) &&
+              (suggestion.occurrenceId
+                ? Number(item.occurrenceId) === Number(suggestion.occurrenceId)
+                : item.scheduledDate === suggestion.scheduledDate)
+            ) as any
+            if (!match) {
+              return {
+                ...suggestion,
+                action: 'NEEDS_MANUAL_REVIEW' as const,
+                recurringBookingId: null,
+                recurringBookingName: null,
+                occurrenceId: null,
+                scheduledDate: null,
+                reason: `${suggestion.reason} Dauerbuchungs-Treffer konnte nicht sicher validiert werden.`,
+                transaction
+              }
+            }
+            return {
+              ...suggestion,
+              recurringBookingId: Number(match.recurringBookingId),
+              recurringBookingName: match.recurringBookingName || null,
+              occurrenceId: match.occurrenceId == null ? null : Number(match.occurrenceId),
+              scheduledDate: match.scheduledDate || match.date,
+              transaction
+            }
+          }
+          return { ...suggestion, transaction }
+        })
+      const seen = new Set(suggestions.map((suggestion) => Number(suggestion.transactionId)))
+      for (const transaction of openRows) {
+        if (!seen.has(Number(transaction.id))) {
+          suggestions.push({
+            transactionId: Number(transaction.id),
+            action: 'NEEDS_MANUAL_REVIEW',
+            confidence: 0.2,
+            reason: 'Die KI hat fuer diesen Bankbeleg keinen belastbaren Vorschlag geliefert.',
+            warnings: ['Manuelle Pruefung empfohlen.'],
+            evidence: [],
+            transaction
+          })
+        }
+      }
+      const output = AiBankImportReviewOutput.parse({
+        ...reviewed.result,
+        suggestions
+      })
+      saveBankTransactionAiSuggestions(suggestions)
+      progress('complete', [], ids)
+      return output
     })
   })
   ipcMain.handle('ai.jobs.create', async (_e, payload) => {
@@ -1278,6 +1297,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       throw new Error('Dieser KI-Buchungsvorschlag wurde bereits gebucht.')
     }
     const voucherPayload = VoucherCreateInput.parse({
+      note: currentAiBookingComment(candidate.note),
       date: candidate.date,
       type: candidate.type,
       sphere: candidate.sphere,
@@ -2269,11 +2289,15 @@ ${reportAnalyticsCss}
   })
   ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
     const parsed = PaymentAccountUpsertInput.parse(payload)
-    return PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
+    const result = PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
+    notifyDataChanged(['settings'])
+    return result
   })
   ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {
     const parsed = PaymentAccountDeleteInput.parse(payload)
-    return PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
+    const result = PaymentAccountDeleteOutput.parse(deletePaymentAccount(parsed.id))
+    notifyDataChanged(['settings'])
+    return result
   })
   ipcMain.handle('parties.list', async (_e, payload) => {
     const parsed = PartiesListInput.parse(payload)
@@ -2338,11 +2362,13 @@ ${reportAnalyticsCss}
   ipcMain.handle('bindings.upsert', async (_e, payload) => {
     const parsed = BindingUpsertInput.parse(payload)
     const res = upsertBinding(parsed as any)
+    notifyDataChanged(['earmarks'])
     return BindingUpsertOutput.parse({ id: res.id })
   })
   ipcMain.handle('bindings.delete', async (_e, payload) => {
     const parsed = BindingDeleteInput.parse(payload)
     const res = deleteBinding(parsed.id)
+    notifyDataChanged(['earmarks'])
     return BindingDeleteOutput.parse(res)
   })
   ipcMain.handle('bindings.usage', async (_e, payload) => {
@@ -2359,6 +2385,7 @@ ${reportAnalyticsCss}
   ipcMain.handle('budgets.upsert', async (_e, payload) => {
     const parsed = BudgetUpsertInput.parse(payload)
     const res = upsertBudget(parsed as any)
+    notifyDataChanged(['budgets'])
     return BudgetUpsertOutput.parse({ id: res.id })
   })
   ipcMain.handle('budgets.list', async (_e, payload) => {
@@ -2369,6 +2396,7 @@ ${reportAnalyticsCss}
   ipcMain.handle('budgets.delete', async (_e, payload) => {
     const parsed = BudgetDeleteInput.parse(payload)
     const res = deleteBudget(parsed.id)
+    notifyDataChanged(['budgets'])
     return BudgetDeleteOutput.parse(res)
   })
   ipcMain.handle('budgets.usage', async (_e, payload) => {
@@ -2596,6 +2624,17 @@ ${reportAnalyticsCss}
   ipcMain.handle('bankTransactions.list', async (_e, payload) => {
     const parsed = BankTransactionsListInput.parse(payload ?? {})
     return BankTransactionsListOutput.parse(listBankTransactions(parsed as any))
+  })
+  ipcMain.handle('bankTransactions.previewAiBatch', (_e, payload) => {
+    return previewBankAiBatch(BankAiBatchPreviewInput.parse(payload).ids)
+  })
+  ipcMain.handle('bankTransactions.applyAiBatch', (_e, payload) => {
+    const result = applyBankAiBatchRow(BankAiBatchApplySchema.parse(payload))
+    notifyDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
+    return result
+  })
+  ipcMain.handle('bankTransactions.validateAiBatchDraft', (_e, payload) => {
+    return validateBankAiBatchDraft(BankAiBatchApplySchema.parse(payload))
   })
   ipcMain.handle('bankTransactions.importStatus', async () => {
     return BankImportStatusOutput.parse(getBankImportStatus())

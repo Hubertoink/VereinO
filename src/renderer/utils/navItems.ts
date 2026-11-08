@@ -38,3 +38,7 @@ export const navItems: NavItem[] = [
   // System
   { key: 'Einstellungen', label: 'Einstellungen', group: 'system' },
 ]
+
+export function getProfileNavigationItems(profile: 'GENERAL' | 'NONPROFIT') {
+  return profile === 'GENERAL' ? navItems.filter(item => item.key !== 'Mitglieder') : navItems
+}

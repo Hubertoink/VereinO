@@ -30,6 +30,7 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
     setBusy(true)
     try {
       const next = await window.api.ai.settings.set({
+        bookingCommentsEnabled: settings.bookingCommentsEnabled,
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         model: settings.model,
         textModel: settings.textModel,
@@ -43,6 +44,7 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
       })
       setSettings(
         normalizeAiSettings({
+          bookingCommentsEnabled: next.bookingCommentsEnabled,
           hasApiKey: next.hasApiKey,
           model: next.model,
           textModel: next.textModel,

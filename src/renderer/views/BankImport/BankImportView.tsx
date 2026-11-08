@@ -1,10 +1,16 @@
+import type { BankTransaction, BankAiSuggestion } from '../../../../shared/bankAiBatch'
+import BankAiBatchModal from './BankAiBatchModal'
+import BankAiRecheckModal from './BankAiRecheckModal'
+import type { BankAiReviewProgress } from '../../../../shared/bankAiReviewProgress'
+import './bankAiReviewProgress.css'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
 import { IconArrowDown, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
 import './bankReview.css'
 import './bankImportDialog.css'
 import './bankImportPage.css'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ToastContext } from '../../context/ToastContextCore'
 import { createPortal } from 'react-dom'
 import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconHistory, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
@@ -21,66 +27,6 @@ type PaymentAccount = {
   iban?: string | null
   color?: string | null
   isActive: number
-}
-
-type BankTransaction = {
-  id: number
-  bookingDate: string
-  valueDate?: string | null
-  direction: 'IN' | 'OUT'
-  amount: number
-  currency: string
-  counterparty?: string | null
-  counterpartyIban?: string | null
-  purpose?: string | null
-  endToEndId?: string | null
-  bankReference?: string | null
-  status: 'OPEN' | 'LINKED' | 'CHECKED'
-  paymentAccountId: number
-  paymentAccountName: string
-  paymentAccountColor?: string | null
-  voucherId?: number | null
-  voucherNo?: string | null
-  voucherDescription?: string | null
-  voucherReversedById?: number | null
-  linkOrigin?: 'EXISTING' | 'CREATED' | null
-  checkedNote?: string | null
-  resolvedAt?: string | null
-  sourceFileName: string
-  matchScore?: number | null
-  possibleDuplicateCount?: number
-  aiSuggestion?: BankAiSuggestion | null
-}
-
-type BankAiSuggestion = {
-  matchedVoucher?: { grossAmount: number; date: string; description: string | null } | null
-  action: 'LINK_EXISTING' | 'APPLY_RECURRING' | 'CREATE_BOOKING' | 'MARK_CHECKED' | 'NEEDS_MANUAL_REVIEW'
-  confidence: number
-  reason: string
-  voucherId?: number | null
-  voucherNo?: string | null
-  recurringBookingId?: number | null
-  recurringBookingName?: string | null
-  occurrenceId?: number | null
-  scheduledDate?: string | null
-  bookingCandidate?: {
-    date: string
-    type: 'IN' | 'OUT'
-    sphere: string
-    primaryClassificationValueId?: number | null
-    counterparty?: string | null
-    description: string
-    grossAmount: number
-    vatRate?: number | null
-    paymentMethod?: string | null
-    paymentAccountId?: number | null
-    budgets?: Array<{ id: number; amount: number }>
-    earmarks?: Array<{ id: number; amount: number }>
-    tags?: string[]
-  } | null
-  warnings: string[]
-  evidence: string[]
-  reviewedAt?: string | null
 }
 
 type BankImportStatus = {
@@ -1710,7 +1656,7 @@ function BankAiSuggestionModal({
             vatRate: candidate.vatRate ?? 0,
             counterparty: transaction.counterparty?.trim() || candidate.counterparty?.trim() || '',
             description: candidate.description,
-            note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason].filter(Boolean).join('\n'),
+            note: candidate.note || '',
             paymentMethod: candidate.paymentMethod || 'BANK',
             paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId,
             paymentAccountName: transaction.paymentAccountName,
@@ -1891,13 +1837,47 @@ export default function BankImportView({
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC')
   const [showImport, setShowImport] = useState(initialTask?.kind === 'bank' && initialTask.accountId != null && !initialTask.filter)
   const [initialImportFile, setInitialImportFile] = useState<File | null>(null)
+  useEffect(() => {
+    if (initialTask?.kind !== 'bank') return
+    setAccountId(initialTask.accountId ?? null)
+    setQuery(''); setFrom(''); setTo(''); setBatchFilter(null); setPage(1); setHistoryPage(1)
+    setStatus('OPEN')
+    setShowImport(initialTask.accountId != null && !initialTask.filter)
+  }, [initialTask])
   const [selected, setSelected] = useState<BankTransaction | null>(null)
   const [aiSuggestionTransaction, setAiSuggestionTransaction] = useState<BankTransaction | null>(null)
+  const [batchReview, setBatchReview] = useState<{ transactions: BankTransaction[]; page: number; scope: string } | null>(null)
+  const [batchVisible, setBatchVisible] = useState(false)
+  useEffect(() => {
+    const hideBatchForDraft = () => setBatchVisible(false)
+    window.addEventListener('ai:open-booking-draft', hideBatchForDraft)
+    return () => window.removeEventListener('ai:open-booking-draft', hideBatchForDraft)
+  }, [])
   const [checkTransaction, setCheckTransaction] = useState<BankTransaction | null>(null)
   const [importStatus, setImportStatus] = useState<BankImportStatus | null>(null)
   const [importStatusLoading, setImportStatusLoading] = useState(true)
   const [importStatusFailed, setImportStatusFailed] = useState(false)
   const [reviewingWithAi, setReviewingWithAi] = useState(false)
+  const [recheckIds, setRecheckIds] = useState<number[] | null>(null)
+  const [reviewProgress, setReviewProgress] = useState<(BankAiReviewProgress & { error?: string }) | null>(null)
+  const progressToastId = useId()
+  const setProgressToast = useContext(ToastContext)?.setProgressToast
+  const progressToastText = reviewingWithAi && reviewProgress && !reviewProgress.error
+    ? reviewProgress.phase === 'validating' || reviewProgress.phase === 'complete'
+      ? 'KI-Prüfung läuft · Vorschläge werden gespeichert …'
+      : `KI-Prüfung läuft · ${reviewProgress.completedIds.length} von ${reviewProgress.transactionIds.length} Bankbelegen analysiert`
+    : null
+  useEffect(() => {
+    setProgressToast?.(progressToastId, progressToastText)
+  }, [setProgressToast, progressToastId, progressToastText])
+  useEffect(() => () => { setProgressToast?.(progressToastId, null) }, [setProgressToast, progressToastId])
+  const reviewRequestId = useRef<string | null>(null)
+  useEffect(() => {
+    const unsubscribe = window.api.ai?.bankImports?.onReviewProgress?.(progress => {
+      if (progress.requestId === reviewRequestId.current) setReviewProgress(progress)
+    })
+    return () => { unsubscribe?.(); reviewRequestId.current = null }
+  }, [])
   useEffect(() => setExpandedId(null), [page, query, status, accountId, from, to, batchFilter])
   const aiReviewInFlight = React.useRef(false)
   const listRequest = React.useRef(0)
@@ -2017,6 +1997,9 @@ export default function BankImportView({
   const previousMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0)
   const olderBankData = selectedAccount?.isActive !== 0 && lastBookingDate != null && lastBookingDate < previousMonthEnd
   const openVisibleIds = rows.filter((row) => row.status === 'OPEN').map((row) => row.id)
+  const unreviewedVisibleIds = rows.filter(row => row.status === 'OPEN' && !row.aiSuggestion).map(row => row.id)
+  const nextReviewIds = unreviewedVisibleIds.length ? unreviewedVisibleIds : openVisibleIds
+  const visibleSuggestions = rows.filter(row => row.status === 'OPEN' && row.aiSuggestion)
 
   const showImportBatch = (entry: { id: number; fileName: string; paymentAccountId: number }) => {
     setAccountId(entry.paymentAccountId)
@@ -2041,26 +2024,47 @@ export default function BankImportView({
     setPage(1)
   }
 
-  const reviewVisibleWithAi = async () => {
-    if (aiReviewInFlight.current || loading || !openVisibleIds.length) return
+  const reviewVisibleWithAi = async (ids: number[]) => {
+    if (aiReviewInFlight.current || loading || !ids.length) return
     aiReviewInFlight.current = true
+    setRecheckIds(null)
     setReviewingWithAi(true)
-    notify('info', `KI prüft passende Zuordnungen für ${openVisibleIds.length} offene Bankbelege …`)
+    const requestId = crypto.randomUUID()
+    reviewRequestId.current = requestId
+    setReviewProgress({ requestId, phase: 'preparing', transactionIds: ids, activeIds: [], completedIds: [] })
     try {
-      const result = await window.api.ai.bankImports.reviewOpen({ transactionIds: openVisibleIds })
+      const result = await window.api.ai.bankImports.reviewOpen({ transactionIds: ids, requestId })
+      setReviewProgress({ requestId, phase: 'complete', transactionIds: result.suggestions.map(s => s.transactionId), activeIds: [], completedIds: result.suggestions.map(s => s.transactionId) })
       const matches = result.suggestions.filter((suggestion) =>
         suggestion.action === 'LINK_EXISTING' || suggestion.action === 'APPLY_RECURRING'
       ).length
       const manual = result.suggestions.filter((suggestion) => suggestion.action === 'NEEDS_MANUAL_REVIEW').length
-      notify(manual ? 'info' : 'success', `${result.suggestions.length} Bankbelege geprüft · ${matches} Zuordnungsvorschläge${manual ? ` · ${manual} manuell prüfen` : ''}. Über das KI-Symbol in der Spalte „Zuordnung“ öffnen.`)
+      notify(manual ? 'info' : 'success', `${result.suggestions.length} Bankbelege geprüft · ${matches} Zuordnungsvorschläge${manual ? ` · ${manual} manuell prüfen` : ''}. Über „Vorschläge“ in der Spalte „Zuordnung“ gesammelt öffnen.`)
       await load()
     } catch (reason: any) {
+      setReviewProgress(previous => previous?.requestId === requestId ? { ...previous, activeIds: [], error: reason?.message || String(reason) } : previous)
       notify('error', `KI-Prüfung fehlgeschlagen: ${reason?.message || String(reason)}`)
     } finally {
+      reviewRequestId.current = null
       aiReviewInFlight.current = false
       setReviewingWithAi(false)
     }
   }
+
+  const requestAiReview = () => {
+    if (aiReviewInFlight.current || loading || !nextReviewIds.length) return
+    if (!unreviewedVisibleIds.length) setRecheckIds([...openVisibleIds])
+    else void reviewVisibleWithAi([...unreviewedVisibleIds])
+  }
+  const rowReviewState = (id: number) => {
+    if (!reviewProgress?.transactionIds.includes(id)) return null
+    if (reviewProgress.error) return 'error'
+    if (reviewProgress.phase === 'complete') return 'done'
+    if (reviewProgress.completedIds.includes(id)) return 'analyzed'
+    if (reviewProgress.activeIds.includes(id)) return 'active'
+    return 'queued'
+  }
+  const rowReviewLabel = { active: 'KI prüft …', queued: 'Wartet auf KI-Prüfung', analyzed: 'Analyse fertig', done: 'KI-geprüft', error: 'Prüfung nicht abgeschlossen' }
 
   return (
     <div className="bank-import-container">
@@ -2202,13 +2206,13 @@ export default function BankImportView({
               className="btn ghost bank-ai-review-button"
               type="button"
               disabled={loading || reviewingWithAi || !openVisibleIds.length}
-              onClick={() => void reviewVisibleWithAi()}
-              title={`KI prüft die ${openVisibleIds.length} offenen Bankbelege auf dieser Seite unter Berücksichtigung der aktuellen Filter. Zuordnungen werden als Vorschläge gespeichert.`}
+              onClick={requestAiReview}
+              title={`KI prüft ${nextReviewIds.length} ${unreviewedVisibleIds.length ? 'noch ungeprüfte' : 'bereits geprüfte'} offene Bankbelege auf dieser Seite unter Berücksichtigung der aktuellen Filter.`}
               aria-label="Sichtbare offene Bankbelege mit KI prüfen"
               aria-busy={reviewingWithAi}
             >
               <AppIcon icon={IconSparkles} size="control" />
-              {reviewingWithAi ? 'KI prüft …' : 'KI prüfen'}
+              {reviewingWithAi ? `KI prüft … ${reviewProgress?.completedIds.length || 0}/${reviewProgress?.transactionIds.length || 0}` : 'KI prüfen'}
             </button>
             <BankImportActionDropdown
               onOpenImport={(file) => {
@@ -2250,7 +2254,14 @@ export default function BankImportView({
               <th className="sortable" aria-sort={sortBy === 'status' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('status')}> Status {renderSort('status')}</button></th>
               <th className="sortable" aria-sort={sortBy === 'date' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('date')}> Datum {renderSort('date')}</button></th>
               <th className="sortable" aria-sort={sortBy === 'description' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('description')}> Beschreibung {renderSort('description')}</button></th>
-              <th>Zuordnung</th>
+              <th>Zuordnung<br /><button type="button" className="bank-ai-batch-trigger"
+                disabled={loading || reviewingWithAi || (!visibleSuggestions.length && !batchReview)}
+                title="KI-Vorschläge der aktuellen Seite gesammelt prüfen"
+                onClick={() => {
+                  if (!batchReview) setBatchReview({ transactions: visibleSuggestions, page,
+                    scope: [selectedAccount?.name || 'Alle Zahlkonten', from && `ab ${from}`, to && `bis ${to}`, query && `Suche: ${query}`, batchFilter?.fileName].filter(Boolean).join(' · ') })
+                  setBatchVisible(true)
+                }}><IconSparkles size={14} aria-hidden="true" />{batchReview ? 'Prüfung fortsetzen' : `Vorschläge (${visibleSuggestions.length})`}</button></th>
               <th className="sortable" aria-sort={sortBy === 'account' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('account')}> Zahlkonto {renderSort('account')}</button></th>
               <th className="sortable" aria-sort={sortBy === 'type' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('type')}> Typ {renderSort('type')}</button></th>
               <th className="number sortable" aria-sort={sortBy === 'amount' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('amount')}> Summe {renderSort('amount')}</button></th>
@@ -2259,7 +2270,7 @@ export default function BankImportView({
           <tbody>
             {rows.map((row) => (
               <React.Fragment key={row.id}>
-              <tr className={expandedId === row.id ? 'bank-row-expanded' : undefined}>
+              <tr data-bank-transaction-id={row.id} aria-busy={rowReviewState(row.id) === 'active'} className={[expandedId === row.id ? 'bank-row-expanded' : '', rowReviewState(row.id) ? `bank-ai-row-${rowReviewState(row.id)}` : ''].filter(Boolean).join(' ')}>
                 <td><button className="btn ghost bank-expand" aria-expanded={expandedId === row.id} aria-controls={`bank-inline-${row.id}`} aria-label={`Bankbeleg ${row.id}: Details ${expandedId === row.id ? 'schließen' : 'anzeigen'}`} onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}>{expandedId === row.id ? '−' : '+'}</button></td>
                 <td>
                   <span
@@ -2276,6 +2287,7 @@ export default function BankImportView({
                     <span className={`bank-import-direction-symbol bank-import-direction-symbol--${row.direction.toLowerCase()}`} aria-hidden="true"><AppIcon icon={row.direction === 'OUT' ? IconArrowUp : IconArrowDown} size="action" /></span>
                     <div><button className="bank-description-button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} aria-expanded={expandedId === row.id}>{row.counterparty || row.purpose || 'Ohne Beschreibung'}</button>
                       {row.counterparty && row.purpose && <span className="bank-import-purpose-subline" title={row.purpose}>{row.purpose}</span>}
+                      {rowReviewState(row.id) && <span className={`bank-ai-row-progress bank-ai-row-progress--${rowReviewState(row.id)}`}>{rowReviewLabel[rowReviewState(row.id)!]}</span>}
                     </div>
                   </div>
                 </td>
@@ -2305,6 +2317,7 @@ export default function BankImportView({
                             type="button"
                             title="KI-Vorschlag öffnen"
                             aria-label="KI-Vorschlag öffnen"
+                            disabled={reviewingWithAi && reviewProgress?.transactionIds.includes(row.id)}
                             onClick={(event) => {
                               event.stopPropagation()
                               setAiSuggestionTransaction(row)
@@ -2414,6 +2427,11 @@ export default function BankImportView({
         />
       )}
       {remapBatchId != null && <BankImportRemapDialog batchId={remapBatchId} onClose={() => setRemapBatchId(null)} onApplied={() => { setListRefresh(value => value + 1); setHistoryRefresh(value => value + 1) }} notify={notify} />}
+      {recheckIds && <BankAiRecheckModal count={recheckIds.length} page={page} onClose={() => setRecheckIds(null)} onConfirm={() => void reviewVisibleWithAi(recheckIds)} />}
+      {batchReview && <BankAiBatchModal transactions={batchReview.transactions} page={batchReview.page} scope={batchReview.scope} visible={batchVisible}
+        onClose={() => { setBatchReview(null); setBatchVisible(false) }}
+        onChanged={() => { dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings']); void load() }}
+        onReview={transaction => transaction.aiSuggestion ? setAiSuggestionTransaction(transaction) : setSelected(transaction)} />}
       {selected && (
         <BankReviewModal
           transaction={selected}
@@ -2423,7 +2441,7 @@ export default function BankImportView({
             dispatchDataChanged(['bank-imports', 'vouchers'])
             void load()
           }}
-          onCreateBooking={onCreateBooking}
+          onCreateBooking={(transaction, acknowledgements) => { setBatchVisible(false); onCreateBooking(transaction, acknowledgements) }}
           onCheckWithoutBooking={setCheckTransaction}
           onOpenVoucher={onOpenVoucher}
         />

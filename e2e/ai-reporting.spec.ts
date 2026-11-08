@@ -10,6 +10,8 @@ test.beforeAll(async () => {
     import { createRoot } from 'react-dom/client'
     import DashboardAssistant from './src/renderer/views/DashboardPlus/DashboardAssistant'
     import { AiMessageList } from './src/renderer/views/AI/AiMessageList'
+    import { takeAgentReview } from './src/renderer/utils/aiAgentHandoff'
+    window.addEventListener('ai:continue-agent', () => { window.reviewHandoff = takeAgentReview('test') })
     import { buildReportFinance } from './shared/aiReporting'
     window.requests = []; window.sources = []; window.fail = false; window.pending = false; window.empty = false
     window.api = {
@@ -22,7 +24,7 @@ test.beforeAll(async () => {
         const finance = buildReportFinance(input, rows, rows.map(row => ({ ...row, gross: -1693.75 })), 0, '2026-11-07T12:00:00Z')
         const result = { title: 'So hat sich euer Saldo entwickelt', summary: 'Die Ausgaben übersteigen die Einnahmen. Die Veränderung konzentriert sich auf August.', notes: ['Die Werte stammen aus den gebuchten Einnahmen und Ausgaben.'], blocks: [{ type: 'metrics', data: 'finance' }, { type: 'balance', data: 'finance' }], datasets: { finance } }
         window.lastReport = result
-        const response = { sessionId: 'test-session', answer: result.summary + (window.extraText || ''), reports: [result], drafts: [], trace: [], toolCalls: [] }
+        const response = { sessionId: 'test-session', answer: result.summary + (window.extraText || ''), reports: [result], drafts: window.drafts || [], trace: [], toolCalls: [] }
         if (window.pending) return new Promise(resolve => window.finishReport = () => resolve(response))
         return response
       } } }
@@ -44,6 +46,7 @@ test.beforeEach(async ({ page }) => {
 
 const ask = async (page: import('@playwright/test').Page) => {
   await page.getByRole('button', { name: 'Wie hat sich unser Saldo entwickelt?', exact: true }).click()
+  await page.getByRole('button', { name: 'Frage senden' }).click()
   await expect(page.getByRole('heading', { name: 'So hat sich euer Saldo entwickelt' })).toBeVisible()
 }
 
@@ -72,6 +75,8 @@ test('follow-ups preserve the original scope even after the date controls change
   await ask(page)
   await page.getByLabel('Auswertung von').fill('2026-10-01')
   await page.getByRole('button', { name: 'Erkläre die Entwicklung kurz für den Vorstand.' }).click()
+  await expect(page.getByLabel('Frage zu Reporting oder Controlling')).toHaveValue('Erkläre die Entwicklung kurz für den Vorstand.')
+  await page.getByRole('button', { name: 'Frage senden' }).click()
   await expect(page.locator('.ai-report-answer')).toHaveCount(2)
   const request = await page.evaluate(() => (window as any).requests[1])
   expect(request.from).toBe('2026-08-12')
@@ -107,7 +112,8 @@ test('late responses cannot reappear after a new chat or organization switch', a
   for (const reset of ['new', 'organization']) {
     await page.evaluate(() => { (window as any).pending = true })
     await page.getByRole('button', { name: 'Wie hat sich unser Saldo entwickelt?', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText('prüft deine Frage')
+  await page.getByRole('button', { name: 'Frage senden' }).click()
+    await expect(page.locator('.dp-assistant-icon--busy')).toBeVisible()
     if (reset === 'new') await page.getByRole('button', { name: 'Neuer Chat' }).click()
     else await page.evaluate(() => (window as any).switchOrg())
     await page.evaluate(() => (window as any).finishReport())
@@ -182,4 +188,39 @@ test('report summaries are shown once while additional findings remain in dashbo
   await page.evaluate(() => (window as any).renderAgentReport())
   await expect(page.getByText(summary, { exact: true })).toHaveCount(1)
   await expect(page.getByText('Zwei Beiträge sind noch offen.', { exact: true })).toBeVisible()
+})
+
+
+test('suggestions only fill the input and allow editing the question and period before sending', async ({ page }) => {
+  await page.getByRole('button', { name: 'Wie hat sich unser Saldo entwickelt?', exact: true }).click()
+  const input = page.getByLabel('Frage zu Reporting oder Controlling')
+  await expect(input).toBeFocused()
+  await expect(input).toHaveValue('Wie hat sich unser Saldo entwickelt?')
+  expect(await page.evaluate(() => (window as any).requests)).toEqual([])
+  await input.fill('Wie hat sich unser Saldo im August entwickelt?')
+  await page.getByLabel('Auswertung von').fill('2026-08-01')
+  await page.getByLabel('Auswertung bis').fill('2026-08-31')
+  await page.evaluate(() => { (window as any).pending = true })
+  await page.getByRole('button', { name: 'Frage senden' }).click()
+  await expect(page.locator('.dp-assistant-icon--busy')).toBeVisible()
+  expect(await page.evaluate(() => (window as any).requests[0])).toMatchObject({ question: 'Wie hat sich unser Saldo im August entwickelt?', from: '2026-08-01', to: '2026-08-31' })
+  await page.evaluate(() => (window as any).finishReport())
+  await expect(page.locator('.dp-assistant-icon--busy')).toHaveCount(0)
+})
+
+
+test('keeps the composer below answers and hands budget drafts to review without another run', async ({ page }) => {
+  await page.evaluate(() => { (window as any).drafts = [{ kind: 'budgetChange', title: 'Budget Raumkosten', payload: { name: 'Raumkosten' } }] })
+  await ask(page)
+  const answers = page.locator('.dp-ai-answers')
+  const form = page.locator('.dp-assistant form')
+  expect(await answers.evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('.dp-assistant form')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+  const bounds = await answers.boundingBox()
+  expect((await form.boundingBox())!.y).toBeGreaterThanOrEqual(bounds!.y + bounds!.height)
+  await page.getByRole('button', { name: 'Vorschläge im KI-Bereich prüfen' }).click()
+  expect(await page.evaluate(() => (window as any).requests.length)).toBe(1)
+  expect(await page.evaluate(() => (window as any).reviewHandoff.result.drafts[0].kind)).toBe('budgetChange')
+  await page.getByRole('button', { name: 'Neuer Chat' }).click()
+  await expect(answers).toHaveCount(0)
+  await expect(page.getByLabel('Frage zu Reporting oder Controlling')).toHaveValue('')
 })

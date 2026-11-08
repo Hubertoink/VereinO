@@ -6304,6 +6304,12 @@ tbody tr.row-flash {
   pointer-events: none;
 }
 
+.toast-progress { flex-wrap: nowrap; max-width: min(420px, calc(100vw - 64px)); min-width: 0; }
+.toast-progress > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+.toast-spinner { flex: 0 0 auto; animation: toastSpin 1s linear infinite; }
+@keyframes toastSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .toast-spinner { animation: none; } }
+
 @keyframes toastIn {
   from {
     opacity: 0;

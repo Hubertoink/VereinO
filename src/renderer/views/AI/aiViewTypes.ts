@@ -38,7 +38,7 @@ export type AiMentionOption = {
   id: string
   label: string
   insert: string
-  scope: 'Bereich' | 'Tag' | 'Kategorie' | 'Zweckbindung' | 'Zahlungskonto' | 'Sphäre'
+  scope: 'Bereich' | 'Tag' | 'Budget' | 'Kategorie' | 'Zweckbindung' | 'Zahlungskonto' | 'Sphäre'
   description: string
   plannerHint: string
 }

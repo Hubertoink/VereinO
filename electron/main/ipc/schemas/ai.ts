@@ -48,6 +48,7 @@ export const AiBookingSourceStructured = z.object({
 })
 
 export const AiBookingCandidate = z.object({
+  note: z.string().nullable().optional(),
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
   sphere: Sphere,
@@ -82,6 +83,7 @@ export const AiTextDraftResult = z.object({
 })
 
 export const AiBookingCandidateStructured = z.object({
+  note: z.string().nullable(),
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
   sphere: Sphere,
@@ -708,6 +710,7 @@ export const AiProvider = z.enum(['openai', 'minimax', 'mittwald'])
 export const AiProxyMode = z.enum(['system', 'direct', 'manual'])
 export const AiTaskProfile = z.enum(['auto', 'fast', 'quality', 'custom'])
 export const AiSettingsGetOutput = z.object({
+  bookingCommentsEnabled: z.boolean().default(true),
   hasApiKey: z.boolean(),
   model: z.string(),
   textModel: z.string(),
@@ -721,6 +724,7 @@ export const AiSettingsGetOutput = z.object({
   proxyBypassRules: z.string().default('<local>')
 })
 export const AiSettingsSetInput = z.object({
+  bookingCommentsEnabled: z.boolean().optional(),
   apiKey: z.string().optional(),
   model: z.string().min(1).max(200).optional(),
   textModel: z.string().min(1).max(200).optional(),
@@ -734,6 +738,7 @@ export const AiSettingsSetInput = z.object({
   proxyBypassRules: z.string().max(4096).optional()
 })
 export const AiSettingsSetOutput = z.object({
+  bookingCommentsEnabled: z.boolean().default(true),
   ok: z.boolean(),
   hasApiKey: z.boolean(),
   model: z.string(),
@@ -771,6 +776,7 @@ export const AiMcpConfigureInput = z.object({
 export const AiMcpConfigureOutput = AiMcpStatusOutput
 export const AiBankImportReviewInput = z
   .object({
+    requestId: z.string().min(1).max(100).optional(),
     limit: z.number().int().min(1).max(50).default(20).optional(),
     transactionIds: z.array(z.number().int().positive()).min(1).max(50).optional()
   })

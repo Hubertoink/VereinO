@@ -56,7 +56,7 @@ it('does not demand a document source in the bank review output schema', () => {
       ...link, action: 'CREATE_BOOKING', voucherId: null, voucherNo: null,
       recurringBookingId: null, recurringBookingName: null, occurrenceId: null, scheduledDate: null,
       warnings: [], evidence: [],
-      bookingCandidate: { ...booking, vatRate: 0, paymentMethod: null, paymentAccountId: null,
+      bookingCandidate: { ...booking, note: null, vatRate: 0, paymentMethod: null, paymentAccountId: null,
         counterparty: null, counterpartyIban: null, budgets: [], earmarks: [], tags: [], confidence: 0.8, warnings: [], evidence: [] }
     }], summary: null, warnings: []
   }).success).toBe(true)

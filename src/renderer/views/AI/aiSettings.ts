@@ -1,6 +1,7 @@
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
 
 export const DEFAULT_AI_SETTINGS: TAiSettingsGetOutput = {
+  bookingCommentsEnabled: true,
   hasApiKey: false,
   model: 'gpt-5.5',
   textModel: 'gpt-5.4-mini',
@@ -104,6 +105,7 @@ export function normalizeAiSettings(settings: TAiSettingsGetOutput): TAiSettings
   const usesDiscoveredMittwaldModel = settings.provider === 'mittwald'
   return {
     ...settings,
+    bookingCommentsEnabled: settings.bookingCommentsEnabled !== false,
     apiBaseUrl: providerConfig.apiBaseUrl,
     model:
       (usesDiscoveredMittwaldModel && settings.model.trim()) || allowedModels.has(settings.model)

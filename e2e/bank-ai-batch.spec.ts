@@ -1,0 +1,170 @@
+import { expect, test } from '@playwright/test'
+import { build } from 'esbuild'
+import fs from 'node:fs/promises'
+
+let script: string
+let css: string
+test.beforeAll(async () => {
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/BankImport/bankAiBatch.css'].map(path => fs.readFile(path, 'utf8')))).join('\n')
+  const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+    import React from 'react'
+    import { createRoot } from 'react-dom/client'
+    import BankAiBatchModal from './src/renderer/views/BankImport/BankAiBatchModal'
+    const root = createRoot(document.getElementById('root'))
+    window.renderBatch = (options = {}) => {
+      window.applied = []; window.closes = 0; window.changed = 0; window.reviews = []
+      const names = ['Canva Pty Ltd', 'REWE Markt GmbH', 'Raummiete Jugendhaus']
+      const transactions = names.map((counterparty, i) => ({ id: i + 1, status: 'OPEN', direction: 'OUT', amount: 29.99 + i,
+        bookingDate: '2026-08-13', currency: 'EUR', paymentAccountId: 1, paymentAccountName: 'Bank', counterparty, purpose: 'Jugendhaus August',
+        aiSuggestion: { action: 'CREATE_BOOKING', reason: 'Wiederkehrende Ausgabe für das Jugendhaus.', warnings: [], evidence: [],
+          bookingCandidate: { date: '2026-08-13', type: 'OUT', sphere: 'IDEELL', description: 'Ausgabe Jugendhaus', grossAmount: 29.99 + i, vatRate: 0, budgets: [], earmarks: [], tags: [] } }
+      }))
+      if (options.mixed) transactions[1].aiSuggestion = { action: 'LINK_EXISTING', voucherId: 41, voucherNo: '2026-41', reason: 'Passende Buchung.', warnings: [], evidence: [] }
+      const rows = transactions.map(transaction => ({ transaction, token: 'a'.repeat(64), commentsEnabled: !!options.comments,
+        candidate: transaction.aiSuggestion.bookingCandidate ? { ...transaction.aiSuggestion.bookingCandidate, note: options.comments ? 'Referenz BREF-123' : '' } : null,
+        targetDescription: 'Verpflegung Jugendhaus', warnings: transaction.id === 1 ? ['Kein Budget zugeordnet.'] : [],
+        blockers: transaction.id === 3 ? ['Mögliche Doppelbuchung. Bitte einzeln prüfen.'] : options.missingCategory && transaction.id === 1 ? ['Eine Kategorie ist erforderlich.'] : [] }))
+      window.api = {
+        bankTransactions: {
+          validateAiBatchDraft: async ({ candidate }) => ({ blockers: candidate.description.trim() && (!options.missingCategory || candidate.primaryClassificationValueId) ? [] : ['Bitte Buchungstext und Kategorie ergänzen.'] }),
+          previewAiBatch: async () => { if (options.loadFailure) throw new Error('Vorschau nicht verfügbar'); return rows },
+          applyAiBatch: async (payload) => {
+            window.applied.push(payload)
+            if (options.hold) await new Promise(resolve => window.finishApply = resolve)
+            if (options.failSecond && payload.id === 2) { options.failSecond = false; throw new Error('Zeitraum geschlossen') }
+            return { voucherId: 40 + payload.id, voucherNo: '2026-' + (40 + payload.id), warnings: [] }
+          }
+        },
+        classifications: { primary: { list: async () => ({ profile: options.general ? 'GENERAL' : 'NONPROFIT', definition: { primaryLabel: options.general ? 'Kategorie' : 'Sphäre' }, values: [
+          { id: 1, stableKey: 'IDEELL', name: options.general ? 'Verwaltung' : 'Ideeller Bereich', isActive: true },
+          { id: 2, stableKey: 'ZWECK', name: options.general ? 'Veranstaltungen' : 'Zweckbetrieb', isActive: true }
+        ] }) } },
+        budgets: { list: async () => ({ rows: [{ id: 9, name: 'Jugendhaus' }] }) },
+        bindings: { list: async () => ({ rows: [] }) }
+      }
+      window.changePreview = () => { rows[0].token = 'b'.repeat(64) }
+      window.setBatchVisibility = (visible) => root.render(<BankAiBatchModal visible={visible} transactions={transactions} page={2} onClose={() => window.closes++} onChanged={() => window.changed++} onReview={t => window.reviews.push(t.id)} />)
+      window.setBatchVisibility(true)
+    }
+  ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })
+  script = result.outputFiles[0].text
+})
+
+test.beforeEach(async ({ page }) => {
+  await page.route('http://batch.test/**', route => route.fulfill({ contentType: 'text/html', body: '<html data-theme="light"><div id="root"></div></html>' }))
+  await page.goto('http://batch.test/')
+  await page.addStyleTag({ content: css })
+  await page.addScriptTag({ content: script })
+})
+
+test('requires selection, excludes blockers, shows results and retries only failed rows', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await page.evaluate(() => (window as any).renderBatch({ failSecond: true }))
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Vorschau aktualisieren' })).toHaveCount(0)
+  await expect(page.getByText('Hinweis: Kein Budget zugeordnet.')).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })).toBeEnabled()
+  await expect(page.getByText(/Seite 2/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '0 Vorschläge übernehmen' })).toBeDisabled()
+  await expect(page.getByRole('checkbox', { name: 'Bankbeleg 3 auswählen' })).toBeDisabled()
+  await page.getByRole('checkbox', { name: 'Alle übernahmefähigen Vorschläge auswählen' }).check()
+  await expect(page.getByRole('checkbox', { name: 'Bankbeleg 3 auswählen' })).not.toBeChecked()
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await page.getByLabel('Buchungstext', { exact: true }).fill('Canva Pro Monatsabo Jugendhaus')
+  await page.getByLabel('Budget hinzufügen', { exact: true }).selectOption('9')
+  await expect(page.getByText('Hinweis: Kein Budget zugeordnet.')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '2 Buchungen anlegen' })).toBeEnabled()
+  await page.screenshot({ path: info.outputPath('batch-review-edit.png') })
+  await page.getByRole('button', { name: '2 Buchungen anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-41', { exact: true })).toBeVisible()
+  await expect(page.getByText('Zeitraum geschlossen', { exact: true })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })).toBeDisabled()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-42', { exact: true })).toBeVisible()
+  const applied = await page.evaluate(() => (window as any).applied)
+  expect(applied.map((p: any) => p.id)).toEqual([1, 2, 2])
+  expect(applied[0].candidate).toMatchObject({ description: 'Canva Pro Monatsabo Jugendhaus', budgets: [{ id: 9, amount: 29.99 }] })
+})
+
+test('locks close, selection and submission while processing and exposes individual review', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ hold: true, mixed: true }))
+  await page.getByRole('button', { name: 'Einzeln prüfen' }).click()
+  expect(await page.evaluate(() => (window as any).reviews)).toEqual([3])
+  await page.getByRole('checkbox', { name: 'Bankbeleg 2 auswählen' }).check()
+  await expect(page.getByText('0 neue Buchungen · 1 Zuordnungen · 0 Dauerbuchungen')).toBeVisible()
+  await page.getByRole('button', { name: '1 Vorschlag übernehmen' }).click()
+  await expect(page.getByRole('button', { name: 'Wird übernommen …', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Schließen', exact: true }).first()).toBeDisabled()
+  await page.keyboard.press('Escape')
+  expect(await page.evaluate(() => (window as any).closes)).toBe(0)
+  await page.evaluate(() => (window as any).finishApply())
+  await expect(page.getByText('Zugeordnet · 2026-42')).toBeVisible()
+})
+
+test('keeps the footer reachable on small screens and supports general categories', async ({ page }, info) => {
+  await page.setViewportSize({ width: 520, height: 740 })
+  await page.evaluate(() => (window as any).renderBatch({ general: true }))
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await page.getByLabel('Kategorie', { exact: true }).selectOption('2')
+  await page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' }).check()
+  const button = page.getByRole('button', { name: '1 Buchung anlegen' })
+  const box = await button.boundingBox()
+  await page.screenshot({ path: info.outputPath('batch-small-screen.png') })
+  expect(box!.y + box!.height).toBeLessThanOrEqual(740)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(520)
+  await button.click()
+  await expect(page.getByText('Angelegt · 2026-41')).toBeVisible()
+  expect((await page.evaluate(() => (window as any).applied))[0].candidate).toMatchObject({ primaryClassificationValueId: 2, sphere: 'IDEELL' })
+})
+
+test('failed preview never enables bulk approval', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ loadFailure: true }))
+  await expect(page.getByRole('alert')).toContainText('Vorschau nicht verfügbar')
+  await expect(page.getByRole('button', { name: '0 Vorschläge übernehmen' })).toBeDisabled()
+  await expect(page.getByRole('checkbox', { name: 'Alle übernahmefähigen Vorschläge auswählen' })).toBeDisabled()
+})
+
+test('a blocked draft remains editable and becomes selectable after fixing required data', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ general: true, missingCategory: true }))
+  const checkbox = page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })
+  await expect(checkbox).toBeDisabled()
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await expect(page.getByLabel('Kategorie', { exact: true })).toBeEnabled()
+  await page.getByLabel('Kategorie', { exact: true }).selectOption('2')
+  await expect(checkbox).toBeEnabled()
+  await checkbox.check()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-41')).toBeVisible()
+})
+
+test('preserves repaired drafts and selection on return, but clears consent for changed suggestions', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ general: true, missingCategory: true }))
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await page.getByLabel('Kategorie', { exact: true }).selectOption('2')
+  const checkbox = page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })
+  await expect(checkbox).toBeEnabled()
+  await checkbox.check()
+  await page.evaluate(() => (window as any).setBatchVisibility(false))
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.evaluate(() => (window as any).setBatchVisibility(true))
+  await expect(checkbox).toBeChecked()
+  await expect(page.getByLabel('Kategorie', { exact: true })).toHaveValue('2')
+  await page.evaluate(() => { (window as any).changePreview(); (window as any).setBatchVisibility(false) })
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.evaluate(() => (window as any).setBatchVisibility(true))
+  await expect(checkbox).not.toBeChecked()
+  await expect(checkbox).toBeDisabled()
+})
+
+test('opted-in comments are visible, editable and sent with the approved draft', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ comments: true }))
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await expect(page.getByLabel('Kommentar', { exact: true })).toHaveValue('Referenz BREF-123')
+  await page.getByLabel('Kommentar', { exact: true }).fill('Referenz BREF-123 · Jugendhaus')
+  const checkbox = page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })
+  await expect(checkbox).toBeEnabled()
+  await checkbox.check()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-41')).toBeVisible()
+  expect((await page.evaluate(() => (window as any).applied))[0].candidate.note).toBe('Referenz BREF-123 · Jugendhaus')
+})

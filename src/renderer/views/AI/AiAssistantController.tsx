@@ -1,3 +1,4 @@
+import { currentAiDraftComment } from '../../utils/aiBookingDraft'
 import { resolveBankDraftParty } from '../../utils/bankDraftParty'
 import { takeAgentReview } from '../../utils/aiAgentHandoff'
 import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
@@ -1115,9 +1116,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             description: reviewCandidate.description,
             counterparty: reviewCandidate.counterparty || '',
             partyCreationSource: { name: reviewCandidate.counterparty || '', iban: reviewCandidate.counterpartyIban },
-            note: ['Aus KI-Buchungsvorschlag vorbereitet.', ...(reviewCandidate.warnings || [])]
-              .filter(Boolean)
-              .join('\n'),
+            note: reviewCandidate.note || '',
             paymentMethod: reviewCandidate.paymentMethod ?? null,
             paymentAccountId: reviewCandidate.paymentAccountId ?? null,
             paymentAccountName,
@@ -2055,7 +2054,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         type: 'IN',
         sphere: 'IDEELL',
         description: pendingContributionPayment.description,
-        note: `Aus VereinO KI-Beitragsvorschlag erstellt und mit ${pendingContributionPayment.memberName} / ${pendingContributionPayment.periodKey} verknüpft.`,
+        note: '',
         grossAmount: pendingContributionPayment.amount,
         vatRate: 0,
         paymentMethod: pendingContributionPayment.paymentMethod || undefined,
@@ -2290,10 +2289,10 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
               .join('\n')
           : '- keine Tags angelegt',
         '',
-        'Budgets/Kategorien:',
+        'Optionale Budgets:',
         budgetLabels.length
           ? budgetLabels.map((name) => `- ${name}`).join('\n')
-          : '- keine Budgets oder Kategorien angelegt',
+          : '- keine Budgets angelegt',
         '',
         'Zweckbindungen:',
         bindingRows.length
@@ -3187,7 +3186,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         sphere: replacement.sphere,
         primaryClassificationValueId: replacement.primaryClassificationValueId ?? undefined,
         description: replacement.description,
-        note: replacement.note || `Ersatzbuchung nach Storno ${reversal.voucherNo}.`,
+        note: replacement.note || '',
         grossAmount: Number(replacement.grossAmount || 0),
         vatRate: Number(replacement.vatRate || 0),
         paymentMethod: replacement.paymentMethod || undefined,
@@ -3399,9 +3398,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         sphere: candidate.sphere,
         primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
         description: candidate.description,
-        note: ['Aus KI-Bankimport-Vorschlag erstellt.', suggestion.reason]
-          .filter(Boolean)
-          .join('\n'),
+        note: await currentAiDraftComment(candidate.note),
         grossAmount: candidate.grossAmount,
         vatRate: candidate.vatRate ?? 0,
         paymentMethod:
@@ -3453,9 +3450,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             vatRate: candidate.vatRate ?? 0,
             counterparty: transaction.counterparty?.trim() || candidate.counterparty?.trim() || '',
             description: candidate.description,
-            note: ['Aus KI-Bankimport-Vorschlag vorbereitet.', suggestion.reason]
-              .filter(Boolean)
-              .join('\n'),
+            note: candidate.note || '',
             paymentMethod:
               candidate.paymentMethod ??
               paymentMethodForAccount(transaction.paymentAccountKind) ??
@@ -4986,8 +4981,8 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             busy={busy}
             onReportFollowUp={(question, scope) => {
               const text = `${question} Zeitraum: ${scope.from} bis ${scope.to}.`
-              if (files.length) { setPrompt(text); promptInputRef.current?.focus() }
-              else void submitPrompt(text)
+              setPrompt(text)
+              promptInputRef.current?.focus()
             }}
           />
 

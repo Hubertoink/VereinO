@@ -1,3 +1,4 @@
+import type { BankAiReviewProgress } from '../../../shared/bankAiReviewProgress'
 import type {
   TAiActionPlanInput,
   TAiActionPlanOutput,
@@ -118,6 +119,7 @@ export interface AiApi {
       }
     }
     bankImports: {
+      onReviewProgress: (callback: (progress: BankAiReviewProgress) => void) => () => void
       reviewOpen: (payload?: TAiBankImportReviewInput) => Promise<TAiBankImportReviewOutput>
     }
   }

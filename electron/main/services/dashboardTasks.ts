@@ -6,14 +6,12 @@ import { assignmentMonthly } from '../repositories/assignmentMonthly'
 import { advanceRecurringSchedule, type RecurringFrequency } from '../../../shared/recurrence'
 import { recurringGrossAmount } from '../../../shared/recurringMatching'
 import type { DashboardTasks, DashboardTaskGroup, DashboardTaskItem, DashboardTaskKind, DashboardTaskLevel } from '../../../shared/dashboardTasks'
+import { bankReminderDays } from '../../../shared/bankImportReminder'
+export { bankReminderDays } from '../../../shared/bankImportReminder'
 
 const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const dateLabel = (date: string) => date.slice(0, 10).split('-').reverse().join('.')
 export const taskDaysBetween = (today: string, date: string) => Math.max(0, Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${date.slice(0, 10)}T00:00:00Z`)) / 86400000))
-export function bankReminderDays(value: unknown) {
-  const days = Number(value)
-  return value == null || !Number.isInteger(days) || days < 0 || days > 365 ? 14 : days
-}
 const rank: Record<DashboardTaskLevel, number> = { urgent: 0, soon: 1, open: 2, clear: 3 }
 
 function group(kind: DashboardTaskKind, title: string, items: DashboardTaskItem[], value?: string, detail?: string, count = items.length): DashboardTaskGroup {
