@@ -142,6 +142,71 @@ it('completes the bank review when one provider suggestion contains a null requi
   })
   expect(result.result.suggestions[0]).toMatchObject({ action: 'LINK_EXISTING', voucherId: 42 })
   expect(result.result.suggestions[1]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: expect.stringContaining('reason') })
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+})
+
+it('repairs missing voucher IDs for bank closing fees without changing already valid suggestions', async () => {
+  const valid = { transactionId: 72, action: 'LINK_EXISTING', reason: 'Passende Buchung fuer August.', voucherId: 42 }
+  mockChatCreate
+    .mockResolvedValueOnce(completion(JSON.stringify({ summary: 'Manuell prüfen.', suggestions: [
+      { transactionId: 71, action: 'LINK_EXISTING', reason: 'Abschlussgebuehren.', voucherId: null }, valid
+    ] })))
+    .mockResolvedValueOnce(completion(JSON.stringify({ suggestions: [
+      { transactionId: 71, action: 'CREATE_BOOKING', reason: 'Bankabschluss April ohne vorhandene Buchung.',
+        bookingCandidate: { date: '2026-04-30', type: 'OUT', sphere: 'IDEELL', description: 'Bankgebühren – Abschluss per 30.04.2026',
+          grossAmount: 8.85, paymentMethod: 'BANK', paymentAccountId: 1, counterparty: null } },
+      // The provider must not be able to replace a previously valid row during repair.
+      { ...valid, action: 'MARK_CHECKED', reason: 'Ignorieren.' }
+    ] })))
+  const result = await reviewBankImportTransactions({ context: {}, transactions: [
+    { id: 71, bookingDate: '2026-04-30', direction: 'OUT', amount: 8.85, counterparty: null,
+      purpose: 'Abschluss per 30.04.2026', paymentAccountId: 1, matches: [] },
+    { id: 72, bookingDate: '2026-08-31', direction: 'OUT', amount: 4.9, counterparty: null,
+      purpose: 'Abschluss per 31.08.2026', paymentAccountId: 1, matches: [{ id: 42, matchKind: 'VOUCHER' }] }
+  ] })
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+  const prompt = mockChatCreate.mock.calls[0][0].messages.find((m: any) => m.role === 'user').content[0].text
+  expect(prompt).toContain('Bankabschlussgebuehren')
+  expect(prompt).toContain('der Bankbuchungstag kann vor dem genannten Monatsende liegen')
+  expect(prompt).toContain('Eine fehlende Gegenpartei ist dabei normal')
+  expect(prompt).toContain('Ein Eingang bleibt IN')
+  const repairPrompt = mockChatCreate.mock.calls[1][0].messages.find((m: any) => m.role === 'user').content[0].text
+  const corrections = JSON.parse(repairPrompt.split('Korrekturauftrag:')[1].split('\n')[1])
+  expect(corrections).toEqual([{ transactionId: 71, reason: expect.stringContaining('voucherId') }])
+  expect(result.result.suggestions[0]).toMatchObject({ action: 'CREATE_BOOKING', bookingCandidate: {
+    type: 'OUT', grossAmount: 8.85, date: '2026-04-30', description: 'Bankgebühren – Abschluss per 30.04.2026', counterparty: null
+  } })
+  expect(result.result.suggestions[1]).toMatchObject(valid)
+  expect(result.result.summary).toBe('2 Bankbelege geprüft.')
+  expect(result.usage?.totalTokens).toBe(600)
+})
+
+it('leaves repeated invalid fee links open after exactly one correction attempt', async () => {
+  mockChatCreate.mockResolvedValue(completion(JSON.stringify({ suggestions: [
+    { transactionId: 71, action: 'LINK_EXISTING', reason: 'Abschlussgebuehren.', voucherId: 999 }
+  ] })))
+  const result = await reviewBankImportTransactions({ context: {}, transactions: [
+    { id: 71, bookingDate: '2026-05-29', direction: 'OUT', amount: 4.9, purpose: 'Abschluss per 31.05.2026', matches: [] }
+  ] })
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+  expect(result.result.suggestions[0]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: expect.stringContaining('voucherId') })
+  expect(result.result.suggestions[0].voucherId).toBeUndefined()
+  expect(result.result.suggestions[0].bookingCandidate).toBeUndefined()
+})
+
+it('preserves valid results and the safe fallback when the correction request fails', async () => {
+  mockChatCreate.mockResolvedValueOnce(completion(JSON.stringify({ suggestions: [
+    { transactionId: 71, action: 'LINK_EXISTING', reason: 'Abschlussgebuehren.', voucherId: null },
+    { transactionId: 72, action: 'NEEDS_MANUAL_REVIEW', reason: 'Abrechnung enthaelt unklare Einzelposten.' }
+  ] }))).mockRejectedValueOnce(new Error('Provider offline'))
+  const result = await reviewBankImportTransactions({ context: {}, transactions: [71, 72].map(id => ({
+    id, bookingDate: '2026-04-30', direction: 'OUT', amount: 8.85, purpose: 'Abschluss per 30.04.2026', matches: []
+  })) })
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+  expect(result.result.suggestions.map(s => s.action)).toEqual(['NEEDS_MANUAL_REVIEW', 'NEEDS_MANUAL_REVIEW'])
+  expect(result.result.suggestions[1].reason).toBe('Abrechnung enthaelt unklare Einzelposten.')
+  expect(result.result.warnings).toContainEqual(expect.stringContaining('Nachprüfung'))
+  expect(result.usage?.totalTokens).toBe(300)
 })
 
 it.each([false, true])('passes comment rules into bank analysis and gates note output with opt-in %s', async enabled => {

@@ -1,9 +1,11 @@
 import { aiBookingComment } from '../../../shared/aiBookingPolicy'
 
-export function selectAiDraftBookingType<T extends { type?: string }>(qa: T): T & { bookingTypeSelected: boolean } {
+export function selectAiDraftBookingType<T extends { type?: string; bankReviewSource?: { direction: 'IN' | 'OUT' } }>(qa: T): T & { bookingTypeSelected: boolean } {
+  const type = qa.bankReviewSource?.direction ?? qa.type
   return {
     ...qa,
-    bookingTypeSelected: qa.type === 'IN' || qa.type === 'OUT' || qa.type === 'TRANSFER' || qa.type === 'INTERNAL'
+    type,
+    bookingTypeSelected: type === 'IN' || type === 'OUT' || type === 'TRANSFER' || type === 'INTERNAL'
   }
 }
 

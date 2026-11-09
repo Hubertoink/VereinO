@@ -2,7 +2,7 @@
 .bank-ai-row-progress--active { color: var(--accent); font-weight: 600; }
 .bank-ai-row-progress--done { color: var(--success); }
 .bank-ai-row-progress--error { color: var(--danger); }
-.bank-master-table .bank-table tr.bank-ai-row-active > td { background-image: linear-gradient(110deg, transparent 15%, color-mix(in srgb, var(--accent) 12%, transparent) 40%, color-mix(in srgb, var(--accent) 20%, transparent) 50%, transparent 80%); background-size: 220% 100%; animation: bank-ai-review-sweep 2.4s ease-in-out infinite; }
+.bank-master-table .bank-table tr.bank-ai-row-active { background-image: linear-gradient(110deg, transparent 15%, color-mix(in srgb, var(--accent) 12%, transparent) 40%, color-mix(in srgb, var(--accent) 20%, transparent) 50%, transparent 80%); background-size: 220% 100%; animation: bank-ai-review-sweep 2.4s ease-in-out infinite; }
 .bank-master-table .bank-table tr.bank-ai-row-active > td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .bank-master-table .bank-table tr.bank-ai-row-done > td:first-child { box-shadow: inset 3px 0 var(--success); }
 @keyframes bank-ai-review-sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
@@ -10,5 +10,5 @@
 .bank-ai-recheck-modal p { font-size: 14px; line-height: 1.55; margin: 0 0 12px; }
 .bank-ai-recheck-modal > .bank-modal-footer { position: static; margin: 0; padding: 0; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) {
-  .bank-master-table .bank-table tr.bank-ai-row-active > td { animation: none; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  .bank-master-table .bank-table tr.bank-ai-row-active { animation: none; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 }

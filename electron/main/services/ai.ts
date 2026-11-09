@@ -1783,18 +1783,22 @@ export async function reviewBankImportTransactions(input: {
     '- NEEDS_MANUAL_REVIEW: wenn die Daten uneindeutig sind.',
     '',
     'Wichtige Regeln:',
-    'Verknuepfe nur mit voucherId aus den mitgegebenen matches.',
+    'LINK_EXISTING braucht zwingend eine konkrete voucherId: uebernimm exakt matches[].id eines passenden Treffers mit matchKind VOUCHER. transaction.id ist die Bankbeleg-ID, keine voucherId. Bei leeren matches oder ohne passenden VOUCHER-Treffer ist LINK_EXISTING verboten; bereite bei ausreichenden Bankdaten CREATE_BOOKING mit vollstaendigem bookingCandidate vor. Erfinde keine Buchungs-ID und verwende niemals voucherId null fuer LINK_EXISTING.',
     'Fuer APPLY_RECURRING uebernimm recurringBookingId, recurringBookingName, occurrenceId und scheduledDate exakt aus einem RECURRING-Match. Erfinde keine IDs oder Termine.',
     'LINK_EXISTING nur bei passendem Typ, Betrag und hoher Plausibilitaet.',
     'Die matches enthalten auch schwach bewertete Kandidaten in einem erweiterten Zeitraum. Bewerte Zweck, Gegenpartei, Referenzen, Buchungsdatum und Wertstellung selbst; der lokale score ist keine Wahrscheinlichkeit.',
     'counterparty ist der Name des Zahlungsbeteiligten aus dem Bankimport. Beruecksichtige ihn als eigenstaendige Information, gerade wenn purpose nur einen kryptischen Zahlungs- oder Terminaltext enthaelt. Leite die Art einer neuen Buchung nicht allein aus diesem Text ab.',
     'Wende aktive aiRules mit Geltungsbereich ALL oder BOOKINGS auf passende Bankbelege und neue Buchungsvorschlaege an. Pruefe ihre Bedingungen auch gegen counterparty; nutze fuer Zuordnungen nur vorhandene Stammdaten-IDs. Erwaehne eine angewendete Regel kurz in reason oder evidence.',
     'Gleiches Datum und gleicher Betrag sind starke Hinweise, aber bei mehreren plausiblen Buchungen kein eindeutiger Nachweis. Bei uneindeutigen Treffern NEEDS_MANUAL_REVIEW verwenden.',
+    'Bankabschlussgebuehren: Eine Abbuchung mit Verwendungszweck "Abschluss per TT.MM.JJJJ", "Rechnungsabschluss", "Kontofuehrungsgebuehren" oder "Entgeltabrechnung" kann ein Bankgebuehrenabschluss sein. Eine fehlende Gegenpartei ist dabei normal und allein kein Grund fuer NEEDS_MANUAL_REVIEW oder MARK_CHECKED. Ohne gegenteilige Angaben und ohne passenden bestehenden Treffer bereite einen Ausgabenentwurf mit nachvollziehbarer Beschreibung wie "Bankgebuehren – Abschluss per 30.04.2026" vor. Betrag, Buchungsdatum, Richtung und Zahlkonto kommen unveraendert aus dem Bankbeleg; erfinde weder Gegenpartei noch IBAN.',
+    'Bei wiederkehrenden Bankgebuehren ist der Abrechnungszeitraum entscheidend: Gleich hohe Betraege (z. B. 4,90 EUR) in verschiedenen Monaten sind unterschiedliche Umsaetze. Vergleiche das Abschlussdatum im Zwecktext mit Beschreibung und Zeitraum der Treffer; der Bankbuchungstag kann vor dem genannten Monatsende liegen. Verknuepfe nicht mit Gebuehren eines anderen Monats, nur weil Betrag und Text aehnlich sind. Auch wechselnde Betraege (z. B. 8,85 EUR) koennen Abschlussgebuehren sein. APPLY_RECURRING nur mit einer tatsaechlich mitgegebenen passenden Ausfuehrung.',
+    'Ein Abschluss kann auch Zinsen, Erstattungen oder andere Posten enthalten: Beachte ausdrueckliche Hinweise im Zwecktext, erfinde keine Aufteilung, Steuerbetraege oder Gebuehrenbestandteile. Ein Eingang bleibt IN und wird nicht pauschal zur Bankgebuehren-Ausgabe. Nutze fuer Kategorie/Sphaere und optionale Zuordnungen den Organisationskontext und passende aiRules; das Wort Bank allein bestimmt keine Sphaere.',
     'Abweichende Zahlkonten immer in warnings nennen und nur mit klaren weiteren Belegen LINK_EXISTING vorschlagen. Niemals dieselbe vorhandene Buchung mehreren Bankbelegen vorschlagen.',
     'Wenn ein lokaler Treffer passt, ist LINK_EXISTING vorrangig. Erstelle dann keine neue Buchung.',
     'CREATE_BOOKING erzeugt nur einen Vorschlag, keine finale Buchung.',
     'CREATE_BOOKING wird spaeter mit dem Bankbeleg verknuepft; die Beschreibung soll den Zahler/Zweck nachvollziehbar enthalten, aber keine IBAN-Fuelltexte.',
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
+    'Die Bankrichtung ist verbindlich: direction IN entspricht einem positiven Bankumsatz und erzwingt bookingCandidate.type IN (Einnahme); direction OUT entspricht einem negativen Bankumsatz und erzwingt bookingCandidate.type OUT (Ausgabe). grossAmount bleibt der positive Absolutbetrag. Zwecktext, Gegenpartei und aiRules duerfen diese Richtung niemals umkehren. Auch ein Eingang mit Zweck "Kauf Lastenanhaenger" bleibt eine Einnahme, etwa eine Erstattung oder ein Zuschuss. Erfinde keinen Zahlungsgrund; bei unklarer Zuordnung benenne die Unsicherheit oder nutze NEEDS_MANUAL_REVIEW.',
     'Übernimm counterparty und counterpartyIban für neue Buchungsvorschläge aus dem jeweiligen Bankbeleg. counterpartyIban ist das Gegenkonto, niemals das eigene Zahlungskonto. Fehlt sie, setze null.',
     'Wenn keine passende optionale Budget-/Zweckbindungszuordnung erkennbar ist, lasse die Listen ohne Warnung leer. Beachte ausdrücklich verlangte Zuordnungen aus aiRules.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
@@ -1807,7 +1811,7 @@ export async function reviewBankImportTransactions(input: {
     JSON.stringify(input.transactions)
   ].join('\n')
 
-  const response = await createAiResponse({
+  const requestReview = (reviewPrompt: string) => createAiResponse({
     model,
     reasoning: { effort: 'low' },
     text: {
@@ -1818,21 +1822,56 @@ export async function reviewBankImportTransactions(input: {
     input: [
       {
         role: 'user',
-        content: [{ type: 'input_text', text: prompt }]
+        content: [{ type: 'input_text', text: reviewPrompt }]
       }
     ]
   } as any)
 
-  const result = (() => {
-      const result = validateBankReviewResult(response.output_parsed ?? JSON.parse(extractOutputText(response)), input.transactions.map((transaction) => transaction.id))
-      return { ...result, warnings: filterOptionalAssignmentWarnings(result.warnings), suggestions: result.suggestions.map(suggestion => ({ ...suggestion,
-        warnings: filterOptionalAssignmentWarnings(suggestion.warnings),
-        bookingCandidate: suggestion.bookingCandidate ? { ...suggestion.bookingCandidate,
-          note: aiBookingComment(settings.bookingCommentsEnabled, suggestion.bookingCandidate.note),
-          warnings: filterOptionalAssignmentWarnings(suggestion.bookingCandidate.warnings)
-        } : suggestion.bookingCandidate
-      })) }
-    })()
+  const response = await requestReview(prompt)
+  let usage = normalizeUsage(response, model)
+  const invalidSuggestions: Array<{ transactionId: number; reason: string }> = []
+  let validated = validateBankReviewResult(
+    response.output_parsed ?? JSON.parse(extractOutputText(response)), input.transactions,
+    (transactionId, reason) => invalidSuggestions.push({ transactionId, reason })
+  )
+  // Retry only structurally invalid suggestions, never a deliberate manual-review decision.
+  // Keep valid rows intact and leave the original safe fallback in place if repair fails.
+  if (invalidSuggestions.length) {
+    const retryIds = new Set(invalidSuggestions.map(suggestion => suggestion.transactionId))
+    const retryTransactions = input.transactions.filter(transaction => retryIds.has(transaction.id))
+    try {
+      const repairedResponse = await requestReview([
+        prompt,
+        '',
+        'Korrekturauftrag: Die vorherige Antwort enthielt ungueltige Vorschlaege. Liefere jetzt ausschliesslich fuer die folgenden transactionIds jeweils einen vollstaendigen, gueltigen Vorschlag. Alle anderen Bankbelege wurden bereits geprueft und duerfen nicht erneut ausgegeben werden.',
+        JSON.stringify(invalidSuggestions),
+        'Behebe die genannten Fehler anhand der Original-Bankdaten und matches oben. LINK_EXISTING benoetigt matches[].id eines passenden VOUCHER-Treffers als voucherId. Ohne passenden Treffer CREATE_BOOKING mit vollstaendigem bookingCandidate, wenn der Bankbeleg ausreichend ist; sonst NEEDS_MANUAL_REVIEW mit fachlicher Begruendung. Erfinde niemals IDs oder fehlende Daten.'
+      ].join('\n'))
+      const repairUsage = normalizeUsage(repairedResponse, model)
+      if (repairUsage) usage = usage ? mergeAiUsage(usage, repairUsage) : repairUsage
+      const repaired = validateBankReviewResult(
+        repairedResponse.output_parsed ?? JSON.parse(extractOutputText(repairedResponse)), retryTransactions
+      )
+      const repairedById = new Map(repaired.suggestions.map(suggestion => [suggestion.transactionId, suggestion]))
+      validated = { ...validated,
+        summary: `${input.transactions.length} Bankbelege geprüft.`,
+        suggestions: validated.suggestions.map(suggestion => repairedById.get(suggestion.transactionId) ?? suggestion),
+        warnings: [...new Set([...validated.warnings, ...repaired.warnings])]
+      }
+    } catch {
+      validated.warnings.push('Die automatische Nachprüfung ungültiger KI-Vorschläge war nicht erfolgreich. Die betroffenen Bankbelege bleiben zur manuellen Prüfung offen.')
+    }
+  }
+  const result = { ...validated,
+    warnings: filterOptionalAssignmentWarnings(validated.warnings),
+    suggestions: validated.suggestions.map(suggestion => ({ ...suggestion,
+      warnings: filterOptionalAssignmentWarnings(suggestion.warnings),
+      bookingCandidate: suggestion.bookingCandidate ? { ...suggestion.bookingCandidate,
+        note: aiBookingComment(settings.bookingCommentsEnabled, suggestion.bookingCandidate.note),
+        warnings: filterOptionalAssignmentWarnings(suggestion.bookingCandidate.warnings)
+      } : suggestion.bookingCandidate
+    }))
+  }
   input.onProgress?.({ activeIds: [], completedIds: input.transactions.map(t => t.id) })
-  return { model, result, usage: normalizeUsage(response, model) }
+  return { model, result, usage }
 }

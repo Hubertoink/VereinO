@@ -145,6 +145,19 @@ test('AI review passes imported originals separately from edited proposal values
   expect(await page.evaluate(() => (window as any).closeCalls)).toBe(1)
 })
 
+test('a saved expense suggestion for a positive bank import opens as income', async ({ page }) => {
+  await page.evaluate(() => {
+    window.addEventListener('ai:open-booking-draft', event => { (window as any).openedDraft = (event as CustomEvent).detail.qa }, { once: true })
+    ;(window as any).renderBankTest('ai', { transaction: {
+      direction: 'IN', amount: 106.99, purpose: 'Kauf von Lastenanhänger', counterparty: 'Synthia Ajong Achankeng'
+    } })
+  })
+  await page.getByRole('button', { name: 'Entwurf prüfen und bearbeiten' }).click()
+  expect(await page.evaluate(() => (window as any).openedDraft)).toMatchObject({
+    type: 'IN', bankTransactionId: 77, bankReviewSource: { direction: 'IN', amount: 106.99 }
+  })
+})
+
 
 test('bank AI review keeps the shared title bar and close action visible while scrolling', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 900, height: 650 })

@@ -1648,7 +1648,7 @@ function BankAiSuggestionModal({
         detail: {
           qa: {
             date: candidate.date,
-            type: candidate.type,
+            type: transaction.direction,
             sphere: candidate.sphere,
             primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
             mode: 'GROSS',

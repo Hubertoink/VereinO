@@ -62,6 +62,12 @@ test('confirms rechecks, shows persistent toast with real progress, and removes 
   await expect(start).toBeDisabled()
   await page.evaluate(() => (window as any).emit([1, 2, 3, 4, 5], []))
   await expect(page.locator('.bank-ai-row-active')).toHaveCount(5)
+  await expect(page.locator('.bank-ai-row-active').first()).toHaveCSS('animation-name', 'bank-ai-review-sweep')
+  await expect(page.locator('.bank-ai-row-active').first()).toHaveCSS('background-image', /linear-gradient/)
+  for (const cell of await page.locator('.bank-ai-row-active').first().locator('td').all()) {
+    await expect(cell).toHaveCSS('background-image', 'none')
+    await expect(cell).toHaveCSS('animation-name', 'none')
+  }
   const toast = page.locator('.toast-progress')
   await expect(toast).toContainText('KI-Prüfung läuft · 0 von 7')
   await expect(page.locator('.toast-spinner')).toHaveCSS('animation-name', 'toastSpin')
@@ -95,7 +101,7 @@ test('only checks unreviewed rows, ignores unrelated events, and clears loading 
   await expect(page.locator('.bank-ai-row-active')).toHaveCount(2)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(page.locator('.toast-spinner')).toHaveCSS('animation-name', 'none')
-  await expect(page.locator('.bank-ai-row-active td').first()).toHaveCSS('animation-name', 'none')
+  await expect(page.locator('.bank-ai-row-active').first()).toHaveCSS('animation-name', 'none')
   await page.evaluate(() => (window as any).fail())
   await expect(page.locator('.toast-progress')).toHaveCount(0)
   await expect(page.getByRole('alert')).toContainText('Provider nicht erreichbar')

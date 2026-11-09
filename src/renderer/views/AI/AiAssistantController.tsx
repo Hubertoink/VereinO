@@ -3394,7 +3394,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       const res = await window.api.vouchers.create({
         ...bankParty,
         date: candidate.date,
-        type: candidate.type,
+        type: transaction.direction ?? candidate.type,
         sphere: candidate.sphere,
         primaryClassificationValueId: candidate.primaryClassificationValueId ?? undefined,
         description: candidate.description,
@@ -3443,7 +3443,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         detail: {
           qa: {
             date: candidate.date,
-            type: candidate.type,
+            type: transaction.direction ?? candidate.type,
             sphere: candidate.sphere,
             mode: 'GROSS',
             grossAmount: candidate.grossAmount,

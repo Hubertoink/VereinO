@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.12.1] - 2026-11-09
+
+### Geändert
+
+- Die KI-Prüfung berücksichtigt typische Bankabschlussgebühren auch ohne Gegenpartei sowie unterschiedliche Abrechnungsmonate und wechselnde Gebührenbeträge.
+- Unvollständige KI-Vorschläge werden einmal gezielt nachgeprüft. Verknüpfungen benötigen eine gültige Buchungs-ID aus den angebotenen Treffern; weiterhin ungültige Vorschläge bleiben zur manuellen Prüfung offen.
+
+### Behoben
+
+- KI-Buchungsentwürfe übernehmen verbindlich die Richtung des Bankimports: Eingänge bleiben Einnahmen, Ausgänge bleiben Ausgaben. Das gilt auch beim Öffnen älterer KI-Vorschläge.
+- Der Verlauf während der KI-Prüfung erstreckt sich über die gesamte Bankbelegzeile statt über jede Tabellenzelle einzeln.
+
 ## [4.12.0] - 2026-11-08
 
 ### Hinzugefügt
