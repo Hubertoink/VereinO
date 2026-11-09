@@ -1,10 +1,14 @@
-.bank-import-container .bank-import-context-toolbar {
+.bank-import-container .bank-header-tools {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  margin-left: auto;
 }
+.bank-header-tools .bank-search-wrap { flex: 0 1 280px; width: 280px; }
+.bank-header-tools > .btn, .bank-header-tools > .filter-dropdown { flex-shrink: 0; }
+.bank-import-filter-fields { display: grid; gap: 14px; }
 .bank-import-context-account,
 .bank-import-date-range label {
   display: grid;
@@ -14,12 +18,10 @@
   font-weight: 600;
   color: var(--text-dim);
 }
-.bank-import-context-account { flex: 1 1 280px; max-width: 430px; }
+.bank-import-context-account { width: 100%; }
 .bank-import-context-account .input { width: 100%; box-sizing: border-box; }
-.bank-import-date-range { display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 8px; flex: 1 1 360px; max-width: 450px; min-width: 0; }
+.bank-import-date-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
 .bank-import-date-range .input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
-.bank-import-context-toolbar .filter-dropdown__trigger { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 12px; white-space: nowrap; border: 1px solid var(--border); background: var(--surface); }
-.bank-import-context-toolbar .filter-dropdown__trigger[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .bank-import-account-overview,
 .bank-import-outcome {
   border: 1px solid var(--border);
@@ -86,19 +88,10 @@
 .bank-import-history-actions button { border: 0; border-radius: 5px; background: transparent; color: var(--text); text-align: left; padding: 9px 10px; cursor: pointer; }
 .bank-import-history-actions button:hover, .bank-import-history-actions button:focus-visible { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .bank-import-history-pages { justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border); }
-@media (max-width: 900px) {
-  .bank-import-context-account { max-width: none; }
-  .bank-import-date-range { flex: 1 1 330px; max-width: none; }
-}
 @media (max-width: 650px) {
-  .bank-import-container .bank-page-tools { flex-wrap: wrap; }
-  .bank-import-container .bank-search-wrap { flex: 1 1 100%; max-width: none; }
-  .bank-import-container .bank-page-tools > .bank-import-filter-toolbar { flex: 1 1 100%; margin: 0; justify-content: flex-end; }
-  .bank-import-context-account,
-  .bank-import-date-range,
-  .bank-import-context-toolbar > .filter-dropdown { flex-basis: 100%; }
-  .bank-import-date-range { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bank-import-context-toolbar .filter-dropdown__trigger { width: 100%; justify-content: center; }
+  .bank-import-container .bank-header-tools { justify-content: flex-start; }
+  .bank-header-tools .bank-search-wrap { flex: 1 1 100%; max-width: none; }
+  .bank-header-tools .filter-divider { display: none; }
   .bank-import-history-entry { grid-template-columns: minmax(0, 1fr) auto; }
   .bank-import-history-entry--empty { grid-template-columns: minmax(0, 1fr); }
   .bank-import-history-entry-details { grid-column: 1 / -1; grid-row: 2; }

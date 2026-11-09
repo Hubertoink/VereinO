@@ -20,13 +20,16 @@ test.beforeAll(async () => {
           bookingCandidate: { date: '2026-08-13', type: 'OUT', sphere: 'IDEELL', description: 'Ausgabe Jugendhaus', grossAmount: 29.99 + i, vatRate: 0, budgets: [], earmarks: [], tags: [] } }
       }))
       if (options.mixed) transactions[1].aiSuggestion = { action: 'LINK_EXISTING', voucherId: 41, voucherNo: '2026-41', reason: 'Passende Buchung.', warnings: [], evidence: [] }
+      if (options.preassigned) Object.assign(transactions[0].aiSuggestion.bookingCandidate, { budgets: [{ id: 9, amount: 29.99 }], earmarks: [{ id: 11, amount: 29.99 }], tags: ['Freizeit'] })
       const rows = transactions.map(transaction => ({ transaction, token: 'a'.repeat(64), commentsEnabled: !!options.comments,
         candidate: transaction.aiSuggestion.bookingCandidate ? { ...transaction.aiSuggestion.bookingCandidate, note: options.comments ? 'Referenz BREF-123' : '' } : null,
         targetDescription: 'Verpflegung Jugendhaus', warnings: transaction.id === 1 ? ['Kein Budget zugeordnet.'] : [],
         blockers: transaction.id === 3 ? ['Mögliche Doppelbuchung. Bitte einzeln prüfen.'] : options.missingCategory && transaction.id === 1 ? ['Eine Kategorie ist erforderlich.'] : [] }))
       window.api = {
         bankTransactions: {
-          validateAiBatchDraft: async ({ candidate }) => ({ blockers: candidate.description.trim() && (!options.missingCategory || candidate.primaryClassificationValueId) ? [] : ['Bitte Buchungstext und Kategorie ergänzen.'] }),
+          validateAiBatchDraft: async ({ candidate }) => ({ blockers: candidate.description.trim() && (!options.missingCategory || candidate.primaryClassificationValueId)
+            && [candidate.budgets || [], candidate.earmarks || []].every(values => values.every(value => value.id > 0 && value.amount > 0) && values.reduce((sum, value) => sum + value.amount, 0) <= candidate.grossAmount + .001)
+            ? [] : ['Bitte Buchungstext, Kategorie und Zuordnungen prüfen.'] }),
           previewAiBatch: async () => { if (options.loadFailure) throw new Error('Vorschau nicht verfügbar'); return rows },
           applyAiBatch: async (payload) => {
             window.applied.push(payload)
@@ -39,8 +42,9 @@ test.beforeAll(async () => {
           { id: 1, stableKey: 'IDEELL', name: options.general ? 'Verwaltung' : 'Ideeller Bereich', isActive: true },
           { id: 2, stableKey: 'ZWECK', name: options.general ? 'Veranstaltungen' : 'Zweckbetrieb', isActive: true }
         ] }) } },
-        budgets: { list: async () => ({ rows: [{ id: 9, name: 'Jugendhaus' }] }) },
-        bindings: { list: async () => ({ rows: [] }) }
+        budgets: { list: async () => ({ rows: [{ id: 9, name: 'Jugendhaus' }, { id: 10, name: 'Freizeit' }] }) },
+        bindings: { list: async () => ({ rows: [{ id: 11, name: 'Jugendförderung' }] }) },
+        tags: { list: async () => ({ rows: [{ id: 1, name: 'Freizeit', color: '#287da6' }, { id: 2, name: 'Material', color: '#8656b8' }] }) }
       }
       window.changePreview = () => { rows[0].token = 'b'.repeat(64) }
       window.setBatchVisibility = (visible) => root.render(<BankAiBatchModal visible={visible} transactions={transactions} page={2} onClose={() => window.closes++} onChanged={() => window.changed++} onReview={t => window.reviews.push(t.id)} />)
@@ -64,6 +68,9 @@ test('requires selection, excludes blockers, shows results and retries only fail
   await expect(page.getByRole('button', { name: 'Vorschau aktualisieren' })).toHaveCount(0)
   await expect(page.getByText('Hinweis: Kein Budget zugeordnet.')).toBeVisible()
   await expect(page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })).toBeEnabled()
+  await expect(page.getByRole('img', { name: 'Zur Übernahme bereit' })).toHaveCount(2)
+  await page.getByRole('img', { name: 'Zur Übernahme bereit' }).first().hover()
+  await expect(page.getByRole('tooltip')).toHaveText('Zur Übernahme bereit')
   await expect(page.getByText(/Seite 2/)).toBeVisible()
   await expect(page.getByRole('button', { name: '0 Vorschläge übernehmen' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: 'Bankbeleg 3 auswählen' })).toBeDisabled()
@@ -71,7 +78,11 @@ test('requires selection, excludes blockers, shows results and retries only fail
   await expect(page.getByRole('checkbox', { name: 'Bankbeleg 3 auswählen' })).not.toBeChecked()
   await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
   await page.getByLabel('Buchungstext', { exact: true }).fill('Canva Pro Monatsabo Jugendhaus')
-  await page.getByLabel('Budget hinzufügen', { exact: true }).selectOption('9')
+  await page.getByRole('button', { name: '+ Budget', exact: true }).click()
+  await page.getByRole('button', { name: 'Budget 1', exact: true }).click()
+  await page.getByRole('option', { name: 'Jugendhaus', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })).toBeEnabled()
+  await page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' }).check()
   await expect(page.getByText('Hinweis: Kein Budget zugeordnet.')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '2 Buchungen anlegen' })).toBeEnabled()
   await page.screenshot({ path: info.outputPath('batch-review-edit.png') })
@@ -167,4 +178,65 @@ test('opted-in comments are visible, editable and sent with the approved draft',
   await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
   await expect(page.getByText('Angelegt · 2026-41')).toBeVisible()
   expect((await page.evaluate(() => (window as any).applied))[0].candidate.note).toBe('Referenz BREF-123 · Jugendhaus')
+})
+
+test('booking modules edit tags and split assignments without losing hidden values', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.evaluate(() => (window as any).renderBatch({ comments: true }))
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  const editor = page.getByRole('region', { name: 'Buchungsentwurf bearbeiten' })
+  await expect(page.getByRole('complementary', { name: 'Begründung der KI' })).toContainText('Wiederkehrende Ausgabe')
+  await expect(page.getByLabel('Tags (durch Komma getrennt)')).toHaveCount(0)
+  await editor.getByRole('button', { name: '+ Tag', exact: true }).click()
+  await editor.getByRole('button', { name: 'Tag Freizeit hinzufügen' }).click()
+  await editor.getByRole('textbox', { name: 'Neuen Tag hinzufügen' }).fill('Jugendhaus')
+  await editor.getByRole('textbox', { name: 'Neuen Tag hinzufügen' }).press('Enter')
+  await editor.getByRole('button', { name: '− Tag · 2', exact: true }).click()
+  await expect(editor.getByRole('textbox', { name: 'Neuen Tag hinzufügen' })).toHaveCount(0)
+  await editor.getByRole('button', { name: '+ Tag · 2', exact: true }).click()
+  await expect(editor.getByRole('button', { name: 'Tag Jugendhaus entfernen' })).toBeVisible()
+  await editor.getByRole('button', { name: '+ Budget', exact: true }).click()
+  await editor.getByRole('button', { name: 'Budget 1', exact: true }).click()
+  await page.getByRole('option', { name: 'Jugendhaus', exact: true }).click()
+  await editor.getByRole('spinbutton', { name: 'Budgetbetrag 1', exact: true }).fill('10')
+  await editor.getByRole('button', { name: '+ Budgetzeile', exact: true }).click()
+  await expect(editor.getByRole('spinbutton', { name: 'Budgetbetrag 2', exact: true })).toHaveValue('19.99')
+  await editor.getByRole('button', { name: 'Budget 2', exact: true }).click()
+  await expect(page.getByRole('option', { name: 'Jugendhaus', exact: true })).toBeDisabled()
+  await page.getByRole('option', { name: 'Freizeit', exact: true }).click()
+  await editor.getByRole('button', { name: '+ Zweckbindung', exact: true }).click()
+  await editor.getByRole('button', { name: 'Zweckbindung 1', exact: true }).click()
+  await page.getByRole('option', { name: 'Jugendförderung', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('batch-booking-modules-light.png'), fullPage: true })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await page.screenshot({ path: info.outputPath('batch-booking-modules-dark.png'), fullPage: true })
+  const checkbox = page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })
+  await expect(checkbox).toBeEnabled()
+  await checkbox.check()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-41', { exact: true })).toBeVisible()
+  expect((await page.evaluate(() => (window as any).applied))[0].candidate).toMatchObject({
+    tags: ['Freizeit', 'Jugendhaus'], budgets: [{ id: 9, amount: 10 }, { id: 10, amount: 19.99 }], earmarks: [{ id: 11, amount: 29.99 }]
+  })
+  const saved = page.getByRole('region', { name: 'Buchungsdaten', exact: true })
+  await expect(saved.getByRole('button', { name: 'Budget 1', exact: true })).toBeDisabled()
+  await expect(saved.getByRole('textbox', { name: 'Neuen Tag hinzufügen' })).toBeDisabled()
+})
+
+test('preassigned modules are expanded and removing them clears the draft assignments', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBatch({ preassigned: true }))
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  await expect(page.getByRole('button', { name: 'Budget 1', exact: true })).toContainText('Jugendhaus')
+  await expect(page.getByRole('button', { name: 'Zweckbindung 1', exact: true })).toContainText('Jugendförderung')
+  await expect(page.getByRole('textbox', { name: 'Neuen Tag hinzufügen' })).toBeVisible()
+  await page.getByRole('button', { name: 'Budget-Feld entfernen' }).click()
+  await page.getByRole('button', { name: 'Zweckbindung-Feld entfernen' }).click()
+  await page.getByRole('button', { name: 'Tag-Feld entfernen' }).click()
+  await expect(page.getByLabel('Kommentar', { exact: true })).toHaveCount(0)
+  const checkbox = page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' })
+  await expect(checkbox).toBeEnabled()
+  await checkbox.check()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  await expect(page.getByText('Angelegt · 2026-41', { exact: true })).toBeVisible()
+  expect((await page.evaluate(() => (window as any).applied))[0].candidate).toMatchObject({ budgets: [], earmarks: [], tags: [] })
 })

@@ -17,6 +17,8 @@ test('compact rows and removable filter chips retain the detail inspector', asyn
   await page.locator('.bp-row').filter({ hasText: 'Einnahme Test' }).click()
   await expect(page.getByRole('complementary', { name: 'Ausgewählte Buchung' })).toContainText('Einnahme Test')
   await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
+  await expect(page.locator('.bp-browse-tools').getByText('Gesamter Verlauf', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Zurücksetzen', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Einnahme: Filter entfernen' })).toBeVisible()

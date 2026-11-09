@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.12.2] - 2026-11-09
+
+### Geändert
+
+- Die Bankimport-Kopfleiste orientiert sich an Verbindlichkeiten: Suche, Filter, Importhistorie und Aktionen stehen gemeinsam oben. Zahlkonto und Zeitraum liegen im Filtermenü; Statuskacheln nutzen die volle Breite.
+- Buchungsentwürfe in der KI-Sammelprüfung verwenden kompakte Formularfelder sowie aufklappbare Module für Tags, Budgets, Zweckbindungen und Kommentare. Tags lassen sich als farbige Chips auswählen; Zuordnungsbeträge können auf mehrere Budgets verteilt werden.
+- Die KI-Begründung erscheint als hervorgehobene Karte neben dem Entwurf und bleibt auf breiten Fenstern beim Scrollen sichtbar. Ein grüner Haken mit Tooltip kennzeichnet übernahmefähige Vorschläge.
+
+### Entfernt
+
+- Der zusätzliche Hinweis „Gesamter Verlauf“ neben dem Filter und der Zurücksetzen-Button im Buchungsfilter von Buchungen Plus entfallen. Aktive Filter lassen sich weiterhin über ihre Badges entfernen.
+
 ## [4.12.1] - 2026-11-09
 
 ### Geändert

@@ -300,8 +300,6 @@
 }
 
 .bp-filters > .bp-section-heading { min-height: 22px; }
-:is(.bookings-plus, .bp-filters-popover) .bp-reset-badge { height: 20px; min-height: 0; line-height: 16px; border: 1px solid var(--accent); border-radius: 999px; padding: 1px 7px; font-size: 10px; font-weight: 700; color: var(--text); background: color-mix(in srgb, var(--accent) 38%, var(--surface)); white-space: nowrap; }
-:is(.bookings-plus, .bp-filters-popover) .bp-reset-badge:hover { background: color-mix(in srgb, var(--accent) 55%, var(--surface)); }
 
 /* Half-screen tiles use page scrolling so short windows keep every action reachable. */
 @media (max-width: 1100px) {
@@ -396,7 +394,6 @@
 .bp-browse-tools > .bp-filter-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 5px 10px !important; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); font-size: 12px; }
 .bp-filter-trigger[aria-expanded='true'], .bp-month-trigger[aria-expanded='true'] { color: var(--accent); }
 .bp-filter-count { display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--btn-primary-fg, var(--surface)); font-size: 10px; }
-.bp-period-hint { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
 .bp-toolbar .bp-invoice-tools { margin: 0; flex-shrink: 0; gap: 8px; }
 .bp-toolbar .invoice-inline-hint { display: none; }
 .bp-toolbar .invoice-batch-control--inline { padding: 0; border: 0; background: transparent; }
@@ -424,9 +421,6 @@
 .bp-assignment { grid-auto-rows: minmax(24px, auto); }
 .bp-assignment-edit-row { min-height: 24px; }
 
-@media (max-width: 1250px) {
- .bp-period-hint { display: none; }
-}
 @media (max-width: 1100px) {
  .bp-toolbar { flex-wrap: wrap; gap: 10px; }
  .bp-toolbar .bp-invoice-tools { margin-left: auto; }

@@ -1,6 +1,12 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { build } from 'esbuild'
 import fs from 'node:fs/promises'
+
+async function openBankFilters(page: Page) {
+  if (!await page.getByRole('dialog', { name: 'Bankfilter', exact: true }).isVisible()) {
+    await page.getByRole('button', { name: 'Bankfilter', exact: true }).click()
+  }
+}
 
 let script: string
 let css: string
@@ -103,8 +109,9 @@ test.beforeEach(async ({ page }) => {
   await page.addScriptTag({ content: script })
 })
 
-test('visible account and date controls scope the status counts and list', async ({ page }, info) => {
+test('account and date controls in the filter menu scope the status counts and list', async ({ page }, info) => {
   await expect(page.getByRole('button', { name: 'Offen 3' })).toBeVisible()
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await expect(page.getByRole('button', { name: 'Gesamt 3' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Offen 2' })).toBeVisible()
@@ -120,12 +127,14 @@ test('visible account and date controls scope the status counts and list', async
   await page.getByLabel('Bis', { exact: true }).fill('')
   await expect(page.getByRole('button', { name: 'Gesamt 2' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('bank-account-date-filter.png'), fullPage: true })
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('2')
   await expect(page.getByRole('button', { name: 'Gesamt 1' })).toBeVisible()
   await expect(page.getByText('Neuester erfasster Umsatz: 3.9.2026')).toBeVisible()
 })
 
 test('account history reaches older pages and opens the chosen import batch', async ({ page }, info) => {
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await page.getByRole('button', { name: 'Importhistorie' }).click()
   const history = page.getByRole('dialog', { name: 'Importhistorie' })
@@ -153,7 +162,9 @@ test('account history reaches older pages and opens the chosen import batch', as
   await page.screenshot({ path: info.outputPath('bank-import-history.png'), fullPage: true })
   await page.getByRole('button', { name: 'Importfilter entfernen' }).click()
   await expect(page.getByRole('button', { name: 'Gesamt 3' })).toBeVisible()
+  await openBankFilters(page)
   await expect(page.getByRole('combobox', { name: 'Zahlkonto' })).toHaveValue('1')
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('')
   await page.getByRole('button', { name: 'Importhistorie' }).click()
   await expect(history).toContainText('13 Vorgänge')
@@ -161,20 +172,25 @@ test('account history reaches older pages and opens the chosen import batch', as
 })
 
 test('filter chips remove one filter or reset all page filters', async ({ page }) => {
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await page.getByLabel('Von', { exact: true }).fill('2026-09-01')
   await expect(page.getByRole('button', { name: 'Zahlkontofilter entfernen' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Von-Filter entfernen' })).toBeVisible()
   await page.getByRole('button', { name: 'Von-Filter entfernen' }).click()
+  await openBankFilters(page)
   await expect(page.getByLabel('Von', { exact: true })).toHaveValue('')
+  await openBankFilters(page)
   await expect(page.getByRole('combobox', { name: 'Zahlkonto' })).toHaveValue('1')
   await page.getByRole('button', { name: 'Alle Filter zurücksetzen' }).click()
+  await openBankFilters(page)
   await expect(page.getByRole('combobox', { name: 'Zahlkonto' })).toHaveValue('')
   await expect(page.getByRole('button', { name: 'Gesamt 4' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Alle Filter zurücksetzen' })).toHaveCount(0)
 })
 
 test('history menu previews stored CSV assignments and updates an existing bank record', async ({ page }, info) => {
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await page.getByRole('button', { name: 'Importhistorie' }).click()
   const history = page.getByRole('dialog', { name: 'Importhistorie' })
@@ -201,6 +217,7 @@ test('bank rows show counterparty above purpose with a compact date and directio
 })
 
 test('finished import stays visible and opens only its new bank records', async ({ page }, info) => {
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await page.getByRole('button', { name: 'Bankdaten importieren' }).click()
   await page.locator('input[type=file]').setInputFiles({ name: 'neu.csv', mimeType: 'text/csv',
@@ -218,6 +235,7 @@ test('finished import stays visible and opens only its new bank records', async 
 test('account controls and history fit on a narrow dark page', async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await page.getByRole('button', { name: 'Importhistorie' }).click()
   await expect(page.getByRole('dialog', { name: 'Importhistorie' })).toContainText('12 Vorgänge')
@@ -228,16 +246,34 @@ test('account controls and history fit on a narrow dark page', async ({ page }, 
 
 test('date fields and history dropdown stay within a desktop window', async ({ page }, info) => {
   await page.setViewportSize({ width: 1170, height: 760 })
+  await openBankFilters(page)
   await page.getByRole('combobox', { name: 'Zahlkonto' }).selectOption('1')
   await expect(page.getByRole('button', { name: 'Gesamt 3' })).toBeVisible()
-  const account = (await page.getByRole('combobox', { name: 'Zahlkonto' }).boundingBox())!
-  const from = (await page.getByLabel('Von', { exact: true }).boundingBox())!
-  const to = (await page.getByLabel('Bis', { exact: true }).boundingBox())!
-  const trigger = (await page.getByRole('button', { name: 'Importhistorie' }).boundingBox())!
-  expect(account.x + account.width).toBeLessThanOrEqual(from.x)
+  await openBankFilters(page)
+  const filter = page.getByRole('dialog', { name: 'Bankfilter', exact: true })
+  const account = (await filter.getByRole('combobox', { name: 'Zahlkonto' }).boundingBox())!
+  const from = (await filter.getByLabel('Von', { exact: true }).boundingBox())!
+  const to = (await filter.getByLabel('Bis', { exact: true }).boundingBox())!
+  expect(account.y + account.height).toBeLessThanOrEqual(from.y)
   expect(from.x + from.width).toBeLessThanOrEqual(to.x)
-  expect(to.x + to.width).toBeLessThanOrEqual(trigger.x)
-  expect(trigger.x + trigger.width).toBeLessThanOrEqual(1170)
+  const filterBounds = (await filter.boundingBox())!
+  expect(filterBounds.x).toBeGreaterThanOrEqual(0)
+  expect(to.x + to.width).toBeLessThanOrEqual(filterBounds.x + filterBounds.width)
+  await page.keyboard.press('Escape')
+  await expect(filter).toHaveCount(0)
+  const header = page.locator('.bank-page-header')
+  const controls = [header.getByRole('heading', { name: 'Bankimport' }), header.getByRole('textbox', { name: 'Bankbelege durchsuchen' }),
+    header.getByRole('button', { name: 'Bankfilter', exact: true }), header.getByRole('button', { name: 'Importhistorie', exact: true }),
+    header.getByRole('button', { name: 'Sichtbare offene Bankbelege mit KI prüfen' }), header.getByRole('button', { name: 'Bankdaten importieren' })]
+  const bounds = await Promise.all(controls.map(control => control.boundingBox()))
+  bounds.forEach((box, index) => {
+    expect(box!.x + box!.width).toBeLessThanOrEqual(1170)
+    if (index) {
+      expect(box!.x).toBeGreaterThanOrEqual(bounds[index - 1]!.x + bounds[index - 1]!.width)
+      expect(Math.abs(box!.y + box!.height / 2 - bounds[0]!.y - bounds[0]!.height / 2)).toBeLessThan(2)
+    }
+  })
+  await page.screenshot({ path: info.outputPath('bank-import-compact-header.png'), fullPage: true, animations: 'disabled' })
   await page.getByRole('button', { name: 'Importhistorie' }).click()
   const history = page.getByRole('dialog', { name: 'Importhistorie' })
   await expect(history).toContainText('12 Vorgänge')

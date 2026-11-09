@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconSparkles } from '@tabler/icons-react'
+import { IconCircleCheckFilled, IconSparkles } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
+import HoverTooltip from '../../components/common/HoverTooltip'
+import BankAiDraftEditor, { type BankDraftOption, type BankDraftTag } from './BankAiDraftEditor'
 import type { BankAiBatchRow, BankBookingCandidate, BankTransaction } from '../../../../shared/bankAiBatch'
 import type { ClassificationValue } from '../../../../shared/classification'
 import './bankAiBatch.css'
@@ -10,7 +12,6 @@ const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR'
 const date = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-').reverse().join('.') : value
 const actions = { CREATE_BOOKING: 'Neue Buchung', LINK_EXISTING: 'Bestehende Buchung zuordnen', APPLY_RECURRING: 'Dauerbuchung anwenden', MARK_CHECKED: 'Ohne Buchung prüfen', NEEDS_MANUAL_REVIEW: 'Manuelle Prüfung' }
 type Outcome = { state: 'running' | 'success' | 'error'; message: string }
-type Option = { id: number; name: string }
 type Validation = { pending: boolean; blockers: string[] }
 
 export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle Filter', visible = true, onClose, onChanged, onReview }: {
@@ -32,8 +33,9 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
   const [classifications, setClassifications] = useState<ClassificationValue[]>([])
   const [classificationLabel, setClassificationLabel] = useState('Sphäre / Kategorie')
   const [general, setGeneral] = useState(false)
-  const [budgets, setBudgets] = useState<Option[]>([])
-  const [bindings, setBindings] = useState<Option[]>([])
+  const [budgets, setBudgets] = useState<BankDraftOption[]>([])
+  const [bindings, setBindings] = useState<BankDraftOption[]>([])
+  const [tagDefs, setTagDefs] = useState<BankDraftTag[]>([])
   const inFlight = useRef(false)
   const dialog = useRef<HTMLDivElement>(null)
   const selectAll = useRef<HTMLInputElement>(null)
@@ -64,8 +66,8 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
     const pending = transactions.filter(t => !completed.current.has(t.id)).map(t => t.id)
     void Promise.all([
       pending.length ? window.api.bankTransactions.previewAiBatch({ ids: pending }) : Promise.resolve([]),
-      window.api.classifications.primary.list(), window.api.budgets.list(), window.api.bindings.list()
-    ]).then(async ([next, primary, budgetData, bindingData]) => {
+      window.api.classifications.primary.list(), window.api.budgets.list(), window.api.bindings.list(), window.api.tags.list()
+    ]).then(async ([next, primary, budgetData, bindingData, tags]) => {
       if (!active) return
       const unchanged = new Set(next.filter(row => previewTokens.current.get(row.transaction.id) === row.token).map(row => row.transaction.id))
       for (const row of next) {
@@ -92,6 +94,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
       setClassificationLabel(primary.definition.primaryLabel)
       setBudgets(budgetData.rows.map(b => ({ id: b.id, name: b.name || b.categoryName || b.projectName || `Budget ${b.year} · #${b.id}` })))
       setBindings(bindingData.rows.map(b => ({ id: b.id, name: b.name })))
+      setTagDefs(tags.rows)
       setOutcomes(previous => Object.fromEntries(Object.entries(previous).filter(([, value]) => value.state === 'success')))
     }).catch(reason => { if (active) setError(reason?.message || String(reason)) })
       .finally(() => { if (active) setLoading(false) })
@@ -166,7 +169,6 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
     }
   }
   const classification = (candidate: BankBookingCandidate) => classifications.find(v => candidate.primaryClassificationValueId ? v.id === candidate.primaryClassificationValueId : !general && v.stableKey === candidate.sphere)
-  const allocationName = (options: Option[], id: number) => options.find(o => o.id === id)?.name || `#${id}`
 
   return createPortal(<div className="modal-overlay bank-import-overlay" style={visible ? undefined : { display: 'none' }} onMouseDown={event => {
     if (!busy && event.target === event.currentTarget) onClose()
@@ -206,7 +208,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
             const editable = suggestion?.action === 'CREATE_BOOKING' && transaction.status === 'OPEN' && outcome?.state !== 'success' && !busy
             const showDetails = expanded === id
             return <React.Fragment key={id}>
-              <tr className={outcome?.state === 'success' ? 'bank-ai-batch-done' : ''}>
+              <tr className={[outcome?.state === 'success' ? 'bank-ai-batch-done' : '', showDetails ? 'bank-ai-batch-expanded' : ''].filter(Boolean).join(' ')}>
                 <td><input type="checkbox" aria-label={`Bankbeleg ${id} auswählen`} checked={selected.has(id)}
                   disabled={busy || !!blockers.length || validation[id]?.pending || outcome?.state === 'success'}
                   onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(id); else next.delete(id); return next })} /></td>
@@ -218,39 +220,26 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
                   {!!edits[id] && <small>Entwurf bearbeitet</small>}
                 </td>
                 <td aria-live="polite">{validation[id]?.pending ? <span>Entwurf wird geprüft …</span> : outcome ? <span className={`bank-ai-batch-${outcome.state}`}>{outcome.message}</span>
-                  : blockers.length ? <span className="bank-ai-batch-warning">{blockers.join(' ')}</span> : <span className="bank-ai-batch-ready">Zur Übernahme bereit</span>}
+                  : blockers.length ? <span className="bank-ai-batch-warning">{blockers.join(' ')}</span> : <HoverTooltip content="Zur Übernahme bereit">
+                    {({ ref, props }) => <span ref={ref} {...props} tabIndex={0} role="img" aria-label="Zur Übernahme bereit" className="bank-ai-batch-ready"><IconCircleCheckFilled size={23} aria-hidden="true" /></span>}
+                  </HoverTooltip>}
                   {!!warnings.length && <small className="bank-ai-batch-hint">Hinweis: {warnings.join(' ')}</small>}</td>
                 <td><div className="bank-ai-batch-actions"><button className="btn bank-ai-batch-action" disabled={busy} aria-expanded={showDetails} aria-label={`Details zu Bankbeleg ${id}`} onClick={() => setExpanded(showDetails ? null : id)}>{showDetails ? 'Zuklappen' : editable ? 'Prüfen / Bearbeiten' : 'Ansehen'}</button>
                   {!!blockers.length && <button className="btn bank-ai-batch-action" disabled={busy} onClick={() => onReview(suggestion?.action === 'CREATE_BOOKING' && candidate
                     ? { ...transaction, aiSuggestion: { ...suggestion, bookingCandidate: candidate } } : transaction)}>Einzeln prüfen</button>}</div></td>
               </tr>
-              {showDetails && <tr><td colSpan={6} className="bank-ai-batch-details">
-                <div><strong>Begründung der KI</strong><p>{suggestion?.reason || 'Kein Vorschlag vorhanden.'}</p>
-                  {!!suggestion?.evidence.length && <p className="helper">{suggestion.evidence.join(' · ')}</p>}</div>
-                {candidate && <fieldset disabled={!editable} className="bank-ai-batch-fields"><legend>{editable ? 'Buchungsentwurf bearbeiten' : 'Buchungsdaten'}</legend>
-                  <label>Buchungsdatum<input className="input" type="date" value={candidate.date} onChange={event => updateCandidate(row, { date: event.target.value })} /></label>
-                  <label>{classificationLabel}<select className="input" aria-label={classificationLabel} value={classification(candidate)?.id || ''} onChange={event => {
-                    const value = classifications.find(v => v.id === Number(event.target.value))
-                    if (value) updateCandidate(row, { primaryClassificationValueId: value.id, sphere: general ? candidate.sphere : value.stableKey })
-                  }}><option value="" disabled>Bitte auswählen</option>{classifications.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
-                  <label>Umsatzsteuer (%)<input className="input" type="number" min="0" max="100" step="0.01" value={candidate.vatRate ?? 0} onChange={event => updateCandidate(row, { vatRate: Number(event.target.value) })} /></label>
-                  <label className="bank-ai-batch-wide">Buchungstext<input className="input" value={candidate.description} onChange={event => updateCandidate(row, { description: event.target.value })} /></label>
-                  <label>Gegenpartei<input className="input" value={candidate.counterparty || ''} onChange={event => updateCandidate(row, { counterparty: event.target.value })} /></label>
-                  {row.commentsEnabled && suggestion?.action === 'CREATE_BOOKING' && <label className="bank-ai-batch-wide">Kommentar<textarea className="input" aria-label="Kommentar" rows={3} value={candidate.note || ''} onChange={event => updateCandidate(row, { note: event.target.value })} /></label>}
-                  <label className="bank-ai-batch-wide">Tags (durch Komma getrennt)<input className="input" value={(candidate.tags || []).join(', ')} onChange={event => updateCandidate(row, { tags: event.target.value.split(',').map(t => t.trim()) })} /></label>
-                  {(['budgets', 'earmarks'] as const).map(kind => <div key={kind} className="bank-ai-batch-wide"><strong>{kind === 'budgets' ? 'Budgets' : 'Zweckbindungen'}</strong>
-                    {(candidate[kind] || []).map((allocation, index) => <div className="bank-ai-batch-allocation" key={`${allocation.id}-${index}`}>
-                      <span>{allocationName(kind === 'budgets' ? budgets : bindings, allocation.id)}</span>
-                      <input className="input" aria-label={`Betrag ${kind === 'budgets' ? 'Budget' : 'Zweckbindung'} ${allocation.id}`} type="number" min="0.01" step="0.01" value={allocation.amount} onChange={event => updateCandidate(row, { [kind]: candidate[kind]!.map((a, i) => i === index ? { ...a, amount: Number(event.target.value) } : a) })} />
-                      <button className="btn bank-ai-batch-action" onClick={() => updateCandidate(row, { [kind]: candidate[kind]!.filter((_, i) => i !== index) })}>Entfernen</button>
-                    </div>)}
-                    {!candidate[kind]?.length && <p className="helper">Keine Zuordnung</p>}
-                    {editable && <select className="input" aria-label={kind === 'budgets' ? 'Budget hinzufügen' : 'Zweckbindung hinzufügen'} value="" onChange={event => updateCandidate(row, { [kind]: [...(candidate[kind] || []), { id: Number(event.target.value), amount: candidate.grossAmount }] })}>
-                      <option value="" disabled>{kind === 'budgets' ? 'Budget hinzufügen …' : 'Zweckbindung hinzufügen …'}</option>
-                      {(kind === 'budgets' ? budgets : bindings).filter(o => !candidate[kind]?.some(a => a.id === o.id)).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>}
-                  </div>)}
-                </fieldset>}
+              {showDetails && <tr className="bank-ai-batch-detail-row"><td colSpan={6} className="bank-ai-batch-details">
+                <div className="bank-ai-batch-detail-layout">
+                  <aside className="bank-ai-batch-reason" aria-label="Begründung der KI">
+                    <div className="bank-ai-batch-reason-heading"><IconSparkles size={21} aria-hidden="true" /><h3>Begründung der KI</h3></div>
+                    <p>{suggestion?.reason || 'Kein Vorschlag vorhanden.'}</p>
+                    {!!suggestion?.evidence.length && <div className="bank-ai-batch-evidence"><strong>Hinweise aus dem Beleg</strong><ul>{suggestion.evidence.map((evidence, index) => <li key={index}>{evidence}</li>)}</ul></div>}
+                  </aside>
+                  {candidate && <BankAiDraftEditor candidate={candidate} editable={editable}
+                    commentsEnabled={row.commentsEnabled && suggestion?.action === 'CREATE_BOOKING'}
+                    classifications={classifications} classificationLabel={classificationLabel} general={general}
+                    budgets={budgets} bindings={bindings} tagDefs={tagDefs} onChange={update => updateCandidate(row, update)} />}
+                </div>
               </td></tr>}
             </React.Fragment>
           })}</tbody>

@@ -12,7 +12,7 @@ import './bankImportPage.css'
 import React, { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ToastContext } from '../../context/ToastContextCore'
 import { createPortal } from 'react-dom'
-import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconHistory, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconDotsVertical, IconExternalLink, IconFileUpload, IconFilter, IconHistory, IconLink, IconPlus, IconSparkles, IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
@@ -2070,112 +2070,7 @@ export default function BankImportView({
     <div className="bank-import-container">
       <div className="bank-page-header">
         <h1>Bankimport</h1>
-      </div>
-
-      <div className="bank-import-context-toolbar">
-        <label className="bank-import-context-account">
-          <span>Zahlkonto</span>
-          <select className="input" value={accountId ?? ''} onChange={event => {
-            setAccountId(event.target.value ? Number(event.target.value) : null)
-            setBatchFilter(null)
-            setHistoryPage(1)
-            setPage(1)
-          }}>
-            <option value="">Alle Zahlkonten</option>
-            {bankAccounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.iban ? ` · ${account.iban}` : ''}{account.isActive === 0 ? ' · Inaktiv' : ''}</option>)}
-          </select>
-        </label>
-        <div className="bank-import-date-range" role="group" aria-label="Buchungsdatum filtern">
-          <label><span>Von</span><input className="input" type="date" value={from} max={to || undefined} onChange={event => {
-            const value = event.target.value
-            setFrom(value)
-            if (to && value > to) setTo('')
-            setPage(1)
-          }} /></label>
-          <label><span>Bis</span><input className="input" type="date" value={to} min={from || undefined} onChange={event => {
-            const value = event.target.value
-            setTo(value)
-            if (value && from && value < from) setFrom('')
-            setPage(1)
-          }} /></label>
-        </div>
-        <FilterDropdown
-          trigger={<><AppIcon icon={IconHistory} size="control" /> Importhistorie</>}
-          title="Importhistorie"
-          ariaLabel="Importhistorie"
-          panelClassName="bank-import-history-dropdown"
-          width={560}
-          alignRight
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-        >
-          <div className="bank-import-history-panel">
-            <p className="bank-import-history-context">{selectedAccount ? `Importe für ${selectedAccount.name}` : 'Importe aller Zahlkonten'} · {historyTotal} Vorgänge</p>
-            {historyLoading ? <p role="status">Importhistorie wird geladen …</p> : historyError ? <p role="alert">Die Importhistorie konnte nicht geladen werden. Bitte erneut öffnen.</p> : historyRows.length ? <div className="bank-import-history-entries">
-              {historyRows.map(entry => <div className={`bank-import-history-entry${entry.imported === 0 ? ' bank-import-history-entry--empty' : ''}`} key={entry.id}>
-                <div className="bank-import-history-entry-main"><strong title={entry.fileName}>{entry.fileName}</strong><span>{formatDateTime(entry.importedAt)} · {entry.paymentAccountName || 'Zahlkonto'} · {entry.format}</span></div>
-                <div className="bank-import-history-entry-details"><span>{entry.imported} neu · {entry.duplicates} Duplikate · {entry.errors} Fehler</span><span>{entry.periodFrom ? `Übernommene Buchungstage: ${formatDate(entry.periodFrom)}${entry.periodTo && entry.periodTo !== entry.periodFrom ? ` – ${formatDate(entry.periodTo)}` : ''}` : 'Keine neuen Buchungen'}</span></div>
-                {entry.imported > 0 && <FilterDropdown
-                  trigger={<AppIcon icon={IconDotsVertical} size="action" />}
-                  title={`Aktionen für ${entry.fileName}`}
-                  ariaLabel={`Aktionen für Import ${entry.fileName}`}
-                  panelClassName="bank-import-history-actions-panel"
-                  alignRight width={238}
-                >
-                  <div className="bank-import-history-actions">
-                    <button type="button" onClick={() => showImportBatch({ id: entry.id, fileName: entry.fileName, paymentAccountId: entry.paymentAccountId })}>Belege anzeigen</button>
-                    {entry.format === 'CSV' && <button type="button" onClick={() => { setHistoryOpen(false); setRemapBatchId(entry.id) }}>Zuordnungen aktualisieren</button>}
-                  </div>
-                </FilterDropdown>}
-              </div>)}
-            </div> : <p>Für {selectedAccount?.name || 'die Zahlkonten'} liegt noch kein Import vor.</p>}
-            {historyTotal > 10 && <div className="bank-import-history-pages"><span>Seite {historyPage} / {historyPageCount}</span><button className="btn" type="button" disabled={historyPage <= 1 || historyLoading} onClick={() => setHistoryPage(page => page - 1)} aria-label="Vorherige Historienseite"><AppIcon icon={IconChevronLeft} size="control" /></button><button className="btn" type="button" disabled={historyPage >= historyPageCount || historyLoading} onClick={() => setHistoryPage(page => page + 1)} aria-label="Nächste Historienseite"><AppIcon icon={IconChevronRight} size="control" /></button></div>}
-          </div>
-        </FilterDropdown>
-      </div>
-
-      {accountId && <div className="bank-import-account-overview" role="status">
-        <strong>{selectedAccount?.name || 'Zahlkonto'}</strong>
-        {importStatusLoading ? <span>Importstand wird geladen …</span> : importStatusFailed ? <span>Importstand derzeit nicht verfügbar.</span> : <>
-          <span>{selectedAccountHistory?.lastImportAt ? `Letzter Import mit Buchungen: ${formatDateTime(selectedAccountHistory.lastImportAt)}` : 'Noch keine Buchungen importiert'}</span>
-          <span>Neuester erfasster Umsatz: {formatDate(selectedAccountHistory?.lastBookingDate)}</span>
-          {selectedAccountHistory?.lastImportAt && <span>Dabei übernommen: {selectedAccountHistory.lastImportImportedCount} Buchungssätze</span>}
-          {olderBankData && <small>Prüfe, ob seitdem weitere Kontoauszüge vorliegen. Auch überlappende Auszüge können auf Duplikate geprüft werden.</small>}
-        </>}
-      </div>}
-
-      {importOutcome && <div className="bank-import-outcome" role="status">
-        <div><strong>Import abgeschlossen: {importOutcome.fileName}</strong><span>{importOutcome.imported} übernommen · {importOutcome.duplicates} Duplikate übersprungen · {importOutcome.errors} fehlerhaft</span></div>
-        {importOutcome.imported > 0 && <button className="btn primary" type="button" onClick={() => showImportBatch({ id: importOutcome.batchId, fileName: importOutcome.fileName, paymentAccountId: importOutcome.paymentAccountId })}>{importOutcome.imported === 1 ? 'Diesen Beleg anzeigen' : `Diese ${importOutcome.imported} Belege anzeigen`}</button>}
-        <button className="btn ghost" type="button" aria-label="Importzusammenfassung schließen" onClick={() => setImportOutcome(null)}><AppIcon icon={IconX} size="control" /></button>
-      </div>}
-
-      <div className="bank-overview-row">
-        <div className="bank-status-tabs" role="group" aria-label="Bankbelegstatus">
-        {(
-          [
-            ['ALL', 'Gesamt', stats.total],
-            ['OPEN', 'Offen', stats.open],
-            ['LINKED', 'Zugeordnet', stats.linked],
-            ['CHECKED', 'Geprüft', stats.checked]
-          ] as const
-        ).map(([key, label, count]) => (
-          <button
-            key={key}
-            className={status === key ? 'active' : ''}
-            aria-pressed={status === key}
-            onClick={() => {
-              setStatus(key)
-              setPage(1)
-            }}
-          >
-            <span>{label}</span>
-            <strong>{count}</strong>
-          </button>
-        ))}
-        </div>
-
-        <div className="bank-page-tools">
+        <div className="bank-page-tools bank-header-tools">
           <div className="bank-search-wrap">
             <input
               className="input bank-import-search"
@@ -2201,27 +2096,141 @@ export default function BankImportView({
               </button>
             )}
           </div>
-          <div className="journal-filter-toolbar bank-import-filter-toolbar">
-            <button
-              className="btn ghost bank-ai-review-button"
-              type="button"
-              disabled={loading || reviewingWithAi || !openVisibleIds.length}
-              onClick={requestAiReview}
-              title={`KI prüft ${nextReviewIds.length} ${unreviewedVisibleIds.length ? 'noch ungeprüfte' : 'bereits geprüfte'} offene Bankbelege auf dieser Seite unter Berücksichtigung der aktuellen Filter.`}
-              aria-label="Sichtbare offene Bankbelege mit KI prüfen"
-              aria-busy={reviewingWithAi}
-            >
-              <AppIcon icon={IconSparkles} size="control" />
-              {reviewingWithAi ? `KI prüft … ${reviewProgress?.completedIds.length || 0}/${reviewProgress?.transactionIds.length || 0}` : 'KI prüfen'}
-            </button>
-            <BankImportActionDropdown
-              onOpenImport={(file) => {
-                setInitialImportFile(file || null)
-                setShowImport(true)
-              }}
-            />
-          </div>
+          <FilterDropdown
+            trigger={<AppIcon icon={IconFilter} size="action" />}
+            title="Bankfilter"
+            ariaLabel="Bankfilter"
+            buttonTitle="Bankfilter"
+            colorVariant="filter"
+            hasActiveFilters={Boolean(accountId || from || to)}
+            panelClassName="bank-import-filters-dropdown"
+            width={380}
+            alignRight
+          >
+            <div className="bank-import-filter-fields">
+              <label className="bank-import-context-account">
+                <span>Zahlkonto</span>
+                <select className="input" value={accountId ?? ''} onChange={event => {
+                  setAccountId(event.target.value ? Number(event.target.value) : null)
+                  setBatchFilter(null)
+                  setHistoryPage(1)
+                  setPage(1)
+                }}>
+                  <option value="">Alle Zahlkonten</option>
+                  {bankAccounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.iban ? ` · ${account.iban}` : ''}{account.isActive === 0 ? ' · Inaktiv' : ''}</option>)}
+                </select>
+              </label>
+              <div className="bank-import-date-range" role="group" aria-label="Buchungsdatum filtern">
+                <label><span>Von</span><input className="input" type="date" value={from} max={to || undefined} onChange={event => {
+                  const value = event.target.value
+                  setFrom(value)
+                  if (to && value > to) setTo('')
+                  setPage(1)
+                }} /></label>
+                <label><span>Bis</span><input className="input" type="date" value={to} min={from || undefined} onChange={event => {
+                  const value = event.target.value
+                  setTo(value)
+                  if (value && from && value < from) setFrom('')
+                  setPage(1)
+                }} /></label>
+              </div>
+            </div>
+          </FilterDropdown>
+          <FilterDropdown
+            trigger={<AppIcon icon={IconHistory} size="action" />}
+            title="Importhistorie"
+            buttonTitle="Importhistorie"
+            colorVariant="display"
+            ariaLabel="Importhistorie"
+            panelClassName="bank-import-history-dropdown"
+            width={560}
+            alignRight
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+          >
+            <div className="bank-import-history-panel">
+              <p className="bank-import-history-context">{selectedAccount ? `Importe für ${selectedAccount.name}` : 'Importe aller Zahlkonten'} · {historyTotal} Vorgänge</p>
+              {historyLoading ? <p role="status">Importhistorie wird geladen …</p> : historyError ? <p role="alert">Die Importhistorie konnte nicht geladen werden. Bitte erneut öffnen.</p> : historyRows.length ? <div className="bank-import-history-entries">
+                {historyRows.map(entry => <div className={`bank-import-history-entry${entry.imported === 0 ? ' bank-import-history-entry--empty' : ''}`} key={entry.id}>
+                  <div className="bank-import-history-entry-main"><strong title={entry.fileName}>{entry.fileName}</strong><span>{formatDateTime(entry.importedAt)} · {entry.paymentAccountName || 'Zahlkonto'} · {entry.format}</span></div>
+                  <div className="bank-import-history-entry-details"><span>{entry.imported} neu · {entry.duplicates} Duplikate · {entry.errors} Fehler</span><span>{entry.periodFrom ? `Übernommene Buchungstage: ${formatDate(entry.periodFrom)}${entry.periodTo && entry.periodTo !== entry.periodFrom ? ` – ${formatDate(entry.periodTo)}` : ''}` : 'Keine neuen Buchungen'}</span></div>
+                  {entry.imported > 0 && <FilterDropdown
+                    trigger={<AppIcon icon={IconDotsVertical} size="action" />}
+                    title={`Aktionen für ${entry.fileName}`}
+                    ariaLabel={`Aktionen für Import ${entry.fileName}`}
+                    panelClassName="bank-import-history-actions-panel"
+                    alignRight width={238}
+                  >
+                    <div className="bank-import-history-actions">
+                      <button type="button" onClick={() => showImportBatch({ id: entry.id, fileName: entry.fileName, paymentAccountId: entry.paymentAccountId })}>Belege anzeigen</button>
+                      {entry.format === 'CSV' && <button type="button" onClick={() => { setHistoryOpen(false); setRemapBatchId(entry.id) }}>Zuordnungen aktualisieren</button>}
+                    </div>
+                  </FilterDropdown>}
+                </div>)}
+              </div> : <p>Für {selectedAccount?.name || 'die Zahlkonten'} liegt noch kein Import vor.</p>}
+              {historyTotal > 10 && <div className="bank-import-history-pages"><span>Seite {historyPage} / {historyPageCount}</span><button className="btn" type="button" disabled={historyPage <= 1 || historyLoading} onClick={() => setHistoryPage(page => page - 1)} aria-label="Vorherige Historienseite"><AppIcon icon={IconChevronLeft} size="control" /></button><button className="btn" type="button" disabled={historyPage >= historyPageCount || historyLoading} onClick={() => setHistoryPage(page => page + 1)} aria-label="Nächste Historienseite"><AppIcon icon={IconChevronRight} size="control" /></button></div>}
+            </div>
+          </FilterDropdown>
+          <div className="filter-divider" aria-hidden="true" />
+          <button
+            className="btn ghost bank-ai-review-button"
+            type="button"
+            disabled={loading || reviewingWithAi || !openVisibleIds.length}
+            onClick={requestAiReview}
+            title={`KI prüft ${nextReviewIds.length} ${unreviewedVisibleIds.length ? 'noch ungeprüfte' : 'bereits geprüfte'} offene Bankbelege auf dieser Seite unter Berücksichtigung der aktuellen Filter.`}
+            aria-label="Sichtbare offene Bankbelege mit KI prüfen"
+            aria-busy={reviewingWithAi}
+          >
+            <AppIcon icon={IconSparkles} size="control" />
+            {reviewingWithAi ? `KI prüft … ${reviewProgress?.completedIds.length || 0}/${reviewProgress?.transactionIds.length || 0}` : 'KI prüfen'}
+          </button>
+          <BankImportActionDropdown
+            onOpenImport={(file) => {
+              setInitialImportFile(file || null)
+              setShowImport(true)
+            }}
+          />
         </div>
+      </div>
+
+      {accountId && <div className="bank-import-account-overview" role="status">
+        <strong>{selectedAccount?.name || 'Zahlkonto'}</strong>
+        {importStatusLoading ? <span>Importstand wird geladen …</span> : importStatusFailed ? <span>Importstand derzeit nicht verfügbar.</span> : <>
+          <span>{selectedAccountHistory?.lastImportAt ? `Letzter Import mit Buchungen: ${formatDateTime(selectedAccountHistory.lastImportAt)}` : 'Noch keine Buchungen importiert'}</span>
+          <span>Neuester erfasster Umsatz: {formatDate(selectedAccountHistory?.lastBookingDate)}</span>
+          {selectedAccountHistory?.lastImportAt && <span>Dabei übernommen: {selectedAccountHistory.lastImportImportedCount} Buchungssätze</span>}
+          {olderBankData && <small>Prüfe, ob seitdem weitere Kontoauszüge vorliegen. Auch überlappende Auszüge können auf Duplikate geprüft werden.</small>}
+        </>}
+      </div>}
+
+      {importOutcome && <div className="bank-import-outcome" role="status">
+        <div><strong>Import abgeschlossen: {importOutcome.fileName}</strong><span>{importOutcome.imported} übernommen · {importOutcome.duplicates} Duplikate übersprungen · {importOutcome.errors} fehlerhaft</span></div>
+        {importOutcome.imported > 0 && <button className="btn primary" type="button" onClick={() => showImportBatch({ id: importOutcome.batchId, fileName: importOutcome.fileName, paymentAccountId: importOutcome.paymentAccountId })}>{importOutcome.imported === 1 ? 'Diesen Beleg anzeigen' : `Diese ${importOutcome.imported} Belege anzeigen`}</button>}
+        <button className="btn ghost" type="button" aria-label="Importzusammenfassung schließen" onClick={() => setImportOutcome(null)}><AppIcon icon={IconX} size="control" /></button>
+      </div>}
+
+      <div className="bank-status-tabs" role="group" aria-label="Bankbelegstatus">
+        {(
+          [
+            ['ALL', 'Gesamt', stats.total],
+            ['OPEN', 'Offen', stats.open],
+            ['LINKED', 'Zugeordnet', stats.linked],
+            ['CHECKED', 'Geprüft', stats.checked]
+          ] as const
+        ).map(([key, label, count]) => (
+          <button
+            key={key}
+            className={status === key ? 'active' : ''}
+            aria-pressed={status === key}
+            onClick={() => {
+              setStatus(key)
+              setPage(1)
+            }}
+          >
+            <span>{label}</span>
+            <strong>{count}</strong>
+          </button>
+        ))}
       </div>
 
       <div className="bank-list-caption">

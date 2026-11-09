@@ -54,7 +54,7 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ onResetFilters, onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+export default function BookingsPlusView({ onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
     const draftTabsRef = useRef<HTMLDivElement>(null)
     const activeDraftId = bookingDraftTabs.find(draft => draft.isActive)?.id
     useEffect(() => {
@@ -394,7 +394,7 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                 </section>
     )
     const filterContent = (
-                <section className="bp-filters"><div className="bp-section-heading"><h2>Filter</h2>{hasActiveFilters && <button type="button" className="bp-reset-badge" onClick={() => { setFilters(emptyFilters); setPage(1); setSimilarTo(null); onResetFilters() }}>Zurücksetzen</button>}</div>
+                <section className="bp-filters"><div className="bp-section-heading"><h2>Filter</h2></div>
                     {chipFilter('type', 'Art', Object.entries(kinds).map(([value, label]) => ({ value, label, color: kindFilterColors[value as keyof typeof kinds] })))}
                     {generalProfile ? chipFilter('classification', 'Kategorie', classifications.map(item => ({ value: String(item.id), label: item.name, color: item.color }))) : chipFilter('sphere', 'Sphäre', Object.entries(spheres).map(([value, label]) => ({ value, label, color: sphereFilterColors[value as keyof typeof spheres] })))}
                     {chipFilter('account', 'Zahlweg / Konto', paymentAccounts.map(item => ({ value: String(item.id), label: item.name, color: item.color, icon: paymentFilterIcon(item, filters.account === String(item.id)) })))}
@@ -417,7 +417,6 @@ export default function BookingsPlusView({ onResetFilters, onFilterChange, calen
                         <button type="button" className="btn ghost" aria-label="Nächster Monat" onClick={() => navigateMonth(1)}><IconChevronRight size={16} /></button>
                     </div>
                     <BookingDetailPopover label="Buchungsfilter" trigger={<><IconFilter size={16} /><span>Filter</span>{activeFilterCount > 0 && <span className="bp-filter-count">{activeFilterCount}</span>}</>} triggerClassName="bp-filter-trigger" panelClassName="bp-filters-popover">{filterContent}</BookingDetailPopover>
-                    {allDates && <span className="bp-period-hint">Gesamter Verlauf</span>}
                 </div>
                 <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
             </div>
