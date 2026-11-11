@@ -111,7 +111,13 @@ export async function getDashboardTasks(today: string): Promise<DashboardTasks> 
   }
 
   const interval = Math.max(1, Number(getSetting('backup.intervalDays') || 7))
-  const { backups } = await listBackups()
+  let backups: Awaited<ReturnType<typeof listBackups>>['backups']
+  try {
+    ;({ backups } = await listBackups())
+  } catch {
+    groups.push(group('backup', 'Datensicherung', [{ id: 'backup-unavailable', title: 'Sicherungsordner nicht erreichbar', detail: 'Verbindung prüfen oder Sicherungsordner ändern.', level: 'soon', target: { kind: 'backup' } }], 'Nicht erreichbar', 'Sicherungsstatus konnte nicht geprüft werden'))
+    return { today, groups, bankAccounts }
+  }
   const latest = backups.find(backup => backup.size > 0)
   const lastDate = latest ? new Date(latest.mtime).toISOString().slice(0, 10) : null
   const backupItems: DashboardTaskItem[] = !lastDate || taskDaysBetween(today, lastDate) >= interval ? [{ id: 'backup', title: 'Datensicherung', detail: lastDate ? `Letzte vorhandene Sicherung vom ${dateLabel(lastDate)}` : 'Noch keine Sicherung vorhanden', level: 'soon', target: { kind: 'backup' } }] : []

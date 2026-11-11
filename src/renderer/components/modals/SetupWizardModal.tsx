@@ -394,18 +394,6 @@ export default function SetupWizardModal({
                 const moved = Number(res.moved || 0)
                 setBackupMsg(moved > 0 ? `${moved} vorhandene Sicherung(en) übernommen.` : 'Sicherungsordner aktualisiert.')
                 notify('success', moved > 0 ? `Backup-Ordner gesetzt – ${moved} Datei(en) übernommen.` : 'Backup-Ordner gesetzt.')
-                // Zusatz: Wenn im neu gewählten Ordner bereits eine Datenbank existiert, zeige Vergleichsmodal wie bei „Standard wiederherstellen“.
-                try {
-                    const preview = await (window as any).api?.db?.smartRestore?.preview?.({ mode: 'selectedFolder' })
-                    // Erwartete Struktur ähnlich wie beim Standard: { current, default, recommendation }
-                    // Wir tauschen hier 'default' gegen 'selected' aus, wenn vorhanden.
-                    if (preview && preview.selected && preview.selected.exists) {
-                        ;(window as any).dispatchEvent(new CustomEvent('setup-show-db-compare', { detail: { preview } }))
-                    } else if (preview && preview.default && preview.default.exists && preview.current && preview.current.exists) {
-                        // Fallback: älteres API ohne selected – zeige normalen Vergleich, falls sinnvoll
-                        ;(window as any).dispatchEvent(new CustomEvent('setup-show-db-compare', { detail: { preview } }))
-                    }
-                } catch { /* ignore preview errors */ }
             } else if (res?.error) {
                 notify('error', String(res.error))
             }

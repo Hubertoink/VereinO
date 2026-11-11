@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconAlertTriangle, IconCalendarRepeat, IconCircleCheckFilled, IconClipboardCheck, IconLink, IconReceipt, IconSparkles, IconUserCheck } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCalendarRepeat, IconChevronRight, IconCircleCheckFilled, IconClipboardCheck, IconLink, IconLoader2, IconReceipt, IconSparkles, IconUserCheck } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
 import HoverTooltip from '../../components/common/HoverTooltip'
 import BankAiDraftEditor, { type BankDraftOption, type BankDraftTag } from './BankAiDraftEditor'
@@ -42,6 +42,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
   const inFlight = useRef(false)
   const dialog = useRef<HTMLDivElement>(null)
   const selectAll = useRef<HTMLInputElement>(null)
+  const tableSelectAll = useRef<HTMLInputElement>(null)
   const completed = useRef(new Set<number>())
   const previewTokens = useRef(new Map<number, string>())
   const validationVersions = useRef(new Map<number, number>())
@@ -115,9 +116,22 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
   const membershipCount = selectedRows.filter(row => row.membershipPreview).length
   const successes = Object.values(outcomes).filter(o => o.state === 'success').length
   const failures = Object.values(outcomes).filter(o => o.state === 'error').length
+  const blockedCount = rows.filter(row => blockersFor(row).length && outcomes[row.transaction.id]?.state !== 'success').length
+  const allSelected = !!available.length && selectedRows.length === available.length
+  const selectionDisabled = loading || busy || validating || !!error || !available.length
+  const toggleAll = (checked: boolean) => setSelected(new Set(checked ? available.map(row => row.transaction.id) : []))
+  const selectionSummary = [
+    newCount && `${newCount} ${newCount === 1 ? 'neue Buchung' : 'neue Buchungen'}`,
+    linkCount && `${linkCount} ${linkCount === 1 ? 'Zuordnung' : 'Zuordnungen'}`,
+    recurringCount && `${recurringCount} ${recurringCount === 1 ? 'Dauerbuchung' : 'Dauerbuchungen'}`,
+    membershipCount && `${membershipCount} ${membershipCount === 1 ? 'Beitragszuordnung' : 'Beitragszuordnungen'}`
+  ].filter(Boolean).join(' · ')
+  const SummaryIcon = loading || validating || busy ? IconLoader2 : error || failures || blockedCount ? IconAlertTriangle : IconCircleCheckFilled
   useEffect(() => {
-    if (selectAll.current) selectAll.current.indeterminate = selectedRows.length > 0 && selectedRows.length < available.length
-  }, [selectedRows.length, available.length])
+    for (const checkbox of [selectAll.current, tableSelectAll.current]) {
+      if (checkbox) checkbox.indeterminate = selectedRows.length > 0 && selectedRows.length < available.length
+    }
+  }, [selectedRows.length, available.length, loading])
 
   const updateCandidate = (row: BankAiBatchRow, update: Partial<BankBookingCandidate>) => {
     const id = row.transaction.id
@@ -190,21 +204,27 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
       }}>
       <ModalHeader title="KI-Vorschläge prüfen" titleId="bank-ai-batch-title" icon={<IconSparkles size={24} />}
-        subtitle={`Offene Bankbelege von Seite ${page} · ${scope} · ${transactions.length} Vorschläge`}
+        subtitle="Prüfe die Buchungsvorschläge für deine Bankbelege und übernimm die gewünschten Buchungen."
         onClose={onClose} closeDisabled={busy} />
       <div className="bank-ai-batch-intro">
-        <p>Prüfe die Buchungsdaten und wähle die Vorschläge aus, die du übernehmen möchtest. Erst mit deiner Freigabe werden Buchungen angelegt oder zugeordnet.</p>
-        <div className="bank-ai-batch-toolbar">
-          <label><input ref={selectAll} type="checkbox" disabled={loading || busy || validating || !!error || !available.length}
-            checked={!!available.length && selectedRows.length === available.length}
-            onChange={event => setSelected(new Set(event.target.checked ? available.map(r => r.transaction.id) : []))} /> Alle übernahmefähigen Vorschläge auswählen</label>
+        <div className={`bank-ai-batch-summary${error || failures || blockedCount ? ' bank-ai-batch-summary--warning' : ''}`}>
+          <SummaryIcon size={38} aria-hidden="true" className="bank-ai-batch-summary-icon" />
+          <div className="bank-ai-batch-summary-copy" role="status" aria-live="polite">
+            <strong>{loading ? 'Vorschläge werden geladen …' : error ? 'Vorschau nicht verfügbar' : successes === rows.length && successes ? 'Alle Vorschläge übernommen' : `${rows.length} ${rows.length === 1 ? 'Buchungsvorschlag gefunden' : 'Buchungsvorschläge gefunden'}`}</strong>
+            <p>{loading ? 'Buchungsdaten und Zuordnungen werden geprüft.' : validating ? 'Geänderte Buchungsdaten werden geprüft …' : busy ? 'Ausgewählte Vorschläge werden übernommen …' : error ? 'Lade die Vorschau erneut, um die Vorschläge zu prüfen.' : successes || blockedCount || failures
+              ? [`${available.length} übernahmefähig`, blockedCount && `${blockedCount} zu prüfen`, successes && `${successes} übernommen`, failures && `${failures} fehlgeschlagen`].filter(Boolean).join(' · ')
+              : rows.length ? 'Alle Vorschläge sind übernahmefähig. Wähle die Buchungen aus, die du übernehmen möchtest.' : 'Für diese Auswahl liegen keine Vorschläge vor.'}</p>
+            <small>Seite {page} · {scope}</small>
+          </div>
+          <label className="bank-ai-batch-select-all"><input ref={selectAll} type="checkbox" disabled={selectionDisabled}
+            aria-label="Alle übernahmefähigen Vorschläge auswählen" checked={allSelected}
+            onChange={event => toggleAll(event.target.checked)} /> Alle Vorschläge auswählen</label>
         </div>
-        <p className="helper" role="status" aria-live="polite">{loading ? 'Vorschläge und Zuordnungen werden geprüft …' : validating ? 'Geänderte Buchungsdaten werden geprüft …' : `${available.length} übernahmefähig · ${rows.filter(r => blockersFor(r).length).length} zu prüfen · ${successes} übernommen${failures ? ` · ${failures} fehlgeschlagen` : ''}`}</p>
         {error && <div role="alert" className="bank-ai-batch-error">Die Vorschau konnte nicht geladen werden: {error} <button className="btn bank-ai-batch-action" onClick={() => setRevision(value => value + 1)}>Erneut laden</button></div>}
       </div>
       <div className="bank-ai-batch-scroll" aria-busy={loading}>
         {!loading && !error && <table className="bank-table bank-ai-batch-table" aria-label="KI-Vorschläge zur Sammelübernahme">
-          <thead><tr><th>Auswahl</th><th>Bankbeleg</th><th>Betrag</th><th>Aktion und Buchungsdaten</th><th>Prüfung / Ergebnis</th><th>Details</th></tr></thead>
+          <thead><tr><th><input ref={tableSelectAll} type="checkbox" aria-label="Alle auswählbaren Bankbelege auswählen" disabled={selectionDisabled} checked={allSelected} onChange={event => toggleAll(event.target.checked)} /></th><th>Bankbeleg</th><th>Betrag</th><th>Aktion und Buchungsdaten</th><th>Prüfung</th><th>Details</th></tr></thead>
           <tbody>{rows.map(row => {
             const transaction = row.transaction, id = transaction.id, suggestion = transaction.aiSuggestion
             const candidate = edits[id] || row.candidate
@@ -244,7 +264,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
                     {({ ref, props }) => <span ref={ref} {...props} tabIndex={0} role="img" aria-label="Zur Übernahme bereit" className="bank-ai-batch-ready"><IconCircleCheckFilled size={23} aria-hidden="true" /></span>}
                   </HoverTooltip>}
                   {!!warnings.length && <small className="bank-ai-batch-hint">Hinweis: {warnings.join(' ')}</small>}</td>
-                <td><div className="bank-ai-batch-actions"><button className="btn bank-ai-batch-action" disabled={busy} aria-expanded={showDetails} aria-label={`Details zu Bankbeleg ${id}`} onClick={() => setExpanded(showDetails ? null : id)}>{showDetails ? 'Zuklappen' : editable ? 'Prüfen / Bearbeiten' : 'Ansehen'}</button>
+                <td><div className="bank-ai-batch-actions"><button className="btn bank-ai-batch-action" disabled={busy} aria-expanded={showDetails} aria-label={`Details zu Bankbeleg ${id}`} onClick={() => setExpanded(showDetails ? null : id)}>{showDetails ? 'Zuklappen' : editable ? 'Prüfen / Bearbeiten' : 'Ansehen'}<IconChevronRight size={16} aria-hidden="true" className={showDetails ? 'is-expanded' : undefined} /></button>
                   {!!blockers.length && <button className="btn bank-ai-batch-action" disabled={busy} onClick={() => onReview(suggestion?.action === 'CREATE_BOOKING' && candidate
                     ? { ...transaction, aiSuggestion: { ...suggestion, bookingCandidate: candidate } } : transaction)}>Einzeln prüfen</button>}</div></td>
               </tr>
@@ -267,11 +287,11 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
         </table>}
       </div>
       <footer className="bank-modal-footer bank-ai-batch-footer">
-        <div className="bank-ai-batch-selection"><strong>{selectedRows.length} ausgewählt</strong><small>{newCount} neue Buchungen · {linkCount} Zuordnungen · {recurringCount} Dauerbuchungen{membershipCount ? ` · ${membershipCount} ${membershipCount === 1 ? 'Beitragszuordnung' : 'Beitragszuordnungen'}` : ''}</small></div>
+        <button className="btn bank-ai-batch-cancel" disabled={busy} onClick={onClose}>{successes ? 'Schließen' : 'Abbrechen'}</button>
         <div className="bank-ai-batch-footer-actions">
-        <button className="btn" disabled={busy} onClick={onClose}>Schließen</button>
+        <div className="bank-ai-batch-selection"><strong>{selectedRows.length} von {available.length} ausgewählt</strong><small>{selectionSummary || (successes === rows.length && successes ? 'Alle ausgewählten Vorschläge wurden übernommen.' : 'Wähle die gewünschten Vorschläge aus.')}</small></div>
         <button className="btn primary" disabled={loading || busy || validating || !!error || !selectedRows.length} onClick={() => void apply()}>
-          {busy ? 'Wird übernommen …' : newCount === selectedRows.length && newCount ? `${newCount} ${newCount === 1 ? 'Buchung' : 'Buchungen'} anlegen` : `${selectedRows.length} ${selectedRows.length === 1 ? 'Vorschlag' : 'Vorschläge'} übernehmen`}
+          <IconCircleCheckFilled size={19} aria-hidden="true" />{busy ? 'Wird übernommen …' : newCount === selectedRows.length && newCount ? `${newCount} ${newCount === 1 ? 'Buchung' : 'Buchungen'} übernehmen` : `${selectedRows.length} ${selectedRows.length === 1 ? 'Vorschlag' : 'Vorschläge'} übernehmen`}
         </button>
         </div>
       </footer>

@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BackupInfo, AutoBackupMode } from '../types'
+import { useBackupProgress } from '../../../hooks/useBackupProgress'
+import type { BackupResult } from '../../../../../shared/backupProgress'
 
 /**
  * useBackupSettings - Manage Backup Configuration & Operations
@@ -17,6 +19,10 @@ export function useBackupSettings() {
   const [backups, setBackups] = useState<BackupInfo[]>([])
   const [backupDir, setBackupDir] = useState<string>('')
   const [busy, setBusy] = useState(false)
+  const [listError, setListError] = useState('')
+  const [listLoading, setListLoading] = useState(true)
+  const listRequest = useRef(0)
+  const progress = useBackupProgress()
 
   // Load initial settings
   useEffect(() => {
@@ -56,29 +62,38 @@ export function useBackupSettings() {
 
   // Refresh backup list
   const refreshBackups = async () => {
+    const request = ++listRequest.current
+    setListLoading(true)
     try {
       const res = await window.api?.backup?.list?.()
+      if (request !== listRequest.current) return
       if (res?.ok && res?.backups) {
         setBackups(res.backups)
+        setListError('')
+      } else {
+        setListError(res?.error || 'Sicherungen konnten nicht geladen werden.')
       }
     } catch (error) {
+      if (request !== listRequest.current) return
       console.error('Failed to refresh backups:', error)
-    }
+      setListError(error instanceof Error ? error.message : String(error))
+    } finally { if (request === listRequest.current) setListLoading(false) }
   }
 
   // Load backups on mount
   useEffect(() => {
-    refreshBackups()
+    void refreshBackups()
+    return () => { listRequest.current++ }
   }, [])
 
   // Create a new backup
-  const makeBackup = async (type: 'manual' | 'auto' = 'manual'): Promise<{ ok: boolean; filePath?: string; error?: string }> => {
+  const makeBackup = async (type: 'manual' | 'auto' = 'manual'): Promise<{ ok: boolean; error?: string } & Partial<BackupResult>> => {
     setBusy(true)
     try {
       const res = await window.api?.backup?.make?.(type)
       if (res?.ok && res?.filePath) {
-        await refreshBackups()
-        return { ok: true, filePath: res.filePath }
+        void refreshBackups()
+        return res
       }
       return { ok: false, error: res?.error || 'Backup failed' }
     } catch (error: any) {
@@ -102,19 +117,20 @@ export function useBackupSettings() {
   }
 
   // Set backup directory
-  const chooseBackupDir = async (): Promise<{ ok: boolean; dir?: string; moved?: number }> => {
+  const chooseBackupDir = async (): Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }> => {
+    setBusy(true)
     try {
       const res = await window.api?.backup?.setDir?.()
       if (res?.ok && res?.dir) {
         setBackupDir(String(res.dir))
-        await refreshBackups()
-        return { ok: true, dir: String(res.dir), moved: (res as any)?.moved ?? 0 }
+        void refreshBackups()
+        return res
       }
-      return { ok: false }
+      return { ok: false, error: res?.error }
     } catch (error) {
       console.error('Failed to set backup dir:', error)
-      return { ok: false }
-    }
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    } finally { setBusy(false) }
   }
 
   // Open backup folder in file explorer
@@ -133,7 +149,10 @@ export function useBackupSettings() {
     lastAuto,
     backups,
     backupDir,
-    busy,
+    busy: busy || !!progress?.active,
+    progress,
+    listError,
+    listLoading,
 
     // Actions
     refreshBackups,

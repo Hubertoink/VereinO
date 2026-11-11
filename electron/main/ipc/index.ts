@@ -249,8 +249,8 @@ import {
   closeDb,
   getCurrentDbInfo,
   migrateToRoot,
+  assertStorageMoveIdle,
   readAppConfig,
-  writeAppConfig,
   listOrganizations,
   getActiveOrganization,
   createOrganization,
@@ -262,7 +262,7 @@ import {
   setOrganizationAppearance,
   getActiveOrganizationAppearance
 } from '../db/database'
-import { getDefaultDbInfo, inspectBackupDetailed } from '../services/backup'
+import { validateOrganizationStorageTarget } from '../db/organizationStorage'
 import {
   createVoucher,
   reverseVoucher,
@@ -402,9 +402,6 @@ import {
 import {
   AuditRecentInput,
   AuditRecentOutput,
-  DbSmartRestorePreviewOutput,
-  DbSmartRestoreApplyInput,
-  DbSmartRestoreApplyOutput
 } from './schemas'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
@@ -2846,206 +2843,37 @@ ${reportAnalyticsCss}
       root: info.root,
       dbPath: info.dbPath,
       filesDir: info.filesDir,
-      configuredRoot: cfg.dbRoot || null
+      configuredRoot: cfg.dbRoot || null,
+      organization: getActiveOrganization()
     }
   })
 
-  // DB location: pick a folder (no migration) – return info so renderer can decide next step
+  // A selected folder is bound to the organization visible when picking it.
+  function ensureStorageChangeAllowed() {
+    assertStorageMoveIdle()
+    if (options.hasDetachedQuickAdds?.()) throw new Error('Bitte zuerst die separaten Erfassungsfenster schließen.')
+    backup.assertBackupIdle()
+  }
   ipcMain.handle('db.location.pick', async () => {
+    ensureStorageChangeAllowed()
+    const organization = getActiveOrganization()
+    if (!organization) throw new Error('Keine aktive Organisation gefunden.')
     const pick = await dialog.showOpenDialog({
-      title: 'Ordner wählen…',
+      title: `Neuer Speicherort für ${organization.name}`,
       properties: ['openDirectory', 'createDirectory']
     })
     if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-    const chosen = pick.filePaths[0]
-    const dbPath = path.join(chosen, 'database.sqlite')
-    const hasDb = fs.existsSync(dbPath)
-    const filesDir = path.join(chosen, 'files')
-    return { root: chosen, hasDb, dbPath, filesDir }
+    ensureStorageChangeAllowed()
+    if (getActiveOrganization()?.id !== organization.id) throw new Error('Die Organisation wurde inzwischen gewechselt. Bitte erneut auswählen.')
+    const root = await validateOrganizationStorageTarget(pick.filePaths[0], organization, listOrganizations())
+    return { root, sourceRoot: organization.dbRoot, organization: { id: organization.id, name: organization.name } }
   })
 
-  // DB location: migrate to a specific folder (copy-overwrite)
-  ipcMain.handle('db.location.migrateTo', async (_e, payload: any) => {
-    const { root } = payload || {}
-    if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-    const res = await migrateToRoot(root, 'copy-overwrite')
-    const d = getDb()
-    try {
-      applyMigrations(d as any)
-    } catch {}
-    return { ok: true, ...res }
-  })
-
-  // DB location: use a specific folder that already contains database.sqlite (no copy)
-  ipcMain.handle('db.location.useFolder', async (_e, payload: any) => {
-    const { root } = payload || {}
-    if (!root || typeof root !== 'string') throw new Error('Kein Zielordner angegeben')
-    const res = await migrateToRoot(root, 'use')
-    const d = getDb()
-    try {
-      applyMigrations(d as any)
-    } catch {}
-    return { ok: true, ...res }
-  })
-
-  // DB location: pick a new folder and migrate (copy-overwrite)
-  ipcMain.handle('db.location.chooseAndMigrate', async () => {
-    const pick = await dialog.showOpenDialog({
-      title: 'Ordner für Datenbank wählen',
-      properties: ['openDirectory', 'createDirectory']
-    })
-    if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-    const chosen = pick.filePaths[0]
-    const res = await migrateToRoot(chosen, 'copy-overwrite')
-    // Reopen DB to ensure app uses new file immediately
-    const d = getDb()
-    try {
-      applyMigrations(d as any)
-    } catch {}
-    return { ok: true, ...res }
-  })
-
-  // DB location: use existing folder with an existing database.sqlite (no copy)
-  ipcMain.handle('db.location.useExisting', async () => {
-    const pick = await dialog.showOpenDialog({
-      title: 'Bestehende Datenbank auswählen (Ordner)',
-      properties: ['openDirectory']
-    })
-    if (pick.canceled || !pick.filePaths?.[0]) throw new Error('Abbruch')
-    const chosen = pick.filePaths[0]
-    const res = await migrateToRoot(chosen, 'use')
-    const d = getDb()
-    try {
-      applyMigrations(d as any)
-    } catch {}
-    return { ok: true, ...res }
-  })
-
-  // DB location: reset to default (userData)
-  ipcMain.handle('db.location.resetDefault', async () => {
-    writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-    const info = getCurrentDbInfo()
-    // Reopen default DB
-    const d = getDb()
-    try {
-      applyMigrations(d as any)
-    } catch {}
-    return { ok: true, ...info }
-  })
-
-  // Smart restore preview: compare current configured DB vs default userData DB
-  ipcMain.handle('db.smartRestore.preview', async () => {
-    const currentInfo = getCurrentDbInfo()
-    const defaultInfo = getDefaultDbInfo()
-    async function statOrNull(p: string) {
-      try {
-        return await fsp.stat(p)
-      } catch {
-        return null
-      }
-    }
-    const [curStat, defStat] = await Promise.all([
-      statOrNull(currentInfo.dbPath),
-      statOrNull(defaultInfo.dbPath)
-    ])
-    const curInspect = curStat ? inspectBackupDetailed(currentInfo.dbPath) : { ok: false }
-    const defInspect = defStat ? inspectBackupDetailed(defaultInfo.dbPath) : { ok: false }
-    // Recommendation heuristic:
-    // 1) If default exists and current does NOT -> useDefault
-    // 2) If both exist: compare last voucher date then mtime fallback
-    // 3) If default missing -> migrateToDefault
-    let recommendation: 'useDefault' | 'migrateToDefault' | 'manual' = 'manual'
-    if (defStat && !curStat) recommendation = 'useDefault'
-    else if (!defStat && curStat) recommendation = 'migrateToDefault'
-    else if (defStat && curStat) {
-      const lvCur = curInspect.last?.voucher || curInspect.last?.audit || null
-      const lvDef = defInspect.last?.voucher || defInspect.last?.audit || null
-      if (lvCur && lvDef) recommendation = lvCur > lvDef ? 'migrateToDefault' : 'useDefault'
-      else if (lvCur && !lvDef) recommendation = 'migrateToDefault'
-      else if (!lvCur && lvDef) recommendation = 'useDefault'
-      else {
-        // Fallback to mtime
-        const mCur = curStat?.mtimeMs || 0
-        const mDef = defStat?.mtimeMs || 0
-        recommendation = mCur > mDef ? 'migrateToDefault' : 'useDefault'
-      }
-    }
-    return DbSmartRestorePreviewOutput.parse({
-      current: {
-        root: currentInfo.root,
-        dbPath: currentInfo.dbPath,
-        exists: !!curStat,
-        mtime: curStat?.mtimeMs ?? null,
-        counts: curInspect.counts,
-        last: curInspect.last
-      },
-      default: {
-        root: defaultInfo.root,
-        dbPath: defaultInfo.dbPath,
-        exists: !!defStat,
-        mtime: defStat?.mtimeMs ?? null,
-        counts: defInspect.counts,
-        last: defInspect.last
-      },
-      recommendation
-    })
-  })
-
-  // Smart restore apply
-  ipcMain.handle('db.smartRestore.apply', async (_e, payload) => {
-    const parsed = DbSmartRestoreApplyInput.parse(payload)
-    const { action } = parsed
-    const currentInfo = getCurrentDbInfo()
-    const defaultInfo = getDefaultDbInfo()
-    if (action === 'useDefault') {
-      // Point config to default, do not copy current over
-      writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-      // Close any open DB and reopen default
-      try {
-        closeDb()
-      } catch {}
-      const d = getDb()
-      try {
-        applyMigrations(d as any)
-      } catch {}
-      return DbSmartRestoreApplyOutput.parse({ ok: true })
-    } else if (action === 'migrateToDefault') {
-      // Copy current DB + attachments to default, then reset config
-      try {
-        // Close current DB first
-        try {
-          closeDb()
-        } catch {}
-        // Ensure default dirs exist
-        await fsp.mkdir(defaultInfo.filesDir, { recursive: true })
-        // Copy DB file
-        await fsp.copyFile(currentInfo.dbPath, defaultInfo.dbPath)
-        // Copy attachments (voucher_files file paths adjustment not required; they store absolute paths currently updated by migrateToRoot. For simplicity we leave as-is if absolute.)
-        try {
-          const files = await fsp.readdir(path.join(currentInfo.root, 'files'))
-          for (const f of files) {
-            const src = path.join(currentInfo.root, 'files', f)
-            const dst = path.join(defaultInfo.filesDir, f)
-            try {
-              if (!fs.existsSync(dst)) await fsp.copyFile(src, dst)
-            } catch {}
-          }
-        } catch {
-          /* ignore */
-        }
-        // Point config to default
-        writeAppConfig({ ...readAppConfig(), dbRoot: undefined })
-        // Reopen DB
-        const d = getDb()
-        try {
-          applyMigrations(d as any)
-        } catch {}
-        return DbSmartRestoreApplyOutput.parse({ ok: true })
-      } catch (e: any) {
-        throw new Error('Migration zum Standard fehlgeschlagen: ' + (e?.message || String(e)))
-      }
-    }
-    return DbSmartRestoreApplyOutput.parse({ ok: false })
+  ipcMain.handle('db.location.migrateTo', async (_e, payload: { root: string; organizationId: string }) => {
+    ensureStorageChangeAllowed()
+    if (!payload?.root || typeof payload.root !== 'string' || !payload.organizationId) throw new Error('Zielordner und Organisation sind erforderlich.')
+    const result = await migrateToRoot(payload.root, payload.organizationId)
+    return { ok: true, ...result }
   })
 
   // Tags CRUD

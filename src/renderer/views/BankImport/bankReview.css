@@ -40,6 +40,9 @@
 }
 .bank-list-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; color: var(--text-dim); font-size: 12px; margin: 4px 0 12px; }
 .app-main:has(.bank-import-container) { scrollbar-gutter: stable; }
+@media (max-width: 1200px) {
+  .app-main:has(.bank-import-container) { scrollbar-gutter: auto; }
+}
 .bank-master-table { overflow-x: auto; min-width: 0; }
 /* Expanded rows must never participate in calculating the column widths. */
 .bank-master-table .bank-table { min-width: 960px; table-layout: fixed; }

@@ -69,6 +69,44 @@ const AI_SUGGESTION_ENABLED_KEY = 'booking.aiSuggestions.enabled'
 export const AI_PATTERNS_CHANGED_EVENT = 'booking-ai-patterns:changed'
 const MIN_LEARNED_PATTERN_OCCURRENCES = 2
 
+// Bind this renderer to its organization before mounting the app (including
+// detached booking windows). Never infer ownership from shared localStorage.
+let organizationId: string | null = null
+let organizationRevision = 0
+let unsubscribeOrganization: (() => void) | undefined
+
+function notifyPatternsChanged() {
+  window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
+}
+
+export async function initializeBookingAIPatterns() {
+  unsubscribeOrganization?.()
+  unsubscribeOrganization = undefined
+  organizationId = null
+  const revision = ++organizationRevision
+  try {
+    unsubscribeOrganization = window.api.organizations.onSwitched(() => {
+      // Existing forms still contain the previous organization's accounts and
+      // assignments until the full reload. Block both reads and writes now.
+      organizationRevision++
+      organizationId = null
+      notifyPatternsChanged()
+    })
+    const { organization } = await window.api.organizations.active()
+    if (revision === organizationRevision) organizationId = organization?.id || null
+  } catch {
+    // Without a confirmed organization, do not fall back to the legacy global
+    // store: its patterns may contain account/budget IDs from several orgs.
+  }
+  notifyPatternsChanged()
+}
+
+function organizationStorageKey(key: string) {
+  // Leave the old unscoped keys intact for recovery, but never read/migrate
+  // them automatically: their original organization cannot be determined.
+  return organizationId ? `${key}.org.${encodeURIComponent(organizationId)}` : null
+}
+
 const BUILT_IN_BOOKING_AI_RULES: BookingAISuggestion[] = [
   {
     key: 'rule:mitgliedsbeitrag',
@@ -142,8 +180,10 @@ function normalizeSuggestionText(value: string) {
 }
 
 export function readAISuggestionLearning(): Record<string, BookingAIPattern> {
+  const key = organizationStorageKey(AI_SUGGESTION_STORAGE_KEY)
+  if (!key) return {}
   try {
-    const raw = localStorage.getItem(AI_SUGGESTION_STORAGE_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
@@ -153,24 +193,30 @@ export function readAISuggestionLearning(): Record<string, BookingAIPattern> {
 }
 
 function writeAISuggestionLearning(data: Record<string, BookingAIPattern>) {
+  const key = organizationStorageKey(AI_SUGGESTION_STORAGE_KEY)
+  if (!key) return
   try {
-    localStorage.setItem(AI_SUGGESTION_STORAGE_KEY, JSON.stringify(data))
-    window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
+    localStorage.setItem(key, JSON.stringify(data))
+    notifyPatternsChanged()
   } catch {}
 }
 
 export function isBookingAIPatternsEnabled() {
+  const key = organizationStorageKey(AI_SUGGESTION_ENABLED_KEY)
+  if (!key) return false
   try {
-    return localStorage.getItem(AI_SUGGESTION_ENABLED_KEY) !== 'false'
+    return localStorage.getItem(key) !== 'false'
   } catch {
     return true
   }
 }
 
 export function setBookingAIPatternsEnabled(enabled: boolean) {
+  const key = organizationStorageKey(AI_SUGGESTION_ENABLED_KEY)
+  if (!key) return
   try {
-    localStorage.setItem(AI_SUGGESTION_ENABLED_KEY, String(enabled))
-    window.dispatchEvent(new CustomEvent(AI_PATTERNS_CHANGED_EVENT))
+    localStorage.setItem(key, String(enabled))
+    notifyPatternsChanged()
   } catch {}
 }
 

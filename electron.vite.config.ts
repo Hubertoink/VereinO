@@ -12,7 +12,11 @@ export default defineConfig({
         build: {
             outDir: 'dist-electron/main',
             lib: {
-                entry: path.resolve(__dirname, 'electron/main/index.ts'),
+                entry: {
+                    index: path.resolve(__dirname, 'electron/main/index.ts'),
+                    backupIo: path.resolve(__dirname, 'electron/main/workers/backupIo.ts')
+                },
+                fileName: (_format, entryName) => `${entryName}.cjs`,
                 formats: ['cjs'],
             },
             rollupOptions: {

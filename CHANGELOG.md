@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.13.2] - 2026-11-12
+
+### Geändert
+
+- Schmale Fenster nutzen mehr Inhaltsbreite. Die obere Fensterleiste schließt mit den Fensterbuttons ab und ist zwölf Pixel niedriger.
+- Die Bankimport-Tabelle richtet ihre Höhe nach den Einträgen. Die KI-Sammelprüfung zeigt Buchungsdaten, Auswahl und Übernahmeaktionen übersichtlicher.
+- Speicherorte werden klar gegliedert angezeigt und lassen sich direkt im Explorer öffnen. Fehler bei Sicherungen und Speicherortwechseln erscheinen als Toast.
+- „Ordner wählen“ kopiert Datenbank, Anhänge und lokale Sicherungen in einen leeren Zielordner und ordnet ihn dauerhaft ausschließlich der aktuellen Organisation zu. Die bisherige Kopie bleibt erhalten.
+
+### Behoben
+
+- Sicherungen auf langsamen oder nicht erreichbaren Netzlaufwerken laufen in einem getrennten Prozess mit Zeitlimit und Fortschrittsanzeige. Bei fehlgeschlagener Übertragung bleiben eine vollständige lokale Sicherung und ein Protokoll erhalten.
+- KI-Muster, Regel-Einstellungen und Nutzungszähler werden pro Organisation gespeichert. Bisherige gemeinsame Muster bleiben erhalten, werden wegen ihrer unklaren Zuordnung aber nicht mehr verwendet; jede Organisation lernt neu.
+- Speicherortwechsel schützen andere Organisationen und vorhandene Datenbanken vor Überschreiben. Bei Kopier- oder Konfigurationsfehlern bleibt der ursprüngliche Speicherort aktiv.
+- Nicht gemeinnützige Organisationen zeigen „Mitglieder“ auch in den Reiterleisten-Optionen nicht mehr an.
+
+### Entfernt
+
+- Der globale Standard-Datenbank-Vergleich und seine Wechselaktionen wurden entfernt, da sie nicht zur getrennten Speicherung mehrerer Organisationen passen.
+
 ## [4.13.1] - 2026-11-11
 
 ### Geändert

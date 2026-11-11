@@ -475,7 +475,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
             const due = !lastAuto || (now - lastAuto) > intervalDays * 24 * 60 * 60 * 1000
             if (!due) return
             if (mode === 'SILENT') {
-                try { await backup.makeBackup('auto') } catch { /* ignore */ }
+                await backup.makeBackup('auto')
                 setSetting('backup.lastAuto', now)
             } else if (mode === 'PROMPT') {
                 // Renderer will handle user-facing prompt with a custom modal

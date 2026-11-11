@@ -125,10 +125,4 @@ export class LocalAdapter implements IDataAdapter {
     inspectCurrent: () => this.api.backup.inspectCurrent()
   }
 
-  db: IDataAdapter['db'] = {
-    smartRestore: {
-      preview: () => this.api.db.smartRestore.preview(),
-      apply: (params) => this.api.db.smartRestore.apply(params)
-    }
-  }
 }

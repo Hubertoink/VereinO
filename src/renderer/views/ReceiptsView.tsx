@@ -81,7 +81,7 @@ export default function ReceiptsView({ openVoucher, onVoucherOpened }: { openVou
     }
 
     return (
-        <div className="receipts-container" style={{ padding: 12 }}>
+        <div className="receipts-container">
             <header className="receipts-header">
                 <div><h1>Belege</h1><span className="helper">Buchungen mit Belegen ({total})</span></div>
                 <div className="receipts-toolbar">

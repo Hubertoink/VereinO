@@ -198,7 +198,7 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
             <span aria-hidden="true">✦</span> <strong>KI-Muster</strong>
           </div>
           <div className="settings-sub">
-            Steuere, welche lokalen Buchungshilfen im Buchungsmodal Vorschläge machen. Ein Muster wird erst nach mindestens zwei passenden gespeicherten Buchungen gelernt.
+            Muster und Einstellungen gelten nur für die aktuelle Organisation. Ein Muster wird erst nach mindestens zwei passenden gespeicherten Buchungen gelernt.
           </div>
         </div>
         <label className={`ai-pattern-global-toggle ${enabled ? 'is-on' : 'is-off'}`} htmlFor="ai-patterns-enabled">

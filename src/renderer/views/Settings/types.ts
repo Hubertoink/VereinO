@@ -76,6 +76,7 @@ export interface BackupInfo {
 }
 
 export interface LocationInfo {
+  organization: { id: string; name: string } | null
   root: string
   dbPath: string
   filesDir: string
@@ -182,6 +183,7 @@ export interface SettingsProps {
 // ============================================================================
 
 export interface GeneralPaneProps {
+  organizationProfile: OrganizationProfile
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
   sidebarCollapsed: boolean

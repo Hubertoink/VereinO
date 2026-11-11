@@ -115,6 +115,7 @@ export function SettingsView(props: SettingsProps) {
       <div className="settings-content">
         {activeTile === 'general' && (
           <GeneralPane
+            organizationProfile={props.organizationProfile}
             navLayout={props.navLayout}
             setNavLayout={props.setNavLayout}
             sidebarCollapsed={props.sidebarCollapsed}

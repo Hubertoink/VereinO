@@ -2,7 +2,7 @@ import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
-import { navItems, type NavKey } from '../../../utils/navItems'
+import { getProfileNavigationItems, type NavKey } from '../../../utils/navItems'
 import { getNavIcon } from '../../../utils/navIcons'
 import { IconPalette, IconSparkles } from '@tabler/icons-react'
 
@@ -17,6 +17,7 @@ import { IconPalette, IconSparkles } from '@tabler/icons-react'
  * - Date format
  */
 export function GeneralPane({
+  organizationProfile,
   journalRowStyle,
   setJournalRowStyle,
   journalRowDensity,
@@ -354,7 +355,7 @@ export function GeneralPane({
                 <span>Bestimme, welche Hauptbereiche in der Navigation dieser Organisation sichtbar sind.</span>
               </div>
               <div className="settings-nav-visibility-grid">
-                {navItems.map((item) => {
+                {getProfileNavigationItems(organizationProfile).map((item) => {
                   const locked = lockedNavItems.has(item.key)
                   const checked = locked || visibleNavItems.includes(item.key)
                   return (

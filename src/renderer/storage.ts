@@ -1,7 +1,7 @@
 // Storage selection helpers for Settings UI
-// Provides a two-step flow: pick folder first, then migrate or use existing.
+// Pick an empty destination, then copy the selected organization into it.
 
-export type PickResult = { root: string; hasDb: boolean; dbPath: string; filesDir: string }
+export type PickResult = Awaited<ReturnType<Window['api']['db']['location']['pick']>>
 export type MigrateUseResult = { ok: true; root: string; dbPath: string; filesDir: string }
 
 export async function pickFolder(): Promise<PickResult | null> {
@@ -15,12 +15,7 @@ export async function pickFolder(): Promise<PickResult | null> {
     }
 }
 
-export async function migrateTo(root: string): Promise<MigrateUseResult> {
-    const res = await (window as any).api?.db?.location?.migrateTo?.({ root })
-    return res
-}
-
-export async function useFolder(root: string): Promise<MigrateUseResult> {
-    const res = await (window as any).api?.db?.location?.useFolder?.({ root })
+export async function migrateTo(root: string, organizationId: string): Promise<MigrateUseResult> {
+    const res = await (window as any).api?.db?.location?.migrateTo?.({ root, organizationId })
     return res
 }

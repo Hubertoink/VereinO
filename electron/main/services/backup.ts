@@ -1,11 +1,13 @@
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
-import { app, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { runBackupIo } from './backupWorker'
+import type { BackupProgress, BackupResult } from '../../../shared/backupProgress'
 import { getSetting, setSetting } from './settings'
 import { getAppDataDir, getCurrentDbInfo, getDb, closeDb } from '../db/database'
 import { applyMigrations } from '../db/migrations'
-import { isUsableBackupDirectory, resolveBackupDirectory } from './backupDirectory'
 
 export type BackupEntry = { filePath: string; size: number; mtime: number }
 type BackupCounts = Record<string, number>
@@ -17,7 +19,6 @@ type BackupLastActivity = {
 }
 
 const BACKUP_DIR_SETTING = 'backup.dir'
-const BACKUP_FILE_PATTERN = /\.sqlite$/i
 const INSPECTION_TABLES = [
   'vouchers',
   'invoice_files',
@@ -63,14 +64,6 @@ async function pathExists(filePath: string) {
   }
 }
 
-async function removePathIfExists(targetPath: string) {
-  try {
-    await fs.rm(targetPath, { recursive: true, force: true })
-  } catch {
-    /* ignore */
-  }
-}
-
 async function copyDirRecursive(src: string, dest: string) {
   if (!(await pathExists(src))) return
   await fs.cp(src, dest, { recursive: true, force: true })
@@ -104,93 +97,55 @@ function relinkFilePaths(d: any, filesDir: string) {
   }
 }
 
-function applyBackupDirSetting(dir: string | null | undefined) {
-  if (dir && String(dir).trim()) {
-    const value = String(dir).trim()
-    if (!isUsableBackupDirectory(value))
-      throw new Error(`Der Backup-Ordner ist nicht beschreibbar: ${value}`)
-    setSetting(BACKUP_DIR_SETTING, value)
-    return value
-  }
+let backupBusy = false
+export function assertBackupIdle() {
+  if (backupBusy) throw new Error('Bitte zuerst die laufende Sicherung oder den Wechsel des Sicherungsordners abwarten.')
+}
+let progress: BackupProgress | null = null
+export function getBackupProgress() { return progress }
 
-  const fallback = defaultBackupDir()
-  try {
-    ensureDir(fallback)
-  } catch {
-    /* fallback may still be created lazily by directory resolution */
-  }
-  setSetting(BACKUP_DIR_SETTING, null)
-  return fallback
+function recoveryRoot() {
+  const localRoot = process.platform === 'win32' ? process.env.LOCALAPPDATA || app.getPath('temp') : app.getPath('userData')
+  return path.join(localRoot, 'VereinO', 'backup-recovery')
 }
 
-async function migrateBackupFiles(sourceDir: string, targetDir: string) {
-  if (pathsEqual(sourceDir, targetDir)) return 0
-
-  let moved = 0
-  try {
-    const files = await pathExists(sourceDir) ? await fs.readdir(sourceDir) : []
-    for (const fileName of files) {
-      if (!BACKUP_FILE_PATTERN.test(fileName)) continue
-      const sourceFile = path.join(sourceDir, fileName)
-      const targetFile = path.join(targetDir, fileName)
-      try {
-        if (await pathExists(targetFile)) continue
-        await fs.copyFile(sourceFile, targetFile)
-        const sourceSnapshot = snapshotDirForBackupFile(sourceFile)
-        const targetSnapshot = snapshotDirForBackupFile(targetFile)
-        if (await pathExists(sourceSnapshot) && !(await pathExists(targetSnapshot)))
-          await copyDirRecursive(sourceSnapshot, targetSnapshot)
-        moved += 1
-      } catch {
-        /* skip individual files */
-      }
-    }
-  } catch {
-    /* ignore directory-level migration failures */
-  }
-  return moved
+export async function openRecoveryFolder() {
+  const dir = recoveryRoot()
+  await fs.mkdir(dir, { recursive: true })
+  const error = await shell.openPath(dir)
+  return { ok: !error, error: error || undefined }
 }
 
+// Reading a configured path must never contact a potentially unavailable drive.
+// In particular, a temporarily offline share must not erase the user's setting.
 export function getBackupDir(): string {
-  const resolution = resolveBackupDirectory(configuredBackupDir(), defaultBackupDir())
-  if (resolution.usedFallback) {
-    // Repair stale paths, for example after moving a database from another
-    // Windows user profile or disconnecting an external drive.
-    try {
-      setSetting(BACKUP_DIR_SETTING, null)
-    } catch {
-      /* fallback remains usable for this run */
-    }
-  }
-  return resolution.dir
+  return configuredBackupDir() ?? defaultBackupDir()
 }
 
-export function setBackupDir(dir: string | null | undefined): { ok: boolean; dir: string } {
-  try {
-    applyBackupDirSetting(dir)
-    return { ok: true, dir: getBackupDir() }
-  } catch {
-    return { ok: false, dir: getBackupDir() }
-  }
+export async function setBackupDir(dir: string | null | undefined) {
+  return setBackupDirWithMigration(dir)
 }
 
-/**
- * Change backup directory and migrate existing backups from the previously effective directory
- * to the new one. Copies only .sqlite files. If a file with the same name already exists
- * in the target directory, it will be skipped to avoid overwriting.
- */
 export async function setBackupDirWithMigration(dir: string | null | undefined): Promise<{
-  ok: boolean
-  dir: string
-  moved: number
+  ok: boolean; dir: string; moved: number; error?: string; warning?: string
 }> {
+  if (backupBusy) return { ok: false, dir: getBackupDir(), moved: 0, error: 'Eine Sicherung oder ein Ordnerwechsel läuft bereits.' }
+  backupBusy = true
   try {
-    const previousDir = configuredBackupDir() ?? defaultBackupDir()
-    const targetDir = applyBackupDirSetting(dir)
-    return { ok: true, dir: targetDir, moved: await migrateBackupFiles(previousDir, targetDir) }
-  } catch {
-    return { ok: false, dir: getBackupDir(), moved: 0 }
-  }
+    const previousDir = getBackupDir()
+    const targetDir = dir?.trim() || defaultBackupDir()
+    await runBackupIo({ action: 'probe', dir: targetDir })
+    setSetting(BACKUP_DIR_SETTING, dir?.trim() || null)
+    if (pathsEqual(previousDir, targetDir)) return { ok: true, dir: targetDir, moved: 0 }
+    try {
+      const result = await runBackupIo({ action: 'migrate', source: previousDir, dir: targetDir })
+      return { ok: true, dir: targetDir, moved: result.moved || 0 }
+    } catch (error) {
+      return { ok: true, dir: targetDir, moved: 0, warning: `Der neue Ordner ist gesetzt. Vorhandene Sicherungen konnten nicht vollständig kopiert werden; die Originale bleiben erhalten. ${error instanceof Error ? error.message : String(error)}` }
+    }
+  } catch (error) {
+    return { ok: false, dir: getBackupDir(), moved: 0, error: error instanceof Error ? error.message : String(error) }
+  } finally { backupBusy = false }
 }
 
 function timestamp(now = new Date()) {
@@ -203,71 +158,87 @@ function timestamp(now = new Date()) {
   return `${y}-${m}-${d}_${hh}${mm}${ss}`
 }
 
-export async function makeBackup(reason?: string): Promise<{ filePath: string }> {
-  const dir = getBackupDir()
-  const stamp = timestamp()
-  const tag = reason ? `_${reason.replace(/[^a-zA-Z0-9_-]+/g, '_')}` : ''
-  const out = path.join(dir, `database_${stamp}${tag}.sqlite`)
-  const snapshotDir = snapshotDirForBackupFile(out)
-  // Use better-sqlite3 online backup for a consistent copy while DB is open
-  const d: any = getDb()
-  try {
-    if (typeof d.backup === 'function') {
-      await d.backup(out)
-    } else {
-      // Fallback: copy file directly (less safe with WAL but better than nothing)
-      const { dbPath } = getCurrentDbInfo()
-      await fs.copyFile(dbPath, out)
+export async function makeBackup(reason?: string): Promise<BackupResult> {
+  if (backupBusy) throw new Error('Eine Sicherung oder ein Ordnerwechsel läuft bereits.')
+  backupBusy = true
+  let localFilePath = ''
+  let localComplete = false
+  let logFilePath = ''
+  let logQueue = Promise.resolve()
+  let lastStage = ''
+  const report = (update: Omit<BackupProgress, 'active'> & { active?: boolean }) => {
+    progress = { ...update, active: update.active ?? true, localFilePath: localComplete && update.stage !== 'done' ? localFilePath : undefined, logFilePath: logFilePath || undefined }
+    for (const window of BrowserWindow.getAllWindows()) {
+      try {
+        if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('backup:progress', progress)
+      } catch { /* A closing window must not interrupt the backup. */ }
     }
-    const { filesDir } = getCurrentDbInfo()
-    await removePathIfExists(snapshotDir)
-    await copyDirRecursive(filesDir, snapshotDir)
-  } catch (e) {
-    // If backup failed, ensure file does not remain as a partial
-    await removePathIfExists(out)
-    await removePathIfExists(snapshotDir)
-    throw e
+    if (logFilePath && (lastStage !== update.stage || update.stage === 'error' || update.stage === 'done')) {
+      lastStage = update.stage
+      const line = JSON.stringify({ time: new Date().toISOString(), ...progress }) + '\n'
+      logQueue = logQueue.then(() => fs.appendFile(logFilePath, line, 'utf8')).catch(() => undefined)
+    }
   }
   try {
-    await rotateBackups()
-  } catch {
-    /* ignore rotation errors */
-  }
-  return { filePath: out }
+    const dir = getBackupDir()
+    // Capture the source before awaiting; a later organization switch must not mix backups.
+    const database = getDb()
+    const { filesDir } = getCurrentDbInfo()
+    const root = recoveryRoot()
+    await fs.mkdir(root, { recursive: true })
+    const staging = await fs.mkdtemp(path.join(root, 'backup-'))
+    logFilePath = path.join(staging, 'backup.log')
+    const tag = reason ? `_${reason.replace(/[^a-zA-Z0-9_-]+/g, '_')}` : ''
+    const name = `database_${timestamp()}${tag}_${randomUUID()}.sqlite`
+    localFilePath = path.join(staging, name)
+    await fs.writeFile(logFilePath, JSON.stringify({ time: new Date().toISOString(), targetDir: dir, reason: reason || 'manual' }) + '\n')
+    report({ stage: 'database', message: 'Datenbank wird lokal gesichert …' })
+    const deadline = Date.now() + 30 * 60_000
+    // Never copy an open SQLite file directly: WAL transactions could be missing.
+    await database.backup(`${localFilePath}.partial`, { progress: () => {
+      if (Date.now() > deadline) throw new Error('Zeitüberschreitung beim Erstellen der lokalen Datenbanksicherung.')
+      return 100
+    } })
+    report({ stage: 'attachments', message: 'Belege werden lokal gesichert …' })
+    await runBackupIo({ action: 'snapshot', source: filesDir, destination: snapshotDirForBackupFile(localFilePath) }, report)
+    await fs.rename(`${localFilePath}.partial`, localFilePath)
+    localComplete = true
+    report({ stage: 'transfer', message: 'Sicherung wird zum Zielordner übertragen …' })
+    const result = await runBackupIo({ action: 'publish', source: localFilePath, dir }, report)
+    if (!result.filePath) throw new Error('Die Übertragung wurde nicht bestätigt.')
+    let warning: string | undefined
+    report({ stage: 'rotation', message: 'Alte Sicherungen werden bereinigt …' })
+    try {
+      await runBackupIo({ action: 'rotate', dir, keep: 5 }, report, { idleMs: 20_000, totalMs: 60_000 })
+    } catch (error) {
+      warning = `Die Sicherung wurde gespeichert. Alte Sicherungen konnten nicht bereinigt werden: ${error instanceof Error ? error.message : String(error)}`
+    }
+    report({ active: false, stage: 'done', message: warning || `Sicherung erfolgreich gespeichert: ${result.filePath}` })
+    await logQueue
+    // Keep the diagnostic log, but remove the redundant local backup only after publication.
+    await Promise.all([fs.unlink(localFilePath), fs.rm(snapshotDirForBackupFile(localFilePath), { recursive: true, force: true })]).catch(() => undefined)
+    progress = { ...progress!, localFilePath: undefined }
+    return { filePath: result.filePath, warning, logFilePath }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    const message = localComplete
+      ? `Die Übertragung zum Sicherungsziel ist fehlgeschlagen oder wurde nicht bestätigt. ${detail} Die vollständige lokale Sicherung bleibt erhalten: ${localFilePath}`
+      : `Die Sicherung konnte nicht vollständig erstellt werden. ${detail}`
+    report({ active: false, stage: 'error', message })
+    await logQueue
+    // Incomplete local snapshots remain marked .partial, never as restorable backups.
+    throw new Error(`${message}${logFilePath ? ` Protokoll: ${logFilePath}` : ''}`)
+  } finally { backupBusy = false }
 }
 
 export async function listBackups(): Promise<{ dir: string; backups: BackupEntry[] }> {
   const dir = getBackupDir()
-  const entries: BackupEntry[] = []
-  try {
-    const files = await fs.readdir(dir)
-    for (const f of files) {
-      if (!BACKUP_FILE_PATTERN.test(f)) continue
-      const full = path.join(dir, f)
-      try {
-        const st = await fs.stat(full)
-        if (st.isFile()) entries.push({ filePath: full, size: st.size, mtime: st.mtimeMs })
-      } catch {
-        /* ignore */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  entries.sort((a, b) => b.mtime - a.mtime)
-  return { dir, backups: entries }
+  const result = await runBackupIo({ action: 'list', dir })
+  return { dir, backups: result.files || [] }
 }
 
-// Simple rotation: keep the most recent backup files; delete older ones.
-export async function rotateBackups(keep: number = 5): Promise<void> {
-  const { backups } = await listBackups()
-  if (backups.length <= keep) return
-  for (const backup of backups.slice(keep)) {
-    await Promise.all([
-      removePathIfExists(backup.filePath),
-      removePathIfExists(snapshotDirForBackupFile(backup.filePath))
-    ])
-  }
+export async function rotateBackups(keep = 5): Promise<void> {
+  await runBackupIo({ action: 'rotate', dir: getBackupDir(), keep })
 }
 
 export async function openBackupFolder(): Promise<{ ok: boolean; error?: string | null }> {
@@ -350,13 +321,6 @@ export function inspectCurrent(): { ok: boolean; counts?: Record<string, number>
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) }
   }
-}
-
-export function getDefaultDbInfo() {
-  const root = app.getPath('userData')
-  const filesDir = path.join(root, 'files')
-  const dbPath = path.join(root, 'database.sqlite')
-  return { root, filesDir, dbPath }
 }
 
 export function inspectBackupDetailed(filePath: string): {

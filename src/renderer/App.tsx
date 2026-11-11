@@ -4109,10 +4109,10 @@ function AppInner() {
               const res = await window.api?.backup?.make?.('auto')
               if (res?.filePath) {
                 await window.api?.settings?.set?.({ key: 'backup.lastAuto', value: Date.now() })
-                notify('success', 'Backup erstellt')
+                notify(res.warning ? 'info' : 'success', res.warning || 'Backup erstellt')
                 dispatchDataChanged(['settings'])
               } else {
-                notify('error', 'Backup konnte nicht erstellt werden')
+                notify('error', res?.error || 'Backup konnte nicht erstellt werden')
               }
             } catch (e: any) {
               notify('error', e?.message || String(e))

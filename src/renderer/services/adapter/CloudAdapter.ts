@@ -239,10 +239,4 @@ export class CloudAdapter implements IDataAdapter {
     inspectCurrent: async () => { throw new Error('Inspect not available in cloud mode') }
   }
 
-  db: IDataAdapter['db'] = {
-    smartRestore: {
-      preview: async () => { throw new Error('Smart restore not available in cloud mode') },
-      apply: async () => { throw new Error('Smart restore not available in cloud mode') }
-    }
-  }
 }

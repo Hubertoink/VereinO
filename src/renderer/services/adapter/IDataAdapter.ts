@@ -140,9 +140,6 @@ export interface IDataAdapter {
     inspect: RendererApi['backup']['inspect']
     inspectCurrent: RendererApi['backup']['inspectCurrent']
   }
-  db: {
-    smartRestore: RendererApi['db']['smartRestore']
-  }
 }
 
 export type AppMode = 'local' | 'cloud'

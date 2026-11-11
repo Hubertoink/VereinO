@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { BankAiReviewProgress } from '../../shared/bankAiReviewProgress'
+import type { BackupProgress } from '../../shared/backupProgress'
 import type { QuickAddPayload, RendererApi, UpdateState } from '../../src/types/api'
 import { DATA_CHANGE_SCOPES, type DataChangeScope } from '../../shared/dataChange'
 import type { OrganizationProfile } from '../../shared/classification'
@@ -394,19 +395,11 @@ const rendererApi = {
       fromPath: (filePath: string) =>
         invokeRaw<RendererResultAt<'db.import.fromPath'>>('db.import.fromPath', { filePath })
     },
-    smartRestore: {
-      preview: () => invoke('db.smartRestore.preview'),
-      apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) =>
-        invoke('db.smartRestore.apply', payload)
-    },
     location: {
       get: () => invoke('db.location.get'),
       pick: () => invoke('db.location.pick'),
       migrateTo: (payload) => invoke('db.location.migrateTo', payload),
-      useFolder: (payload) => invoke('db.location.useFolder', payload),
-      chooseAndMigrate: () => invoke('db.location.chooseAndMigrate'),
-      useExisting: () => invoke('db.location.useExisting'),
-      resetDefault: () => invoke('db.location.resetDefault')
+
     },
     onInitFailed: (cb: (info: { message: string }) => void) => {
       const handler = (_event: IpcRendererEvent, info: { message: string }) => {
@@ -445,6 +438,13 @@ const rendererApi = {
     exportMoneyReceipt: (payload) => invoke('donations.exportMoneyReceipt', payload)
   },
   backup: {
+    getProgress: () => invoke('backup.getProgress'),
+    openRecoveryFolder: () => invoke('backup.openRecoveryFolder'),
+    onProgress: (callback: (progress: BackupProgress) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: BackupProgress) => callback(progress)
+      ipcRenderer.on('backup:progress', handler)
+      return () => ipcRenderer.removeListener('backup:progress', handler)
+    },
     make: (reason?: string) =>
       invokeRaw<RendererResultAt<'backup.make'>>('backup.make', { reason }),
     list: () => invoke('backup.list'),

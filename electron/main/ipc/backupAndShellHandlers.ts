@@ -10,7 +10,7 @@ export function registerBackupAndShellHandlers(): void {
     ipcMain.handle('backup.make', async (_event, payload?: { reason?: string }) => {
         try {
             const result = await backup.makeBackup(payload?.reason)
-            return { ok: true, filePath: result.filePath }
+            return { ok: true, ...result }
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
         }
@@ -22,6 +22,8 @@ export function registerBackupAndShellHandlers(): void {
             return { ok: false, error: errorMessage(error) }
         }
     })
+    ipcMain.handle('backup.getProgress', () => backup.getBackupProgress())
+    ipcMain.handle('backup.openRecoveryFolder', () => backup.openRecoveryFolder())
     ipcMain.handle('backup.openFolder', async () => {
         try {
             return await backup.openBackupFolder()
@@ -44,7 +46,7 @@ export function registerBackupAndShellHandlers(): void {
             })
             if (pick.canceled || !pick.filePaths[0]) throw new Error('Abbruch')
             const result = await backup.setBackupDirWithMigration(pick.filePaths[0])
-            return { ok: result.ok, dir: result.dir, moved: result.moved }
+            return result
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
         }
@@ -52,7 +54,7 @@ export function registerBackupAndShellHandlers(): void {
     ipcMain.handle('backup.resetDir', async () => {
         try {
             const result = await backup.setBackupDirWithMigration(null)
-            return { ok: result.ok, dir: result.dir, moved: result.moved }
+            return result
         } catch (error) {
             return { ok: false, error: errorMessage(error) }
         }

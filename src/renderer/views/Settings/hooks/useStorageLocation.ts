@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { LocationInfo } from '../types'
+import type { PickResult } from '../../../storage'
 
 /**
  * useStorageLocation - Manage Database Storage Location
@@ -7,7 +8,6 @@ import { LocationInfo } from '../types'
  * Handles:
  * - Current location info (root, dbPath, filesDir)
  * - Folder selection & migration
- * - Smart restore to default location
  */
 export function useStorageLocation() {
   const [info, setInfo] = useState<LocationInfo | null>(null)
@@ -36,7 +36,8 @@ export function useStorageLocation() {
   }, [])
 
   // Pick a folder (returns selection info without changing location yet)
-  const pickFolder = async (): Promise<{ root: string; dbPath: string; hasDb: boolean } | null> => {
+  const pickFolder = async (): Promise<PickResult | null> => {
+    setError('')
     try {
       const storage = await import('../../../storage')
       return await storage.pickFolder()
@@ -50,57 +51,17 @@ export function useStorageLocation() {
   }
 
   // Migrate database to a new folder
-  const migrateTo = async (root: string): Promise<{ ok: boolean }> => {
+  const migrateTo = async (root: string, organizationId: string): Promise<{ ok: boolean }> => {
     setBusy(true)
     setError('')
     try {
       const storage = await import('../../../storage')
-      const res = await storage.migrateTo(root)
+      const res = await storage.migrateTo(root, organizationId)
       if (res?.ok) {
         await refresh()
         return { ok: true }
       }
-      return { ok: false }
-    } catch (err: any) {
-      const msg = err?.message || String(err)
-      setError(msg)
-      return { ok: false }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Use an existing database in a folder (without migrating current DB)
-  const useFolder = async (root: string): Promise<{ ok: boolean }> => {
-    setBusy(true)
-    setError('')
-    try {
-      const storage = await import('../../../storage')
-      const res = await storage.useFolder(root)
-      if (res?.ok) {
-        await refresh()
-        return { ok: true }
-      }
-      return { ok: false }
-    } catch (err: any) {
-      const msg = err?.message || String(err)
-      setError(msg)
-      return { ok: false }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Reset to default location (smart restore)
-  const resetToDefault = async (): Promise<{ ok: boolean }> => {
-    setBusy(true)
-    setError('')
-    try {
-      const res = await window.api?.db?.smartRestore?.apply?.({ action: 'useDefault' })
-      if (res?.ok) {
-        await refresh()
-        return { ok: true }
-      }
+      setError('Migration fehlgeschlagen')
       return { ok: false }
     } catch (err: any) {
       const msg = err?.message || String(err)
@@ -121,7 +82,5 @@ export function useStorageLocation() {
     refresh,
     pickFolder,
     migrateTo,
-    useFolder,
-    resetToDefault,
   }
 }

@@ -28,7 +28,9 @@ test('dashboard tasks use actual SQLite balances, import coverage and recurring 
           global.fixtureDb.exec("INSERT INTO membership_receipts VALUES(2,7,NULL,'MANUAL',3000,'2026-10-04'); INSERT INTO membership_allocations VALUES(2,2,1000),(2,3,1000),(2,4,1000)")
           global.fixtureBackups = [{ size:100, mtime:Date.now() }]
           const second = await getDashboardTasks('2026-10-04')
-          console.log(JSON.stringify({first,second}))
+          global.fixtureBackupError = true
+          const offline = await getDashboardTasks('2026-10-04')
+          console.log(JSON.stringify({first,second,offline}))
           global.fixtureDb.close()
         })().catch(error => { console.error(error); process.exit(1) })
       ` }, bundle: true, platform: 'node', format: 'cjs', write: false,
@@ -37,12 +39,12 @@ test('dashboard tasks use actual SQLite balances, import coverage and recurring 
         builder.onResolve({ filter: /db\/database$/ }, () => ({ path: 'database', namespace: 'fixture' }))
         builder.onLoad({ filter: /database/, namespace: 'fixture' }, () => ({ contents: 'export const getDb = () => global.fixtureDb; export const withTransaction = fn => fn(global.fixtureDb);', loader: 'js' }))
         builder.onResolve({ filter: /^\.\/backup$/ }, () => ({ path: 'backup', namespace: 'fixture' }))
-        builder.onLoad({ filter: /backup/, namespace: 'fixture' }, () => ({ contents: 'export const listBackups = async () => ({ backups: global.fixtureBackups });', loader: 'js' }))
+        builder.onLoad({ filter: /backup/, namespace: 'fixture' }, () => ({ contents: 'export const listBackups = async () => { if (global.fixtureBackupError) throw new Error("Network unavailable"); return { backups: global.fixtureBackups }; };', loader: 'js' }))
       } }]
     })
     await writeFile(script, result.outputFiles[0].text)
     const output = execFileSync(require('electron'), [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8' })
-    const { first, second } = JSON.parse(output) as { first: DashboardTasks; second: DashboardTasks }
+    const { first, second, offline } = JSON.parse(output) as { first: DashboardTasks; second: DashboardTasks; offline: DashboardTasks }
     const group = (kind: string) => first.groups.find(group => group.kind === kind)!
     expect(first.bankAccounts).toHaveLength(1)
     expect(first.bankAccounts[0].lastImportAt).toBe('2026-09-16 12:00:00')
@@ -66,5 +68,7 @@ test('dashboard tasks use actual SQLite balances, import coverage and recurring 
     expect(second.groups.find(group => group.kind === 'bank')?.items).toHaveLength(1)
     expect(second.groups.find(group => group.kind === 'members')?.level).toBe('clear')
     expect(second.groups.find(group => group.kind === 'backup')?.level).toBe('clear')
+    expect(offline.groups.find(group => group.kind === 'backup')?.value).toBe('Nicht erreichbar')
+    expect(offline.groups.filter(group => group.kind !== 'backup')).toEqual(second.groups.filter(group => group.kind !== 'backup'))
   } finally { await rm(directory, { recursive: true, force: true }) }
 })

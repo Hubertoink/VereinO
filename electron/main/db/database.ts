@@ -5,6 +5,7 @@ import path from 'node:path'
 import { app } from 'electron'
 
 import { deleteOrganizationStorage } from './organizationDeletion'
+import { copyOrganizationStorage, validateOrganizationStorageTarget } from './organizationStorage'
 import type { OrganizationProfile } from '../../../shared/classification'
 
 const require = createRequire(import.meta.url)
@@ -16,27 +17,21 @@ try {
 }
 
 export function getAppDataDir() {
-    let root = getConfiguredRoot()
-    try {
-        if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true })
-    } catch {
-        // Fallback: configured root ist nicht verfügbar (z. B. Netzwerklaufwerk entfernt)
-        // Verwende den Standard-App-Datenordner, damit der Prozess nicht abstürzt.
-        root = app.getPath('userData')
-        try { if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true }) } catch { /* last resort: ignore, other calls will throw with clearer errors */ }
-    }
+    assertStorageMoveIdle()
+    const root = getConfiguredRoot()
+    // An unavailable organization folder must never fall back to another DB.
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true })
     const filesDir = path.join(root, 'files')
-    try {
-        if (!fs.existsSync(filesDir)) fs.mkdirSync(filesDir, { recursive: true })
-    } catch {
-        // Wenn selbst der files-Ordner nicht angelegt werden kann, belasse ihn als Pfad;
-        // nachgelagerte Funktionen behandeln dies und liefern verständlichere Fehlermeldungen.
-    }
+    if (!fs.existsSync(filesDir)) fs.mkdirSync(filesDir, { recursive: true })
     return { root, filesDir }
 }
 
 type DB = any
 let db: DB | undefined
+let storageMoveBusy = false
+export function assertStorageMoveIdle() {
+    if (storageMoveBusy) throw new Error('Der Speicherort wird gerade geändert. Bitte warte, bis der Vorgang abgeschlossen ist.')
+}
 
 // Simple app-level JSON config (outside DB) to remember custom DB location
 type AppConfig = {
@@ -76,6 +71,8 @@ export function writeAppConfig(cfg: AppConfig) {
 }
 function getConfiguredRoot(): string {
     const cfg = readAppConfig()
+    const org = cfg.organizations?.find(item => item.id === cfg.activeOrgId) || cfg.organizations?.[0]
+    if (org) return org.dbRoot
     return (cfg.dbRoot && typeof cfg.dbRoot === 'string' && cfg.dbRoot.trim()) ? cfg.dbRoot : app.getPath('userData')
 }
 export function getCurrentDbInfo() {
@@ -85,6 +82,7 @@ export function getCurrentDbInfo() {
 }
 
 export function getDb(): DB {
+    assertStorageMoveIdle()
     if (db) return db
     if (!BetterSqlite3) {
         throw new Error(
@@ -118,67 +116,42 @@ export function closeDb() {
     }
 }
 
-// Migrate database and attachments to a new root directory.
-// mode: 'use' -> just switch to the folder (expects a database.sqlite there), no copy
-//       'copy-overwrite' -> copy current DB and attachments to new root; rewrite attachment file paths
-export async function migrateToRoot(newRoot: string, mode: 'use' | 'copy-overwrite' = 'copy-overwrite') {
-    if (!newRoot || typeof newRoot !== 'string') throw new Error('Ungültiger Zielordner')
-    const normalizedTarget = path.resolve(newRoot)
-    await fsp.mkdir(normalizedTarget, { recursive: true })
-    const dstRoot = normalizedTarget
-    const dstFilesDir = path.join(dstRoot, 'files')
-    await fsp.mkdir(dstFilesDir, { recursive: true })
-    const dstDbPath = path.join(dstRoot, 'database.sqlite')
-
-    // Close current DB so OS file locks are released
-    try { closeDb() } catch { }
-
-    if (mode === 'use') {
-        // Use existing folder: do not depend on current root availability
-        if (!fs.existsSync(dstDbPath)) throw new Error('Im gewählten Ordner wurde keine database.sqlite gefunden')
-        writeAppConfig({ ...readAppConfig(), dbRoot: dstRoot })
-        return { root: dstRoot, dbPath: dstDbPath, filesDir: dstFilesDir }
-    }
-
-    // copy-overwrite requires access to current DB as source
-    let srcRoot = ''
-    let srcDbPath = ''
-    let srcFilesDir = ''
+// Relocate only the selected organization; existing databases are never adopted
+// or overwritten by this operation.
+export async function migrateToRoot(newRoot: string, expectedOrgId: string) {
+    assertStorageMoveIdle()
+    const org = getActiveOrganization()
+    if (!org || org.id !== expectedOrgId) throw new Error('Die Organisation wurde inzwischen gewechselt. Bitte den Zielordner erneut auswählen.')
+    const source = getDb()
+    const wasQueryOnly = source.pragma('query_only', { simple: true })
+    source.pragma('query_only = ON')
+    storageMoveBusy = true
     try {
-        const currentInfo = getCurrentDbInfo()
-        srcRoot = currentInfo.root
-        srcDbPath = currentInfo.dbPath
-        srcFilesDir = currentInfo.filesDir
-    } catch (e: any) {
-        throw new Error('Aktueller Speicherort ist nicht verfügbar. Verwende bitte "Bestehende verwenden" oder setze auf Standard zurück.')
-    }
-
-    // copy-overwrite: copy DB file
-    try { await fsp.copyFile(srcDbPath, dstDbPath) } catch (e) { throw new Error('Kopieren der Datenbank fehlgeschlagen: ' + (e as any)?.message) }
-
-    // Try to update attachment paths inside the copied DB and copy files
-    try {
-        const d = new BetterSqlite3(dstDbPath)
-        d.pragma('journal_mode = WAL')
-        const rows = d.prepare('SELECT id, file_path FROM voucher_files').all() as Array<{ id: number; file_path: string }>
-        for (const r of rows) {
-            const baseName = path.basename(r.file_path)
-            const src = path.join(srcFilesDir, baseName)
-            const dst = path.join(dstFilesDir, baseName)
-            try {
-                if (fs.existsSync(src)) await fsp.copyFile(src, dst)
-            } catch { /* ignore */ }
-            d.prepare('UPDATE voucher_files SET file_path = ? WHERE id = ?').run(dst, r.id)
+        const target = await validateOrganizationStorageTarget(newRoot, org, listOrganizations())
+        const result = await copyOrganizationStorage({
+            sourceRoot: org.dbRoot, targetRoot: target, database: source,
+            openDatabase: filename => new BetterSqlite3(filename),
+        })
+        const cfg = readAppConfig()
+        if (getActiveOrganization()?.id !== expectedOrgId) throw new Error('Die Organisation wurde während des Kopierens gewechselt.')
+        const next: AppConfig = {
+            ...cfg, activeOrgId: org.id, dbRoot: target,
+            organizations: cfg.organizations?.length
+                ? cfg.organizations.map(item => item.id === org.id ? { ...item, dbRoot: target } : item)
+                : [{ ...org, dbRoot: target }],
         }
-        d.close()
-    } catch (e) {
-        throw new Error('Migration der Anhänge fehlgeschlagen: ' + (e as any)?.message)
+        // Unlike legacy best-effort config writes, failures must be reported.
+        // Commit atomically after the complete copy has been verified.
+        const configPath = getConfigPath()
+        const temporary = `${configPath}.storage-move.tmp`
+        fs.writeFileSync(temporary, JSON.stringify(next, null, 2), 'utf8')
+        fs.renameSync(temporary, configPath)
+        closeDb()
+        return result
+    } finally {
+        if (source.open) source.pragma(`query_only = ${wasQueryOnly ? 'ON' : 'OFF'}`)
+        storageMoveBusy = false
     }
-
-    // Persist new root in config
-    writeAppConfig({ ...readAppConfig(), dbRoot: dstRoot })
-
-    return { root: dstRoot, dbPath: dstDbPath, filesDir: dstFilesDir }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,6 +220,7 @@ export function createOrganization(
     name: string,
     profile: OrganizationProfile = 'NONPROFIT'
 ): { id: string; name: string; dbRoot: string; createdAt: string; profile: OrganizationProfile } {
+    assertStorageMoveIdle()
     if (!name || typeof name !== 'string' || !name.trim()) {
         throw new Error('Organisationsname ist erforderlich')
     }
@@ -307,6 +281,7 @@ export function createOrganization(
  * Closes current DB and updates config. Caller should reload the app/window.
  */
 export function switchOrganization(orgId: string): { success: boolean; org: { id: string; name: string; dbRoot: string; profile?: OrganizationProfile } } {
+    assertStorageMoveIdle()
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
 
@@ -368,6 +343,7 @@ export function renameOrganization(orgId: string, newName: string): { success: b
  * Cannot delete the last organization or the currently active one.
  */
 export async function deleteOrganization(orgId: string, deleteData: boolean = false): Promise<{ success: boolean }> {
+    assertStorageMoveIdle()
     const cfg = readAppConfig()
     const orgs = cfg.organizations || []
 

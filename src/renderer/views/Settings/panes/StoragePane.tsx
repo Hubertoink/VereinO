@@ -1,21 +1,22 @@
 import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { StoragePaneProps } from '../types'
-import DbMigrateModal from '../../../DbMigrateModal'
+import type { PickResult } from '../../../storage'
 import { dispatchDataChanged } from '../../../utils/refresh'
-import { IconClock, IconDatabase, IconDeviceFloppy, IconFolder, IconRefresh, IconShieldCheck } from '@tabler/icons-react'
+import { IconClock, IconDatabase, IconDeviceFloppy, IconFolder, IconShieldCheck } from '@tabler/icons-react'
 
 import { useStorageLocation, useBackupSettings } from '../hooks'
 import { LocationInfoDisplay, BackupList } from '../components'
+import BackupProgressStatus from '../../../components/common/BackupProgressStatus'
 
 /**
  * StoragePane - DB Location + Backups (auto + manual)
  */
 export function StoragePane({ notify }: StoragePaneProps) {
-  const { info, busy: locBusy, error: locError, refresh: refreshLoc, pickFolder, migrateTo, useFolder, resetToDefault } = useStorageLocation()
-  const { autoMode, intervalDays, backups, busy: backupBusy, refreshBackups, makeBackup, updateAutoMode, updateInterval, chooseBackupDir, backupDir, openBackupFolder } = useBackupSettings()
+  const { info, busy: locBusy, error: locError, pickFolder, migrateTo } = useStorageLocation()
+  const { autoMode, intervalDays, backups, busy: backupBusy, progress, listError, listLoading, refreshBackups, makeBackup, updateAutoMode, updateInterval, chooseBackupDir, backupDir, openBackupFolder } = useBackupSettings()
   const [busy, setBusy] = React.useState(false)
-  const [err, setErr] = React.useState('')
   const [busyDanger, setBusyDanger] = React.useState(false)
   // Data management & security (moved from GeneralPane)
   const [importPick, setImportPick] = React.useState<null | { filePath: string; size?: number; mtime?: number; counts?: Record<string, number>; currentCounts?: Record<string, number> }>(null)
@@ -25,183 +26,81 @@ export function StoragePane({ notify }: StoragePaneProps) {
   const [showDeleteOrg, setShowDeleteOrg] = React.useState(false)
   const [deleteOrgConfirmText, setDeleteOrgConfirmText] = React.useState('')
   const [activeOrg, setActiveOrg] = React.useState<null | { id: string; name: string }>(null)
-  // Unified comparison modal state
-  const [compareModal, setCompareModal] = React.useState<null | {
-    mode: 'folder' | 'default'
-    root: string
-    dbPath?: string
-    hasTargetDb: boolean
-    currentCounts: Record<string, number>
-    targetCounts: Record<string, number> | null
-  }>(null)
-  // Legacy simple migrate modal (kept for fallback when counts fail to load)
-  const [migrateModal, setMigrateModal] = React.useState<{ mode: 'useOrMigrate' | 'migrateEmpty'; root: string; dbPath?: string } | null>(null)
+  const [compareModal, setCompareModal] = React.useState<PickResult | null>(null)
+  const compareDialog = React.useRef<HTMLDivElement>(null)
+  const compareReturnFocus = React.useRef<HTMLElement | null>(null)
+  const lastListError = React.useRef('')
+  const lastLocationError = React.useRef('')
+  React.useEffect(() => {
+    if (listLoading) { lastListError.current = ''; return }
+    if (listError && listError !== lastListError.current) {
+      notify('error', listError, 8000, { label: 'Erneut laden', onClick: () => void refreshBackups() })
+    }
+    lastListError.current = listError
+  }, [listError, listLoading, notify, refreshBackups])
+  React.useEffect(() => {
+    if (locError && locError !== lastLocationError.current) notify('error', locError)
+    lastLocationError.current = locError
+  }, [locError, notify])
+  React.useEffect(() => {
+    if (!compareModal) return
+    const previous = compareReturnFocus.current || document.activeElement as HTMLElement | null
+    compareDialog.current?.focus()
+    return () => previous?.focus()
+  }, [compareModal])
 
 
   async function doMakeBackup() {
-    setBusy(true); setErr('')
+    setBusy(true)
     try {
       const res = await makeBackup('manual')
       if (res.ok && res.filePath) {
-        notify('success', `Backup erstellt: ${res.filePath}`)
-        await refreshBackups()
+        notify(res.warning ? 'info' : 'success', res.warning || `Backup erstellt: ${res.filePath}`)
       } else {
         const message = res.error || 'Backup fehlgeschlagen'
-        setErr(message)
-        notify('error', message)
+        notify('error', message, 12000, { label: 'Lokale Kopien & Protokolle', onClick: () => void window.api.backup.openRecoveryFolder() })
       }
     }
-    catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
+    catch (e: any) { notify('error', e?.message || String(e)) }
     finally { setBusy(false) }
   }
   async function doRestore(filePath: string) {
-    setBusy(true); setErr('')
+    setBusy(true)
     try {
       const res = await window.api?.backup?.restore?.(filePath)
       if (res?.ok) { notify('success', 'Backup wiederhergestellt'); dispatchDataChanged() }
       else notify('error', res?.error || 'Wiederherstellung fehlgeschlagen')
-    } catch (e: any) { setErr(e?.message || String(e)); notify('error', e?.message || String(e)) }
+    } catch (e: any) { notify('error', e?.message || String(e)) }
     finally { setBusy(false) }
   }
 
-  // Helper: load counts for current + selected DB (silently fall back to simple modal if inspection fails)
-  async function loadCountsFor(dbPath?: string): Promise<Record<string, number> | null> {
-    if (!dbPath) return null
+  async function handlePickFolder() {
+    compareReturnFocus.current = document.activeElement as HTMLElement | null
+    setBusy(true)
     try {
-      const res = await window.api?.backup?.inspect?.(dbPath)
-      return res?.counts || null
-    } catch { return null }
+      const picked = await pickFolder()
+      if (picked) setCompareModal(picked)
+    } finally { setBusy(false) }
   }
+
   async function loadCurrentCounts(): Promise<Record<string, number>> {
     try {
-      const res = await window.api?.backup?.inspectCurrent?.()
-      return res?.counts || {}
+      return (await window.api.backup.inspectCurrent()).counts || {}
     } catch { return {} }
   }
 
-  async function openFolderCompare(picked: { root: string; dbPath: string; hasDb: boolean }) {
-    const [cur, target] = await Promise.all([
-      loadCurrentCounts(),
-      picked.hasDb ? loadCountsFor(picked.dbPath) : Promise.resolve(null)
-    ])
-    if (picked.hasDb && target === null) {
-      // fallback
-      setMigrateModal({ mode: 'useOrMigrate', root: picked.root, dbPath: picked.dbPath })
-      return
-    }
-    setCompareModal({
-      mode: 'folder',
-      root: picked.root,
-      dbPath: picked.dbPath,
-      hasTargetDb: picked.hasDb,
-      currentCounts: cur,
-      targetCounts: target
-    })
-  }
-
-  async function handlePickFolder() {
-    const picked = await pickFolder()
-    if (!picked) return
-    await openFolderCompare(picked)
-  }
-
-  async function handleResetToDefault() {
-    // Show smart restore preview instead of direct apply
-    setBusy(true)
-    try {
-      const preview = await window.api?.db?.smartRestore?.preview?.()
-      if (preview) {
-        const cur = preview.current?.counts || {}
-        const def = preview.default?.counts || null
-        setCompareModal({
-          mode: 'default',
-          root: preview.default?.root || '(Standard)',
-          dbPath: preview.default?.dbPath,
-          hasTargetDb: !!preview.default?.exists,
-          currentCounts: cur,
-          targetCounts: def
-        })
-      } else {
-        notify('error', 'Smart Restore Vorschau fehlgeschlagen')
-      }
-    } catch (e: any) {
-      notify('error', e?.message || String(e))
-    } finally { setBusy(false) }
-  }
-
-  async function handleMigrateConfirm() {
-    // From legacy migrateModal fallback
-    if (!migrateModal) return
-    setBusy(true)
-    try {
-      const result = await migrateTo(migrateModal.root)
-      if (result.ok) {
-        notify('success', 'Migration erfolgreich')
-        setMigrateModal(null)
-        await refreshLoc()
-      } else {
-        notify('error', 'Migration fehlgeschlagen')
-      }
-    } catch (err: any) {
-      notify('error', err?.message || String(err))
-    } finally { setBusy(false) }
-  }
-  async function handleUseExisting() {
-    if (!migrateModal) return
-    setBusy(true)
-    try {
-      const result = await useFolder(migrateModal.root)
-      if (result.ok) {
-        notify('success', 'Ordner übernommen')
-        setMigrateModal(null)
-        await refreshLoc()
-      } else {
-        notify('error', 'Ordnerwechsel fehlgeschlagen')
-      }
-    } catch (err: any) {
-      notify('error', err?.message || String(err))
-    } finally { setBusy(false) }
-  }
-
-  // Actions from compare modal
-  async function useSelectedFolder() {
-    if (!compareModal || compareModal.mode !== 'folder') return
-    setBusy(true)
-    try {
-      const result = await useFolder(compareModal.root)
-      if (result.ok) { notify('success', 'Bestehende Datenbank verwendet'); await refreshLoc() }
-    } catch (e: any) { notify('error', e?.message || String(e)) }
-    finally { setBusy(false); setCompareModal(null) }
-  }
   async function migrateToSelectedFolder() {
-    if (!compareModal || compareModal.mode !== 'folder') return
+    if (!compareModal) return
     setBusy(true)
     try {
-      const result = await migrateTo(compareModal.root)
-      if (result.ok) { notify('success', 'Aktuelle Datenbank migriert'); await refreshLoc() }
-    } catch (e: any) { notify('error', e?.message || String(e)) }
-    finally { setBusy(false); setCompareModal(null) }
+      const result = await migrateTo(compareModal.root, compareModal.organization.id)
+      if (result.ok) {
+        notify('success', `Speicherort für „${compareModal.organization.name}“ geändert`)
+        // Clear all cached paths and reload settings/backups from the new root.
+        window.location.reload()
+      }
+    } finally { setBusy(false) }
   }
-  async function useDefaultDb() {
-    if (!compareModal || compareModal.mode !== 'default') return
-    setBusy(true)
-    try {
-      const res = await window.api?.db?.smartRestore?.apply?.({ action: 'useDefault' })
-      if (res?.ok) { notify('success', 'Standard-Datenbank verwendet'); await refreshLoc() }
-    } catch (e: any) { notify('error', e?.message || String(e)) }
-    finally { setBusy(false); setCompareModal(null) }
-  }
-  async function migrateToDefaultDb() {
-    if (!compareModal || compareModal.mode !== 'default') return
-    setBusy(true)
-    try {
-      const res = await window.api?.db?.smartRestore?.apply?.({ action: 'migrateToDefault' })
-      if (res?.ok) { notify('success', 'Aktuelle Datenbank zum Standard migriert'); await refreshLoc() }
-    } catch (e: any) { notify('error', e?.message || String(e)) }
-    finally { setBusy(false); setCompareModal(null) }
-  }
-
-  React.useEffect(() => { refreshBackups(); refreshLoc() }, [])
 
   async function ensureActiveOrgLoaded() {
     if (activeOrg) return
@@ -218,13 +117,15 @@ export function StoragePane({ notify }: StoragePaneProps) {
       </div>
 
       <section className="card storage-section">
-        <div className="helper">Aktueller Speicherort</div>
-        <LocationInfoDisplay info={info} />
-        <div className="storage-actions">
-          <button className="btn" disabled={busy || locBusy} onClick={handlePickFolder}><IconFolder size={16} aria-hidden="true" /> Ordner wählen…</button>
-          <button className="btn" disabled={busy || locBusy} onClick={handleResetToDefault}><IconRefresh size={16} aria-hidden="true" /> Standard vergleichen…</button>
+        <div className="storage-location-heading">
+          <div><IconFolder size={21} aria-hidden="true" /><strong>Aktueller Speicherort</strong></div>
+          {info?.organization && <span className="storage-location-badge">{info.organization.name}</span>}
         </div>
-        {locError && <div className="error-text">{locError}</div>}
+        <div className="helper">Dieser Speicherort gehört ausschließlich zur aktuellen Organisation.</div>
+        <LocationInfoDisplay info={info} onError={message => notify('error', message)} />
+        <div className="storage-actions">
+          <button className="btn" disabled={busy || locBusy || backupBusy} onClick={handlePickFolder}><IconFolder size={16} aria-hidden="true" /> Ordner wählen…</button>
+        </div>
       </section>
 
       <section className="card storage-section">
@@ -236,12 +137,13 @@ export function StoragePane({ notify }: StoragePaneProps) {
               <div className="helper">Schütze deine Daten mit automatischen und manuellen Sicherungen.</div>
             </div>
           </div>
-          <button className="btn primary" disabled={busy} onClick={doMakeBackup}>
+          <button className="btn primary" disabled={busy || backupBusy} onClick={doMakeBackup}>
             <IconDeviceFloppy size={16} aria-hidden="true" />
             Jetzt sichern
           </button>
         </div>
 
+        <BackupProgressStatus progress={progress} />
         <div className="backup-settings-grid">
           {/* Auto-backup config */}
           <div className="backup-auto-card">
@@ -290,12 +192,17 @@ export function StoragePane({ notify }: StoragePaneProps) {
               <code>{backupDir || 'Standard-Verzeichnis'}</code>
             </div>
             <div className="backup-dir-actions">
-              <button className="btn btn-sm" disabled={backupBusy} onClick={async () => { const r = await chooseBackupDir(); if (r.ok) notify('success', 'Backup-Verzeichnis gesetzt') }}>
+              <button className="btn btn-sm" disabled={backupBusy} onClick={async () => {
+                const r = await chooseBackupDir()
+                if (r.ok) notify(r.warning ? 'info' : 'success', r.warning || 'Backup-Verzeichnis gesetzt')
+                else if (r.error && r.error !== 'Abbruch') notify('error', r.error)
+              }}>
                 Ändern
               </button>
               <button className="btn btn-sm" disabled={backupBusy} onClick={openBackupFolder}>
                 Öffnen
               </button>
+              <button className="btn btn-sm" onClick={() => void window.api.backup.openRecoveryFolder()}>Lokale Kopien & Protokolle</button>
             </div>
           </div>
         </div>
@@ -304,9 +211,11 @@ export function StoragePane({ notify }: StoragePaneProps) {
         <div className="backup-list-section">
           <div className="backup-list-header">
             <span>Vorhandene Sicherungen</span>
-            <span className="backup-count">{backups.length}</span>
+            {!listError && !listLoading && <span className="backup-count">{backups.length}</span>}
+            {listError && !listLoading && <button className="btn btn-sm" onClick={() => void refreshBackups()}>Erneut laden</button>}
           </div>
-          <BackupList backups={backups} onRestore={doRestore} />
+          {listLoading && <div role="status" className="helper">Sicherungsordner wird gelesen …</div>}
+          {!listLoading && !listError && <BackupList backups={backups} onRestore={doRestore} />}
         </div>
       </section>
 
@@ -583,125 +492,43 @@ export function StoragePane({ notify }: StoragePaneProps) {
 
 
       {/* Fallback simple migrate modal */}
-      {migrateModal && (
-        <DbMigrateModal
-          {...(migrateModal.mode === 'useOrMigrate'
-            ? {
-                mode: 'useOrMigrate' as const,
-                root: migrateModal.root,
-                dbPath: migrateModal.dbPath || '',
-                busy,
-                onCancel: () => setMigrateModal(null),
-                onUse: handleUseExisting,
-                onMigrate: handleMigrateConfirm,
-              }
-            : {
-                mode: 'migrateEmpty' as const,
-                root: migrateModal.root,
-                busy,
-                onCancel: () => setMigrateModal(null),
-                onMigrate: handleMigrateConfirm,
-              })}
-        />
-      )}
-
-      {compareModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busy && setCompareModal(null)}>
-          <div className="modal modal-wider modal-grid-14" onClick={e => e.stopPropagation()}>
+      {compareModal && createPortal(
+        <div className="modal-overlay storage-compare-overlay" onClick={() => !busy && setCompareModal(null)}>
+          <div ref={compareDialog} className="modal storage-compare-modal" role="dialog" aria-modal="true" aria-labelledby="storage-compare-title" tabIndex={-1} onClick={e => e.stopPropagation()}
+            onKeyDown={event => {
+              if (event.key !== 'Tab') return
+              const controls = Array.from(compareDialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') || [])
+              const first = controls[0], last = controls[controls.length - 1]
+              if (!first) { event.preventDefault(); return }
+              if (event.shiftKey && (document.activeElement === first || document.activeElement === compareDialog.current)) { event.preventDefault(); last.focus() }
+              else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+            }}>
             <ModalHeader
               className="modal-header"
-              title={<>{compareModal.mode === 'folder' ? 'Datenbanken vergleichen' : 'Standard-Datenbank Vergleich'}</>}
+              title="Speicherort ändern"
+              titleId="storage-compare-title"
               onClose={() => setCompareModal(null)}
               closeLabel="Schließen"
-              closeOnEscape={false}
+              closeDisabled={busy}
             />
-            <div className="helper helper-mt-neg">
-              {compareModal.mode === 'folder' ? (
-                compareModal.hasTargetDb ? 'Im gewählten Ordner wurde eine bestehende Datenbank gefunden. Vergleiche die Tabellenstände und wähle eine Aktion.' : 'Der gewählte Ordner enthält keine Datenbank. Du kannst deine aktuelle Datenbank dorthin migrieren.'
-              ) : (
-                compareModal.hasTargetDb ? 'Es existiert bereits eine Standard-Datenbank. Vergleiche Tabellenstände, bevor du wechselst oder migrierst.' : 'Im Standardordner liegt keine Datenbank. Du kannst deine aktuelle dorthin migrieren.'
-              )}
+            <div className="storage-compare-body">
+              <p>Speicherort für <strong>{compareModal.organization.name}</strong> ändern.</p>
+              <div className="storage-location-paths">
+                <div className="storage-location-path"><span className="storage-location-path__copy"><strong>Bisheriger Ordner</strong><code>{compareModal.sourceRoot}</code></span></div>
+                <div className="storage-location-path"><span className="storage-location-path__copy"><strong>Neuer Ordner</strong><code>{compareModal.root}</code></span></div>
+              </div>
+              <p className="helper">Datenbank, Belege und Sicherungen im bisherigen Datenordner werden in den leeren Zielordner kopiert. Danach verwendet nur diese Organisation den neuen Ordner. Die bisherige Kopie bleibt erhalten.</p>
+              <p className="helper">Ein separat gewählter Sicherungsordner bleibt bestehen.</p>
+              {busy && <div role="status">Daten werden kopiert und geprüft …</div>}
             </div>
-            <div className="card compare-table-10">
-              <div className="compare-header">
-                <div>Tabelle</div>
-                <div className="compare-badge-current">Aktuell</div>
-                <div className="compare-badge-target">{compareModal.mode === 'folder' ? 'Gewählt' : 'Standard'}</div>
-              </div>
-              <div className="compare-rows">
-                {(() => {
-                  // Map technical table names to German
-                  const tableNames: Record<string, string> = {
-                    'invoice_files': 'Verbindlichkeitsdateien',
-                    'invoices': 'Verbindlichkeiten',
-                    'members': 'Mitglieder',
-                    'tags': 'Tags',
-                    'voucher_files': 'Belegdateien',
-                    'vouchers': 'Buchungen',
-                    'budgets': 'Budgets',
-                    'bindings': 'Zweckbindungen',
-                    'member_payments': 'Mitgliedsbeiträge',
-                    'audit_log': 'Änderungsprotokoll',
-                    'settings': 'Einstellungen'
-                  }
-                  
-                  const allTables = Array.from(new Set([
-                    ...Object.keys(compareModal.currentCounts || {}),
-                    ...Object.keys(compareModal.targetCounts || {})
-                  ])).sort()
-                  
-                  return allTables.map(k => {
-                    const current = compareModal.currentCounts[k] ?? 0
-                    const target = (compareModal.targetCounts || {})[k] ?? 0
-                    const isDifferent = current !== target
-                    const germanName = tableNames[k] || k
-                    
-                    return (
-                      <React.Fragment key={k}>
-                        <div>{germanName}</div>
-                        <div className={isDifferent ? 'compare-cell-diff-current' : 'compare-cell'}>
-                          {current}
-                        </div>
-                        <div className={isDifferent ? 'compare-cell-diff-target' : 'compare-cell'}>
-                          {target || '0'}
-                        </div>
-                      </React.Fragment>
-                    )
-                  })
-                })()}
-                {Object.keys(compareModal.currentCounts).length === 0 && Object.keys(compareModal.targetCounts || {}).length === 0 && (
-                  <div className="compare-no-data helper">Keine Tabellenstände verfügbar.</div>
-                )}
-              </div>
-            </div>
-            <div className="modal-actions-between">
-              <div className="helper helper-flex-1">
-                {compareModal.mode === 'folder' ? (
-                  compareModal.hasTargetDb ? 'Aktion wählen: Bestehende Datenbank verwenden oder aktuelle Datenbank in den Ordner kopieren.' : 'Aktion wählen: Aktuelle Datenbank in den Ordner kopieren.'
-                ) : (
-                  compareModal.hasTargetDb ? 'Aktion wählen: Standard-Datenbank verwenden oder aktuelle zur Standard migrieren.' : 'Aktion wählen: Aktuelle Datenbank zum Standard migrieren.'
-                )}
-              </div>
-              <div className="storage-actions">
-                {compareModal.mode === 'folder' && compareModal.hasTargetDb && (
-                  <button className="btn" onClick={useSelectedFolder} disabled={busy}>Bestehende verwenden</button>
-                )}
-                {compareModal.mode === 'default' && compareModal.hasTargetDb && (
-                  <button className="btn" onClick={useDefaultDb} disabled={busy}>Standard verwenden</button>
-                )}
-                {compareModal.mode === 'folder' && (
-                  <button className="btn primary" onClick={migrateToSelectedFolder} disabled={busy}>Aktuelle migrieren</button>
-                )}
-                {compareModal.mode === 'default' && (
-                  <button className="btn primary" onClick={migrateToDefaultDb} disabled={busy}>Aktuelle migrieren</button>
-                )}
-              </div>
+            <div className="modal-actions-between storage-compare-footer">
+              <button className="btn" onClick={() => setCompareModal(null)} disabled={busy}>Abbrechen</button>
+              <button className="btn primary" onClick={migrateToSelectedFolder} disabled={busy}>Kopieren und verwenden</button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
 
-      {err && <div className="error-text">{err}</div>}
     </div>
   )
 }

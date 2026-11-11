@@ -1,3 +1,4 @@
+import type { BackupProgress, BackupResult } from '../../../shared/backupProgress'
 import type {
     ClassificationScheme,
     ClassificationValue,
@@ -82,7 +83,10 @@ export interface SystemApi {
         }>
     }
     backup: {
-        make: (reason?: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>
+        make: (reason?: string) => Promise<{ ok: boolean; error?: string } & Partial<BackupResult>>
+        getProgress: () => Promise<BackupProgress | null>
+        onProgress: (callback: (progress: BackupProgress) => void) => () => void
+        openRecoveryFolder: () => Promise<{ ok: boolean; error?: string }>
         list: () => Promise<{
             ok: boolean
             dir?: string
@@ -91,8 +95,8 @@ export interface SystemApi {
         }>
         openFolder: () => Promise<{ ok: boolean; error?: string | null }>
         getDir: () => Promise<{ ok: boolean; dir?: string; error?: string }>
-        setDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string }>
-        resetDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string }>
+        setDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }>
+        resetDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }>
         inspect: (filePath: string) => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
         inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
         restore: (filePath: string) => Promise<{ ok: boolean; error?: string }>
@@ -117,35 +121,9 @@ export interface SystemApi {
             fromPath: (filePath: string) => Promise<{ ok: boolean; filePath?: string }>
         }
         location: {
-            get: () => Promise<StorageLocation & { configuredRoot: string | null }>
-            chooseAndMigrate: () => Promise<{ ok: true } & StorageLocation>
-            useExisting: () => Promise<{ ok: true } & StorageLocation>
-            resetDefault: () => Promise<{ ok: true } & StorageLocation>
-            pick: () => Promise<{ root: string; hasDb: boolean; dbPath: string; filesDir: string }>
-            migrateTo: (payload: { root: string }) => Promise<{ ok: true } & StorageLocation>
-            useFolder: (payload: { root: string }) => Promise<{ ok: true } & StorageLocation>
-        }
-        smartRestore: {
-            preview: () => Promise<{
-                current: {
-                    root: string
-                    dbPath: string
-                    exists: boolean
-                    mtime?: number | null
-                    counts?: Record<string, number>
-                    last?: Record<string, string | null>
-                }
-                default: {
-                    root: string
-                    dbPath: string
-                    exists: boolean
-                    mtime?: number | null
-                    counts?: Record<string, number>
-                    last?: Record<string, string | null>
-                }
-                recommendation?: 'useDefault' | 'migrateToDefault' | 'manual'
-            }>
-            apply: (payload: { action: 'useDefault' | 'migrateToDefault' }) => Promise<{ ok: boolean }>
+            get: () => Promise<StorageLocation & { configuredRoot: string | null; organization: { id: string; name: string } | null }>
+            pick: () => Promise<{ root: string; sourceRoot: string; organization: { id: string; name: string } }>
+            migrateTo: (payload: { root: string; organizationId: string }) => Promise<{ ok: true } & StorageLocation>
         }
         onInitFailed?: (callback: (info: { message: string }) => void) => () => void
         onPreUpdateBackup?: (callback: (info: {

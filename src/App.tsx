@@ -1,7 +1,14 @@
 import React, { Suspense, lazy } from 'react'
+import { initializeBookingAIPatterns } from './renderer/utils/bookingAiPatterns'
 
 // Lazy-load the heavy renderer App to keep the root lightweight
-const RendererApp = lazy(() => import('./renderer/App'))
+const RendererApp = lazy(async () => {
+	const [renderer] = await Promise.all([
+		import('./renderer/App'),
+		initializeBookingAIPatterns(),
+	])
+	return renderer
+})
 
 export default function App() {
 	return (
