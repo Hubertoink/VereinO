@@ -30,6 +30,14 @@ test.beforeAll(async () => {
           list: async () => ({ rows, total: 2, stats: { total: 2, open: 2, checked: 0, linked: 0 } }),
           importStatus: async () => ({ total: 2, lastBookingDate: null, accounts: [], recentImports: [] })
         } }
+        window.api.classifications = { primary: { list: async () => {
+          if (options.classificationError) throw new Error('Offline')
+          return { profile: options.general ? 'GENERAL' : 'NONPROFIT', definition: { primaryLabel: options.general ? 'Kategorie' : 'Sphäre' },
+            values: [{ id: 9, stableKey: options.general ? 'EVENTS' : 'IDEELL', name: options.general ? 'Veranstaltungen' : 'Ideeller Bereich' }] }
+        } } }
+        window.api.budgets = { list: async () => ({ rows: [{ id: 3, name: 'Sommercamp' }] }) }
+        window.api.bindings = { list: async () => ({ rows: [{ id: 4, name: 'Jugendarbeit' }] }) }
+        window.api.paymentAccounts = { list: async () => ({ rows: [{ id: 2, name: 'Projektkonto' }] }) }
         if (options.membershipPreview) {
           window.api.bankTransactions.previewAiBatch = async () => [{ transaction: { ...current, aiSuggestion: { action:'CREATE_BOOKING',reason:'Mitgliedsbeitrag',confidence:1,warnings:[],evidence:[],membership:{memberId:1} } },
             token:'a'.repeat(64),commentsEnabled:false,blockers:[],warnings:[],candidate:{date:current.bookingDate,type:'IN',sphere:'IDEELL',grossAmount:10,description:current.purpose},
@@ -40,7 +48,7 @@ test.beforeAll(async () => {
         const onCreateBooking = (row, acknowledgements) => window.creations.push({ id: row.id, acknowledgements })
         if (kind === 'ai') {
           root.render(<BankAiSuggestionModal transaction={current} suggestion={{ action: 'CREATE_BOOKING', transactionId: current.id,
-            confidence: 0.9, reason: 'Buchung vorbereiten', warnings: [], evidence: [], bookingCandidate: { date: '2026-04-01', type: 'OUT', sphere: 'IDEELL', grossAmount: 5, description: 'Entwurf', budgets: [], earmarks: [], tags: [] }
+            confidence: 0.9, reason: 'Buchung vorbereiten', warnings: [], evidence: [], bookingCandidate: { date: '2026-04-01', type: 'OUT', sphere: 'IDEELL', grossAmount: 5, description: 'Entwurf', budgets: [], earmarks: [], tags: [], ...options.candidate }
           }} onClose={() => { window.closeCalls++ }} onChanged={() => {}} onOpenReview={() => {}} notify={notify} />)
           return
         }
@@ -63,6 +71,65 @@ test.beforeEach(async ({ page }) => {
   await page.addStyleTag({ content: css })
   await page.addStyleTag({ content: '* { animation: none !important; transition: none !important; }' })
   await page.addScriptTag({ content: script })
+})
+
+test('draft comparison separates bank direction, booking type and classification in both themes', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1176, height: 800 })
+  await page.evaluate(() => (window as any).renderBankTest('ai', {
+    transaction: { id: 6, bookingDate: '2026-08-10', valueDate: '2026-08-10', direction: 'IN', amount: 15, counterparty: 'Tobias Müller', purpose: 'Spende Jugendhaus Sommercamp', bankReference: 'BREF-JH-0006' },
+    candidate: { date: '2026-08-10', grossAmount: 15, description: 'Spende Jugendhaus Sommercamp · Tobias Müller' }
+  }))
+  const source = page.getByRole('region', { name: 'Bankbeleg aus Import' })
+  const draft = page.getByRole('region', { name: 'KI-Entwurf', exact: true })
+  await expect(draft).toContainText('Ideeller Bereich')
+  await expect(draft).toContainText('BuchungsartEinnahme')
+  await expect(draft).toContainText('SphäreIdeeller Bereich')
+  await expect(source).toContainText('Eingang15,00')
+  const sourceBox = await source.boundingBox()
+  const draftBox = await draft.boundingBox()
+  expect(draftBox!.x).toBeGreaterThan(sourceBox!.x + sourceBox!.width)
+  expect(draftBox!.y).toBe(sourceBox!.y)
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme)
+    await expect(page.getByRole('button', { name: 'Entwurf prüfen und bearbeiten' })).toBeInViewport()
+    await page.screenshot({ path: testInfo.outputPath(`draft-${theme}.png`) })
+  }
+})
+
+test('draft uses custom category IDs and named allocations and footer opens the draft', async ({ page }) => {
+  await page.evaluate(() => {
+    window.addEventListener('ai:open-booking-draft', event => { (window as any).openedDraft = (event as CustomEvent).detail.qa }, { once: true })
+    ;(window as any).renderBankTest('ai', { general: true, candidate: {
+      primaryClassificationValueId: 9, paymentAccountId: 2,
+      budgets: [{ id: 3, amount: 3 }], earmarks: [{ id: 4, amount: 2 }], tags: ['Sommer']
+    } })
+  })
+  const draft = page.getByRole('region', { name: 'KI-Entwurf', exact: true })
+  await expect(draft).toContainText('KategorieVeranstaltungen')
+  await expect(draft).toContainText('ZahlkontoProjektkonto')
+  await expect(draft).toContainText('BudgetsSommercamp')
+  await expect(draft).toContainText('ZweckbindungenJugendarbeit')
+  await expect(draft).toContainText('TagsSommer')
+  await expect(draft).not.toContainText('Ideeller Bereich')
+  await page.getByRole('button', { name: 'Entwurf prüfen und bearbeiten', exact: true }).click()
+  expect(await page.evaluate(() => (window as any).openedDraft)).toMatchObject({ primaryClassificationValueId: 9, paymentAccountId: 2, budgets: [{ budgetId: 3, amount: 3 }], earmarksAssigned: [{ earmarkId: 4, amount: 2 }], tags: ['Sommer'] })
+})
+
+test('narrow draft keeps actions visible and missing categories never become nonprofit spheres', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 740 })
+  await page.evaluate(() => (window as any).renderBankTest('ai', { general: true, transaction: { purpose: 'Verwendungszweck'.repeat(35) } }))
+  const modal = page.locator('.bank-ai-draft-modal')
+  const draft = page.getByRole('region', { name: 'KI-Entwurf', exact: true })
+  await expect(draft).toContainText('KategorieIm Buchungsformular auswählen')
+  await expect(draft).not.toContainText('Ideeller Bereich')
+  await expect(page.getByRole('button', { name: 'Entwurf prüfen und bearbeiten' })).toBeInViewport()
+  expect(await modal.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await modal.locator('.bank-ai-review-body').evaluate(el => { el.scrollTop = el.scrollHeight })
+  await expect(page.getByRole('button', { name: 'Entwurf prüfen und bearbeiten' })).toBeInViewport()
+  expect(await modal.locator('.bank-ai-review-body').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('draft-mobile.png') })
+  await page.keyboard.press('Escape')
+  expect(await page.evaluate(() => (window as any).closeCalls)).toBe(1)
 })
 
 test('create booking is beside close after checking and uses the existing callback', async ({ page }, testInfo) => {
@@ -106,6 +173,23 @@ test('pending or failed duplicate check never exposes the footer shortcut', asyn
   await page.evaluate(() => (window as any).finishMatches())
   await expect.poll(() => page.evaluate(() => (window as any).notices.length)).toBe(1)
   await expect(create).toHaveCount(0)
+})
+
+test('bank row opens details from ordinary cells without toggling twice on buttons', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBankTest('list'))
+  const row = page.locator('tr[data-bank-transaction-id="77"]')
+  const details = page.locator('#bank-inline-77')
+  await row.locator('td').last().click()
+  await expect(details).toBeVisible()
+  await row.locator('td').nth(1).click()
+  await expect(details).toHaveCount(0)
+  await row.getByRole('button', { name: 'Bankbeleg 77: Details anzeigen', exact: true }).click()
+  await expect(details).toBeVisible()
+  await row.locator('.bank-description-button').click()
+  await expect(details).toHaveCount(0)
+  await row.getByRole('button', { name: 'Bankbeleg 77: Details anzeigen', exact: true }).focus()
+  await page.keyboard.press('Enter')
+  await expect(details).toBeVisible()
 })
 
 test('long expanded details preserve every column and wrap within the table', async ({ page }, testInfo) => {

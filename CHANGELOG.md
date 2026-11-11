@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.13.1] - 2026-11-11
+
+### Geändert
+
+- Neue KI-Buchungsvorschläge zeigen Bankbeleg und Entwurf übersichtlich nebeneinander. Buchungsart, Sphäre beziehungsweise Kategorie, Budgets, Zweckbindungen und Tags werden getrennt dargestellt; die Begründung und der nächste Schritt ins Buchungsformular sind klar hervorgehoben.
+- Auch bei manuell aus einem Bankimport erfassten Buchungen stehen die importierten Originaldaten zum Vergleichen neben dem Formular. Auf schmalen Fenstern erscheint die Quellenansicht innerhalb des Formulars.
+- Die Reiterauswahl für Buchungsentwürfe zeigt jeden Buchungstext nur einmal und begrenzt Einträge auf zwei Zeilen. Vollständige Texte bleiben als Tooltip verfügbar.
+- Bankbelegdetails lassen sich durch Klick auf die Tabellenzeile öffnen und schließen. Die einzelnen Aktionsbuttons bleiben unabhängig bedienbar.
+
+### Behoben
+
+- Auswahllisten in Buchungsdialogen lassen sich wieder mit dem Mausrad scrollen, während Formular und Hintergrund geschützt bleiben.
+- Die Vorschau verwendet die tatsächlichen Sphären- beziehungsweise Kategorienamen der Organisation und zeigt bei einem abweichenden vorgeschlagenen Zahlkonto nicht mehr den Namen des ursprünglichen Kontos an.
+
 ## [4.13.0] - 2026-11-11
 
 ### Hinzugefügt

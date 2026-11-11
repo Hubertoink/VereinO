@@ -30,9 +30,10 @@ export type SelectDropdownProps = {
   disabled?: boolean
   invalid?: boolean
   menuPlacement?: 'auto' | 'top' | 'bottom'
+  compact?: boolean
 }
 
-function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement | null>, menuPlacement: SelectDropdownProps['menuPlacement']) {
+function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement | null>, menuPlacement: SelectDropdownProps['menuPlacement'], minWidth = 0) {
   const [position, setPosition] = React.useState<MenuPosition | null>(null)
 
   const sync = React.useCallback(() => {
@@ -53,14 +54,15 @@ function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement |
       if (Number.isFinite(layer)) zIndex = Math.max(zIndex, layer + 1)
     }
     const placeAbove = menuPlacement === 'top' || (menuPlacement !== 'bottom' && below < 230 && above > below)
+    const width = Math.min(Math.max(rect.width, minWidth), window.innerWidth - 24)
     setPosition({
       zIndex,
-      left: rect.left,
-      width: rect.width,
+      left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
+      width,
       ...(placeAbove ? { bottom: window.innerHeight - rect.top - 1 } : { top: rect.bottom - 1 }),
       maxHeight: Math.min(280, Math.max(120, (placeAbove ? above : below) - gap))
     })
-  }, [anchorRef, menuPlacement])
+  }, [anchorRef, menuPlacement, minWidth])
 
   React.useLayoutEffect(() => {
     if (!open) {
@@ -79,11 +81,11 @@ function useMenuPosition(open: boolean, anchorRef: React.RefObject<HTMLElement |
   return position
 }
 
-export default function SelectDropdown({ value, options, onChange, id, ariaLabel, placeholder = 'Auswählen', className = '', style, disabled, invalid, menuPlacement = 'auto' }: SelectDropdownProps) {
+export default function SelectDropdown({ value, options, onChange, id, ariaLabel, placeholder = 'Auswählen', className = '', style, disabled, invalid, menuPlacement = 'auto', compact = false }: SelectDropdownProps) {
   const [open, setOpen] = React.useState(false)
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
   const menuRef = React.useRef<HTMLDivElement | null>(null)
-  const menuPosition = useMenuPosition(open, triggerRef, menuPlacement)
+  const menuPosition = useMenuPosition(open, triggerRef, menuPlacement, compact ? 280 : 0)
   const selected = options.find((option) => option.value === value)
 
   React.useEffect(() => {
@@ -132,7 +134,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
         <span className="select-dropdown__chevron" aria-hidden="true" />
       </button>
       {open && menuPosition && createPortal(
-        <div ref={menuRef} className="select-dropdown__menu select-dropdown__menu--portal" style={menuPosition} role="listbox" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus() } }}>
+        <div ref={menuRef} className={`select-dropdown__menu select-dropdown__menu--portal${compact ? ' select-dropdown__menu--compact' : ''}`} style={menuPosition} role="listbox" aria-label={ariaLabel} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus() } }}>
           {options.map((option) => (
             <button
               key={option.value}
@@ -141,6 +143,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
               aria-selected={option.value === value}
               className={option.value === value ? 'is-selected' : ''}
               disabled={option.disabled}
+              title={option.description || option.label}
               onClick={() => choose(option.value)}
             >
               <span style={option.color ? { color: option.color } : undefined}><strong>{option.label}</strong>{option.description ? <small>{option.description}</small> : null}</span>

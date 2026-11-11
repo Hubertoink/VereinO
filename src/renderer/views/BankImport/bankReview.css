@@ -68,6 +68,7 @@
 .bank-import-direction-symbol--in { color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--surface)); }
 .bank-import-direction-symbol--out { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
 .bank-master-table .bank-row-expanded { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.bank-master-table tr[data-bank-transaction-id] { cursor: pointer; }
 .bank-master-table .bank-inline-detail, .bank-master-table .bank-inline-detail:hover { background: var(--surface); cursor: default; }
 .bank-master-table .bank-inline-detail > td { padding: 0 12px 14px; white-space: normal; }
 .bank-master-table .bank-inline-detail > .bank-inline-indent { padding: 0; }
@@ -91,17 +92,59 @@
 .bank-master-table .bank-row-expanded > td { border-bottom: 0; }
 
 .bank-ai-review-group { display:contents; }
-.bank-ai-draft-group { display:grid; min-width:0; }
-.bank-ai-draft-group > .bank-ai-reasoning {
-  box-sizing:border-box;
-  justify-self:end;
-  width:min(620px, calc(100% - 48px));
-  margin:0 16px 0 0;
-  padding:14px 16px;
-  border-top:0;
-  border-radius:0 0 12px 12px !important;
-  background:color-mix(in srgb, var(--accent) 5%, var(--surface));
+.bank-ai-draft-group { display: grid; min-width: 0; gap: 16px; }
+.modal.bank-ai-draft-modal { width: min(980px, calc(100vw - 32px)); }
+.bank-draft-title { display: flex; align-items: center; gap: 12px; }
+.bank-draft-title-icon, .bank-draft-icon, .bank-draft-reason-icon { display: grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 8px; color: var(--text-dim); background: color-mix(in srgb, var(--text) 7%, var(--surface)); }
+.bank-draft-title-icon { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-radius: 50%; }
+.bank-ai-draft-modal .bank-ai-confidence { border: 0; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.bank-ai-draft-modal .bank-ai-confidence strong::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--accent); }
+.bank-ai-draft-modal .bank-ai-review-body { padding: 18px 22px 0; }
+.bank-draft-intro { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.bank-draft-intro > svg { flex-shrink: 0; color: var(--accent); }
+.bank-draft-intro strong { font-size: 15px; }
+.bank-draft-intro p { margin: 4px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.bank-draft-comparison { display: grid; grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.bank-draft-card { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--text) 2%, var(--surface)); }
+.bank-draft-card--proposal { border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+.bank-draft-card-heading { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; }
+.bank-draft-card-heading > div { flex: 1; min-width: 130px; }
+.bank-draft-card-heading h3 { margin: 0; font-size: 13px; line-height: 1.4; }
+.bank-draft-card-heading p { margin: 4px 0 0; font-size: 11px; line-height: 1.4; color: var(--text-dim); }
+.bank-draft-card--proposal .bank-draft-icon { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.bank-draft-card--proposal h3 { color: var(--accent); }
+.bank-draft-card dl { margin: 14px 0 0; font-size: 12px; }
+.bank-draft-card dl > div { display: grid; grid-template-columns: minmax(108px, .85fr) minmax(0, 1.4fr); gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--border); line-height: 1.45; }
+.bank-draft-card dl > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.bank-draft-card dt { color: var(--text-dim); }
+.bank-draft-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.bank-draft-card .bank-draft-amount dd { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.bank-draft-arrow { display: grid; place-items: center; align-self: center; width: 32px; height: 32px; border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.bank-draft-kind { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.bank-draft-kind--in { color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--surface)); }
+.bank-draft-kind--out { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); }
+.bank-draft-empty { color: var(--text-dim); }
+.bank-draft-allocation { display: block; }
+.bank-draft-allocation + .bank-draft-allocation { margin-top: 6px; }
+.bank-draft-allocation small { color: var(--text-dim); white-space: nowrap; }
+.bank-draft-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.bank-draft-tags > span { padding: 2px 7px; border-radius: 4px; background: color-mix(in srgb, var(--text) 6%, var(--surface)); }
+.bank-ai-draft-group > .bank-ai-reasoning { display: flex; align-items: flex-start; gap: 14px; padding: 12px 14px; border-radius: 8px; }
+.bank-draft-reason-icon { color: var(--text-dim); }
+.bank-ai-reasoning > div { min-width: 0; }
+.bank-ai-reasoning > div > p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; color: var(--text-dim); }
+.bank-ai-suggestion-modal > .bank-modal-footer { position: static; flex: 0 0 auto; margin: 0; padding: 0 16px 16px; background: var(--surface); pointer-events: auto; }
+.bank-ai-draft-modal > .bank-modal-footer { padding: 0 22px 20px; }
+.bank-ai-suggestion-modal > .bank-modal-footer .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; box-shadow: none; }
+.bank-ai-draft-modal > .bank-modal-footer > .btn:first-child { margin-right: auto; }
+@media (max-width: 760px) {
+  .bank-draft-comparison { grid-template-columns: minmax(0, 1fr); }
+  .bank-draft-arrow { display: none; }
+  .bank-ai-draft-modal .bank-ai-review-body { padding: 14px 14px 0; }
+  .bank-ai-draft-modal > .bank-modal-footer { padding: 0 14px 14px; }
 }
-@media(max-width:520px) {
-  .bank-ai-draft-group > .bank-ai-reasoning { width:calc(100% - 24px); margin-right:12px; }
+@media (max-width: 520px) {
+  .bank-ai-draft-modal > .bank-modal-footer > .btn.primary { width: 100%; }
+  .bank-draft-card { padding: 12px; }
+  .bank-draft-title-icon { display: none; }
 }

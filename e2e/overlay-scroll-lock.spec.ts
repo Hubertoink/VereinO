@@ -6,20 +6,24 @@ test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })
 
 let script: string
 let scrollLockCss: string
+let dropdownCss: string
 test.beforeAll(async () => {
   const stylesheet = await fs.readFile('src/renderer/styles.css', 'utf8')
   scrollLockCss = stylesheet.match(/\.overlay-scroll-(?:locked|gutter)\s*\{[^}]*\}/g)!.join('\n')
+  dropdownCss = (stylesheet.match(/[^{}]+\{[^{}]*\}/g) || []).filter(rule => rule.split('{')[0].includes('.select-dropdown__')).join('\n')
   script = (await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React, { useState } from 'react'
     import { createRoot } from 'react-dom/client'
     import { useOverlayScrollLock } from './src/renderer/hooks/useOverlayScrollLock'
     import InvoiceAnalysisInfo from './src/renderer/components/modals/InvoiceAnalysisInfo'
     import FilterDropdown from './src/renderer/components/dropdowns/FilterDropdown'
+    import SelectDropdown from './src/renderer/components/common/SelectDropdown'
     function App() {
       useOverlayScrollLock()
       const [modal, setModal] = useState(false), [nested, setNested] = useState(false)
+      const [draft, setDraft] = useState('0')
       return <><div id="background"><button onClick={() => setModal(true)}>Modal öffnen</button><FilterDropdown trigger="Import" title="Import"><div id="flyout-content" style={{ height: 1300 }}>Import-Inhalt</div></FilterDropdown><div style={{ height: 1800 }}>Hintergrund</div></div>
-      {modal && <div className="modal-overlay"><div id="modal-scroll"><InvoiceAnalysisInfo message="KI-Auswertung übernommen" warning={true} warnings={Array.from({ length: 30 }, (_, index) => 'Prüfhinweis ' + (index + 1))} /><button onClick={() => setModal(false)}>Modal schließen</button><button onClick={() => setNested(true)}>Verschachtelt öffnen</button><div style={{ height: 1500 }}>Modal-Inhalt</div></div></div>}
+      {modal && <div className="modal-overlay"><div id="modal-scroll"><InvoiceAnalysisInfo message="KI-Auswertung übernommen" warning={true} warnings={Array.from({ length: 30 }, (_, index) => 'Prüfhinweis ' + (index + 1))} /><button onClick={() => setModal(false)}>Modal schließen</button><button onClick={() => setNested(true)}>Verschachtelt öffnen</button><SelectDropdown compact ariaLabel="Buchungsreiter wechseln" style={{width:180}} value={draft} onChange={setDraft} options={Array.from({length:20}, (_, i) => ({value:String(i),label:'Bastelmaterial Ferienprogramm · dm-drogerie markt · 07 Aug 2026 · ' + i}))} /><div style={{ height: 1500 }}>Modal-Inhalt</div></div></div>}
       {nested && <div className="modal-overlay nested"><div id="nested-scroll"><button onClick={() => setNested(false)}>Verschachtelt schließen</button><div style={{ height: 800 }}>Innerer Inhalt</div></div></div>}</>
     }
     createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>)
@@ -57,6 +61,33 @@ test('flyout blocks background wheel and keyboard scrolling; closing restores it
   await page.mouse.move(1100, 500)
   await page.mouse.wheel(0, 400)
   await expect.poll(() => background.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+})
+
+test('compact draft menu scrolls by wheel without moving the form or background', async ({ page }, testInfo) => {
+  await page.addStyleTag({ content: dropdownCss })
+  await page.getByRole('button', { name: 'Modal öffnen' }).click()
+  await page.getByRole('button', { name: 'Buchungsreiter wechseln' }).click()
+  const menu = page.getByRole('listbox', { name: 'Buchungsreiter wechseln' })
+  const parent = page.locator('#modal-scroll')
+  await expect(parent).toHaveClass(/overlay-scroll-locked/)
+  expect((await menu.getByRole('option').first().boundingBox())!.height).toBeLessThan(54)
+  await expect(menu.locator('small')).toHaveCount(0)
+  await menu.hover()
+  await page.mouse.wheel(0, 220)
+  await expect.poll(() => menu.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+  expect(await parent.evaluate(el => el.scrollTop)).toBe(0)
+  expect(await page.locator('#background').evaluate(el => el.scrollTop)).toBe(0)
+  await menu.evaluate(el => { el.scrollTop = el.scrollHeight })
+  await page.mouse.wheel(0, 300)
+  expect(await parent.evaluate(el => el.scrollTop)).toBe(0)
+  await page.screenshot({ path: testInfo.outputPath('compact-draft-menu.png') })
+  await menu.getByRole('option').last().click()
+  await expect(menu).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Buchungsreiter wechseln' })).toContainText('19')
+  await expect(parent).not.toHaveClass(/overlay-scroll-locked/)
+  await parent.hover()
+  await page.mouse.wheel(0, 180)
+  await expect.poll(() => parent.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
 })
 
 test('nested modal keeps the page and parent locked, including scroll boundaries', async ({ page }) => {

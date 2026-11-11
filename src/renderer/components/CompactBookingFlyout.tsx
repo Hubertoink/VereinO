@@ -573,7 +573,8 @@ export default function CompactBookingFlyout({
               value={activeDraftId ?? ''}
               onChange={onSelectDraft}
               ariaLabel="Buchungsreiter wechseln"
-              options={draftTabs.map((draft) => ({ value: draft.id, label: draft.label, description: draft.title }))}
+              compact
+              options={draftTabs.map((draft) => ({ value: draft.id, label: draft.label }))}
             />
             <button type="button" className="btn ghost compact-booking-flyout__action compact-booking-flyout__action--new" onClick={onNewDraft} aria-label="Neuen Buchungsreiter öffnen" title="Neue Buchung als weiteren Reiter öffnen">+</button>
           </div>

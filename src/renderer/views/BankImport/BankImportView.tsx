@@ -2,11 +2,12 @@ import type { BankTransaction, BankAiSuggestion } from '../../../../shared/bankA
 import { isExplicitMembershipPayment } from '../../../../shared/membershipPayments'
 import BankAiBatchModal from './BankAiBatchModal'
 import BankAiRecheckModal from './BankAiRecheckModal'
+import BankAiDraftComparison from './BankAiDraftComparison'
 import type { BankAiReviewProgress } from '../../../../shared/bankAiReviewProgress'
 import './bankAiReviewProgress.css'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
-import { IconArrowDown, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowRight, IconArrowUp, IconBuildingBank, IconCalendar, IconFileDescription, IconInfoCircle, IconBulb, IconMessage, IconPaperclip, IconUser } from '@tabler/icons-react'
 import './bankReview.css'
 import './bankImportDialog.css'
 import './bankImportPage.css'
@@ -1660,7 +1661,7 @@ function BankAiSuggestionModal({
             note: candidate.note || '',
             paymentMethod: candidate.paymentMethod || 'BANK',
             paymentAccountId: candidate.paymentAccountId ?? transaction.paymentAccountId,
-            paymentAccountName: transaction.paymentAccountName,
+            paymentAccountName: candidate.paymentAccountId == null || candidate.paymentAccountId === transaction.paymentAccountId ? transaction.paymentAccountName : undefined,
             budgets: (candidate.budgets || []).map((budget) => ({ budgetId: budget.id, amount: budget.amount })),
             earmarksAssigned: (candidate.earmarks || []).map((earmark) => ({ earmarkId: earmark.id, amount: earmark.amount })),
             tags: candidate.tags || [],
@@ -1688,14 +1689,17 @@ function BankAiSuggestionModal({
   return createPortal(
     <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" aria-labelledby="bank-ai-review-title" onMouseDown={(event) => !busy && event.target === event.currentTarget && onClose()}>
       <div className={`modal bank-ai-suggestion-modal${newBooking ? ' bank-ai-draft-modal' : ''}`}>
-        <ModalHeader className="bank-modal-header bank-ai-review-header">
-          <div>
+        <ModalHeader className="bank-modal-header bank-ai-review-header" onClose={onClose} closeDisabled={busy}>
+          <div className={newBooking ? 'bank-draft-title' : undefined}>
+            {newBooking && <span className="bank-draft-title-icon"><IconFileDescription size={23} aria-hidden="true" /></span>}
+            <div>
             <h2 id="bank-ai-review-title">{newBooking ? 'Neue Buchung aus Bankbeleg' : existing || recurring ? 'KI-Zuordnungsempfehlung' : 'KI-Prüfung'}</h2>
             <p>Bankbeleg #{transaction.id} · {formatDate(transaction.bookingDate)}</p>
+            </div>
           </div>
           <div className={`bank-ai-confidence${strongMatch ? ' bank-ai-confidence--high' : ''}`}>
-            <strong>{newBooking ? 'Entwurf · noch nicht gebucht' : strongMatch ? 'Hohe Übereinstimmung' : actionLabel}</strong>
-            <span>{newBooking ? 'KI-Vorschlag zur Erfassung' : `KI-Einschätzung: ${confidence} %`}</span>
+            <strong>{newBooking ? 'Entwurf' : strongMatch ? 'Hohe Übereinstimmung' : actionLabel}</strong>
+            <span>{newBooking ? 'noch nicht gebucht' : `KI-Einschätzung: ${confidence} %`}</span>
           </div>
           <ModalCloseButton type="button" disabled={busy} onClick={onClose} aria-label="Schließen" />
         </ModalHeader>
@@ -1708,14 +1712,16 @@ function BankAiSuggestionModal({
               KI prüft den Bankbeleg mit den aktuellen Treffern …
             </div>
           )}
-          <p className="bank-ai-intro">{existing
+          {newBooking ? <div className="bank-draft-intro">
+            <IconSparkles size={26} aria-hidden="true" />
+            <div><strong>Die KI schlägt eine neue Buchung vor.</strong><p>Bitte prüfe die Angaben und bearbeite den Entwurf. Gespeichert wird erst im Buchungsformular.</p></div>
+          </div> : <p className="bank-ai-intro">{existing
             ? 'Die KI empfiehlt, diesen Bankbeleg der folgenden bestehenden Buchung zuzuordnen.'
-            : newBooking ? 'Die KI schlägt vor, eine neue Buchung zu erstellen. Prüfe und bearbeite den Entwurf; gespeichert wird erst im Buchungsformular.'
-            : recurring ? 'Die KI empfiehlt, diesen Bankbeleg mit einer Dauerbuchung zu verbuchen.' : actionLabel}</p>
+            : recurring ? 'Die KI empfiehlt, diesen Bankbeleg mit einer Dauerbuchung zu verbuchen.' : actionLabel}</p>}
           <div className={newBooking ? 'bank-ai-draft-group' : 'bank-ai-review-group'}>
-          <div className={`bank-ai-comparison${newBooking ? ' bank-ai-draft-layout' : !existing ? ' bank-ai-comparison--no-arrow' : ''}`}>
+          {newBooking ? <BankAiDraftComparison transaction={transaction} candidate={suggestion.bookingCandidate} /> : <div className={`bank-ai-comparison${!existing ? ' bank-ai-comparison--no-arrow' : ''}`}>
             <section className="bank-ai-comparison-card">
-              <header><h3>{newBooking ? 'Quelle: importierter Bankbeleg' : 'Bankbeleg'}</h3><p>{transaction.direction === 'OUT' ? 'Ausgang vom Konto' : 'Eingang auf dem Konto'}</p></header>
+              <header><h3>Bankbeleg</h3><p>{transaction.direction === 'OUT' ? 'Ausgang vom Konto' : 'Eingang auf dem Konto'}</p></header>
               <dl>
                 <div><dt>Datum</dt><dd>{formatDate(transaction.bookingDate)}</dd></div>
                 {transaction.valueDate && <div><dt>Wertstellung</dt><dd>{formatDate(transaction.valueDate)}</dd></div>}
@@ -1728,19 +1734,21 @@ function BankAiSuggestionModal({
             </section>
             {existing && <span className="bank-ai-comparison-arrow" aria-hidden="true">↔</span>}
             <section className="bank-ai-comparison-card">
-              <header><h3>{existing ? 'Vorgeschlagene Buchung' : recurring ? 'Dauerbuchung' : newBooking ? 'Entwurf für eine neue Buchung' : 'Prüfergebnis'}</h3>
-                <p>{existing ? 'Bereits in der Buchhaltung vorhanden' : recurring ? 'Wird beim Übernehmen gebucht' : newBooking ? 'Diese Buchung wird erst nach deiner Prüfung und dem Speichern angelegt.' : 'Keine Buchung zur Zuordnung vorgeschlagen'}</p></header>
+              <header><h3>{existing ? 'Vorgeschlagene Buchung' : recurring ? 'Dauerbuchung' : 'Prüfergebnis'}</h3>
+                <p>{existing ? 'Bereits in der Buchhaltung vorhanden' : recurring ? 'Wird beim Übernehmen gebucht' : 'Keine Buchung zur Zuordnung vorgeschlagen'}</p></header>
               {(existing || recurring || suggestion.bookingCandidate) ? <>
                 <dl>
                   <div><dt>{recurring ? 'Fälligkeit' : 'Datum'}</dt><dd>{formatDate(targetDate)}</dd></div>
                   {existing && <div><dt>Buchungsnummer</dt><dd>{suggestion.voucherNo || `#${suggestion.voucherId}`}</dd></div>}
                   <div><dt>Beschreibung</dt><dd>{recurring ? suggestion.recurringBookingName || 'Ohne Bezeichnung' : target?.description || 'Keine Beschreibung verfügbar'}</dd></div>
                 </dl>
-                <div className="bank-ai-comparison-amount"><span>{newBooking ? 'Vorgeschlagener Betrag' : recurring ? 'Zu buchender Betrag' : 'Buchungswert'}</span><strong>{targetAmount == null ? 'Nicht verfügbar' : euro.format(targetAmount)}</strong></div>
+                <div className="bank-ai-comparison-amount"><span>{recurring ? 'Zu buchender Betrag' : 'Buchungswert'}</span><strong>{targetAmount == null ? 'Nicht verfügbar' : euro.format(targetAmount)}</strong></div>
               </> : <p>{suggestion.action === 'MARK_CHECKED' ? 'Der Bankbeleg soll ohne Buchung als geprüft markiert werden.' : 'Bitte den Bankbeleg und mögliche Buchungen manuell vergleichen.'}</p>}
             </section>
-          </div>
+          </div>}
           <section className="bank-ai-reasoning">
+            {newBooking && <span className="bank-draft-reason-icon"><IconBulb size={23} aria-hidden="true" /></span>}
+            <div>
             <h3>{newBooking ? 'Warum schlägt die KI eine neue Buchung vor?' : existing || recurring ? 'Warum diese Zuordnung?' : 'Begründung der KI'}</h3>
             <p>{suggestion.reason}</p>
             {existing && amountDifference != null && <div className="bank-ai-comparison-facts">
@@ -1749,6 +1757,7 @@ function BankAiSuggestionModal({
               <div><strong>Datumsvergleich</strong><span>{formatDate(transaction.bookingDate)} ↔ {formatDate(targetDate)}</span></div>
             </div>}
             {!!suggestion.evidence.length && <ul className="bank-ai-evidence">{suggestion.evidence.map((item, index) => <li key={index}>{item}</li>)}</ul>}
+            </div>
           </section>
           </div>
           {suggestion.warnings.length > 0 && (
@@ -1757,6 +1766,7 @@ function BankAiSuggestionModal({
             </ul></div>
           )}
         </section>
+        </div>
 
         <footer className="bank-modal-footer">
           <button className="btn" type="button" disabled={busy} onClick={onClose}>Schließen</button>
@@ -1764,7 +1774,7 @@ function BankAiSuggestionModal({
             {refreshing ? 'KI prüft …' : 'KI erneut prüfen'}
           </button>
           {suggestion.action === 'CREATE_BOOKING' && suggestion.bookingCandidate && (
-            <button className="btn primary" type="button" disabled={busy} onClick={openBookingDraft}>Entwurf prüfen und bearbeiten</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={openBookingDraft}>Entwurf prüfen und bearbeiten <IconArrowRight size={18} aria-hidden="true" /></button>
           )}
           {suggestion.action === 'LINK_EXISTING' && suggestion.voucherId && (
             <button className="btn primary" type="button" disabled={busy} onClick={() => void complete(
@@ -1798,7 +1808,6 @@ function BankAiSuggestionModal({
             }}>Bankbeleg manuell prüfen</button>
           )}
         </footer>
-        </div>
       </div>
     </div>,
     document.body
@@ -2238,7 +2247,7 @@ export default function BankImportView({
 
       <div className="bank-list-caption">
         <span>{total} Bankbelege · {status === 'ALL' ? 'Alle Status' : statusLabel(status)}</span>
-        <span>Details über + öffnen</span>
+        <span>Zeile anklicken, um Details zu öffnen</span>
         {hasPageFilters && <div className="bank-import-filter-chips" aria-label="Aktive Bankfilter">
           {batchFilter && <span className="chip bank-import-filter-chip" title={`Import #${batchFilter.id}: ${batchFilter.fileName}`}><span>Import #{batchFilter.id}: {batchFilter.fileName}</span><button className="chip-x" type="button" aria-label="Importfilter entfernen" onClick={() => { setBatchFilter(null); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
           {accountId && <span className="chip bank-import-filter-chip"><span>Zahlkonto: {selectedAccount?.name || accountId}</span><button className="chip-x" type="button" aria-label="Zahlkontofilter entfernen" onClick={() => { setAccountId(null); setBatchFilter(null); setHistoryPage(1); setPage(1) }}><AppIcon icon={IconX} size="inline" /></button></span>}
@@ -2282,7 +2291,10 @@ export default function BankImportView({
           <tbody>
             {rows.map((row) => (
               <React.Fragment key={row.id}>
-              <tr data-bank-transaction-id={row.id} aria-busy={rowReviewState(row.id) === 'active'} className={[expandedId === row.id ? 'bank-row-expanded' : '', rowReviewState(row.id) ? `bank-ai-row-${rowReviewState(row.id)}` : ''].filter(Boolean).join(' ')}>
+              <tr data-bank-transaction-id={row.id} aria-busy={rowReviewState(row.id) === 'active'} className={[expandedId === row.id ? 'bank-row-expanded' : '', rowReviewState(row.id) ? `bank-ai-row-${rowReviewState(row.id)}` : ''].filter(Boolean).join(' ')} onClick={(event) => {
+                if ((event.target as Element).closest('button, a, input, select, textarea, [role="button"]')) return
+                setExpandedId(current => current === row.id ? null : row.id)
+              }}>
                 <td><button className="btn ghost bank-expand" aria-expanded={expandedId === row.id} aria-controls={`bank-inline-${row.id}`} aria-label={`Bankbeleg ${row.id}: Details ${expandedId === row.id ? 'schließen' : 'anzeigen'}`} onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}>{expandedId === row.id ? '−' : '+'}</button></td>
                 <td>
                   <span

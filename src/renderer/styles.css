@@ -12553,7 +12553,13 @@ html[data-glass-modals='true'] .modal-content {
   left: auto;
   /* The position is calculated from the trigger's border box. */
   right: auto;
+  overscroll-behavior: contain;
 }
+
+.select-dropdown__menu--compact > button { padding: 8px 10px; align-items: center; min-height: 34px; }
+.select-dropdown__menu--compact > button > span { flex: 1; }
+.select-dropdown__menu--compact strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.select-dropdown__menu--compact small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .party-selector__menu > button,
 .select-dropdown__menu > button {
@@ -17047,20 +17053,12 @@ button.filter-totals-stat {
 .bank-ai-suggestion-modal .bank-modal-footer { flex-wrap: wrap; gap: 8px; }
 
 .bank-ai-comparison--no-arrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.bank-ai-draft-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-.bank-ai-draft-layout > .bank-ai-comparison-card:first-child { padding: 12px 16px; background: transparent; }
-.bank-ai-draft-layout > .bank-ai-comparison-card:first-child dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 8px 0; }
-.bank-ai-draft-layout > .bank-ai-comparison-card:last-child { border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
-.bank-ai-draft-layout > .bank-ai-comparison-card:last-child h3 { font-size: 16px; }
-.bank-ai-draft-layout > .bank-ai-comparison-card:last-child dl { margin: 8px 0 14px; }
-.bank-ai-draft-modal .bank-ai-confidence { border: 1px dashed var(--border); background: transparent; }
 
 @media (max-width: 680px) {
   .bank-ai-review-header { flex-wrap: wrap; }
   .bank-ai-review-header > div:first-child { flex-basis: calc(100% - 60px); }
   .bank-ai-confidence { order: 3; }
   .bank-ai-comparison { grid-template-columns: minmax(0, 1fr); }
-  .bank-ai-draft-layout > .bank-ai-comparison-card:first-child dl { grid-template-columns: minmax(0, 1fr); }
   .bank-ai-comparison-arrow { display: none; }
   .bank-ai-comparison-facts { grid-template-columns: minmax(0, 1fr); }
 }

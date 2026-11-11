@@ -1,4 +1,4 @@
-/** Original imported values retained only for drafts opened from an AI bank review. */
+/** Original imported values retained for manual and AI-assisted bank booking drafts. */
 export type BankDraftSource = {
   transactionId: number
   bookingDate: string

@@ -2,6 +2,7 @@ import { currentAiDraftComment } from './utils/aiBookingDraft'
 import { openReportBookings } from './utils/reportNavigation'
 import ModalHeader from './components/ModalHeader'
 import { resolveBankDraftParty } from './utils/bankDraftParty'
+import { bankDraftSourceFromTransaction } from './types/bankDraftSource'
 import { invoiceDescription } from './utils/invoiceDescription'
 import { markOrganizationReady } from './utils/organizationTransition'
 import { usePageHistory } from './hooks/usePageHistory'
@@ -3836,6 +3837,7 @@ function AppInner() {
                     counterparty: transaction.counterparty || '',
                     partyCreationSource: { name: transaction.counterparty || '', iban: transaction.counterpartyIban },
                     bankTransactionId: transaction.id,
+                    bankReviewSource: bankDraftSourceFromTransaction(transaction),
                     acknowledgedBankVoucherIds
                   }
                 })
