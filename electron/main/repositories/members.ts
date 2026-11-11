@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { getMemberPaymentStatuses } from './members_payments'
+import { initializeMemberPlan, prepareMemberPlanChange, refreshNextDue, reconcileMemberCredit } from './membershipLedger'
 
 type DB = InstanceType<typeof Database>
 
@@ -128,7 +129,7 @@ export function listMembers(params: MembersListParams): { rows: MemberRow[]; tot
       if (member.status === 'ACTIVE') acc.active++
       const overdue = Math.max(0, statuses.get(member.id)?.overdue || 0)
       const amount = Math.max(0, member.contribution_amount || 0)
-      if (amount > 0 && overdue > 0) { acc.dueMembers++; acc.dueAmount += Math.round(amount * 100) * overdue }
+      if (overdue > 0) { acc.dueMembers++; acc.dueAmount += Math.round((statuses.get(member.id)?.dueAmount || 0) * 100) }
       return acc
     }, { active: 0, dueMembers: 0, dueAmount: 0 })
     summary.dueAmount /= 100
@@ -171,17 +172,19 @@ export function createMember(input: { memberNo?: string | null; name: string; em
       input.next_due_date ?? null
     )
     const id = Number(info.lastInsertRowid)
+    initializeMemberPlan(d, id)
     setMemberTags(d, id, input.tags)
     return { id }
   })
 }
 
-export function updateMember(input: { id: number; memberNo?: string | null; name?: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[];
+export function updateMember(input: { id: number; contribution_effective_date?: string | null; memberNo?: string | null; name?: string; email?: string | null; phone?: string | null; address?: string | null; status?: MemberStatus; tags?: string[];
   iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
   mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; }) {
   return withTransaction((d: DB) => {
-    const cur = d.prepare('SELECT id FROM members WHERE id=?').get(input.id)
+    const cur = d.prepare('SELECT * FROM members WHERE id=?').get(input.id) as Record<string, unknown> | undefined
     if (!cur) throw new Error('Mitglied nicht gefunden')
+    prepareMemberPlanChange(d, cur, input)
     const fields: string[] = []
     const args: any[] = []
     if (input.memberNo !== undefined) { fields.push('member_no = ?'); args.push(input.memberNo) }
@@ -208,6 +211,8 @@ export function updateMember(input: { id: number; memberNo?: string | null; name
       d.prepare(sql).run(...args)
     }
     if (input.tags) setMemberTags(d, input.id, input.tags)
+    refreshNextDue(input.id, d)
+    if (['contribution_amount', 'contribution_interval', 'contribution_effective_date', 'leave_date', 'next_due_date'].some(key => (input as any)[key] !== undefined && (input as any)[key] !== cur[key])) reconcileMemberCredit(input.id, d)
     return { id: input.id }
   })
 }

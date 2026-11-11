@@ -69,7 +69,7 @@ export default function ReimbursementCreateForm({ voucherId, description, busy, 
         <section className="reimbursement-extra">
           <span className="reimbursement-field-label">Weitere Angaben</span>
           <div className="reimbursement-extra-actions"><button type="button" className="btn" disabled={busy} aria-expanded={showDueDate} onClick={() => setShowDueDate(value => !value)}>{showDueDate ? '−' : '+'} Fälligkeit{dueDate ? ' · 1' : ''}</button><button type="button" className="btn" disabled={busy} aria-expanded={showNote} onClick={() => setShowNote(value => !value)}>{showNote ? '−' : '+'} Notiz{note ? ' · 1' : ''}</button></div>
-          {showDueDate && <label className="reimbursement-create-field"><span className="reimbursement-field-label">Fällig am (optional)</span><input className="input" type="date" value={dueDate} disabled={busy} onChange={event => setDueDate(event.target.value)} /></label>}
+          {showDueDate && <label className="reimbursement-create-field reimbursement-date-field"><span className="reimbursement-field-label">Fällig am</span><input className="input" type="date" value={dueDate} disabled={busy} onChange={event => setDueDate(event.target.value)} /></label>}
           {showNote && <label className="reimbursement-create-field"><span className="reimbursement-field-label">Notiz / Abrechnungsreferenz</span><textarea className="input" maxLength={10000} value={note} disabled={busy} onChange={event => setNote(event.target.value)} placeholder="Vereinbarung oder Referenz der Abrechnung" /></label>}
         </section>
       </div>

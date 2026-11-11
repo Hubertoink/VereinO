@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 let script: string
 let css: string
 test.beforeAll(async () => {
-  css = await fs.readFile('src/renderer/styles.css', 'utf8') + '\n' + await fs.readFile('src/renderer/views/BankImport/bankImportDialog.css', 'utf8')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/BankImport/bankImportDialog.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
   const result = await build({
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'

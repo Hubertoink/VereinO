@@ -54,7 +54,7 @@ export async function getDashboardTasks(today: string): Promise<DashboardTasks> 
     const status = statuses.get(member.id)
     const count = status && 'overdue' in status ? Number(status.overdue || 0) : 0
     if (!count) continue
-    const amount = Math.round(count * Number(member.contribution_amount) * 100) / 100
+      const amount = status?.dueAmount || 0
     memberTotal += amount; periods += count
     memberItems.push({ id: `member-${member.id}`, title: member.name, detail: `${count} offene Beitragszeiträume`, amount, level: 'urgent', target: { kind: 'members', id: member.id, filter: 'overdue' } })
   }

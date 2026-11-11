@@ -1,4 +1,5 @@
 import { voucherAuditState } from './voucherAuditState'
+import { refreshMembershipVoucher, refreshNextDue } from './membershipLedger'
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -594,6 +595,7 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         }
 
         d.prepare('UPDATE vouchers SET reversed_by_id=? WHERE id=?').run(id, originalId)
+        refreshMembershipVoucher(originalId, d)
 
         writeAudit(d, userId ?? null, 'vouchers', id, 'REVERSE', { originalId })
         return { id, voucherNo }
@@ -1538,6 +1540,8 @@ export function updateVoucher(input: {
         effectiveGrossAmount = gross
         setAmounts = true
     }
+    const contributionReserved = (d.prepare('SELECT COALESCE(SUM(amount_cents),0) as amount FROM membership_receipts WHERE voucher_id=?').get(input.id) as { amount: number }).amount
+    if (contributionReserved > 0 && (newType !== 'IN' || Math.round(effectiveGrossAmount * 100) < contributionReserved)) throw new Error('Die Buchung ist bereits Mitgliedsbeiträgen zugeordnet. Bitte zuerst die betroffenen Zahlungszuordnungen lösen.')
     const normalizedBudgets = input.budgets !== undefined
         ? input.budgets.filter((b) => b?.budgetId && (newType === 'INTERNAL' ? Number(b.amount) !== 0 : Number(b.amount) > 0)).map((b) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
         : undefined
@@ -1555,6 +1559,7 @@ export function updateVoucher(input: {
     if (fields.length) {
         params.push(input.id)
         d.prepare(`UPDATE vouchers SET ${fields.join(', ')} WHERE id = ?`).run(...params)
+        if (input.date) d.prepare('UPDATE membership_receipts SET date_paid=? WHERE voucher_id=?').run(input.date, input.id)
     }
     if (normalizedBudgets !== undefined) setVoucherBudgets(input.id, normalizedBudgets)
     if (normalizedEarmarks !== undefined) setVoucherEarmarks(input.id, normalizedEarmarks)
@@ -1701,7 +1706,9 @@ export function deleteVoucher(id: number, options?: { allowAdvancePlaceholder?: 
     // Optional: cascade delete files on disk
     const files = d.prepare('SELECT file_path FROM voucher_files WHERE voucher_id=?').all(id) as any[]
     d.prepare('DELETE FROM voucher_files WHERE voucher_id=?').run(id)
+    const contributionMembers = d.prepare('SELECT DISTINCT member_id FROM membership_receipts WHERE voucher_id=?').all(id) as { member_id: number }[]
     d.prepare('DELETE FROM vouchers WHERE id=?').run(id)
+    for (const member of contributionMembers) refreshNextDue(member.member_id, d)
     for (const f of files) {
         try { fs.unlinkSync(f.file_path) } catch { }
     }
@@ -1737,6 +1744,7 @@ export function clearAllVouchers() {
 
         // Now safe to delete all vouchers
         d.prepare('DELETE FROM vouchers').run()
+        for (const member of d.prepare("SELECT DISTINCT member_id FROM membership_receipts WHERE source='BOOKING'").all() as { member_id: number }[]) refreshNextDue(member.member_id, d)
 
         // Reset sequences
         d.prepare('DELETE FROM voucher_sequences').run()

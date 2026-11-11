@@ -1499,6 +1499,7 @@ export const MemberCreateInput = z.object({
 })
 export const MemberCreateOutput = z.object({ id: z.number() })
 export const MemberUpdateInput = z.object({
+  contribution_effective_date: z.string().nullable().optional(),
   id: z.number(),
   memberNo: z.string().nullable().optional(),
   name: z.string().optional(),
@@ -1567,7 +1568,8 @@ export const PaymentsListDueInput = z.object({
   to: z.string().optional(),
   q: z.string().optional(),
   includePaid: z.boolean().optional(),
-  memberId: z.number().optional()
+  memberId: z.number().optional(),
+  dueThroughToday: z.boolean().optional()
 })
 export const PaymentsListDueOutput = z.object({
   rows: z.array(
@@ -1579,6 +1581,10 @@ export const PaymentsListDueOutput = z.object({
       periodKey: z.string(),
       interval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']),
       amount: z.number(),
+      expected: z.number().optional(),
+      paidAmount: z.number().optional(),
+      remaining: z.number().optional(),
+      dueDate: z.string().optional(),
       paid: z.number(),
       voucherId: z.number().nullable().optional(),
       verified: z.number().optional()
@@ -1595,6 +1601,11 @@ export const PaymentsMarkPaidInput = z.object({
   datePaid: z.string().nullable().optional()
 })
 export const PaymentsMarkPaidOutput = z.object({ ok: z.boolean() })
+export const ContributionPaymentInput = z.object({
+  memberId: z.number().int().positive(), amount: z.number().positive(), voucherId: z.number().int().positive().nullable().optional(),
+  receiptId: z.number().int().positive().optional(), datePaid: z.string().nullable().optional(), startPeriod: z.string().optional(), token: z.string().optional(),
+  allocations: z.array(z.object({ periodKey: z.string(), interval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']), amount: z.number().positive() })).max(2400).optional()
+})
 export const PaymentsUnmarkInput = z.object({ memberId: z.number(), periodKey: z.string() })
 export const PaymentsUnmarkOutput = z.object({ ok: z.boolean() })
 export const PaymentsSuggestVouchersInput = z.object({
@@ -1611,7 +1622,8 @@ export const PaymentsSuggestVouchersOutput = z.object({
       date: z.string(),
       description: z.string().nullable().optional(),
       counterparty: z.string().nullable().optional(),
-      gross: z.number()
+      gross: z.number(),
+      available: z.number().optional()
     })
   )
 })

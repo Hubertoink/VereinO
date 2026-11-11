@@ -1,4 +1,7 @@
 /* Flat recipient list and focused detail area, using the application theme. */
+.modal.advances-resolve-modal { box-sizing: border-box; width: min(554px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.advances-resolve-body { min-height: 0; padding: 16px; display: grid; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
+.advances-resolve-modal > .advances-modal-actions { flex-shrink: 0; margin: 0; padding: 0 16px 16px; }
 .advances-page { border: 0; border-radius: 0; gap: 20px; }
 .advances-page .helper { color: var(--text-dim); }
 .advances-page .advances-layout { grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); gap: 20px; border: 0; }

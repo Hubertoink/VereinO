@@ -1,0 +1,24 @@
+CAMT.053-Test: Mitgliedsbeiträge, Vorauszahlungen und Teilzahlungen
+
+Teststichtag: 11.11.2026. Fünf Einnahmen, insgesamt 135,00 EUR.
+Alle Namen entsprechen den vier Beispielmitgliedern. Keine echten Kontodaten der Mitglieder enthalten.
+Importkonto: Bank (Test-IBAN DE02120300000000202608, wie die vorhandene Bank-Testdatei).
+
+Reproduzierbare Ausgangslage: vier aktive Mitglieder, monatlich je 10,00 EUR.
+0001 Max Mustermann: erste offene Periode 2026-11.
+0002 Niko Dubio: erste offene Periode 2026-12 (noch nicht fällig).
+0003 Petra Coolio: erste offene Periode 2027-01 (noch nicht fällig).
+0004 Umut Tanis: erste offene Periode 2026-11.
+
+Erwartung nach Zuordnung:
+Max: November 2026 bezahlt, nächste Fälligkeit Dezember 2026.
+Niko: Dezember 2026 bis September 2027 bezahlt, nächste Fälligkeit Oktober 2027.
+Petra: Januar 2027 bezahlt; Februar 2027 teilbezahlt (5,00 von 10,00 EUR).
+Umut: nach 4,00 EUR noch 6,00 EUR offen; nach zweiter Zahlung (6,00 EUR) November bezahlt.
+
+Im Bankimport mit KI prüfen, Mitgliedsvorschläge kontrollieren und übernehmen.
+Bei mehreren Zahlungen desselben Mitglieds wird eine zwischenzeitlich geänderte
+Aufteilung neu geladen und muss vor der nächsten Übernahme erneut geprüft werden.
+Ein erneuter Import derselben Datei darf keine weiteren Zahlungen anlegen.
+Abweichende vorhandene Mitgliedspläne führen entsprechend zu anderen Verteilungen.
+Die Testdatei verändert Mitgliedspläne nicht.

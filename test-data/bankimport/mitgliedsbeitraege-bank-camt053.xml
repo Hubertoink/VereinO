@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt><GrpHdr><MsgId>VEREINO-MITGLIEDER-TEST-20261111</MsgId><CreDtTm>2026-11-11T12:00:00+01:00</CreDtTm></GrpHdr>
+    <Stmt><Id>MITGLIEDSBEITRAEGE-VORAUS-TEILZAHLUNGEN</Id><CreDtTm>2026-11-11T12:00:00+01:00</CreDtTm>
+      <Acct><Id><IBAN>DE02120300000000202608</IBAN></Id><Ccy>EUR</Ccy><Ownr><Nm>JH Hochstaett Testkonto Bank</Nm></Ownr></Acct>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-TEST-MAX-202611</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>TEST-MAX-202611</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Max Mustermann</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0001 fuer 2026-11</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">100.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-TEST-NIKO-10-MONATE</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>TEST-NIKO-10-MONATE</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Niko Dubio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0002 ab 2026-12 Vorauszahlung 10 Monate</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">15.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-TEST-PETRA-VORAUS</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>TEST-PETRA-VORAUS</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Petra Coolio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0003 ab 2027-01 Vorauszahlung</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">4.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-TEST-UMUT-TEIL1</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>TEST-UMUT-TEIL1</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Umut Tanis</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0004 Teilzahlung November 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">6.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-TEST-UMUT-TEIL2</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>TEST-UMUT-TEIL2</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Umut Tanis</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0004 Restzahlung November 2026</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

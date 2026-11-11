@@ -28,6 +28,7 @@ export type BankTransaction = {
 }
 
 export type BankAiSuggestion = {
+  membership?: import('./membershipPayments').MembershipSuggestion | null
   matchedVoucher?: { grossAmount: number; date: string; description: string | null } | null
   action: 'LINK_EXISTING' | 'APPLY_RECURRING' | 'CREATE_BOOKING' | 'MARK_CHECKED' | 'NEEDS_MANUAL_REVIEW'
   confidence: number
@@ -62,6 +63,7 @@ export type BankAiSuggestion = {
 export type BankBookingCandidate = NonNullable<BankAiSuggestion['bookingCandidate']>
 
 export type BankAiBatchRow = {
+  membershipPreview?: import('./membershipPayments').ContributionPreview | null
   commentsEnabled: boolean
   transaction: BankTransaction
   token: string
@@ -72,6 +74,7 @@ export type BankAiBatchRow = {
 }
 
 export type BankAiBatchApplyInput = {
+  membershipAllocation?: { startPeriod?: string; allocations?: import('./membershipPayments').ContributionAllocation[] }
   id: number
   token: string
   candidate?: BankBookingCandidate

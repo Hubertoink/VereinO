@@ -25,7 +25,7 @@ test('dashboard tasks use actual SQLite balances, import coverage and recurring 
         ;(async () => {
           const first = await getDashboardTasks('2026-10-04')
           global.fixtureDb.prepare("INSERT INTO settings VALUES (?,?)").run('dashboard.bankReminderDays.1','0')
-          global.fixtureDb.exec("INSERT INTO membership_payments VALUES (2,7,'2026-07','2026-10-04'),(3,7,'2026-08','2026-10-04'),(4,7,'2026-09','2026-10-04')")
+          global.fixtureDb.exec("INSERT INTO membership_receipts VALUES(2,7,NULL,'MANUAL',3000,'2026-10-04'); INSERT INTO membership_allocations VALUES(2,2,1000),(2,3,1000),(2,4,1000)")
           global.fixtureBackups = [{ size:100, mtime:Date.now() }]
           const second = await getDashboardTasks('2026-10-04')
           console.log(JSON.stringify({first,second}))

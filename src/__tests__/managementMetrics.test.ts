@@ -17,10 +17,10 @@ test('member metrics cover the entire filtered set before pagination and respect
     { id: 3, name: 'C', status: 'LEFT', contribution_amount: 10 }
   ]
   ;(getDb as jest.Mock).mockReturnValue({ prepare: () => ({ all: () => rows }) })
-  ;(getMemberPaymentStatuses as jest.Mock).mockReturnValue(new Map([[1, { overdue: 2 }], [2, { overdue: 3 }], [3, { overdue: 0 }]]))
+  ;(getMemberPaymentStatuses as jest.Mock).mockReturnValue(new Map([[1, { overdue: 2, dueAmount: 16 }], [2, { overdue: 3, dueAmount: 75 }], [3, { overdue: 0, dueAmount: 0 }]]))
   const result = listMembers({ includeSummary: true, limit: 1, offset: 1 })
   expect(result.rows.map(r => r.id)).toEqual([2])
-  expect(result.summary).toEqual({ active: 2, dueMembers: 2, dueAmount: 95 })
+  expect(result.summary).toEqual({ active: 2, dueMembers: 2, dueAmount: 91 })
   expect(listMembers({ includeSummary: true, contributionFilter: 'NOT_DUE' }).summary?.dueAmount).toBe(0)
   expect(listMembers({ includeSummary: true, contributionFilter: 'DUE', limit: 1 }).total).toBe(2)
 })

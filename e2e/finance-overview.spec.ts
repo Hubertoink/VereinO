@@ -17,6 +17,7 @@ test.beforeAll(async () => {
     const months = [{ month: '2026-07', inflow: 100, spent: 300 }, { month: '2026-08', inflow: 0, spent: 1050 }]
     window.calls = []
     window.api = {
+      settings: { get: async () => ({ value: undefined }) },
       reports: { summary: async () => ({ classificationProfile: 'NONPROFIT', totals: { gross: 1250 }, bySphere: [{ key: 'IDEELL', gross: 950 }, { key: 'ZWECK', gross: 300 }] }) },
       budgets: { list: async () => ({ rows: budgets }), usage: async input => { window.calls.push(input); if (window.failUsage) throw Error('offline'); return { planned: 1000, inflow: 100, spent: 1350, monthly: months, count: 3, countOutside: 1 } } },
       bindings: { list: async () => ({ rows: [{ id: 3, code: 'JUG', name: 'Jugendspenden', budget: 2000, isActive: 1 }] }), usage: async () => ({ allocated: 100, released: 1350, monthly: months, budget: 2000 }) },

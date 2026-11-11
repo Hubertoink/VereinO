@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { ensureReimbursementTables } from './reimbursements'
+import { migrateMembershipLedger } from './membershipLedger'
 import { CLASSIFICATION_SCHEME_KEYS, NONPROFIT_SPHERE_KEYS } from '../../../shared/classification'
 type DB = InstanceType<typeof Database>
 
@@ -823,6 +824,10 @@ const MIGRATIONS: Mig[] = [
   {
     version: 43,
     up: backfillBankCounterparties
+  },
+  {
+    version: 44,
+    up: migrateMembershipLedger
   }
 ]
 
@@ -1455,6 +1460,7 @@ export function ensureBankImportTables(db: DB) {
         occurrence_id INTEGER,
         scheduled_date TEXT,
         booking_candidate_json TEXT,
+        membership_json TEXT,
         warnings_json TEXT NOT NULL DEFAULT '[]',
         evidence_json TEXT NOT NULL DEFAULT '[]',
         reviewed_at TEXT NOT NULL DEFAULT (datetime('now'))

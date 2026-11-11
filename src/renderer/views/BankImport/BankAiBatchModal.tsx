@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconCircleCheckFilled, IconSparkles } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCalendarRepeat, IconCircleCheckFilled, IconClipboardCheck, IconLink, IconReceipt, IconSparkles, IconUserCheck } from '@tabler/icons-react'
 import ModalHeader from '../../components/ModalHeader'
 import HoverTooltip from '../../components/common/HoverTooltip'
 import BankAiDraftEditor, { type BankDraftOption, type BankDraftTag } from './BankAiDraftEditor'
+import ContributionAllocationEditor from '../../components/finance/ContributionAllocationEditor'
+import type { ContributionPaymentInput, ContributionPreview } from '../../../../shared/membershipPayments'
 import type { BankAiBatchRow, BankBookingCandidate, BankTransaction } from '../../../../shared/bankAiBatch'
 import type { ClassificationValue } from '../../../../shared/classification'
 import './bankAiBatch.css'
@@ -24,6 +26,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [outcomes, setOutcomes] = useState<Record<number, Outcome>>({})
   const [edits, setEdits] = useState<Record<number, BankBookingCandidate>>({})
+  const [membershipEdits, setMembershipEdits] = useState<Record<number, { preview: ContributionPreview; input: ContributionPaymentInput } | null>>({})
   const [validation, setValidation] = useState<Record<number, Validation>>({})
   const [expanded, setExpanded] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,6 +89,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
       const eligible = new Set(next.filter(row => !(checkedDrafts[row.transaction.id]?.blockers ?? row.blockers).length).map(row => row.transaction.id))
       setSelected(previous => new Set([...previous].filter(id => unchanged.has(id) && eligible.has(id))))
       setEdits(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => unchanged.has(Number(id)))))
+      setMembershipEdits(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => unchanged.has(Number(id)))))
       setValidation(checkedDrafts)
       previewTokens.current = new Map(next.map(row => [row.transaction.id, row.token]))
       setRows(previous => [...previous.filter(r => completed.current.has(r.transaction.id)), ...next])
@@ -102,12 +106,13 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
   }, [transactions, revision, visible])
 
   const blockersFor = (row: BankAiBatchRow) => validation[row.transaction.id]?.blockers ?? row.blockers
-  const validating = Object.values(validation).some(value => value.pending)
+  const validating = Object.values(validation).some(value => value.pending) || Object.values(membershipEdits).some(value => value === null)
   const available = rows.filter(row => !blockersFor(row).length && outcomes[row.transaction.id]?.state !== 'success')
   const selectedRows = available.filter(row => selected.has(row.transaction.id))
   const newCount = selectedRows.filter(r => r.transaction.aiSuggestion?.action === 'CREATE_BOOKING').length
   const recurringCount = selectedRows.filter(r => r.transaction.aiSuggestion?.action === 'APPLY_RECURRING').length
   const linkCount = selectedRows.length - newCount - recurringCount
+  const membershipCount = selectedRows.filter(row => row.membershipPreview).length
   const successes = Object.values(outcomes).filter(o => o.state === 'success').length
   const failures = Object.values(outcomes).filter(o => o.state === 'error').length
   useEffect(() => {
@@ -141,7 +146,8 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
         const id = row.transaction.id
         setOutcomes(previous => ({ ...previous, [id]: { state: 'running', message: 'Wird übernommen …' } }))
         try {
-          const result = await window.api.bankTransactions.applyAiBatch({ id, token: row.token, candidate: edits[id] })
+          const memberEdit = membershipEdits[id]
+          const result = await window.api.bankTransactions.applyAiBatch({ id, token: row.token, candidate: edits[id], membershipAllocation: memberEdit ? { allocations: memberEdit.preview.allocations } : undefined })
           completed.current.add(id)
           setSelected(previous => { const next = new Set(previous); next.delete(id); return next })
           const verb = row.transaction.aiSuggestion?.action === 'LINK_EXISTING' ? 'Zugeordnet' : 'Angelegt'
@@ -156,6 +162,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
               previewTokens.current.set(id, fresh.token)
               setSelected(previous => { const next = new Set(previous); next.delete(id); return next })
               setEdits(previous => { const next = { ...previous }; delete next[id]; return next })
+              setMembershipEdits(previous => { const next = { ...previous }; delete next[id]; return next })
               setValidation(previous => { const next = { ...previous }; delete next[id]; return next })
               setOutcomes(previous => ({ ...previous, [id]: { state: 'error', message: 'Vorschlag wurde geändert und automatisch neu geladen. Bitte prüfen und erneut auswählen.' } }))
             }
@@ -207,6 +214,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
             const blockers = blockersFor(row)
             const editable = suggestion?.action === 'CREATE_BOOKING' && transaction.status === 'OPEN' && outcome?.state !== 'success' && !busy
             const showDetails = expanded === id
+            const ActionIcon = suggestion?.action === 'LINK_EXISTING' ? IconLink : suggestion?.action === 'APPLY_RECURRING' ? IconCalendarRepeat : suggestion?.action === 'MARK_CHECKED' ? IconClipboardCheck : suggestion?.action === 'CREATE_BOOKING' ? IconReceipt : IconAlertTriangle
             return <React.Fragment key={id}>
               <tr className={[outcome?.state === 'success' ? 'bank-ai-batch-done' : '', showDetails ? 'bank-ai-batch-expanded' : ''].filter(Boolean).join(' ')}>
                 <td><input type="checkbox" aria-label={`Bankbeleg ${id} auswählen`} checked={selected.has(id)}
@@ -214,10 +222,22 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
                   onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(id); else next.delete(id); return next })} /></td>
                 <td><strong>{transaction.counterparty || 'Ohne Gegenpartei'}</strong><small>{transaction.purpose || 'Ohne Verwendungszweck'}</small><small>{date(transaction.bookingDate)} · {transaction.paymentAccountName} · #{id}</small></td>
                 <td className={`bank-ai-batch-amount bank-ai-batch-amount--${transaction.direction.toLowerCase()}`}>{transaction.direction === 'OUT' ? '−' : '+'}{euro.format(transaction.amount)}</td>
-                <td><strong>{suggestion ? actions[suggestion.action] : 'Kein Vorschlag'}</strong>
-                  {candidate ? <><small>{candidate.description}</small><small>{classification(candidate)?.name || (general ? 'Kategorie fehlt' : candidate.sphere)} · {date(candidate.date)} · {candidate.vatRate ?? 0} % USt.</small></>
-                    : <small>{suggestion?.voucherNo} {row.targetDescription}</small>}
-                  {!!edits[id] && <small>Entwurf bearbeitet</small>}
+                <td>
+                  <div className="bank-ai-batch-booking-step"><ActionIcon size={18} aria-hidden="true" /><div>
+                    <strong className="bank-ai-batch-step-title">{suggestion ? actions[suggestion.action] : 'Kein Vorschlag'}</strong>
+                    {candidate ? <><p className="bank-ai-batch-description">{candidate.description}</p><small>{classification(candidate)?.name || (general ? 'Kategorie fehlt' : candidate.sphere)} · {date(candidate.date)} · {candidate.vatRate ?? 0} % USt.</small></>
+                      : <small>{suggestion?.voucherNo} {row.targetDescription}</small>}
+                    {!!edits[id] && <small>Entwurf bearbeitet</small>}
+                  </div></div>
+                  {row.membershipPreview && <div className="bank-ai-batch-membership-step">
+                    <IconUserCheck size={18} aria-hidden="true" /><div>
+                      <span className="bank-ai-batch-step-label">Anschließend</span>
+                      <strong className="bank-ai-batch-step-title">Beitragszahlung zuordnen</strong>
+                      <span className="bank-ai-batch-member-name">{row.membershipPreview.memberName}</span>
+                      {row.membershipPreview.allocations.length > 0 && <small>{row.membershipPreview.allocations.length} {row.membershipPreview.allocations.length === 1 ? 'Beitragsperiode' : 'Beitragsperioden'} · {row.membershipPreview.allocations[0]?.periodKey}{row.membershipPreview.allocations.length > 1 ? ` – ${row.membershipPreview.allocations.at(-1)?.periodKey}` : ''}</small>}
+                      {row.membershipPreview.credit > 0 && <small>Guthaben: {euro.format(row.membershipPreview.credit)}</small>}
+                    </div>
+                  </div>}
                 </td>
                 <td aria-live="polite">{validation[id]?.pending ? <span>Entwurf wird geprüft …</span> : outcome ? <span className={`bank-ai-batch-${outcome.state}`}>{outcome.message}</span>
                   : blockers.length ? <span className="bank-ai-batch-warning">{blockers.join(' ')}</span> : <HoverTooltip content="Zur Übernahme bereit">
@@ -229,6 +249,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
                     ? { ...transaction, aiSuggestion: { ...suggestion, bookingCandidate: candidate } } : transaction)}>Einzeln prüfen</button>}</div></td>
               </tr>
               {showDetails && <tr className="bank-ai-batch-detail-row"><td colSpan={6} className="bank-ai-batch-details">
+                {row.membershipPreview && <ContributionAllocationEditor key={`${id}:${row.token}`} disabled={busy} source={{ memberId: row.membershipPreview.memberId, amount: transaction.amount, datePaid: transaction.bookingDate, voucherId: suggestion?.action === 'LINK_EXISTING' ? suggestion.voucherId : undefined, startPeriod: row.membershipPreview.allocations[0]?.periodKey }} onReady={(preview, input) => setMembershipEdits(previous => ({ ...previous, [id]: preview ? { preview, input } : null }))} />}
                 <div className="bank-ai-batch-detail-layout">
                   <aside className="bank-ai-batch-reason" aria-label="Begründung der KI">
                     <div className="bank-ai-batch-reason-heading"><IconSparkles size={21} aria-hidden="true" /><h3>Begründung der KI</h3></div>
@@ -246,11 +267,13 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
         </table>}
       </div>
       <footer className="bank-modal-footer bank-ai-batch-footer">
-        <div><strong>{selectedRows.length} ausgewählt</strong><small>{newCount} neue Buchungen · {linkCount} Zuordnungen · {recurringCount} Dauerbuchungen</small></div>
+        <div className="bank-ai-batch-selection"><strong>{selectedRows.length} ausgewählt</strong><small>{newCount} neue Buchungen · {linkCount} Zuordnungen · {recurringCount} Dauerbuchungen{membershipCount ? ` · ${membershipCount} ${membershipCount === 1 ? 'Beitragszuordnung' : 'Beitragszuordnungen'}` : ''}</small></div>
+        <div className="bank-ai-batch-footer-actions">
         <button className="btn" disabled={busy} onClick={onClose}>Schließen</button>
         <button className="btn primary" disabled={loading || busy || validating || !!error || !selectedRows.length} onClick={() => void apply()}>
           {busy ? 'Wird übernommen …' : newCount === selectedRows.length && newCount ? `${newCount} ${newCount === 1 ? 'Buchung' : 'Buchungen'} anlegen` : `${selectedRows.length} ${selectedRows.length === 1 ? 'Vorschlag' : 'Vorschläge'} übernehmen`}
         </button>
+        </div>
       </footer>
     </div>
   </div>, document.body)

@@ -415,7 +415,8 @@ Status: ${statusLabel}`
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={embedded ? undefined : {
-          width: windowMode ? '100vw' : 'min(680px, 96vw)',
+          width: windowMode ? '100vw' : 'min(712px, calc(100vw - 32px))',
+          boxSizing: 'border-box',
           height: windowMode ? '100dvh' : undefined,
           maxHeight: windowMode ? '100dvh' : '92vh',
           display: 'flex',
@@ -423,7 +424,8 @@ Status: ${statusLabel}`
           borderRadius: windowMode ? 0 : 12,
           boxShadow: windowMode ? 'none' : '0 8px 24px rgba(0,0,0,0.25)',
           background: 'var(--surface)',
-          padding: windowMode ? 0 : 16,
+          padding: 0,
+          overflow: 'hidden',
           WebkitAppRegion: 'no-drag',
           pointerEvents: 'auto',
           position: 'relative',
@@ -530,7 +532,7 @@ Status: ${statusLabel}`
         </ModalHeader>
 
         {/* Content */}
-        <div className="voucher-info-modal__content" style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto', padding: windowMode ? '12px 16px 0' : undefined } as React.CSSProperties}>
+        <div className="voucher-info-modal__content" style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto', padding: windowMode ? '12px 16px 0' : '16px 16px 0' } as React.CSSProperties}>
           {!!reimbursements.length && <div className="reimbursement-voucher-links">{reimbursements.map(row => <button key={row.id} className="reimbursement-text-link" onClick={() => setReimbursementDialog({ id: row.id })}>Kostenerstattung: {row.title} · {row.status === 'PAID' ? 'Erstattet' : row.status === 'PARTIAL' ? 'Teilweise erstattet' : 'Offen'} · {eurFmt.format(row.remainingCents / 100)} offen</button>)}</div>}
           <section className="card voucher-info-card voucher-info-summary">
             <div className="voucher-info-summary__main">
@@ -793,7 +795,8 @@ Status: ${statusLabel}`
           className="voucher-info-footer"
           style={{
             marginTop: 16,
-            padding: windowMode ? '16px 16px 0' : undefined,
+            padding: '16px 16px 0',
+            flexShrink: 0,
             WebkitAppRegion: 'no-drag',
             pointerEvents: 'auto'
           } as React.CSSProperties}
@@ -808,7 +811,7 @@ Status: ${statusLabel}`
           {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{!embedded && (editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />)}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 
-        <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 0, fontSize: 11, textAlign: 'center' }}>
+        <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 16, flexShrink: 0, fontSize: 11, textAlign: 'center' }}>
           Esc = Schließen
         </div>
       </div>

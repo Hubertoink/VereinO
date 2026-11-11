@@ -12,9 +12,14 @@ import { ensurePeriodOpen } from './settings'
 import { recurringPeriodDescription } from '../../../shared/recurrence'
 import { aiBookingComment, filterOptionalAssignmentWarnings } from '../../../shared/aiBookingPolicy'
 import { aiBookingCommentsEnabled, currentAiBookingComment } from './aiBookingPolicy'
+import { allocateContributionPayment, previewContributionPayment } from '../repositories/membershipLedger'
+import { membershipBankCandidates } from './bankMembership'
+import { inferMembershipSuggestion, isExplicitMembershipPayment } from '../../../shared/membershipPayments'
+import { ContributionPaymentInput } from '../ipc/schemas'
 
 export const BankAiBatchPreviewInput = z.object({ ids: z.array(z.number().int().positive()).min(1).max(50) })
 export const BankAiBatchApplySchema = z.object({
+  membershipAllocation: ContributionPaymentInput.pick({ startPeriod: true, allocations: true }).optional(),
   id: z.number().int().positive(), token: z.string().length(64),
   candidate: AiBookingCandidate.extend({ date: z.string(), description: z.string(), vatRate: z.number() }).optional()
 })
@@ -52,6 +57,10 @@ export function previewBankAiBatchRow(id: number, editedCandidate?: BankBookingC
   const transaction = getBankTransaction(id) as BankTransaction
   const commentsEnabled = aiBookingCommentsEnabled()
   const suggestion = transaction.aiSuggestion
+  const membershipCandidates = suggestion && ['CREATE_BOOKING', 'LINK_EXISTING'].includes(suggestion.action)
+    && (suggestion.membership || isExplicitMembershipPayment(transaction)) ? membershipBankCandidates(transaction) : []
+  // Also repair the preview of already saved suggestions without mutating the stored record.
+  if (suggestion && !suggestion.membership) suggestion.membership = inferMembershipSuggestion(transaction, suggestion.action, membershipCandidates)
   const blockers: string[] = []
   // Model prose is advisory. Required fields, bank consistency, duplicate checks
   // and explicit NEEDS_MANUAL_REVIEW determine whether approval is blocked.
@@ -59,6 +68,7 @@ export function previewBankAiBatchRow(id: number, editedCandidate?: BankBookingC
   let candidate: BankBookingCandidate | null = editedCandidate ?? suggestion?.bookingCandidate ?? null
   let target: unknown = null
   let targetDescription = ''
+  let membershipPreview: BankAiBatchRow['membershipPreview'] = null
   if (transaction.status !== 'OPEN') blockers.push('Dieser Bankbeleg ist bereits erledigt.')
   if (!suggestion) blockers.push('Kein KI-Vorschlag vorhanden. Bitte erneut mit KI prüfen.')
   if (suggestion) {
@@ -74,10 +84,11 @@ export function previewBankAiBatchRow(id: number, editedCandidate?: BankBookingC
     } else if (suggestion.action === 'LINK_EXISTING' || suggestion.action === 'APPLY_RECURRING') {
       const matches = findBankTransactionMatches({ id, forAiReview: true })
       const match = matches.find((m: any) => suggestion.action === 'LINK_EXISTING'
-        ? m.matchKind !== 'RECURRING' && m.id === suggestion.voucherId && !m.paymentAccountMismatch
+        ? m.matchKind !== 'RECURRING' && m.id === suggestion.voucherId
         : m.matchKind === 'RECURRING' && m.recurringBookingId === suggestion.recurringBookingId
           && (suggestion.occurrenceId ? m.occurrenceId === suggestion.occurrenceId : m.scheduledDate === suggestion.scheduledDate))
       if (!match) blockers.push('Die vorgeschlagene Zuordnung ist nicht mehr passend. Bitte einzeln prüfen.')
+      else if (match.paymentAccountMismatch) blockers.push(`Die vorhandene Buchung liegt auf „${match.paymentAccountName || 'ohne Konto'}“, der Bankbeleg auf „${transaction.paymentAccountName || 'ohne Konto'}“. Vor einer Verknüpfung bitte prüfen, ob das Konto der Buchung falsch ist oder eine separate Zahlung vorliegt.`)
       target = match ?? null
       targetDescription = match?.description || ''
       if (suggestion.action === 'APPLY_RECURRING') {
@@ -99,10 +110,23 @@ export function previewBankAiBatchRow(id: number, editedCandidate?: BankBookingC
         }
       }
     } else blockers.push(suggestion.action === 'MARK_CHECKED'
-      ? 'Ohne Buchung prüfen: bitte einzeln bestätigen.' : 'Dieser Vorschlag benötigt eine manuelle Prüfung.')
+      ? 'Ohne Buchung prüfen: bitte einzeln bestätigen.' : suggestion.reason || 'Dieser Vorschlag benötigt eine manuelle Prüfung.')
   }
-  const token = createHash('sha256').update(JSON.stringify({ transaction, target, commentsEnabled })).digest('hex')
-  return { transaction, token, candidate, commentsEnabled, blockers: [...new Set(blockers)], warnings: [...new Set(warnings)], targetDescription }
+  if (suggestion?.membership) {
+    try {
+      const candidates = membershipCandidates
+      if (transaction.direction !== 'IN' || !['CREATE_BOOKING', 'LINK_EXISTING'].includes(suggestion.action) || candidates.length !== 1 || candidates[0].memberId !== suggestion.membership.memberId) throw new Error('Mitgliedszuordnung ist nicht mehr eindeutig. Bitte einzeln prüfen.')
+      warnings.push(...(candidates[0].warnings || []))
+      if (candidate && !editedCandidate && transaction.purpose?.trim()) {
+        candidate = { ...candidate, description: transaction.purpose.trim(), note: candidate.note === candidate.description ? transaction.purpose.trim() : candidate.note }
+      }
+      membershipPreview = previewContributionPayment({ memberId: suggestion.membership.memberId, amount: transaction.amount,
+        startPeriod: candidates[0].startPeriod,
+        voucherId: suggestion.action === 'LINK_EXISTING' ? suggestion.voucherId : undefined, datePaid: transaction.bookingDate })
+    } catch (error) { blockers.push((error as Error).message) }
+  }
+  const token = createHash('sha256').update(JSON.stringify({ transaction, target, commentsEnabled, membershipPreview })).digest('hex')
+  return { transaction, token, candidate, membershipPreview, commentsEnabled, blockers: [...new Set(blockers)], warnings: [...new Set(warnings)], targetDescription }
 }
 
 export function previewBankAiBatch(ids: number[]) {
@@ -122,13 +146,25 @@ export function applyBankAiBatchRow(input: BankAiBatchApplyInput): BankAiBatchRe
     if (row.token !== input.token) throw new Error('Bankbeleg, Vorschlag oder Zuordnung wurde geändert. Bitte die Vorschau aktualisieren und erneut auswählen.')
     if (row.blockers.length) throw new Error(row.blockers.join(' '))
     const suggestion = row.transaction.aiSuggestion!
+    const assignMember = (voucherId: number) => {
+      if (!suggestion.membership) {
+        if (input.membershipAllocation) throw new Error('Keine Mitgliedszuordnung vorgeschlagen.')
+        return
+      }
+      allocateContributionPayment({ memberId: suggestion.membership.memberId, voucherId, amount: row.transaction.amount,
+        datePaid: row.transaction.bookingDate,
+        allocations: input.membershipAllocation ? input.membershipAllocation.allocations : row.membershipPreview!.allocations,
+        ...input.membershipAllocation })
+    }
     if (suggestion.action === 'CREATE_BOOKING') {
       const result = createVoucher(bookingPayload(row.transaction, input.candidate ?? row.candidate!))
+      assignMember(result.id)
       return { voucherId: result.id, voucherNo: result.voucherNo, warnings: result.warnings ?? [] }
     }
     if (input.candidate) throw new Error('Nur neue Buchungsentwürfe können hier bearbeitet werden.')
     if (suggestion.action === 'LINK_EXISTING') {
       const result = linkBankTransaction({ id: input.id, voucherId: suggestion.voucherId! })
+      assignMember(suggestion.voucherId!)
       return { voucherId: suggestion.voucherId!, voucherNo: String(result.voucherNo || suggestion.voucherNo || suggestion.voucherId), warnings: [] }
     }
     if (suggestion.action === 'APPLY_RECURRING') {

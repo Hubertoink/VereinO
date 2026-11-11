@@ -1,4 +1,5 @@
 import type { BankTransaction, BankAiSuggestion } from '../../../../shared/bankAiBatch'
+import { isExplicitMembershipPayment } from '../../../../shared/membershipPayments'
 import BankAiBatchModal from './BankAiBatchModal'
 import BankAiRecheckModal from './BankAiRecheckModal'
 import type { BankAiReviewProgress } from '../../../../shared/bankAiReviewProgress'
@@ -1682,6 +1683,8 @@ function BankAiSuggestionModal({
   const confidence = Math.round(suggestion.confidence * 100)
   const strongMatch = (existing || recurring) && confidence >= 80 && !suggestion.warnings.length && (!existing || amountDifference === 0)
 
+  if (suggestion.membership || (isExplicitMembershipPayment(transaction) && (newBooking || existing))) return <BankAiBatchModal transactions={[transaction]} page={1} scope="Mitgliedsbeitragszahlung" onClose={onClose} onChanged={onChanged} onReview={onOpenReview} />
+
   return createPortal(
     <div className="modal-overlay bank-import-overlay" role="dialog" aria-modal="true" aria-labelledby="bank-ai-review-title" onMouseDown={(event) => !busy && event.target === event.currentTarget && onClose()}>
       <div className={`modal bank-ai-suggestion-modal${newBooking ? ' bank-ai-draft-modal' : ''}`}>
@@ -2173,7 +2176,7 @@ export default function BankImportView({
           </FilterDropdown>
           <div className="filter-divider" aria-hidden="true" />
           <button
-            className="btn ghost bank-ai-review-button"
+            className="btn bank-ai-review-button"
             type="button"
             disabled={loading || reviewingWithAi || !openVisibleIds.length}
             onClick={requestAiReview}
@@ -2181,8 +2184,8 @@ export default function BankImportView({
             aria-label="Sichtbare offene Bankbelege mit KI prüfen"
             aria-busy={reviewingWithAi}
           >
-            <AppIcon icon={IconSparkles} size="control" />
-            {reviewingWithAi ? `KI prüft … ${reviewProgress?.completedIds.length || 0}/${reviewProgress?.transactionIds.length || 0}` : 'KI prüfen'}
+            <span>{reviewingWithAi ? `KI prüft … ${reviewProgress?.completedIds.length || 0}/${reviewProgress?.transactionIds.length || 0}` : 'KI prüfen'}</span>
+            <span className="bank-ai-review-button__icon" aria-hidden="true"><AppIcon icon={IconSparkles} size="control" /></span>
           </button>
           <BankImportActionDropdown
             onOpenImport={(file) => {
@@ -2270,7 +2273,7 @@ export default function BankImportView({
                   if (!batchReview) setBatchReview({ transactions: visibleSuggestions, page,
                     scope: [selectedAccount?.name || 'Alle Zahlkonten', from && `ab ${from}`, to && `bis ${to}`, query && `Suche: ${query}`, batchFilter?.fileName].filter(Boolean).join(' · ') })
                   setBatchVisible(true)
-                }}><IconSparkles size={14} aria-hidden="true" />{batchReview ? 'Prüfung fortsetzen' : `Vorschläge (${visibleSuggestions.length})`}</button></th>
+                }}><IconSparkles size={14} aria-hidden="true" />{`Vorschläge (${visibleSuggestions.length})`}</button></th>
               <th className="sortable" aria-sort={sortBy === 'account' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('account')}> Zahlkonto {renderSort('account')}</button></th>
               <th className="sortable" aria-sort={sortBy === 'type' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('type')}> Typ {renderSort('type')}</button></th>
               <th className="number sortable" aria-sort={sortBy === 'amount' ? (sortDir === 'ASC' ? 'ascending' : 'descending') : 'none'}><button className="bank-sort-button" onClick={() => toggleSort('amount')}> Summe {renderSort('amount')}</button></th>
@@ -2439,7 +2442,7 @@ export default function BankImportView({
       {recheckIds && <BankAiRecheckModal count={recheckIds.length} page={page} onClose={() => setRecheckIds(null)} onConfirm={() => void reviewVisibleWithAi(recheckIds)} />}
       {batchReview && <BankAiBatchModal transactions={batchReview.transactions} page={batchReview.page} scope={batchReview.scope} visible={batchVisible}
         onClose={() => { setBatchReview(null); setBatchVisible(false) }}
-        onChanged={() => { dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings']); void load() }}
+        onChanged={() => { dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings', 'members']); void load() }}
         onReview={transaction => transaction.aiSuggestion ? setAiSuggestionTransaction(transaction) : setSelected(transaction)} />}
       {selected && (
         <BankReviewModal
@@ -2462,7 +2465,7 @@ export default function BankImportView({
           notify={notify}
           onClose={() => setAiSuggestionTransaction(null)}
           onChanged={() => {
-            dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings'])
+            dispatchDataChanged(['bank-imports', 'vouchers', 'recurring-bookings', 'members'])
             void load()
           }}
           onOpenReview={(transaction) => setSelected(transaction)}

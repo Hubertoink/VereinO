@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt><GrpHdr><MsgId>VEREINO-EDGE10-20261111</MsgId><CreDtTm>2026-11-11T12:00:00+01:00</CreDtTm></GrpHdr>
+    <Stmt><Id>MITGLIEDER-EDGE10-20261111</Id><CreDtTm>2026-11-11T12:00:00+01:00</CreDtTm>
+      <Acct><Id><IBAN>DE02120300000000202608</IBAN></Id><Ccy>EUR</Ccy><Ownr><Nm>JH Hochstaett Testkonto Bank</Nm></Ownr></Acct>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-01</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-01</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Max Mustermann</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0001 fuer 2026-12</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">100.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-02</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-02</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Niko Dubio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0002 ab 2027-01 Vorauszahlung 10 Monate</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">5.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-03</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-03</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Petra Coolio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0003 fuer 2027-01 Teilzahlung</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-04</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-04</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Umut Tanis</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Mitgliedsbeitrag 0004 ab 2026-12 fuer zwei Monate</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-05</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-05</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Umut Tanis</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Umut Tanis Spende Verein</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">50.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-06</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-06</EndToEndId></Refs>
+          <RltdPties><Cdtr><Nm>Umut Tanis</Nm></Cdtr></RltdPties>
+          <RmtInf><Ustrd>Schicht Umut Tanis 50 EUR</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-07</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-07</EndToEndId></Refs>
+          <RltdPties><Cdtr><Nm>Max Mustermann</Nm></Cdtr></RltdPties>
+          <RmtInf><Ustrd>Rueckerstattung Mitgliedsbeitrag 0001 Max Mustermann</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-08</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-08</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Niko Dubio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Teilnahmegebuehr Sommerfest - Referenz 0002</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">10.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-09</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-09</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Petra Coolio</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Spende Verein - Referenz 0003</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry><Amt Ccy="EUR">20.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-11-11</Dt></BookgDt><ValDt><Dt>2026-11-11</Dt></ValDt><NtryRef>VEREINO-EDGE10-20261111-10</NtryRef>
+        <NtryDtls><TxDtls><Refs><EndToEndId>EDGE10-20261111-10</EndToEndId></Refs>
+          <RltdPties><Dbtr><Nm>Max Mustermann</Nm></Dbtr></RltdPties>
+          <RmtInf><Ustrd>Kostenerstattung Material Gruppenraum - Referenz 0001</Ustrd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

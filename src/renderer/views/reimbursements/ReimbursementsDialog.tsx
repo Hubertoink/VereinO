@@ -1,7 +1,9 @@
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
-import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil } from '@tabler/icons-react'
-import React, { useCallback, useEffect, useState } from 'react'
+import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil, IconFilter, IconPlus, IconX } from '@tabler/icons-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import FilterDropdown from '../../components/dropdowns/FilterDropdown'
+import AppIcon from '../../components/common/AppIcon'
 import { createPortal } from 'react-dom'
 import type { Reimbursement, ReimbursementDetail, ReimbursementRole, ReimbursementVoucher } from '../../../../shared/reimbursements'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
@@ -15,6 +17,16 @@ const labels = { OPEN: 'Offen', PARTIAL: 'Teilweise erstattet', PAID: 'Erstattet
 type Voucher = { id: number; type: string; grossAmount: number; description?: string | null }
 type Notify = (type: 'success' | 'error' | 'info', text: string) => void
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
+
+function ReimbursementStatusFilter({ value, onApply }: { value: string; onApply: (value: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  const closeRef = useRef<(() => void) | null>(null)
+  useEffect(() => setDraft(value), [value])
+  return <FilterDropdown trigger={<AppIcon icon={IconFilter} size="action" />} title="Status filtern" buttonTitle="Status filtern" colorVariant="filter" hasActiveFilters={value !== 'ALL'} alignRight width={300} closeRef={closeRef} panelClassName="reimbursement-filter-panel" onOpenChange={open => { if (open) setDraft(value) }}>
+    <label className="filter-dropdown__field"><span className="filter-dropdown__label">Status</span><select className="input" aria-label="Status filtern" value={draft} onChange={event => setDraft(event.target.value)}><option value="ALL">Alle Status</option><option value="UNPAID">Alle offenen Erstattungen</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select></label>
+    <div className="filter-dropdown__actions"><button className="btn" onClick={() => { setDraft('ALL'); onApply('ALL') }}>Zurücksetzen</button><div className="filter-dropdown__actions-right"><button className="btn primary" onClick={() => { onApply(draft); closeRef.current?.() }}>Übernehmen</button></div></div>
+  </FilterDropdown>
+}
 
 function VoucherPicker({ role, initialVoucherId, maxCents, busy, submitDisabled = false, onSubmit }: {
   role: ReimbursementRole; initialVoucherId?: number; maxCents?: number; busy: boolean; submitDisabled?: boolean
@@ -122,25 +134,31 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   const metadata = { title: title.trim(), partner: partner.trim(), dueDate: dueDate || null, note }
   const metadataValid = !!metadata.title && !!metadata.partner
   const form = <div className="reimbursement-form">
-    <label>Bezeichnung<input className="input" maxLength={200} value={title} disabled={busy} onChange={event => setTitle(event.target.value)} placeholder="Lebensmittel Sommerfest" required /></label>
-    <label>Erstattung durch<input className="input" maxLength={200} value={partner} disabled={busy} onChange={event => setPartner(event.target.value)} placeholder="Kooperationspartner" required /></label>
-    <label>Fällig am (optional)<input className="input" type="date" value={dueDate} disabled={busy} onChange={event => setDueDate(event.target.value)} /></label>
+    <label>Bezeichnung *<input className="input" maxLength={200} value={title} disabled={busy} onChange={event => setTitle(event.target.value)} placeholder="Lebensmittel Sommerfest" required /></label>
+    <label>Erstattung durch *<input className="input" maxLength={200} value={partner} disabled={busy} onChange={event => setPartner(event.target.value)} placeholder="Kooperationspartner" required /></label>
+    <label className="reimbursement-date-field">Fällig am<input className="input" type="date" value={dueDate} disabled={busy} onChange={event => setDueDate(event.target.value)} /></label>
     <label>Notiz / Abrechnungsreferenz<textarea className="input" maxLength={10000} value={note} disabled={busy} onChange={event => setNote(event.target.value)} placeholder="Vereinbarung, Versanddatum oder Referenz der Abrechnung" /></label>
   </div>
   const visible = rows.filter(row => (statusFilter === 'ALL' || statusFilter === 'UNPAID' && row.remainingCents > 0 || row.status === statusFilter) && `${row.title} ${row.partner}`.toLocaleLowerCase().includes(q.toLocaleLowerCase()))
   const today = new Date().toLocaleDateString('en-CA')
   const overdue = visible.filter(row => row.remainingCents > 0 && row.dueDate && row.dueDate < today)
-  const toolbar = <div className="reimbursement-overview-toolbar"><input className="input" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} /><select className="input" aria-label="Status filtern" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="ALL">Alle Status</option><option value="UNPAID">Alle offenen Erstattungen</option><option value="OPEN">Offen</option><option value="PARTIAL">Teilweise erstattet</option><option value="PAID">Erstattet</option></select><button className="btn primary" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}>+ Erstattung erwarten</button></div>
+  const toolbar = <div className="reimbursement-overview-toolbar">
+    <input className="input invoices-search" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} />
+    <ReimbursementStatusFilter value={statusFilter} onApply={setStatusFilter} />
+    {(q.trim() || statusFilter !== 'ALL') && <button className="btn btn-clear-filters" title="Alle Filter löschen" aria-label="Alle Filter löschen" onClick={() => { setQ(''); setStatusFilter('ALL') }}><AppIcon icon={IconX} size="action" /></button>}
+    <div className="filter-divider" />
+    <button className="btn primary invoices-toolbar-action btn-with-icon" onClick={() => { setTitle(voucher?.type === 'OUT' ? voucher.description || '' : ''); setPartner(''); setDueDate(''); setNote(''); setCreating(true) }}><AppIcon icon={IconPlus} size="control" />Erstattung erwarten</button>
+  </div>
   const overview = <div className="reimbursement-inline">
         {!(embedded && toolbarTarget) && toolbar}
         {voucher?.type === 'IN' && <p className="helper">Wähle den Vorgang und anschließend „Erstattung zuordnen“. Die aktuelle Einnahme wird vorausgewählt.</p>}
-        <ManagementKpis label="Kostenerstattungsübersicht" loading={loading} items={[
+        <ManagementKpis compact label="Kostenerstattungsübersicht" loading={loading} items={[
           { label: 'Offene Erstattungen', value: error ? '—' : money(visible.reduce((sum, row) => sum + Math.max(0, row.remainingCents), 0)), hint: `${visible.length} Vorgänge · gefilterte Auswahl` },
           { label: 'Bereits erstattet', value: error ? '—' : money(visible.reduce((sum, row) => sum + row.paidCents, 0)), hint: 'Zugeordnete Erstattungszahlungen' },
           { label: 'Überfällig', value: error ? '—' : money(overdue.reduce((sum, row) => sum + row.remainingCents, 0)), hint: `${overdue.length} ${overdue.length === 1 ? 'überfälliger Vorgang' : 'überfällige Vorgänge'}`, tone: overdue.length ? 'warning' : undefined }
         ]} />
         {loading ? <p>Lädt …</p> : <div className="invoices-table-scroll-wrapper"><table cellPadding={6} className="invoices-table invoices-table--wide reimbursement-overview-table"><thead><tr><th>Bezeichnung</th><th>Partner</th><th>Fällig</th><th className="money">Erwartet</th><th className="money">Erstattet</th><th className="money">Rest</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
-          {visible.map(row => <tr key={row.id} onClick={() => void open(row.id)}><td><button className="reimbursement-title-button" onClick={event => { event.stopPropagation(); void open(row.id) }}>{row.title}</button></td><td>{row.partner}</td><td className="nowrap">{date(row.dueDate)}<InvoiceDueHint date={row.dueDate} remaining={row.remainingCents / 100} /></td><td className="money">{money(row.expectedCents)}</td><td className="money"><InvoicePaymentProgress paid={row.paidCents / 100} gross={row.expectedCents / 100} label="erstattet" /></td><td className="money">{money(row.remainingCents)}</td><td><span className={`reimbursement-status reimbursement-status--${row.status.toLowerCase()}`}>{labels[row.status]}</span></td><td><button className="btn" onClick={event => { event.stopPropagation(); void open(row.id) }}>Info</button></td></tr>)}
+          {visible.map(row => <tr key={row.id} onClick={() => void open(row.id)}><td><button className="reimbursement-title-button" onClick={event => { event.stopPropagation(); void open(row.id) }}>{row.title}</button></td><td>{row.partner}</td><td className="nowrap">{date(row.dueDate)}<InvoiceDueHint date={row.dueDate} remaining={row.remainingCents / 100} /></td><td className="money">{money(row.expectedCents)}</td><td className="money"><InvoicePaymentProgress paid={row.paidCents / 100} gross={row.expectedCents / 100} label="erstattet" /></td><td className="money">{money(row.remainingCents)}</td><td><span className={`badge reimbursement-status reimbursement-status--${row.status.toLowerCase()}`}>{labels[row.status]}</span></td><td><button className="btn" onClick={event => { event.stopPropagation(); void open(row.id) }}>Info</button></td></tr>)}
           {!visible.length && <tr><td colSpan={8} className="helper">Keine Kostenerstattungen gefunden.</td></tr>}
         </tbody></table></div>}
 
@@ -148,13 +166,13 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   if (creating && voucher?.type === 'OUT') return <ReimbursementCreateForm voucherId={voucher.id} description={voucher.description} busy={busy} error={error} onClose={close} onSave={input => void mutate(() => window.api.reimbursements.create(input), 'Kostenerstattung angelegt.')} />
   const content = <div className={embedded && !detail && !creating ? 'reimbursement-inline' : 'modal reimbursement-modal'}>
       {(!embedded || detail || creating) && <ModalHeader className="reimbursement-header"><div><h2 id="reimbursement-heading">{creating ? 'Erstattung erwarten' : detail ? 'Kostenerstattung' : 'Kostenerstattungen'}</h2>{detail && <p className="reimbursement-detail-title">{detail.title}</p>}</div><ModalCloseButton disabled={busy} onClick={close} aria-label="Schließen" /></ModalHeader>}
+      <div className="reimbursement-modal-body">
       {error && <p className="reimbursement-error" role="alert">{error}</p>}
       {creating ? <>
         {form}
-        {!metadataValid && <p className="helper">Bitte Bezeichnung und Kooperationspartner angeben.</p>}
         <VoucherPicker role="EXPENSE" initialVoucherId={voucher?.type === 'OUT' ? voucher.id : undefined} busy={busy} submitDisabled={!metadataValid} onSubmit={(selected, amountCents) => void mutate(() => window.api.reimbursements.create({ ...metadata, voucherId: selected.id, amountCents }), 'Kostenerstattung angelegt.')} />
       </> : detail ? <>
-        <div className="reimbursement-toolbar"><span className={`reimbursement-status reimbursement-status--${detail.status.toLowerCase()}`}>{labels[detail.status]}</span><span className="reimbursement-meta"><IconUser size={15} />{detail.partner}</span>{detail.dueDate && <span className="reimbursement-meta"><IconCalendar size={15} />{date(detail.dueDate)}</span>}
+        <div className="reimbursement-toolbar"><span className={`badge reimbursement-status reimbursement-status--${detail.status.toLowerCase()}`}>{labels[detail.status]}</span><span className="reimbursement-meta"><IconUser size={15} />{detail.partner}</span>{detail.dueDate && <span className="reimbursement-meta"><IconCalendar size={15} />{date(detail.dueDate)}</span>}
           <button className="btn ghost" disabled={busy} onClick={() => { setTitle(detail.title); setPartner(detail.partner); setDueDate(detail.dueDate || ''); setNote(detail.note); setEditing(value => !value) }}><IconPencil size={14} /> Angaben bearbeiten</button></div>
         <div className="reimbursement-totals"><div>Erwartet<strong>{money(detail.expectedCents)}</strong></div><div>Erstattet<strong>{money(detail.paidCents)}</strong></div><div>Restbetrag<strong>{money(detail.remainingCents)}</strong></div></div>
         {editing ? <>{form}<button className="btn" disabled={busy || !metadataValid} onClick={() => void mutate(() => window.api.reimbursements.update({ ...metadata, id: detail.id }), 'Angaben gespeichert.')}>Angaben speichern</button></> : detail.note && <p className="reimbursement-note">{detail.note}</p>}
@@ -170,6 +188,7 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
       </> : <>
         {overview}
       </>}
+      </div>
       {(!embedded || detail || creating) && <footer className="reimbursement-footer">{(creating || detail) && <button className="btn" disabled={busy} onClick={() => { setDetail(null); setCreating(false); setPicker(null); setConfirmAction(null); setEditing(false) }}>Zur Übersicht</button>}{detail && !detail.paidCents && <button className="btn ghost" disabled={busy} onClick={() => setConfirmAction({ kind: 'delete' })}>Vorgang entfernen</button>}<button className="btn" disabled={busy} onClick={close}>Schließen</button></footer>}
     </div>
   const overlay = createPortal(<div className="modal-overlay reimbursement-overlay" role="dialog" aria-modal="true" aria-labelledby="reimbursement-heading" onMouseDown={event => { if (event.target === event.currentTarget && !busy) close() }}>{content}</div>, document.body)

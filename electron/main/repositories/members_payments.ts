@@ -1,408 +1,83 @@
-import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
 import { getSetting } from '../services/settings'
-import { scoreContributionVoucherMatch } from '../../../shared/contributionVoucherMatching'
-
-type DB = InstanceType<typeof Database>
-
-export type Interval = 'MONTHLY'|'QUARTERLY'|'YEARLY'
-
-export type MemberPaymentStatusInput = {
-  id: number
-  contribution_interval?: Interval | null
-  contribution_amount?: number | null
-  next_due_date?: string | null
-  join_date?: string | null
-  leave_date?: string | null
-}
-
-type MemberPaymentRow = { memberId: number; periodKey: string; datePaid?: string | null }
-
-export function periodKeyFromDate(d: Date, interval: Interval): string {
-  const y = d.getUTCFullYear()
-  if (interval === 'MONTHLY') {
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-    return `${y}-${m}`
-  }
-  if (interval === 'QUARTERLY') {
-    const q = Math.floor(d.getUTCMonth() / 3) + 1
-    return `${y}-Q${q}`
-  }
-  return String(y)
-}
-
-export function periodRange(periodKey: string, interval: Interval): { start: string; end: string } {
-  const [yStr, rest] = periodKey.split('-')
-  const y = Number(yStr)
-  if (interval === 'MONTHLY') {
-    const m = Number(rest)
-    const start = new Date(Date.UTC(y, m - 1, 1))
-    const end = new Date(Date.UTC(y, m, 0))
-    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-  }
-  if (interval === 'QUARTERLY') {
-    const q = Number((rest||'Q1').replace('Q',''))
-    const start = new Date(Date.UTC(y, (q-1)*3, 1))
-    const end = new Date(Date.UTC(y, (q)*3, 0))
-    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-  }
-  const start = new Date(Date.UTC(y, 0, 1))
-  const end = new Date(Date.UTC(y, 12, 0))
-  return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-}
+import { periodRange, type ContributionInterval as Interval } from '../../../shared/membershipPayments'
+import { activeReceipt, allocateContributionPayment, availableVoucherAmount, contributionPeriods, contributionStatus, refreshNextDue } from './membershipLedger'
+export { periodKeyFromDate, periodRange, nextPeriod } from '../../../shared/membershipPayments'
+export type { ContributionInterval as Interval } from '../../../shared/membershipPayments'
+export type MemberPaymentStatusInput = { id: number; contribution_interval?: Interval | null; contribution_amount?: number | null; next_due_date?: string | null; join_date?: string | null; leave_date?: string | null }
 
 export function listDue(params: { interval: Interval; periodKey?: string; from?: string; to?: string; q?: string; includePaid?: boolean; memberId?: number; dueThroughToday?: boolean }) {
   const d = getDb()
-  const { interval, periodKey, q, includePaid, memberId } = params
-  // Members with contribution configured; status filter: ACTIVE always, PAUSED optional by config, NEW excluded (option C)
-  const includePaused = !!getSetting<boolean>('membership.includePaused')
-  const statuses = includePaused ? ["'ACTIVE'", "'PAUSED'"] : ["'ACTIVE'"]
-  const wh: string[] = [
-    "m.contribution_amount IS NOT NULL",
-    "m.contribution_interval IS NOT NULL",
-    `m.status IN (${statuses.join(',')})`
-  ]
-  const args: any[] = []
-  if (memberId != null) { wh.push('m.id = ?'); args.push(memberId) }
-  if (q && q.trim()) { wh.push('(m.name LIKE ? OR m.email LIKE ? OR m.member_no LIKE ?)'); const like = `%${q.trim()}%`; args.push(like, like, like) }
-  const members = d.prepare(`SELECT m.id, m.name, m.member_no as memberNo, m.contribution_amount as amount, m.contribution_interval as interval, m.next_due_date as nextDue, m.join_date as joinDate, m.leave_date as leaveDate, m.status
-    FROM members m
-    WHERE ${wh.join(' AND ')}
-    ORDER BY m.name COLLATE NOCASE ASC`).all(...args) as any[]
-
-  function* iteratePeriods(intv: Interval, startKey: string, endKey: string): Generator<string> {
-    // inclusive range
-    let cur = startKey
-    while (true) {
-      // stop condition: cur after endKey
-      const cmp = comparePeriodKeys(cur, endKey, intv)
-      if (cmp > 0) break
-      yield cur
-      cur = nextPeriod(cur, intv)
+  const members = d.prepare(`SELECT * FROM members WHERE (? IS NULL OR id=?) AND (status='ACTIVE' OR (? AND status='PAUSED')) ORDER BY name COLLATE NOCASE`).all(params.memberId ?? null, params.memberId ?? null, getSetting('membership.includePaused') ? 1 : 0) as any[]
+  const rows: any[] = []
+  for (const member of members) {
+    if (params.q && !`${member.name} ${member.member_no} ${member.email}`.toLocaleLowerCase('de-DE').includes(params.q.toLocaleLowerCase('de-DE'))) continue
+    const status = contributionStatus(member.id, d)
+    const from = params.periodKey ? periodRange(params.periodKey, params.interval).start : params.from
+    const through = params.periodKey ? periodRange(params.periodKey, params.interval).end : params.to || (params.dueThroughToday ? new Date().toISOString().slice(0, 10) : ('nextDue' in status ? status.nextDue : null)) || new Date().toISOString().slice(0, 10)
+    const periods = contributionPeriods(member.id, through, d).filter(p => p.interval === params.interval && (!from || p.dueDate >= from) && (params.includePaid || p.remaining > 0))
+    for (const period of periods) {
+      if (!params.periodKey && !params.from && !params.to && !params.dueThroughToday && period.dueDate !== ('nextDue' in status ? status.nextDue : null)) continue
+      rows.push({ memberId: member.id, name: member.name, memberNo: member.member_no, status: member.status, ...period,
+        amount: period.remaining, paid: period.remaining === 0 ? 1 : 0, voucherId: null, verified: period.paidAmount > 0 ? 1 : 0 })
     }
   }
-
-  function clampRangeForInterval(intv: Interval, f: string, t: string): { startKey: string; endKey: string } {
-    // Derive nearest period keys from dates
-    const fDate = new Date(f)
-    const tDate = new Date(t)
-    const startKey = periodKeyFromDate(fDate, intv)
-    const endKey = periodKeyFromDate(tDate, intv)
-    return { startKey, endKey }
-  }
-
-  const out: any[] = []
-  for (const m of members) {
-    const intv = (m.interval || interval) as Interval
-    if (intv !== interval) continue
-    const today = new Date().toISOString().slice(0, 10)
-    const from = params.from || (params.dueThroughToday ? (m.nextDue || m.joinDate || `${today.slice(0, 4)}-01-01`) : undefined)
-    const to = params.to || (params.dueThroughToday ? today : undefined)
-    if (periodKey) {
-      const pk = periodKey
-      const paid = d.prepare('SELECT id, voucher_id as voucherId, verified, date_paid as datePaid FROM membership_payments WHERE member_id = ? AND period_key = ?').get(m.id, pk) as any
-      out.push({
-        memberId: m.id,
-        name: m.name,
-        memberNo: m.memberNo,
-        status: m.status,
-        periodKey: pk,
-        interval: intv,
-        amount: m.amount || 0,
-        paid: paid ? 1 : 0,
-        voucherId: paid?.voucherId || null,
-        verified: paid?.verified || 0
-      })
-      continue
-    }
-    if (from && to) {
-      // Clamp lower bound to max(joinDate, nextDue) to avoid listing periods before initial due
-      const joinDate = (m.joinDate as string | undefined) || undefined
-      const nextDueDate = (m.nextDue as string | undefined) || undefined
-      const leaveDate = (m.leaveDate as string | undefined) || undefined
-      let effFrom = from
-      if (joinDate && effFrom < joinDate) effFrom = joinDate
-      if (nextDueDate && effFrom < nextDueDate) effFrom = nextDueDate
-      // Clamp upper bound to leave date if member has left
-      let effTo = to
-      if (leaveDate && effTo > leaveDate) effTo = leaveDate
-      // Skip if effective range is invalid (member left before due period started)
-      if (effFrom > effTo) continue
-      const { startKey, endKey } = clampRangeForInterval(intv, effFrom, effTo)
-      for (const pk of iteratePeriods(intv, startKey, endKey)) {
-        const paid = d.prepare('SELECT id, voucher_id as voucherId, verified, date_paid as datePaid FROM membership_payments WHERE member_id = ? AND period_key = ?').get(m.id, pk) as any
-        out.push({
-          memberId: m.id,
-          name: m.name,
-          memberNo: m.memberNo,
-          status: m.status,
-          periodKey: pk,
-          interval: intv,
-          amount: m.amount || 0,
-          paid: paid ? 1 : 0,
-          voucherId: paid?.voucherId || null,
-          verified: paid?.verified || 0
-        })
-      }
-      continue
-    }
-  // Default: show the next due period for each member (fall back to today only when no nextDue configured)
-  const pk = m.nextDue ? periodKeyFromDate(new Date(m.nextDue), intv) : periodKeyFromDate(new Date(), intv)
-    const paid = d.prepare('SELECT id, voucher_id as voucherId, verified, date_paid as datePaid FROM membership_payments WHERE member_id = ? AND period_key = ?').get(m.id, pk) as any
-    out.push({
-      memberId: m.id,
-      name: m.name,
-      memberNo: m.memberNo,
-      status: m.status,
-      periodKey: pk,
-      interval: intv,
-      amount: m.amount || 0,
-      paid: paid ? 1 : 0,
-      voucherId: paid?.voucherId || null,
-      verified: paid?.verified || 0
-    })
-  }
-  const rows = out.filter(r => includePaid ? true : !r.paid)
   return { rows, total: rows.length }
-}
-
-function comparePeriodKeys(a: string, b: string, intv: Interval): number {
-  if (intv === 'MONTHLY') {
-    const [ay, am] = a.split('-'); const [by, bm] = b.split('-')
-    const ai = Number(ay)*12 + Number(am)
-    const bi = Number(by)*12 + Number(bm)
-    return ai === bi ? 0 : (ai < bi ? -1 : 1)
-  }
-  if (intv === 'QUARTERLY') {
-    const [ay, aqS] = a.split('-'); const [by, bqS] = b.split('-')
-    const aq = Number((aqS||'Q1').replace('Q','')); const bq = Number((bqS||'Q1').replace('Q',''))
-    const ai = Number(ay)*4 + aq
-    const bi = Number(by)*4 + bq
-    return ai === bi ? 0 : (ai < bi ? -1 : 1)
-  }
-  const ai = Number(a)
-  const bi = Number(b)
-  return ai === bi ? 0 : (ai < bi ? -1 : 1)
 }
 
 export function markPaid(input: { memberId: number; periodKey: string; interval: Interval; amount: number; voucherId?: number | null; datePaid?: string | null }) {
-  return withTransaction((d: DB) => {
-    const stmt = d.prepare(`INSERT OR IGNORE INTO membership_payments(member_id, period_key, interval, amount, date_paid, voucher_id, verified)
-      VALUES (?,?,?,?,?,?,?)`)
-    const verified = input.voucherId ? 1 : 0
-    stmt.run(input.memberId, input.periodKey, input.interval, input.amount, input.datePaid ?? new Date().toISOString().slice(0,10), input.voucherId ?? null, verified)
-    // advance next_due_date based on this payment
-    try { recomputeNextDueInternal(d, input.memberId) } catch {}
-    return { ok: true }
-  })
+  const period = contributionPeriods(input.memberId, periodRange(input.periodKey, input.interval).end).find(p => p.periodKey === input.periodKey && p.interval === input.interval)
+  if (!period) throw new Error('Diese Periode liegt außerhalb des Beitragsplans.')
+  if (period.remaining === 0) return { ok: true }
+  return allocateContributionPayment({ ...input, allocations: [{ periodKey: input.periodKey, interval: input.interval, amount: input.amount }] })
 }
 
 export function unmark(input: { memberId: number; periodKey: string }) {
-  const d = getDb()
-  d.prepare('DELETE FROM membership_payments WHERE member_id = ? AND period_key = ?').run(input.memberId, input.periodKey)
-  return { ok: true }
-}
-
-export function suggestVouchers(input: { name?: string; amount: number; periodKey: string; memberId?: number }) {
-  const d = getDb()
-  const { amount, name, periodKey } = input
-  // Automatic suggestions must belong to the requested contribution period.
-  const pr = periodRange(periodKey, guessInterval(periodKey))
-
-  // Exclude vouchers already assigned to ANY member
-  const rows = d.prepare(`
-    SELECT v.id, v.voucher_no as voucherNo, v.date, v.description, v.counterparty, v.gross_amount as gross
-    FROM vouchers v
-    WHERE v.date BETWEEN ? AND ?
-      AND ABS(v.gross_amount - ?) <= 0.01
-      AND v.id NOT IN (SELECT voucher_id FROM membership_payments WHERE voucher_id IS NOT NULL)
-    ORDER BY v.date DESC
-  `).all(pr.start, pr.end, amount) as any[]
-
-  const matchingRows = rows.filter((row) => scoreContributionVoucherMatch({
-    amount,
-    periodStart: pr.start,
-    periodEnd: pr.end,
-    memberName: name,
-    voucherAmount: row.gross,
-    voucherDate: row.date,
-    voucherDescription: row.description,
-    voucherCounterparty: row.counterparty,
-  }))
-  return { rows: matchingRows.slice(0, 10) }
-}
-
-function normalize(s: string) { return s.toLowerCase() }
-function guessInterval(periodKey: string): Interval { return periodKey.includes('-Q') ? 'QUARTERLY' : (periodKey.includes('-') ? 'MONTHLY' : 'YEARLY') }
-
-export function recomputeNextDue(memberId: number) {
-  return withTransaction((d: DB) => {
-    const m = d.prepare('SELECT contribution_interval as interval, next_due_date as nextDue, join_date as joinDate FROM members WHERE id = ?').get(memberId) as any
-    if (!m?.interval) return { ok: true }
-    const last = d.prepare('SELECT period_key FROM membership_payments WHERE member_id = ? ORDER BY created_at DESC LIMIT 1').get(memberId) as any
-    const baseKey = last?.period_key || (m.nextDue ? periodKeyFromDate(new Date(m.nextDue), m.interval) : periodKeyFromDate(new Date(m.joinDate || new Date().toISOString().slice(0,10)), m.interval))
-    const nextKey = nextPeriod(baseKey, m.interval)
-    const { start } = periodRange(nextKey, m.interval)
-    d.prepare('UPDATE members SET next_due_date = ?, updated_at = datetime("now") WHERE id = ?').run(start, memberId)
-    return { ok: true, nextDue: start }
+  return withTransaction(d => {
+    d.prepare('DELETE FROM membership_allocations WHERE period_id IN (SELECT id FROM membership_periods WHERE member_id=? AND period_key=?)').run(input.memberId, input.periodKey)
+    return refreshNextDue(input.memberId, d)
   })
 }
 
-// Internal helper to reuse transaction
-function recomputeNextDueInternal(d: DB, memberId: number) {
-  const m = d.prepare('SELECT contribution_interval as interval, next_due_date as nextDue, join_date as joinDate FROM members WHERE id = ?').get(memberId) as any
-  if (!m?.interval) return
-  const last = d.prepare('SELECT period_key FROM membership_payments WHERE member_id = ? ORDER BY created_at DESC LIMIT 1').get(memberId) as any
-  const baseKey = last?.period_key || (m.nextDue ? periodKeyFromDate(new Date(m.nextDue), m.interval) : periodKeyFromDate(new Date(m.joinDate || new Date().toISOString().slice(0,10)), m.interval))
-  const nextKey = nextPeriod(baseKey, m.interval)
-  const { start } = periodRange(nextKey, m.interval)
-  d.prepare('UPDATE members SET next_due_date = ?, updated_at = datetime("now") WHERE id = ?').run(start, memberId)
+const normalize = (s: string) => s.toLocaleLowerCase('de-DE').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+export function suggestVouchers(input: { name?: string | null; amount: number; periodKey: string; memberId?: number }) {
+  const d = getDb()
+  const member = input.memberId ? d.prepare('SELECT name,member_no FROM members WHERE id=?').get(input.memberId) as any : null
+  const name = normalize(member?.name || input.name || '')
+  const candidates = d.prepare(`SELECT id,voucher_no as voucherNo,date,description,counterparty,gross_amount as gross FROM vouchers
+    WHERE type='IN' AND original_id IS NULL AND reversed_by_id IS NULL ORDER BY date DESC,id DESC`).all() as any[]
+  const rows = candidates.flatMap(row => {
+    const text = normalize(`${row.description || ''} ${row.counterparty || ''}`)
+    if (!(name && text.includes(name)) && !(member?.member_no && text.split(' ').includes(normalize(member.member_no)))) return []
+    const available = availableVoucherAmount(row.id, d).available
+    return available > 0 ? [{ ...row, available }] : []
+  }).slice(0, 20)
+  return { rows }
 }
 
+export function recomputeNextDue(memberId: number) { return withTransaction(d => refreshNextDue(memberId, d)) }
+export function status(input: { memberId: number }) { return contributionStatus(input.memberId) }
+export function getMemberPaymentStatuses(members: MemberPaymentStatusInput[]) {
+  return new Map(members.map(member => [member.id, contributionStatus(member.id)]))
+}
 export function history(input: { memberId: number; limit?: number; offset?: number }) {
   const d = getDb()
-  const limit = Math.max(1, Math.min(200, input.limit ?? 50))
-  const offset = Math.max(0, input.offset ?? 0)
-  const rows = d.prepare(`
-    SELECT mp.period_key as periodKey, mp.interval as interval, mp.amount as amount, mp.date_paid as datePaid,
-           mp.voucher_id as voucherId,
-           v.voucher_no as voucherNo, v.description as description, v.counterparty as counterparty, v.gross_amount as gross
-    FROM membership_payments mp
-    LEFT JOIN vouchers v ON v.id = mp.voucher_id
-    WHERE mp.member_id = ?
-    ORDER BY mp.period_key DESC
-    LIMIT ? OFFSET ?
-  `).all(input.memberId, limit, offset) as any[]
-  return { rows, total: rows.length }
+  const rows = d.prepare(`SELECT r.id as receiptId,p.period_key as periodKey,p.interval,
+    COALESCE(a.amount_cents,r.amount_cents)/100.0 as amount,r.amount_cents/100.0 as paymentAmount,r.date_paid as datePaid,
+    r.voucher_id as voucherId,v.voucher_no as voucherNo,v.description,v.counterparty,v.gross_amount as gross,
+    CASE WHEN ${activeReceipt} THEN 1 ELSE 0 END as active
+    FROM membership_receipts r LEFT JOIN vouchers v ON v.id=r.voucher_id
+    LEFT JOIN membership_allocations a ON a.receipt_id=r.id LEFT JOIN membership_periods p ON p.id=a.period_id
+    WHERE r.member_id=? ORDER BY r.date_paid DESC,r.id DESC,p.due_date`).all(input.memberId) as any[]
+  return { rows: rows.slice(input.offset || 0, (input.offset || 0) + Math.min(500, input.limit || 50)), total: rows.length }
 }
-
-function computeMemberPaymentStatus(m: any, paidRows: MemberPaymentRow[]) {
-  if (!m || !m.interval) return { hasPlan: 0, state: 'NONE' as const }
-  const interval = m.interval as Interval
-  const amount = Number(m.amount || 0)
-  const leaveDate = m.leaveDate as string | null
-  let nextDue = m.nextDue as string | null
-  // last paid
-  const last = paidRows[0]
-  const lastPeriod = last?.periodKey || null
-  const lastDate = last?.datePaid || null
-  const today = new Date()
-  const todayKey = periodKeyFromDate(today, interval)
-  // If nextDue missing, derive from lastPeriod or joinDate (clamped to joinDate)
-  if (!nextDue) {
-    const baseKey = lastPeriod || periodKeyFromDate(new Date(m.joinDate || today.toISOString().slice(0,10)), interval)
-    const nKey = nextPeriod(baseKey, interval)
-    const { start } = periodRange(nKey, interval)
-    nextDue = start
-  }
-  // Build set of paid period keys for overdue calc
-  const paidSet = new Set((paidRows || []).map(r => r.periodKey))
-  // Determine effective end key: if member left, use leave date period, else today
-  const leaveKey = leaveDate ? periodKeyFromDate(new Date(leaveDate), interval) : null
-  const effectiveEndKey = leaveKey && comparePeriodKeys(leaveKey, todayKey, interval) < 0 ? leaveKey : todayKey
-  // derive first unpaid (candidate): iterate forward from join or nextDue to find earliest unpaid up to effective end
-  const startKeyForScan = (() => {
-    if (nextDue) return periodKeyFromDate(new Date(nextDue), interval)
-    if (lastPeriod) return nextPeriod(lastPeriod, interval)
-    return periodKeyFromDate(new Date(m.joinDate || today.toISOString().slice(0,10)), interval)
-  })()
-  // count overdue: iterate periods from earliest candidate up to effective end inclusive; also keep track of firstOverdue
-  let overdue = 0
-  let cur = startKeyForScan
-  let firstOverdue: string | null = null
-  const { end: effectiveEnd } = periodRange(effectiveEndKey, interval)
-  while (comparePeriodKeys(cur, effectiveEndKey, interval) <= 0) {
-    const { end } = periodRange(cur, interval)
-    if (end <= effectiveEnd && !paidSet.has(cur)) { overdue++; if (!firstOverdue) firstOverdue = cur }
-    cur = nextPeriod(cur, interval)
-  }
-  const state = overdue > 0 ? 'OVERDUE' as const : 'OK' as const
-  return { hasPlan: 1, interval, amount, lastPeriod, lastDate, nextDue: nextDue || null, overdue, state, joinDate: m.joinDate || null, leaveDate: leaveDate || null, firstOverdue: firstOverdue || null }
-}
-
-export function getMemberPaymentStatuses(members: MemberPaymentStatusInput[]) {
-  const d = getDb()
-  const ids = members.map((member) => Number(member.id)).filter((id) => Number.isFinite(id))
-  const paidByMember = new Map<number, MemberPaymentRow[]>()
-
-  // Stay below SQLite's common parameter limit while still avoiding per-member queries.
-  for (let start = 0; start < ids.length; start += 500) {
-    const chunk = ids.slice(start, start + 500)
-    if (!chunk.length) continue
-    const placeholders = chunk.map(() => '?').join(',')
-    const rows = d.prepare(`
-      SELECT member_id as memberId, period_key as periodKey, date_paid as datePaid
-      FROM membership_payments
-      WHERE member_id IN (${placeholders})
-      ORDER BY member_id, period_key DESC
-    `).all(...chunk) as MemberPaymentRow[]
-    for (const row of rows) {
-      const list = paidByMember.get(row.memberId) || []
-      list.push(row)
-      paidByMember.set(row.memberId, list)
-    }
-  }
-
-  const result = new Map<number, ReturnType<typeof computeMemberPaymentStatus>>()
-  for (const member of members) {
-    result.set(member.id, computeMemberPaymentStatus({
-      interval: member.contribution_interval,
-      amount: member.contribution_amount,
-      nextDue: member.next_due_date,
-      joinDate: member.join_date,
-      leaveDate: member.leave_date
-    }, paidByMember.get(member.id) || []))
-  }
-  return result
-}
-
-export function status(input: { memberId: number }) {
-  const d = getDb()
-  const member = d.prepare(`
-    SELECT id, contribution_interval, contribution_amount, next_due_date, join_date, leave_date
-    FROM members WHERE id = ?
-  `).get(input.memberId) as MemberPaymentStatusInput | undefined
-  if (!member) return { hasPlan: 0, state: 'NONE' as const }
-  return getMemberPaymentStatuses([member]).get(member.id) || { hasPlan: 0, state: 'NONE' as const }
-}
-
 export function dueSummary() {
   const d = getDb()
-  const includePaused = !!getSetting<boolean>('membership.includePaused')
-  const statuses = includePaused ? ["'ACTIVE'", "'PAUSED'"] : ["'ACTIVE'"]
-  const members = d.prepare(`
-    SELECT id, contribution_interval, contribution_amount, next_due_date, join_date, leave_date
-    FROM members
-    WHERE contribution_amount IS NOT NULL
-      AND contribution_interval IS NOT NULL
-      AND status IN (${statuses.join(',')})
-  `).all() as MemberPaymentStatusInput[]
-  const statusesByMember = getMemberPaymentStatuses(members)
-  let dueMembers = 0
-  let duePeriods = 0
+  const members = d.prepare("SELECT id FROM members WHERE status='ACTIVE' OR (? AND status='PAUSED')").all(getSetting('membership.includePaused') ? 1 : 0) as { id: number }[]
+  let dueMembers = 0, duePeriods = 0, dueAmount = 0
   for (const member of members) {
-    const s = statusesByMember.get(member.id)
-    const overdue = Number((s as any)?.overdue || 0)
-    if (overdue > 0) {
-      dueMembers += 1
-      duePeriods += overdue
-    }
+    const s = contributionStatus(member.id, d)
+    if ((s.overdue || 0) > 0) { dueMembers++; duePeriods += s.overdue || 0; dueAmount += Math.round((s.dueAmount || 0) * 100) }
   }
-  return { dueMembers, duePeriods }
-}
-
-export function nextPeriod(pk: string, interval: Interval): string {
-  if (interval === 'MONTHLY') {
-    const [y,m] = pk.split('-'); const Y=Number(y), M=Number(m)
-    const d = new Date(Date.UTC(Y, M-1, 1)); d.setUTCMonth(d.getUTCMonth()+1)
-    return periodKeyFromDate(d, 'MONTHLY')
-  }
-  if (interval === 'QUARTERLY') {
-    const [y,qStr] = pk.split('-'); const Y=Number(y); const Q=Number((qStr||'Q1').replace('Q',''))
-    const d = new Date(Date.UTC(Y, (Q-1)*3, 1)); d.setUTCMonth(d.getUTCMonth()+3)
-    return periodKeyFromDate(d, 'QUARTERLY')
-  }
-  const Y = Number(pk)
-  const d = new Date(Date.UTC(Y+1, 0, 1))
-  return periodKeyFromDate(d, 'YEARLY')
+  return { dueMembers, duePeriods, dueAmount: dueAmount / 100 }
 }

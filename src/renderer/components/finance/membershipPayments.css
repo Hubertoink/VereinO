@@ -1,0 +1,38 @@
+.contribution-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; min-width: 0; }
+.contribution-panel > *, .contribution-allocation > *, .contribution-form > * { min-width: 0; }
+.contribution-form > label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; }
+.contribution-form > label .input { width: 100%; min-width: 0; box-sizing: border-box; }
+.contribution-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.contribution-controls label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; }
+.contribution-controls .input { min-height: 34px; width: 190px; max-width: 100%; }
+.contribution-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.contribution-kpis > div { display: grid; gap: 4px; }
+.contribution-kpis small { color: var(--text-dim); }
+.contribution-table-wrap { overflow: auto; max-height: 300px; }
+.contribution-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.contribution-table th, .contribution-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.contribution-table th { color: var(--text-dim); }
+.contribution-table .contribution-amount { width: 100px; min-height: 32px; }
+.contribution-timeline-navigation { display: grid; grid-template-columns: 26px minmax(0, 1fr) 26px; gap: 6px; align-items: center; margin-top: 10px; }
+.contribution-timeline { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.contribution-period { display: grid; gap: 5px; min-width: 0; padding: 8px 6px; border: 1px solid var(--border); border-top: 3px solid var(--text-dim); border-radius: 5px; background: var(--surface); color: var(--text); text-align: left; font-size: 11px; }
+.contribution-timeline-arrow { width: 26px; min-width: 0; padding: 4px; }
+.contribution-timeline-arrow:disabled { opacity: .25; }
+@media (max-width: 650px) { .contribution-timeline { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.contribution-voucher-table tbody tr:has(input) { cursor: pointer; }
+.contribution-voucher-table tbody tr:hover, .contribution-voucher-table .is-selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.contribution-voucher-table small { display: block; color: var(--text-dim); margin-top: 4px; }
+.contribution-voucher-table td:last-child { white-space: nowrap; text-align: right; }
+.contribution-period small { color: var(--text-dim); }
+.contribution-period[data-state="paid"], .contribution-period[data-state="prepaid"] { border-top-color: var(--success); }
+.contribution-period[data-state="partial"] { border-top-color: var(--warning); }
+.contribution-period[data-state="overdue"] { border-top-color: var(--danger); }
+.contribution-period:focus-visible { outline: 2px solid var(--accent); }
+.contribution-form, .contribution-allocation { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.contribution-form { border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+.contribution-error { color: var(--danger); }
+.contribution-history-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.member-contribution-modal { width: min(780px, calc(100vw - 32px)) !important; }
+.member-contribution-modal .compact-booking-popup__content { overflow-y: auto; min-height: 0; padding: 0; overscroll-behavior: contain; }
+.contribution-allocation details > summary { cursor: pointer; font-size: 12px; color: var(--text-dim); }
+.contribution-allocation details[open] > summary { margin-bottom: 10px; }

@@ -168,6 +168,7 @@ export const AiBankImportAction = z.enum([
 ])
 export const AiBankImportReviewSuggestion = z
   .object({
+    membership: z.object({ memberId: z.number().int().positive(), startPeriod: z.string().nullable().optional() }).nullable().optional(),
     matchedVoucher: z.object({
       grossAmount: z.number(),
       date: z.string(),
@@ -220,6 +221,7 @@ export const AiBankImportReviewResult = z.object({
 
 export const AiBankImportReviewSuggestionStructured = z
   .object({
+    membership: z.object({ memberId: z.number().int().positive(), startPeriod: z.string().nullable() }).nullable(),
     transactionId: z.number().int().positive(),
     action: AiBankImportAction,
     confidence: z.number().min(0).max(1),

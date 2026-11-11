@@ -23,7 +23,8 @@ describe('bank transaction matching with real SQLite queries', () => {
       CREATE TABLE vouchers (id INTEGER PRIMARY KEY, voucher_no TEXT, date TEXT, type TEXT,
         description TEXT, note TEXT, gross_amount REAL, payment_account_id INTEGER, reversed_by_id INTEGER);
       CREATE TABLE payment_accounts (id INTEGER PRIMARY KEY, name TEXT, color TEXT);
-      CREATE TABLE bank_transactions (id INTEGER PRIMARY KEY, voucher_id INTEGER);
+      CREATE TABLE bank_transactions (id INTEGER PRIMARY KEY, voucher_id INTEGER,
+        bank_reference TEXT, end_to_end_id TEXT);
       CREATE TABLE recurring_occurrences (id INTEGER PRIMARY KEY, voucher_id INTEGER, status TEXT,
         recurring_booking_id INTEGER, scheduled_date TEXT);
       CREATE TABLE recurring_bookings (id INTEGER PRIMARY KEY, name TEXT, type TEXT, description TEXT,
@@ -85,7 +86,7 @@ describe('bank transaction matching with real SQLite queries', () => {
     voucher(2)
     voucher(3, undefined, 1, 3998.4, 'IN')
     voucher(4, undefined, 1, 3998.41)
-    db.exec('UPDATE vouchers SET reversed_by_id = 99 WHERE id = 1; INSERT INTO bank_transactions VALUES (99, 2);')
+    db.exec('UPDATE vouchers SET reversed_by_id = 99 WHERE id = 1; INSERT INTO bank_transactions (id, voucher_id) VALUES (99, 2);')
     expect(findBankTransactionMatches({ id: 57 })).toEqual([])
   })
 
@@ -94,9 +95,29 @@ describe('bank transaction matching with real SQLite queries', () => {
     voucher(2, '2026-06-20', 1, 123)
     voucher(3, '2026-06-20', 1, 3998.4, 'IN')
     expect(findBankTransactionMatches({ id: 57 })).toEqual([])
+    expect(findBankTransactionMatches({ id: 57, forAiReview: true })).toEqual([])
+    db.exec("UPDATE vouchers SET description = 'Belegnr 2496676' WHERE id = 1")
     expect(findBankTransactionMatches({ id: 57, forAiReview: true })).toEqual([
-      expect.objectContaining({ id: 1, score: 0 })
+      expect.objectContaining({ id: 1, score: 35 })
     ])
+  })
+
+  it('does not confuse Max reimbursement with Umut membership on a different account', () => {
+    Object.assign(transaction, { bookingDate: '2026-11-11', direction: 'IN', amount: 20,
+      counterparty: 'Max Mustermann', purpose: 'Kostenerstattung Material Gruppenraum - Referenz 0001' })
+    voucher(126, '2026-11-01', 2, 20, 'IN')
+    db.exec("UPDATE vouchers SET description = 'Umut Tanis Mitgliedsbeitrag' WHERE id = 126")
+    expect(findBankTransactionMatches({ id: 57 })).toEqual([])
+    expect(findBankTransactionMatches({ id: 57, forAiReview: true })).toEqual([])
+
+    // A matching member and purpose still warrant review of the account difference.
+    Object.assign(transaction, { counterparty: 'Umut Tanis',
+      purpose: 'Mitgliedsbeitrag 0004 ab 2026-12 fuer zwei Monate' })
+    for (const forAiReview of [false, true]) {
+      expect(findBankTransactionMatches({ id: 57, forAiReview })).toEqual([
+        expect.objectContaining({ id: 126, score: 50, paymentAccountMismatch: true })
+      ])
+    }
   })
 
   it('keeps manual matching available for mismatched amounts and directions', () => {
@@ -107,7 +128,7 @@ describe('bank transaction matching with real SQLite queries', () => {
   it('marks open table rows with the same duplicate evidence as the review modal and clears resolved rows', () => {
     voucher(54)
     expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(0)
-    db.exec('INSERT INTO bank_transactions VALUES (99, 54)')
+    db.exec('INSERT INTO bank_transactions (id, voucher_id) VALUES (99, 54)')
     expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(1)
     expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toHaveLength(1)
     transaction.status = 'CHECKED'
@@ -128,6 +149,32 @@ describe('bank transaction matching with real SQLite queries', () => {
     ])
   })
 
+  it.each([
+    ['BANK-05', 'BANK-08', 'E2E-05', 'E2E-08', false],
+    ['BANK-05', 'BANK-08', 'SAME', 'SAME', false],
+    ['BANK-05', 'BANK-05', 'E2E-05', 'E2E-08', true],
+    [null, null, 'E2E-05', 'E2E-08', false],
+    ['BANK-05', null, 'SAME', 'SAME', true],
+    ['BANK-05', null, null, null, true],
+    ['NOTPROVIDED', 'N/A', null, null, true]
+  ])('checks linked bank identities before blocking an unrelated payment (%s, %s, %s, %s)',
+    (bankReference, linkedReference, endToEndId, linkedEndToEnd, expectedDuplicate) => {
+      Object.assign(transaction, { bookingDate: '2026-11-11', direction: 'IN', amount: 10,
+        counterparty: 'Umut Tanis', purpose: 'Umut Tanis Spende Verein', bankReference, endToEndId })
+      voucher(132, '2026-11-11', 1, 10, 'IN')
+      db.exec("UPDATE vouchers SET description = 'Teilnahmegebuehr Sommerfest' WHERE id = 132")
+      db.prepare('INSERT INTO bank_transactions (id, voucher_id, bank_reference, end_to_end_id) VALUES (?, ?, ?, ?)')
+        .run(90, 132, linkedReference, linkedEndToEnd)
+      expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toHaveLength(expectedDuplicate ? 1 : 0)
+      expect(listBankTransactions({}).rows[0].possibleDuplicateCount).toBe(expectedDuplicate ? 1 : 0)
+      if (expectedDuplicate) {
+        expect(() => assertBankBookingCreationReviewed(57)).toThrow('Mögliche Doppelbuchung')
+        expect(() => assertBankBookingCreationReviewed(57, [132])).not.toThrow()
+      } else {
+        expect(() => assertBankBookingCreationReviewed(57)).not.toThrow()
+      }
+    })
+
   it('finds the reported June income automatically and through manual text search', () => {
     Object.assign(transaction, { bookingDate: '2026-06-02', direction: 'IN', amount: 75,
       purpose: 'Jolie Nwayotalu Freizeit St.Goar' })
@@ -135,7 +182,7 @@ describe('bank transaction matching with real SQLite queries', () => {
     db.exec("UPDATE vouchers SET description = 'Freizeit St Goar Jolie Nwayotalu' WHERE id = 118")
     expect(findBankTransactionMatches({ id: 57 })[0]).toMatchObject({ id: 118, score: 100 })
     expect(findBankTransactionMatches({ id: 57, manual: true, q: 'Freizei' })[0]).toMatchObject({ id: 118 })
-    db.exec('INSERT INTO bank_transactions VALUES (99, 118)')
+    db.exec('INSERT INTO bank_transactions (id, voucher_id) VALUES (99, 118)')
     expect(findBankTransactionMatches({ id: 57 })).toEqual([])
     expect(findBankTransactionMatches({ id: 57, manual: true, q: 'Freizei' })).toEqual([])
     expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toEqual([
@@ -153,7 +200,7 @@ describe('bank transaction matching with real SQLite queries', () => {
     voucher(1, undefined, 2)
     voucher(2, undefined, 1, 20)
     voucher(3)
-    db.exec('INSERT INTO bank_transactions VALUES (91, 1), (92, 2), (93, 3); UPDATE vouchers SET reversed_by_id = 99 WHERE id = 3;')
+    db.exec('INSERT INTO bank_transactions (id, voucher_id) VALUES (91, 1), (92, 2), (93, 3); UPDATE vouchers SET reversed_by_id = 99 WHERE id = 3;')
     expect(findBankTransactionMatches({ id: 57, linkedOnly: true })).toEqual([])
     expect(() => assertBankBookingCreationReviewed(57)).not.toThrow()
   })

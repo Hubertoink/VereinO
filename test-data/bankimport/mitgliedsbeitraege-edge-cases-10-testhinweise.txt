@@ -1,0 +1,57 @@
+CAMT.053: zehn Buchungen zur Abgrenzung von Mitgliedsbeiträgen
+
+Datei: mitgliedsbeitraege-edge-cases-10-camt053.xml
+Stichtag: 11.11.2026. Konto: Bank, Test-IBAN DE02120300000000202608.
+Acht Einnahmen: 185,00 EUR. Zwei Ausgaben: 60,00 EUR. Saldo: +125,00 EUR.
+Die eindeutigen EDGE10-Referenzen unterscheiden diese Datei vom ersten Testsample.
+Keine echten Gegenkonto-IBANs der Mitglieder enthalten.
+
+Erwartete Erkennung (Nummer = letzte zwei Stellen der Bankreferenz):
+
+01 | +10,00 EUR  | Max Mustermann | Mitgliedsbeitrag 0001 fuer 2026-12
+   Mitglied: Max. Bei 10 EUR monatlich wird Dezember 2026 bezahlt.
+02 | +100,00 EUR | Niko Dubio | Mitgliedsbeitrag 0002 ab 2027-01 Vorauszahlung 10 Monate
+   Mitglied: Niko. Bei 10 EUR monatlich Januar bis Oktober 2027.
+03 | +5,00 EUR   | Petra Coolio | Mitgliedsbeitrag 0003 fuer 2027-01 Teilzahlung
+   Mitglied: Petra. Bei 10 EUR monatlich verbleiben 5 EUR für Januar 2027.
+04 | +20,00 EUR  | Umut Tanis | Mitgliedsbeitrag 0004 ab 2026-12 fuer zwei Monate
+   Mitglied: Umut. Bei 10 EUR monatlich Dezember 2026 und Januar 2027.
+05 | +10,00 EUR  | Umut Tanis | Umut Tanis Spende Verein
+   Spende. Keine Beitragszuordnung, obwohl Name und Betrag passen.
+06 | -50,00 EUR  | Umut Tanis | Schicht Umut Tanis 50 EUR
+   Ausgabe für eine Schicht. Keine Beitragszuordnung.
+07 | -10,00 EUR  | Max Mustermann | Rueckerstattung Mitgliedsbeitrag 0001 Max Mustermann
+   Ausgabe/Rückerstattung. Trotz Schlüsselwort und Mitgliedsnummer keine neue
+   Beitragszahlung; bestehende Beitragszuordnungen nicht automatisch verändern.
+08 | +10,00 EUR  | Niko Dubio | Teilnahmegebuehr Sommerfest - Referenz 0002
+   Teilnahmegebühr. Keine Beitragszuordnung trotz passendem Betrag und Referenz.
+09 | +10,00 EUR  | Petra Coolio | Spende Verein - Referenz 0003
+   Spende. Keine Beitragszuordnung trotz passendem Betrag und Referenz.
+10 | +20,00 EUR  | Max Mustermann | Kostenerstattung Material Gruppenraum - Referenz 0001
+   Erstattungseingang. Keine Beitragszuordnung, auch wenn 20 EUR zwei Monatsbeiträgen entsprechen.
+
+Ausgangslage für die genannten Perioden: alle vier Mitglieder aktiv, monatlich
+10 EUR, die genannten Perioden vorhanden und noch unbezahlt. Abweichende Pläne
+oder bereits bezahlte Perioden ändern die Verteilung, nicht die Abgrenzung
+zwischen Beitragszahlung, Spende, Teilnahmegebühr, Erstattung und Ausgabe.
+
+Prüfung in VereinO:
+1. Datei über Bankdaten importieren für das Testkonto Bank auswählen.
+2. Die zehn neuen Belege anzeigen und mit KI prüfen.
+3. Nur 01 bis 04 dürfen zusätzlich die Kachel "Beitragszahlung zuordnen" zeigen.
+4. Bei 05 bis 10 darf auch nach Übernahme keine Beitragszuordnung entstehen.
+5. 06 und 07 müssen Ausgaben bleiben. Vorhandene Buchungen können als bestehende
+   Zuordnung vorgeschlagen werden; es darf keine doppelte Einnahme entstehen.
+6. Dieselbe Datei erneut importieren: zehn Duplikate, keine weiteren Bankbelege.
+
+Zusätzlicher Grenzfall: Nach Übernahme einer 10-EUR-Zahlung kann die
+Doppelbuchungsprüfung weitere 10-EUR-Zahlungen am selben Tag zur Einzelprüfung
+zurückhalten. Unterschiedliche Gegenparteien und Zwecke prüfen. Dieser Hinweis
+ist getrennt von der Mitgliedsbeitragszuordnung zu beurteilen.
+
+Die automatisierten Tests prüfen Import, Richtung, Summen, lokale Erkennung,
+Vorschlagsvalidierung, Übernahme der vier Beiträge und Duplikatschutz mit einer
+isolierten Testdatenbank. Fehlzuordnungen der sechs Gegenbeispiele werden
+ausdrücklich als ungültige KI-Vorschläge getestet.
+Die tatsächliche Antwort des konfigurierten KI-Anbieters kann anschließend
+mit dieser Datei in der Anwendung geprüft werden.

@@ -1,17 +1,18 @@
 jest.mock('../../electron/main/db/database', () => ({ getDb: jest.fn() }))
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(() => false) }))
+jest.mock('../../electron/main/repositories/membershipLedger', () => ({ contributionStatus: jest.fn(() => ({ nextDue: '2026-09-01' })), contributionPeriods: jest.fn() }))
 
 import { getDb } from '../../electron/main/db/database'
 import { listDue } from '../../electron/main/repositories/members_payments'
+import { contributionPeriods } from '../../electron/main/repositories/membershipLedger'
 
 describe('all membership periods due through today', () => {
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(new Date('2026-10-01T12:00:00Z'))
     ;(getDb as jest.Mock).mockReturnValue({
-      prepare: (sql: string) => sql.includes('FROM members m')
-        ? { all: () => [{ id: 7, name: 'Test', amount: 20, interval: 'MONTHLY', nextDue: '2026-09-01', status: 'ACTIVE' }] }
-        : { get: (_id: number, key: string) => key === paidPeriod ? { id: 1 } : undefined }
+      prepare: () => ({ all: () => [{ id: 7, name: 'Test', status: 'ACTIVE' }] })
     })
+    jest.mocked(contributionPeriods).mockImplementation((_id, through) => ['2026-09', '2026-10', '2026-11'].filter(key => key + '-01' <= through).map(key => ({ periodKey: key, interval: 'MONTHLY', dueDate: key + '-01', expected: 20, paidAmount: key === paidPeriod ? 20 : 0, remaining: key === paidPeriod ? 0 : 20 })))
     paidPeriod = null
   })
   afterEach(() => jest.useRealTimers())

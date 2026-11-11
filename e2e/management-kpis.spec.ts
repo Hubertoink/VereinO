@@ -29,11 +29,11 @@ test.beforeAll(async () => {
       invoices: { get: async () => ({ id: 1, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bürobedarf Muster', description: 'Material für die Jugendarbeit', invoiceNo: 'R-12', voucherType: 'OUT', grossAmount: 200, paidSum: 50, status: 'PARTIAL', sphere: 'IDEELL', budgets: [{ budgetId: 1, amount: 200 }], earmarks: [], payments: [{ id: 1, date: '2026-09-05', amount: 50 }], files: [{ id: 1, fileName: 'Eine sehr lange Rechnung für Material.pdf', size: 25000, createdAt: '2026-09-01 12:00:00' }], tags: [] }), list: async () => ({ total: 40, rows: [{ id: 1, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bürobedarf Muster', invoiceNo: 'R-12', voucherType: 'OUT', grossAmount: 200, paidSum: 50, status: 'PARTIAL', sphere: 'IDEELL' }, { id: 2, date: '2026-09-01', dueDate: '2026-09-10', party: 'Bezahlte Rechnung', voucherType: 'IN', grossAmount: 100, paidSum: 100, status: 'PAID', sphere: 'IDEELL' }] }), summary: async () => ({ count: 40, gross: 1000, paid: 700, remaining: 300, remainingIn: 110, remainingOut: 190, overdueAmount: 150, overdueCount: 1 }) }
     }
     const root = createRoot(document.getElementById('root'))
-    function App({ view }) {
+    function App({ view, task }) {
       useOverlayScrollLock()
-      return view === 'members' ? <MembersView /> : <InvoicesView />
+      return view === 'members' ? <MembersView initialTask={task} /> : <InvoicesView />
     }
-    window.mount = view => root.render(<App view={view} />)
+    window.mount = (view, task) => root.render(<App view={view} task={task} />)
     window.mount('members')
   ` }, bundle: true, jsx: 'automatic', write: false, platform: 'browser', external: ['pdfjs-dist/*'], loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }, plugins: [{ name: 'toast', setup(build) {
     build.onResolve({ filter: /\/(LocalInvoiceScanModal|InvoiceBatchControl|MembersExportModal)$/ }, args => ({ path: args.path, namespace: 'unused-modal' }))
@@ -112,6 +112,22 @@ async function checkMemberFinanceHover(page: Page) {
   await expect(interval).toHaveValue('MONTHLY')
   await page.getByRole('button', { name: 'Abbrechen', exact: true }).click()
 }
+
+test('opening overdue members reapplies the contribution filter on the already open page', async ({ page }) => {
+  const search = page.getByPlaceholder('Suche (Name, E-Mail, Tel., Nr.)')
+  await search.fill('Andere Suche')
+  await expect.poll(() => page.evaluate(() => (window as any).requests.at(-1)?.q)).toBe('Andere Suche')
+  await page.evaluate(() => (window as any).mount('members', { kind: 'members', filter: 'overdue' }))
+  await expect(search).toHaveValue('')
+  await expect.poll(() => page.evaluate(() => {
+    const request = (window as any).requests.at(-1)
+    return { filter: request?.contributionFilter, q: request?.q || '', offset: request?.offset }
+  })).toEqual({ filter: 'DUE', q: '', offset: 0 })
+  await page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).requests.at(-1)?.contributionFilter)).toBe('ALL')
+  await page.evaluate(() => (window as any).mount('members', { kind: 'members', filter: 'overdue' }))
+  await expect.poll(() => page.evaluate(() => (window as any).requests.at(-1)?.contributionFilter)).toBe('DUE')
+})
 
 test('member finance fields stay in place when hovering the interval', async ({ page }) => {
   await page.setViewportSize({ width: 845, height: 838 })
@@ -218,10 +234,12 @@ test('reimbursements show filtered amounts and reimbursement progress', async ({
   await expect(kpis).toContainText('150,00')
   await expect(kpis).toContainText('60,00')
   await expect(page.getByRole('row').filter({ hasText: 'Renovierung' })).toContainText('25 % erstattet')
+  await page.getByRole('button', { name: 'Status filtern', exact: true }).click()
   await page.getByRole('combobox', { name: 'Status filtern' }).selectOption('PAID')
+  await page.getByRole('button', { name: 'Übernehmen', exact: true }).click()
   await expect(kpis).toContainText('10,00')
   await expect(kpis).not.toContainText('150,00')
-  await page.getByRole('combobox', { name: 'Status filtern' }).selectOption('ALL')
+  await page.getByRole('button', { name: 'Alle Filter löschen', exact: true }).click()
   await page.screenshot({ path: info.outputPath('reimbursements-kpis.png'), fullPage: true })
 })
 

@@ -356,6 +356,7 @@ const BANK_TRANSACTION_SELECT = `
     btai.occurrence_id as aiSuggestionOccurrenceId,
     btai.scheduled_date as aiSuggestionScheduledDate,
     btai.booking_candidate_json as aiSuggestionBookingCandidateJson,
+    btai.membership_json as aiSuggestionMembershipJson,
     btai.warnings_json as aiSuggestionWarningsJson,
     btai.evidence_json as aiSuggestionEvidenceJson,
     btai.reviewed_at as aiSuggestionReviewedAt,
@@ -383,6 +384,7 @@ function withAiSuggestion(row: Record<string, any>) {
     aiSuggestionOccurrenceId,
     aiSuggestionScheduledDate,
     aiSuggestionBookingCandidateJson,
+    aiSuggestionMembershipJson,
     aiSuggestionWarningsJson,
     aiSuggestionEvidenceJson,
     aiSuggestionReviewedAt,
@@ -404,6 +406,7 @@ function withAiSuggestion(row: Record<string, any>) {
       occurrenceId: aiSuggestionOccurrenceId == null ? null : Number(aiSuggestionOccurrenceId),
       scheduledDate: aiSuggestionScheduledDate ?? null,
       bookingCandidate: jsonValue(aiSuggestionBookingCandidateJson, null),
+      membership: jsonValue(aiSuggestionMembershipJson, null),
       warnings: jsonValue<string[]>(aiSuggestionWarningsJson, []),
       evidence: jsonValue<string[]>(aiSuggestionEvidenceJson, []),
       reviewedAt: aiSuggestionReviewedAt ?? null,
@@ -633,8 +636,8 @@ export function saveBankTransactionAiSuggestions(suggestions: Array<Record<strin
       INSERT INTO bank_transaction_ai_suggestions (
         transaction_id, action, confidence, reason, voucher_id, voucher_no,
         recurring_booking_id, recurring_booking_name, occurrence_id, scheduled_date,
-        booking_candidate_json, warnings_json, evidence_json, reviewed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        booking_candidate_json, warnings_json, evidence_json, membership_json, reviewed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(transaction_id) DO UPDATE SET
         action = excluded.action,
         confidence = excluded.confidence,
@@ -646,6 +649,7 @@ export function saveBankTransactionAiSuggestions(suggestions: Array<Record<strin
         occurrence_id = excluded.occurrence_id,
         scheduled_date = excluded.scheduled_date,
         booking_candidate_json = excluded.booking_candidate_json,
+        membership_json = excluded.membership_json,
         warnings_json = excluded.warnings_json,
         evidence_json = excluded.evidence_json,
         reviewed_at = datetime('now')
@@ -664,7 +668,8 @@ export function saveBankTransactionAiSuggestions(suggestions: Array<Record<strin
         suggestion.scheduledDate ?? null,
         suggestion.bookingCandidate ? JSON.stringify(suggestion.bookingCandidate) : null,
         JSON.stringify(suggestion.warnings || []),
-        JSON.stringify(suggestion.evidence || [])
+        JSON.stringify(suggestion.evidence || []),
+        suggestion.membership ? JSON.stringify(suggestion.membership) : null
       )
     }
     return suggestions.length
@@ -800,8 +805,29 @@ export function findBankTransactionMatches(input: {
     LIMIT 100
   `).all(input.id, ...params, ...(manual ? [] : [transaction.paymentAccountId]), transaction.bookingDate, valueDate) as any[]
 
+  // A linked voucher already has an original bank payment. Compare its identity
+  // before treating matching date/amount/account as a possible duplicate.
+  const linkedSource = input.linkedOnly ? d.prepare(`
+    SELECT bank_reference as bankReference, end_to_end_id as endToEndId
+    FROM bank_transactions WHERE id = ?
+  `) : null
+  const plausibleRows = rows.filter(row => {
+    if (!linkedSource || !row.linkedBankTransactionId) return true
+    const source = linkedSource.get(row.linkedBankTransactionId) as Record<string, any> | undefined
+    if (!source) return true
+    // Bank references take precedence; End-to-End-ID is the fallback used by
+    // import deduplication too. Missing/placeholder references remain uncertain.
+    for (const key of ['bankReference', 'endToEndId'] as const) {
+      if (meaningfulReference({ bankReference: transaction[key] }) && meaningfulReference({ bankReference: source[key] })) {
+        return normalized(transaction[key]) === normalized(source[key])
+      }
+    }
+    return true
+  })
   const sourceWords = wordSet([transaction.counterparty, transaction.purpose].filter(Boolean).join(' '))
-  const voucherMatches = rows.map((row) => {
+  // Exclude zero-score rows from automatic results: unrelated bookings must not
+  // become AI evidence or block creation merely because their amount matches.
+  const voucherMatches = plausibleRows.map((row) => {
     const targetWords = wordSet([row.description, row.note].filter(Boolean).join(' '))
     let sharedWords = 0
     for (const word of sourceWords) if (targetWords.has(word)) sharedWords++
@@ -828,7 +854,7 @@ export function findBankTransactionMatches(input: {
       if (sharedWords === 0 && dateDistance > 20) score = Math.max(1, Math.min(score, 15))
     }
     return { ...row, matchKind: 'VOUCHER', dateDistance, matchedDateSource, amountMatches, score, sharedWords, paymentAccountMismatch, paymentAccountWarning }
-  }).sort((a, b) => {
+  }).filter(match => manual || match.score > 0).sort((a, b) => {
     if (!manual && Number(a.paymentAccountMismatch) !== Number(b.paymentAccountMismatch)) return Number(a.paymentAccountMismatch) - Number(b.paymentAccountMismatch)
     return a.dateDistance - b.dateDistance || b.score - a.score
   })

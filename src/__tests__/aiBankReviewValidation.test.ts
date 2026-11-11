@@ -78,6 +78,18 @@ it('reports invalid answers for correction but leaves deliberate manual-review d
   expect(result.suggestions[2]).toMatchObject({ action: 'LINK_EXISTING', voucherId: 42 })
 })
 
+it('rejects cross-account links and requests a corrected decision with the actual account conflict', () => {
+  const invalid = jest.fn()
+  const result = validateBankReviewResult({ suggestions: [link] }, [{
+    id: 1, direction: 'OUT', paymentAccountName: 'Volksbank',
+    matches: [{ id: 42, matchKind: 'VOUCHER', paymentAccountMismatch: true, paymentAccountName: 'Bank' }]
+  }], invalid)
+  expect(result.suggestions[0]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: expect.stringContaining('„Bank“') })
+  expect(result.suggestions[0].reason).toContain('„Volksbank“')
+  expect(result.suggestions[0].voucherId).toBeUndefined()
+  expect(invalid).toHaveBeenCalledWith(1, result.suggestions[0].reason)
+})
+
 it.each(['IN', 'OUT'] as const)('keeps the imported %s direction even when the AI interprets the purpose differently', (direction) => {
   const result = validateBankReviewResult({ suggestions: [{
     transactionId: 46, action: 'CREATE_BOOKING', confidence: 0.9, reason: 'Kauf Lastenanhänger',
@@ -100,7 +112,7 @@ it('uses each original transaction by ID rather than the order returned by the A
 
 it('does not demand a document source in the bank review output schema', () => {
   expect(AiBankImportReviewResultStructured.safeParse({
-    suggestions: [{
+    suggestions: [{ membership: null,
       ...link, action: 'CREATE_BOOKING', voucherId: null, voucherNo: null,
       recurringBookingId: null, recurringBookingName: null, occurrenceId: null, scheduledDate: null,
       warnings: [], evidence: [],
@@ -108,4 +120,45 @@ it('does not demand a document source in the bank review output schema', () => {
         counterparty: null, counterpartyIban: null, budgets: [], earmarks: [], tags: [], confidence: 0.8, warnings: [], evidence: [] }
     }], summary: null, warnings: []
   }).success).toBe(true)
+})
+
+it('uses the validated contribution start and keeps each original payment purpose', () => {
+  const warning = 'Der Verwendungszweck nennt 2026-12; der Beitragsplan beginnt erst 2027-01.'
+  const result = validateBankReviewResult({ suggestions: [
+    { transactionId: 1, action: 'CREATE_BOOKING', reason: 'Vorauszahlung', membership: { memberId: 2, startPeriod: '2026-12' },
+      bookingCandidate: { ...booking, type: 'IN', grossAmount: 100 } },
+    { transactionId: 2, action: 'CREATE_BOOKING', reason: 'Teilzahlung', membership: { memberId: 4, startPeriod: '2026-12' },
+      bookingCandidate: { ...booking, type: 'IN', grossAmount: 6, description: 'Teilzahlung', note: 'Teilzahlung' } }
+  ] }, [
+    { id: 1, direction: 'IN', purpose: 'Mitgliedsbeitrag Niko Dubio ab 2026-12', counterparty: 'Niko Dubio',
+      membershipCandidates: [{ memberId: 2, startPeriod: '2027-01', warnings: [warning] }] },
+    { id: 2, direction: 'IN', purpose: 'Mitgliedsbeitrag Umut Tanis Restzahlung November 2026',
+      membershipCandidates: [{ memberId: 4 }] }
+  ])
+  expect(result.suggestions[0]).toMatchObject({ action: 'CREATE_BOOKING', membership: { memberId: 2, startPeriod: '2027-01' }, warnings: [warning] })
+  expect(result.suggestions[1]).toMatchObject({ membership: { memberId: 4 }, bookingCandidate: {
+    description: 'Mitgliedsbeitrag Umut Tanis Restzahlung November 2026', note: 'Mitgliedsbeitrag Umut Tanis Restzahlung November 2026'
+  } })
+  expect(result.suggestions[1].membership?.startPeriod).toBeUndefined()
+})
+
+it('preserves a deliberate manual-review reason even if the model supplied member metadata', () => {
+  const result = validateBankReviewResult({ suggestions: [{ transactionId: 1, action: 'NEEDS_MANUAL_REVIEW', reason: 'Zwei mögliche vorhandene Buchungen.', membership: { memberId: 2 } }] }, [{ id: 1, direction: 'IN', membershipCandidates: [{ memberId: 2 }] }])
+  expect(result.suggestions[0]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: 'Zwei mögliche vorhandene Buchungen.', membership: null })
+})
+
+it('completes an omitted member assignment for an explicit contribution with one verified member', () => {
+  const result = validateBankReviewResult({ suggestions: [{ transactionId: 78, action: 'CREATE_BOOKING', reason: 'Mitgliedsbeitrag Max Mustermann', membership: null,
+    bookingCandidate: { ...booking, type: 'IN', grossAmount: 10 } }] }, [{ id: 78, direction: 'IN', purpose: 'Mitgliedsbeitrag 0001 fuer 2026-11', membershipCandidates: [{ memberId: 1, startPeriod: '2026-11' }] }])
+  expect(result.suggestions[0]).toMatchObject({ action: 'CREATE_BOOKING', membership: { memberId: 1, startPeriod: '2026-11' } })
+})
+
+it.each([
+  { direction: 'IN' as const, purpose: 'Vorauszahlung Max Mustermann', membershipCandidates: [{ memberId: 1 }] },
+  { direction: 'OUT' as const, purpose: 'Mitgliedsbeitrag 0001', membershipCandidates: [{ memberId: 1 }] },
+  { direction: 'IN' as const, purpose: 'Mitgliedsbeitrag', membershipCandidates: [{ memberId: 1 }, { memberId: 2 }] },
+  { direction: 'IN' as const, purpose: 'Mitgliedsbeitrag unbekannt', membershipCandidates: [] }
+])('does not infer an unsupported member assignment: %j', source => {
+  const result = validateBankReviewResult({ suggestions: [{ transactionId: 1, action: 'CREATE_BOOKING', reason: 'Zahlung', bookingCandidate: booking }] }, [{ id: 1, ...source }])
+  expect(result.suggestions[0].membership).toBeNull()
 })

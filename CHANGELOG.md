@@ -5,6 +5,26 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.13.0] - 2026-11-11
+
+### Hinzugefügt
+
+- Beitragszahlungen werden einem Mitglied zugeordnet und automatisch auf offene und zukünftige Beitragsperioden verteilt. Vorauszahlungen, Teilzahlungen und unverrechnetes Guthaben werden berücksichtigt; die Zahlungshistorie zeigt die Verteilung und erlaubt das Lösen einer Zuordnung.
+- Die KI im Bankimport erkennt Mitgliedsbeiträge und schlägt die Mitgliedszuordnung zusätzlich zur Buchung vor. Spenden, Erstattungen und Ausgaben bleiben davon getrennt.
+- Budgets und Zweckbindungen lassen sich per Stern in der Seitenleiste anheften. Dort erscheinen auch Werte ohne Plan und überfällige Mitgliedsbeiträge; aufklappbare Bereiche merken sich ihren Zustand.
+
+### Geändert
+
+- Der Beitragsstatus zeigt vorausbezahlte Beträge, sechs Intervalle im Zeitstrahl und eine kompakte Buchungssuche zur Zahlungszuordnung.
+- Die KI-Sammelprüfung trennt neue Buchungen und anschließende Beitragszuordnungen durch unterschiedliche Kacheln und verständliche Kontohinweise.
+- Kostenerstattungen, E-Mail-Einladungen und zahlreiche Dialoge verwenden einheitliche Formularfelder sowie durchgängige Kopf- und Fußbereiche, auch in dunklen Themes. Das Öffnen des Mail-Programms wird als Toast bestätigt.
+
+### Behoben
+
+- Unpassende Buchungstreffer mit null Punkten werden nicht mehr an die KI weitergegeben. Unterschiedliche Bankreferenzen verhindern falsche Dublettenwarnungen allein aufgrund gleicher Beträge und Daten.
+- Mitgliedsbeiträge können von einem anderen Absenderkonto und auf einem anderen Vereinskonto eingehen. Direkte Verknüpfungen zu bestehenden Buchungen auf einem anderen Vereinskonto werden mit einem konkreten Kontokonflikt zur Prüfung zurückgegeben.
+- Vorausbezahlte Perioden, historische Beitragsintervalle und Teilzahlungen werden bei der Beitragsdarstellung und KI-Zuordnung berücksichtigt. Der Vorschläge-Button behält beim Öffnen seinen Text und seine Größe.
+
 ## [4.12.2] - 2026-11-09
 
 ### Geändert

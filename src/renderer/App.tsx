@@ -3423,6 +3423,11 @@ function AppInner() {
             selectedAccountId={filterPaymentAccountId}
             onSelectAccount={openSidebarAccount}
             onSelectAssignment={openSidebarAssignment}
+            onSelectMembershipFees={() => {
+              setDashboardTaskTarget({ kind: 'members', filter: 'overdue' })
+              setDashboardTaskPage('Mitglieder')
+              setActivePage('Mitglieder')
+            }}
             onSelectBankAccount={accountId => {
               setDashboardTaskTarget({ kind: 'bank', accountId, filter: 'open' })
               setDashboardTaskPage('Bankimport')

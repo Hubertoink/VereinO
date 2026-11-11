@@ -30,6 +30,13 @@ test.beforeAll(async () => {
           list: async () => ({ rows, total: 2, stats: { total: 2, open: 2, checked: 0, linked: 0 } }),
           importStatus: async () => ({ total: 2, lastBookingDate: null, accounts: [], recentImports: [] })
         } }
+        if (options.membershipPreview) {
+          window.api.bankTransactions.previewAiBatch = async () => [{ transaction: { ...current, aiSuggestion: { action:'CREATE_BOOKING',reason:'Mitgliedsbeitrag',confidence:1,warnings:[],evidence:[],membership:{memberId:1} } },
+            token:'a'.repeat(64),commentsEnabled:false,blockers:[],warnings:[],candidate:{date:current.bookingDate,type:'IN',sphere:'IDEELL',grossAmount:10,description:current.purpose},
+            membershipPreview:{token:'b'.repeat(64),memberId:1,memberName:'Max Mustermann',amount:10,credit:0,allocations:[{periodKey:'2026-11',amount:10}]}}]
+          window.api.classifications={primary:{list:async()=>({profile:'NONPROFIT',definition:{primaryLabel:'Sphäre'},values:[]})}}
+          window.api.budgets={list:async()=>({rows:[]})};window.api.bindings={list:async()=>({rows:[]})};window.api.tags={list:async()=>({rows:[]})}
+        }
         const onCreateBooking = (row, acknowledgements) => window.creations.push({ id: row.id, acknowledgements })
         if (kind === 'ai') {
           root.render(<BankAiSuggestionModal transaction={current} suggestion={{ action: 'CREATE_BOOKING', transactionId: current.id,
@@ -156,6 +163,14 @@ test('a saved expense suggestion for a positive bank import opens as income', as
   expect(await page.evaluate(() => (window as any).openedDraft)).toMatchObject({
     type: 'IN', bankTransactionId: 77, bankReviewSource: { direction: 'IN', amount: 106.99 }
   })
+})
+
+test('an older contribution suggestion without member metadata opens the full assignment preview', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderBankTest('ai', {membershipPreview:true,transaction:{direction:'IN',amount:10,counterparty:'Max Mustermann',purpose:'Mitgliedsbeitrag 0001 fuer 2026-11'}}))
+  await expect(page.getByRole('dialog', {name:'KI-Vorschläge prüfen'})).toBeVisible()
+  await expect(page.locator('.bank-ai-batch-membership-step')).toContainText('Max Mustermann')
+  await expect(page.locator('.bank-ai-batch-membership-step')).toContainText('2026-11')
+  await expect(page.getByRole('button', {name:'Entwurf prüfen und bearbeiten'})).toHaveCount(0)
 })
 
 

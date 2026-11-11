@@ -874,12 +874,14 @@ export default function AdvancesView() {
 
       {resolveConfirmOpen && detail && (
         <div className="modal-overlay" onClick={() => resolveBusy ? undefined : setResolveConfirmOpen(false)} role="dialog" aria-modal="true">
-          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal advances-resolve-modal" onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Vorschuss jetzt auflösen?" closeDisabled={resolveBusy} onClose={() => setResolveConfirmOpen(false)} closeOnEscape={false} />
-            <div className="helper" style={{ marginBottom: 8 }}>Empfänger: {detail.memberName || detail.recipientName}</div>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div>- Alle Buchungen werden als Belege gebucht</div>
-              <div>- Der Platzhalter-Beleg (Barvorschuss) wird entfernt</div>
+            <div className="advances-resolve-body">
+              <div className="helper">Empfänger: {detail.memberName || detail.recipientName}</div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div>- Alle Buchungen werden als Belege gebucht</div>
+                <div>- Der Platzhalter-Beleg (Barvorschuss) wird entfernt</div>
+              </div>
             </div>
             <div className="advances-modal-actions">
               <button className="btn" type="button" disabled={resolveBusy} onClick={() => setResolveConfirmOpen(false)}>Abbrechen</button>

@@ -1,5 +1,4 @@
-import React, { useEffect, useId, useState } from 'react'
-import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import React, { useEffect, useState } from 'react'
 import { addDataChangedListener } from '../../utils/refresh'
 
 type Account = { id: number; name: string; balance: number; isActive: number; color?: string | null }
@@ -10,19 +9,11 @@ const localToday = () => {
 }
 
 export function SidebarAccounts({ selectedId, onSelect }: { selectedId?: number | null; onSelect: (id: number) => void }) {
-  const [expanded, setExpanded] = useState(() => {
-    try { return localStorage.getItem('ui.sidebarAccountsExpanded') !== 'false' } catch { return true }
-  })
   const [showAll, setShowAll] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [retry, setRetry] = useState(0)
-  const listId = useId()
   useEffect(() => {
-    try { localStorage.setItem('ui.sidebarAccountsExpanded', String(expanded)) } catch { /* Optional preference. */ }
-  }, [expanded])
-  useEffect(() => {
-    if (!expanded) return
     let disposed = false
     let request = 0
     const load = async () => {
@@ -50,13 +41,11 @@ export function SidebarAccounts({ selectedId, onSelect }: { selectedId?: number 
     scheduleMidnight()
     void load()
     return () => { disposed = true; offSwitch?.(); offChange(); window.removeEventListener('focus', load); clearTimeout(midnightTimer) }
-  }, [expanded, retry])
+  }, [retry])
   const visible = showAll ? accounts : accounts.slice(0, 3)
   return <div className="sidebar-accounts">
-    <button type="button" className="sidebar-accounts-toggle" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)}>
-      <span>Zahlkonten</span>{expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-    </button>
-    {expanded && <div id={listId} className="sidebar-accounts-content">
+    <p className="sidebar-section-caption">Zahlkonten</p>
+    <div className="sidebar-accounts-content">
       <p className="sidebar-accounts-caption">Bestand laut Buchungen · Stand heute</p>
       {status === 'loading' && <p className="sidebar-accounts-message" role="status">Bestände werden geladen …</p>}
       {status === 'error' && <div className="sidebar-accounts-message" role="status">Bestände nicht verfügbar.<button type="button" className="sidebar-accounts-more" onClick={() => setRetry(value => value + 1)}>Erneut laden</button></div>}
@@ -66,6 +55,6 @@ export function SidebarAccounts({ selectedId, onSelect }: { selectedId?: number 
         <span className={`sidebar-account-balance${account.balance < 0 ? ' is-negative' : ''}`}>{euro.format(account.balance)}</span>
       </button>)}
       {status === 'ready' && accounts.length > 3 && <button type="button" className="sidebar-accounts-more" aria-expanded={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? 'Weniger anzeigen' : `Alle Zahlkonten (${accounts.length}) …`}</button>}
-    </div>}
+    </div>
   </div>
 }

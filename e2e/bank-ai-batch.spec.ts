@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 let script: string
 let css: string
 test.beforeAll(async () => {
-  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/BankImport/bankAiBatch.css'].map(path => fs.readFile(path, 'utf8')))).join('\n')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/BankImport/bankAiBatch.css', 'src/renderer/components/finance/membershipPayments.css'].map(path => fs.readFile(path, 'utf8')))).join('\n')
   const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
@@ -21,11 +21,18 @@ test.beforeAll(async () => {
       }))
       if (options.mixed) transactions[1].aiSuggestion = { action: 'LINK_EXISTING', voucherId: 41, voucherNo: '2026-41', reason: 'Passende Buchung.', warnings: [], evidence: [] }
       if (options.preassigned) Object.assign(transactions[0].aiSuggestion.bookingCandidate, { budgets: [{ id: 9, amount: 29.99 }], earmarks: [{ id: 11, amount: 29.99 }], tags: ['Freizeit'] })
+      if (options.membership) {
+        Object.assign(transactions[0], { direction:'IN', amount:25, counterparty:'Niko Dubio', purpose:'Mitgliedsbeitrag 0002 Vorauszahlung' })
+        transactions[0].aiSuggestion.membership={memberId:2}
+        Object.assign(transactions[0].aiSuggestion.bookingCandidate,{type:'IN',grossAmount:25,description:'Mitgliedsbeitrag Niko Dubio'})
+      }
+      if (options.single) transactions.splice(1)
       const rows = transactions.map(transaction => ({ transaction, token: 'a'.repeat(64), commentsEnabled: !!options.comments,
         candidate: transaction.aiSuggestion.bookingCandidate ? { ...transaction.aiSuggestion.bookingCandidate, note: options.comments ? 'Referenz BREF-123' : '' } : null,
         targetDescription: 'Verpflegung Jugendhaus', warnings: transaction.id === 1 ? ['Kein Budget zugeordnet.'] : [],
         blockers: transaction.id === 3 ? ['Mögliche Doppelbuchung. Bitte einzeln prüfen.'] : options.missingCategory && transaction.id === 1 ? ['Eine Kategorie ist erforderlich.'] : [] }))
       window.api = {
+        payments: { previewAllocation: async () => rows[0].membershipPreview },
         bankTransactions: {
           validateAiBatchDraft: async ({ candidate }) => ({ blockers: candidate.description.trim() && (!options.missingCategory || candidate.primaryClassificationValueId)
             && [candidate.budgets || [], candidate.earmarks || []].every(values => values.every(value => value.id > 0 && value.amount > 0) && values.reduce((sum, value) => sum + value.amount, 0) <= candidate.grossAmount + .001)
@@ -47,6 +54,11 @@ test.beforeAll(async () => {
         tags: { list: async () => ({ rows: [{ id: 1, name: 'Freizeit', color: '#287da6' }, { id: 2, name: 'Material', color: '#8656b8' }] }) }
       }
       window.changePreview = () => { rows[0].token = 'b'.repeat(64) }
+      if (options.membership) rows[0].membershipPreview={token:'c'.repeat(64),memberId:2,memberName:'Niko Dubio',amount:25,credit:0,allocations:[
+        {periodKey:'2026-11',interval:'MONTHLY',dueDate:'2026-11-01',expected:10,paidBefore:0,amount:10,remaining:0},
+        {periodKey:'2026-12',interval:'MONTHLY',dueDate:'2026-12-01',expected:10,paidBefore:0,amount:10,remaining:0},
+        {periodKey:'2027-01',interval:'MONTHLY',dueDate:'2027-01-01',expected:10,paidBefore:0,amount:5,remaining:5}
+      ]}
       window.setBatchVisibility = (visible) => root.render(<BankAiBatchModal visible={visible} transactions={transactions} page={2} onClose={() => window.closes++} onChanged={() => window.changed++} onReview={t => window.reviews.push(t.id)} />)
       window.setBatchVisibility(true)
     }
@@ -239,4 +251,29 @@ test('preassigned modules are expanded and removing them clears the draft assign
   await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
   await expect(page.getByText('Angelegt · 2026-41', { exact: true })).toBeVisible()
   expect((await page.evaluate(() => (window as any).applied))[0].candidate).toMatchObject({ budgets: [], earmarks: [], tags: [] })
+})
+
+test('approves a member payment together with its automatic contribution allocation', async ({ page }, info) => {
+  await page.setViewportSize({width:1440,height:960})
+  await page.evaluate(() => { document.documentElement.setAttribute('data-theme','dark'); (window as any).renderBatch({ membership: true, single: true }) })
+  await expect(page.locator('.bank-ai-batch-membership-step')).toContainText('Niko Dubio')
+  await expect(page.locator('.bank-ai-batch-booking-step')).toContainText('Neue Buchung')
+  await expect(page.locator('.bank-ai-batch-membership-step')).toContainText('Anschließend')
+  await page.screenshot({path:info.outputPath('membership-review-hierarchy-dark.png'), animations:'disabled'})
+  const footer = page.locator('.bank-ai-batch-footer')
+  const bounds = await footer.evaluate(el => {
+    const outer = el.getBoundingClientRect(), summary = el.querySelector('.bank-ai-batch-selection')!.getBoundingClientRect(), buttons = el.querySelector('.bank-ai-batch-footer-actions')!.getBoundingClientRect()
+    return {left:summary.left-outer.left,right:outer.right-buttons.right,top:buttons.top-outer.top,bottom:outer.bottom-buttons.bottom}
+  })
+  expect(bounds.left).toBeGreaterThanOrEqual(16)
+  expect(bounds.right).toBeGreaterThanOrEqual(16)
+  expect(bounds.top).toBeGreaterThanOrEqual(14)
+  expect(bounds.bottom).toBeGreaterThanOrEqual(14)
+  await page.getByRole('button', { name: 'Details zu Bankbeleg 1' }).click()
+  const allocation = page.getByRole('region', { name: 'Beitragsaufteilung' })
+  await expect(allocation.getByRole('row')).toHaveCount(4)
+  await expect(allocation).toContainText('2027-01')
+  await page.getByRole('checkbox', { name: 'Bankbeleg 1 auswählen' }).check()
+  await page.getByRole('button', { name: '1 Buchung anlegen' }).click()
+  expect(await page.evaluate(() => (window as any).applied[0])).toEqual(expect.objectContaining({ id: 1, membershipAllocation: { allocations: expect.arrayContaining([expect.objectContaining({ periodKey: '2027-01', amount: 5, remaining: 5 })]) } }))
 })

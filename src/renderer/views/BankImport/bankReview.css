@@ -1,11 +1,11 @@
-.modal.bank-review-modal--structured { box-sizing: border-box; width: min(900px, 96vw); display: flex; flex-direction: column; overflow: hidden; gap: 14px; }
+.modal.bank-review-modal--structured { box-sizing: border-box; width: min(900px, 96vw); display: flex; flex-direction: column; overflow: hidden; gap: 14px; padding: 0; }
 .bank-review-modal--structured > .bank-modal-header, .bank-review-modal--structured > .bank-modal-footer { flex-shrink: 0; }
 .bank-review-title { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .bank-review-title > svg { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
 .bank-review-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .bank-review-title h2 { font-size: 18px; margin: 0; }
 .bank-review-title p { margin: 5px 0 0; font-size: 11px; color: var(--text-dim); }
-.bank-review-scroll { min-height: 0; overflow-y: auto; display: grid; gap: 14px; padding-right: 6px; }
+.bank-review-scroll { min-height: 0; overflow-y: auto; display: grid; gap: 14px; padding: 0 16px; }
 .bank-review-summary { padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
 .bank-review-summary-main { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); gap: 18px; }
 .bank-review-eyebrow { font-size: 11px; color: var(--text-dim); }
@@ -31,7 +31,8 @@
 .bank-review-info dt { color: var(--text-dim); }
 .bank-review-info dd { margin: 0; overflow-wrap: anywhere; }
 .bank-review-modal--structured .bank-section-title__label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-.bank-review-modal--structured > .bank-modal-footer { position: relative; bottom: auto; background: var(--surface); border-top: 0; margin: 0; padding-top: 12px; pointer-events: auto; }
+.bank-review-modal--structured > .bank-modal-footer { position: static; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; background: var(--surface); border: 0; border-radius: 0; margin: 0; padding: 14px 16px; pointer-events: auto; }
+.bank-review-modal--structured > .bank-modal-footer .btn { min-height: 34px; margin: 0; padding: 8px 14px; box-shadow: none; }
 @media (max-width: 640px) {
   .bank-review-summary-main, .bank-review-info-grid { grid-template-columns: 1fr; }
   .bank-review-purpose { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }

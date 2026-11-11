@@ -36,3 +36,14 @@ INSERT INTO budgets VALUES (1,'Jugend','2026-01-01','2026-12-31',100,0),(2,'Arch
 INSERT INTO earmarks VALUES (1,'Förderung','2026-01-01','2026-10-10',100,1);
 INSERT INTO vouchers VALUES (1,'OUT','2026-09-01','IDEELL',150,NULL,NULL,NULL,NULL),(2,'INTERNAL','2026-09-01','IDEELL',-20,NULL,NULL,1,-20);
 INSERT INTO voucher_budgets VALUES (1,1,150);
+
+ALTER TABLE vouchers ADD COLUMN original_id INTEGER;
+ALTER TABLE vouchers ADD COLUMN reversed_by_id INTEGER;
+CREATE TABLE membership_plans(id INTEGER PRIMARY KEY,member_id INTEGER,starts_on TEXT,interval TEXT,amount_cents INTEGER);
+CREATE TABLE membership_periods(id INTEGER PRIMARY KEY,member_id INTEGER,period_key TEXT,interval TEXT,due_date TEXT,expected_cents INTEGER);
+CREATE TABLE membership_receipts(id INTEGER PRIMARY KEY,member_id INTEGER,voucher_id INTEGER,source TEXT,amount_cents INTEGER,date_paid TEXT);
+CREATE TABLE membership_allocations(receipt_id INTEGER,period_id INTEGER,amount_cents INTEGER);
+INSERT INTO membership_plans VALUES(1,7,'2026-07-01','MONTHLY',1000),(2,8,'2026-07-01','MONTHLY',1000);
+INSERT INTO membership_periods VALUES(1,7,'2026-10','MONTHLY','2026-10-01',1000),(2,7,'2026-07','MONTHLY','2026-07-01',1000),(3,7,'2026-08','MONTHLY','2026-08-01',1000),(4,7,'2026-09','MONTHLY','2026-09-01',1000);
+INSERT INTO membership_receipts VALUES(1,7,NULL,'MANUAL',1000,'2026-10-02');
+INSERT INTO membership_allocations VALUES(1,1,1000);

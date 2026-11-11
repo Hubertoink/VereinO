@@ -148,6 +148,7 @@ import {
   MemberGetInput,
   MemberGetOutput,
   PaymentsListDueInput,
+  ContributionPaymentInput,
   PaymentsListDueOutput,
   PaymentsMarkPaidInput,
   PaymentsMarkPaidOutput,
@@ -407,6 +408,8 @@ import {
 } from './schemas'
 import * as backup from '../services/backup'
 import * as mp from '../repositories/members_payments'
+import { membershipBankCandidates } from '../services/bankMembership'
+import { previewContributionPayment, allocateContributionPayment, contributionPeriods, removeContributionReceipt, availableContributionVouchers } from '../repositories/membershipLedger'
 import { exportMoneyDonationReceiptPdf } from '../services/donationReceipt'
 import {
   AdvancesListInput,
@@ -1089,6 +1092,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
           paymentAccountId: transaction.paymentAccountId,
           paymentAccountName: transaction.paymentAccountName,
           alreadyLinked: findBankTransactionMatches({ id: transaction.id, linkedOnly: true }),
+          membershipCandidates: membershipBankCandidates(transaction),
           matches
         }
       })
@@ -3107,6 +3111,14 @@ ${reportAnalyticsCss}
   })
 
   // Membership payments
+  ipcMain.handle('payments.availableVouchers', (_e, payload) => availableContributionVouchers(z.object({ q: z.string().optional() }).parse(payload).q))
+  ipcMain.handle('payments.previewAllocation', (_e, payload) => previewContributionPayment(ContributionPaymentInput.parse(payload)))
+  ipcMain.handle('payments.allocate', (_e, payload) => allocateContributionPayment(ContributionPaymentInput.extend({ token: z.string().length(64) }).parse(payload)))
+  ipcMain.handle('payments.periods', (_e, payload) => {
+    const input = z.object({ memberId: z.number().int().positive(), through: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(payload)
+    return contributionPeriods(input.memberId, input.through)
+  })
+  ipcMain.handle('payments.removeReceipt', (_e, payload) => removeContributionReceipt(z.object({ receiptId: z.number().int().positive() }).parse(payload).receiptId))
   ipcMain.handle('payments.listDue', async (_e, payload) => {
     const parsed = PaymentsListDueInput.parse(payload)
     const res = mp.listDue(parsed as any)

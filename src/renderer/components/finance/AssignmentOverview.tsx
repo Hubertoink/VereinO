@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { IconStar, IconStarFilled } from '@tabler/icons-react'
+import { useSidebarAssignmentPins } from '../../hooks/useSidebarAssignmentPins'
 import { addDataChangedListener } from '../../utils/refresh'
 import FinanceSparkline from './FinanceSparkline'
 import { fillFinanceMonths, financeUsage, type FinanceMonth } from './financeModel'
@@ -12,6 +14,7 @@ const monthLabel = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleD
 const dateLabel = (date?: string | null) => date ? date.split('-').reverse().join('.') : 'offen'
 
 export default function AssignmentOverview({ kind, definitions, from, to, sphere, compact = true, sortable, revision, onEdit, onArchive, onBookings }: Props) {
+  const pins = useSidebarAssignmentPins(kind)
   const [usage, setUsage] = useState<Record<number, Usage>>({})
   const [errors, setErrors] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,6 +69,7 @@ export default function AssignmentOverview({ kind, definitions, from, to, sphere
   if (!definitions.length) return <p className="finance-muted">Keine {kind === 'budget' ? 'Budgets' : 'Zweckbindungen'} für diese Auswahl.</p>
   return <section className={`finance-overview${compact ? ' finance-overview--compact' : ''}`} aria-label={kind === 'budget' ? 'Budgetentwicklung' : 'Entwicklung der Zweckbindungen'} aria-busy={loading}>
     <div className="finance-overview-heading"><div><h2>Verbrauch und Entwicklung</h2><p>{from || to ? `${dateLabel(from)} – ${dateLabel(to)} · Rest zum Gesamtplan nach Bewegungen in diesem Zeitraum` : 'Alle Buchungen · Rest zum Plan nach Einnahmen und Ausgaben'}</p></div></div>
+    {pins.error && <p className="finance-pin-error" role="alert">{pins.error} <button className="btn ghost" onClick={pins.retry}>Auswahl erneut laden</button></p>}
     <div className="finance-table-scroll" role="region" aria-label="Finanzübersicht" tabIndex={0}>
       <table className="finance-table"><thead><tr>{sortable ? <>{sortHeader('caption', kind === 'budget' ? 'Jahr' : 'Code')}{sortHeader('name', 'Name')}{sortHeader('plan', 'Plan')}{sortHeader('net', 'Nettoverbrauch')}{sortHeader('remaining', 'Rest zum Plan')}</> : <><th scope="col">{kind === 'budget' ? 'Budget' : 'Zweckbindung'}</th><th scope="col">Plan</th><th scope="col">Nettoverbrauch</th><th scope="col">Rest zum Plan</th></>}<th scope="col">Monatsverlauf</th><th scope="col"><span className="finance-muted">Details</span></th></tr></thead><tbody>
         {sortedDefinitions.map(def => {
@@ -76,9 +80,11 @@ export default function AssignmentOverview({ kind, definitions, from, to, sphere
           const values = months.map(row => Math.round((row.spent - row.inflow) * 100) / 100)
           const open = expanded === def.id
           const detailId = `finance-${kind}-${def.id}`
+          const pinned = pins.ids.includes(def.id)
+          const pinLabel = pinned ? 'Aus der Seitenleiste entfernen' : 'In der Seitenleiste anzeigen'
           return <React.Fragment key={def.id}><tr className={open ? 'is-expanded' : undefined}>
             {sortable && <td className="finance-caption">{def.caption || '—'}</td>}
-            <th scope="row"><div className="finance-name"><i style={{ background: def.color || 'var(--accent)' }} /><div><strong>{def.name}</strong><small>{[!sortable && def.caption, def.archived ? 'archiviert' : '', def.locked ? 'Zeitraum geschützt' : ''].filter(Boolean).join(' · ')}</small></div></div></th>
+            <th scope="row"><div className="finance-name"><i style={{ background: def.color || 'var(--accent)' }} /><div><div className="finance-name-heading"><strong>{def.name}</strong>{!def.archived && <button type="button" className="finance-pin" aria-pressed={pinned} aria-label={`${def.name}: ${pinLabel}`} title={pinLabel} disabled={pins.disabled} onClick={event => { event.stopPropagation(); void pins.toggle(def.id) }}>{pinned ? <IconStarFilled size={16} aria-hidden="true" /> : <IconStar size={16} aria-hidden="true" />}</button>}</div><small>{[!sortable && def.caption, def.archived ? 'archiviert' : '', def.locked ? 'Zeitraum geschützt' : ''].filter(Boolean).join(' · ')}</small></div></div></th>
             <td data-label="Plan" className="finance-number">{plan > 0 ? eur.format(plan) : '—'}</td>
             <td data-label="Nettoverbrauch">{metric ? <><strong className="finance-number">{eur.format(metric.net)}</strong><div className={`finance-progress finance-tone-${metric.tone}`} role={metric.percent === null ? undefined : 'meter'} aria-label="Nettoverbrauch gegenüber Plan" aria-valuemin={0} aria-valuemax={100} aria-valuenow={metric.percent === null ? undefined : Math.min(100, Math.max(0, metric.percent))} aria-valuetext={metric.percent === null ? undefined : `${Math.round(metric.percent)} Prozent`}><i style={{ width: `${Math.min(100, Math.max(0, metric.percent || 0))}%` }} /></div><small className={`finance-status finance-tone-${metric.tone}`}>{metric.percent === null ? metric.status : `${Math.round(metric.percent)} % · ${metric.status}`}</small></> : <span className="finance-muted">{errors.includes(def.id) ? 'Nicht verfügbar' : 'Lädt …'}</span>}</td>
             <td data-label="Rest zum Plan" className={`finance-number ${metric && plan > 0 && metric.remaining < 0 ? 'finance-tone-danger' : ''}`}>{metric && plan > 0 ? eur.format(metric.remaining) : '—'}</td>

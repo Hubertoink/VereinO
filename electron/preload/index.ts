@@ -342,6 +342,11 @@ const rendererApi = {
     export: (payload) => invoke('members.export', payload)
   },
   payments: {
+    availableVouchers: (payload) => invoke('payments.availableVouchers', payload),
+    previewAllocation: (payload) => invoke('payments.previewAllocation', payload),
+    allocate: (payload) => invoke('payments.allocate', payload),
+    periods: (payload) => invoke('payments.periods', payload),
+    removeReceipt: (payload) => invoke('payments.removeReceipt', payload),
     listDue: (payload) => invoke('payments.listDue', payload),
     markPaid: (payload) => invoke('payments.markPaid', payload),
     unmark: (payload) => invoke('payments.unmark', payload),

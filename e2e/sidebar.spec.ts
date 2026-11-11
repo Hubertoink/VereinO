@@ -17,6 +17,7 @@ test.beforeAll(async () => {
       const switches = new Set()
       window.requests = []; window.hold = false; window.fail = false; window.pending = []
       window.assignmentRequests = []
+      window.feeRequests = []; window.feeSummary = { active: 12, dueMembers: 4, dueAmount: 235.50 }; window.feeFailure = false; window.feeHold = false; window.feePending = []
       window.budgetUsage = {}; window.earmarkUsage = {}; window.usageFailure = false
       window.bankImportCalls = 0; window.bankDates = {}; window.reminderSettings = {}; window.bankStatusFails = false
       window.budgets = options.assignments ? [
@@ -36,6 +37,13 @@ test.beforeAll(async () => {
         { id: 4, name: 'Rücklagenkonto mit sehr langem Namen', balance: 1000000.24, kind: 'BANK', isActive: 1 }
       ]
       window.api = { app: { version: async () => ({ version: '4.11.0' }) },
+        members: { list: async input => {
+          window.feeRequests.push(input)
+          const summary = { ...window.feeSummary }
+          if (window.feeHold) await new Promise(resolve => window.feePending.push(resolve))
+          if (window.feeFailure) throw new Error('Unavailable')
+          return { rows: [], total: summary.dueMembers, summary }
+        } },
         bankTransactions: { importStatus: async () => { window.bankImportCalls++; if (window.bankStatusFails) throw new Error('Unavailable'); return { accounts: window.accounts.map(a => ({ ...a, lastImportAt: window.bankDates[a.id] || null })) } } },
         paymentAccounts: { list: async () => ({ rows: window.accounts }) },
         settings: { get: async ({ key }) => ({ value: window.reminderSettings[key] }) },
@@ -61,7 +69,7 @@ test.beforeAll(async () => {
         useEffect(() => { localStorage.setItem('sidebarCollapsed', String(collapsed)) }, [collapsed])
         return <><div className="app-root-grid app-root-grid--side">
           <header className="app-header"><button>KommerzO</button></header>
-          <AppSidebar activePage={active} onNavigate={setActive} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} items={items} navIconColorMode="color" openBankImportsCount={6} openInvoicesCount={3} selectedAccountId={account} onSelectAccount={id => { setAccount(id); setActive('Buchungen') }} onSelectAssignment={(kind, id) => { window.assignmentSelection = { kind, id }; setActive('Buchungen') }} onSelectBankAccount={options.bankImports ? id => { window.bankSelection = id; setActive('Bankimport') } : undefined} />
+          <AppSidebar activePage={active} onNavigate={setActive} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} items={items} navIconColorMode="color" openBankImportsCount={6} openInvoicesCount={3} selectedAccountId={account} onSelectAccount={id => { setAccount(id); setActive('Buchungen') }} onSelectAssignment={(kind, id) => { window.assignmentSelection = { kind, id }; setActive('Buchungen') }} onSelectBankAccount={options.bankImports ? id => { window.bankSelection = id; setActive('Bankimport') } : undefined} onSelectMembershipFees={options.membershipFees ? () => { window.feeSelection = { kind: 'members', filter: 'overdue' }; setActive('Mitglieder') } : undefined} />
           <main className="app-main"><h1>{active}</h1><button onClick={() => setAccount(null)}>Kontofilter entfernen</button><p data-testid="filter">{account || 'Alle Konten'}</p><div className="card" style={{padding:24}}>Buchungsübersicht</div></main>
         </div><LeaderShortcuts commands={[]} /></>
       }
@@ -99,11 +107,11 @@ test('expands with labels, account balances and selection; remembers compact mod
   await page.screenshot({ path: info.outputPath('sidebar-expanded.png') })
   await page.getByRole('button', { name: 'Kontofilter entfernen' }).click()
   await expect(page.locator('.sidebar-account[aria-pressed="true"]')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Zahlkonten', exact: true }).click()
+  await page.getByRole('button', { name: 'Buchungen: Inhalte einklappen' }).click()
   await page.getByRole('button', { name: 'Seitenleiste einklappen' }).click()
   expect(await page.evaluate(() => localStorage.getItem('sidebarCollapsed'))).toBe('true')
   await page.getByRole('button', { name: 'Seitenleiste ausklappen' }).click()
-  await expect(page.getByRole('button', { name: 'Zahlkonten', exact: true })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('button', { name: 'Buchungen: Inhalte ausklappen' })).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('uses only enabled modules and keeps settings visible with a scrollable list', async ({ page }) => {
@@ -171,7 +179,7 @@ test('shows the three newest active assignments, refreshes them and omits disabl
   await page.evaluate(() => (window as any).renderSidebar({ assignments: true }))
   const budgets = page.getByRole('group', { name: 'Aktuelle Budgets' })
   const earmarks = page.getByRole('group', { name: 'Aktuelle Zweckbindungen' })
-  await expect(budgets.getByRole('button')).toHaveText(['Jugend', 'Veranstaltungen', 'Verwaltung'])
+  await expect(budgets.locator('.sidebar-assignment-name')).toHaveText(['Jugend', 'Veranstaltungen', 'Verwaltung'])
   await expect(earmarks.getByRole('button')).toHaveText(['Spende Jugend', 'Projektförderung', 'Ausstattung'])
   await budgets.getByRole('button', { name: /Jugend/ }).click()
   expect(await page.evaluate(() => (window as any).assignmentSelection)).toEqual({ kind: 'budget', id: 5 })
@@ -207,7 +215,7 @@ test('animates expansion, keeps keyboard commands clear of settings and respects
   await expect(page.locator('.leader-shortcut-trigger')).toBeVisible()
 })
 
-test('shows remaining plans and optional periods, marks binding dates and refreshes after bookings', async ({ page }, info) => {
+test('shows remaining plans, balances without plans and optional periods, and refreshes after bookings', async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 1150 })
   await page.evaluate(() => (window as any).renderSidebar({ assignments: true }))
   await expect(page.getByRole('group', { name: 'Aktuelle Budgets' })).toBeVisible()
@@ -217,7 +225,7 @@ test('shows remaining plans and optional periods, marks binding dates and refres
     Object.assign(w.budgets[2], { amountPlanned: 200 })
     Object.assign(w.budgets[3], { endDate: '2026-12-31' })
     Object.assign(w.earmarks[1], { budget: 500, startDate: '2026-03-01' })
-    w.budgetUsage = { 5: { inflow: 50, spent: 300 }, 4: { inflow: 0, spent: 250 } }
+    w.budgetUsage = { 5: { inflow: 50, spent: 300 }, 4: { inflow: 0, spent: 250 }, 3: { inflow: 100, spent: 350 } }
     w.earmarkUsage = { 4: { allocated: 100, released: 200 } }
     window.dispatchEvent(new Event('data-changed:vouchers'))
   })
@@ -227,20 +235,27 @@ test('shows remaining plans and optional periods, marks binding dates and refres
   await expect(youth).toContainText('750,00')
   await expect(youth).toContainText('01.01.2026 – 31.12.2026')
   await expect(youth.locator('svg[aria-label="Verbindlicher Zeitraum"]')).toHaveCount(1)
-  await expect(budgets.locator('.sidebar-assignment-balance.is-negative')).toContainText('-50,00')
+  await expect(budgets.getByRole('button', { name: /Veranstaltungen/ }).locator('.sidebar-assignment-balance.is-negative')).toContainText('-50,00')
   const noPlan = budgets.getByRole('button', { name: /Verwaltung/ })
-  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveCount(0)
+  await expect(noPlan.locator('.sidebar-assignment-balance.is-negative')).toHaveText('-250,00 €')
+  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveAttribute('aria-label', 'Saldo (Einnahmen − Ausgaben): -250,00 €')
   await expect(noPlan).toContainText('bis 31.12.2026')
   const donation = earmarks.getByRole('button', { name: /Spende Jugend/ })
   await expect(donation).toContainText('400,00')
   await expect(donation).toContainText('ab 01.03.2026')
   await expect(donation.locator('svg')).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('sidebar-balances-periods.png'), animations: 'disabled' })
-  await page.evaluate(() => { (window as any).budgetUsage[5] = { inflow: 0, spent: 1000 }; window.dispatchEvent(new Event('data-changed:vouchers')) })
+  await page.evaluate(() => { (window as any).budgetUsage[5] = { inflow: 0, spent: 1000 }; (window as any).budgetUsage[3] = { inflow: 450, spent: 350 }; window.dispatchEvent(new Event('data-changed:vouchers')) })
   await expect(youth.locator('.sidebar-assignment-balance')).toHaveText('0,00 €')
+  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveText('100,00 €')
+  await expect(noPlan.locator('.is-negative')).toHaveCount(0)
+  await page.evaluate(() => { Object.assign((window as any).budgets[3], { amountPlanned: 0 }); (window as any).budgetUsage[3] = { planned: 0, inflow: 0, spent: 0 }; window.dispatchEvent(new Event('data-changed:budgets')) })
+  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveText('0,00 €')
   await page.evaluate(() => { (window as any).usageFailure = true; window.dispatchEvent(new Event('data-changed:vouchers')) })
   await expect(youth.locator('.sidebar-assignment-balance')).toHaveText('—')
   await expect(youth.locator('.sidebar-assignment-balance')).toHaveAttribute('aria-label', 'Reststand nicht verfügbar')
+  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveText('—')
+  await expect(noPlan.locator('.sidebar-assignment-balance')).toHaveAttribute('aria-label', 'Saldo nicht verfügbar')
 })
 
 test('GENERAL organizations can enable and open earmarks', async ({ page }) => {
@@ -333,4 +348,81 @@ test('opens the changelog from the sidebar version', async ({ page }) => {
   await expect(dialog.locator('.changelog-entry').first()).toBeVisible()
   await dialog.getByRole('button', { name: 'Schließen', exact: true }).first().click()
   await expect(dialog).toHaveCount(0)
+})
+
+test('collapses each section independently with hover and keyboard controls and restores preferences after reload', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 1200 })
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; (window as any).renderSidebar({ assignments: true, bankImports: true, membershipFees: true }) })
+  const fees = page.getByRole('group', { name: 'Überfällige Beiträge' })
+  await expect(fees).toContainText('235,50')
+  const membersToggle = page.getByRole('button', { name: 'Mitglieder: Inhalte einklappen' })
+  await page.mouse.move(1000, 100)
+  await expect(membersToggle).toHaveCSS('opacity', '0')
+  await page.getByRole('button', { name: 'Mitglieder', exact: true }).hover()
+  await expect(membersToggle).toHaveCSS('opacity', '1')
+  await page.screenshot({ path: info.outputPath('sidebar-overdue-and-collapse-dark.png'), animations: 'disabled' })
+  await page.mouse.move(1000, 100)
+  await page.getByRole('button', { name: 'Mitglieder', exact: true }).focus()
+  await page.keyboard.press('Tab')
+  await expect(membersToggle).toBeFocused()
+  await expect(membersToggle).toHaveCSS('opacity', '1')
+  await page.keyboard.press('Enter')
+  await expect(fees).toHaveCount(0)
+  await expect(page.getByRole('heading')).toHaveText('Buchungen')
+  await expect(page.locator('.sidebar-account')).toHaveCount(3)
+  const sections = ['Buchungen', 'Bankimport', 'Budgets', 'Zweckbindungen']
+  for (const section of sections) await page.getByRole('button', { name: `${section}: Inhalte einklappen` }).click()
+  await page.getByRole('button', { name: 'Seitenleiste einklappen' }).click()
+  await page.getByRole('button', { name: 'Seitenleiste ausklappen' }).click()
+  await page.reload()
+  await page.addStyleTag({ content: css })
+  await page.addScriptTag({ content: script })
+  await page.evaluate(() => (window as any).renderSidebar({ assignments: true, bankImports: true, membershipFees: true }))
+  for (const section of [...sections, 'Mitglieder']) await expect(page.getByRole('button', { name: `${section}: Inhalte ausklappen` })).toHaveAttribute('aria-expanded', 'false')
+  expect(await page.evaluate(() => (window as any).feeRequests)).toEqual([])
+  expect(await page.evaluate(() => (window as any).requests)).toEqual([])
+  await page.getByRole('button', { name: 'Mitglieder: Inhalte ausklappen' }).click()
+  await expect(fees).toContainText('4 Mitglieder')
+  await expect(page.locator('.sidebar-account')).toHaveCount(0)
+  await page.evaluate(() => (window as any).renderSidebar({ membershipFees: true }))
+  await expect(page.getByRole('button', { name: 'Mitglieder: Inhalte einklappen' })).toHaveAttribute('aria-expanded', 'true')
+})
+
+test('summarizes overdue contributions, refreshes safely and opens the member filter from the overlay', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderSidebar({ membershipFees: true }))
+  const fees = page.getByRole('group', { name: 'Überfällige Beiträge' })
+  await expect(fees).toContainText('4 Mitglieder')
+  await expect(fees).toContainText('235,50')
+  expect(await page.evaluate(() => (window as any).feeRequests[0])).toEqual({ contributionFilter: 'DUE', includeSummary: true, limit: 1, offset: 0 })
+  await page.evaluate(() => { (window as any).feeHold = true; window.dispatchEvent(new Event('data-changed:members')) })
+  await expect.poll(() => page.evaluate(() => (window as any).feePending.length)).toBe(1)
+  await page.evaluate(() => { const w = window as any; w.feeHold = false; w.feeSummary = { active: 1, dueMembers: 1, dueAmount: 30 }; w.switchOrg() })
+  await expect(fees).toContainText('1 Mitglied')
+  await expect(fees).toContainText('30,00')
+  await page.evaluate(() => (window as any).feePending[0]())
+  await expect(fees).toContainText('30,00')
+  await page.evaluate(() => { (window as any).feeFailure = true; window.dispatchEvent(new Event('data-changed:vouchers')) })
+  await expect(fees).toContainText('Beiträge nicht verfügbar.')
+  await expect(fees).not.toContainText('30,00')
+  await page.evaluate(() => { (window as any).feeFailure = false; (window as any).feeSummary = { active: 1, dueMembers: 0, dueAmount: 0 } })
+  await fees.getByRole('button', { name: 'Erneut laden' }).click()
+  await expect(fees).toContainText('Keine überfälligen Beiträge.')
+  await page.evaluate(() => { (window as any).feeSummary = { active: 1, dueMembers: 1, dueAmount: 60 }; window.dispatchEvent(new Event('data-changed:members')) })
+  await expect(fees).toContainText('60,00')
+  await page.setViewportSize({ width: 800, height: 900 })
+  await page.getByRole('button', { name: 'Seitenleiste ausklappen' }).click()
+  await fees.getByRole('button', { name: /1 Mitglied/ }).click()
+  await expect(page.getByRole('dialog', { name: 'Navigation' })).toHaveCount(0)
+  await expect(page.getByRole('heading')).toHaveText('Mitglieder')
+  expect(await page.evaluate(() => (window as any).feeSelection)).toEqual({ kind: 'members', filter: 'overdue' })
+})
+
+test('migrates the previous account collapse preference', async ({ page }) => {
+  await page.evaluate(() => { localStorage.setItem('ui.sidebarAccountsExpanded', 'false'); (window as any).renderSidebar() })
+  await expect(page.getByRole('button', { name: 'Buchungen: Inhalte ausklappen' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('.sidebar-account')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Buchungen: Inhalte ausklappen' }).click()
+  await expect(page.locator('.sidebar-account')).toHaveCount(3)
+  await page.evaluate(() => (window as any).renderSidebar())
+  await expect(page.getByRole('button', { name: 'Buchungen: Inhalte einklappen' })).toHaveAttribute('aria-expanded', 'true')
 })

@@ -194,6 +194,25 @@ it('leaves repeated invalid fee links open after exactly one correction attempt'
   expect(result.result.suggestions[0].bookingCandidate).toBeUndefined()
 })
 
+it('repairs a cross-account link while allowing the member payment on its actual account', async () => {
+  mockChatCreate.mockResolvedValueOnce(completion(JSON.stringify({ suggestions: [{
+    transactionId: 86, action: 'LINK_EXISTING', voucherId: 126, reason: 'Ähnliche Beitragszahlung.'
+  }] }))).mockResolvedValueOnce(completion(JSON.stringify({ suggestions: [{
+    transactionId: 86, action: 'NEEDS_MANUAL_REVIEW', reason: 'Buchung auf Bank, Beleg auf Volksbank: Konto oder separate Zahlung prüfen.'
+  }] })))
+  const result = await reviewBankImportTransactions({ context: {}, transactions: [{
+    id: 86, bookingDate: '2026-11-11', direction: 'IN', amount: 20, purpose: 'Mitgliedsbeitrag 0004 ab 2026-12',
+    paymentAccountId: 3, paymentAccountName: 'Volksbank',
+    matches: [{ id: 126, matchKind: 'VOUCHER', paymentAccountMismatch: true, paymentAccountName: 'Bank', paymentAccountId: 2 }]
+  }] })
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+  const prompt = mockChatCreate.mock.calls[0][0].messages.find((m: any) => m.role === 'user').content[0].text
+  expect(prompt).toContain('Ein Mitglied darf von einem anderen Konto und auf ein anderes Vereinskonto zahlen')
+  expect(prompt).toContain('LINK_EXISTING ist nur auf demselben Vereinskonto möglich')
+  expect(prompt).toContain('nicht den Zuordnungsstatus dieses offenen Bankbelegs')
+  expect(result.result.suggestions[0]).toMatchObject({ action: 'NEEDS_MANUAL_REVIEW', reason: expect.stringContaining('separate Zahlung') })
+})
+
 it('preserves valid results and the safe fallback when the correction request fails', async () => {
   mockChatCreate.mockResolvedValueOnce(completion(JSON.stringify({ suggestions: [
     { transactionId: 71, action: 'LINK_EXISTING', reason: 'Abschlussgebuehren.', voucherId: null },

@@ -1,4 +1,5 @@
 import ManagementKpis from '../../components/finance/ManagementKpis'
+import MemberContributionDialog from './MemberContributionDialog'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -12,6 +13,7 @@ import DatePickerButton from '../../components/common/DatePickerButton'
 import AppIcon from '../../components/common/AppIcon'
 import BookingPopupFrame from '../../components/modals/BookingPopupFrame'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useToast } from '../../context/useToast'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
 
 type PageShortcutAction = {
@@ -31,6 +33,7 @@ interface MembersViewProps {
 }
 
 export default function MembersView({ registerPageShortcuts, initialTask }: MembersViewProps = {}) {
+    const { notify } = useToast()
     const [q, setQ] = useState('')
     const debouncedQ = useDebouncedValue(q, 250)
     const loadRequestIdRef = useRef(0)
@@ -47,11 +50,20 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     const [memberSummary, setMemberSummary] = useState<{ active: number; dueMembers: number; dueAmount: number } | null>(null)
     const [limit, setLimit] = useState(50)
     const [offset, setOffset] = useState(0)
+    useEffect(() => {
+        if (initialTask?.kind !== 'members') return
+        setQ('')
+        setStatus('ALL')
+        setContributionFilter('DUE')
+        setIntervalFilter('ALL')
+        setBoardFilter('ALL')
+        setOffset(0)
+    }, [initialTask])
     const [busy, setBusy] = useState(false)
     const [showPayments, setShowPayments] = useState(false)
     const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
-        mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; } }>(null)
+        mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null; contribution_effective_date?: string | null; } }>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
     const [deleteBusy, setDeleteBusy] = useState(false)
     const [boardRoleError, setBoardRoleError] = useState<string | null>(null)
@@ -417,12 +429,11 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
         if (mailto.length <= 1800) {
             try {
                 window.location.href = mailto
-                setInviteFeedback({
-                    type: 'info',
-                    text: inviteTotalBatches > 1
+                setInviteFeedback(null)
+                notify('info', inviteTotalBatches > 1
                         ? `Mail-Programm für Batch ${inviteBatchIndex + 1}/${inviteTotalBatches} geöffnet.`
                         : 'Mail-Programm geöffnet.'
-                })
+                )
             } catch {
                 setInviteFeedback({ type: 'error', text: 'Mail-Programm konnte nicht geöffnet werden.' })
             }
@@ -435,7 +446,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                 text: `Link zu lang – Batch ${inviteBatchIndex + 1}/${inviteTotalBatches} wurde als BCC kopiert.`
             })
         }
-    }, [copyInviteBcc, inviteCurrentBatch, inviteSubject, inviteBody, inviteBatchIndex, inviteTotalBatches])
+    }, [copyInviteBcc, inviteCurrentBatch, inviteSubject, inviteBody, inviteBatchIndex, inviteTotalBatches, notify])
 
     useEffect(() => {
         if (!form) return
@@ -524,7 +535,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             <ManagementKpis compact label="Mitgliederübersicht" loading={busy} items={[
                 { label: 'Aktive Mitglieder', value: memberSummary ? String(memberSummary.active) : '—', hint: 'In der gefilterten Auswahl' },
                 { label: 'Mit fälligen Beiträgen', value: memberSummary ? String(memberSummary.dueMembers) : '—', hint: 'Mitglieder mit offenen Beitragsperioden', tone: memberSummary?.dueMembers ? 'warning' : undefined },
-                { label: 'Fällige Beiträge', value: memberSummary ? eurFmt.format(memberSummary.dueAmount) : '—', hint: 'Offene Perioden × hinterlegter Beitrag', tone: memberSummary?.dueAmount ? 'warning' : undefined }
+                { label: 'Fällige Beiträge', value: memberSummary ? eurFmt.format(memberSummary.dueAmount) : '—', hint: 'Offene Restbeträge nach Teilzahlungen', tone: memberSummary?.dueAmount ? 'warning' : undefined }
             ]} />
             <div className="members-board-card">
                 <div className="members-board-header">
@@ -803,11 +814,12 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                                     </span>
                                 </div>
                                 <div className="field standard-floating-field standard-floating-field--filled">
-                                    <label htmlFor="member-next-due-date">Initiale Fälligkeit</label>
+                                    <label htmlFor="member-next-due-date">{form.mode === 'create' ? 'Initiale Fälligkeit' : 'Beitragsänderung ab (optional)'}</label>
                                     <span className="booking-date-input-wrap">
-                                        <input id="member-next-due-date" ref={memberNextDueDateInputRef} className="input" type="date" value={form.draft.next_due_date ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, next_due_date: e.target.value || null } })} />
-                                        <DatePickerButton inputRef={memberNextDueDateInputRef} ariaLabel="Kalender zur Auswahl der initialen Fälligkeit öffnen" />
+                                        <input id="member-next-due-date" ref={memberNextDueDateInputRef} className="input" type="date" value={(form.mode === 'create' ? form.draft.next_due_date : form.draft.contribution_effective_date) ?? ''} onChange={(e) => setForm({ ...form, draft: { ...form.draft, [form.mode === 'create' ? 'next_due_date' : 'contribution_effective_date']: e.target.value || null } })} />
+                                        <DatePickerButton inputRef={memberNextDueDateInputRef} ariaLabel="Kalender zur Auswahl des Beitragsbeginns öffnen" />
                                     </span>
+                                    {form.mode === 'edit' && <small className="helper">Ohne Datum gelten Änderungen ab der nächsten Beitragsperiode. Offene Beiträge bleiben erhalten.</small>}
                                 </div>
                             </div>
                         </div>
@@ -837,13 +849,13 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                     onClose={() => setShowInvite(false)}
                     variant="compact"
                     anchorAlign="end"
-                    className="invite-modal standard-floating-modal member-invite-floating-modal"
+                    className="invite-modal member-invite-modal"
                 >
-                        <div className="card invite-modal-content">
+                        <div className="invite-modal-content">
                             <div className="invite-summary-row">
                                 <div className="invite-summary-stats">
                                     <div className="invite-stat-card">
-                                        <div className="helper">Gefunden (mit E-Mail)</div>
+                                        <div className="helper">Gefunden</div>
                                         <strong>{inviteEmails.length}</strong>
                                     </div>
                                     <div className="invite-stat-card">
@@ -855,22 +867,22 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                                         <strong>{inviteStats.candidates}</strong>
                                     </div>
                                 </div>
-                                <label className="helper invite-active-toggle">
-                                    <input type="checkbox" checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
-                                    Nur aktive einladen
+                                <label className="invite-active-toggle">
+                                    <span>Nur aktive einladen</span>
+                                    <input className="toggle" type="checkbox" role="switch" checked={inviteActiveOnly} aria-checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
                                 </label>
                             </div>
                             <div className="invite-grid">
-                                <div className={`field standard-floating-field${inviteSubject.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                <div className="compact-booking-field">
                                     <label htmlFor="member-invite-subject">Betreff</label>
                                     <input id="member-invite-subject" ref={inviteSubjectRef} className="input" value={inviteSubject} onChange={(e)=>setInviteSubject(e.target.value)} />
                                 </div>
-                                <div className="field standard-floating-field standard-floating-field--filled invite-batch-field">
-                                    <label htmlFor="member-invite-batch">Empfänger im Batch (BCC)</label>
+                                <div className="compact-booking-field invite-batch-field">
+                                    <span>Empfänger im Batch (BCC)</span>
                                     <button
                                         id="member-invite-batch"
                                         type="button"
-                                        className="invite-batch-count-display invite-batch-count-button"
+                                        className="input invite-batch-count-display invite-batch-count-button"
                                         onClick={() => setShowInviteRecipients(true)}
                                         disabled={!inviteCurrentBatch.length}
                                         aria-haspopup="dialog"
@@ -878,16 +890,18 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                                         title="Empfänger im aktuellen Batch anzeigen"
                                     >
                                         <strong>{inviteCurrentBatch.length || 0}</strong>
-                                        <span>automatisch aus aktueller Auswahl</span>
+                                        <span>Empfänger anzeigen</span>
                                     </button>
                                 </div>
-                                <div className={`field invite-grid-span standard-floating-field${inviteBody.trim() ? ' standard-floating-field--filled' : ''}`}>
+                                <div className="compact-booking-field invite-grid-span">
                                     <label htmlFor="member-invite-message">Nachricht</label>
                                     <textarea id="member-invite-message" className="input invite-message-input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} />
                                 </div>
-                                <div className={`field invite-grid-span standard-floating-field${inviteCurrentBatch.length ? ' standard-floating-field--filled' : ''}`}>
-                                    <label htmlFor="member-invite-bcc">Empfänger (BCC)</label>
-                                    <textarea id="member-invite-bcc" className="input invite-bcc-input" readOnly rows={3} value={inviteCurrentBatch.join('; ')} />
+                                <div className="invite-grid-span">
+                                    <div className="compact-booking-field">
+                                        <label htmlFor="member-invite-bcc">Empfänger (BCC)</label>
+                                        <textarea id="member-invite-bcc" className="input invite-bcc-input" readOnly rows={3} value={inviteCurrentBatch.join('; ')} />
+                                    </div>
                                     {inviteTotalBatches > 1 && (
                                         <div className="invite-batch-row">
                                             <div className="helper">Batch {inviteBatchIndex + 1} von {inviteTotalBatches} (max. {INVITE_BCC_BATCH_SIZE} Empfänger je E-Mail)</div>
@@ -926,7 +940,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                           className="invite-modal-header"
                           title="Empfänger im Batch"
                           titleId="invite-recipient-modal-title"
-                          subtitle={<>{inviteCurrentBatch.length}E-Mail-Adresse{inviteCurrentBatch.length === 1 ? '' : 'n'}</>}
+                          subtitle={`${inviteCurrentBatch.length} E-Mail-Adresse${inviteCurrentBatch.length === 1 ? '' : 'n'}`}
                           onClose={() => setShowInviteRecipients(false)}
                           closeLabel="Schließen"
                           closeOnEscape={false}
@@ -1165,600 +1179,16 @@ function MemberFilterDropdown({
 function MemberStatusButton({ memberId, name, memberNo }: { memberId: number; name: string; memberNo?: string }) {
     const [open, setOpen] = useState(false)
     const [status, setStatus] = useState<any>(null)
-    const [history, setHistory] = useState<any[]>([])
-    const [historyPage, setHistoryPage] = useState(1)
-    const historyPageSize = 5
-    const [memberData, setMemberData] = useState<any>(null)
-    const [due, setDue] = useState<Array<{ periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }>>([])
-    const [selVoucherByPeriod, setSelVoucherByPeriod] = useState<Record<string, number | null>>({})
-    const [suggestionsByPeriod, setSuggestionsByPeriod] = useState<Record<string, VoucherSuggestion[]>>({})
-    const [manualListByPeriod, setManualListByPeriod] = useState<Record<string, VoucherSuggestion[]>>({})
-    const [searchByPeriod, setSearchByPeriod] = useState<Record<string, string>>({})
-    const [showManualSearch, setShowManualSearch] = useState<Record<string, boolean>>({})
-    const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-    // State for timeline-selected period (quick action)
-    const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null)
-    const [selectedPeriodInfo, setSelectedPeriodInfo] = useState<{ isPaid: boolean; isOverdue: boolean; paymentInfo?: { datePaid: string; amount: number; voucherNo?: string; description?: string } } | null>(null)
-    // State for confirming "mark paid without voucher"
-    const [confirmMarkPaid, setConfirmMarkPaid] = useState<{ periodKey: string; amount: number; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY' } | null>(null)
-
     useEffect(() => {
-        let alive = true
-        async function loadStatusAndBasics() {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId })
-                if (alive) setStatus(s || null)
-            } catch { /* noop */ }
-        }
-        loadStatusAndBasics()
-        const onChanged = () => loadStatusAndBasics()
-        const removeDataChangedListener = addDataChangedListener(['members', 'vouchers'], onChanged)
-        return () => { alive = false; removeDataChangedListener() }
+        let live = true
+        const load = () => { window.api.payments.status({ memberId }).then(s => { if (live) setStatus(s) }).catch(() => { if (live) setStatus(null) }) }
+        load()
+        const off = addDataChangedListener(['members', 'vouchers'], load)
+        return () => { live = false; off() }
     }, [memberId])
-
-    // Load suggestions for all due periods
-    const loadSuggestions = useCallback(async (dueList: typeof due) => {
-        const newSuggestions: Record<string, VoucherSuggestion[]> = {}
-        for (const d of dueList) {
-            try {
-                const res = await (window as any).api?.payments?.suggestVouchers?.({
-                    name,
-                    amount: d.amount,
-                    periodKey: d.periodKey,
-                    memberId  // Pass memberId to exclude already assigned vouchers
-                })
-                const rows = (res?.rows || []).map((v: any) => ({
-                    ...v,
-                    score: calculateScore(v, d.amount, name)
-                }))
-                rows.sort((a: VoucherSuggestion, b: VoucherSuggestion) => (b.score || 0) - (a.score || 0))
-                newSuggestions[d.periodKey] = rows
-            } catch {
-                newSuggestions[d.periodKey] = []
-            }
-        }
-        setSuggestionsByPeriod(newSuggestions)
-    }, [name, memberId])
-
-    // Calculate match score for suggestions
-    function calculateScore(v: VoucherSuggestion, expectedAmount: number, memberName: string): number {
-        let score = 0
-        // Exact amount match: +40
-        if (Math.abs(v.gross - expectedAmount) < 0.01) score += 40
-        // Close amount: +20
-        else if (Math.abs(v.gross - expectedAmount) < 1) score += 20
-        // Name in description/counterparty: +30
-        const text = ((v.description || '') + ' ' + (v.counterparty || '')).toLowerCase()
-        const nameParts = memberName.toLowerCase().split(/\s+/)
-        if (nameParts.some(p => p.length > 2 && text.includes(p))) score += 30
-        // Contains "mitglied" or "beitrag": +20
-        if (text.includes('mitglied') || text.includes('beitrag')) score += 20
-        // Recent date: +10
-        const daysDiff = Math.abs((new Date().getTime() - new Date(v.date).getTime()) / (1000 * 60 * 60 * 24))
-        if (daysDiff < 30) score += 10
-        return score
-    }
-
-    useEffect(() => {
-        if (!open) return
-        let alive = true
-        ;(async () => {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId })
-                const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
-                const member = await (window as any).api?.members?.get?.({ id: memberId })
-                if (alive) {
-                    setStatus(s || null)
-                    setMemberData(member || null)
-                    setHistory(h?.rows || [])
-                    if (s?.interval) {
-                        const today = new Date()
-                        const from = (s?.nextDue || s?.joinDate || new Date(today.getUTCFullYear(), 0, 1).toISOString().slice(0,10))
-                        const to = today.toISOString().slice(0,10)
-                        const res = await (window as any).api?.payments?.listDue?.({ interval: s.interval, from, to, memberId, includePaid: false })
-                        const rows = (res?.rows || []).filter((r: any) => r.memberId === memberId && !r.paid)
-                        const dueList = rows.map((r: any) => ({ periodKey: r.periodKey, interval: r.interval, amount: r.amount, paid: r.paid, voucherId: r.voucherId, verified: r.verified }))
-                        setDue(dueList)
-                        // Auto-load suggestions
-                        if (dueList.length > 0) loadSuggestions(dueList)
-                    } else { setDue([]) }
-                }
-            } catch { }
-        })()
-        return () => { alive = false }
-    }, [open, memberId, loadSuggestions])
-    useEffect(() => { setHistoryPage(1) }, [history.length])
-    useEffect(() => {
-        if (!open) return
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault()
-                setOpen(false)
-            }
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [open])
-
-    const color = status?.state === 'OVERDUE' ? 'var(--danger)' : status?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)'
-    const paidCount = history.length
-    const totalPeriods = paidCount + due.length
-    const progressPercent = totalPeriods > 0 ? (paidCount / totalPeriods) * 100 : 100
-
-    const handleMarkPaid = async (r: typeof due[0], voucherId: number | null) => {
-        try {
-            await (window as any).api?.payments?.markPaid?.({ memberId, periodKey: r.periodKey, interval: r.interval, amount: r.amount, voucherId })
-            const s = await (window as any).api?.payments?.status?.({ memberId })
-            const h = await (window as any).api?.payments?.history?.({ memberId, limit: 24 })
-            setStatus(s || null)
-            setHistory(h?.rows || [])
-            const nextDueList = due.filter((d) => d.periodKey !== r.periodKey)
-            setDue(nextDueList)
-            setSelVoucherByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            setSuggestionsByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            setManualListByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            setSearchByPeriod(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            setShowManualSearch(prev => { const { [r.periodKey]: _, ...rest } = prev; return rest })
-            dispatchDataChanged(['members'])
-        } catch (e: any) { alert(e?.message || String(e)) }
-    }
-
-    const doManualSearch = async (periodKey: string, search: string) => {
-        try {
-            const r = due.find(d => d.periodKey === periodKey)
-            if (!r) return
-            const { start } = periodRangeLocal(periodKey)
-            const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
-            const todayISO = new Date().toISOString().slice(0, 10)
-            const fromISO = s.toISOString().slice(0, 10)
-            const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 30 })
-            const list = (res?.rows || []).map((v: any) => ({
-                id: v.id,
-                voucherNo: v.voucherNo,
-                date: v.date,
-                description: v.description,
-                counterparty: v.counterparty,
-                gross: v.grossAmount,
-                score: calculateScore({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }, r.amount, name)
-            }))
-            list.sort((a: VoucherSuggestion, b: VoucherSuggestion) => (b.score || 0) - (a.score || 0))
-            setManualListByPeriod(prev => ({ ...prev, [periodKey]: list }))
-        } catch { }
-    }
-
-    // Determine if member has left
-    const hasLeft = !!status?.leaveDate
-
-    return (
-        <>
-            <button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color }}>
-                <AppIcon icon={IconCalendarDue} size="control" />
-            </button>
-            {open && (
-                <BookingPopupFrame
-                    title="Beitragsstatus"
-                    titleId={`member-fee-status-${memberId}`}
-                    subtitle={`${name}${memberNo ? ` (${memberNo})` : ''} · Eintritt: ${status?.joinDate || '—'} · Letzte Zahlung: ${status?.lastPeriod || '—'}`}
-                    onClose={() => setOpen(false)}
-                    variant="compact"
-                    anchorAlign="end"
-                    className="fee-modal standard-floating-modal member-fee-floating-modal"
-                    headerAccessory={(
-                        <>
-                            {hasLeft && <span className="fee-modal__status-badge fee-modal__status-badge--left">Ausgetreten</span>}
-                            <span className={`fee-modal__status-badge ${status?.state === 'OVERDUE' ? 'fee-modal__status-badge--overdue' : 'fee-modal__status-badge--ok'}`}>
-                                <AppIcon icon={status?.state === 'OVERDUE' ? IconCalendarDue : IconCalendarCheck} size="inline" />
-                                {status?.state === 'OVERDUE' ? `${status?.overdue || 0} überfällig` : 'OK'}
-                            </span>
-                        </>
-                    )}
-                >
-                    <div className="fee-modal__info-bar">
-                            <div className="fee-modal__info-item">
-                                <span className="fee-modal__info-label">Beitrag</span>
-                                <span className="fee-modal__info-value">{status?.amount ? eurFmt.format(status.amount) : '—'}</span>
-                            </div>
-                            <div className="fee-modal__info-item">
-                                <span className="fee-modal__info-label">Intervall</span>
-                                <span className="fee-modal__info-value">
-                                    {status?.interval === 'MONTHLY' ? 'Monatlich' : status?.interval === 'QUARTERLY' ? 'Quartal' : status?.interval === 'YEARLY' ? 'Jährlich' : '—'}
-                                </span>
-                            </div>
-                            <div className="fee-modal__info-item">
-                                <span className="fee-modal__info-label">Offene Beiträge</span>
-                                <span className="fee-modal__info-value" style={{ color: due.length > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                                    {due.length > 0 ? `${due.length} × ${status?.amount ? eurFmt.format(status.amount) : '—'} = ${eurFmt.format(due.length * (status?.amount || 0))}` : 'Keine'}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Progress */}
-                        {totalPeriods > 0 && (
-                            <div className="fee-progress">
-                                <div className="fee-progress__bar">
-                                    <div className="fee-progress__fill" style={{ width: `${progressPercent}%` }} />
-                                </div>
-                                <span className="fee-progress__label">{paidCount} von {totalPeriods} bezahlt</span>
-                            </div>
-                        )}
-
-                        {/* Timeline - clickable */}
-                        <MemberTimeline 
-                            status={status} 
-                            history={history} 
-                            selectedPeriod={selectedPeriod}
-                            onPeriodClick={(p) => {
-                                setSelectedPeriod(p.pk)
-                                setSelectedPeriodInfo({ isPaid: p.isPaid, isOverdue: p.isOverdue, paymentInfo: p.paymentInfo })
-                            }}
-                        />
-
-                        {/* Quick Action Panel - shows when a period is selected from timeline */}
-                        {selectedPeriod && selectedPeriodInfo && (
-                            <div className="fee-quick-action">
-                                <ModalHeader className="fee-quick-action__header">
-                                    <span className="fee-quick-action__title" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                                        <AppIcon icon={selectedPeriodInfo.isPaid ? IconCalendarCheck : IconCalendarDue} size="inline" />
-                                        {selectedPeriodInfo.isPaid ? 'Bezahlte Periode' : 'Fällige Periode'}: {selectedPeriod}
-                                    </span>
-                                    <ModalCloseButton onClick={() => { setSelectedPeriod(null); setSelectedPeriodInfo(null) }} aria-label="Schließen" />
-                                </ModalHeader>
-                                {selectedPeriodInfo.isPaid && selectedPeriodInfo.paymentInfo ? (
-                                    <div className="fee-quick-action__info">
-                                        <div className="fee-quick-action__row">
-                                            <span className="fee-quick-action__label">Bezahlt am:</span>
-                                            <span>{selectedPeriodInfo.paymentInfo.datePaid}</span>
-                                        </div>
-                                        <div className="fee-quick-action__row">
-                                            <span className="fee-quick-action__label">Betrag:</span>
-                                            <span>{eurFmt.format(selectedPeriodInfo.paymentInfo.amount)}</span>
-                                        </div>
-                                        {selectedPeriodInfo.paymentInfo.voucherNo && (
-                                            <div className="fee-quick-action__row">
-                                                <span className="fee-quick-action__label">Buchung:</span>
-                                                <span className="fee-history__voucher-link">#{selectedPeriodInfo.paymentInfo.voucherNo}</span>
-                                                {selectedPeriodInfo.paymentInfo.description && <span> · {selectedPeriodInfo.paymentInfo.description}</span>}
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : selectedPeriodInfo.isOverdue ? (
-                                    (() => {
-                                        // Find the due record for this period or create a temporary one
-                                        const dueRecord = due.find(d => d.periodKey === selectedPeriod)
-                                        if (!dueRecord) {
-                                            return <div className="helper">Periode nicht in fälligen Beiträgen gefunden</div>
-                                        }
-                                        const selVoucher = selVoucherByPeriod[selectedPeriod] ?? null
-                                        const suggestions = suggestionsByPeriod[selectedPeriod] || []
-                                        const manualList = manualListByPeriod[selectedPeriod] || []
-                                        const search = searchByPeriod[selectedPeriod] || ''
-                                        const showManual = showManualSearch[selectedPeriod] || false
-                                        const displayList = showManual ? manualList : suggestions
-
-                                        return (
-                                            <div className="fee-quick-action__assign">
-                                                <div className="fee-quick-action__amount">{eurFmt.format(dueRecord.amount)}</div>
-                                                
-                                                {displayList.length > 0 ? (
-                                                    <div className="fee-suggestions">
-                                                        {displayList.slice(0, 3).map((v) => {
-                                                            const isSelected = selVoucher === v.id
-                                                            const scoreLevel = (v.score || 0) >= 60 ? 'high' : (v.score || 0) >= 30 ? 'medium' : 'low'
-                                                            return (
-                                                                <div
-                                                                    key={v.id}
-                                                                    className={`fee-suggestion ${isSelected ? 'fee-suggestion--selected' : ''}`}
-                                                                    onClick={() => setSelVoucherByPeriod(prev => ({ ...prev, [selectedPeriod]: isSelected ? null : v.id }))}
-                                                                >
-                                                                    <div className="fee-suggestion__info">
-                                                                        <div className="fee-suggestion__main">
-                                                                            <span className="fee-suggestion__no">#{v.voucherNo || v.id}</span>
-                                                                            <span className="fee-suggestion__date">{v.date}</span>
-                                                                            <span className="fee-suggestion__amount">{eurFmt.format(v.gross)}</span>
-                                                                        </div>
-                                                                        <div className="fee-suggestion__desc">{v.description || v.counterparty || '—'}</div>
-                                                                    </div>
-                                                                    {!showManual && (
-                                                                        <span className={`fee-suggestion__score fee-suggestion__score--${scoreLevel}`}>
-                                                                            {scoreLevel === 'high' ? '★★★' : scoreLevel === 'medium' ? '★★' : '★'}
-                                                                        </span>
-                                                                    )}
-                                                                    <div className="fee-suggestion__check">
-                                                                        {isSelected && <AppIcon icon={IconCheck} size="inline" />}
-                                                                    </div>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="helper">Keine passenden Buchungen gefunden</div>
-                                                )}
-
-                                                {!showManual && (
-                                                    <button className="btn ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setShowManualSearch(prev => ({ ...prev, [selectedPeriod]: true }))}>
-                                                        Andere Buchung suchen…
-                                                    </button>
-                                                )}
-
-                                                {showManual && (
-                                                    <div className="fee-manual-search" style={{ marginTop: 8 }}>
-                                                        <input
-                                                            className="input fee-manual-search__input"
-                                                            placeholder="Suche (Betrag, Datum, Text)…"
-                                                            value={search}
-                                                            onChange={e => setSearchByPeriod(prev => ({ ...prev, [selectedPeriod]: e.target.value }))}
-                                                            onKeyDown={e => { if (e.key === 'Enter') doManualSearch(selectedPeriod, search) }}
-                                                        />
-                                                        <button className="btn" onClick={() => doManualSearch(selectedPeriod, search)}>Suchen</button>
-                                                        <button className="btn ghost" onClick={() => {
-                                                            setShowManualSearch(prev => ({ ...prev, [selectedPeriod]: false }))
-                                                            setManualListByPeriod(prev => ({ ...prev, [selectedPeriod]: [] }))
-                                                            setSearchByPeriod(prev => ({ ...prev, [selectedPeriod]: '' }))
-                                                        }}><AppIcon icon={IconX} size="control" /></button>
-                                                    </div>
-                                                )}
-
-                                                <button
-                                                    className="btn primary"
-                                                    style={{ marginTop: 12 }}
-                                                    onClick={() => {
-                                                        if (selVoucher) {
-                                                            handleMarkPaid(dueRecord, selVoucher)
-                                                            setSelectedPeriod(null)
-                                                            setSelectedPeriodInfo(null)
-                                                        } else {
-                                                            // Show confirmation dialog
-                                                            setConfirmMarkPaid({ periodKey: dueRecord.periodKey, amount: dueRecord.amount, interval: dueRecord.interval })
-                                                        }
-                                                    }}
-                                                >
-                                                    {selVoucher ? 'Mit Buchung verknüpfen' : 'Ohne Buchung bezahlen'}
-                                                </button>
-                                            </div>
-                                        )
-                                    })()
-                                ) : (
-                                    <div className="helper">Aktuelle Periode - noch nicht fällig</div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn btn-with-icon" onClick={async ()=>{
-                                try {
-                                    const addr = memberData?.address || null
-                                    const res = await (window as any).api?.members?.writeLetter?.({ id: memberId, name, address: addr, memberNo })
-                                    if (!(res?.ok)) alert(res?.error || 'Konnte Brief nicht öffnen')
-                                } catch (e: any) { alert(e?.message || String(e)) }
-                            }}><AppIcon icon={IconMail} size="control" />Mitglied anschreiben</button>
-                        </div>
-
-                        {/* History */}
-                        <div className="fee-history">
-                            <div className="fee-history__title">
-                                <span>Zahlungshistorie</span>
-                                {history.length > historyPageSize && (
-                                    <div className="fee-pagination">
-                                        <button className="btn fee-pagination__btn" onClick={() => setHistoryPage(1)} disabled={historyPage <= 1}>«</button>
-                                        <button className="btn fee-pagination__btn" onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage <= 1}>‹</button>
-                                        <span className="helper" style={{ padding: '0 8px' }}>{historyPage}/{Math.ceil(history.length / historyPageSize)}</span>
-                                        <button className="btn fee-pagination__btn" onClick={() => setHistoryPage(p => Math.min(Math.ceil(history.length / historyPageSize), p + 1))} disabled={historyPage >= Math.ceil(history.length / historyPageSize)}>›</button>
-                                        <button className="btn fee-pagination__btn" onClick={() => setHistoryPage(Math.ceil(history.length / historyPageSize))} disabled={historyPage >= Math.ceil(history.length / historyPageSize)}>»</button>
-                                    </div>
-                                )}
-                            </div>
-                            <table className="fee-history__table" cellPadding={0} cellSpacing={0}>
-                                <thead>
-                                    <tr>
-                                        <th>Periode</th>
-                                        <th>Datum</th>
-                                        <th style={{ textAlign: 'right' }}>Betrag</th>
-                                        <th>Verknüpfte Buchung</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.slice((historyPage-1)*historyPageSize, historyPage*historyPageSize).map((r,i)=> (
-                                        <tr key={i+(historyPage-1)*historyPageSize}>
-                                            <td>{r.periodKey}</td>
-                                            <td>{r.datePaid}</td>
-                                            <td style={{ textAlign: 'right' }}>{eurFmt.format(r.amount)}</td>
-                                            <td>
-                                                {r.voucherNo ? (
-                                                    <span className="fee-history__voucher-link">#{r.voucherNo}</span>
-                                                ) : '—'}
-                                                {r.description ? ` · ${r.description}` : ''}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {history.length === 0 && (
-                                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: 16 }}><span className="helper">Noch keine Zahlungen</span></td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                </BookingPopupFrame>
-            )}
-            {/* Confirmation dialog for "mark paid without voucher" */}
-            {confirmMarkPaid && createPortal(
-                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setConfirmMarkPaid(null)}>
-                    <div className="modal" style={{ width: 'min(90vw, 400px)', padding: 24 }} onClick={e => e.stopPropagation()}>
-                        <h3 style={{ margin: '0 0 16px 0' }}>Ohne Buchung bezahlen?</h3>
-                        <p style={{ margin: '0 0 8px 0', color: 'var(--text-dim)' }}>
-                            Beitrag für <strong>{confirmMarkPaid.periodKey}</strong> als bezahlt markieren, ohne eine Buchung zu verknüpfen?
-                        </p>
-                        <p style={{ margin: '0 0 20px 0', color: 'var(--text-dim)', fontSize: 13 }}>
-                            Betrag: <strong>{eurFmt.format(confirmMarkPaid.amount)}</strong>
-                        </p>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <button className="btn" onClick={() => setConfirmMarkPaid(null)}>Abbrechen</button>
-                            <button className="btn primary" onClick={() => {
-                                handleMarkPaid({ periodKey: confirmMarkPaid.periodKey, amount: confirmMarkPaid.amount, interval: confirmMarkPaid.interval, paid: 0 }, null)
-                                setConfirmMarkPaid(null)
-                                setSelectedPeriod(null)
-                                setSelectedPeriodInfo(null)
-                            }}>Ja, als bezahlt markieren</button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
-        </>
-    )
-}
-
-function MemberTimeline({ status, history, onPeriodClick, selectedPeriod }: { 
-    status: any; 
-    history: Array<{ periodKey: string; datePaid: string; amount: number; voucherNo?: string; description?: string }>;
-    onPeriodClick?: (period: { pk: string; isPaid: boolean; isOverdue: boolean; paymentInfo?: { datePaid: string; amount: number; voucherNo?: string; description?: string } }) => void;
-    selectedPeriod?: string | null;
-}) {
-    const interval: 'MONTHLY'|'QUARTERLY'|'YEARLY' = status?.interval || 'MONTHLY'
-    const today = new Date()
-    const currentKey = (() => {
-        const y = today.getUTCFullYear(); const m = today.getUTCMonth()+1
-        if (interval==='MONTHLY') return `${y}-${String(m).padStart(2,'0')}`
-        if (interval==='QUARTERLY') return `${y}-Q${Math.floor((m-1)/3)+1}`
-        return String(y)
-    })()
-    function prevKeyLocal(key: string): string {
-        const [yStr, rest] = key.split('-'); const y = Number(yStr)
-        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q>1) return `${y}-Q${q-1}`; return `${y-1}-Q4` }
-        if (rest) { const m = Number(rest); if (m>1) return `${y}-${String(m-1).padStart(2,'0')}`; return `${y-1}-12` }
-        return String(y-1)
-    }
-    function nextKeyLocal(key: string): string {
-        const [yStr, rest] = key.split('-'); const y = Number(yStr)
-        if (/^Q\d$/.test(rest||'')) { const q = Number((rest||'Q1').slice(1)); if (q<4) return `${y}-Q${q+1}`; return `${y+1}-Q1` }
-        if (rest) { const m = Number(rest); if (m<12) return `${y}-${String(m+1).padStart(2,'0')}`; return `${y+1}-01` }
-        return String(y+1)
-    }
-    function compareKeysLocal(a: string, b: string): number {
-        if (interval === 'MONTHLY') {
-            const [ay, am] = a.split('-'); const [by, bm] = b.split('-')
-            const ai = Number(ay)*12 + Number(am)
-            const bi = Number(by)*12 + Number(bm)
-            return ai === bi ? 0 : (ai < bi ? -1 : 1)
-        }
-        if (interval === 'QUARTERLY') {
-            const [ay, aqS] = a.split('-'); const [by, bqS] = b.split('-')
-            const aq = Number((aqS||'Q1').replace('Q','')); const bq = Number((bqS||'Q1').replace('Q',''))
-            const ai = Number(ay)*4 + aq
-            const bi = Number(by)*4 + bq
-            return ai === bi ? 0 : (ai < bi ? -1 : 1)
-        }
-        const ai = Number(a); const bi = Number(b)
-        return ai === bi ? 0 : (ai < bi ? -1 : 1)
-    }
-    function periodKeyFromDateLocal(d: Date): string { return (interval==='MONTHLY' ? `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}` : interval==='QUARTERLY' ? `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth()/3)+1}` : String(d.getUTCFullYear())) }
-    const joinKey = (() => { try { if (!status?.joinDate) return null; const jd = new Date(status.joinDate); if (isNaN(jd.getTime())) return null; return periodKeyFromDateLocal(jd) } catch { return null } })()
-    // Determine leave key if member has left
-    const leaveKey = (() => { try { if (!status?.leaveDate) return null; const ld = new Date(status.leaveDate); if (isNaN(ld.getTime())) return null; return periodKeyFromDateLocal(ld) } catch { return null } })()
-    
-    // Build payment lookup map
-    const paymentMap = new Map<string, { datePaid: string; amount: number; voucherNo?: string; description?: string }>()
-    for (const h of (history || [])) {
-        paymentMap.set(h.periodKey, { datePaid: h.datePaid, amount: h.amount, voucherNo: h.voucherNo, description: h.description })
-    }
-    const paidSet = new Set(paymentMap.keys())
-    
-    const nextDue = status?.nextDue || null
-    const firstDueKey = (() => {
-        if (nextDue) {
-            try { const d = new Date(nextDue); return periodKeyFromDateLocal(d) } catch { /* ignore */ }
-        }
-        return currentKey
-    })()
-    
-    // Calculate start key: Must go back far enough to show ALL overdue periods + some buffer
-    // Start from firstDueKey (earliest possible due) or joinKey
-    let startKey = firstDueKey
-    if (joinKey && compareKeysLocal(joinKey, startKey) < 0) {
-        // Check if join is before firstDue - use firstDue
-    } else if (joinKey && compareKeysLocal(joinKey, startKey) > 0) {
-        startKey = joinKey
-    }
-    // Also ensure we show at least a few periods before current for context
-    const pastCount = interval === 'QUARTERLY' ? 2 : 4
-    let contextStart = currentKey
-    for (let i = 0; i < pastCount; i++) { contextStart = prevKeyLocal(contextStart) }
-    // Use earlier of contextStart or startKey
-    if (compareKeysLocal(contextStart, startKey) < 0) {
-        startKey = contextStart
-    }
-    // Clamp to joinKey/firstDueKey if they are later
-    if (joinKey && compareKeysLocal(joinKey, startKey) > 0) startKey = joinKey
-    if (compareKeysLocal(firstDueKey, startKey) > 0) startKey = firstDueKey
-    
-    // End key: current + some future, or leave date
-    const futureCount = leaveKey ? 0 : 3
-    let endKey = leaveKey && compareKeysLocal(leaveKey, currentKey) < 0 ? leaveKey : currentKey
-    for (let i = 0; i < futureCount; i++) { endKey = nextKeyLocal(endKey) }
-    
-    // Build period list
-    const keys: string[] = []
-    let k = startKey
-    keys.push(k)
-    while (compareKeysLocal(k, endKey) < 0) { k = nextKeyLocal(k); keys.push(k) }
-
-    // Compute state for each period
-    const periodsWithState = keys.map((pk) => {
-        const isCurrent = pk === currentKey
-        const isPaid = paidSet.has(pk)
-        const isBeforeOrEqCurrent = compareKeysLocal(pk, currentKey) <= 0
-        const isOnOrAfterFirstDue = compareKeysLocal(pk, firstDueKey) >= 0
-        const isBeforeOrEqLeave = !leaveKey || compareKeysLocal(pk, leaveKey) <= 0
-        const isOverdue = !isPaid && isBeforeOrEqCurrent && isOnOrAfterFirstDue && isBeforeOrEqLeave
-        const isAfterLeave = leaveKey && compareKeysLocal(pk, leaveKey) > 0
-        const paymentInfo = paymentMap.get(pk)
-        return { pk, isCurrent, isPaid, isOverdue, isAfterLeave, paymentInfo }
-    })
-
-    const handleClick = (p: typeof periodsWithState[0]) => {
-        if (onPeriodClick) {
-            onPeriodClick({ pk: p.pk, isPaid: p.isPaid, isOverdue: p.isOverdue, paymentInfo: p.paymentInfo })
-        }
-    }
-
-    return (
-        <div className="fee-timeline-v2">
-            <div className="fee-timeline-v2__header">
-                <span className="fee-timeline-v2__title">Zeitstrahl</span>
-                <div className="fee-timeline-v2__legend">
-                    <span className="fee-timeline-v2__legend-item"><span className="fee-timeline-v2__legend-dot fee-timeline-v2__legend-dot--paid" /> bezahlt</span>
-                    <span className="fee-timeline-v2__legend-item"><span className="fee-timeline-v2__legend-dot fee-timeline-v2__legend-dot--overdue" /> überfällig</span>
-                    <span className="fee-timeline-v2__legend-item"><span className="fee-timeline-v2__legend-dot fee-timeline-v2__legend-dot--current" /> aktuell</span>
-                </div>
-            </div>
-            <div className="fee-timeline-v2__bar">
-                {periodsWithState.map((p) => {
-                    const { pk, isCurrent, isPaid, isOverdue, isAfterLeave } = p
-                    const isSelected = selectedPeriod === pk
-                    const stateClass = isPaid ? 'fee-timeline-v2__segment--paid'
-                        : isOverdue ? 'fee-timeline-v2__segment--overdue'
-                        : isCurrent ? 'fee-timeline-v2__segment--current'
-                        : isAfterLeave ? 'fee-timeline-v2__segment--inactive'
-                        : 'fee-timeline-v2__segment--future'
-                    const tooltip = `${pk}: ${isPaid ? 'bezahlt' : isOverdue ? 'überfällig' : isCurrent ? 'aktuell' : isAfterLeave ? 'nach Austritt' : 'offen'} – Klicken für Details`
-                    const isClickable = isPaid || isOverdue || isCurrent
-                    return (
-                        <div 
-                            key={pk} 
-                            className={`fee-timeline-v2__segment ${stateClass} ${isSelected ? 'fee-timeline-v2__segment--selected' : ''} ${isClickable ? 'fee-timeline-v2__segment--clickable' : ''}`} 
-                            title={tooltip}
-                            onClick={() => isClickable && handleClick(p)}
-                            role={isClickable ? 'button' : undefined}
-                            tabIndex={isClickable ? 0 : undefined}
-                            onKeyDown={(e) => isClickable && e.key === 'Enter' && handleClick(p)}
-                        >
-                            <span className="fee-timeline-v2__segment-label">{pk}</span>
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-    )
+    return <><button className="btn ghost" title="Beitragsstatus & Historie" aria-label="Beitragsstatus & Historie" onClick={() => setOpen(true)} style={{ marginLeft: 6, width: 24, height: 24, padding: 0, display: 'inline-grid', placeItems: 'center', color: status?.state === 'OVERDUE' ? 'var(--danger)' : 'var(--success)' }}>
+        <AppIcon icon={status?.state === 'OVERDUE' ? IconCalendarDue : IconCalendarCheck} size="control" />
+    </button>{open && <MemberContributionDialog memberId={memberId} name={name} memberNo={memberNo} onClose={() => setOpen(false)} />}</>
 }
 
 function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
@@ -1842,169 +1272,12 @@ function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
     )
 }
 
-function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string; memberNo?: string|null; status: string; periodKey: string; interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'; amount: number; paid: number; voucherId?: number|null; verified?: number }; onChanged: () => void }) {
-    const [suggestions, setSuggestions] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
-    const [selVoucher, setSelVoucher] = useState<number | null>(row.voucherId ?? null)
-    const [busy, setBusy] = useState(false)
-    const [search, setSearch] = useState('')
-    const [manualList, setManualList] = useState<Array<{ id: number; voucherNo: string; date: string; description?: string|null; counterparty?: string|null; gross: number }>>([])
-    const [showStatus, setShowStatus] = useState(false)
-    const [statusData, setStatusData] = useState<any>(null)
-    const [historyRows, setHistoryRows] = useState<any[]>([])
-    useEffect(() => {
-        let alive = true
-        async function loadStatus() {
-            try { const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId }); if (alive) setStatusData(s || null) } catch { }
-        }
-        loadStatus()
-        const onChanged = () => loadStatus()
-        const removeDataChangedListener = addDataChangedListener(['members', 'vouchers'], onChanged)
-        return () => { alive = false; removeDataChangedListener() }
-    }, [row.memberId])
-
-    useEffect(() => {
-        if (!showStatus) return
-        let alive = true
-        ;(async () => {
-            try {
-                const s = await (window as any).api?.payments?.status?.({ memberId: row.memberId })
-                const h = await (window as any).api?.payments?.history?.({ memberId: row.memberId, limit: 20 })
-                if (alive) { setStatusData(s || null); setHistoryRows(h?.rows || []) }
-            } catch { /* ignore */ }
-        })()
-        return () => { alive = false }
-    }, [showStatus, row.memberId])
-
-    useEffect(() => {
-        let active = true
-        ;(async () => {
-            try {
-                const res = await (window as any).api?.payments?.suggestVouchers?.({ name: row.name, amount: row.amount, periodKey: row.periodKey })
-                if (active) setSuggestions(res?.rows || [])
-            } catch { /* ignore */ }
-        })()
-        return () => { active = false }
-    }, [row.memberId, row.periodKey, row.amount])
-
-    const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
-    return (
-        <tr>
-            <td title={row.memberNo || undefined}>
-                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
-                <button
-                    className="btn ghost"
-                    title="Beitragsstatus & Historie"
-                    aria-label="Beitragsstatus & Historie"
-                    onClick={() => setShowStatus(true)}
-                    style={{ marginLeft: 6, width: 24, height: 24, padding: 0, borderRadius: 6, display: 'inline-grid', placeItems: 'center', color: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--text-dim)') }}
-                >
-                    <AppIcon icon={IconCalendarDue} size="inline" />
-                </button>
-                {showStatus && (
-                    <BookingPopupFrame
-                        title="Beitragsstatus"
-                        titleId={`payment-row-status-${row.memberId}-${row.periodKey}`}
-                        subtitle={`${row.name}${row.memberNo ? ` (${row.memberNo})` : ''} · Periode ${row.periodKey}`}
-                        onClose={() => setShowStatus(false)}
-                        variant="compact"
-                        anchorAlign="end"
-                        className="standard-floating-modal payments-row-status-modal"
-                        headerAccessory={(
-                            <span className="badge" style={{ background: (statusData?.state === 'OVERDUE' ? 'var(--danger)' : statusData?.state === 'OK' ? 'var(--success)' : 'var(--muted)'), color: '#fff' }}>
-                                {statusData?.state === 'OVERDUE' ? `Überfällig (${statusData?.overdue})` : statusData?.state === 'OK' ? 'OK' : '—'}
-                            </span>
-                        )}
-                    >
-                        <div className="payments-row-status-content">
-                            <div className="helper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <span>{row.name}{row.memberNo ? ` (${row.memberNo})` : ''}</span>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                <div className="card" style={{ padding: 10 }}>
-                                    <strong>Überblick</strong>
-                                    <ul style={{ margin: '6px 0 0 16px' }}>
-                                        <li>Eintritt: {statusData?.joinDate || '—'}</li>
-                                        <li>Letzte Zahlung: {statusData?.lastPeriod ? `${statusData.lastPeriod} (${statusData?.lastDate||''})` : '—'}</li>
-                                        <li>Initiale Fälligkeit: {statusData?.nextDue || '—'}</li>
-                                    </ul>
-                                </div>
-                                <div className="card" style={{ padding: 10 }}>
-                                    <strong>Historie</strong>
-                                    <table cellPadding={6} style={{ width: '100%', marginTop: 6 }}>
-                                        <thead>
-                                            <tr>
-                                                <th align="left">Periode</th>
-                                                <th align="left">Datum</th>
-                                                <th align="right">Betrag</th>
-                                                <th align="left">Beleg</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {historyRows.map((r,i)=> (
-                                                <tr key={i}>
-                                                    <td>{r.periodKey}</td>
-                                                    <td>{r.datePaid}</td>
-                                                    <td align="right">{eur.format(r.amount)}</td>
-                                                    <td>
-                                                        {r.voucherNo ? (
-                                                            <a href="#" onClick={(e)=>{ e.preventDefault(); if (r.voucherId) { const ev = new CustomEvent('apply-voucher-jump', { detail: { voucherId: r.voucherId } }); window.dispatchEvent(ev) } }}>{`#${r.voucherNo}`}</a>
-                                                        ) : '—'}
-                                                        {r.description ? ` · ${r.description}` : ''}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {historyRows.length===0 && <tr><td colSpan={4}><div className="helper">Keine Zahlungen</div></td></tr>}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                                <button className="btn" onClick={()=>setShowStatus(false)}>Schließen</button>
-                            </div>
-                        </div>
-                    </BookingPopupFrame>
-                )}
-            </td>
-            <td>{row.periodKey}</td>
-            <td>{row.interval}</td>
-            <td align="right">{eur.format(row.amount)}</td>
-            <td>
-                <div style={{ display: 'grid', gap: 6 }}>
-                    <select className="input" value={selVoucher ?? ''} onChange={e => setSelVoucher(e.target.value ? Number(e.target.value) : null)} title="Passende Buchung verknüpfen">
-                        <option value="">— ohne Verknüpfung —</option>
-                        {suggestions.map(s => (
-                            <option key={s.id} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
-                        ))}
-                        {manualList.map(s => (
-                            <option key={`m-${s.id}`} value={s.id}>{s.voucherNo || s.id} · {s.date} · {eur.format(s.gross)} · {(s.description || s.counterparty || '')}</option>
-                        ))}
-                    </select>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                        <input className="input" placeholder="Buchung suchen…" value={search} onChange={e => setSearch(e.target.value)} title="Suche in Buchungen (Betrag/Datum/Text)" />
-                        <button className="btn" onClick={async () => {
-                            try {
-                                const { start } = periodRangeLocal(row.periodKey)
-                                const s = new Date(start); s.setUTCDate(s.getUTCDate() - 90)
-                                const todayISO = new Date().toISOString().slice(0,10)
-                                const fromISO = s.toISOString().slice(0,10)
-                                const res = await (window as any).api?.vouchers?.list?.({ from: fromISO, to: todayISO, q: search || undefined, limit: 50 })
-                                const list = (res?.rows || []).map((v: any) => ({ id: v.id, voucherNo: v.voucherNo, date: v.date, description: v.description, counterparty: v.counterparty, gross: v.grossAmount }))
-                                setManualList(list)
-                            } catch {}
-                        }}>Suchen</button>
-                    </div>
-                </div>
-            </td>
-            <td>{row.paid ? (row.verified ? 'bezahlt ✔︎ (verifiziert)' : 'bezahlt') : 'offen'}</td>
-            <td style={{ whiteSpace: 'nowrap' }}>
-                {row.paid ? (
-                    <button className="btn" onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.unmark?.({ memberId: row.memberId, periodKey: row.periodKey }); onChanged(); dispatchDataChanged(['members']) } finally { setBusy(false) } }}>Rückgängig</button>
-                ) : (
-                    <button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await (window as any).api?.payments?.markPaid?.({ memberId: row.memberId, periodKey: row.periodKey, interval: row.interval, amount: row.amount, voucherId: selVoucher || null }); onChanged(); dispatchDataChanged(['members']) } finally { setBusy(false) } }}>Als bezahlt markieren</button>
-                )}
-            </td>
-        </tr>
-    )
+function PaymentsRow({ row, onChanged }: { row: { memberId: number; name: string; memberNo?: string|null; periodKey: string; interval: string; amount: number; paid: number; paidAmount?: number }; onChanged: () => void }) {
+    const [open, setOpen] = useState(false)
+    const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+    return <tr><td>{row.name}{open && <MemberContributionDialog memberId={row.memberId} name={row.name} memberNo={row.memberNo || undefined} onClose={() => setOpen(false)} onChanged={onChanged} />}</td>
+        <td>{row.periodKey}</td><td>{row.interval === 'MONTHLY' ? 'Monatlich' : row.interval === 'QUARTERLY' ? 'Quartalsweise' : 'Jährlich'}</td><td align="right">{euro.format(row.amount)}</td><td>Automatische Verrechnung</td>
+        <td>{row.paid ? 'Bezahlt' : row.paidAmount ? 'Teilbezahlt' : 'Offen'}</td><td><button className="btn" onClick={() => setOpen(true)}>Zahlung zuordnen</button></td></tr>
 }
 
 function sanitizePeriodKey(s: string, interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'): string {

@@ -148,6 +148,7 @@ export function memberFieldLabel(field: AiMemberUpdateField) {
     bic: 'BIC',
     contribution_amount: 'Beitrag',
     contribution_interval: 'Intervall',
+    contribution_effective_date: 'Beitragsänderung ab',
     mandate_ref: 'Mandatsreferenz',
     mandate_date: 'Mandatsdatum',
     join_date: 'Eintritt',
@@ -169,6 +170,7 @@ export function displayMemberValue(field: AiMemberUpdateField, value: unknown) {
     field === 'join_date' ||
     field === 'leave_date' ||
     field === 'mandate_date' ||
+    field === 'contribution_effective_date' ||
     field === 'next_due_date'
   )
     return formatIsoDate(String(value))

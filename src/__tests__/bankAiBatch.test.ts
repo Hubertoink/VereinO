@@ -142,6 +142,20 @@ describe('bank AI batch approval', () => {
     expect(() => applyBankAiBatchRow({ id: 7, token: preview.token })).toThrow(/geändert/)
   })
 
+  it('explains the account conflict in a saved link proposal without calling it stale', () => {
+    transaction.paymentAccountName = 'Volksbank'
+    transaction.aiSuggestion = { action: 'LINK_EXISTING', voucherId: 81, confidence: .9, reason: 'Treffer', warnings: [], evidence: [] }
+    jest.mocked(findBankTransactionMatches).mockImplementation(input => input.linkedOnly ? [] : [{
+      id: 81, matchKind: 'VOUCHER', description: 'Mitgliedsbeitrag', paymentAccountMismatch: true, paymentAccountName: 'Bank'
+    }] as any)
+    const preview = previewBankAiBatchRow(7)
+    expect(preview.blockers).toEqual([expect.stringContaining('Die vorhandene Buchung liegt auf „Bank“, der Bankbeleg auf „Volksbank“')])
+    expect(preview.blockers[0]).not.toContain('nicht mehr passend')
+    expect(() => applyBankAiBatchRow({ id: 7, token: preview.token })).toThrow('separate Zahlung')
+    expect(linkBankTransaction).not.toHaveBeenCalled()
+    expect(createVoucher).not.toHaveBeenCalled()
+  })
+
   it('applies the exact recurring occurrence and detects changed recurring settings', () => {
     transaction.aiSuggestion = { action: 'APPLY_RECURRING', recurringBookingId: 2, occurrenceId: 5, scheduledDate: '2026-08-13', confidence: .9, reason: 'Abo', warnings: [], evidence: [] }
     const recurring = { id: 2, name: 'Canva', sphere: 'IDEELL', description: 'Software', counterparty: 'Canva', vatRate: 0, frequency: 'MONTHLY', budgets: [], earmarks: [], tags: [], status: 'ACTIVE' }

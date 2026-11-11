@@ -1,5 +1,6 @@
-.modal.bank-import-dialog { width: min(1180px, 96vw); gap: 16px; max-height: calc(100dvh - 48px); }
-.bank-import-dialog .bank-import-scroll { padding-right: 4px; gap: 12px; }
+.modal.bank-import-dialog { width: min(1180px, 96vw); padding: 0; gap: 0; max-height: calc(100dvh - 48px); }
+.bank-import-dialog .bank-import-scroll { padding: 16px; gap: 12px; overscroll-behavior: contain; }
+.bank-import-dialog > .bank-modal-footer { padding: 12px 16px; }
 .bank-import-dialog .bank-modal-header h2 { margin: 0; }
 .bank-import-dialog .bank-modal-header p { margin: 6px 0 0; }
 .bank-import-account-card,

@@ -1586,7 +1586,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         })
     )
     const openRows = rows.filter((row) => row.status.hasPlan && row.overdue > 0)
-    const total = openRows.reduce((sum, row) => sum + row.amount * row.overdue, 0)
+    const total = openRows.reduce((sum, row) => sum + (row.status.dueAmount || 0), 0)
     return {
       summary: {
         checkedMembers: rows.length,
