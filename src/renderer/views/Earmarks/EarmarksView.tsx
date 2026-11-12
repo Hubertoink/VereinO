@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useState } from 'react'
 import { IconArchive, IconChevronsDown, IconChevronsUp, IconPlus } from '@tabler/icons-react'
@@ -132,13 +133,7 @@ export default function EarmarksView({
         </div>
 
         <div className="management-search-toolbar">
-          <input
-            className="input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Suche (Code, Name, Zeitraum, Beschreibung)"
-            style={{ flex: '0 1 560px', minWidth: 0, width: '100%' }}
-          />
+          <ResponsiveSearch wide value={q} onChange={setQ} placeholder="Suche (Code, Name, Zeitraum, Beschreibung)" label="Zweckbindungen durchsuchen" />
           <button
             className="btn primary btn-with-icon"
             onClick={() =>

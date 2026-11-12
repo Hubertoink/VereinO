@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ManagementKpis from '../../components/finance/ManagementKpis'
 import MemberContributionDialog from './MemberContributionDialog'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
@@ -470,7 +471,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             <div className="members-header-top">
                 <div className="members-header-left">
                     <h1 className="members-title">Mitglieder</h1>
-                    <input className="input members-search" placeholder="Suche (Name, E-Mail, Tel., Nr.)" value={q} onChange={(e) => { setOffset(0); setQ(e.target.value) }} />
+                    <ResponsiveSearch placeholder="Suche (Name, E-Mail, Tel., Nr.)" label="Mitglieder durchsuchen" value={q} onChange={value => { setOffset(0); setQ(value) }} />
                     <MemberFilterDropdown
                         status={status}
                         contributionFilter={contributionFilter}

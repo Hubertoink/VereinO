@@ -23,9 +23,6 @@
 .bp-field { display: grid; gap: 7px; font-size: 11px; font-weight: 600; color: var(--text-dim); min-width: 0; }
 .bp-field .input { width: 100%; min-width: 0; font-size: 12px; color: var(--text); }
 .bp-date-range { display: grid; gap: 10px; }
-.bp-search { position: relative; }
-.bp-search > svg { position: absolute; top: 11px; left: 8px; color: var(--text-dim); }
-.bp-search .input { width: 100%; padding-left: 30px; font-size: 12px; }
 .bp-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .bp-heading h1 { margin: 0; font-size: 20px; line-height: 1.2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bp-totals { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -171,11 +168,6 @@
 
 /* Search and compact filters for the experimental journal. */
 .bp-heading { display: grid; grid-template-columns: auto minmax(140px, 1fr) auto; align-items: center; }
-.bp-header-search { min-width: 0; width: 100%; max-width: 580px; justify-self: center; }
-.bp-header-search .input { height: 36px; font-size: 13px; padding-right: 34px; }
-.bp-header-search > svg { top: 9px; left: 10px; }
-.bp-header-search > .btn { position: absolute; right: 2px; top: 2px; display: flex; padding: 7px; }
-.bp-header-search input::-webkit-search-cancel-button { display: none; }
 .bp-month-select { min-width: 0; border: 1px solid transparent; background: transparent; color: var(--text); border-radius: 7px; padding: 6px 8px; font-size: 12px !important; font-weight: 700 !important; }
 .bp-month-select:hover { border-color: var(--accent); }
 .bp-month-select.is-active, .bp-all-dates.is-active { border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--text); }
@@ -215,7 +207,6 @@
 .bp-invoice-tools .invoice-batch-flyout { top: calc(100% + 8px); bottom: auto; z-index: 30; background: var(--surface); }
 .bp-inspector { max-height: calc(100dvh - 245px); }
 @media (max-width: 1450px) {
- .bp-header-search { justify-self: stretch; max-width: none; }
  .bp-inspector { max-height: calc(100dvh - 300px); }
 }
 
@@ -229,8 +220,6 @@
 }
 
 /* Keep actions and status cues consistent with the journal. */
-.bp-header-search > .btn { width: 32px; min-width: 32px; height: 32px; padding: 0; align-items: center; justify-content: center; }
-.bp-header-search > .btn svg { position: static; flex-shrink: 0; }
 .bp-invoice-tools { display: flex; align-items: center; gap: 12px; }
 .bp-invoice-tools > .bp-new { width: auto; flex-shrink: 0; }
 .bp-invoice-tools > .invoice-batch-control { flex: 1; min-width: 0; }
@@ -372,7 +361,6 @@
 
 /* Search and open drafts share one fixed-height row, without pushing the list down. */
 .bp-heading-workspace { display:flex; align-items:center; gap:10px; min-width:0; height:44px; }
-.bp-heading-workspace > .bp-header-search { flex:1 1 240px; min-width:100px; margin-inline:auto; }
 .bp-heading-workspace > .bp-draft-tabs { display:flex; flex:1 1 280px; flex-wrap:nowrap; align-items:center; gap:6px; min-width:0; max-width:52%; height:44px; max-height:44px; margin:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
 .bp-draft-tabs > .booking-draft-tab { display:flex; flex:1 0 82px; min-width:82px; max-width:180px; height:32px; overflow:hidden; }
 .bp-draft-tabs .booking-draft-tab__open { flex:1; min-width:0; overflow:hidden; }
@@ -445,3 +433,6 @@
 @media (max-width: 1100px) {
  .bp-inspector.bp-inspector--open { max-height: calc(100dvh - 16px); }
 }
+
+.bp-heading-workspace > .responsive-search:not(.responsive-search--compact) { flex: 1 1 240px; max-width: 580px; margin-inline: auto; }
+.bp-heading-workspace .responsive-search__field > .input { height: 36px; font-size: 13px; }

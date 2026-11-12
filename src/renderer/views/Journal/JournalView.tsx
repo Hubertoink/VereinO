@@ -1,3 +1,4 @@
+import ResponsiveSearch, { type ResponsiveSearchHandle } from '../../components/common/ResponsiveSearch'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconExternalLink, IconGripVertical, IconLayoutGrid, IconPaperclip, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
@@ -318,7 +319,7 @@ export default function JournalView({
     const [activeEditTabId, setActiveEditTabId] = useState<string | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
-    const searchInputRef = useRef<HTMLInputElement | null>(null)
+    const searchInputRef = useRef<ResponsiveSearchHandle | null>(null)
     const timeFilterRef = useRef<HTMLDivElement | null>(null)
     const metaFilterRef = useRef<HTMLDivElement | null>(null)
     const columnsFilterRef = useRef<HTMLDivElement | null>(null)
@@ -866,19 +867,9 @@ export default function JournalView({
         <div className="journal-view">
             {/* Filter Toolbar */}
             <div className="journal-filter-controls">
-                <div className="journal-filter-toolbar__search-wrap">
-                    <input
-                        ref={searchInputRef}
-                        className="input journal-filter-toolbar__search"
-                        placeholder="Suche (#ID, Text, Datum z. B. Juni, Juni 2026 oder 26.06.2026 …)"
-                        value={activeQ}
-                        onChange={(e) => {
-                            activeSetQ(e.target.value)
-                            activeSetPage(1)
-                        }}
-                        aria-label="Suche"
-                    />
-                </div>
+                <ResponsiveSearch ref={searchInputRef} wide value={activeQ}
+                    onChange={value => { activeSetQ(value); activeSetPage(1) }} label="Suche"
+                    placeholder="Suche (#ID, Text, Datum z. B. Juni, Juni 2026 oder 26.06.2026 …)" />
 
                 {/* Active filter chips stay beside the search field to keep the toolbar compact. */}
                 {chips.length > 0 && (

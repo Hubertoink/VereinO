@@ -78,6 +78,8 @@ test.beforeAll(async () => {
   styles = (await Promise.all(['src/renderer/views/BookingsPlus/bookingsPlus.css', 'src/renderer/components/booking/bookingTable.css'].map(file => readFile(file, 'utf8')))).join('\n')
   const sharedStyles = await readFile('src/renderer/styles.css', 'utf8')
   styles = sharedStyles.slice(sharedStyles.indexOf('.booking-draft-tabs {'), sharedStyles.indexOf('.booking-close-guard-modal {')) + '\n' + styles
+  styles += '\n' + sharedStyles.slice(sharedStyles.indexOf('/* Page searches share'))
+  styles += '\n' + sharedStyles.slice(sharedStyles.indexOf('.filter-dropdown {'), sharedStyles.indexOf('.filter-dropdown__grid {'))
 })
 
 test('filter refresh keeps rows, totals and panel geometry until results arrive', async ({ page }) => {
@@ -127,7 +129,9 @@ test('compact list chrome stays fixed while bookings scroll behind it', async ({
       const rows = Array.from({ length: 20 }, (_, index) => ({ id: index + 1, date: '2026-09-09', voucherNo: `IN-${index + 1}`, type: index % 2 ? 'OUT' : 'IN', sphere: 'IDEELL', grossAmount: 100 + index, description: `Scroll Buchung ${index + 1}`, tags: [] }))
       ;(window as any).api.vouchers.list = async () => ({ rows, total: rows.length })
     })
+    if (width <= 1100) await page.getByRole('button', { name: 'Buchungen suchen', exact: true }).click()
     await page.getByRole('searchbox', { name: 'Buchungen suchen' }).fill('Scroll')
+    if (width <= 1100) await page.keyboard.press('Escape')
     await expect(page.locator('.bp-row')).toHaveCount(20)
     const scroll = page.locator('.bp-list-scroll')
     const header = page.locator('.bp-list-header')

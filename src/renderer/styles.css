@@ -18724,8 +18724,8 @@ button.filter-totals-stat {
 }
 
 .recurring-overview-row {
-  display: grid;
-  grid-template-columns: minmax(430px, 1fr) minmax(440px, 1.1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -18737,32 +18737,14 @@ button.filter-totals-stat {
   justify-content: flex-end;
   gap: 8px;
   min-width: 0;
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
+  flex: 1 1 480px;
+  flex-wrap: wrap;
 }
 
-.recurring-search-wrap {
-  position: relative;
-  flex: 1 1 320px;
-  min-width: 0;
-  max-width: min(520px, 100%);
-}
-
-.recurring-search-wrap .input {
-  width: 100%;
-  padding-right: 40px;
-}
-
-.recurring-search-clear {
-  position: absolute;
-  top: 50%;
-  right: 5px;
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  padding: 0;
-  transform: translateY(-50%);
-}
+.recurring-overview-row > .recurring-summary-grid { flex: 1 1 380px; min-width: 0; }
+.recurring-page-tools:has(.responsive-search--compact) { flex: 0 1 auto; margin-left: auto; }
+.recurring-page-tools > .btn,
+.recurring-page-tools > .filter-dropdown { flex-shrink: 0; }
 
 .recurring-status-filter-menu {
   display: grid;
@@ -19210,10 +19192,6 @@ button.filter-totals-stat {
   padding: 12px;
 }
 
-@media (max-width: 1050px) {
-  .recurring-overview-row { grid-template-columns: 1fr; }
-}
-
 @media (max-width: 900px) {
   .recurring-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recurring-page-header { align-items: flex-start; flex-direction: column; }
@@ -19225,7 +19203,6 @@ button.filter-totals-stat {
   .recurring-book-summary,
   .recurring-schedule-grid { grid-template-columns: 1fr; }
   .recurring-page-tools { align-items: stretch; flex-wrap: wrap; }
-  .recurring-search-wrap { max-width: none; width: 100%; flex-basis: 100%; }
   .recurring-finance-row { grid-template-columns: 1fr; }
   .recurring-finance-row--net { grid-template-columns: 1fr; }
   .recurring-assignment-row { grid-template-columns: minmax(0, 1fr) 100px 30px; }
@@ -21646,3 +21623,21 @@ html.receipt-widget-document::before { content: none !important; display: none !
 
 .local-invoice-scan__payment-account { margin: 12px 0 16px; }
 .local-invoice-scan__payment-account small { font-size: 11px; line-height: 1.5; }
+
+/* Page searches share the same compact dropdown and keep filters outside the field. */
+.responsive-search { flex: 0 1 280px; width: 280px; min-width: 0; max-width: 100%; }
+.responsive-search--wide { flex-basis: 560px; width: 560px; }
+.responsive-search.responsive-search--compact { flex: 0 0 auto; width: auto; }
+.responsive-search__field { position: relative; display: flex; align-items: center; min-width: 0; width: 100%; }
+.responsive-search__field > svg { position: absolute; left: 10px; color: var(--text-dim); pointer-events: none; }
+.responsive-search__field > .input { box-sizing: border-box; width: 100%; min-width: 0; padding-left: 34px; padding-right: 38px; }
+.responsive-search__field > .responsive-search__clear { position: absolute; right: 4px; display: grid; place-items: center; width: 28px; height: 28px; min-height: 28px; padding: 0; }
+.responsive-search-panel .filter-dropdown__content { padding: 12px; }
+.responsive-search--compact .filter-dropdown__trigger { color: var(--text); }
+.responsive-search--compact .filter-dropdown__trigger.has-filters { color: var(--accent); }
+.journal-filter-controls > .responsive-search:not(.responsive-search--compact) { flex: 0 1 560px; }
+@media (max-width: 740px) {
+  .journal-filter-controls > .journal-filter-toolbar { flex-basis: auto; margin-left: auto; order: 0; }
+}
+
+.responsive-search__field input[type="search"]::-webkit-search-cancel-button { appearance: none; }

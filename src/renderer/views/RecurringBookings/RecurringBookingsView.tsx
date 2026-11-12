@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -594,10 +595,7 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
           <div className="recurring-summary-card recurring-summary-card--paused"><span>Pausiert</span><strong>{summary.paused}</strong></div>
         </div>
         <div className="recurring-page-tools">
-          <div className="recurring-search-wrap">
-            <input className="input" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Dauerbuchungen durchsuchen…" aria-label="Dauerbuchungen durchsuchen" />
-            {q && <button className="btn ghost recurring-search-clear" type="button" onClick={() => setQ('')} aria-label="Suche leeren"><AppIcon icon={IconX} size="control" /></button>}
-          </div>
+          <ResponsiveSearch value={q} onChange={setQ} placeholder="Dauerbuchungen durchsuchen…" label="Dauerbuchungen durchsuchen" />
           <RecurringStatusFilterDropdown value={status} onChange={setStatus} />
           {attentionOnly && <button className="btn" onClick={() => setAttentionOnly(false)}>Aufgabenfilter aufheben</button>}
           <div className="filter-divider" />

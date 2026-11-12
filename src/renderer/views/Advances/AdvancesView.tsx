@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../context/useToast'
@@ -709,13 +710,8 @@ export default function AdvancesView() {
         <div className="advances-layout">
         <section className="advances-list-card">
           <div className="advances-toolbar">
-            <input
-              className="input"
-              placeholder="Suchen (Person, Notiz)…"
-              value={q}
-              onChange={(e) => { setQ(e.target.value); setPage(0) }}
-              aria-label="Vorschüsse durchsuchen"
-            />
+            <ResponsiveSearch placeholder="Suchen (Person, Notiz)…" value={q}
+              onChange={value => { setQ(value); setPage(0) }} label="Vorschüsse durchsuchen" />
             <SelectDropdown value={status} onChange={value => { setStatus(value as AdvanceStatus); setPage(0) }} ariaLabel="Status filtern" options={[{ value: 'OPEN', label: 'Offen' }, { value: 'RESOLVED', label: 'Erledigt' }, { value: 'ALL', label: 'Alle' }]} />
           </div>
 

@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../components/common/ResponsiveSearch'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../components/finance/ManagementKpis'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -746,7 +747,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
         </div>
         {showReimbursements && <div className="invoices-filters" ref={setReimbursementToolbar} />}
         {!showReimbursements && <div className="invoices-filters">
-          <input className="input invoices-search" placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)..." value={q} onChange={(e) => { setQ(e.target.value); setOffset(0) }} aria-label="Verbindlichkeiten durchsuchen" />
+          <ResponsiveSearch placeholder="Suche Verbindlichkeiten (Nr., Partei, Text)..." value={q} onChange={value => { setQ(value); setOffset(0) }} label="Verbindlichkeiten durchsuchen" />
           <InvoiceFilterDropdown
             status={status}
             sphere={sphere}

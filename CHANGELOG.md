@@ -5,6 +5,19 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.14.0] - 2026-11-12
+
+### Geändert
+
+- Zahlkonten im Bankimport erscheinen als direkt auswählbare Karten. Ein einzelnes aktives Bankkonto wird automatisch vorausgewählt.
+- Der Importdialog hebt die Dateiauswahl und das Startdatum für den nächsten Kontoauszug hervor. Die KI-Option steht als Schalter bei den Importaktionen in der Fußzeile.
+- Die Kontoübersicht im Bankimport trennt Kontostatus, letzten Import und neuesten Umsatz. Das Umsatzdatum kennzeichnet einen veralteten Importstand rot und einen aktuellen grün; zusätzliche Hinweise stehen am Info-Symbol.
+- Seitensuchen werden bei schmalen Fenstern zu einem Suchsymbol mit aufklappbarem Suchfeld. Suchtext und Tastaturbedienung bleiben beim Größenwechsel erhalten; Filter stehen separat daneben.
+
+### Behoben
+
+- Die Kopfzeile der Dauerbuchungen passt sich der verfügbaren Breite an, sodass Suche, Filter und Aktionen auf schmalen Bildschirmen nicht mehr überlaufen.
+
 ## [4.13.2] - 2026-11-12
 
 ### Geändert

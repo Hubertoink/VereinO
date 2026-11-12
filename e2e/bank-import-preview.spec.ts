@@ -16,7 +16,10 @@ test.beforeAll(async () => {
       window.previews = []
       window.closeCalls = 0
       window.api = {
-        ai: { settings: { get: async () => ({ hasApiKey: false }) } },
+        ai: {
+          settings: { get: async () => ({ hasApiKey: !!window.aiAvailable }) },
+          bankImports: { reviewOpen: async input => { window.aiReview = input; return { suggestions: [] } } }
+        },
         bankTransactions: { importStatus: async () => ({ lastBookingDate: '2026-09-01', total: 34, recentImports: [], accounts: [
           { id: 1, name: 'Bank', lastImportAt: '2026-09-02 12:30:00', lastBookingDate: '2026-09-01',
             lastImportImportedCount: 34, lastImportFileName: 'september.csv', total: 34 },
@@ -44,7 +47,10 @@ test.beforeAll(async () => {
             duplicates: 0, duplicateRows: [], errors: [], importedTransactionIds: [] } }
         }
       }
-      createRoot(document.getElementById('root')).render(<BankImportModal accounts={accounts} onClose={() => { window.closeCalls++ }} onImported={() => {}} notify={() => {}} />)
+      const root = createRoot(document.getElementById('root'))
+      let renderKey = 0
+      window.renderImport = (nextAccounts = accounts, initialAccountId) => root.render(<BankImportModal key={++renderKey} accounts={nextAccounts} initialAccountId={initialAccountId} onClose={() => { window.closeCalls++ }} onImported={() => {}} notify={() => {}} />)
+      window.renderImport()
     ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'expose-import-dialog', setup(builder) {
       builder.onLoad({ filter: /BankImportView\.tsx$/ }, async ({ path }) => ({ contents: await fs.readFile(path, 'utf8') + '\nexport { BankImportModal }', loader: 'tsx' }))
@@ -62,10 +68,101 @@ test.beforeEach(async ({ page }) => {
 })
 
 async function loadFile(page: import('@playwright/test').Page, account = '1') {
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption(account)
+  await page.locator(`input[type=radio][value="${account}"]`).check()
   await page.locator('input[type=file]').setInputFiles({ name: 'export.csv', mimeType: 'text/csv', buffer: Buffer.from('Buchungstag;Betrag;Buchungstext;Verwendungszweck;Name Zahlungsbeteiligter\n28.01.2026;-8,80;SEPA-UEBERWEISUNG;Porto und Versandkosten;Merle Beckord') })
   await expect(page.getByRole('table', { name: 'Umsätze vor dem Import prüfen' })).toBeVisible()
 }
+
+test('account cards sit side by side and support keyboard selection', async ({ page }) => {
+  const first = page.getByRole('radio', { name: 'Bank', exact: true })
+  const second = page.getByRole('radio', { name: 'Weitere Bank', exact: true })
+  await expect(first).not.toBeChecked()
+  await expect(second).not.toBeChecked()
+  const cards = page.locator('.bank-import-account-choice')
+  const firstBox = (await cards.nth(0).boundingBox())!
+  const secondBox = (await cards.nth(1).boundingBox())!
+  expect(firstBox.y).toBe(secondBox.y)
+  expect(secondBox.x).toBeGreaterThan(firstBox.x + firstBox.width)
+  await first.focus()
+  await first.press('Space')
+  await expect(first).toBeChecked()
+  await first.press('ArrowRight')
+  await expect(second).toBeChecked()
+  await expect(first).not.toBeChecked()
+})
+
+test('the only active bank is preselected and its IBAN stays readable on narrow screens', async ({ page }, testInfo) => {
+  await page.evaluate(() => (window as any).renderImport([
+    { id: 1, name: 'Vereinsbank', kind: 'BANK', iban: 'DE89370400440532013000', isActive: 1 },
+    { id: 2, name: 'Alte Bank', kind: 'BANK', isActive: 0 },
+    { id: 3, name: 'Barkasse', kind: 'CASH', isActive: 1 }
+  ]))
+  await expect(page.getByRole('radio')).toHaveCount(1)
+  await expect(page.getByRole('radio')).toBeChecked()
+  await expect(page.getByRole('button', { name: 'Datei wählen', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Importhistorie des ausgewählten Kontos' })).toContainText('september.csv')
+  await page.screenshot({ path: testInfo.outputPath('single-account-selected.png') })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByText('DE89370400440532013000', { exact: true })).toBeVisible()
+  const card = (await page.locator('.bank-import-account-choice').boundingBox())!
+  expect(card.x).toBeGreaterThanOrEqual(0)
+  expect(card.x + card.width).toBeLessThanOrEqual(390)
+  await page.screenshot({ path: testInfo.outputPath('single-account-narrow.png') })
+})
+
+test('an explicit account takes precedence over the single bank default', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderImport([
+    { id: 1, name: 'Bank', kind: 'BANK', isActive: 1 },
+    { id: 2, name: 'PayPal', kind: 'PAYPAL', isActive: 1 }
+  ], 2))
+  await expect(page.getByRole('radio', { name: 'PayPal', exact: true })).toBeChecked()
+  await expect(page.getByRole('radio', { name: 'Bank', exact: true })).not.toBeChecked()
+})
+
+test('without eligible accounts the dialog asks for an active payment account', async ({ page }) => {
+  await page.evaluate(() => (window as any).renderImport([
+    { id: 1, name: 'Alte Bank', kind: 'BANK', isActive: 0 },
+    { id: 2, name: 'Barkasse', kind: 'CASH', isActive: 1 }
+  ]))
+  await expect(page.getByRole('radio')).toHaveCount(0)
+  await expect(page.getByText('Lege zuerst ein aktives Zahlkonto in den Einstellungen an.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Datei wählen', exact: true })).toHaveCount(0)
+})
+
+test('AI switch stays in the footer and reviews new records after importing', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1150, height: 740 })
+  await page.evaluate(() => {
+    (window as any).aiAvailable = true
+    ;(window as any).renderImport(undefined, 1)
+  })
+  const footer = page.locator('.bank-import-modal > .bank-modal-footer')
+  const aiSwitch = footer.getByRole('switch', { name: 'KI-Vorschläge nach dem Import erstellen' })
+  await expect(aiSwitch).toBeVisible()
+  await expect(aiSwitch).not.toBeChecked()
+  await expect(page.locator('.bank-import-account-card').getByRole('switch')).toHaveCount(0)
+  await expect(page.locator('.bank-import-next-date')).toContainText('Nächsten Import ab 1.9.2026')
+  await page.getByRole('button', { name: 'Datei wählen', exact: true }).click({ trial: true })
+  await page.screenshot({ path: testInfo.outputPath('import-hierarchy-dark.png') })
+  await aiSwitch.focus()
+  await aiSwitch.press('Space')
+  await expect(aiSwitch).toBeChecked()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+  await page.getByRole('button', { name: 'Datei wählen', exact: true }).click({ trial: true })
+  await expect(aiSwitch).toBeInViewport()
+  const footerBox = (await footer.boundingBox())!
+  expect(footerBox.x + footerBox.width).toBeLessThanOrEqual(390)
+  expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(844)
+  await page.screenshot({ path: testInfo.outputPath('import-hierarchy-narrow-light.png') })
+  await page.setViewportSize({ width: 1150, height: 740 })
+  await loadFile(page, '2')
+  await expect(aiSwitch).toBeChecked()
+  await page.evaluate(() => {
+    (window as any).commitResult = { imported: 1, duplicates: 0, errors: [], duplicateRows: [], importedTransactionIds: [44] }
+  })
+  await footer.getByRole('button', { name: '1 Beleg(e) importieren', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).aiReview)).toEqual({ transactionIds: [44] })
+})
 
 test('counterparty mapping is prominent and required before a CSV import', async ({ page }) => {
   await loadFile(page, '2')
@@ -81,17 +178,15 @@ test('counterparty mapping is prominent and required before a CSV import', async
 test('account selection shows its latest import and clears history on account changes', async ({ page }, testInfo) => {
   const history = page.getByRole('region', { name: 'Importhistorie des ausgewählten Kontos' })
   await expect(history).toHaveCount(0)
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('1')
+  await page.getByRole('radio', { name: 'Bank', exact: true }).check()
   await expect(history).toContainText('02.09.26')
   await expect(history).toContainText('34 Buchungssätze')
-  await expect(history).toContainText('Nächsten Auszug ab 1.9.2026 wählen')
+  await expect(history).toContainText('Nächsten Import ab 1.9.2026')
   await expect(history).toContainText('september.csv')
   await page.screenshot({ path: testInfo.outputPath('account-import-history.png') })
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('2')
+  await page.getByRole('radio', { name: 'Weitere Bank', exact: true }).check()
   await expect(history).toContainText('noch keine Buchungen importiert')
   await expect(history).not.toContainText('september.csv')
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('')
-  await expect(history).toHaveCount(0)
 })
 
 test('account comes first and actions stay disabled until the file is checked', async ({ page }, testInfo) => {
@@ -102,7 +197,7 @@ test('account comes first and actions stay disabled until the file is checked', 
   await page.screenshot({ path: testInfo.outputPath('account-first.png') })
   await loadFile(page, '2')
   await expect(page.getByRole('button', { name: '1 Beleg(e) importieren', exact: true })).toBeEnabled()
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('')
+  await page.getByRole('button', { name: 'Datei entfernen' }).click()
   await expect(page.getByRole('table')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '0 Beleg(e) importieren', exact: true })).toBeDisabled()
 })
@@ -147,9 +242,9 @@ test('account and mapping changes reset confirmations and recheck duplicates', a
   await page.getByRole('combobox', { name: 'Verwendungszweck', exact: true }).selectOption('Buchungstext')
   await expect(choice).not.toBeChecked()
   await expect(page.getByRole('alert')).toContainText('Zweckspalte')
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('2')
+  await page.getByRole('radio', { name: 'Weitere Bank', exact: true }).check()
   await expect(page.getByRole('cell', { name: 'Neu', exact: true })).toBeVisible()
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('1')
+  await page.getByRole('radio', { name: 'Bank', exact: true }).check()
   await expect(choice).not.toBeChecked()
   await page.getByRole('button', { name: 'Automatisch zuordnen' }).click()
   await expect(page.getByRole('combobox', { name: 'Verwendungszweck', exact: true })).toHaveValue('Verwendungszweck')
@@ -205,15 +300,15 @@ test('large previews paginate and keep footer accessible at smaller sizes', asyn
   await page.screenshot({ path: testInfo.outputPath('narrow-preview.png') })
 })
 
-test('late preview cannot restore an account after clearing it', async ({ page }) => {
+test('late preview cannot restore the previous account after switching it', async ({ page }) => {
   await page.evaluate(() => { (window as any).previewDelay = 300 })
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('1')
+  await page.getByRole('radio', { name: 'Bank', exact: true }).check()
   await page.locator('input[type=file]').setInputFiles({ name: 'export.csv', mimeType: 'text/csv', buffer: Buffer.from('test') })
   await expect(page.getByRole('button', { name: 'Wird geprüft …', exact: true })).toBeDisabled()
-  await page.getByLabel('Zahlkonto', { exact: false }).selectOption('')
-  await page.waitForTimeout(400)
-  await expect(page.getByLabel('Zahlkonto', { exact: false })).toHaveValue('')
-  await expect(page.getByRole('table')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'Weitere Bank', exact: true }).check()
+  await expect(page.getByRole('cell', { name: 'Neu', exact: true })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Weitere Bank', exact: true })).toBeChecked()
+  await expect(page.getByRole('radio', { name: 'Bank', exact: true })).not.toBeChecked()
 })
 
 test('failed recheck blocks stale imports and file removal resets the dialog', async ({ page }) => {

@@ -1,13 +1,14 @@
 .modal.bank-import-dialog { width: min(1180px, 96vw); padding: 0; gap: 0; max-height: calc(100dvh - 48px); }
 .bank-import-dialog .bank-import-scroll { padding: 16px; gap: 12px; overscroll-behavior: contain; }
 .bank-import-dialog > .bank-modal-footer { padding: 12px 16px; }
-.bank-import-dialog .bank-modal-header h2 { margin: 0; }
+.bank-import-dialog .bank-modal-header h2 { margin: 0; font-size: 20px; }
 .bank-import-dialog .bank-modal-header p { margin: 6px 0 0; }
 .bank-import-account-card,
 .bank-import-file-card,
 .bank-import-mapping-card,
 .bank-import-review { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px; min-width: 0; }
 .bank-import-step-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.bank-import-step-heading strong { font-size: 17px; }
 .bank-import-step-heading > div,
 .bank-import-section-heading > div,
 .bank-import-file-card > div,
@@ -15,8 +16,19 @@
 .bank-import-duplicate-banner > div { display: grid; gap: 4px; min-width: 0; }
 .bank-import-step-heading span,
 .bank-import-dialog small { color: var(--text-dim); font-size: 12px; line-height: 1.45; }
-.bank-import-account-options { display: flex; gap: 16px; align-items: center; }
-.bank-import-account-options > .field { flex: 1; min-width: 0; margin: 0; }
+.bank-import-account-options { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
+.bank-import-account-selection { min-width: 0; margin: 0; padding: 0; border: 0; }
+.bank-import-account-selection legend { padding: 0; margin-bottom: 8px; font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.bank-import-account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 10px; }
+.bank-import-account-choice { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.bank-import-account-choice:hover { border-color: var(--accent); }
+.bank-import-account-choice.is-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.bank-import-account-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bank-import-account-choice input { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.bank-import-account-selection:disabled .bank-import-account-choice { opacity: .6; cursor: not-allowed; }
+.bank-import-account-details { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.bank-import-account-details strong { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.bank-import-account-dot { flex: 0 0 8px; height: 8px; border-radius: 50%; }
 .bank-import-account-history { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--text) 4%, var(--surface)); font-size: 12px; }
 .bank-import-history-heading { display: flex; align-items: center; gap: 7px; }
 .bank-import-history-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; margin: 12px 0; }
@@ -25,15 +37,25 @@
 .bank-import-history-facts dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .bank-import-account-history p { margin: 8px 0 0; color: var(--text-dim); line-height: 1.5; }
 .bank-import-history-file { overflow-wrap: anywhere; }
-.bank-import-dialog .bank-import-ai-option { flex: 0 1 380px; margin: 0; padding: 10px 12px; font-size: 12px; }
-.bank-import-file-card { display: flex; gap: 12px; align-items: center; border-style: dashed; background: color-mix(in srgb, var(--accent) 3%, var(--surface)); }
+.bank-import-next-date { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--accent); border-radius: 6px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.bank-import-next-date > svg { flex-shrink: 0; color: var(--accent); }
+.bank-import-next-date > div { display: grid; gap: 5px; }
+.bank-import-next-date strong { font-size: 15px; }
+.bank-import-next-date time { white-space: nowrap; }
+.bank-import-file-card { display: flex; gap: 14px; align-items: center; padding: 20px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .bank-import-file-card > div { flex: 1; }
-.bank-import-file-card strong { overflow-wrap: anywhere; font-size: 13px; }
-.bank-import-file-card.is-dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.bank-import-file-card strong { overflow-wrap: anywhere; font-size: 17px; }
+.bank-import-file-icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.bank-import-file-card .btn { min-height: 40px; flex-shrink: 0; }
+.bank-import-file-card.has-file { padding: 14px; border-color: var(--border); border-style: solid; background: var(--surface); }
+.bank-import-file-card.has-file strong { font-size: 14px; }
+.bank-import-file-card:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bank-import-file-card.is-dragging { border-color: var(--accent); border-style: solid; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); outline: 2px solid var(--accent); outline-offset: 2px; }
 .bank-import-file-status { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; background: color-mix(in srgb, var(--success) 9%, var(--surface)); color: var(--success); font-size: 13px; }
 .bank-import-file-status.has-errors { background: color-mix(in srgb, var(--warning) 9%, var(--surface)); color: var(--warning); }
 .bank-import-loading { font-size: 13px; color: var(--text-dim); padding: 8px 0; }
 .bank-import-section-heading { display: flex; gap: 12px; align-items: center; justify-content: space-between; font-size: 13px; }
+.bank-import-section-heading > div > strong { font-size: 16px; }
 .bank-import-section-heading .btn { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; }
 .bank-import-mapping-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .bank-import-mapping-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
@@ -83,8 +105,21 @@
 .bank-import-choice input:disabled { opacity: .5; cursor: wait; }
 .bank-import-review-pagination { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
 .bank-import-review-pagination > div { display: flex; align-items: center; gap: 10px; }
-.modal.bank-import-dialog > .bank-modal-footer { display: flex; align-items: center; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; }
-.bank-import-dialog > .bank-modal-footer > .helper { margin-right: auto; font-size: 12px; }
+.modal.bank-import-dialog > .bank-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; padding: 14px 16px; border: 0; border-top: 1px solid var(--border); border-radius: 0; }
+.bank-import-footer-context { display: grid; flex: 1 1 280px; gap: 8px; min-width: 0; }
+.bank-import-footer-context > .helper { font-size: 12px; color: var(--text-dim); }
+.bank-import-footer-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.bank-import-dialog .bank-import-footer-actions .btn { min-height: 38px; }
+.bank-import-ai-toggle { display: flex; align-items: center; gap: 10px; width: fit-content; cursor: pointer; }
+.bank-import-ai-toggle > span { display: grid; gap: 3px; }
+.bank-import-ai-toggle strong { display: flex; align-items: center; gap: 5px; font-size: 13px; }
+.bank-import-ai-toggle strong svg { color: var(--accent); }
+.bank-import-ai-toggle input { appearance: none; position: relative; flex: 0 0 34px; width: 34px; height: 20px; margin: 0; border: 1px solid var(--border); border-radius: 20px; background: color-mix(in srgb, var(--text-dim) 38%, var(--surface)); cursor: pointer; }
+.bank-import-ai-toggle input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text); }
+.bank-import-ai-toggle input:checked { background: var(--accent); border-color: var(--accent); }
+.bank-import-ai-toggle input:checked::after { left: 16px; background: var(--surface); }
+.bank-import-ai-toggle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.bank-import-ai-toggle input:disabled { opacity: .5; cursor: not-allowed; }
 .bank-import-dialog > .bank-modal-footer .btn { box-shadow: none; }
 .bank-import-dialog .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: var(--text-dim); border-color: var(--border); opacity: .6; box-shadow: none; cursor: not-allowed; }
 /* Keep disabled footer actions muted even when global primary hover styles load later. */
@@ -99,15 +134,14 @@
 }
 @media (max-width: 900px) {
   .bank-import-mapping-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .bank-import-account-options { flex-wrap: wrap; }
-  .bank-import-dialog .bank-import-ai-option { flex-basis: 100%; }
 }
 @media (max-width: 600px) {
   .bank-import-history-facts { grid-template-columns: 1fr; }
   .bank-import-mapping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bank-import-file-card, .bank-import-section-heading, .bank-import-duplicate-banner { flex-wrap: wrap; }
   .bank-import-file-card > div { flex-basis: 70%; }
-  .bank-import-dialog > .bank-modal-footer > .helper { flex-basis: 100%; }
+  .bank-import-file-card:not(.has-file) > .btn { width: 100%; }
+  .bank-import-footer-context { flex-basis: 100%; }
 }
 @media (max-height: 760px) {
   .modal.bank-import-dialog { max-height: calc(100dvh - 88px); }

@@ -1,3 +1,4 @@
+import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
 import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil, IconFilter, IconPlus, IconX } from '@tabler/icons-react'
@@ -143,7 +144,7 @@ export default function ReimbursementsDialog({ onClose, notify, voucher, initial
   const today = new Date().toLocaleDateString('en-CA')
   const overdue = visible.filter(row => row.remainingCents > 0 && row.dueDate && row.dueDate < today)
   const toolbar = <div className="reimbursement-overview-toolbar">
-    <input className="input invoices-search" placeholder="Partner oder Bezeichnung suchen" aria-label="Kostenerstattungen suchen" value={q} onChange={event => setQ(event.target.value)} />
+    <ResponsiveSearch placeholder="Partner oder Bezeichnung suchen" label="Kostenerstattungen suchen" value={q} onChange={setQ} />
     <ReimbursementStatusFilter value={statusFilter} onApply={setStatusFilter} />
     {(q.trim() || statusFilter !== 'ALL') && <button className="btn btn-clear-filters" title="Alle Filter löschen" aria-label="Alle Filter löschen" onClick={() => { setQ(''); setStatusFilter('ALL') }}><AppIcon icon={IconX} size="action" /></button>}
     <div className="filter-divider" />
