@@ -5,7 +5,7 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
-## [4.15.0] - 2026-11-13
+## [4.15.1] - 2026-11-13
 
 ### Hinzugefügt
 

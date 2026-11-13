@@ -42,7 +42,7 @@ interface OrganizationAppearance {
 
 export interface SystemApi {
     clipboard: {
-        readImage: () => Promise<{ dataBytes: Uint8Array; fileName: string } | null>
+        readImage: () => Promise<{ dataBytes: Uint8Array; mimeType: string; fileName: string } | null>
     }
     ocr: {
         status: () => Promise<{

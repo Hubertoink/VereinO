@@ -58,7 +58,7 @@ export function useInvoicePaste({ enabled, surfaceRef, onFile, onError }: {
         try {
           const image = await window.api.clipboard?.readImage()
           if (ticket !== request || !available() || !image) return
-          callbacks.current.onFile(new File([new Uint8Array(image.dataBytes)], image.fileName, { type: 'image/png' }))
+          callbacks.current.onFile(new File([new Uint8Array(image.dataBytes)], image.fileName, { type: image.mimeType }))
         } catch (error) {
           if (ticket === request && available()) callbacks.current.onError(error instanceof Error ? error.message : 'Bild konnte nicht eingefügt werden.')
         } finally { if (ticket === request) reading = false }
