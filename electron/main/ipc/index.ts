@@ -913,6 +913,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const { getAiSettings } = await loadAiService()
     return AiSettingsGetOutput.parse(getAiSettings())
   })
+  ipcMain.handle('clipboard.readImage', async (event) => {
+    if (!BrowserWindow.fromWebContents(event.sender)?.isFocused()) return null
+    const { readClipboardImage } = await import('../services/clipboardImage')
+    return readClipboardImage()
+  })
   ipcMain.handle('ai.settings.set', async (_e, payload) => {
     const parsed = AiSettingsSetInput.parse(payload)
     const { setAiSettings } = await loadAiService()
@@ -1059,7 +1064,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         warnings: []
       })
     }
-    return withBankAiReviewLock(getDb(), openRows.map(row => Number(row.id)), async () => {
+    const reviewDb = getDb()
+    return withBankAiReviewLock(reviewDb, openRows.map(row => Number(row.id)), async () => {
       const ids = openRows.map(row => Number(row.id))
       const progress = (phase: BankAiReviewProgress['phase'], activeIds: number[] = [], completedIds: number[] = []) => {
         if (parsed?.requestId && !event.sender.isDestroyed()) {
@@ -1199,6 +1205,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
           })
         }
       }
+      const { resolveAiMasterData } = await import('../services/aiMasterData')
+      if (getDb() !== reviewDb) throw new Error('Die Organisation wurde während der KI-Prüfung gewechselt. Bitte erneut prüfen.')
+      for (const suggestion of suggestions) {
+        if (suggestion.action !== 'CREATE_BOOKING' || !suggestion.bookingCandidate) continue
+        const bank = transactionById.get(Number(suggestion.transactionId))!
+        suggestion.bookingCandidate = resolveAiMasterData({ ...suggestion.bookingCandidate,
+          counterparty: bank.counterparty?.trim() || suggestion.bookingCandidate.counterparty,
+          date: bank.bookingDate, grossAmount: Number(bank.amount) })
+        suggestion.warnings = [...new Set([...suggestion.warnings, ...suggestion.bookingCandidate.warnings])]
+      }
+      if (suggestions.some(suggestion => suggestion.bookingCandidate?.masterDataCreated?.length)) notifyDataChanged(['tags', 'budgets', 'earmarks', 'parties'])
       const output = AiBankImportReviewOutput.parse({
         ...reviewed.result,
         suggestions
@@ -1230,6 +1247,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
         loadAiContextService()
       ])
       if (initial.type === 'BOOKING_FROM_DOCUMENTS') {
+        const analysisDb = getDb()
         const context = buildAiContext()
         const analyzed = await analyzeBookingDocuments({
           files: initial.files.map((file) => ({
@@ -1240,7 +1258,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
           context,
           model: initial.model
         })
-        const sourceNormalizedResult = normalizeAiCandidateSources(initial.files, analyzed.result)
+        const { resolveAiMasterData } = await import('../services/aiMasterData')
+        if (getDb() !== analysisDb) throw new Error('Die Organisation wurde während der KI-Prüfung gewechselt. Bitte erneut prüfen.')
+        const sourceNormalizedResult = normalizeAiCandidateSources(initial.files, {
+          ...analyzed.result, candidates: analyzed.result.candidates.map(candidate => resolveAiMasterData(candidate))
+        })
+        if (sourceNormalizedResult.candidates.some((candidate: { masterDataCreated?: string[] }) => candidate.masterDataCreated?.length)) notifyDataChanged(['tags', 'budgets', 'earmarks', 'parties'])
         const hardenedResult = applyPaymentAccountHintToAiAnalysis(
           sourceNormalizedResult,
           initial.prompt || initial.title || '',
@@ -1299,6 +1322,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     }
     const voucherPayload = VoucherCreateInput.parse({
       note: currentAiBookingComment(candidate.note),
+      counterparty: candidate.counterparty ?? null,
+      partyId: candidate.partyId ?? null,
       date: candidate.date,
       type: candidate.type,
       sphere: candidate.sphere,
@@ -1387,6 +1412,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       loadAiContextService()
     ])
     const result = await runAiAgent({ ...parsed, context: buildAiContext() })
+    if (result.toolCalls.some(call => call.ok && ['master_data_create', 'booking_draft_prepare'].includes(call.name))) notifyDataChanged(['tags', 'budgets', 'earmarks', 'parties'])
     return AiAgentRunOutput.parse(result)
   })
   ipcMain.handle('ai.agent.memory.list', async (_e, payload) => {

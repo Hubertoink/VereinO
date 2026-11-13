@@ -1,3 +1,4 @@
+import { AiMasterDataPermissions, AiMasterDataProposal } from '../../../../shared/aiMasterDataPolicy'
 import { z } from 'zod'
 import { AiReportAnswerSchema } from './aiReporting'
 import { FileDataFields, hasFileData, PaymentMethod, Sphere, VoucherType } from './primitives'
@@ -48,6 +49,9 @@ export const AiBookingSourceStructured = z.object({
 })
 
 export const AiBookingCandidate = z.object({
+  masterData: AiMasterDataProposal.nullable().optional(),
+  masterDataCreated: z.array(z.string()).optional(),
+  partyId: z.number().int().positive().nullable().optional(),
   note: z.string().nullable().optional(),
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
@@ -83,6 +87,7 @@ export const AiTextDraftResult = z.object({
 })
 
 export const AiBookingCandidateStructured = z.object({
+  masterData: AiMasterDataProposal.nullable(),
   note: z.string().nullable(),
   date: z.string().min(4),
   type: VoucherType.exclude(['TRANSFER', 'INTERNAL']),
@@ -712,6 +717,7 @@ export const AiProvider = z.enum(['openai', 'minimax', 'mittwald'])
 export const AiProxyMode = z.enum(['system', 'direct', 'manual'])
 export const AiTaskProfile = z.enum(['auto', 'fast', 'quality', 'custom'])
 export const AiSettingsGetOutput = z.object({
+  masterDataCreation: AiMasterDataPermissions.default({}),
   bookingCommentsEnabled: z.boolean().default(true),
   hasApiKey: z.boolean(),
   model: z.string(),
@@ -726,6 +732,7 @@ export const AiSettingsGetOutput = z.object({
   proxyBypassRules: z.string().default('<local>')
 })
 export const AiSettingsSetInput = z.object({
+  masterDataCreation: AiMasterDataPermissions.partial().optional(),
   bookingCommentsEnabled: z.boolean().optional(),
   apiKey: z.string().optional(),
   model: z.string().min(1).max(200).optional(),
@@ -740,6 +747,7 @@ export const AiSettingsSetInput = z.object({
   proxyBypassRules: z.string().max(4096).optional()
 })
 export const AiSettingsSetOutput = z.object({
+  masterDataCreation: AiMasterDataPermissions.default({}),
   bookingCommentsEnabled: z.boolean().default(true),
   ok: z.boolean(),
   hasApiKey: z.boolean(),

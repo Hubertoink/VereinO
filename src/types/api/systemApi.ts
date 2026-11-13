@@ -41,6 +41,9 @@ interface OrganizationAppearance {
 }
 
 export interface SystemApi {
+    clipboard: {
+        readImage: () => Promise<{ dataBytes: Uint8Array; fileName: string } | null>
+    }
     ocr: {
         status: () => Promise<{
             available: boolean

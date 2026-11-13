@@ -1,4 +1,5 @@
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
+import { useInvoicePaste } from '../../hooks/useInvoicePaste'
 import type { PartyCreationSource } from '../../utils/partyCreationSource'
 import { locateInvoiceSource, type InvoiceSource, type SourcePage } from '../../utils/invoiceSources'
 import InvoiceFileName from './InvoiceFileName'
@@ -281,6 +282,7 @@ export default function LocalInvoiceScanModal({
 }) {
   const { notify } = useToast()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const pasteSurfaceRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const textLayerRef = useRef<HTMLDivElement | null>(null)
@@ -880,6 +882,10 @@ export default function LocalInvoiceScanModal({
     if (nextFile) void analyzeFile(nextFile)
   }
 
+  useInvoicePaste({ enabled: !file && !isTransferring, surfaceRef: pasteSurfaceRef,
+    onFile: nextFile => { void analyzeFile(nextFile) },
+    onError: message => { setAnalysisState('error'); setAnalysisMessage(message) } })
+
   useEffect(() => {
     if (!initialFile) return
     let cancelled = false
@@ -1143,6 +1149,7 @@ export default function LocalInvoiceScanModal({
     <div className="modal-overlay local-invoice-scan-overlay" role="presentation" onClick={onClose}>
       <section
         className={`modal local-invoice-scan${!file && anchorRect ? ' local-invoice-scan--flyout' : ''}`}
+        ref={pasteSurfaceRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="local-invoice-scan-title"
@@ -1208,7 +1215,7 @@ export default function LocalInvoiceScanModal({
               <FileTextPlusIcon size={34} />
             </span>
             <strong>Rechnung hier ablegen</strong>
-            <span>oder Datei auswählen</span>
+            <span>oder Datei auswählen · Strg+V zum Einfügen</span>
             <small>PDF, PNG, JPG oder WebP · maximal 25 MB</small>
             {analysisState === 'error' && (
               <span className="local-invoice-scan__drop-error" role="alert">

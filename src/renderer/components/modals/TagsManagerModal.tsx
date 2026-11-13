@@ -2,12 +2,13 @@ import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagModal, { TagValue } from './TagModal'
+import TagDeleteModal, { TagDeleteTarget } from './TagDeleteModal'
 
 export default function TagsManagerModal({ onClose, notify, onChanged }: { onClose: () => void; notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void; onChanged?: () => void }) {
     const [tags, setTags] = useState<Array<{ id: number; name: string; color?: string | null; usage?: number }>>([])
     const [edit, setEdit] = useState<null | TagValue>(null)
     const [busy, setBusy] = useState(false)
-    const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; name: string }>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<TagDeleteTarget | null>(null)
     async function refresh() {
         try {
             setBusy(true)
@@ -46,7 +47,7 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
                                 <td align="right">{t.usage ?? '—'}</td>
                                 <td align="center" style={{ whiteSpace: 'nowrap' }}>
                                     <button className="btn" onClick={() => setEdit({ id: t.id, name: t.name, color: t.color ?? null })}>✎</button>
-                                    <button className="btn danger" onClick={() => setDeleteConfirm({ id: t.id, name: t.name })}>🗑</button>
+                                    <button className="btn danger" onClick={() => setDeleteConfirm({ id: t.id, name: t.name, usage: t.usage })}>🗑</button>
                                 </td>
                             </tr>
                         ))}
@@ -64,32 +65,18 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
                     />
                 )}
                 {deleteConfirm && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12 }}>
-                            <ModalHeader
-                              title="Tag löschen"
-                              onClose={() => setDeleteConfirm(null)}
-                              closeOnEscape={false}
-                            />
-                            <div>Den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?</div>
-                            <div className="helper">Hinweis: Der Tag wird aus allen Buchungen entfernt.</div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
-                                <button className="btn danger" onClick={async () => {
-                                    try {
-                                        await (window as any).api?.tags?.delete?.({ id: deleteConfirm.id })
-                                        notify('success', `Tag "${deleteConfirm.name}" gelöscht`)
-                                        setDeleteConfirm(null)
-                                        await refresh()
-                                        window.dispatchEvent(new Event('tags-changed'))
-                                        onChanged?.()
-                                    } catch (e: any) {
-                                        notify('error', e?.message || String(e))
-                                    }
-                                }}>Ja, löschen</button>
-                            </div>
-                        </div>
-                    </div>
+                    <TagDeleteModal tag={deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={async () => {
+                        try {
+                            await (window as any).api?.tags?.delete?.({ id: deleteConfirm.id })
+                            notify('success', `Tag "${deleteConfirm.name}" gelöscht`)
+                            setDeleteConfirm(null)
+                            await refresh()
+                            window.dispatchEvent(new Event('tags-changed'))
+                            onChanged?.()
+                        } catch (e: any) {
+                            notify('error', e?.message || String(e))
+                        }
+                    }} />
                 )}
             </div>
         </div>,

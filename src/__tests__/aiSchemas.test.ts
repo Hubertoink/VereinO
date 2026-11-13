@@ -73,6 +73,7 @@ describe('AiBookingAnalysisResult', () => {
       candidates: [
         {
           note: null,
+          masterData: null,
           date: '2026-07-04',
           type: 'OUT',
           sphere: 'IDEELL',

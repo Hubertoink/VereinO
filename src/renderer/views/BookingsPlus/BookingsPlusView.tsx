@@ -6,7 +6,6 @@ import RecentBookingsDropdown from './RecentBookingsDropdown'
 import DateFilterInput from '../../components/common/DateFilterInput'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { IconCalendar, IconTag, IconCategory, IconDots, IconArrowDown, IconArrowUp, IconArrowsExchange, IconChevronLeft, IconChevronsLeft, IconCopy, IconWallet, IconTargetArrow, IconChevronRight, IconFilter, IconPaperclip, IconPencil, IconPlus, IconReceipt2, IconSearch, IconTrash, IconX } from '@tabler/icons-react'
-import type { RendererApi } from '../../../types/api'
 import AttachmentsModal from '../../components/modals/AttachmentsModal'
 import VoucherInfoModal from '../../components/modals/VoucherInfoModal'
 import BookingDetailPopover from '../../components/booking/BookingDetailPopover'
@@ -67,6 +66,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         else if (tab.left < container.left) strip.scrollLeft -= container.left - tab.left
     }, [activeDraftId, bookingDraftTabs.length, showBookingDraftTabs])
     const [filters, setFilters] = useState<Filter>(() => ({ ...emptyFilters, ...externalFilters, from: calendarSelection.from, to: calendarSelection.to }))
+    const [stornoPairIds, setStornoPairIds] = useState<[number, number] | null>(null)
     const q = useDebouncedValue(filters.q.trim(), 250)
     const batchNotify = useCallback((type: 'info' | 'success' | 'error' | 'warn', message: string) => notify(type === 'warn' ? 'info' : type, message), [notify])
     const [classifications, setClassifications] = useState<Array<{ id: number; name: string; color?: string | null }>>([])
@@ -97,7 +97,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         return () => { active = false; unsubscribe() }
     }, [])
     const [total, setTotal] = useState(0)
-    const [summary, setSummary] = useState<Awaited<ReturnType<RendererApi['reports']['summary']>> | null>(null)
+    const [summary, setSummary] = useState<{ byType: Array<{ key: string; gross: number }> } | null>(null)
     const [selected, setSelected] = useState<BookingPlusRow | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -109,13 +109,15 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     const [infoOpen, setInfoOpen] = useState(false)
     const [attachments, setAttachments] = useState<BookingPlusRow | null>(null)
     const [confirm, setConfirm] = useState<BookingPlusRow | null>(null)
+    const confirmRef = useRef<HTMLDivElement>(null)
+    const cancelConfirmRef = useRef<HTMLButtonElement>(null)
     const [busy, setBusy] = useState(false)
     useEffect(() => {
-        if (!confirm || busy) return
-        const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); setConfirm(null) } }
-        window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
-    }, [confirm, busy])
+        if (!confirm) return
+        const previous = document.activeElement as HTMLElement | null
+        cancelConfirmRef.current?.focus()
+        return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }) }
+    }, [confirm])
     const [similarTo, setSimilarTo] = useState<BookingPlusRow | null>(null)
     const [similarRows, setSimilarRows] = useState<BookingPlusRow[]>([])
     const [similarLoading, setSimilarLoading] = useState(false)
@@ -133,6 +135,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     useEffect(() => {
         if (!externalFilters || lastJumpRevision.current === jumpRevision) return
         lastJumpRevision.current = jumpRevision
+        setStornoPairIds(null)
         setFilters({ ...emptyFilters, ...externalFilters }); setPage(1)
         if (externalFilters.from) setMonth(externalFilters.from.slice(0, 7))
         setSelected(null); setMetaEditing(false); setSimilarTo(null)
@@ -142,10 +145,11 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         const target = rows.find(row => row.id === flashId)
         if (target) { setSelected(target); setDetailOpen(true) }
     }, [flashId, rows])
-    const update = (key: keyof Filter, value: string) => { onFilterChange?.(key, value); setFilters(current => ({ ...current, [key]: value })); setPage(1) }
+    const update = (key: keyof Filter, value: string) => { setStornoPairIds(null); onFilterChange?.(key, value); setFilters(current => ({ ...current, [key]: value })); setPage(1) }
     const refresh = useCallback(() => { cache.current.clear(); setRevision(value => value + 1) }, [])
     useEffect(() => addDataChangedListener(['vouchers'], refresh), [refresh])
     useEffect(() => window.api.organizations.onSwitched(() => {
+        setStornoPairIds(null)
         setFilters(emptyFilters); setMonth(isoDate(new Date()).slice(0, 7)); setPage(1); setRows([]); setSummary(null); setTotal(0); setSelected(null); setDetailOpen(false)
         setInfoOpen(false); setMetaEditing(false); setAttachments(null); setConfirm(null); setSimilarTo(null); refresh()
     }), [refresh])
@@ -169,9 +173,9 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     const visibleMonthRange = monthRange(month)
     const monthSelected = filters.from === visibleMonthRange.from && filters.to === visibleMonthRange.to
     const allDates = !filters.from && !filters.to
-    const clearDates = () => { setFilters(current => ({ ...current, from: '', to: '' })); setPage(1) }
-    const selectMonth = () => { if (monthSelected) clearDates(); else { setFilters(current => ({ ...current, ...visibleMonthRange })); setPage(1) } }
-    const payload = useMemo(() => ({
+    const clearDates = () => { setStornoPairIds(null); setFilters(current => ({ ...current, from: '', to: '' })); setPage(1) }
+    const selectMonth = () => { setStornoPairIds(null); if (monthSelected) clearDates(); else { setFilters(current => ({ ...current, ...visibleMonthRange })); setPage(1) } }
+    const payload = useMemo(() => stornoPairIds ? { voucherIds: stornoPairIds } : ({
         q: q || undefined, from: filters.from || undefined, to: filters.to || undefined,
         type: (filters.type || undefined) as BookingPlusRow['type'] | undefined,
         sphere: !generalProfile ? (filters.sphere || undefined) as BookingPlusRow['sphere'] | undefined : undefined,
@@ -180,7 +184,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         budgetId: filters.budget ? Number(filters.budget) : undefined,
         earmarkId: filters.earmark ? Number(filters.earmark) : undefined,
         tag: filters.tag || undefined
-    }), [q, filters.from, filters.to, filters.type, filters.sphere, filters.account, filters.budget, filters.earmark, filters.tag, filters.classification, generalProfile])
+    }), [stornoPairIds, q, filters.from, filters.to, filters.type, filters.sphere, filters.account, filters.budget, filters.earmark, filters.tag, filters.classification, generalProfile])
     const invalidRange = !!(filters.from && filters.to && filters.from > filters.to)
     useEffect(() => {
         let alive = true
@@ -188,16 +192,19 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         setLoading(true); setError('')
         void Promise.all([
             window.api.vouchers.list({ ...payload, limit, offset: (page - 1) * limit, sort, sortBy }),
-            window.api.reports.summary(payload)
+            stornoPairIds ? Promise.resolve(null) : window.api.reports.summary(payload)
         ]).then(([result, totals]) => {
             if (!alive) return
             const last = Math.max(1, Math.ceil(result.total / limit))
             if (page > last) { setPage(last); return }
-            setRows(result.rows); setTotal(result.total); setSummary(totals)
+            setRows(result.rows); setTotal(result.total)
+            // A pair contains at most two rows, so its totals can use the exact
+            // filtered result without requesting an unfiltered report summary.
+            setSummary(totals || { byType: ['IN', 'OUT'].map(key => ({ key, gross: result.rows.filter(row => row.type === key).reduce((sum, row) => sum + row.grossAmount, 0) })) })
             setSelected(current => metaEditingRef.current && current ? current : result.rows.find(row => row.id === current?.id) || result.rows[0] || null)
         }).catch((cause: unknown) => { if (alive) { console.error('Buchungen Plus: Laden fehlgeschlagen', cause); setError(String(cause).includes('sortBy') ? 'Die laufende App unterstützt diese Sortierung noch nicht. Bitte VereinO vollständig neu starten.' : 'Buchungen konnten nicht geladen werden. Bitte erneut versuchen.') } }).finally(() => { if (alive) setLoading(false) })
         return () => { alive = false }
-    }, [payload, page, sort, sortBy, revision, invalidRange])
+    }, [payload, page, sort, sortBy, revision, invalidRange, stornoPairIds])
     useEffect(() => {
         if (!similarTo) return
         let alive = true
@@ -239,7 +246,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     }, [narrow, detailOpen, selected?.id, metaEditing])
     useEffect(() => {
         if (!narrow || !detailOpen || attachments || infoOpen || confirm) return
-        inspector.current?.focus({ preventScroll: true })
+        if (!inspector.current?.contains(document.activeElement)) inspector.current?.focus({ preventScroll: true })
         const handle = (event: KeyboardEvent) => {
             if (event.key === 'Escape') { event.preventDefault(); closeDetails() }
             if (event.key === 'Tab') {
@@ -296,7 +303,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     }
     const income = summary?.byType.find(item => item.key === 'IN')?.gross || 0
     const expense = Math.abs(summary?.byType.find(item => item.key === 'OUT')?.gross || 0)
-    const hasActiveFilters = Object.values(filters).some(value => value.trim())
+    const hasActiveFilters = !!stornoPairIds || Object.values(filters).some(value => value.trim())
     const classificationLabel = (row: BookingPlusRow) => generalProfile ? row.primaryClassificationName || '—' : spheres[row.sphere]
     const paymentBadge = (row: BookingPlusRow) => {
         const badge = (label: string, kind: BookingPlusRow['paymentAccountKind'], method: BookingPlusRow['paymentMethod'], color?: string | null) => <span className="bp-payment-badge" style={{ borderColor: color || undefined }}><span className="bp-payment-icon">{kind === 'PAYPAL' ? <IconPayPal size={14} color={color || undefined} /> : kind === 'CASH' || method === 'BAR' ? <IconCash size={14} color={color || undefined} /> : <IconBank size={14} color={color || undefined} />}</span><span>{label}</span></span>
@@ -312,6 +319,17 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         setSimilarTo(null)
         if (key === 'budget') setMoreFiltersOpen(true)
         if (narrow) closeDetails()
+    }
+    const reversalStatus = (row: BookingPlusRow) => {
+        const pair: [number, number] | null = row.originalId ? [row.originalId, row.id] : row.reversedById ? [row.id, row.reversedById] : null
+        if (!pair) return null
+        return <button type="button" className={`bp-reversal-status ${row.originalId ? 'badge-storno' : 'badge-storniert'}`} title="Original und Storno zusammen anzeigen" disabled={loading}
+            onDoubleClick={event => event.stopPropagation()} onClick={event => {
+                event.stopPropagation()
+                if (metaEditing) { notify('info', 'Bitte die Bearbeitung zuerst speichern oder abbrechen.'); return }
+                setFilters({ ...emptyFilters }); setStornoPairIds(pair); setPage(1); setSimilarTo(null)
+                if (narrow) closeDetails()
+            }}>{row.originalId ? `Storno zu #${row.originalVoucherNo || row.originalId}` : `storniert durch #${row.reversedByVoucherNo || row.reversedById}`}</button>
     }
     const paymentMeta = (row: BookingPlusRow) => <>{paymentBadge(row)}{reimbursementIds.has(row.id) && <span className="bp-reimbursement-indicator" role="img" aria-label="Kostenerstattung verknüpft" title="Kostenerstattung verknüpft – Details in der Buchungsansicht"><IconArrowsExchange size={16} /></span>}{(row.fileCount || 0) > 0 && <small><IconPaperclip size={13} />{row.fileCount}</small>}</>
 
@@ -347,6 +365,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
             <div><strong className={`bp-detail-amount ${signedAmount(selected) < 0 ? 'bp-negative' : selected.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(selected))}</strong><h2>{selected.description || 'Ohne Beschreibung'}</h2>{selected.counterparty && <p className="bp-dim"><PartyName name={selected.counterparty} /></p>}</div>
         </div>
         <dl className="bp-detail-facts">
+            {(selected.originalId || selected.reversedById) && <div><dt>Status</dt><dd>{reversalStatus(selected)}</dd></div>}
             <div><dt><IconCalendar size={15} />Datum</dt><dd>{prettyDate(selected.date)}</dd></div>
             <div><dt><IconReceipt2 size={15} />Belegnummer</dt><dd className="bp-detail-voucher"><span>{selected.voucherNo}</span><button type="button" className="btn ghost" aria-label="Belegnummer kopieren" title="Belegnummer kopieren" onClick={() => { navigator.clipboard.writeText(selected.voucherNo).then(() => notify('success', 'Belegnummer kopiert')).catch(() => notify('error', 'Kopieren fehlgeschlagen')) }}><IconCopy size={14} /></button></dd></div>
             <div><dt><IconTag size={15} />Art</dt><dd><span className={`bp-type-badge bp-kind-icon--${selected.type.toLowerCase()}`}>{kinds[selected.type]}</span></dd></div>
@@ -379,6 +398,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     const monthLabel = new Date(`${month}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
     const activeFilterCount = [filters.type, generalProfile ? filters.classification : filters.sphere, filters.account, filters.tag, filters.budget, filters.earmark, filters.from || filters.to].filter(Boolean).length
     const navigateMonth = (offset: number) => {
+        setStornoPairIds(null)
         const date = new Date(`${month}-01T12:00:00`)
         date.setMonth(date.getMonth() + offset)
         const next = isoDate(date).slice(0, 7)
@@ -389,7 +409,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
     const calendarContent = (
                 <section className="bp-calendar" aria-label="Kalender">
                     <div className="bp-calendar-heading"><button className="btn ghost" aria-label="Vorheriger Monat" onClick={() => changeMonth(-1)}><IconChevronLeft size={16} /></button><button className={`bp-month-select${monthSelected ? ' is-active' : ''}`} aria-pressed={monthSelected} title="Monat filtern / Monatsfilter aufheben" onClick={selectMonth}>{new Date(`${month}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</button><button className="btn ghost" aria-label="Nächster Monat" onClick={() => changeMonth(1)}><IconChevronRight size={16} /></button></div>
-                    <div className="bp-days">{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(day => <span className="bp-weekday" key={day}>{day}</span>)}{calendarDays(month).map((day, index) => day ? <button key={day} className={`${filters.from === day && filters.to === day ? 'is-selected' : ''} ${day === isoDate(new Date()) ? 'is-today' : ''}`} aria-label={`${prettyDate(day)}${receiptDays.has(day) ? ' · Buchungen vorhanden' : ''}`} title={receiptDays.has(day) ? 'An diesem Tag gibt es Buchungen' : undefined} aria-pressed={filters.from === day && filters.to === day} onClick={() => { if (filters.from === day && filters.to === day) clearDates(); else { setFilters(current => ({ ...current, from: day, to: day })); setPage(1) } }}>{Number(day.slice(-2))}{receiptDays.has(day) && <span className="bp-receipt-dot" aria-hidden="true" />}</button> : <span key={`empty-${index}`} />)}</div>
+                    <div className="bp-days">{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(day => <span className="bp-weekday" key={day}>{day}</span>)}{calendarDays(month).map((day, index) => day ? <button key={day} className={`${filters.from === day && filters.to === day ? 'is-selected' : ''} ${day === isoDate(new Date()) ? 'is-today' : ''}`} aria-label={`${prettyDate(day)}${receiptDays.has(day) ? ' · Buchungen vorhanden' : ''}`} title={receiptDays.has(day) ? 'An diesem Tag gibt es Buchungen' : undefined} aria-pressed={filters.from === day && filters.to === day} onClick={() => { if (filters.from === day && filters.to === day) clearDates(); else { setStornoPairIds(null); setFilters(current => ({ ...current, from: day, to: day })); setPage(1) } }}>{Number(day.slice(-2))}{receiptDays.has(day) && <span className="bp-receipt-dot" aria-hidden="true" />}</button> : <span key={`empty-${index}`} />)}</div>
                     <button className={`btn ghost bp-all-dates${allDates ? ' is-active' : ''}`} aria-pressed={allDates} onClick={clearDates}>Gesamter Verlauf</button>
                     <div className="bp-calendar-legend">{calendarState === 'loading' ? 'Buchungstage werden geladen …' : calendarState === 'error' ? <button className="btn ghost" onClick={refresh}>Buchungstage erneut laden</button> : <><span className="bp-receipt-dot" />Tag mit Buchungen · unabhängig von Filtern</>}</div>
                 </section>
@@ -421,7 +441,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
                 </div>
                 <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
             </div>
-            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter">{hasActiveFilters && <span>Aktive Filter:</span>}{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
+            <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter">{hasActiveFilters && <span>Aktive Filter:</span>}{stornoPairIds && <button type="button" aria-label="Original + Storno: Filter entfernen" onClick={() => { setStornoPairIds(null); setPage(1) }}>Original + Storno <span aria-hidden="true">×</span></button>}{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
                 const color = activeFilterColors[key]
                 return <button type="button" key={key} style={color ? { background: color, borderColor: color, color: getContrastTextColor(color) } : undefined} aria-label={`${activeFilterLabels[key] || filters[key]}: Filter entfernen`} onClick={() => update(key, '')}>{key === 'account' && activePaymentAccount && paymentFilterIcon(activePaymentAccount, true)}{activeFilterLabels[key] || filters[key]} <span aria-hidden="true">×</span></button>
             })}</div>
@@ -433,9 +453,9 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
                         <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
                         <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
                     </header>
-                    <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} data-voucher-id={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
+                    <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} data-voucher-id={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${row.originalId ? ' bp-row--storno' : row.reversedById ? ' bp-row--storniert' : ''}${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">
                         <time className="bp-date" dateTime={row.date}><strong>{Number(row.date.slice(8, 10))}</strong><span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('de-DE', { month: 'short' })}</span><small>{row.date.slice(0, 4)}</small></time>
-                        <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span><span className="bp-row-payment bp-row-payment--compact">{paymentMeta(row)}</span>{row.originalId || row.reversedById ? <span className="bp-tag">{row.originalId ? 'Storno' : 'Storniert'}</span> : null}{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{assignmentBadges(row)}</span></span>
+                        <span className="bp-row-main"><span className={`bp-kind-icon bp-kind-icon--${row.type.toLowerCase()}`}>{row.type === 'IN' ? <IconArrowDown size={21} /> : row.type === 'OUT' ? <IconArrowUp size={21} /> : <IconArrowsExchange size={21} />}</span><span className="bp-row-text"><strong>{row.description || 'Ohne Beschreibung'}</strong><small>{row.counterparty || row.voucherNo}</small><span className="bp-row-tags"><span className="bp-tag">{classificationLabel(row)}</span><span className="bp-row-payment bp-row-payment--compact">{paymentMeta(row)}</span>{tags((row.tags || []).slice(0, 2))}{(row.tags?.length || 0) > 2 && <span className="bp-tag">+{row.tags!.length - 2}</span>}</span>{reversalStatus(row)}{assignmentBadges(row)}</span></span>
                         <span className="bp-row-payment">{paymentMeta(row)}</span><strong className={`bp-row-amount ${signedAmount(row) < 0 ? 'bp-negative' : row.type === 'IN' ? 'bp-positive' : ''}`}>{signedMoney.format(signedAmount(row))}</strong>
                     </div>)}</div>}
                     </div>
@@ -475,6 +495,30 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
         </section>
         {infoOpen && selected && <VoucherInfoModal voucher={selected} onClose={() => setInfoOpen(false)} suspended={!!attachments} eurFmt={money} fmtDate={fmtDate} notify={notify} budgets={budgets} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} onSaveMeta={saveMeta} onReverse={!blocked ? () => setConfirm(selected) : undefined} onOpenAttachments={() => setAttachments(selected)} />}
         {attachments && <AttachmentsModal voucher={{ voucherId: attachments.id, voucherNo: attachments.voucherNo, date: attachments.date, description: attachments.description || '' }} onClose={() => { setAttachments(null); refresh() }} onChanged={refresh} />}
-        {confirm && <div className="modal-overlay bp-confirm" role="dialog" aria-modal="true" aria-labelledby="bp-confirm-title"><div className="modal"><h2 id="bp-confirm-title">Buchung {allowVoucherDeletion ? 'löschen' : 'stornieren'}?</h2><p>{confirm.voucherNo} · {confirm.description}</p><p>{allowVoucherDeletion ? 'Die Buchung wird endgültig gelöscht.' : 'Die Originalbuchung bleibt erhalten. Es wird eine Gegenbuchung erstellt.'}</p><div className="bp-confirm-actions"><button className="btn" autoFocus disabled={busy} onClick={() => setConfirm(null)}>Abbrechen</button><button className="btn danger" disabled={busy} onClick={() => { void remove() }}>{busy ? 'Wird gespeichert …' : allowVoucherDeletion ? 'Löschen' : 'Stornieren'}</button></div></div></div>}
+        {confirm && <div className="modal-overlay bp-confirm" role="dialog" aria-modal="true" aria-labelledby="bp-confirm-title" aria-describedby="bp-confirm-impact"
+            onClick={event => { if (event.target === event.currentTarget && !busy) setConfirm(null) }}>
+            <div ref={confirmRef} className="modal compact-booking-flyout compact-booking-popup bp-confirm-modal" onKeyDown={event => {
+                if (event.key !== 'Tab') return
+                const buttons = confirmRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+                if (!buttons?.length) { event.preventDefault(); return }
+                const first = buttons[0], last = buttons[buttons.length - 1]
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+            }}>
+                <ModalHeader title={`Buchung ${allowVoucherDeletion ? 'löschen' : 'stornieren'}?`} titleId="bp-confirm-title" onClose={() => setConfirm(null)} closeDisabled={busy} />
+                <div className="bp-confirm-body">
+                    <div className="bp-confirm-booking">
+                        <span className="bp-dim">{confirm.voucherNo}</span>
+                        <strong>{confirm.description || 'Ohne Beschreibung'}</strong>
+                        <span className="bp-confirm-meta"><span>{fmtDate(confirm.date)}</span><strong>{signedMoney.format(signedAmount(confirm))}</strong></span>
+                    </div>
+                    <p id="bp-confirm-impact">{allowVoucherDeletion ? 'Die Buchung wird endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.' : 'Die Originalbuchung bleibt erhalten und wird als storniert markiert. Eine verknüpfte Gegenbuchung gleicht den Betrag aus.'}</p>
+                </div>
+                <footer className="bp-confirm-actions">
+                    <button ref={cancelConfirmRef} type="button" className="btn" disabled={busy} onClick={() => setConfirm(null)}>Abbrechen</button>
+                    <button type="button" className="btn danger" disabled={busy} onClick={() => { void remove() }}>{busy ? 'Wird gespeichert …' : allowVoucherDeletion ? 'Löschen' : 'Stornieren'}</button>
+                </footer>
+            </div>
+        </div>}
     </div>
 }

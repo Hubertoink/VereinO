@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import type { AiMasterDataPermissions } from '../../../../shared/aiMasterDataPolicy'
 import { resolveAiTaskModel } from '../../../../shared/aiModelProfiles'
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
 import type { Notify } from './aiViewTypes'
@@ -12,6 +13,9 @@ import {
 
 export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) {
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
+  const [masterDataSaving, setMasterDataSaving] = useState(false)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const settingsGeneration = useRef(0)
   const [apiKey, setApiKey] = useState('')
   const [mittwaldModels, setMittwaldModels] = useState<string[] | null>(null)
   const [connectionTest, setConnectionTest] = useState<Awaited<
@@ -19,8 +23,14 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
   > | null>(null)
 
   const loadSettings = useCallback(async () => {
+    const generation = ++settingsGeneration.current
+    setSettingsLoaded(false)
+    setMasterDataSaving(false)
     try {
-      setSettings(normalizeAiSettings(await window.api.ai.settings.get()))
+      const loaded = await window.api.ai.settings.get()
+      if (generation !== settingsGeneration.current) return
+      setSettings(normalizeAiSettings(loaded))
+      setSettingsLoaded(true)
     } catch (error: any) {
       notify('error', error?.message || String(error))
     }
@@ -44,6 +54,7 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
       })
       setSettings(
         normalizeAiSettings({
+          masterDataCreation: next.masterDataCreation,
           bookingCommentsEnabled: next.bookingCommentsEnabled,
           hasApiKey: next.hasApiKey,
           model: next.model,
@@ -160,7 +171,22 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
     setMittwaldModels(null)
   }
 
+  const saveMasterDataPermission = async (key: keyof AiMasterDataPermissions, enabled: boolean) => {
+    if (masterDataSaving || !settingsLoaded) return
+    setMasterDataSaving(true)
+    const generation = settingsGeneration.current
+    try {
+      const next = await window.api.ai.settings.set({ masterDataCreation: { [key]: enabled } })
+      if (generation !== settingsGeneration.current) return
+      setSettings(current => ({ ...current, masterDataCreation: next.masterDataCreation }))
+    } catch (error: any) {
+      notify('error', error?.message || 'Freigabe konnte nicht gespeichert werden.')
+    } finally { if (generation === settingsGeneration.current) setMasterDataSaving(false) }
+  }
+
   return {
+    saveMasterDataPermission,
+    masterDataSaving: masterDataSaving || !settingsLoaded,
     settings,
     setSettings,
     apiKey,

@@ -5,6 +5,27 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [4.15.0] - 2026-11-13
+
+### Hinzugefügt
+
+- Im Agent-Kontext lässt sich pro Organisation festlegen, ob die KI Tags, Budgets, Zweckbindungen, Lieferanten und Kunden selbstständig anlegen darf. Tags, Lieferanten und Kunden sind standardmäßig aktiviert; Budgets und Zweckbindungen bleiben zunächst deaktiviert. Bestehende Einträge werden bevorzugt und gespeicherte Einstellungen bleiben erhalten.
+- Belegfotos können in der leeren Rechnungserfassung mit Strg+V eingefügt werden, einschließlich nativer Windows-Bilder aus der Zwischenablage, etwa von Smartphone-Link.
+- In Buchungen Plus zeigt ein Klick auf den Storno-Status Original und Gegenbuchung gemeinsam über alle Zeiträume hinweg. Der Filter „Original + Storno“ lässt sich entfernen; die Summen beziehen sich auf das angezeigte Paar.
+
+### Geändert
+
+- Stornobuchungen und stornierte Originalbuchungen werden in Buchungen Plus farblich unterschieden und zeigen die zugehörige Belegnummer in Liste und Details.
+- Storno- und Tag-Löschdialoge verwenden das gemeinsame Modaldesign. Der Tag-Löschdialog nennt die verknüpften Buchungen und erklärt, dass nur der Tag und seine Zuordnungen entfernt werden.
+- Erneute KI-Prüfungen beim Bankimport berücksichtigen aktuelle Stammdaten und ausdrücklich auch passende, bislang unbenutzte Tags. Freigegebene neue Stammdaten stehen in Buchungsentwürfen und Zuordnungen zur Verfügung.
+
+### Behoben
+
+- Schmale Kategorie- und Zahlwegspalten im klassischen Journal zeigen keine abgeschnittenen Auslassungspunkte mehr neben den Badges.
+- Zufällig gewählte Farben für Budgets und Zweckbindungen sind direkt in der Farbauswahl sichtbar.
+- Lange Beschreibungen im Storno-Tooltip umbrechen korrekt, ohne die Feldbezeichnung auf einzelne Buchstaben zusammenzudrücken.
+- Die Storno-Bestätigung hält den Tastaturfokus im Dialog und gibt ihn beim Schließen an die auslösende Schaltfläche zurück.
+
 ## [4.14.0] - 2026-11-12
 
 ### Geändert

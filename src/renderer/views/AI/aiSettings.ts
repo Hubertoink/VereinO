@@ -1,6 +1,8 @@
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
+import { DEFAULT_AI_MASTER_DATA_PERMISSIONS, normalizeMasterDataPermissions } from '../../../../shared/aiMasterDataPolicy'
 
 export const DEFAULT_AI_SETTINGS: TAiSettingsGetOutput = {
+  masterDataCreation: { ...DEFAULT_AI_MASTER_DATA_PERMISSIONS },
   bookingCommentsEnabled: true,
   hasApiKey: false,
   model: 'gpt-5.5',
@@ -106,6 +108,7 @@ export function normalizeAiSettings(settings: TAiSettingsGetOutput): TAiSettings
   return {
     ...settings,
     bookingCommentsEnabled: settings.bookingCommentsEnabled !== false,
+    masterDataCreation: normalizeMasterDataPermissions(settings.masterDataCreation),
     apiBaseUrl: providerConfig.apiBaseUrl,
     model:
       (usesDiscoveredMittwaldModel && settings.model.trim()) || allowedModels.has(settings.model)

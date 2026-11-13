@@ -42,7 +42,7 @@ function bookingPayload(transaction: BankTransaction, candidate: BankBookingCand
   return VoucherCreateInput.parse({
     date: c.date, type: c.type, sphere: c.sphere,
     primaryClassificationValueId: c.primaryClassificationValueId ?? undefined,
-    description: c.description.trim(), counterparty: c.counterparty ?? transaction.counterparty,
+    description: c.description.trim(), counterparty: c.counterparty ?? transaction.counterparty, partyId: c.partyId ?? null,
     grossAmount: c.grossAmount, vatRate: c.vatRate, paymentMethod: 'BANK', paymentAccountId: transaction.paymentAccountId,
     budgets: c.budgets.map(b => ({ budgetId: b.id, amount: b.amount })),
     earmarks: c.earmarks.map(e => ({ earmarkId: e.id, amount: e.amount })), tags: c.tags.map(t => t.trim()).filter(Boolean),

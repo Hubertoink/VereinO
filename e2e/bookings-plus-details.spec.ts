@@ -252,3 +252,53 @@ test('calendar and filters open without moving the list at desktop and mobile wi
   }
 })
 
+
+for (const width of [1440, 390]) {
+  test(`storno status filters its pair across dates and clears competing filters (${width})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.setContent('<html data-theme="dark"><body><div id="root"></div></body></html>')
+    await page.addStyleTag({ content: styles })
+    await page.evaluate(() => {
+      const base = { sphere: 'IDEELL', grossAmount: 18.58, paymentMethod: 'BAR', tags: [] }
+      ;(window as any).fixtureRows = [
+        { ...base, id: 16, date: '2026-11-13', voucherNo: '2026-11-13_00016', type: 'IN', description: 'Gegenbuchung', originalId: 15, originalVoucherNo: '2026-10-30_00015' },
+        { ...base, id: 15, date: '2026-10-30', voucherNo: '2026-10-30_00015', type: 'OUT', description: 'Lebensmittel', reversedById: 16, reversedByVoucherNo: '2026-11-13_00016' },
+        { ...base, id: 14, date: '2026-10-30', voucherNo: '2026-10-30_00014', type: 'OUT', description: 'Andere Buchung' }
+      ]
+    })
+    await page.addScriptTag({ content: script })
+    await expect(page.locator('.bp-row')).toHaveCount(3)
+    await page.evaluate(() => {
+      const state = window as any
+      state.listCalls = []
+      state.api.vouchers.list = async (filter: any) => {
+        state.listCalls.push(filter)
+        const rows = state.fixtureRows.filter((row: any) => (!filter.voucherIds || filter.voucherIds.includes(row.id)) && (!filter.q || row.description.includes(filter.q)) && (!filter.from || row.date >= filter.from) && (!filter.to || row.date <= filter.to) && (!filter.type || row.type === filter.type))
+        return { rows, total: rows.length }
+      }
+    })
+    await page.getByRole('button', { name: 'Kalender öffnen', exact: true }).click()
+    await page.locator('.bp-month-select').click()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.bp-row')).toHaveCount(2)
+    await page.locator('.bp-row[data-voucher-id="15"]').click()
+    await page.locator('.bp-inspector').getByRole('button', { name: 'storniert durch #2026-11-13_00016', exact: true }).click()
+    await expect(page.locator('.bp-row')).toHaveCount(2)
+    await expect(page.locator('.bp-row[data-voucher-id="16"]')).toBeVisible()
+    await expect(page.locator('.bp-row[data-voucher-id="14"]')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Original + Storno: Filter entfernen' })).toBeVisible()
+    expect(await page.evaluate(() => (window as any).listCalls.filter((call: any) => call.limit === 20).at(-1))).toMatchObject({ voucherIds: [15, 16], offset: 0 })
+    expect(await page.evaluate(() => (window as any).listCalls.filter((call: any) => call.limit === 20).at(-1).from)).toBeUndefined()
+    await expect(page.locator('.bp-totals')).toContainText('0,00')
+    await expect(page.getByRole('button', { name: 'Letzte 10 Einnahmen', exact: true })).toContainText('18,58')
+    await expect(page.getByRole('button', { name: 'Letzte 10 Ausgaben', exact: true })).toContainText('18,58')
+    await page.getByRole('button', { name: 'Original + Storno: Filter entfernen' }).click()
+    await expect(page.locator('.bp-row')).toHaveCount(3)
+    const status = page.locator('.bp-row[data-voucher-id="16"]').getByRole('button', { name: 'Storno zu #2026-10-30_00015', exact: true })
+    await status.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.bp-row')).toHaveCount(2)
+    await expect(page.locator('.bp-row[data-voucher-id="15"]')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Original + Storno: Filter entfernen' })).toBeVisible()
+  })
+}

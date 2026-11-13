@@ -1,3 +1,4 @@
+import { getAiMasterDataPermissions } from './aiMasterDataPolicy'
 import { aiBookingCommentsEnabled } from './aiBookingPolicy'
 import { randomBytes, randomUUID } from 'node:crypto'
 import http, {
@@ -169,6 +170,7 @@ function jsonResource(uri: string, data: unknown) {
 
 function toolSafetyKind(tool: AiAgentTool) {
   if (tool.readOnly) return 'READ_ONLY'
+  if (tool.name === 'master_data_create') return 'MASTER_DATA_CREATE'
   if (/(^memory_upsert$|^auto_rule_upsert$)/.test(tool.name)) return 'MEMORY'
   if (/(reports_export|content_pdf_export)/.test(tool.name)) return 'EXPORT'
   return 'DRAFT'
@@ -244,7 +246,7 @@ function createVereinoMcpServer(input: {
   const server = new McpServer(
     { name: 'vereino-agent-mcp', version: '1.0.0' },
     {
-      instructions: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile),
+      instructions: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile, getAiMasterDataPermissions()),
       capabilities: { logging: {} }
     }
   )
@@ -311,7 +313,7 @@ function createVereinoMcpServer(input: {
           role: 'user',
           content: {
             type: 'text',
-            text: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile)
+            text: buildAgentInstructions(aiBookingCommentsEnabled(), input.contextProvider().organization?.profile, getAiMasterDataPermissions())
           }
         }
       ]
@@ -393,7 +395,7 @@ export class VereinoMcpHost {
       .filter(Boolean)
       .join('\n')
       .trim()
-    return text || buildAgentInstructions(aiBookingCommentsEnabled())
+    return text || buildAgentInstructions(aiBookingCommentsEnabled(), undefined, getAiMasterDataPermissions())
   }
 
   // fallow-ignore-next-line unused-class-member -- public MCP host API used by aiAgent.ts and MCP tests

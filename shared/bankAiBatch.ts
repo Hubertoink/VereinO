@@ -40,6 +40,8 @@ export type BankAiSuggestion = {
   occurrenceId?: number | null
   scheduledDate?: string | null
   bookingCandidate?: {
+    partyId?: number | null
+    masterDataCreated?: string[]
     note?: string | null
     date: string
     type: 'IN' | 'OUT'

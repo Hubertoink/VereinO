@@ -325,7 +325,7 @@ export async function runAiAgent(input: {
     const usesMittwaldChatCompletions = settings.provider === 'mittwald'
     const baseRequest = {
       model,
-      instructions: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile),
+      instructions: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile, settings.masterDataCreation),
       tools: providerTools,
       reasoning: { effort: settings.defaultReasoningEffort },
       text: { verbosity: 'medium' }
@@ -333,7 +333,7 @@ export async function runAiAgent(input: {
 
     const mittwaldMessages: any[] = usesMittwaldChatCompletions
       ? [
-          { role: 'system', content: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile) },
+          { role: 'system', content: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile, settings.masterDataCreation) },
           { role: 'user', content: prompt }
         ]
       : []

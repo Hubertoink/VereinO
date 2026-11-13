@@ -1,4 +1,5 @@
 import { currentAiBookingComment } from './aiBookingPolicy'
+import { createAiMasterData, getAiMasterDataPermissions, resolveAiMasterData } from './aiMasterData'
 import { createReimbursementTools } from './aiReimbursementTools'
 import { bankDraftSourceFromTransaction } from '../../../shared/bankDraftSource'
 import { z } from 'zod'
@@ -633,13 +634,26 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
   return [
     ...createReimbursementTools(),
     {
+      name: 'master_data_create',
+      description: 'Legt einen sinnvollen Tag, ein Budget, eine Zweckbindung, einen Lieferanten oder Kunden sofort an, ausschließlich bei aktiver Nutzerfreigabe für diesen Bereich. Verwendet bestehende Einträge wieder. Keine Änderungen oder Löschungen. Budgets starten mit Planbetrag 0; Jahr und Sphäre sind erforderlich. Zweckbindungen benötigen code. Liefert die echte ID zur Verwendung im Buchungsentwurf.',
+      readOnly: false,
+      parameters: toolParameters({
+        kind: { type: 'string', enum: ['tags', 'budgets', 'earmarks', 'suppliers', 'customers'] },
+        name: { type: 'string' }, year: nullableNumber, sphere: { type: ['string', 'null'], enum: ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB', null] }, code: nullableString
+      }, ['kind', 'name']),
+      run: raw => {
+        try { return { ok: true, data: createAiMasterData(raw) } }
+        catch (error) { return { ok: false, warning: error instanceof Error ? error.message : String(error) } }
+      }
+    },
+    {
       name: 'vereino_context_overview',
       description: 'Liefert eine kompakte Übersicht über Verein, Stammdaten, aktuelle Kennzahlen, Konten, Tags, Budgets, Mitglieder-, Rechnungs- und Dauerbuchungsstatus.',
       readOnly: true,
       parameters: toolParameters({}),
       run: () => ({
         ok: true,
-        data: input.context
+        data: { ...input.context, masterDataCreation: getAiMasterDataPermissions() }
       })
     },
     {
@@ -2644,6 +2658,9 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         paymentMethod: { type: ['string', 'null'], enum: ['BAR', 'BANK', null] },
         paymentAccountId: nullableNumber,
         tags: { type: 'array', items: { type: 'string' } },
+        partyId: nullableNumber,
+        budgets: { type: 'array', items: toolParameters({ id: { type: 'number' }, amount: { type: 'number' } }, ['id', 'amount']) },
+        earmarks: { type: 'array', items: toolParameters({ id: { type: 'number' }, amount: { type: 'number' } }, ['id', 'amount']) },
         note: nullableString
       }, ['date', 'type', 'description', 'grossAmount']),
       run: (rawArgs) => {
@@ -2661,6 +2678,9 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           paymentMethod: z.enum(['BAR', 'BANK']).nullable().optional(),
           paymentAccountId: z.number().nullable().optional(),
           tags: z.array(z.string()).optional(),
+          partyId: z.number().int().positive().nullable().optional(),
+          budgets: z.array(z.object({ id: z.number().int().positive(), amount: z.number().positive() })).max(5).optional(),
+          earmarks: z.array(z.object({ id: z.number().int().positive(), amount: z.number().positive() })).max(5).optional(),
           note: z.string().nullable().optional()
         }), rawArgs)
         const categoryWarning = requireValidCategory(args.primaryClassificationValueId)
@@ -2679,6 +2699,9 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
         const account = paymentAccountId
           ? listPaymentAccounts({ activeOnly: true } as any).find((item: any) => Number(item.id) === Number(paymentAccountId))
           : null
+        const resolved = resolveAiMasterData({ date: source?.bookingDate ?? args.date,
+          sphere: isGeneralOrganization ? 'IDEELL' : args.sphere || 'IDEELL', grossAmount: args.grossAmount,
+          tags: args.tags || [], budgets: args.budgets || [], earmarks: args.earmarks || [] })
         const draft = {
           date: source?.bookingDate ?? args.date,
           type: args.type,
@@ -2696,11 +2719,14 @@ export function createAiAgentTools(input: { context: AiContext }): AiAgentTool[]
           paymentMethod: bank ? 'BANK' : args.paymentMethod ?? (account?.kind === 'CASH' ? 'BAR' : account ? 'BANK' : null),
           paymentAccountId,
           paymentAccountName: source?.paymentAccountName ?? account?.name ?? null,
-          tags: args.tags || []
+          partyId: args.partyId ?? null,
+          budgets: resolved.budgets.map(item => ({ budgetId: item.id, amount: item.amount })),
+          earmarksAssigned: resolved.earmarks.map(item => ({ earmarkId: item.id, amount: item.amount })),
+          tags: resolved.tags
         }
         return {
           ok: true,
-          data: { message: 'Buchungsentwurf vorbereitet. Speicherung erfolgt erst im Buchungsmodal.' },
+          data: { message: 'Buchungsentwurf vorbereitet. Speicherung erfolgt erst im Buchungsmodal.', warnings: resolved.warnings, masterDataCreated: resolved.masterDataCreated },
           draft: {
             kind: 'booking',
             title: args.description,

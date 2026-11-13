@@ -1652,7 +1652,7 @@ function BankAiSuggestionModal({
       )
       if (!nextSuggestion) throw new Error('Die KI hat keinen aktualisierten Vorschlag zurückgegeben.')
       setSuggestion(nextSuggestion as BankAiSuggestion)
-      notify('success', 'KI-Vorschlag wurde mit den aktuellen Treffern neu erstellt.')
+      notify('success', 'Die KI hat den Bankbeleg mit aktuellen Tags, Stammdaten und Treffern erneut geprüft.')
       onChanged()
     } catch (reason: any) {
       notify('error', reason?.message || String(reason))
@@ -1677,6 +1677,7 @@ function BankAiSuggestionModal({
             grossAmount: candidate.grossAmount,
             vatRate: candidate.vatRate ?? 0,
             counterparty: transaction.counterparty?.trim() || candidate.counterparty?.trim() || '',
+            partyId: candidate.partyId ?? null,
             description: candidate.description,
             note: candidate.note || '',
             paymentMethod: candidate.paymentMethod || 'BANK',

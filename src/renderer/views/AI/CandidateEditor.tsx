@@ -190,6 +190,7 @@ export function CandidateEditor({
           })}
         </div> : null}
 
+        {!!candidate.masterDataCreated?.length && <p className="ai-review-note-evidence">Von der KI angelegt: {candidate.masterDataCreated.join(' · ')}</p>}
         {candidate.warnings?.length || candidate.evidence?.length ? <div className="ai-review-notes">
           {candidate.warnings?.map((warning, index) => <p key={`w-${index}`} className={warningClassName(warning)}>{warning}</p>)}
           {candidate.evidence?.map((item, index) => <p key={`e-${index}`} className="ai-review-note-evidence">{item}</p>)}

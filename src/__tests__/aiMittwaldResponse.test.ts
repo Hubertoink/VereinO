@@ -19,6 +19,7 @@ jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(
 import { getSetting, setSetting } from '../../electron/main/services/settings'
 import { createAiResponse, getAiSettings, setAiSettings, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
 import { AI_BOOKING_COMMENTS_SETTING } from '../../shared/aiBookingPolicy'
+import { AI_MASTER_DATA_SETTING } from '../../shared/aiMasterDataPolicy'
 
 const structuredRequest = {
   model: 'Qwen3.6-35B-A3B-FP8', input: 'Prüfe die Belege.',
@@ -34,6 +35,18 @@ beforeEach(() => {
   jest.mocked(getSetting).mockImplementation(((key: string) => ({
     'ai.openai.provider': 'mittwald', 'ai.openai.apiKey': 'test-key'
   } as Record<string, unknown>)[key]) as any)
+})
+
+it('persists each master data permission independently without resetting other grants', () => {
+  const store = new Map<string, unknown>()
+  jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
+  jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
+  expect(getAiSettings().masterDataCreation).toEqual({ tags: true, budgets: false, earmarks: false, suppliers: true, customers: true })
+  setAiSettings({ masterDataCreation: { tags: true } })
+  setAiSettings({ masterDataCreation: { customers: true } })
+  setAiSettings({ masterDataCreation: { tags: false } })
+  expect(store.get(AI_MASTER_DATA_SETTING)).toEqual({ tags: false, budgets: false, earmarks: false, suppliers: true, customers: true })
+  expect(getAiSettings().masterDataCreation.customers).toBe(true)
 })
 
 it('honors a structured request budget instead of capping it at 2048 tokens', async () => {
@@ -117,6 +130,30 @@ it('gives bank reviews the payment participant and applicable booking rules', as
   expect(context.aiRules).toEqual([{ id: 1, name: 'Getränke', scope: 'ALL', instruction: 'Getränke Fessler als Getränke und Tickets behandeln.' }])
   expect(transactions[0]).toMatchObject({ counterparty: 'Getränke Fessler', counterpartyIban: 'DE123', purpose: '26N0773 SecureGo plus: GENODE61SPE' })
   expect(prompt).toContain('Pruefe ihre Bedingungen auch gegen counterparty')
+})
+
+it('sends another bank review with newly available unused tags and preserves the returned selection', async () => {
+  const suggestion = (tags: string[]) => completion(JSON.stringify({ suggestions: [{
+    transactionId: 77, action: 'CREATE_BOOKING', reason: 'Getränkeeinkauf für den Jugendtreff.',
+    bookingCandidate: { date: '2026-08-03', type: 'OUT', sphere: 'IDEELL',
+      description: 'Getränke Jugendtreff August · EDEKA Höchstädt', grossAmount: 86.4, tags }
+  }] }))
+  mockChatCreate.mockResolvedValueOnce(suggestion([])).mockResolvedValueOnce(suggestion(['Getränke']))
+  const transactions = [{ id: 77, bookingDate: '2026-08-03', direction: 'OUT' as const, amount: 86.4,
+    counterparty: 'EDEKA Höchstädt', purpose: 'Getränke Jugendtreff August', matches: [] }]
+  const first = await reviewBankImportTransactions({ transactions, context: { tags: [] } })
+  const tag = { id: 4, name: 'Getränke', usage: 0 }
+  const second = await reviewBankImportTransactions({ transactions, context: { tags: [tag] } })
+
+  expect(mockChatCreate).toHaveBeenCalledTimes(2)
+  const contexts = mockChatCreate.mock.calls.map(([request]) => {
+    const prompt = request.messages.find((message: any) => message.role === 'user').content[0].text as string
+    return JSON.parse(prompt.split('VereinO-Kontext:\n')[1].split('\n\nOffene Bankbelege')[0])
+  })
+  expect(contexts[0].tags).toEqual([])
+  expect(contexts[1].tags).toEqual([tag])
+  expect(first.result.suggestions[0].bookingCandidate?.tags).toEqual([])
+  expect(second.result.suggestions[0].bookingCandidate?.tags).toEqual(['Getränke'])
 })
 
 it('checks structured JSON during the Mittwald connection test', async () => {

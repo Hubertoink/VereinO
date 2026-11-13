@@ -80,6 +80,9 @@ function cleanInvoke<Path extends RendererInvokePath>(
 }
 
 const rendererApi = {
+  clipboard: {
+    readImage: () => cleanInvoke('clipboard.readImage')
+  },
   window: {
     minimize: () => invoke('window.minimize'),
     toggleMaximize: () => invoke('window.toggleMaximize'),

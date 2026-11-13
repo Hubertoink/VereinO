@@ -3403,6 +3403,11 @@ table {
   white-space: nowrap;
 }
 
+/* Avoid a second, partially clipped ellipsis beside category/payment badges. */
+.journal-table td.journal-badge-cell {
+  text-overflow: clip;
+}
+
 /* Allow description column to wrap and take remaining space */
 .journal-table td:has(> div) {
   /* Description cell with tags */
@@ -6222,6 +6227,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
   font-weight: 700;
   color: var(--text);
 }
+
+.journal-storno-tooltip { width: min(420px, calc(100vw - 32px)); min-width: 0; max-width: calc(100vw - 32px); }
+.journal-storno-tooltip .tooltip-modal__row { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: start; }
+.journal-storno-tooltip .tooltip-modal__key { white-space: nowrap; }
+.journal-storno-tooltip .tooltip-modal__dot { flex-shrink: 0; }
+.journal-storno-tooltip .tooltip-modal__val { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: right; }
 
 .journal-usage-tooltip .tooltip-modal__hint {
   margin-top: 12px;
@@ -9947,6 +9958,8 @@ label .req-asterisk {
 /* Custom color button */
 .custom-color-btn {
   height: 28px;
+  background: var(--swatch-color, var(--muted));
+  color: var(--swatch-text, var(--text));
 }
 
 /* TagsEditor */
@@ -10024,6 +10037,47 @@ label .req-asterisk {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Shared tag deletion confirmation */
+.modal.compact-booking-popup.tag-delete-modal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+}
+
+.tag-delete-modal__body {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tag-delete-modal__body p { margin: 0; }
+
+.tag-delete-modal__impact {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--warning) 35%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--warning) 8%, var(--surface));
+}
+
+.tag-delete-modal__impact > svg { flex-shrink: 0; color: var(--warning); margin-top: 2px; }
+.tag-delete-modal__impact p { margin-top: 6px; }
+
+.tag-delete-modal__actions {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
 }
 
 /* Color picker modal */

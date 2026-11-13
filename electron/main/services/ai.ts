@@ -1,4 +1,5 @@
 import { AI_BOOKING_COMMENTS_SETTING, aiClassificationInstruction, aiBookingComment, aiBookingCommentInstruction, filterOptionalAssignmentWarnings } from '../../../shared/aiBookingPolicy'
+import { AI_MASTER_DATA_SETTING, aiMasterDataInstruction, normalizeMasterDataPermissions, type AiMasterDataPermissions } from '../../../shared/aiMasterDataPolicy'
 import type { BankAiAnalysisProgress } from '../../../shared/bankAiReviewProgress'
 import { safeStorage, session } from 'electron'
 import { visibleAiText } from '../../../shared/aiVisibleText'
@@ -107,6 +108,7 @@ type AiStoredSecret = {
 }
 
 export type AiSettings = {
+  masterDataCreation: AiMasterDataPermissions
   bookingCommentsEnabled: boolean
   hasApiKey: boolean
   model: string
@@ -331,6 +333,7 @@ export function getAiSettings(): AiSettings {
   const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
     bookingCommentsEnabled: getSetting(AI_BOOKING_COMMENTS_SETTING) !== false,
+    masterDataCreation: normalizeMasterDataPermissions(getSetting(AI_MASTER_DATA_SETTING)),
     hasApiKey: !!apiKey.trim(),
     model,
     textModel,
@@ -346,6 +349,7 @@ export function getAiSettings(): AiSettings {
 }
 
 export function setAiSettings(input: {
+  masterDataCreation?: Partial<AiMasterDataPermissions>
   bookingCommentsEnabled?: boolean
   apiKey?: string
   model?: string
@@ -402,10 +406,12 @@ export function setAiSettings(input: {
     setSetting(PROXY_BYPASS_SETTING, input.proxyBypassRules.trim())
   }
   if (input.bookingCommentsEnabled !== undefined) setSetting(AI_BOOKING_COMMENTS_SETTING, input.bookingCommentsEnabled)
+  if (input.masterDataCreation !== undefined) setSetting(AI_MASTER_DATA_SETTING, normalizeMasterDataPermissions({ ...current.masterDataCreation, ...input.masterDataCreation }))
   const next = getAiSettings()
   return {
     ok: true,
     bookingCommentsEnabled: next.bookingCommentsEnabled,
+    masterDataCreation: next.masterDataCreation,
     hasApiKey: next.hasApiKey,
     model: next.model,
     textModel: next.textModel,
@@ -1152,6 +1158,7 @@ export async function analyzeBookingDocuments(input: {
     'Du bist ein vorsichtiger Buchungsassistent für die im Kontext beschriebene Organisation.',
     aiClassificationInstruction(input.context.organization?.profile),
     aiBookingCommentInstruction(settings.bookingCommentsEnabled),
+    aiMasterDataInstruction(settings.masterDataCreation),
     'Extrahiere aus den angehaengten Belegen, Rechnungen oder Tabellen Buchungsvorschlaege fuer VereinO.',
     'Jede angehaengte Quelle ist eine eigenstaendige Quelleinheit. Mehrseitige PDFs wurden vorab seitenweise getrennt.',
     'Vermische niemals Inhalte aus verschiedenen Quelleinheiten in einem Kandidaten.',
@@ -1163,7 +1170,7 @@ export async function analyzeBookingDocuments(input: {
     'counterparty ist der externe Geschäftspartner. counterpartyIban ist ausschließlich dessen vollständig und eindeutig in der Quelle angegebene IBAN. Keine eigene IBAN der Organisation, keine Kontonummer aus Stammdaten und keine unklare oder unvollständige IBAN übernehmen; dann counterpartyIban null setzen. Bei mehreren Konten nur ein eindeutig zugehöriges Konto übernehmen, sonst null.',
     'Nutze Kategorie-, Budget-, Zweckbindungs- und Konto-IDs nur aus dem bereitgestellten Kontext.',
     'Bei Organisationen mit profile GENERAL ist primaryClassificationValueId verpflichtend: wähle ausschließlich eine passende Kategorie aus primaryClassifications. sphere bleibt aus technischen Gründen IDEELL.',
-    'Bei Tags: Nutze vorhandene VereinO-Tags, wenn sie passen. Wenn eine Datei eine Tag-/Kategorie-Spalte mit einem noch nicht vorhandenen Tag enthaelt, uebernimm den Tag-Namen trotzdem als vorgeschlagenen Tag und ergaenze eine Warnung, dass der Tag vor dem Buchen angelegt werden muss.',
+    'Bei Tags: Nutze vorhandene VereinO-Tags, wenn sie passen. Neue Tags nur gemäß der Freigabe für automatische Stammdatenanlage vorschlagen. Ohne Freigabe vorhandene Tags verwenden.',
     'Wende aktive aiRules mit Geltungsbereich ALL oder BOOKINGS verbindlich an, sobald ihre beschriebene Bedingung erfüllt ist. Nutze dabei nur vorhandene Stammdaten-IDs.',
     'Wenn ein Feld unsicher ist, waehle den plausibelsten Wert und ergaenze eine Warnung.',
     'Betrage werden in Euro als positive Zahlen geliefert. Ausgabe/Einnahme steckt in type.',
@@ -1198,6 +1205,8 @@ export async function analyzeBookingDocuments(input: {
     result: (() => {
       const result = AiBookingAnalysisResult.parse(parseStructured(response, AiBookingAnalysisResultStructured))
       return { ...result, warnings: filterOptionalAssignmentWarnings(result.warnings), candidates: result.candidates.map(candidate => ({ ...candidate,
+        partyId: undefined,
+        masterDataCreated: [],
         note: aiBookingComment(settings.bookingCommentsEnabled, candidate.note),
         warnings: filterOptionalAssignmentWarnings(candidate.warnings)
       })) }
@@ -1775,6 +1784,7 @@ export async function reviewBankImportTransactions(input: {
     'Du bist ein vorsichtiger Bankimport-Assistent für die im Kontext beschriebene Organisation.',
     aiClassificationInstruction(input.context.organization?.profile),
     aiBookingCommentInstruction(settings.bookingCommentsEnabled),
+    aiMasterDataInstruction(settings.masterDataCreation),
     'Denke wie ein Kassier: Jeder offene Bankbeleg soll entweder mit einer vorhandenen Buchung verknuepft, als neue Buchung vorbereitet, als nicht buchungsrelevant markiert oder bewusst manuell geklaert werden. Lass Bankbelege nicht unverbunden, wenn du eine Buchung daraus erzeugst.',
     'Pruefe offene Bankbelege und entscheide pro Beleg genau eine Aktion:',
     '- LINK_EXISTING: wenn eine vorhandene Buchung sehr wahrscheinlich passt.',
@@ -1805,6 +1815,7 @@ export async function reviewBankImportTransactions(input: {
     'Nutze fuer neue Buchungsvorschlaege Zahlungskonto, Datum, Betrag und Richtung des Bankbelegs.',
     'Die Bankrichtung ist verbindlich: direction IN entspricht einem positiven Bankumsatz und erzwingt bookingCandidate.type IN (Einnahme); direction OUT entspricht einem negativen Bankumsatz und erzwingt bookingCandidate.type OUT (Ausgabe). grossAmount bleibt der positive Absolutbetrag. Zwecktext, Gegenpartei und aiRules duerfen diese Richtung niemals umkehren. Auch ein Eingang mit Zweck "Kauf Lastenanhaenger" bleibt eine Einnahme, etwa eine Erstattung oder ein Zuschuss. Erfinde keinen Zahlungsgrund; bei unklarer Zuordnung benenne die Unsicherheit oder nutze NEEDS_MANUAL_REVIEW.',
     'Übernimm counterparty und counterpartyIban für neue Buchungsvorschläge aus dem jeweiligen Bankbeleg. counterpartyIban ist das Gegenkonto, niemals das eigene Zahlungskonto. Fehlt sie, setze null.',
+    'Prüfe bei jedem CREATE_BOOKING die aktuell im Kontext vorhandenen tags anhand von purpose, counterparty und passenden aiRules. Übernimm eindeutig passende Tags mit ihrem exakten Namen in bookingCandidate.tags. Auch neu angelegte Tags mit usage 0 sind gültige Kandidaten; eine bisher fehlende Nutzung ist kein Ausschlussgrund. Beispiel: Ein Getränkeeinkauf mit Zweck "Getränke Jugendtreff August" passt zum vorhandenen Tag "Getränke". Bei bloßer Wortähnlichkeit oder unklarem Bezug keinen Tag wählen. Neue Tags nur gemäß der Freigabe für automatische Stammdatenanlage vorschlagen.',
     'Wenn keine passende optionale Budget-/Zweckbindungszuordnung erkennbar ist, lasse die Listen ohne Warnung leer. Beachte ausdrücklich verlangte Zuordnungen aus aiRules.',
     'Betrage werden positiv geliefert; Ausgabe/Einnahme steckt in type.',
     'Halte reason, warnings und evidence kurz. Liefere fuer jeden mitgegebenen Bankbeleg genau einen Vorschlag und keine weiteren Bankbelege.',
@@ -1872,6 +1883,8 @@ export async function reviewBankImportTransactions(input: {
     suggestions: validated.suggestions.map(suggestion => ({ ...suggestion,
       warnings: filterOptionalAssignmentWarnings(suggestion.warnings),
       bookingCandidate: suggestion.bookingCandidate ? { ...suggestion.bookingCandidate,
+        partyId: undefined,
+        masterDataCreated: [],
         note: aiBookingComment(settings.bookingCommentsEnabled, suggestion.bookingCandidate.note),
         warnings: filterOptionalAssignmentWarnings(suggestion.bookingCandidate.warnings)
       } : suggestion.bookingCandidate

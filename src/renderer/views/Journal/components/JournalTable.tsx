@@ -235,7 +235,7 @@ function StornoHover({ linkedId, title, eurFmt, fmtDate, getVoucher, onClick, ch
     return (
         <HoverTooltip<HTMLButtonElement>
             content={<TooltipList title={title} rows={tooltipRows} hint={loading ? 'Lädt…' : voucher ? 'Klick zeigt Original und Storno.' : 'Zum Laden hovern.'} />}
-            className="tooltip-modal journal-usage-tooltip"
+            className="tooltip-modal journal-usage-tooltip journal-storno-tooltip"
             preferredPlacement="top"
         >
             {({ ref, props }) => (
@@ -789,7 +789,7 @@ export default function JournalTable({
         ) : k === 'type' ? (
             <td key={k}><span className={`badge voucher-type-badge voucher-type-badge--${r.type.toLowerCase()} ${r.type.toLowerCase()}`}>{r.type}</span></td>
         ) : k === 'sphere' ? (
-            <td key={k}>{r.type === 'TRANSFER' ? '' : isGeneralProfile ? <span className="badge" style={{ background: r.primaryClassificationColor || 'var(--muted)', color: '#fff' }}>{r.primaryClassificationIcon ? `${r.primaryClassificationIcon} ` : ''}{r.primaryClassificationName || '—'}</span> : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
+            <td key={k} className="journal-badge-cell">{r.type === 'TRANSFER' ? '' : isGeneralProfile ? <span className="badge" style={{ background: r.primaryClassificationColor || 'var(--muted)', color: '#fff' }}>{r.primaryClassificationIcon ? `${r.primaryClassificationIcon} ` : ''}{r.primaryClassificationName || '—'}</span> : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (
             <td key={k}>
                 <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -924,7 +924,7 @@ export default function JournalTable({
                 })()}
             </td>
         ) : k === 'paymentMethod' ? (
-            <td key={k}>
+            <td key={k} className="journal-badge-cell">
                 {r.type === 'TRANSFER' ? (
                     (() => {
                         const from = r.transferFrom

@@ -82,6 +82,7 @@ export default function BankAiDraftComparison({ transaction, candidate }: {
         {hasBudgets && <div><dt>Budgets</dt><dd>{allocations(candidate.budgets!, budgets, 'Budget')}</dd></div>}
         {hasBindings && <div><dt>Zweckbindungen</dt><dd>{allocations(candidate.earmarks!, bindings, 'Zweckbindung')}</dd></div>}
         {!!candidate.tags?.length && <div><dt>Tags</dt><dd className="bank-draft-tags">{candidate.tags.map(tag => <span key={tag}>{tag}</span>)}</dd></div>}
+        {!!candidate.masterDataCreated?.length && <div><dt>Von der KI angelegt</dt><dd>{candidate.masterDataCreated.join(' · ')}</dd></div>}
         {!hasBudgets && !hasBindings && !candidate.tags?.length && <div><dt>Zuordnungen</dt><dd className="bank-draft-empty">Keine vorgeschlagen</dd></div>}
       </dl> : <p>Kein Buchungsentwurf verfügbar. Bitte die KI erneut prüfen lassen.</p>}
     </section>

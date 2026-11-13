@@ -271,6 +271,8 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
   const [busy, setBusy] = useState(false)
   const {
     settings,
+    saveMasterDataPermission,
+    masterDataSaving,
     setSettings,
     apiKey,
     connectionTest,
@@ -1115,6 +1117,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
             vatRate: reviewCandidate.vatRate ?? 0,
             description: reviewCandidate.description,
             counterparty: reviewCandidate.counterparty || '',
+            partyId: reviewCandidate.partyId ?? null,
             partyCreationSource: { name: reviewCandidate.counterparty || '', iban: reviewCandidate.counterpartyIban },
             note: reviewCandidate.note || '',
             paymentMethod: reviewCandidate.paymentMethod ?? null,
@@ -5225,7 +5228,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
           role="dialog"
           aria-label="Agent-Kontext"
         >
-          <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules} />
+          <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules}
+            permissions={settings.masterDataCreation} savingPermissions={masterDataSaving}
+            onPermissionChange={saveMasterDataPermission} />
         </section>
       )}
 

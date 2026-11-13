@@ -1,4 +1,4 @@
-import ModalHeader from '../../../components/ModalHeader'
+import TagDeleteModal, { TagDeleteTarget } from '../../../components/modals/TagDeleteModal'
 import React from 'react'
 import { IconPencil, IconTag } from '@tabler/icons-react'
 import { TagsPaneProps } from '../types'
@@ -12,7 +12,7 @@ import { IconTrash } from '../../../utils/icons'
  */
 export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDataVersion }: TagsPaneProps) {
   const [editTag, setEditTag] = React.useState<TagValue | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = React.useState<{ id: number; name: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = React.useState<TagDeleteTarget | null>(null)
   const [busy, setBusy] = React.useState(false)
 
   // Refresh tags with usage counts
@@ -35,18 +35,17 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
     refreshTags()
   }, [])
 
-  async function deleteTag(id: number, name: string) {
+  async function deleteTag(id: number) {
     try {
       const res = await window.api?.tags?.delete?.({ id })
       if (res?.id) {
         setTagDefs(prev => prev.filter(t => t.id !== id))
         notify('success', 'Tag gelöscht')
         bumpDataVersion()
+        setDeleteConfirm(null)
       }
     } catch (e: any) {
       notify('error', e?.message || String(e))
-    } finally {
-      setDeleteConfirm(null)
     }
   }
 
@@ -141,7 +140,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                   </button>
                   <button 
                     className="btn ghost btn-trash" 
-                    onClick={() => setDeleteConfirm({ id: t.id, name: t.name })} 
+                    onClick={() => setDeleteConfirm({ id: t.id, name: t.name, usage: t.usage })}
                     title="Löschen"
                     style={{ padding: '6px 8px' }}
                   >
@@ -164,23 +163,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
       )}
 
       {deleteConfirm && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
-            <ModalHeader
-              title="Tag löschen"
-              onClose={() => setDeleteConfirm(null)}
-              closeLabel="Schließen"
-              closeOnEscape={false}
-            />
-            <div className="helper">
-              Möchtest du den Tag <strong>{deleteConfirm.name}</strong> wirklich löschen?
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setDeleteConfirm(null)}>Abbrechen</button>
-              <button className="btn danger" onClick={() => deleteTag(deleteConfirm.id, deleteConfirm.name)}>Löschen</button>
-            </div>
-          </div>
-        </div>
+        <TagDeleteModal tag={deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={() => deleteTag(deleteConfirm.id)} />
       )}
     </div>
   )

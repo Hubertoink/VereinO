@@ -1,4 +1,5 @@
 import ModalHeader from './ModalHeader'
+import { useInvoicePaste } from '../hooks/useInvoicePaste'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
 import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
@@ -43,6 +44,7 @@ export default function InvoiceBatchControl({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const singleInputRef = useRef<HTMLInputElement | null>(null)
+  const singleSurfaceRef = useRef<HTMLElement | null>(null)
   const allowBatchAutoOpenRef = useRef(true)
   const lastInsidePointerDownRef = useRef<PointerEvent | null>(null)
   const [queue, setQueue] = useState<TAiInvoiceBatchListOutput | null>(null)
@@ -218,6 +220,9 @@ export default function InvoiceBatchControl({
     })
   }
 
+  useInvoicePaste({ enabled: singleOpen, surfaceRef: singleSurfaceRef,
+    onFile: file => openSingleInvoice([file]), onError: setSingleError })
+
   return (
     <div
       className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
@@ -310,7 +315,7 @@ export default function InvoiceBatchControl({
       />
 
       {singleOpen && (
-        <section className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
+        <section ref={singleSurfaceRef} className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
           <ModalHeader
             title="Rechnung erfassen"
             subtitle="Eine Rechnung zur Erkennung auswählen"
@@ -354,7 +359,7 @@ export default function InvoiceBatchControl({
               </svg>
             </span>
             <strong>Rechnung hier ablegen</strong>
-            <span>oder Datei auswählen</span>
+            <span>oder Datei auswählen · Strg+V zum Einfügen</span>
             <small>PDF, PNG, JPG oder WebP · maximal 25 MB</small>
             {singleError && <span className="invoice-single-upload-flyout__error" role="alert">{singleError}</span>}
           </button>
