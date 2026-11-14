@@ -1,9 +1,9 @@
-# Regenerate the checked-in NSIS bitmaps on Windows. No external dependencies.
+# Regenerate the checked-in app PNGs and NSIS bitmaps on Windows. No external dependencies.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $projectDir = Split-Path $PSScriptRoot -Parent
 $brandDir = Join-Path $projectDir 'build'
-$logo = [System.Drawing.Image]::FromFile((Join-Path $brandDir 'icon.png'))
+$logo = [System.Drawing.Image]::FromFile((Join-Path $brandDir 'VereinO_Off_icon.png'))
 
 function Brush([string]$hex) {
     return [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml($hex))
@@ -27,6 +27,19 @@ function New-Canvas([int]$width, [int]$height) {
 }
 
 try {
+    # Keep platform PNGs in sync with the official logo; preserve transparency.
+    foreach ($size in @(256, 1024)) {
+        $bitmap = [System.Drawing.Bitmap]::new($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.Clear([System.Drawing.Color]::Transparent)
+            $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $graphics.DrawImage($logo, 0, 0, $size, $size)
+            $fileName = if ($size -eq 256) { 'icon.png' } else { 'icon-1024.png' }
+            $bitmap.Save((Join-Path $brandDir $fileName), [System.Drawing.Imaging.ImageFormat]::Png)
+        } finally { $graphics.Dispose(); $bitmap.Dispose() }
+    }
+
     # The stock NSIS welcome/finish page expects a 164 x 314 sidebar.
     $sidebar = New-Canvas 164 314
     $canvas = $sidebar.Graphics

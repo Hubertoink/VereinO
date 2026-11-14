@@ -11,6 +11,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 - Der Windows-Installer führt mit VereinO-Branding durch Begrüßung, MIT-Lizenz, Installationsart und Zielordner. Automatische Updates verwenden weiterhin den bestehenden Update-Ablauf.
 - GitHub und README kennzeichnen VereinO als Open Source unter der MIT-Lizenz. Der vollständige Lizenztext liegt im Repository und wird mit der Anwendung ausgeliefert.
+- Installer-Grafiken und Plattform-Icons verwenden einheitlich das offizielle blaue VereinO-Logo.
 
 ## [4.15.1] - 2026-11-13
 
