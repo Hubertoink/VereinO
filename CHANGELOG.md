@@ -7,6 +7,17 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-11-14
+
+### Geändert
+
+- Die Abschnitte der Exportoptionen einschließlich Vorschau sind standardmäßig aufgeklappt und lassen sich weiterhin einzeln einklappen.
+
+### Behoben
+
+- Die Exportauswahl bleibt beim Scrollen bündig unter der Titelzeile. Durch die obere und seitlichen Lücken scheint kein Inhalt mehr durch.
+- Die Exportbuttons bleiben auch am Ende des Scrollbereichs an derselben Position und springen nicht mehr nach oben.
+
 ## [4.16.0] - 2026-11-14
 
 ### Hinzugefügt

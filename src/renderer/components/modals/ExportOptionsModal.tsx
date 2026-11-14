@@ -2,7 +2,7 @@ import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import React, { useState, useEffect, useMemo } from 'react'
 
 function ExportSection({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
-  return <details className="export-section"><summary><strong>{title}</strong>{summary && <span>{summary}</span>}</summary><div className="export-section__body">{children}</div></details>
+  return <details className="export-section" open><summary><strong>{title}</strong>{summary && <span>{summary}</span>}</summary><div className="export-section__body">{children}</div></details>
 }
 
 // Preview row type

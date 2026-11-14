@@ -21640,8 +21640,13 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .management-search-toolbar > .btn,
 .management-search-toolbar > .helper { flex-shrink: 0; }
 
-/* Report exports use the available viewport; sections open only when needed. */
-.report-export-panel > .filter-dropdown__content { max-height: none; }
+/* Report exports use the available viewport; sections start expanded and can be collapsed. */
+.report-export-panel > .filter-dropdown__content { max-height: none; padding-block: 0; }
+/* Keep the sticky export tabs flush with the scrollport, including its side padding. */
+.report-export-panel .export-options-flyout > .modal-header-bar.modal-header-bar {
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+}
 .export-section { border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
 .export-section > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; cursor: pointer; padding: 12px 14px; list-style: none; }
 .export-section > summary::before { content: '›'; font-size: 18px; line-height: 1; }
@@ -21651,7 +21656,8 @@ html.receipt-widget-document::before { content: none !important; display: none !
 .export-section__body { padding: 4px 14px 14px; min-width: 0; }
 .export-section__body .field { margin-bottom: 0; }
 .export-pdf-hint { margin: 0; }
-.report-export-panel .export-options-flyout__actions { position: sticky; bottom: -16px; background: var(--surface); padding: 12px 0; z-index: 1; }
+/* No bottom inset in the scrollport: the actions keep the same position at the end. */
+.report-export-panel .export-options-flyout__actions { position: sticky; bottom: 0; background: var(--surface); padding: 12px 0; z-index: 1; }
 /* Theme-aware native selects keep browser keyboard, form and accessibility behavior.
    Multiple/size listboxes deliberately retain their list presentation. */
 @supports (appearance: base-select) {
